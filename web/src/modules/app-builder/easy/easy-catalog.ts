@@ -56,6 +56,33 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
     }]),
   },
   {
+    // AD-02 / S11: قائمة التصنيفات (جيل التطبيق 1.2.0) — كل تصنيف زر يفتح منتجاته. مقيَّد: لا يعرضها تطبيق أقدم من 1.2.0.
+    key: 'categories', category: 'products', status: 'limited', reasonKey: 'easy.reasons.needs120', pages: ['home'],
+    build: () => section([{
+      type: 'CategoryList',
+      id: generateComponentId('CategoryList'),
+      props: { layout: 'grid', columns: 2 },
+      binding: { resource: 'commerce.categories' },
+      children: [{
+        type: 'Button',
+        id: generateComponentId('Button'),
+        optional: true,
+        props: { label: '$item.name', style: 'secondary' },
+        action: { type: 'openCategory', params: { categoryId: '$item.id' } },
+      }],
+    }]),
+  },
+  {
+    // AD-02 / S11: زر يفتح شاشة البحث الأصلية (جيل التطبيق 1.2.0).
+    key: 'search', category: 'navigation', status: 'limited', reasonKey: 'easy.reasons.needs120',
+    build: () => section([{
+      type: 'Button',
+      id: generateComponentId('Button'),
+      props: { label: 'بحث', style: 'secondary' },
+      action: { type: 'openSearch', params: {} },
+    }]),
+  },
+  {
     key: 'cartList', category: 'cart', status: 'ready', pages: ['cart'],
     build: () => section([{
       type: 'CartList',
@@ -101,7 +128,6 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
   },
   { key: 'slider', category: 'content', status: 'proposed', reasonKey: 'easy.reasons.noComponent' },
   { key: 'productGrid', category: 'products', status: 'proposed', reasonKey: 'easy.reasons.noComponent' },
-  { key: 'categories', category: 'products', status: 'proposed', reasonKey: 'easy.reasons.noScreen' },
   { key: 'video', category: 'content', status: 'proposed', reasonKey: 'easy.reasons.noComponent' },
   { key: 'testimonials', category: 'content', status: 'proposed', reasonKey: 'easy.reasons.noComponent' },
   { key: 'myOrders', category: 'cart', status: 'proposed', reasonKey: 'easy.reasons.noScreen' },

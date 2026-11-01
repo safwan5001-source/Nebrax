@@ -36,7 +36,7 @@ void main() {
   test('ComponentRegistry.builders covers exactly RuntimeCapabilities.components', () {
     expect(
       ComponentRegistry.builders.keys.toSet(),
-      RuntimeCapabilities.components.keys.toSet(),
+      {...RuntimeCapabilities.components.keys, ...RuntimeCapabilities.componentsV120.keys},
       reason: 'the rendering registry must implement exactly the identifiers the '
           'capability manifest claims to support — never more, never fewer',
     );

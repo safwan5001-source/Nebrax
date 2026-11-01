@@ -8,6 +8,7 @@ import '../push/push_controller.dart';
 import '../schema/schema.dart';
 import '../startup/startup.dart';
 import 'cart_screen.dart';
+import 'category_screen.dart';
 import 'home_screen.dart';
 import 'product_screen.dart';
 import 'runtime_action_handler.dart';
@@ -15,6 +16,7 @@ import 'runtime_config.dart';
 import 'runtime_schema.dart';
 import 'page_screen.dart';
 import 'runtime_state.dart';
+import 'search_screen.dart';
 import 'runtime_status_views.dart';
 import 'runtime_strings.dart';
 
@@ -347,6 +349,20 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
       ),
       RuntimePage.product => ProductScreen(
         productId: _state.selectedProductId!,
+        client: _client,
+        dispatcher: _dispatcher,
+        locale: widget.locale,
+      ),
+      RuntimePage.category => CategoryScreen(
+        key: ValueKey('category-${_state.selectedCategoryId}'),
+        categoryId: _state.selectedCategoryId!,
+        client: _client,
+        dispatcher: _dispatcher,
+        locale: widget.locale,
+      ),
+      RuntimePage.search => SearchScreen(
+        initialQuery: _state.searchQuery,
+        onQueryChanged: _state.rememberSearchQuery,
         client: _client,
         dispatcher: _dispatcher,
         locale: widget.locale,

@@ -51,6 +51,8 @@ Ledger side is matched at **document level**: lines with the same `source.kind +
 3. **R3** same mirrored direction + amount within P-2 + date within P-1, **unique on both sides** (one candidate each way). Not unique ⇒ `ambiguous`, never a guess.
 4. **Many-to-one** (one payment line vs several invoices, or the reverse): **never automatic.** A reviewer picks the set; the engine only *verifies* that the selected set sums to the line (±P-2) and records it. PS-A2 exposes only the **verification read** ("does this set equal this line?"); persisting a manual decision is PS-A3. The engine may *suggest* candidate sets ("sum of invoices X+Y equals the line") as a hint flagged `suggestion`, never applied.
 
+> **PS-A2c implementation notes (2026-11-02, `reports/IMP-PS-A2c-REPORT.md`):** R1–R3 are built exactly as above on top of `PartnerLedgerCandidates`; `rule` is an ordinal evidence tier (no probability/confidence score is invented). **Not built:** `R-REV` netting of a statement's invoice+cancellation lines against a neutralised pair (proposed as D-PS-15) — a key hit on a neutralised unit is `amount_difference / reversed_in_books`, an incomplete one is `ambiguous / candidate_reversal_incomplete`, never matched. Running a match needs `partner_statements.reconcile` **and** `.view` (no implicit grant). Many-to-one is only suggested (pool ≤ 20, sets of 2–3, ≤ 5 per line, first 200 unresolved lines) and verifiable read-only.
+
 ### 3.4 Outcomes (statement side) and (ledger side)
 | Outcome | Meaning |
 |---|---|

@@ -180,6 +180,7 @@ use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\PartnerStatementImportController;
+use App\Http\Controllers\Api\PartnerStatementMatchController;
 use App\Http\Controllers\Api\StockPermitImportController;
 use App\Http\Controllers\Api\StocktakeCountImportController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -1754,6 +1755,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('partner-statements/import/fields', [PartnerStatementImportController::class, 'fields'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements')]);
         Route::post('partner-statements/import/inspect', [PartnerStatementImportController::class, 'inspect'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
         Route::post('partner-statements/import/preview', [PartnerStatementImportController::class, 'preview'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
+        // IMP-PS-A2c: مطابقة الكشوف — لا أثر مالي. التشغيل `reconcile` (+ معلَّق = قراءة فقط عبر بوابة القدرة)، القراءة والتحقق `view`. رؤية الطرف/الفرع داخل الخدمة.
+        Route::post('partner-statement-reconciliations/{id}/match', [PartnerStatementMatchController::class, 'run'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
+        Route::get('partner-statement-reconciliations/{id}/matches', [PartnerStatementMatchController::class, 'matches'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
+        Route::get('partner-statement-reconciliations/{id}/verify-set', [PartnerStatementMatchController::class, 'verifySet'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements'), 'throttle:60,1']);
         Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

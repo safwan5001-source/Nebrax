@@ -346,3 +346,25 @@ describe('AppBuilderCanvas — S10a ProductList layout', () => {
     expect(renderList({ layout: 'vertical' }).container.querySelector('[data-layout="vertical"]')).toBeTruthy();
   });
 });
+
+describe('AppBuilderCanvas — S11 CategoryList (generation 1.2.0)', () => {
+  const root: AppSchemaComponent = {
+    type: 'Page', id: 'root',
+    children: [{
+      type: 'CategoryList', id: 'cats', props: { layout: 'grid', columns: 3 },
+      binding: { resource: 'commerce.categories', itemProps: {} } as never,
+      children: [{ type: 'Button', id: 'cat-btn', props: { label: '$item.name' }, action: { type: 'openCategory', params: { categoryId: '$item.id' } } }],
+    } as AppSchemaComponent],
+  };
+
+  it('repeats the item template once per sample category, in the requested layout', () => {
+    const { container } = render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+    expect(screen.getByText('المشروبات')).toBeTruthy();
+    expect(screen.getByText('الأدوات')).toBeTruthy();
+    expect(screen.getByText('الهدايا')).toBeTruthy();
+    const grid = container.querySelector('[data-layout="grid"]') as HTMLElement;
+    expect(grid.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+    expect(screen.getByText('Sample data — not your real store data')).toBeTruthy();
+  });
+});
+

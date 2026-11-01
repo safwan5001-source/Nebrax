@@ -1,16 +1,10 @@
+import { normalizeDecimalInput } from '@/lib/decimal-input';
 import { displayLocale } from '@/lib/formatting';
-function normalizedDecimal(input: string | number): string {
-  return String(input)
-    .trim()
-    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-    .replace(/٫/g, '.')
-    .replace(/[,٬\s]/g, '');
-}
-
 /** يحوّل لتر المستخدم إلى mL صحيح لعقد API، ويرفض الكسور الأدق من 3 منازل والقيم السالبة. */
 export function litersToMilliliters(input: string | number, allowZero = false): number | null {
-  const value = normalizedDecimal(input);
-  if (!/^\d+(?:\.\d{1,3})?$/.test(value)) return null;
+  // الفاصلة تُفسَّر عشرية/آلافاً بحسب الشكل؛ الملتبس (مثل `1,500`) يُرفض بدل تخمين 1.5 أو 1500 (انظر decimal-input).
+  const value = normalizeDecimalInput(input, 3);
+  if (value === null || !/^\d+(?:\.\d{1,3})?$/.test(value)) return null;
 
   const [whole, fraction = ''] = value.split('.');
   const result = Number(`${whole}${fraction.padEnd(3, '0')}`);
