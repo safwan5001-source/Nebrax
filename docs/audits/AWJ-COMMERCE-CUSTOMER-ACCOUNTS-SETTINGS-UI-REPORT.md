@@ -83,7 +83,7 @@ CI المستودع (`web-ci.yml`: `npm ci` ← `npm run test` ← `npm run buil
 ## 6. Branch / PR / SHAs
 
 - **Branch:** `feat/commerce-customer-accounts-settings-ui`
-- **PR:** انظر أسفل (يُحدَّث بعد الفتح)
+- **PR:** #1883 — https://github.com/safwan5001-source/Nebrax/pull/1883
 - **Base:** `main` @ `18838967da03c5c4e35021420796783bddc6e5e7`
 - **Head (آخر commit كود):** `0d4eee7f372f41887bf5d62ae22aacef0113266e` — يليه commit هذا التقرير؛ الـ head النهائي هو طرف الفرع في الـ PR.
 
