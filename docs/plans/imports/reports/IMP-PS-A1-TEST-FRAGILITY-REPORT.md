@@ -1,6 +1,6 @@
 # IMP-PS-A1 — test-only fix: structural privacy assertion in the job-read test
 
-**Scope:** one test, `PartnerStatementImportTest::reading_a_statement_job_requires_partner_visibility_and_the_stored_result_carries_no_partner_data`. **No application, permission, route, migration or behaviour change.** Base: `main@abacd29fc4ecaf4af5994e8ca592cb692408d0f0` (branch cut from the then-current `main`).
+**Scope:** one test, `PartnerStatementImportTest::reading_a_statement_job_requires_partner_visibility_and_the_stored_result_carries_no_partner_data`. **No application, permission, route, migration or behaviour change.** Base: `main@b5462eea5` (current `main` when cut; it contains the PS merge `abacd29`).
 
 ## Problem
 The test asserted that the raw JSON body of the job responses does not contain the substrings `115000` and `1150`. The body carries random UUIDs and a SHA-256, so a UUID such as `…-ff95a01150ad` makes the test fail by chance (observed once in a wide local run; ≈ 0.3 % per run). The privacy guarantee it protects (a completed statement job exposes no partner data) was never in doubt.
