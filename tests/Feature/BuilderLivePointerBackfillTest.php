@@ -191,6 +191,27 @@ class BuilderLivePointerBackfillTest extends TestCase
     }
 
     /** @test */
+    public function the_backfill_write_is_create_only_so_it_never_undoes_a_promotion_made_after_planning(): void
+    {
+        config(['app_builder.live_pointer_enabled' => true]);
+        $a = $this->store('bf-race');
+        $first = $this->publish($a['tenant_id'], 'planned', 1);
+        $app = BuilderApp::withoutGlobalScopes()->where('tenant_id', $a['tenant_id'])->first();
+        $chosen = $this->publish($a['tenant_id'], 'admin-choice', 2, $app);
+
+        // المعاينة/التخطيط قالت would_create لـ$chosen (الأحدث)... ثم رقّى مدير نسخة أخرى قبل التنفيذ:
+        app(TenantContext::class)->set($a['tenant_id']);
+        $service = app(\App\Services\AppBuilder\BuilderLivePointerService::class);
+        $service->promote($first, null, 'admin promotion');
+        $created = $service->createIfAbsent($chosen, null, 'backfill');
+        app(TenantContext::class)->forget();
+
+        $this->assertFalse($created, 'يتخطّى ولا يحدّث');
+        $this->assertSame($first->id, BuilderLivePointer::withoutGlobalScopes()->firstOrFail()->live_version_id);
+        $this->assertSame(1, BuilderLivePointerEvent::withoutGlobalScopes()->count(), 'لا حدث ثانٍ');
+    }
+
+    /** @test */
     public function an_invalid_tenant_option_is_rejected(): void
     {
         [$code] = $this->backfill(['--tenant' => 'not-a-uuid']);

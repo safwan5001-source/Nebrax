@@ -59,8 +59,10 @@ final class BackfillBuilderLivePointersCommand extends Command
                 try {
                     $context->set($tenant->id);
                     $version = BuilderPublishedExperienceVersion::query()->whereKey($row['version_id'])->firstOrFail();
-                    $pointers->promote($version, null, 'backfill: pinned to the current legacy selection');
-                    $outcome = 'created';
+                    // create-only: مؤشر أنشأه كاتب آخر بين المعاينة والتنفيذ (ترقية مدير) يُترك كما هو ولا يُمحى.
+                    $outcome = $pointers->createIfAbsent($version, null, 'backfill: pinned to the current legacy selection')
+                        ? 'created'
+                        : 'already_pointed';
                 } catch (Throwable $e) {
                     $outcome = 'failed';
                     $row['error'] = $e->getMessage();
