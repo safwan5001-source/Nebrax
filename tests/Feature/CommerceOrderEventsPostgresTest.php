@@ -22,7 +22,8 @@ use Tests\TestCase;
  * ═══════════════════════════════════════════════════════════════
  *  1) التزام متأخر: كاتب لاحق ينتظر الرأس حتى يلتزم السابق، والتسلسل بترتيب الالتزام، ومستطلِع متزامن لا يرى فجوة أبداً.
  *  2) التراجع: لا فجوة لكاتب متزامن ولا لاحق.
- *  3) الاكتمال والأداء: 20 كاتباً × 10 معاملات ⇒ 1..200 بلا تكرار ولا فقد، وقياس انتظار الرأس مقابل حدّ p95 المعتمد (50ms إضافية).
+ *  3) الأداء (D-H1-1-P = P-A): بوابة حمل واقعي ≈130 حدثاً/ث/مستأجر (3 جولات، p95 إضافي < 50ms، تحقق نموذج الحمل، اكتمال) +
+ *     تشخيص اندفاع مشبَع يُسجَّل دائماً (اكتمال مفروض، كمون حدّ تشغيلي موثَّق لا شرط).
  *  4) لا جمود: الكاتب لا يلمس `tenants`، فممسك مِرساة المستأجر (`FOR UPDATE`) المنتظر لصف يمسكه الكاتب لا يكوّن حلقة — مع ضابط سلبي
  *     يُثبت أن قفلاً على `tenants` في الموضع نفسه كان سيُنتج 40P01 (حساسية الاختبار).
  *  5) المسارات الحقيقية (إلغاء الموظف ‖ تحصيل الاستلام ‖ ممسك مِرساة يكتب حدثاً آخراً) بلا جمود وبتسلسل متصل.
@@ -33,8 +34,16 @@ class CommerceOrderEventsPostgresTest extends TestCase
 {
     use UsesWorkerDatabaseWithoutTransaction;
 
-    /** حدّ R-2 المعتمد: الزيادة في p95 لانتظار الرأس تحت 20 كاتباً متزامناً. */
+    /** حدّ R-2 المعتمد (P-A): الزيادة في p95 لانتظار الرأس تحت الحمل الواقعي المعتمد. */
     private const P95_BUDGET_MS = 50.0;
+
+    /** نموذج الحمل الواقعي المعتمد (D-H1-1-P): مهلة تفكير منتظمة 0–200ms لكل كاتب ⇒ ≈130 حدثاً/ث/مستأجر بـ20 كاتباً. */
+    private const REALISTIC_THINK_MAX_MS = 200;
+
+    /** نطاق التحقق من نموذج الحمل (≈130 ± 30%): خارجَه لا يُعتدّ بالقياس. */
+    private const REALISTIC_RATE_MIN = 90.0;
+
+    private const REALISTIC_RATE_MAX = 170.0;
 
     private string $dir;
 
@@ -229,38 +238,89 @@ class CommerceOrderEventsPostgresTest extends TestCase
         $this->assertSame(2, $this->feedHead());
     }
 
-    // ───────────────────────── 3) الاكتمال + قياس التنازع ─────────────────────────
+    // ───────────────────────── 3) الأداء: بوابة الحمل الواقعي + تشخيص الاندفاع المشبَع ─────────────────────────
 
+    /**
+     * بوابة R-2 المعتمدة (قرار المالك D-H1-1-P = P-A): 20 كاتباً متزامناً لمستأجر واحد، كلٌّ 10 معاملات تفصلها مهلة تفكير منتظمة
+     * 0–200ms ببذرة ثابتة ⇒ معدل معروض ≈ 130 حدثاً/ث/مستأجر. ثلاث جولات، وكلٌّ يجب أن (أ) يحقق نموذج الحمل (إنتاجية 90–170/ث)،
+     * (ب) يُكمل التسلسل بلا فجوة ولا تكرار، (ج) يبقي p95 انتظار الرأس الإضافي (p95 المتنافس − p50 خط الأساس) دون 50ms.
+     */
     #[Test]
-    public function twenty_concurrent_writers_produce_a_complete_gap_free_sequence_within_the_contention_budget(): void
+    public function the_realistic_load_gate_keeps_the_added_p95_feed_lock_wait_under_budget_at_about_130_events_per_second(): void
+    {
+        $baselineP50 = $this->baselineP50();
+        $rounds = [];
+        foreach ([1, 2, 3] as $round) {
+            $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: self::REALISTIC_THINK_MAX_MS, seed: 1000 * $round);
+            $m['round'] = $round;
+            $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
+            $rounds[] = $m;
+
+            $this->assertGreaterThanOrEqual(self::REALISTIC_RATE_MIN, $m['events_per_second'], 'نموذج الحمل: المعدل المحقق أدنى من المعتمد (لا يُقبل نجاح بحمل أخف) '.json_encode($m));
+            $this->assertLessThanOrEqual(self::REALISTIC_RATE_MAX, $m['events_per_second'], 'نموذج الحمل: المعدل المحقق أعلى من المعتمد '.json_encode($m));
+            $this->assertLessThan(self::P95_BUDGET_MS, $m['added_p95_ms'], "R-2 (P-A): الجولة {$round} تجاوزت p95 الإضافي المعتمد — تصعيد للمالك. ".json_encode($m));
+        }
+        $this->recordMetrics('realistic_load_gate', ['baseline_p50_ms' => $baselineP50, 'rounds' => $rounds]);
+    }
+
+    /**
+     * تشخيص لا بوابة (D-H1-1-P §3): اندفاع مشبَع — 20 كاتباً × 10 معاملات متتالية بلا فاصل. يُسجَّل دائماً (الإنتاجية، p50/p95/p99/max)
+     * ولا يُخفى؛ الصحة (اكتمال بلا فجوة ولا تكرار، لا جمود) **مفروضة** هنا أيضاً، أما الكمون تحت التشبّع فحدّ تشغيلي موثَّق لا شرط قبول.
+     */
+    #[Test]
+    public function the_saturated_burst_diagnostic_stays_complete_and_records_its_capacity_and_latency(): void
+    {
+        $baselineP50 = $this->baselineP50();
+        $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: 0, seed: 7);
+        $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
+        $this->recordMetrics('saturated_burst_diagnostic', ['baseline_p50_ms' => $baselineP50, 'burst' => $m]);
+        $this->assertGreaterThan(0, $m['events_per_second']);
+    }
+
+    /** p50 زمن الكتابة بلا تنافس: كاتب واحد متسلسل، 30 معاملة (قفل صف الطلب ثم الحدث آخراً). */
+    private function baselineP50(): float
     {
         $tenant = $this->tenantId;
-        $writers = 20;
-        $perWriter = 10;
+        $orderId = $this->order();
+        $samples = [];
+        for ($i = 0; $i < 30; $i++) {
+            DB::transaction(function () use ($tenant, $orderId, &$samples) {
+                CommerceOrder::query()->whereKey($orderId)->lockForUpdate()->first();
+                $t0 = hrtime(true);
+                self::append($tenant, $orderId);
+                $samples[] = (hrtime(true) - $t0) / 1e6;
+            });
+        }
+        sort($samples);
+
+        return round($samples[(int) floor(0.5 * (count($samples) - 1))], 3);
+    }
+
+    /**
+     * يشغّل كتّاباً متزامنين (عملية لكل كاتب، حاجز بدء واحد)، كلٌّ يقفل صف طلبه ثم يكتب الحدث آخراً ثم يلتزم، مع مهلة تفكير منتظمة
+     * [0, thinkMaxMs] ببذرة حتمية لكل كاتب. يثبت الاكتمال (التسلسل متصل من حيث بدأ) ويعيد المقاييس.
+     *
+     * @return array<string, float|int>
+     */
+    private function measureWriters(int $writers, int $perWriter, int $thinkMaxMs, int $seed): array
+    {
+        $tenant = $this->tenantId;
         $orders = [];
         for ($i = 0; $i < $writers; $i++) {
             $orders[] = $this->order();
         }
-
-        // خط أساس بلا تنافس: كاتب واحد متسلسل.
-        $baseline = [];
-        for ($i = 0; $i < 30; $i++) {
-            DB::transaction(function () use ($tenant, $orders, &$baseline) {
-                CommerceOrder::query()->whereKey($orders[0])->lockForUpdate()->first();
-                $t0 = hrtime(true);
-                self::append($tenant, $orders[0]);
-                $baseline[] = (hrtime(true) - $t0) / 1e6;
-            });
-        }
-        $already = count($this->seqs());
+        $before = $this->feedHead();
 
         $jobs = [];
-        foreach ($orders as $orderId) {
-            $jobs[] = function () use ($tenant, $orderId, $perWriter) {
+        foreach ($orders as $i => $orderId) {
+            $jobs[] = function () use ($tenant, $orderId, $perWriter, $thinkMaxMs, $seed, $i) {
+                mt_srand($seed + $i);
                 $waits = [];
                 for ($j = 0; $j < $perWriter; $j++) {
+                    if ($thinkMaxMs > 0) {
+                        usleep(mt_rand(0, $thinkMaxMs * 1000));
+                    }
                     DB::transaction(function () use ($tenant, $orderId, &$waits) {
-                        // عمل سابق في المعاملة (قفل صف الطلب) ثم الحدث آخراً — كما في مسارات الانتقال الحقيقية.
                         CommerceOrder::query()->whereKey($orderId)->lockForUpdate()->first();
                         $t0 = hrtime(true);
                         self::append($tenant, $orderId);
@@ -271,31 +331,38 @@ class CommerceOrderEventsPostgresTest extends TestCase
                 return $waits;
             };
         }
+        $started = microtime(true);
         $results = $this->runConcurrently($jobs);
+        $elapsed = microtime(true) - $started;
         $this->assertNoDeadlock($results);
 
-        $total = $already + $writers * $perWriter;
-        $this->assertSame(range(1, $total), $this->seqs(), 'كل الأحداث موجودة بلا فجوة ولا تكرار');
-        $this->assertSame($total, $this->feedHead());
+        $total = $writers * $perWriter;
+        $this->assertSame(range(1, $before + $total), $this->seqs(), 'كل الأحداث موجودة بلا فجوة ولا تكرار');
         foreach ($orders as $i => $orderId) {
-            $expected = $perWriter + ($i === 0 ? 30 : 0);
-            $this->assertSame($expected, DB::table('commerce_order_events')->where('commerce_order_id', $orderId)->count(), "الكاتب {$i}");
+            $this->assertSame($perWriter, DB::table('commerce_order_events')->where('commerce_order_id', $orderId)->count(), "الكاتب {$i}");
         }
 
         $waits = array_merge(...array_column($results, 'value'));
         sort($waits);
-        sort($baseline);
-        $pct = fn (array $xs, float $p): float => $xs[(int) floor(($p / 100) * (count($xs) - 1))];
-        $metrics = [
-            'writers' => $writers, 'transactions' => count($waits),
-            'baseline_p50_ms' => round($pct($baseline, 50), 3), 'baseline_p95_ms' => round($pct($baseline, 95), 3),
-            'contended_p50_ms' => round($pct($waits, 50), 3), 'contended_p95_ms' => round($pct($waits, 95), 3), 'contended_max_ms' => round(max($waits), 3),
-        ];
-        $metrics['added_p95_ms'] = round($metrics['contended_p95_ms'] - $metrics['baseline_p50_ms'], 3);
-        fwrite(STDERR, "\nCOPS-H1-1 FeedHead contention: ".json_encode($metrics)."\n");
+        $pct = fn (float $p): float => round($waits[(int) floor(($p / 100) * (count($waits) - 1))], 3);
 
-        $this->assertLessThan(self::P95_BUDGET_MS, $metrics['added_p95_ms'],
-            'R-2: انتظار رأس التغذية تحت 20 كاتباً تجاوز حدّ p95 المعتمد — تصعيد للمالك. '.json_encode($metrics));
+        return [
+            'writers' => $writers, 'transactions' => count($waits), 'think_max_ms' => $thinkMaxMs,
+            'elapsed_s' => round($elapsed, 3), 'events_per_second' => round(count($waits) / $elapsed, 1),
+            'contended_p50_ms' => $pct(50), 'contended_p95_ms' => $pct(95), 'contended_p99_ms' => $pct(99), 'contended_max_ms' => round(max($waits), 3),
+        ];
+    }
+
+    /** يُسجّل المقاييس دائماً: STDERR، وملفاً في `pgsql-watchdog/` حين يوجد (يرفعه CI كمرفق) — لا تُخفى نتيجة. */
+    private function recordMetrics(string $name, array $metrics): void
+    {
+        $payload = ['slice' => 'COPS-H1-1', 'name' => $name, 'pg' => DB::selectOne("select current_setting('synchronous_commit') as synchronous_commit, current_setting('fsync') as fsync"), ...$metrics];
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        fwrite(STDERR, "\nCOPS-H1-1 feed metrics: {$json}\n");
+        $dir = base_path('pgsql-watchdog');
+        if (is_dir($dir)) {
+            file_put_contents("{$dir}/cops-h1-1-{$name}.json", $json.PHP_EOL);
+        }
     }
 
     // ───────────────────────── 4) لا جمود مع مِرساة المستأجر ─────────────────────────

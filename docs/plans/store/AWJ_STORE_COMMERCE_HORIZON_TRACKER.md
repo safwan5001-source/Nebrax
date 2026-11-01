@@ -318,7 +318,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | COPS-H0 | تدقيق + خطة + Revision 1 | — | — | (وثائق أُدرجت في H1-0) | Done | — | لا ينطبق | لا ينطبق | — |
 | COPS-H1-0 | ADR-29 + ADR-28 Accepted + المتتبّع + Handoff | H0 | R-1 ✔ | #1896 | **Merged** | ✓ `d729fc9be` | لا ينطبق (وثائق) | لا ينطبق | — |
-| COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ · **D-H1-1-P (مفتوح)** | فرع `claude/cops-h1-1-order-events-feed` | **In PR — Blocked**: بوابة الأداء الحرفية فاشلة؛ كل بوابات الصحة ناجحة | — | — | — | — |
+| COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ · D-H1-1-P ✔ (P-A) | #1910 | In PR — بوابات الصحة والحمل الواقعي ناجحة | — | — | — | — |
 | COPS-H1-2 | أحداث afterCommit + `feed` + `attention` | H1-1 | R-5 ✔ | — | Planned | — | — | — | — |
 | COPS-H1-3 | أساس إعدادات تشغيل القناة (القبول) | H1-0 | D-OPS-1 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
 | COPS-H1-4 | القبول/الرفض + `commerce.orders.manage` + المُسقِط | H1-1 · H1-3 | R-3 ✔ · R-5 ✔ · R-6 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
