@@ -140,9 +140,9 @@ class PartnerStatementImportTest extends TestCase
         $this->assertContains('partner_statement', ImportJobDomain::PREVIEW_BOUND_ONLY);
         $this->assertSame('file', app(PartnerStatementImportAdapter::class)->unit());
         $this->assertSame(
-            ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => null],
+            ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => 'accounting.partner_statements'],
             ImportJobDomain::authorization('partner_statement'),
-            'D-PS-02: صلاحيتان مستقلتان؛ D-PS-08 مفتوح فلا مفتاح تطبيق.'
+            'D-PS-02: صلاحيتان مستقلتان؛ D-PS-08 (PS-A2a): مفتاح القدرة المستقل accounting.partner_statements.'
         );
     }
 
@@ -642,6 +642,50 @@ class PartnerStatementImportTest extends TestCase
         $this->withToken($token)->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertForbidden();
         $this->assertSame(0, $this->reconciliations());
         $this->assertSame('ready', (string) (ImportJob::query()->findOrFail($job['id'])->status->value ?? ImportJob::query()->findOrFail($job['id'])->status));
+    }
+
+    /**
+     * PS-A2a (D-PS-08): بوابة القدرة `accounting.partner_statements` تحكم تشغيلات الاستيراد الدائم لهذا المجال بنفس منطق المسارات الثابتة
+     * (`ImportJobAccess` ← `EnsureApplicationActive::authorize`): المعطّلة تمنع القراءة والترحيل وتُخفي التشغيلة من القائمة، والتفعيل يعيدها.
+     *
+     * @test
+     */
+    public function a_disabled_application_blocks_statement_jobs_and_enabling_restores_them(): void
+    {
+        $token = $this->auth['token'];
+        $job = $this->createJob($token, $this->rows(), $this->hdr())->assertCreated()->json('data');
+        $applications = app(\App\Services\TenantApplicationService::class);
+
+        $applications->disable('accounting.partner_statements', null);
+
+        $this->withToken($token)->getJson("/api/import-jobs/{$job['id']}")->assertForbidden();
+        $this->withToken($token)->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertForbidden();
+        $this->assertNotContains($job['id'], array_column($this->withToken($token)->getJson('/api/import-jobs')->assertOk()->json('data'), 'id'), 'القائمة لا تعرض تشغيلات قدرة معطّلة.');
+        $this->assertSame(0, $this->reconciliations(), 'لا كتابة وراء بوابة معطّلة.');
+
+        $applications->enable('accounting.partner_statements', null);
+
+        $this->withToken($token)->getJson("/api/import-jobs/{$job['id']}")->assertOk();
+        $this->assertContains($job['id'], array_column($this->withToken($token)->getJson('/api/import-jobs')->assertOk()->json('data'), 'id'));
+        $this->withToken($token)->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertOk();
+        $this->assertSame(1, $this->reconciliations());
+    }
+
+    /** @test */
+    public function a_suspended_application_keeps_statement_jobs_readable_but_refuses_new_ones(): void
+    {
+        $token = $this->auth['token'];
+        $binding = $this->bind($token, $this->rows(), $this->hdr());
+        $done = $this->runJob($token, $this->rows(), $this->hdr(['period_to' => '2026-10-31']));
+        $applications = app(\App\Services\TenantApplicationService::class);
+
+        // كشف مستورد ⇒ الإيقاف يصبح تعليقاً (قراءة فقط).
+        $this->assertSame('suspended', $applications->disable('accounting.partner_statements', null)->status);
+
+        $this->withToken($token)->getJson("/api/import-jobs/{$done['id']}")->assertOk();
+        $this->assertContains($done['id'], array_column($this->withToken($token)->getJson('/api/import-jobs')->assertOk()->json('data'), 'id'));
+        $this->createJob($token, $this->rows(), $this->hdr(), $binding)->assertForbidden();
+        $this->assertSame(1, $this->reconciliations());
     }
 
     /** @test */

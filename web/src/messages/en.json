@@ -8436,6 +8436,7 @@
       "purchases_cycle": "Purchase Cycle",
       "accounting_ledger": "Chart of Accounts & Journal Entries",
       "accounting_cheques": "Cheques Cycle",
+      "accounting_partner_statements": "Partner Statements",
       "finance_operations": "Finance Operations",
       "hr_employees": "Employee Records",
       "hr_requests": "Requests Management",
