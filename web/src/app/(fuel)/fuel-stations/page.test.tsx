@@ -112,6 +112,22 @@ describe('FuelStationsWorkspacePage workspace payload', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Could not load the fuel workspace');
   });
 
+  it('shows the gross margin card only when the server returns the margin (FS-23)', async () => {
+    respondWith({ data: { stations: [station] } });
+    const { unmount } = render(<FuelStationsWorkspacePage />);
+    expect(await screen.findByText('grossMargin')).toBeTruthy();
+    unmount();
+
+    api.mockImplementation((path: string) => {
+      if (path === '/fuel-stations/workspace') return Promise.resolve({ data: { stations: [station] } });
+      if (path === '/fuel-stations/dashboard') return Promise.resolve({ data: { ...dashboard, gross_margin_minor: undefined } });
+      return Promise.resolve({ data: [] });
+    });
+    render(<FuelStationsWorkspacePage />);
+    await screen.findByText(/84,250/);
+    expect(screen.queryByText('grossMargin')).toBeNull();
+  });
+
   it('names the liters metric once, in English', async () => {
     locale.current = 'en';
     literUnit.current = 'L';
