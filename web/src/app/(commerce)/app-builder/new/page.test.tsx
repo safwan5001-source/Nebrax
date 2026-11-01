@@ -190,6 +190,9 @@ describe('NewAppBuilderPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('radio', { name: /Blank/ })).toBeTruthy();
+    // إعادة المحاولة تُطلق طلباً واحداً فقط (لا طلبان متزامنان قد يُخفي أحدهما نجاح الآخر).
+    expect(attempts).toBe(2);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('a server rejection of the creation is shown and does not navigate (no half-built app is hidden)', async () => {

@@ -57,15 +57,18 @@ export default function NewAppBuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const loadTemplates = React.useCallback(() => {
-    setTemplatesFailed(false);
-    fetchAppTemplates().then(setTemplates).catch(() => setTemplatesFailed(true));
-  }, []);
-
-  // القوالب تُجلب عند اختيار مسار القالب فقط (لا طلب لمن لا يحتاجها).
+  // آلية واحدة تطلق الجلب: التأثير يعتمد على رقم المحاولة، و«إعادة المحاولة» تزيده فقط (لا طلبان متزامنان).
+  // `cancelled` يمنع نتيجة طلب قديم (تغيّر المسار أثناءه) من الكتابة فوق الحالة.
+  const [templatesAttempt, setTemplatesAttempt] = useState(0);
   React.useEffect(() => {
-    if (source === 'template' && templates === null && !templatesFailed) loadTemplates();
-  }, [source, templates, templatesFailed, loadTemplates]);
+    if (source !== 'template' || templates !== null) return;
+    let cancelled = false;
+    setTemplatesFailed(false);
+    fetchAppTemplates()
+      .then((loaded) => { if (!cancelled) setTemplates(loaded); })
+      .catch(() => { if (!cancelled) setTemplatesFailed(true); });
+    return () => { cancelled = true; };
+  }, [source, templates, templatesAttempt]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -162,7 +165,7 @@ export default function NewAppBuilderPage() {
               {templatesFailed ? (
                 <div className="flex items-center gap-3 text-sm text-muted">
                   <span role="alert">{t('templatesLoadFailed')}</span>
-                  <Button type="button" variant="outline" size="sm" onClick={loadTemplates}>{t('templatesRetry')}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setTemplatesAttempt((n) => n + 1)}>{t('templatesRetry')}</Button>
                 </div>
               ) : templates === null ? (
                 <p className="text-sm text-muted" role="status">{t('templatesLoading')}</p>
