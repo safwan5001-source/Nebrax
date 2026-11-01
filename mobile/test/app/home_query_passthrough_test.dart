@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:awj_mobile_runtime/actions/actions.dart';
 import 'package:awj_mobile_runtime/app/home_screen.dart';
 import 'package:awj_mobile_runtime/app/runtime_schema.dart';
@@ -81,5 +83,90 @@ void main() {
     expect(find.text('Hot'), findsNWidgets(2)); // top + dup
     expect(find.text('Fresh'), findsOneWidget);
     expect(find.text('Plain'), findsOneWidget);
+  });
+
+  testWidgets('when the live experience arrives after mount, products are refetched with its queries and a stale load never wins', (
+    tester,
+  ) async {
+    final seen = <Uri>[];
+    final client = buildFakeCommerceClient(
+      handler: (request) async {
+        seen.add(request.uri);
+        final sort = request.uri.queryParameters['sort'];
+        final name = sort == '-popularity' ? 'Hot' : 'Plain';
+        return jsonResponse(200, {
+          'data': [
+            {'id': 'p-$name', 'name': name, 'name_en': name},
+          ],
+          'meta': paginationMeta(),
+        });
+      },
+    );
+    final state = RuntimeState();
+    final dispatcher = AppActionDispatcher(RecordingActionHandler());
+    final experience = _experience([
+      _list('top', {'sort': '-popularity'}),
+    ]);
+
+    Widget host(RenderableExperience? e) => MaterialApp(
+      home: Scaffold(
+        body: HomeScreen(
+          client: client,
+          state: state,
+          dispatcher: dispatcher,
+          locale: const Locale('en'),
+          experience: e,
+        ),
+      ),
+    );
+
+    // يُركَّب أولاً بلا تجربة (الإقلاع ما زال يحل) ثم تصل التجربة الحيّة.
+    await tester.pumpWidget(host(null));
+    await tester.pumpAndSettle();
+    expect(seen.where((u) => u.queryParameters.containsKey('sort')), isEmpty);
+
+    await tester.pumpWidget(host(experience));
+    await tester.pumpAndSettle();
+
+    expect(seen.where((u) => u.queryParameters['sort'] == '-popularity'), isNotEmpty);
+    expect(find.text('Hot'), findsOneWidget);
+  });
+
+  testWidgets('an older in-flight load finishing late never overwrites the newer experience results', (tester) async {
+    final slowBare = Completer<void>();
+    final client = buildFakeCommerceClient(
+      handler: (request) async {
+        final sort = request.uri.queryParameters['sort'];
+        if (sort == null) await slowBare.future; // الطلب العاري (التجربة المضمَّنة) بطيء
+        final name = sort == '-popularity' ? 'Hot' : 'STALE';
+        return jsonResponse(200, {
+          'data': [
+            {'id': 'p-$name', 'name': name, 'name_en': name},
+          ],
+          'meta': paginationMeta(),
+        });
+      },
+    );
+    final state = RuntimeState();
+    final dispatcher = AppActionDispatcher(RecordingActionHandler());
+    final experience = _experience([
+      _list('top', {'sort': '-popularity'}),
+    ]);
+    Widget host(RenderableExperience? e) => MaterialApp(
+      home: Scaffold(
+        body: HomeScreen(client: client, state: state, dispatcher: dispatcher, locale: const Locale('en'), experience: e),
+      ),
+    );
+
+    await tester.pumpWidget(host(null)); // تحميل عارٍ عالق
+    await tester.pump();
+    await tester.pumpWidget(host(experience)); // وصلت التجربة الحيّة
+    await tester.pumpAndSettle();
+    expect(find.text('Hot'), findsOneWidget);
+
+    slowBare.complete(); // يصل القديم متأخراً
+    await tester.pumpAndSettle();
+    expect(find.text('Hot'), findsOneWidget);
+    expect(find.text('STALE'), findsNothing);
   });
 }

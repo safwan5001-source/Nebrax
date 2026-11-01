@@ -154,7 +154,8 @@ String bindingDataKey(SchemaBinding binding) {
   final query = sanitizedBindingQuery(binding);
   if (query.isEmpty) return binding.resource;
   final keys = query.keys.toList()..sort();
-  return '${binding.resource}?${keys.map((k) => '$k=${query[k]}').join('&')}';
+  // القيم مرمَّزة: `search="a&sort=b"` لا يتطابق أبداً مع استعلامين منفصلين (فريد غير ملتبس).
+  return '${binding.resource}?${keys.map((k) => '$k=${Uri.encodeQueryComponent(query[k]!)}').join('&')}';
 }
 
 /// طلب بيانات مميَّز لمورد: [resource] + [query] المنقّى + [key] القانوني.

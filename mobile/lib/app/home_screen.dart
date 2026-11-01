@@ -67,6 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   int _lastHandledRefreshVersion = -1;
 
+  /// رقم تسلسلي للتحميل: تحميل أقدم ما زال في الطريق (تجربة سابقة/إعادة مشبوهة) لا يستبدل نتائج الأحدث.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // recomputed then too, not only in `initState`.
     if (!identical(oldWidget.experience, widget.experience)) {
       _resolveSchema();
+      // الاستعلامات تأتي من الصفحة المنشورة، فتغيّر التجربة يعيد الجلب (وإلا بقيت بيانات الصفحة المضمَّنة).
+      _loadProducts();
     }
   }
 
@@ -127,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadProducts() async {
+    final seq = ++_loadSeq;
     setState(() => _loading = true);
     try {
       // S08b — كل `binding.query` مميَّز على الصفحة = طلب واحد (التكرار يُجلب مرة). صفحة بلا ربط
@@ -143,6 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
             query: request.query.isEmpty ? null : request.query,
           ),
       ]);
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _products = {
           for (var i = 0; i < requests.length; i++)
@@ -152,16 +159,19 @@ class _HomeScreenState extends State<HomeScreen> {
         _loading = false;
       });
     } on CommerceApiException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } on CommerceProtocolException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted || seq != _loadSeq) return;
       // Any other transport failure (no network, DNS, an unconfigured
       // placeholder Commerce host — see `runtime_config.dart`) — this proof
       // has no real deployed tenant to point at by default.
