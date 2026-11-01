@@ -94,7 +94,8 @@ describe('EasyShellPanel (AD-04 / S09d)', () => {
     fireEvent.change(screen.getByLabelText('Top bar title'), { target: { value: '' } });
     expect(last!.navigation.appBar).toEqual({ showCart: true });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show a cart button with the item count' }));
-    expect(last!.navigation.appBar).toEqual({ showCart: false });
+    // إلغاء الخيار بعد مسح العنوان يعيد التطبيق إلى «لا شريط» (المفتاح يُحذف فلا يفرض الجيل 1.1.0).
+    expect('appBar' in last!.navigation).toBe(false);
   });
 
   it('without manage permission everything is disabled', () => {

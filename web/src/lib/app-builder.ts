@@ -657,7 +657,8 @@ export function setAppBar(schema: AppSchema, appBar: AppSchemaAppBar | undefined
   // النص الخام يُحفظ كما كُتب (المسافات أثناء الكتابة لا تُقصّ — مراجعة Codex)؛ العنوان الفارغ/المسافات وحدها يُحذف.
   const title = appBar?.title;
   if (typeof title === 'string' && title.trim() !== '') next.title = clampChars(title, NAV_LIMITS.maxAppBarTitle);
-  if (typeof appBar?.showCart === 'boolean') next.showCart = appBar.showCart;
+  // `showCart: false` هو الافتراضي = غياب المفتاح؛ لا يُخزَّن صراحةً كي يعود «إلغاء التحديد + مسح العنوان» إلى لا شريط (توافق 1.0.0).
+  if (appBar?.showCart === true) next.showCart = true;
   return { ...schema, navigation: Object.keys(next).length > 0 ? { ...rest, appBar: next } : rest };
 }
 

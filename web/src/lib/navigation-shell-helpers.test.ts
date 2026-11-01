@@ -72,7 +72,9 @@ describe('navigation shell helpers (AD-04 / S09d)', () => {
     expect('appBar' in setAppBar(schema(), undefined).navigation).toBe(false);
     expect(setAppBar(schema(), { title: 'متجري', showCart: true }).navigation.appBar).toEqual({ title: 'متجري', showCart: true });
     expect(setAppBar(schema(), { title: '   ' }).navigation.appBar).toBeUndefined();
-    expect(setAppBar(schema(), { showCart: false }).navigation.appBar).toEqual({ showCart: false });
+    // showCart:false هو الافتراضي فلا يُخزَّن: لا يبقى شريط بلا قيمة يفرض الجيل 1.1.0 (مراجعة Codex)
+    expect(setAppBar(schema(), { showCart: false }).navigation.appBar).toBeUndefined();
+    expect(setAppBar(schema(), { title: 'x', showCart: false }).navigation.appBar).toEqual({ title: 'x' });
   });
 
   it('appBar title is clamped to 40 chars', () => {
