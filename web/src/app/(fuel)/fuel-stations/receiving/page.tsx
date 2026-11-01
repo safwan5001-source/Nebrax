@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatLiters, litersToMilliliters } from '@/lib/fuel-quantity';
+import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isValidRiyal, riyalToMinor } from '@/lib/money';
 
 type Entity = { id: string; name?: string; code?: string; fuel_station_id?: string; warehouse_id?: string; branch_id?: string | null; is_active?: boolean };
@@ -25,6 +26,7 @@ const emptyForm = { fuel_station_id: '', fuel_tank_id: '', fuel_product_id: '', 
 export default function FuelStationsReceivingPage() {
   const t = useTranslations('fuelStationsReceiving');
   const { success } = useToast();
+  const deliveryKeys = useIntentKeys();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
   const [stations, setStations] = useState<Entity[]>([]);
@@ -72,11 +74,13 @@ export default function FuelStationsReceivingPage() {
     if (!isValidRiyal(form.received_total_cost) || costMinor < 0 || dispatchedMl === null || receivedMl === null) return;
     setError(null); setSaving(true);
     try {
-      await api('/fuel-stations/deliveries', { method: 'POST', body: {
+      const deliveryBody = {
         fuel_station_id: form.fuel_station_id, fuel_tank_id: form.fuel_tank_id, fuel_product_id: form.fuel_product_id, warehouse_id: form.warehouse_id, supplier_id: form.supplier_id,
         dispatched_liters: form.dispatched_liters, received_liters: form.received_liters, received_total_cost_minor: costMinor,
-        delivery_note_number: form.delivery_note_number || null, idempotency_key: `web-receipt-${crypto.randomUUID()}`,
-      } });
+        delivery_note_number: form.delivery_note_number || null,
+      };
+      await api('/fuel-stations/deliveries', { method: 'POST', body: { ...deliveryBody, idempotency_key: deliveryKeys.keyFor(deliveryBody, 'web-receipt-') } });
+      deliveryKeys.reset();
       success(t('created')); setForm(emptyForm); load();
     } catch (err) { setError(err instanceof ApiError ? err.message : t('saveFailed')); } finally { setSaving(false); }
   }

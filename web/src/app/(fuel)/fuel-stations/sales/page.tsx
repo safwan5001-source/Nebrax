@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { litersToMilliliters } from '@/lib/fuel-quantity';
+import { useIntentKeys } from '@/lib/intent-key';
 import { isValidRiyal, minorToRiyal, riyalToMinor } from '@/lib/money';
 
 interface Station { id: string; name: string; code: string; status: string }
@@ -36,6 +37,8 @@ export default function FuelSalesPage() {
   const t = useTranslations('fuelStationsSales');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const draftKeys = useIntentKeys();
+  const paymentKeys = useIntentKeys();
   const [sales, setSales] = useState<Sale[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
@@ -90,10 +93,13 @@ export default function FuelSalesPage() {
     if (!stationId || !nozzleId || (!partnerId && !aviAuthorizationId) || !quantity) return;
     setBusy(true); setError(null);
     try {
-      await api('/fuel-stations/sales', { method: 'POST', body: {
+      // FS-08: المفتاح ثابت لإعادة محاولة الحمولة نفسها، ويتبدّل إن تغيّر أي حقل.
+      const draftBody = {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, fuel_shift_id: shiftId || null, partner_id: partnerId || null,
-        fuel_avi_authorization_id: aviAuthorizationId || null, quantity_milliliters: quantity, idempotency_key: crypto.randomUUID(),
-      } });
+        fuel_avi_authorization_id: aviAuthorizationId || null, quantity_milliliters: quantity,
+      };
+      await api('/fuel-stations/sales', { method: 'POST', body: { ...draftBody, idempotency_key: draftKeys.keyFor(draftBody) } });
+      draftKeys.reset();
       success(t('draftCreated')); setDraftOpen(false); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -105,21 +111,23 @@ export default function FuelSalesPage() {
   }
 
   const openPayment = useCallback(async (sale: Sale) => {
-    setPaySale(sale); setPaymentMethodId(''); setPaymentAmount(minorToRiyal(sale.invoice_remaining_minor)); setMethods([]); setError(null);
+    paymentKeys.reset(); setPaySale(sale); setPaymentMethodId(''); setPaymentAmount(minorToRiyal(sale.invoice_remaining_minor)); setMethods([]); setError(null);
     try {
       const result = await api<{ data: PaymentMethod[] }>(`/fuel-stations/stations/${sale.fuel_station_id}/sale-payment-methods`);
       setMethods(result.data);
       if (result.data.length === 0) setError(t('noPaymentMethodHint'));
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); }
-  }, [t, tc]);
+  }, [paymentKeys, t, tc]);
 
   async function collectPayment() {
     if (!paySale || !paymentMethodId || !isValidRiyal(paymentAmount)) return;
     setBusy(true); setError(null);
     try {
+      const paymentBody = { payment_method_id: paymentMethodId, amount_minor: riyalToMinor(paymentAmount) };
       await api(`/fuel-stations/sales/${paySale.id}/payments`, { method: 'POST', body: {
-        payment_method_id: paymentMethodId, amount_minor: riyalToMinor(paymentAmount), idempotency_key: crypto.randomUUID(),
+        ...paymentBody, idempotency_key: paymentKeys.keyFor({ sale_id: paySale.id, ...paymentBody }),
       } });
+      paymentKeys.reset();
       success(t('paymentCollected')); setPaySale(null); setPaymentMethodId(''); setPaymentAmount(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -140,7 +148,7 @@ export default function FuelSalesPage() {
   if (loading && sales.length === 0) return <div className="space-y-4"><Skeleton className="h-9 w-56" /><Skeleton className="h-64 w-full" /></div>;
 
   return <div className="space-y-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div><Button disabled={!can('fuel.sale.create') || stations.length === 0} title={!can('fuel.sale.create') ? t('createPermissionHint') : undefined} onClick={() => { setDraftOpen(true); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); setError(null); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('newSale')}</Button></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div><Button disabled={!can('fuel.sale.create') || stations.length === 0} title={!can('fuel.sale.create') ? t('createPermissionHint') : undefined} onClick={() => { draftKeys.reset(); setDraftOpen(true); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); setError(null); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('newSale')}</Button></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Summary icon={<FileText />} label={t('summaryAll')} value={String(sales.length)} /><Summary icon={<CheckCircle2 />} label={t('summaryFinalized')} value={String(sales.filter((sale) => sale.status === 'finalized').length)} /><Summary icon={<Banknote />} label={t('summaryPaid')} value={String(sales.filter((sale) => sale.payment_status === 'paid').length)} /><Summary icon={<Droplets />} label={t('summaryLiters')} value={`${sales.filter((sale) => sale.status === 'finalized').reduce((total, sale) => total + Number(sale.quantity_liters), 0).toFixed(3)} ${t('literUnit')}`} /></div>
     <p className="rounded-md border border-border bg-primary-soft px-3 py-2 text-xs text-text">{t('separationNotice')}</p>
     {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
