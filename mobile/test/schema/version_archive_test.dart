@@ -17,9 +17,29 @@ void main() {
   final versions = (index['versions'] as List).cast<Map<String, Object?>>();
 
   CapabilityManifest manifestFor(String runtime) {
-    // الجيل الوحيد المعروف اليوم هو 1.0.0 (= CapabilityManifest.current)؛ أجيال لاحقة تُضاف هنا مع كل جيل جديد.
-    expect(runtime, '1.0.0', reason: 'لا جيل Runtime معروف غير 1.0.0 بعد — أضف manifest الجيل الجديد هنا');
-    return CapabilityManifest.current(RuntimePlatform.android);
+    final current = CapabilityManifest.current(RuntimePlatform.android);
+    switch (runtime) {
+      case '1.1.0':
+        expect(current.runtimeVersion.toString(), '1.1.0');
+        return current;
+      case '1.0.0':
+        // الجيل 1.0.0 كما كان تماماً: بلا ميزتي الغلاف (AD-04) — يُبنى صراحةً لأن `current` صار 1.1.0.
+        return CapabilityManifest(
+          platform: RuntimePlatform.android,
+          runtimeVersion: const SchemaVersion(1, 0, 0),
+          minSupportedSchemaVersion: current.minSupportedSchemaVersion,
+          maxSupportedSchemaVersion: current.maxSupportedSchemaVersion,
+          components: current.components,
+          actions: current.actions,
+          nativeCapabilities: current.nativeCapabilities,
+          dataResources: current.dataResources,
+          schemaFeatures: {
+            for (final e in current.schemaFeatures.entries)
+              if (e.key != NavigationShell.featureTabs && e.key != NavigationShell.featureAppBar) e.key: e.value,
+          },
+        );
+    }
+    fail('جيل Runtime غير معروف: $runtime — أضف manifest الجيل الجديد هنا');
   }
 
   test('the archive index is well formed', () {

@@ -127,6 +127,49 @@ class RuntimeState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// الجذر النشط للتبويبات: `home`/`cart` أو معرّف الصفحة المخصّصة؛ شاشة المنتج تتبع الجذر الذي جاءت منه
+  /// (أقرب زيارة سابقة ليست منتجاً)، وإلا `home`.
+  String get activeRootPageId {
+    String? keyOf(RuntimePage page, String? pageId) => switch (page) {
+      RuntimePage.home => 'home',
+      RuntimePage.cart => 'cart',
+      RuntimePage.page => pageId,
+      RuntimePage.product => null,
+    };
+    final own = keyOf(_page, _selectedPageId);
+    if (own != null) return own;
+    for (final visit in _history.reversed) {
+      final key = keyOf(visit.page, visit.pageId);
+      if (key != null) return key;
+    }
+    return 'home';
+  }
+
+  /// تبديل جذر من تبويب سفلي: يمسح السجل ويفتح الوجهة (`home`/`cart`/صفحة معلنة)؛ يعيد هل فعل.
+  bool selectRoot(String pageId) {
+    if (pageId == 'home') {
+      goHome();
+      return true;
+    }
+    if (pageId == 'cart') {
+      _explicitNavigation = true;
+      _history.clear();
+      _page = RuntimePage.cart;
+      _selectedProductId = null;
+      _selectedPageId = null;
+      notifyListeners();
+      return true;
+    }
+    if (!_declaredPageIds.contains(pageId)) return false;
+    _explicitNavigation = true;
+    _history.clear();
+    _page = RuntimePage.page;
+    _selectedProductId = null;
+    _selectedPageId = pageId;
+    notifyListeners();
+    return true;
+  }
+
   void markCartChanged() {
     _cartVersion++;
     notifyListeners();

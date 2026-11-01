@@ -162,7 +162,32 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
     }
   }
 
-  void _onStateChanged() => setState(() {});
+  void _onStateChanged() {
+    // عدّاد السلة في الشريط العلوي (CRT-01) يتبع تغيّر السلة وتحديثات الإقلاع.
+    if (_state.cartVersion != _badgeCartVersion || _state.refreshVersion != _badgeRefreshVersion) {
+      _badgeCartVersion = _state.cartVersion;
+      _badgeRefreshVersion = _state.refreshVersion;
+      _refreshCartBadge();
+    }
+    setState(() {});
+  }
+
+  int _cartCount = 0;
+  int _badgeCartVersion = 0;
+  int _badgeRefreshVersion = 0; // تحديث صريح/عودة من الخلفية يعيد محاولة العدّاد بعد فشل أول
+  int _badgeSeq = 0;
+
+  Future<void> _refreshCartBadge() async {
+    if (_liveExperience?.schema.navigation.appBar?.showCart != true) return;
+    final seq = ++_badgeSeq;
+    try {
+      final cart = await _client.getCart();
+      if (!mounted || seq != _badgeSeq) return;
+      setState(() => _cartCount = cart.items.length);
+    } catch (_) {
+      // العدّاد تجميلي: فشل جلبه لا يكسر الواجهة ولا يخترع رقماً (يبقى آخر قيمة معروفة).
+    }
+  }
 
   void _showError(String message) {
     if (!mounted) return;
@@ -196,6 +221,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
     if (live != null) {
       _state.declarePages(live.pages.keys);
       _state.startAt(live.schema.navigation.initialPageId);
+      _refreshCartBadge();
     }
   }
 
@@ -217,6 +243,9 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final strings = RuntimeStrings.of(widget.locale);
+    final navigation = _liveExperience?.schema.navigation;
+    final appBarConfig = navigation?.appBar;
+    final visibleTabs = navigation?.visibleTabs ?? const <SchemaTab>[];
     return PopScope(
       // S06a: زر الرجوع في النظام يعود خطوة داخل التطبيق قبل أن يغلقه.
       canPop: !_state.canGoBack,
@@ -224,31 +253,77 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
         if (!didPop) _state.goBack();
       },
       child: Scaffold(
-      appBar: AppBar(
-        leading: _state.canGoBack
-            ? IconButton(
-                key: const ValueKey('runtime-back'),
-                icon: const BackButtonIcon(),
-                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                onPressed: _state.goBack,
-              )
-            : null,
-        title: const Text('أَوْج — AWJ Mobile Runtime'),
-        actions: [
-          TextButton(
-            key: const ValueKey('locale-toggle'),
-            onPressed: _toggleLocale,
-            child: Text(
-              strings.languageToggleLabel,
-              style: const TextStyle(color: Colors.white),
+        appBar: AppBar(
+          leading: _state.canGoBack
+              ? IconButton(
+                  key: const ValueKey('runtime-back'),
+                  icon: const BackButtonIcon(),
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: _state.goBack,
+                )
+              : null,
+          // AD-04: عنوان الشريط من المخطط إن وُجد، وإلا العنوان المضمَّن كما كان.
+          title: Text(appBarConfig?.title?.trim().isNotEmpty == true ? appBarConfig!.title! : 'أَوْج — AWJ Mobile Runtime'),
+          actions: [
+            if (appBarConfig?.showCart == true)
+              IconButton(
+                key: const ValueKey('appbar-cart'),
+                tooltip: strings.goToCart,
+                onPressed: _state.goToCart,
+                icon: Badge(
+                  isLabelVisible: _cartCount > 0,
+                  label: Text('$_cartCount'),
+                  child: const Icon(Icons.shopping_cart_outlined),
+                ),
+              ),
+            TextButton(
+              key: const ValueKey('locale-toggle'),
+              onPressed: _toggleLocale,
+              child: Text(
+                strings.languageToggleLabel,
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-          ),
-        ],
-      ),
-      body: _buildBody(),
+          ],
+        ),
+        body: _buildBody(),
+        // `NavigationBar` يشترط وجهتين على الأقل: تبويب ظاهر واحد لا يُنتج شريطاً (لا معنى للتنقل بين وجهة واحدة).
+        bottomNavigationBar: visibleTabs.length < 2 ? null : _buildTabBar(visibleTabs),
       ),
     );
   }
+
+  /// التبويبات السفلية (AD-04): المخفية لا تظهر؛ التحديد يتبع الجذر النشط، ولا تحديد (شفاف) إن لم تطابق شاشةٌ حاليةٌ تبويباً.
+  Widget _buildTabBar(List<SchemaTab> tabs) {
+    final active = _state.activeRootPageId;
+    final index = tabs.indexWhere((t) => t.pageId == active);
+    return NavigationBar(
+      selectedIndex: index < 0 ? 0 : index,
+      indicatorColor: index < 0 ? Colors.transparent : null,
+      onDestinationSelected: (i) => _state.selectRoot(tabs[i].pageId),
+      destinations: [
+        for (final tab in tabs)
+          NavigationDestination(
+            icon: Icon(_tabIcon(tab.icon)),
+            label: tab.title,
+          ),
+      ],
+    );
+  }
+
+  static IconData _tabIcon(String icon) => switch (icon) {
+    'home' => Icons.home_outlined,
+    'search' => Icons.search,
+    'category' => Icons.category_outlined,
+    'cart' => Icons.shopping_cart_outlined,
+    'favorite' => Icons.favorite_border,
+    'person' => Icons.person_outline,
+    'menu' => Icons.menu,
+    'orders' => Icons.receipt_long_outlined,
+    'store' => Icons.storefront_outlined,
+    'offers' => Icons.local_offer_outlined,
+    _ => Icons.circle_outlined,
+  };
 
   Widget _buildBody() {
     final decision = _startupDecision;
