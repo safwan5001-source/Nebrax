@@ -1,0 +1,19 @@
+# S06a — موجّه الصفحات العام في Flutter (AD-04 جزئي، PAG-01 / PAG-02)
+
+**القرار:** AD-04 معتمد (الجزء غير المخطّطي هنا). **لا تغيير في شكل المخطط ولا API ولا هجرة ولا جيل Runtime جديد** — `navigate` و`navigation.initialPageId` موجودان في المخطط منذ البداية؛ هذه الشريحة تجعل الجهاز ينفّذهما. يقوم فوق S08b (استعلامات الربط).
+
+## ما نُفِّذ (Flutter)
+- `RuntimeState`: شاشة `RuntimePage.page` عامة + `selectedPageId`، مجموعة الصفحات المعلنة (`declarePages`)، سجل زيارات (`canGoBack`/`goBack`)، و`startAt` للهبوط مرة واحدة على `initialPageId` بلا إدخال في السجل. `goHome` جذر يمسح السجل.
+- `RuntimeActionHandler.onNavigate`: `home`/`cart` كما كانا؛ صفحة معلنة تُفتح؛ **غير المعلنة تبقى لا شيء** (الفشل الآمن القائم).
+- `PageScreen`: يعرض أي صفحة مخصّصة عبر خط الأنابيب نفسه (حل الربط ← `ComponentView` ← `AppActionDispatcher`)، يجلب كل طلب ربط مميَّز مرة واحدة (منتجات بالاستعلام + السلة)، حالات تحميل/خطأ+إعادة محاولة، ويتحدّث عند `refresh` وتغيّر السلة.
+- `AwjRuntimeShell`: يعلن صفحات التجربة الحيّة ويبدأ من `initialPageId` (PAG-02)، زر رجوع في الشريط + `PopScope` لزر النظام. التجربة الافتراضية/غير المتاحة ⇒ كما كانت حرفياً.
+- `page_bindings.dart`: `localizeProductItems` (قاعدة `display_name` الموحّدة، استخرجت من Home) و`fetchPageBindingData`.
+
+## الاختبارات (Flutter 505/505، analyze نظيف)
+- `runtime_state_test` (+7): الإعلان والتنقل، home/cart ليستا مخصّصتين، الرجوع بالترتيب، الجذر، إعادة الإعلان، `startAt` مرة واحدة.
+- `runtime_action_handler_test` (+1)، `custom_pages_test` (4 widget عبر الصدفة الحقيقية): فتح صفحة معلنة وجلب قائمتها باستعلامها (`sort=-popularity`)، الرجوع، صفحة غير معلنة لا تفعل شيئاً، والبدء من `initialPageId`.
+
+## الحدود المعلنة
+- لا صفحة منتج مخططية (PAG-06) ولا روابط عميقة `/page/<id>` ولا مضيف قابل للضبط (PAG-07، تعتمد AD-13 جزئياً) ولا نقل نصوص Flutter الجامدة (CMP-13) — شرائح S06b/S06c.
+- عناوين الصفحات (PAG-05) لا تصل الجهاز: `editor_meta` لا يُنشر بتصميم AD-05؛ تُحَلّ مع الشريط العلوي في S09.
+- لم يُجرَّب على جهاز/محاكي فعلي.

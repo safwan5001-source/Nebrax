@@ -33,6 +33,7 @@ class RuntimeStrings {
   final String pageNotFound;
   final String productLoadError;
   final String homeLoadError;
+  final String pageLoadError;
   final String cartLoadError;
   final String quantityDecrease;
   final String quantityIncrease;
@@ -55,6 +56,7 @@ class RuntimeStrings {
     required this.pageNotFound,
     required this.productLoadError,
     required this.homeLoadError,
+    required this.pageLoadError,
     required this.cartLoadError,
     required this.quantityDecrease,
     required this.quantityIncrease,
@@ -94,6 +96,7 @@ class RuntimeStrings {
     pageNotFound: 'الصفحة غير موجودة',
     productLoadError: 'تعذّر تحميل المنتج',
     homeLoadError: 'تعذّر تحميل الصفحة الرئيسية',
+    pageLoadError: 'تعذّر تحميل هذه الصفحة',
     cartLoadError: 'تعذّر تحميل السلة',
     quantityDecrease: 'إنقاص الكمية',
     quantityIncrease: 'زيادة الكمية',
@@ -117,6 +120,7 @@ class RuntimeStrings {
     pageNotFound: 'Page not found',
     productLoadError: 'Could not load the product',
     homeLoadError: 'Could not load the home page',
+    pageLoadError: 'Could not load this page',
     cartLoadError: 'Could not load the cart',
     quantityDecrease: 'Decrease quantity',
     quantityIncrease: 'Increase quantity',

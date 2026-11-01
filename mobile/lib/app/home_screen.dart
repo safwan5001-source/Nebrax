@@ -5,6 +5,7 @@ import '../commerce/commerce.dart';
 import '../registry/registry.dart';
 import '../schema/schema.dart';
 import 'binding_resolution.dart';
+import 'page_bindings.dart';
 import 'experience_hydration.dart';
 import 'runtime_schema.dart';
 import 'runtime_state.dart';
@@ -186,23 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [widget.locale] but does **not** refetch — recomputes `display_name`
   /// fresh on every build, exactly like `localizedProductName` was already
   /// called fresh on every build before this screen used bindings.
-  List<Object?> _localizeProducts(List<Object?> rawProducts) {
-    return [
-      for (final entry in rawProducts)
-        if (entry is Map) _withDisplayName(entry.cast<String, Object?>()),
-    ];
-  }
-
-  Map<String, Object?> _withDisplayName(Map<String, Object?> item) {
-    return {
-      ...item,
-      'display_name': localizedProductName(
-        item['name'] is String ? item['name'] as String : '',
-        item['name_en'] is String ? item['name_en'] as String : null,
-        widget.locale,
-      ),
-    };
-  }
+  List<Object?> _localizeProducts(List<Object?> rawProducts) => localizeProductItems(rawProducts, widget.locale);
 
   @override
   Widget build(BuildContext context) {
