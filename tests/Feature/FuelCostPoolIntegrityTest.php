@@ -73,6 +73,26 @@ class FuelCostPoolIntegrityTest extends TestCase
     }
 
     /** @test */
+    public function stock_without_a_cost_baseline_is_not_reported_as_a_verified_zero(): void
+    {
+        $f = $this->fixtureWithStock();
+        // منتج وقود ثانٍ برصيد تاريخي (قبل مجمّع التكلفة): حركة بمفتاح المجمّع بلا حالة تكلفة.
+        $legacy = Product::findOrFail($this->withToken($f['token'])->postJson('/api/products', [
+            'name' => 'وقود تاريخي', 'type' => 'good', 'unit' => 'mL', 'sale_price' => 1, 'purchase_price' => 1, 'track_inventory' => true,
+        ])->assertCreated()['data']['id']);
+        FuelProduct::create(['product_id' => $legacy->id, 'code' => 'F-LEGACY', 'name' => 'وقود تاريخي']);
+        app(InventoryService::class)->applyReceipt($legacy, 500, 99, ['warehouse_id' => $f['warehouse']->id, InventoryService::FUEL_POOL_META => true]);
+
+        $row = collect(app(InventoryReportService::class)->report('value')['rows'])->firstWhere('product_id', $legacy->id);
+        $this->assertSame(500 * 99, $row['stock_value']); // لا يُمحى التقييم السابق صامتاً
+        $this->assertSame('fuel_cost_baseline_missing', $row['value_basis']);
+
+        // والمنتج ذو المجمّع الكامل يبقى على المجمّع.
+        $verified = collect(app(InventoryReportService::class)->report('value')['rows'])->firstWhere('product_id', $f['product']->id);
+        $this->assertSame('fuel_cost_pool', $verified['value_basis']);
+    }
+
+    /** @test */
     public function a_warehouse_restricted_user_sees_the_pool_only_of_allowed_warehouses(): void
     {
         $f = $this->fixtureWithStock();

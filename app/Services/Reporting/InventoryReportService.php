@@ -195,8 +195,12 @@ class InventoryReportService
                 'avg_cost' => (int) $product->avg_cost,
                 // FS-03: الوقود بالهللات/مل كسرٌ (2.33 ر.س/ل = 0.233 هللة/مل) يُقتطع `avg_cost`
                 // الصحيح فيه إلى 0 فتصير كمية × avg_cost = 0؛ القيمة الدقيقة في مجمّع التكلفة.
-                'stock_value' => isset($fuelPools[(string) $product->id]) ? $fuelPools[(string) $product->id] : $quantity * (int) $product->avg_cost,
-                'value_basis' => isset($fuelPools[(string) $product->id]) ? 'fuel_cost_pool' : 'avg_cost',
+                'stock_value' => ($fuelPools[(string) $product->id]['complete'] ?? false) ? $fuelPools[(string) $product->id]['pool'] : $quantity * (int) $product->avg_cost,
+                'value_basis' => match (true) {
+                    ! isset($fuelPools[(string) $product->id]) => 'avg_cost',
+                    $fuelPools[(string) $product->id]['complete'] => 'fuel_cost_pool',
+                    default => 'fuel_cost_baseline_missing',
+                },
             ]);
         }
 
@@ -221,9 +225,13 @@ class InventoryReportService
      * مقيَّدةً بنطاق المخزن الفعّال حين يُقيَّد المستخدم. المفتاح: `products.id` للمنتجات التي لها
      * صف `fuel_products` فقط؛ غيرها لا يظهر فيبقى حسابها `كمية × avg_cost` حرفياً.
      *
+     * `complete=false` لمنتج له رصيد موجب في مخزنٍ ضمن النطاق بلا حالة تكلفة (رصيد تاريخي بلا baseline
+     * مدقَّق — `FUEL_COST_BASELINE_REQUIRED`): غياب المجمّع هنا ليس «صفراً موثَّقاً»، فيُبقي التقرير
+     * تقييمه القديم (`كمية × avg_cost`) موسوماً بأنه غير موثَّق بدل أن يمحو قيمته صامتاً.
+     *
      * @param  array<int,string>  $productIds
      * @param  array<int,string>|null  $warehouseIds
-     * @return array<string,int>
+     * @return array<string,array{pool:int,complete:bool}>
      */
     private function fuelCostPools(array $productIds, ?array $warehouseIds): array
     {
@@ -235,16 +243,30 @@ class InventoryReportService
             return [];
         }
 
-        $pools = FuelInventoryCostState::query()
+        $states = FuelInventoryCostState::query()
             ->whereIn('fuel_product_id', $fuelProducts->keys())
             ->when($warehouseIds !== null, fn ($query) => $query->whereIn('warehouse_id', $warehouseIds))
-            ->selectRaw('fuel_product_id, SUM(cost_pool_minor) as pool')
-            ->groupBy('fuel_product_id')
-            ->pluck('pool', 'fuel_product_id');
+            ->get(['fuel_product_id', 'warehouse_id', 'cost_pool_minor'])
+            ->groupBy('fuel_product_id');
+
+        $stocked = ProductWarehouseStock::query()
+            ->whereIn('product_id', $fuelProducts->values())
+            ->where('quantity', '>', 0)
+            ->when($warehouseIds !== null, fn ($query) => $query->whereIn('warehouse_id', $warehouseIds))
+            ->get(['product_id', 'warehouse_id'])
+            ->groupBy('product_id');
 
         $byProduct = [];
         foreach ($fuelProducts as $fuelProductId => $productId) {
-            $byProduct[(string) $productId] = (int) ($pools[$fuelProductId] ?? 0);
+            $productStates = $states->get($fuelProductId, collect());
+            $missing = array_diff(
+                $stocked->get($productId, collect())->pluck('warehouse_id')->all(),
+                $productStates->pluck('warehouse_id')->all(),
+            );
+            $byProduct[(string) $productId] = [
+                'pool' => (int) $productStates->sum('cost_pool_minor'),
+                'complete' => $missing === [],
+            ];
         }
 
         return $byProduct;
