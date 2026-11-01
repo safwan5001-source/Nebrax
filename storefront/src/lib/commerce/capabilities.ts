@@ -98,8 +98,17 @@ export const COUPON_CAPABILITY = "design_only" as CapabilityState;
  * Missing backend contract (tracked in AWJ_SPREE_EXIT_MIGRATION_PLAN.md, B1-B4):
  * a `store/v1` customer session (register / login / logout / me), verification
  * and recovery delivery, and profile update.
+ *
+ * **B2C-ACCOUNTS — now `live` (built).** The contract above exists: `store/v1`
+ * `auth/*`, `me` and `account/*` (profile, addresses, orders, sessions, guest-order
+ * claim). `live` means "the storefront code is built", NOT "every store has accounts":
+ * the backend gate is closed by default and per host, and the storefront asks the API
+ * (`GET storefront` → `capabilities.customer_accounts`). A host where that is not
+ * literally `true` keeps the honest "accounts are not available" notice
+ * (`AccountsGate`) and never reads a session — so deploying this changes no store
+ * until a store is deliberately switched on.
  */
-export const ACCOUNT_AUTH_CAPABILITY = "gated" as CapabilityState;
+export const ACCOUNT_AUTH_CAPABILITY = "live" as CapabilityState;
 
 /**
  * Online/card payment.
@@ -176,7 +185,12 @@ export const TAX_PRESENTATION_CAPABILITY = "deferred" as CapabilityState;
 /**
  * Account order history.
  *
- * `design_only`: `store/v1` is an anonymous catalog/cart/checkout API
+ * **B2C-ACCOUNTS: `live`** — `GET store/v1/account/orders[/{id}]` returns the
+ * signed-in customer's own orders (ownership from the verified session, never an
+ * id from the client); guest orders are linked only through a verified claim.
+ * The notes below describe the earlier gap and are kept for the record.
+ *
+ * (earlier) `design_only`: `store/v1` is an anonymous catalog/cart/checkout API
  * (`routes/api_storefront.php`). Completing checkout returns one
  * `CommerceOrder` in-session via `POST store/v1/checkout/complete`; there is
  * no `GET store/v1/account/orders` (or any customer order-list route) to read
@@ -197,8 +211,7 @@ export const TAX_PRESENTATION_CAPABILITY = "deferred" as CapabilityState;
  * `CommerceOrder.customer_identity_id` as null because the storefront cart
  * is an anonymous cookie. Listing orders is an identity problem first.
  */
-export const ACCOUNT_ORDER_HISTORY_CAPABILITY =
-  "design_only" as CapabilityState;
+export const ACCOUNT_ORDER_HISTORY_CAPABILITY = "live" as CapabilityState;
 
 /**
  * Account order lookup / detail.
@@ -215,7 +228,7 @@ export const ACCOUNT_ORDER_HISTORY_CAPABILITY =
  *                                      `serializeOrder()` shape
  * scoped to the authenticated customer (or a signed guest lookup token).
  */
-export const ACCOUNT_ORDER_LOOKUP_CAPABILITY = "design_only" as CapabilityState;
+export const ACCOUNT_ORDER_LOOKUP_CAPABILITY = "live" as CapabilityState;
 
 /**
  * Fulfilment / tracking timeline on an order.
@@ -255,7 +268,7 @@ export const ACCOUNT_ORDER_STATUS_CAPABILITY = "design_only" as CapabilityState;
  * also has to teach checkout to offer a saved address — that is a later
  * checkout slice, not this one.
  */
-export const ACCOUNT_ADDRESSES_CAPABILITY = "design_only" as CapabilityState;
+export const ACCOUNT_ADDRESSES_CAPABILITY = "live" as CapabilityState;
 
 /**
  * Saved payment methods on the account.

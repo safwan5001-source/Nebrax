@@ -19,8 +19,14 @@ use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Controllers\Api\StorefrontWholesaleController;
 use App\Http\Middleware\AuthenticateCommerceCustomer;
 use App\Http\Middleware\BindStorefrontBuyerToChannel;
+use App\Http\Controllers\Api\CommerceCustomerAddressController;
+use App\Http\Controllers\Api\StorefrontAccountController;
 use App\Http\Middleware\EnsureApprovedWholesaleBuyer;
+use App\Http\Middleware\EnsureBuyerIdentityEnabled;
+use App\Http\Middleware\EnsureRetailAccountsEnabled;
+use App\Http\Middleware\EstablishCustomerContext;
 use App\Http\Middleware\EnsureWholesaleBuyerEnabled;
+use App\Http\Middleware\EstablishRetailCustomerIfPresent;
 use App\Http\Middleware\EnsureWholesalePriceAccess;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\RequireStorefrontMutationGateway;
@@ -99,8 +105,8 @@ Route::middleware([
         ->middleware(EnsureWholesalePriceAccess::class)->name('offers.index');
 
     Route::get('cart', [StorefrontCartController::class, 'show'])
-        ->middleware(EnsureWholesalePriceAccess::class)->name('cart.show');
-    Route::middleware([RequireStorefrontMutationGateway::class, EnsureWholesalePriceAccess::class])->group(function () {
+        ->middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->name('cart.show');
+    Route::middleware([RequireStorefrontMutationGateway::class, EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->group(function () {
         Route::post('cart/items', [StorefrontCartController::class, 'store'])->name('cart.items.store');
         Route::patch('cart/items/{item}', [StorefrontCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
         Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
@@ -111,7 +117,10 @@ Route::middleware([
     // `wholesale_membership_enabled` وإلا 404 موحَّد (لا أثر على أي متجر DTC). الكتابة خلف بوابة الخادم.
     // الجلسة: `X-Customer-Token` مربوط بقناة هذا الـ Host (`store-channel:{id}`) فلا يُعاد استعماله عبر مضيف/قناة.
     // العضوية حالة أهلية مستقلة عن المصادقة؛ `wholesale/access` نموذج بوابة القدرات المحمية القادمة.
-    Route::middleware(EnsureWholesaleBuyerEnabled::class)->group(function () {
+    // B2C-ACCOUNTS — الهوية المشتركة (auth/*, me, auth/logout): تُفتح بأحد بابَين مستقلَّين — بوابة الجملة (أعلاه، بلا تغيير)
+    // أو بوابة حسابات التجزئة (`commerce.retail_accounts_enabled` + `sales_channels.customer_accounts_enabled`). الاثنان مغلقان افتراضياً
+    // فيبقى 404 الموحَّد، ولا يفتح أحدهما مسارات الآخر (مسارات `wholesale/*`/`buyer/*` تبقى خلف بوابة الجملة وحدها).
+    Route::middleware(EnsureBuyerIdentityEnabled::class)->group(function () {
         Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
             Route::post('auth/register', [StorefrontBuyerAuthController::class, 'register'])
                 ->middleware('throttle:storefront-buyer-register')->name('buyer.register');
@@ -131,6 +140,15 @@ Route::middleware([
                 ->middleware('throttle:storefront-buyer-reset')->name('buyer.password.reset');
         });
 
+        Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
+            Route::get('me', [StorefrontBuyerAuthController::class, 'me'])->name('buyer.me');
+            Route::post('auth/logout', [StorefrontBuyerAuthController::class, 'logout'])
+                ->middleware(RequireStorefrontMutationGateway::class)->name('buyer.logout');
+        });
+    });
+
+    // H6 — wholesale-only surface. Gate unchanged: deployment flag + wholesale-flagged channel, else uniform 404.
+    Route::middleware(EnsureWholesaleBuyerEnabled::class)->group(function () {
         // H6 Batch M — the approved buyer's own order history on this channel (approval re-checked every request; ownership from the
         // verified token via CustomerContext, never from input). A suspended/rejected buyer gets 403 like the catalogue.
         Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
@@ -149,10 +167,8 @@ Route::middleware([
         });
 
         Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
-            Route::get('me', [StorefrontBuyerAuthController::class, 'me'])->name('buyer.me');
             Route::get('wholesale/membership', [StorefrontWholesaleController::class, 'membership'])->name('wholesale.membership.show');
             Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
-                Route::post('auth/logout', [StorefrontBuyerAuthController::class, 'logout'])->name('buyer.logout');
                 Route::post('wholesale/application', [StorefrontWholesaleController::class, 'apply'])
                     ->middleware('throttle:storefront-buyer-apply')->name('wholesale.application.store');
             });
@@ -161,14 +177,50 @@ Route::middleware([
         });
     });
 
+    // B2C-ACCOUNTS — the signed-in retail shopper's OWN account. Gate: deployment flag + channel flag (else uniform 404).
+    // Identity comes ONLY from the verified `X-Customer-Token` bound to this host's channel; `EstablishCustomerContext` then
+    // gives the existing owner-scoped services (addresses, orders) their trusted owner. Guest browsing / cart / checkout /
+    // payment routes are NOT in this group and are untouched. Mutations require the storefront gateway secret like every
+    // other store mutation; the token never travels in a browser cookie to this API (server-to-server header only), so there
+    // is no ambient credential for a cross-site request to ride.
+    Route::middleware([
+        EnsureRetailAccountsEnabled::class,
+        AuthenticateCommerceCustomer::class,
+        BindStorefrontBuyerToChannel::class,
+        EstablishCustomerContext::class,
+    ])->prefix('account')->group(function () {
+        Route::get('profile', [StorefrontAccountController::class, 'show'])->name('account.profile.show');
+
+        Route::get('addresses', [CommerceCustomerAddressController::class, 'index'])->name('account.addresses.index');
+        Route::get('orders', [StorefrontBuyerOrderController::class, 'index'])->name('account.orders.index');
+        Route::get('orders/{order}', [StorefrontBuyerOrderController::class, 'show'])->whereUuid('order')->name('account.orders.show');
+        Route::get('sessions', [StorefrontAccountController::class, 'sessions'])->name('account.sessions.index');
+
+        Route::middleware([RequireStorefrontMutationGateway::class, 'throttle:storefront-account-write'])->group(function () {
+            Route::patch('profile', [StorefrontAccountController::class, 'update'])->name('account.profile.update');
+            Route::put('password', [StorefrontAccountController::class, 'changePassword'])
+                ->middleware('throttle:storefront-account-password')->name('account.password.update');
+
+            Route::post('addresses', [CommerceCustomerAddressController::class, 'store'])->name('account.addresses.store');
+            Route::patch('addresses/{id}', [CommerceCustomerAddressController::class, 'update'])->whereUuid('id')->name('account.addresses.update');
+            Route::delete('addresses/{id}', [CommerceCustomerAddressController::class, 'destroy'])->whereUuid('id')->name('account.addresses.destroy');
+
+            Route::post('orders/claim', [StorefrontAccountController::class, 'claimOrder'])
+                ->middleware('throttle:storefront-account-claim')->name('account.orders.claim');
+
+            Route::delete('sessions', [StorefrontAccountController::class, 'revokeOtherSessions'])->name('account.sessions.revoke_others');
+            Route::delete('sessions/{session}', [StorefrontAccountController::class, 'revokeSession'])->whereNumber('session')->name('account.sessions.revoke');
+        });
+    });
+
     // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —
     // idempotency إلزامية + التزامٌ صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9.
     Route::get('checkout', [StorefrontCheckoutController::class, 'show'])
-        ->middleware(EnsureWholesalePriceAccess::class)->name('checkout.show');
+        ->middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->name('checkout.show');
     // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة الحالية
     // (ADR-09 §3)، عبر PaymentMethodChannelAvailabilityService. قراءة فقط.
     Route::get('checkout/payment-methods', [StorefrontCheckoutController::class, 'paymentMethods'])
-        ->middleware(EnsureWholesalePriceAccess::class)->name('checkout.payment_methods.index');
+        ->middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->name('checkout.payment_methods.index');
     // PAY-H4-04a — حالة الدفع الإلكتروني لطلب (حقيقة الخادم، لا عودة المتصفح). الملكية بمرجع الطلب الموقَّع؛ مغلق (404) خلف البوابة المنصّية.
     Route::get('orders/{order}/payment-status', [StorefrontOnlinePaymentController::class, 'status'])
         ->whereUuid('order')->middleware('throttle:30,1')->name('orders.payment_status');
@@ -176,7 +228,7 @@ Route::middleware([
         // PAY-H4-04a — بدء/استئناف محاولة دفع إلكتروني للطلب (يعيد `checkout_url` لصفحة المزوّد المستضافة).
         Route::post('checkout/payment-intent', [StorefrontOnlinePaymentController::class, 'start'])
             ->middleware('throttle:10,1')->name('checkout.payment_intent.store');
-        Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
+        Route::middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->group(function () {
             Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
             Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
             Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');

@@ -8,8 +8,9 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  // Needs the throwaway Laravel stack (scripts/e2e/wholesale-stack.sh) — runs under playwright.wholesale-e2e.config.ts only.
-  testIgnore: /wholesale-buyer-journey\.spec\.ts/,
+  // Need the throwaway Laravel stack (scripts/e2e/wholesale-stack.sh | retail-accounts-stack.sh) — run only under
+  // playwright.wholesale-e2e.config.ts / playwright.retail-accounts-e2e.config.ts.
+  testIgnore: /(wholesale-buyer-journey|retail-accounts-journey)\.spec\.ts/,
   // Dev-mode Next.js compiles each route on first hit, which blows past Playwright's 30s default on CI runners.
   timeout: 120_000,
   fullyParallel: true,

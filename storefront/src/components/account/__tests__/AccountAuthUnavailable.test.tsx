@@ -7,6 +7,8 @@ const authMock = vi.hoisted(() => ({
   logout: vi.fn(),
   refreshUser: vi.fn(),
   user: null as null | { id: string; email: string },
+  accountsAvailable: false as boolean | null,
+  checkAccountsAvailable: vi.fn(),
 }));
 
 vi.mock("next-intl", () => ({
@@ -22,6 +24,8 @@ vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
     user: authMock.user,
     loading: false,
+    accountsAvailable: authMock.accountsAvailable,
+    checkAccountsAvailable: authMock.checkAccountsAvailable,
     isAuthenticated: !!authMock.user,
     login: authMock.login,
     register: authMock.register,
@@ -35,7 +39,6 @@ vi.mock("@/lib/data/customer", () => ({
   updateCustomer: vi.fn(),
 }));
 
-import ProfilePage from "@/app/[country]/[locale]/(storefront)/account/(authenticated)/profile/page";
 import ForgotPasswordPage from "@/app/[country]/[locale]/(storefront)/account/forgot-password/page";
 import RegisterPage from "@/app/[country]/[locale]/(storefront)/account/register/page";
 import ResetPasswordPage from "@/app/[country]/[locale]/(storefront)/account/reset-password/page";
@@ -46,13 +49,13 @@ const SURFACES: Array<[string, () => React.JSX.Element]> = [
   ["register", () => <RegisterPage />],
   ["forgot-password", () => <ForgotPasswordPage />],
   ["reset-password", () => <ResetPasswordPage />],
-  ["profile", () => <ProfilePage />],
 ];
 
-describe("auth surfaces while buyer authentication is gated", () => {
+describe("auth surfaces on a host without customer accounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.user = null;
+    authMock.accountsAvailable = false;
   });
 
   it.each(
@@ -67,6 +70,14 @@ describe("auth surfaces while buyer authentication is gated", () => {
     expect(container.querySelector("button[type='submit']")).toBeNull();
     expect(authMock.login).not.toHaveBeenCalled();
     expect(authMock.register).not.toHaveBeenCalled();
+  });
+
+  it("shows a quiet skeleton, not a form, until the API has answered", () => {
+    authMock.accountsAvailable = null;
+    const { container } = render(<AccountSignIn />);
+    expect(container.querySelector("form")).toBeNull();
+    expect(screen.queryByTestId("account-auth-unavailable")).toBeNull();
+    expect(authMock.checkAccountsAvailable).toHaveBeenCalled();
   });
 
   it("offers the guest journey (shop / cart) under the locale base path", () => {

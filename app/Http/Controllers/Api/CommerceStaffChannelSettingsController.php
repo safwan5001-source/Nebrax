@@ -36,6 +36,7 @@ class CommerceStaffChannelSettingsController extends ApiController
             'tenant_id' => ['prohibited'],
             SalesChannelSettingsService::KEY_PRICE_LIST => ['sometimes', 'nullable', 'uuid'],
             SalesChannelSettingsService::KEY_WHOLESALE => ['sometimes', 'boolean'],
+            SalesChannelSettingsService::KEY_CUSTOMER_ACCOUNTS => ['sometimes', 'boolean'],
         ]);
         unset($data['tenant_id']);
 
@@ -66,6 +67,8 @@ class CommerceStaffChannelSettingsController extends ApiController
             'wholesale_membership_enabled' => (bool) $channel->wholesale_membership_enabled,
             // Deployment master switch, read-only here: the channel flag alone never enables wholesale.
             'wholesale_deployment_enabled' => (bool) config('commerce.wholesale_buyer_enabled'),
+            'customer_accounts_enabled' => (bool) $channel->customer_accounts_enabled,
+            'customer_accounts_deployment_enabled' => (bool) config('commerce.retail_accounts_enabled'),
         ];
 
         if ($withHistory) {

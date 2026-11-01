@@ -80,7 +80,6 @@ import {
   requestPasswordReset,
   resetPassword,
   syncSession,
-  updateCustomer,
 } from "@/lib/data/customer";
 import { getPolicy, PolicyUnavailableError } from "@/lib/data/policies";
 
@@ -213,9 +212,9 @@ describe("test environment precondition", () => {
   });
 });
 
-describe("buyer account actions stay gated and never initialise Spree", () => {
-  it("ships gated", () => {
-    expect(ACCOUNT_AUTH_CAPABILITY).toBe("gated");
+describe("buyer account actions fail closed without Spree and without a host capability", () => {
+  it("ships live in code, but a host that does not state `customer_accounts` is closed", () => {
+    expect(ACCOUNT_AUTH_CAPABILITY).toBe("live");
   });
 
   it("every account action resolves to a typed refusal without touching Spree", async () => {
@@ -228,16 +227,22 @@ describe("buyer account actions stay gated and never initialise Spree", () => {
       }),
       await requestPasswordReset("a@b.sa", "https://shop.example.sa/r"),
       await resetPassword("tok", "secret1", "secret1"),
-      await updateCustomer({ first_name: "A" }),
     ];
     for (const r of results) {
       expect(r).toEqual({ success: false, code: "capability_unavailable" });
     }
     expect(await getCustomer()).toBeNull();
-    expect(await syncSession()).toEqual({ customer: null, refreshed: false });
+    expect(await syncSession()).toEqual({
+      available: false,
+      customer: null,
+      refreshed: false,
+    });
     await expect(logout()).resolves.toBeUndefined();
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    // The only upstream call is the AWJ storefront config read that decides availability — never Spree.
+    for (const url of awjUrls()) {
+      expect(url.startsWith(`${AWJ_API}/store/v1/storefront`)).toBe(true);
+    }
     expect(JSON.stringify(results)).not.toMatch(LEAK);
   });
 });

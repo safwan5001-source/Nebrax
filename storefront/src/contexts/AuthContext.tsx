@@ -11,8 +11,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
+import { ACCOUNT_HINT_COOKIE } from "@/lib/account/session-cookies";
 import {
+  getAccountsAvailable,
   login as loginAction,
   logout as logoutAction,
   register as registerAction,
@@ -24,14 +25,21 @@ export interface User {
   email: string;
   first_name?: string | null;
   last_name?: string | null;
+  phone?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  /**
+   * B2C-ACCOUNTS — whether this host offers customer accounts, as the API states it. `null` until the first session
+   * sync answers; `false` keeps every account screen on the honest "not available" notice and no session is read.
+   */
+  accountsAvailable: boolean | null;
   login: (
     email: string,
     password: string,
+    remember?: boolean,
   ) => Promise<{ success: boolean; code?: string }>;
   register: (params: {
     email: string;
@@ -40,11 +48,25 @@ interface AuthContextType {
     first_name?: string;
     last_name?: string;
     phone?: string;
-    metadata?: Record<string, unknown>;
-  }) => Promise<{ success: boolean; code?: string }>;
+    basePath?: string;
+  }) => Promise<{
+    success: boolean;
+    verificationRequired?: boolean;
+    code?: string;
+  }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** Asks the API once whether this host has customer accounts (used by the account screens for a visitor with no session). */
+  checkAccountsAvailable: () => Promise<void>;
   isAuthenticated: boolean;
+}
+
+/** The presence hint (see `ACCOUNT_HINT_COOKIE`): is there any chance of an account session in this browser? */
+function hasAccountHint(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((cookie) => cookie.startsWith(`${ACCOUNT_HINT_COOKIE}=`));
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -57,12 +79,16 @@ function toUser(customer: User): User {
     email: customer.email,
     first_name: customer.first_name,
     last_name: customer.last_name,
+    phone: customer.phone,
   };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accountsAvailable, setAccountsAvailable] = useState<boolean | null>(
+    null,
+  );
   const router = useRouter();
 
   // Fetch current user from server, refreshing an expired JWT when possible.
@@ -71,11 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // server components afterwards to replace any data they fetched with the
   // stale session.
   const refreshUser = useCallback(async () => {
-    // SPREE-X1: while buyer authentication is gated there is no session to
-    // reconcile — do not call the server (and so never reach Spree) at all.
-    if (ACCOUNT_AUTH_CAPABILITY !== "live") return;
+    // B2C-ACCOUNTS: the server decides whether this host has accounts at all; when it does not, `syncSession` reads no
+    // session and the provider stays anonymous.
     try {
-      const { customer, refreshed, stale } = await syncSession();
+      const { available, customer, refreshed, stale } = await syncSession();
+      setAccountsAvailable(available);
       // A transparent token rotation may have happened even when the follow-up
       // fetch came back stale — re-render server components so they pick up the
       // renewed session either way.
@@ -98,7 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       lastSyncRef.current = Date.now();
-      await refreshUser();
+      // No hint ⇒ no account session can exist in this browser: make no request (guests and stores without accounts
+      // behave exactly as before this feature).
+      if (hasAccountHint()) await refreshUser();
       setLoading(false);
     };
     initAuth();
@@ -112,6 +140,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const RESYNC_THROTTLE_MS = 30_000;
     const maybeResync = () => {
       if (document.visibilityState !== "visible") return;
+      if (!hasAccountHint()) {
+        // The session (and its hint) is gone — signed out in another tab, or an expired persistent cookie. Drop any
+        // authenticated state this tab still holds, with no request (anonymous visitors still cost nothing).
+        setUser((current) => (current === null ? current : null));
+        return;
+      }
       if (Date.now() - lastSyncRef.current < RESYNC_THROTTLE_MS) return;
       lastSyncRef.current = Date.now();
       void refreshUser();
@@ -126,10 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login
   const login = useCallback(
-    async (email: string, password: string) => {
-      const result = await loginAction(email, password);
+    async (email: string, password: string, remember = true) => {
+      const result = await loginAction(email, password, remember);
       if (result.success && result.user) {
         setUser(toUser(result.user));
+        setAccountsAvailable(true);
         router.refresh();
       }
       return result;
@@ -137,7 +172,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
-  // Register
+  const checkAccountsAvailable = useCallback(async () => {
+    try {
+      setAccountsAvailable(await getAccountsAvailable());
+    } catch {
+      setAccountsAvailable(false);
+    }
+  }, []);
+
+  // Register: the account is created UNVERIFIED — there is no session until the e-mail link is followed, so nothing is
+  // signed in here.
   const register = useCallback(
     async (params: {
       email: string;
@@ -146,16 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       first_name?: string;
       last_name?: string;
       phone?: string;
-      metadata?: Record<string, unknown>;
-    }) => {
-      const result = await registerAction(params);
-      if (result.success && result.user) {
-        setUser(toUser(result.user));
-        router.refresh();
-      }
-      return result;
-    },
-    [router],
+      basePath?: string;
+    }) => registerAction(params),
+    [],
   );
 
   // Logout
@@ -169,13 +206,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      accountsAvailable,
       login,
       register,
       logout,
       refreshUser,
+      checkAccountsAvailable,
       isAuthenticated: !!user,
     }),
-    [user, loading, login, register, logout, refreshUser],
+    [
+      user,
+      loading,
+      accountsAvailable,
+      login,
+      register,
+      logout,
+      refreshUser,
+      checkAccountsAvailable,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

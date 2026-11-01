@@ -78,11 +78,11 @@ class BuyerPasswordResetService
             'expires_at' => now()->addMinutes($ttl),
         ])->id;
 
-        $url = 'https://'.$host.BuyerEmailVerificationService::sanitizeLocalePath($localePath).'/buyer/reset-password?token='.$plain;
+        $url = 'https://'.$host.BuyerEmailVerificationService::sanitizeLocalePath($localePath).self::pagePrefix().'/reset-password?token='.$plain;
         $storeName = (string) (Tenant::query()->whereKey($tenantId)->value('name') ?? '');
 
         try {
-            Mail::to($identity->email)->send(new BuyerPasswordResetMail($url, $storeName, $ttl));
+            Mail::to($identity->email)->send(new BuyerPasswordResetMail($url, $storeName, $ttl, self::pagePrefix() === '/account'));
         } catch (Throwable $e) {
             CustomerPasswordResetToken::query()->whereKey($tokenId)->update(['used_at' => now()]);
             Log::warning('buyer password reset mail failed', ['tenant_id' => $tenantId, 'identity_id' => $identity->id, 'exception' => $e::class]);
@@ -146,6 +146,15 @@ class BuyerPasswordResetService
 
             return true;
         });
+    }
+
+    /**
+     * B2C-ACCOUNTS — the e-mailed link lands on the page family that is open on this host: the wholesale `/buyer/*` pages
+     * where wholesale is open (unchanged), otherwise the retail `/account/*` pages.
+     */
+    public static function pagePrefix(): string
+    {
+        return app(WholesaleBuyerGate::class)->isOpen() ? '/buyer' : '/account';
     }
 
     private function storeHostname(): ?string

@@ -26,6 +26,25 @@ return [
     'wholesale_buyer_enabled' => (bool) env('COMMERCE_WHOLESALE_BUYER_ENABLED', false),
 
     /*
+    |--------------------------------------------------------------------------
+    | حسابات العملاء للتجزئة (B2C) — B2C-ACCOUNTS
+    |--------------------------------------------------------------------------
+    |
+    | مغلق افتراضياً. يفتح مسارات `store/v1` لهوية المتسوّق (تسجيل/دخول/خروج/استرجاع كلمة المرور) ومسارات `account/*`
+    | (الملف الشخصي، العناوين، الطلبات، الجلسات، ربط طلبات الضيف) على قناة web موسومة `customer_accounts_enabled` فقط؛
+    | وإلا 404 موحَّد. لا أثر على التصفح كضيف أو السلة أو الإتمام أو الدفع. لا يُفتح عالمياً قبل قرار تفعيل منسَّق.
+    |
+    */
+    'retail_accounts_enabled' => (bool) env('COMMERCE_RETAIL_ACCOUNTS_ENABLED', false),
+
+    /*
+    | عمر جلسة حساب المتسوّق (أيام): «تذكّرني» (الافتراضي) يعطي رمزاً دائماً عبر إعادة تشغيل المتصفح؛ بدونها يوم واحد وكوكي جلسة.
+    | الرمز Sanctum قابل للإبطال (خروج/إنهاء الجلسات/تغيير كلمة المرور/إعادة تعيينها).
+    */
+    'account_session_days' => (int) env('COMMERCE_ACCOUNT_SESSION_DAYS', 30),
+    'account_session_days_short' => 1,
+
+    /*
     | H6 Batch H — buyer e-mail verification link lifetime (minutes) and the minimum gap between two verification
     | e-mails to the same identity (seconds; a request inside the gap is silently skipped — mail-bombing guard).
     */

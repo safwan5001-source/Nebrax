@@ -1,54 +1,32 @@
-import Link from "next/link";
-import { getTranslations } from "next-intl/server";
-import { AccountGatedNotice } from "@/components/account/AccountGatedNotice";
-import { ACCOUNT_ORDER_LOOKUP_CAPABILITY } from "@/lib/commerce/capabilities";
+import { AccountOrderDetailView } from "@/components/account/AccountOrdersView";
+import { OrdersUnavailable } from "@/components/account/OrdersUnavailable";
+import { getOrder } from "@/lib/data/customer";
 
 interface OrderDetailPageProps {
-  params: Promise<{
-    country: string;
-    locale: string;
-    id: string;
-  }>;
+  params: Promise<{ country: string; locale: string; id: string }>;
 }
 
 /**
- * AWJ DTC order detail. There is no `GET store/v1/account/orders/{id}`,
- * so this route does not call Spree `orders.get`. The designed
- * `AccountOrderDetail` surface lights up when that contract lands.
+ * One of the signed-in customer's own orders. Ownership is the API's: `GET account/orders/{id}` answers one identical 404
+ * for an order that does not exist, belongs to someone else, or belongs to another store — so a guessed id reveals
+ * nothing. The page never decides who owns what.
  */
 export default async function OrderDetailPage({
   params,
 }: OrderDetailPageProps) {
-  const { country, locale } = await params;
-  const t = await getTranslations({
-    locale: locale as Locale,
-    namespace: "orders",
-  });
+  const { country, locale, id } = await params;
   const basePath = `/${country}/${locale}`;
-  const unavailable = ACCOUNT_ORDER_LOOKUP_CAPABILITY !== "live";
+  const result = await getOrder(id);
 
-  return (
-    <div>
-      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
-        {t("orderNotFound")}
-      </h1>
-      {unavailable && (
-        <div className="mt-4">
-          <AccountGatedNotice
-            title={t("lookupUnavailableTitle")}
-            body={t("lookupUnavailableBody")}
-          />
-        </div>
-      )}
-      <p className="mt-4 text-sm text-store-muted-foreground">
-        {t("orderNotFoundDescription")}
-      </p>
-      <Link
-        href={`${basePath}/account/orders`}
-        className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-store-primary hover:text-store-primary-hover"
-      >
-        {t("backToOrders")}
-      </Link>
-    </div>
-  );
+  if (result.kind !== "ok") {
+    return (
+      <OrdersUnavailable
+        basePath={basePath}
+        signedOut={result.kind === "signed_out"}
+        notFound={result.kind === "not_found"}
+      />
+    );
+  }
+
+  return <AccountOrderDetailView order={result.data} basePath={basePath} />;
 }

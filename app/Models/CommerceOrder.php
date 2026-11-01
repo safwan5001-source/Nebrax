@@ -83,6 +83,9 @@ class CommerceOrder extends BaseModel implements CompanyWide
     /** @var list<string> */
     public const CANCELLATION_REASONS = ['customer_request', 'out_of_stock', 'payment_issue', 'duplicate_order', 'fraud_suspected', 'other'];
 
+    /** Order id currently being attached to its owner by the ownership-claim service (guards the immutability rule). */
+    private static ?string $ownershipClaimOrderId = null;
+
     protected $attributes = [
         'status' => self::STATUS_DRAFT,
         'total' => 0,
@@ -100,7 +103,17 @@ class CommerceOrder extends BaseModel implements CompanyWide
         // It is never rewritten, and a historical guest order is never claimed after the fact.
         static::updating(function (self $order): void {
             if ($order->isDirty('customer_identity_id')) {
-                throw new LogicException('مالك طلب Commerce (customer_identity_id) ثابتٌ بعد الإنشاء.');
+                // B2C-ACCOUNTS — the single sanctioned transition is NULL → identity, performed by
+                // {@see self::attachOwnerAfterVerifiedClaim()} on behalf of CommerceOrderOwnershipClaimService (which proves
+                // ownership first). Anything else — reassigning, clearing, or a bare ->save() — stays forbidden.
+                $sanctioned = self::$ownershipClaimOrderId === $order->id
+                    && $order->getOriginal('customer_identity_id') === null
+                    && is_string($order->customer_identity_id)
+                    && $order->customer_identity_id !== '';
+
+                if (! $sanctioned) {
+                    throw new LogicException('مالك طلب Commerce (customer_identity_id) ثابتٌ بعد الإنشاء.');
+                }
             }
         });
 
@@ -109,6 +122,26 @@ class CommerceOrder extends BaseModel implements CompanyWide
                 throw new LogicException('لا يمكن حذف طلب Commerce مؤكَّد — هو سجلٌّ تاريخي لالتزامٍ تجاري.');
             }
         });
+    }
+
+    /**
+     * B2C-ACCOUNTS — attach a guest order (owner NULL) to a verified customer identity. ONLY
+     * {@see \App\Services\Commerce\CommerceOrderOwnershipClaimService} may call this, after proving ownership and under a
+     * row lock. The model refuses any other change of `customer_identity_id` (see `booted()`).
+     */
+    public function attachOwnerAfterVerifiedClaim(string $customerIdentityId): void
+    {
+        if ($this->customer_identity_id !== null) {
+            throw new LogicException('مالك طلب Commerce (customer_identity_id) ثابتٌ بعد الإنشاء.');
+        }
+
+        self::$ownershipClaimOrderId = $this->id;
+        try {
+            $this->customer_identity_id = $customerIdentityId;
+            $this->save();
+        } finally {
+            self::$ownershipClaimOrderId = null;
+        }
     }
 
     public function lines(): HasMany

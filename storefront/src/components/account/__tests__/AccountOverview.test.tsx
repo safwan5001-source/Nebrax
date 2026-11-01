@@ -26,10 +26,12 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 describe("AccountOverview", () => {
-  it("does not fabricate order history on the landing page", () => {
-    expect(ACCOUNT_ORDER_HISTORY_CAPABILITY).toBe("design_only");
+  it("does not fabricate order history on the landing page (history lives on /account/orders)", () => {
+    expect(ACCOUNT_ORDER_HISTORY_CAPABILITY).toBe("live");
     render(<AccountOverview />);
-    expect(screen.getByText("lookupUnavailableTitle")).toBeInTheDocument();
+    expect(
+      screen.queryByText("lookupUnavailableTitle"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/AWJ-/)).not.toBeInTheDocument();
     expect(screen.queryByText(/invoice/i)).not.toBeInTheDocument();
   });

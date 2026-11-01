@@ -40,6 +40,7 @@ class SalesChannel extends BaseModel implements CompanyWide
     protected $casts = [
         'is_active' => 'boolean',
         'wholesale_membership_enabled' => 'boolean',
+        'customer_accounts_enabled' => 'boolean',
     ];
 
     protected $attributes = [
@@ -53,6 +54,11 @@ class SalesChannel extends BaseModel implements CompanyWide
             // web channels). Not mass-assignable: set explicitly by a later staff-settings batch.
             if ($channel->wholesale_membership_enabled && $channel->type !== self::TYPE_WEB) {
                 throw new DomainException('Only a web sales channel can require wholesale membership.');
+            }
+
+            // B2C-ACCOUNTS — retail shopper accounts exist only on a web (store-host) channel.
+            if ($channel->customer_accounts_enabled && $channel->type !== self::TYPE_WEB) {
+                throw new DomainException('Only a web sales channel can offer customer accounts.');
             }
 
             if (! $channel->isDirty('default_price_list_id') || $channel->default_price_list_id === null) {

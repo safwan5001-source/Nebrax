@@ -20,9 +20,10 @@ class CustomerAuthenticationService
      * @param  list<string>  $extraAbilities  additional token abilities (default none — unchanged behaviour). The
      *                                        store-host buyer flow passes a channel-binding ability so the token
      *                                        is only valid on the host/channel it was issued for.
+     * @param  int|null  $ttlDays  token lifetime override (B2C-ACCOUNTS "remember me"); null keeps the 7-day default
      * @return array{identity:CustomerIdentity,token:string}
      */
-    public function login(string $email, string $password, array $extraAbilities = []): array
+    public function login(string $email, string $password, array $extraAbilities = [], ?int $ttlDays = null): array
     {
         if (! $this->tenantContext->has()) {
             throw new LogicException('TenantContext is required before customer credential lookup.');
@@ -50,7 +51,7 @@ class CustomerAuthenticationService
         return [
             'identity' => $identity,
             'token' => $identity
-                ->createToken('customer', ['customer:access', ...$extraAbilities], now()->addDays(self::TOKEN_TTL_DAYS))
+                ->createToken('customer', ['customer:access', ...$extraAbilities], now()->addDays($ttlDays ?? self::TOKEN_TTL_DAYS))
                 ->plainTextToken,
         ];
     }
