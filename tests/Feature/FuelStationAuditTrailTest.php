@@ -132,8 +132,9 @@ class FuelStationAuditTrailTest extends TestCase
 
         $this->expectModelException(fn () => $event->update(['reason' => 'tamper']), LogicException::class);
         $this->expectModelException(fn () => $event->delete(), LogicException::class);
-        $this->expectModelException(fn () => DB::table('fuel_station_audit_events')->where('id', $event->id)->update(['action' => 'x']), QueryException::class);
-        $this->expectModelException(fn () => DB::table('fuel_station_audit_events')->where('id', $event->id)->delete(), QueryException::class);
+        // نقطة حفظ لكل محاولة: على PostgreSQL يُجهض أول خطأ مشغّل المعاملة المغلِّفة كلها.
+        $this->expectModelException(fn () => DB::transaction(fn () => DB::table('fuel_station_audit_events')->where('id', $event->id)->update(['action' => 'x'])), QueryException::class);
+        $this->expectModelException(fn () => DB::transaction(fn () => DB::table('fuel_station_audit_events')->where('id', $event->id)->delete()), QueryException::class);
         $this->assertSame(1, DB::table('fuel_station_audit_events')->count());
     }
 
