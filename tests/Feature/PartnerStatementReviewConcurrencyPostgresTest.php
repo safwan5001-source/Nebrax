@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
+use App\Models\JournalEntry;
 use App\Models\Partner;
 use App\Models\PartnerStatementLine;
 use App\Models\PartnerStatementReviewDecision;
 use App\Models\User;
 use App\Services\Accounting\InvoiceService;
+use App\Services\Accounting\LedgerService;
 use App\Services\PartnerStatementImportService;
 use App\Services\PartnerStatementMatchService;
 use App\Services\PartnerStatementReviewService;
@@ -192,6 +195,54 @@ class PartnerStatementReviewConcurrencyPostgresTest extends TestCase
         $this->assertCount(3, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
         $this->assertSame(3, PartnerStatementReviewDecision::query()->count());
         $this->assertCount(3, array_filter($this->successes($results), fn ($v) => $v['replayed'] === false));
+    }
+
+    /**
+     * Codex #1915 P2: ترحيل/عكس يُثبَّت **أثناء انتظار** قفل المراجعة لا يُتجاوز بلقطة سابقة للقفل. ثلاثة عمليات متزامنة: ماسك للقفل نفسه (1.6 ث)، ومراجِع يبدأ فوراً
+     * ويقف على القفل، وعاكس يعكس فاتورة الوحدة المختارة ويلتزم أثناء الانتظار ⇒ المراجِع يرى الدفتر بعد القفل فيُرفض `run_stale` ولا يُسجَّل قرار على وحدة معكوسة.
+     *
+     * @test
+     */
+    public function a_reversal_committed_while_the_review_waits_for_the_lock_makes_the_decision_stale(): void
+    {
+        [$id, $runId, $units, $lines] = $this->prepare([100000], ['1150.00']);
+        $invoiceId = substr($units[0], strlen('invoice#'));
+
+        $holder = function () use ($id) {
+            app(TenantContext::class)->set($this->tenantId);
+
+            return DB::transaction(function () use ($id) {
+                DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['partner-statement-review:'.$this->tenantId.':'.$id]);
+                usleep(1_600_000);
+
+                return 'held';
+            });
+        };
+        $reviewer = function () use ($id, $runId, $lines, $units) {
+            app(TenantContext::class)->set($this->tenantId);
+            $user = User::query()->findOrFail($this->userId);
+            auth()->setUser($user);
+            usleep(150_000);
+
+            return app(PartnerStatementReviewService::class)->decide($user, $id, ['run_id' => $runId, 'line_id' => $lines[0], 'action' => 'override', 'unit_keys' => [$units[0]], 'reason' => 'أثناء الانتظار'])['replayed'];
+        };
+        $reverser = function () use ($invoiceId) {
+            app(TenantContext::class)->set($this->tenantId);
+            auth()->setUser(User::query()->findOrFail($this->userId));
+            usleep(700_000);
+            $entry = JournalEntry::query()->where('source_type', Invoice::class)->where('source_id', $invoiceId)->firstOrFail();
+
+            return app(LedgerService::class)->reverse($entry, '2026-09-06', 'إلغاء أثناء المراجعة')->id;
+        };
+
+        $results = $this->runConcurrently([$holder, $reviewer, $reverser]);
+
+        app(TenantContext::class)->set($this->tenantId);
+        $this->assertTrue($results[0]['ok'] ?? false, json_encode($results[0], JSON_UNESCAPED_UNICODE));
+        $this->assertTrue($results[2]['ok'] ?? false, 'العكس التزم: '.json_encode($results[2], JSON_UNESCAPED_UNICODE));
+        $this->assertFalse($results[1]['ok'] ?? true, 'المراجِع يجب أن يُرفض: '.json_encode($results[1], JSON_UNESCAPED_UNICODE));
+        $this->assertSame(PartnerStatementReviewException::class, $results[1]['error_class'] ?? null, json_encode($results[1], JSON_UNESCAPED_UNICODE));
+        $this->assertSame(0, PartnerStatementReviewDecision::query()->count(), 'لا قرار على وحدة معكوسة.');
     }
 
     /** @param list<callable> $jobs @return array<int, array<string, mixed>> */

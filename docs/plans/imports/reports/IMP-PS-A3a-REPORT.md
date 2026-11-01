@@ -68,15 +68,19 @@ Writes are serialised per reconciliation by **two layers**: the PostgreSQL advis
 
 | Suite | Result |
 |---|---|
-| `PartnerStatementReviewApiTest` (13, real ledger) | pass on both (265 assertions) |
-| `PartnerStatementReviewConcurrencyPostgresTest` (4, `pcntl_fork`) | pass on PostgreSQL; skipped on SQLite |
-| Wider filter (PartnerStatement · BranchIsolation · ApplicationAccess/Catalog · Rbac · Migration · Schema · TenantApplication) | see the PR description for the final numbers |
+| `PartnerStatementReviewApiTest` (14, real ledger) | pass on both (281 assertions) |
+| `PartnerStatementReviewConcurrencyPostgresTest` (5, `pcntl_fork`) | pass on PostgreSQL; skipped on SQLite |
+| Wider filter (PartnerStatement · BranchIsolation · ApplicationAccess/Catalog · Rbac · Migration · Schema · TenantApplication), run on the first push (before the Codex fixes below) | SQLite: 520 passed, 45 skipped (PostgreSQL-only) · PostgreSQL: 564 passed, 1 skipped — **0 failures** on both. The PartnerStatement suites were re-run after the fixes |
 
 Covered: full lifecycle with linear revisions and a history read; reasons and acceptance rules and every malformed-input refusal (nothing written on any refusal); idempotent re-request and the changed-reason revision; double use by two lines and release on clear; stale run by ledger change and by engine/policy/scope; draft-only; `neutralised` and `incomplete` units refused for confirm **and** override; independent permissions (viewer, reconcile-only, no `partners.view`, none); disabled/suspended gate; other-tenant reconciliation/run/line; branch-restricted reviewer (org-wide run unusable, other branch's unit not in their ledger, hidden decisions); DB-level immutability, revision order and shape through raw SQL; migration `down()` refusal; static wall (no financial writer referenced; writes only the decision table); no financial effect (nine tables' row counts unchanged).
 
 PostgreSQL races: six lines racing for one unit ⇒ exactly one winner and clean `unit_already_decided` refusals; six identical requests ⇒ one revision and five replays; four different decisions on one line ⇒ revisions `1,2,3,4` without gaps; three distinct lines/units ⇒ all succeed (no false blocking). Zero database errors surface.
 
-**Mutation controls (each fails ≥ 1 test):** stale check removed · double-use check removed · non-`active` units allowed · override reason not required · difference acceptance not required · draft-only check removed · hidden-run filter removed from `list` · replay detection removed · (PostgreSQL) advisory lock **and** row lock removed ⇒ 3 of 4 race tests fail. *Finding recorded honestly:* removing the advisory lock alone does **not** fail the race tests, because the `FOR UPDATE` on the reconciliation row serialises the same writers — the two are redundant layers, kept deliberately (the row lock also gives the status re-read its guarantee).
+**Mutation controls (each fails ≥ 1 test):** stale check removed · double-use check removed · non-`active` units allowed · override reason not required · difference acceptance not required · draft-only check removed · hidden-run filter removed from `list` · replay detection removed · (PostgreSQL) advisory lock **and** row lock removed ⇒ 3 of 4 race tests fail · replay not bound to the run · ledger read before the lock (the pre-fix code) ⇒ the lock-wait race test fails. *Finding recorded honestly:* removing the advisory lock alone does **not** fail the race tests, because the `FOR UPDATE` on the reconciliation row serialises the same writers — the two are redundant layers, kept deliberately (the row lock also gives the status re-read its guarantee).
+
+### Codex review of this PR (both valid, fixed with tests that fail on the old behaviour)
+- **P2 — a replay must not cross run scopes.** An organisation-wide run and a branch-restricted run share the same ledger fingerprint when every unit sits in one branch, so a restricted reviewer's `confirm` could be answered with the unrestricted reviewer's decision (its run id and audit data) — which `GET` deliberately hides. Replay is now bound to the **requested run** (`current.run_id === run.id`); a restricted reviewer gets their own revision on their own run and sees it in their list. Test `a_replay_is_bound_to_the_requested_run_…` (fails without the binding).
+- **P2 — freshness is re-checked after the lock.** `LedgerService::reverse/post` do not take the review lock, so a reversal could commit while a decision waited for it and be confirmed from a pre-lock snapshot. The ledger source, the freshness check and the plan (unit state, net, warnings) are now computed **inside the transaction after the locks**. PostgreSQL test `a_reversal_committed_while_the_review_waits_for_the_lock_makes_the_decision_stale` (holder + reviewer + reverser forked; fails on the previous code, passes now). *Residual, declared:* under READ COMMITTED a posting that commits between that read and our commit is not prevented by a review-level lock; it surfaces as `run_stale` on the next decision/read. Closing that window needs the ledger anchor lock, which is out of scope here (the close slice A3c re-validates at close).
 
 ## 7. Risks and disclosures
 
@@ -84,8 +88,9 @@ PostgreSQL races: six lines racing for one unit ⇒ exactly one winner and clean
 2. **No "dismiss / no counterpart" action.** A statement line with no ledger counterpart can only be left undecided; there is no way yet to record "reviewed — genuinely absent from our books". Needed before close can require every line to be resolved; proposed for A3c with the status machine.
 3. **Statement data drift is guarded by immutability, not by a run digest.** `PartnerStatementLine` is immutable through its model guard and the reconciliation carries a frozen `identity_sha256`, but a raw-SQL edit of a line would not invalidate a run. A per-run statement digest would need a column on the A2c runs table; not added here to keep this slice additive-only. Recommended as part of A3c (close must verify it anyway).
 4. **Each decision reads the ledger once** (`PartnerLedgerCandidates`, same cost as `GET matches`). Acceptable at current statement sizes (≤ 2000 lines); batch review would amortise it later.
-5. `list` computes the effective set in memory over all decisions of one reconciliation (bounded by lines × revisions).
-6. Sandbox: `bcmath` and `contracts/` are absent locally (unrelated `Fuel*` / `AppSchemaContractCheckerTest`); CI is the authority.
+5. Reading the ledger inside the transaction holds the per-reconciliation lock for one report read (same cost as `GET matches`); only writers of the same reconciliation wait.
+6. `list` computes the effective set in memory over all decisions of one reconciliation (bounded by lines × revisions).
+7. Sandbox: `bcmath` and `contracts/` are absent locally (unrelated `Fuel*` / `AppSchemaContractCheckerTest`); CI is the authority.
 
 ## 8. Next step (owner approval required; not started)
 

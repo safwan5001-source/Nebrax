@@ -78,29 +78,29 @@ final class PartnerStatementReviewService
 
         $run = $this->run($actor, $reconciliation, (string) ($input['run_id'] ?? ''));
         $line = $this->line($reconciliation, (string) ($input['line_id'] ?? ''));
-        $source = $this->matching->source($actor, $reconciliation);
-        $this->assertFresh($run, $reconciliation, $source);
-
         $row = PartnerStatementMatch::query()->where('run_id', $run->id)->where('side', 'statement')->where('line_id', $line->id)->first();
         if ($row === null) {
             throw new PartnerStatementReviewException('line_not_in_run', 'سطر الكشف غير موجود ضمن هذه التشغيلة.');
         }
 
-        $plan = match ($action) {
-            PartnerStatementReviewDecision::ACTION_CLEAR => ['units' => [], 'net' => null],
-            PartnerStatementReviewDecision::ACTION_CONFIRM => $this->planConfirm($row, $reason, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
-            default => $this->planOverride($requested, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
-        };
-
-        $warnings = $action === PartnerStatementReviewDecision::ACTION_CLEAR ? [] : $this->warnings($run, $line, $plan['units']);
-
-        return DB::transaction(function () use ($actor, $reconciliation, $run, $line, $row, $action, $reason, $plan, $source, $warnings, $input): array {
+        return DB::transaction(function () use ($actor, $reconciliation, $run, $line, $row, $action, $reason, $requested, $input): array {
             $this->lock($reconciliation->id);
             // حالة المقارنة تُعاد قراءتها داخل المعاملة بعد القفل: لا مراجعة إلا على مسودة.
             $fresh = PartnerStatementReconciliation::query()->whereKey($reconciliation->id)->lockForUpdate()->first();
             if ($fresh === null || $fresh->status !== PartnerStatementReconciliation::STATUS_DRAFT) {
                 throw new PartnerStatementReviewException('reconciliation_not_editable', 'لا تُراجَع إلا المقارنة في حالة المسودة.', 409);
             }
+
+            // الدفتر يُقرأ **بعد** أخذ القفل (Codex #1915): ترحيل/عكس يُثبَّت أثناء انتظار القفل لا يتسرّب بلقطة سابقة (`LedgerService` لا يأخذ هذا القفل).
+            // يبقى حدّ READ COMMITTED المعلن: ترحيل يُثبَّت بين هذه القراءة والالتزام لا يمنعه قفل المراجعة؛ يظهر القِدَم عند أي قراءة/قرار لاحق.
+            $source = $this->matching->source($actor, $reconciliation);
+            $this->assertFresh($run, $reconciliation, $source);
+            $plan = match ($action) {
+                PartnerStatementReviewDecision::ACTION_CLEAR => ['units' => [], 'net' => null],
+                PartnerStatementReviewDecision::ACTION_CONFIRM => $this->planConfirm($row, $reason, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
+                default => $this->planOverride($requested, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
+            };
+            $warnings = $action === PartnerStatementReviewDecision::ACTION_CLEAR ? [] : $this->warnings($run, $line, $plan['units']);
 
             $decisions = $this->decisionsOf($reconciliation->id);
             $effective = $this->effective($decisions);
@@ -113,7 +113,7 @@ final class PartnerStatementReviewService
                     return ['decision' => null, 'replayed' => true, 'warnings' => []];
                 }
             } else {
-                if ($current !== null && $this->sameDecision($current, $action, $plan['units'], $reason, $source['fingerprint'])) {
+                if ($current !== null && $this->sameDecision($current, $run->id, $action, $plan['units'], $reason, $source['fingerprint'])) {
                     return ['decision' => $this->present($current), 'replayed' => true, 'warnings' => $warnings];
                 }
                 foreach ($plan['units'] as $unitKey) {
@@ -325,14 +325,15 @@ final class PartnerStatementReviewService
     /**
      * @param  list<string>  $units
      */
-    private function sameDecision(PartnerStatementReviewDecision $current, string $action, array $units, ?string $reason, string $fingerprint): bool
+    private function sameDecision(PartnerStatementReviewDecision $current, string $runId, string $action, array $units, ?string $reason, string $fingerprint): bool
     {
         $existing = $current->unit_keys;
         sort($existing);
         $new = $units;
         sort($new);
 
-        return $current->action === $action && $existing === $new && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint;
+        // الإعادة مرتبطة بالتشغيلة المطلوبة نفسها (Codex #1915): تشغيلتان بنطاقين مختلفين قد تشتركان في البصمة، ولا يُعاد لقارئ قرارٌ بُني على تشغيلة لا يقرؤها.
+        return $current->run_id === $runId && $current->action === $action && $existing === $new && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint;
     }
 
     /**

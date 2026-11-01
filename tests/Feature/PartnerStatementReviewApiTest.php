@@ -450,6 +450,43 @@ class PartnerStatementReviewApiTest extends TestCase
         $this->assertSame([3], array_column($this->listDecisions($token, $id)->assertOk()->json('data'), 'ordinal'));
     }
 
+    /**
+     * Codex #1915 P2: تشغيلتان بنطاقين مختلفين (مؤسسة / فرع) قد تشتركان في بصمة الدفتر إن كانت كل الوحدات في فرع واحد. إعادة الطلب مرتبطة بالتشغيلة المطلوبة:
+     * لا يُعاد لمراجع مقيَّد قرارٌ بُني على تشغيلة المؤسسة (معرّفها وبياناتها)، بل تُسجَّل نسخة له على تشغيلته هو، فيظهر في قائمته.
+     *
+     * @test
+     */
+    public function a_replay_is_bound_to_the_requested_run_so_a_restricted_reviewer_never_receives_an_unreadable_decision(): void
+    {
+        $inside = Branch::create(['code' => 'IN', 'name' => 'فرع داخل']);
+        $this->invoice('2026-09-01', 100000, $inside->id);   // كل وحدات الدفتر في فرع واحد ⇒ البصمة نفسها للتشغيلتين
+        $token = $this->role('ps-rb2', ['partner_statements.view', 'partner_statements.reconcile', 'partners.view'], 'rb2@ps-a3a.test');
+        User::query()->where('email', 'rb2@ps-a3a.test')->firstOrFail()->branches()->sync([$inside->id]);
+
+        $id = $this->statement([['date' => '2026-09-01', 'credit' => 115000]]);
+        $line = $this->lineId($id, 2);
+        $orgRun = $this->match($this->auth['token'], $id);
+        $own = $this->match($token, $id);
+        $this->assertNotSame($orgRun['id'], $own['id']);
+        $this->assertSame($orgRun['ledger_fingerprint'], $own['ledger_fingerprint'], 'نفس البصمة بنطاقين مختلفين — شرط الحالة.');
+
+        $first = $this->decide($this->auth['token'], $id, ['run_id' => $orgRun['id'], 'line_id' => $line, 'action' => 'confirm'])->assertCreated();
+
+        $second = $this->decide($token, $id, ['run_id' => $own['id'], 'line_id' => $line, 'action' => 'confirm'])->assertCreated();
+        $this->assertFalse($second->json('replayed'));
+        $this->assertSame([$own['id'], 2], [$second->json('data.run_id'), $second->json('data.revision')]);
+        $this->assertNotSame($first->json('data.id'), $second->json('data.id'));
+
+        // المقيَّد يرى قراره هو فقط؛ ولا يظهر له معرّف تشغيلة المؤسسة في أي استجابة.
+        $list = $this->listDecisions($token, $id)->assertOk();
+        $this->assertSame([$second->json('data.id')], array_column($list->json('data'), 'id'));
+        $this->assertStringNotContainsString($orgRun['id'], (string) $list->getContent());
+        $this->assertStringNotContainsString($orgRun['id'], (string) $second->getContent());
+
+        // وإعادة طلبه هو على تشغيلته تُعاد replayed.
+        $this->assertTrue($this->decide($token, $id, ['run_id' => $own['id'], 'line_id' => $line, 'action' => 'confirm'])->assertOk()->json('replayed'));
+    }
+
     // ═══════════════════════════════ سجل لا يتغيّر ═══════════════════════════════
 
     /** @test */
