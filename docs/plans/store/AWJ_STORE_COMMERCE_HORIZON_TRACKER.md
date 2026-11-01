@@ -1,6 +1,6 @@
 # AWJ Store Commerce — Horizon Tracker
 
-**آخر تحديث:** 2026-10-26 (سجل ENV0 الجزئي) · **Base الأصلي:** `main@6384ef6342e067407af2edf9c8999033a408186e` (الصفوف المحدَّثة تستند إلى `main@18fc006d4`) · **العقد:** `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1.md`
+**آخر تحديث:** 2026-11-01 (COPS-H1-0: مزامنة صفوف الطلبات O1/O3/O4/N4/F1 وD-9، وإضافة §9 برنامج COPS) · سابقاً 2026-10-26 (سجل ENV0 الجزئي) · **Base الأصلي:** `main@6384ef6342e067407af2edf9c8999033a408186e` (الصفوف المحدَّثة تستند إلى `main@18fc006d4`) · **العقد:** `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1.md`
 **قاعدة التحديث:** تُحدَّث الحالة بدليل (PR/SHA/CI/سجل بيئي) فقط. الدمج ≠ النشر ≠ التحقق البيئي (انظر العقد §2).
 
 **مفتاح الحالة:** `Planned` · `Blocked(D-x)` · `In PR` · `Merged` · `Deployed(env)` · `Env-Verified` · `Closed`.
@@ -18,6 +18,8 @@
 | H4 | Fulfillment, Delivery, Returns & Refunds | 10 | 4 | 6 | 0 | 0 | 0 | 0 | Open |
 | H5 | Store Experience, Promotions, Policies & Analytics | 7 | 2 | 5 | 0 | 0 | 0 | 0 | Open |
 | H6 | Final Spree Dependency Removal | 9 | 2 | 7 | 0 | 0 | 0 | 0 | Open |
+
+> **تنبيه صيانة (2026-11-01):** عدّادات هذه اللوحة لم يُعَد حسابها؛ صفوف الطلبات في §2 حُدِّثت بالدليل (O1، O3 مدموجتان)، وعمليات الطلبات انتقلت إلى برنامج **COPS** (§9) المرتبط بهذا المتتبّع.
 
 > لا أفق Closed. H0 هو الأقرب: X0/X1/X2/CTP1 مدموجة لكنها غير منشورة/مُتحقَّق منها بيئياً؛ X3/X4/X4-FIX/X5/META-BRAND-1/X6 مدموجة، وX4/X4-FIX وX5/META-BRAND-1 منشورة على Railway Beta بتحقق **يدوي** جزئي (ENV0 لم يكتمل: لا فحص HTTP مستقل ولا سجل ثابت لأسماء المتغيرات/مراجعة الخلفية)، والقرارات مفتوحة.
 
@@ -58,10 +60,10 @@
 | B5 | سلة وCheckout `store/v1` واعيان بالهوية + دمج سلة الضيف | C | P1 | B1 | D-1 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار H1 |
 | B6 | `me/orders` + بحث ضيف بمرجع موقَّع | C | P1 | B1 | D-1 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار B1 |
 | B7 | `me/addresses` CRUD + مرجع عنوان في checkout | C | P1 | B1 | D-1 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار B1 |
-| O1 | واجهة موظف لقراءة طلبات الويب (`commerce.orders.view`) | C | P1 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء الآن (لا تعتمد على الهوية) |
+| O1 | واجهة موظف لقراءة طلبات الويب (`commerce.orders.view`) | C | P1 | — | — | #1766 (O1a) · #1768 (O1b) | Claude Code | Merged | ✓ | ؟ | — | التحقق البيئي ضمن BOR لبرنامج COPS (§9) |
 | O2 | `GET store/v1/orders/{id}` للضيف + توحيد المسلسِل | C | P1 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء؛ تجميد شكل `complete` |
-| O3 | دورة حياة الطلب + الإلغاء + اتساق النية/الحجز | C | P1 | O1 | D-9 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار D-9 |
-| O4 | خط زمني/أحداث الطلب | C | P2 | O3 | D-9 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار O3 |
+| O3 | دورة حياة الطلب + الإلغاء + اتساق النية/الحجز | C | P1 | O1 | D-9 ✔ | #1770 (ADR-28) · #1774 · #1775 · #1777 · #1780 · #1781 · #1784 · #1785 (جاهزية) | Claude Code | Merged (بوابة `COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقة؛ غير مُفعَّل) | ✓ | ؟ | — | قرار تفعيل Beta منفصل؛ O3d = COPS-H6-1 (D-9-A1 مفتوح) |
+| O4 | خط زمني/أحداث الطلب | C | P1 | O3 | D-9 ✔ · R-2 ✔ | — | Claude Code | Planned → **COPS-H1-1** | — | — | — | يُنفَّذ كـCOPS-H1-1 (أحداث + FeedHead، ADR-29 §2.4) |
 | CK1 | مفاتيح العنوان الوطني السعودي في `PATCH checkout/address` | C | P1 | CTP1 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء (#1745 مدموج)؛ إضافي |
 | CK4 | سياسة حجز COD/الاستلام (قابلة للضبط) | C | P1 | O3 | D-10 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار D-10 |
 | CK5 | عرض الضريبة في السلة/Checkout | C | P2 | ADR ضريبي | — | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار ADR (TAX/EXT-05) |
@@ -71,7 +73,7 @@
 | S6 | العناوين live + اختيار عنوان محفوظ في Checkout | C | P1 | B7 S1 CTP1 | D-1 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار B7 |
 | S7 | صفحات تفاصيل/سجل طلبات الضيف والمسجّل + order-placed AWJ | C | P1 | O2 B6 | D-1 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار O2/B6 |
 | N2 | تأكيد الطلب للمشتري عبر outbox | C | P1 | N1 O1 | D-12 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار N1 وD-12 |
-| N4 | تنبيه التاجر بطلب ويب جديد | C | P1 | O1 | D-12 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار O1 |
+| N4 | تنبيه التاجر بطلب ويب جديد | C | P1 | O1 | D-OPS-6 ✔ (جزء التاجر داخل المتصفح؛ D-12 يبقى لقنوات المشتري) | — | Claude Code | Planned → **COPS-H3** | — | — | — | بعد COPS-H1-2 (H3-1/H3-2/H3-3) — يحتاج تفويض H3 |
 
 ### H3 — Payments, COD, Accounting & ZATCA
 
@@ -86,7 +88,7 @@
 
 | Slice | العنوان | مسار | أولوية | يعتمد على | قرارات | PR | المالك | الحالة | Merge | Deploy | Env | الخطوة التالية |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| F1 | شحنة/تتبّع/ناقل + إجراءات موظف + كتلة fulfillment إضافية | C | P1 | O1 O3 | D-9 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار D-9 |
+| F1 | شحنة/تتبّع/ناقل + إجراءات موظف + كتلة fulfillment إضافية | C | P1 | O1 O3 | D-9 ✔ · D-OPS-4 ✔ (تصميماً) | — | Claude Code | Planned → **COPS-H2** | — | — | — | بعد COPS-H1-4؛ D-OPS-4b وR-4 قبل H2-1/H2-4 — يحتاج تفويض H2 |
 | F2 | `PickupLocation` واختيار الفرع | C | P2 | F1 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | ADR-19 §5 مؤجَّل |
 | CK2 | `GET store/v1/checkout/delivery-options` | C | P1 | CTP1 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء (#1745 مدموج) |
 | CK3 | شحن مجاني فوق حدّ (سياسة) | C | P2 | CK2 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | بعد CK2 |
@@ -141,7 +143,7 @@
 | D-6 | عمر الجلسة وتجديدها | منزلقة محدودة (تدوير توكن) إن توفّر؛ وإلا ثابتة مع إعادة دخول | H1 | B2 | Open | Safwan | حسم قبل بدء: B2 |
 | D-7 | الشحنات المتعددة | إسقاط | H2 | CK6 | Open | Safwan | حسم قبل بدء: CK6 |
 | D-8 | الأثر المالي لطلبات COD/الاستلام وتوقيت ZATCA | ADR محاسبي/ضريبي؛ مغلق افتراضياً على نمط PAY-H4-03 | H3 | INV1، INV2، INV3 | Open | Safwan | حسم قبل بدء: INV1 |
-| D-9 | دورة حياة الطلب (حالات، أبعاد الدفع/التنفيذ، الإلغاء) | ADR؛ يحافظ على `CommerceOrder ≠ Invoice` — **مقترَح في `ADR-28-COMMERCE-ORDER-LIFECYCLE.md`** | H2 | O3، O4، F1، RT2 | Proposed (ADR-28، بانتظار الموافقة) | Safwan | حسم قبل بدء: O3 |
+| D-9 | دورة حياة الطلب (حالات، أبعاد الدفع/التنفيذ، الإلغاء) | ADR؛ يحافظ على `CommerceOrder ≠ Invoice` — `ADR-28-COMMERCE-ORDER-LIFECYCLE.md` | H2 | O3، O4، F1، RT2 | **Approved** (ADR-28 Accepted، 2026-11-01؛ D-9-A1 وحده مفتوح) | Safwan | — |
 | D-10 | حجز مخزون COD/الاستلام | سياسة قابلة للضبط: `none` (الافتراضي) أو `reserve_on_confirm` | H2 | CK4 | Open | Safwan | حسم قبل بدء: CK4 |
 | D-11 | تقييم المرتجعات (Return≠Refund≠CreditNote≠Exchange) | ADR أولاً | H4 | RT1، RT2، RT3، RT4 | Open | Safwan | حسم قبل بدء: RT1 |
 | D-12 | قنوات إشعار المشتري والتاجر وملكية القوالب والموافقة | مع D-2؛ المصدر Laravel (outbox) | H2 | N1، N2، N3، N4 | Open | Safwan | حسم قبل بدء: N1 |
@@ -189,6 +191,16 @@
 | X4-FIX | #1763 | `2f4de9c01ba5f1a7e5280c741aa7c4628114da2b` | 2026-10-26 | نعم (المالك) | Railway Beta — خلفية + واجهة المتجر (إفادة المالك) | غير مسجَّل |
 | X5 | #1765 | `7cc31d3076c4f56871f938d1c49c1fa1e806fa62` | 2026-10-26 | مشمولة بنشر `096f18f` | Railway Beta — واجهة المتجر (إفادة المالك) | غير مسجَّل |
 | META-BRAND-1 | #1767 | `096f18f2d1077975ce0a2f33fa67f6c126ec7123` | 2026-10-26 | نعم (المالك) | Railway Beta — واجهة المتجر، Deployment `e2fff4f1-850a-40bf-ba9b-5611ff309dcf` (إفادة المالك) | غير مسجَّل |
+| O1a | #1766 | `b8be8fbab91defc3d84ef1adf2a6e9cba9c8f812` | 2026-10-26 | — | ؟ | ؟ |
+| O1b | #1768 | `18fc006d42ae6fc233f0e108a3c535f6072240c2` | 2026-10-26 | — | ؟ | ؟ |
+| ADR-28 (وثائق) | #1770 | `a9ba9bd58c7ecb2e9a6464c5714cdf36fbbf5aa6` | 2026-10-26 | لا ينطبق | — | — |
+| O3a-1 | #1774 | `e46efc8da69608b86cc444245d14c90392689006` | 2026-10-27 | — | ؟ | ؟ |
+| O3a-2a | #1775 | `a3abed4eac7c4ba3fa5f442d1854b6413c95ea72` | 2026-10-27 | — | ؟ | ؟ |
+| O3a-2b | #1777 | `799d09e3f97e1f5c0dab968547632ac94a3850a6` | 2026-10-28 | — (البوابة مغلقة) | ؟ | ؟ |
+| O3b | #1780 | `f3d9f563503cadae17be16baec76c83fad3a7b8d` | 2026-10-28 | — | ؟ | ؟ |
+| O3c | #1781 | `e9761194fd2788bfb40b7c72a025ac475aafb9f2` | 2026-10-29 | — | ؟ | ؟ |
+| O3b fix | #1784 | `ec0236c200ff5d8996c78205ed2bb49bc85ce1b1` | 2026-10-29 | — | ؟ | ؟ |
+| جاهزية إلغاء Beta (وثائق) | #1785 | `01e66d68e8e17c75bb583909dddc8414d0a5a42d` | 2026-10-29 | لا ينطبق | — | — |
 
 ## 7. Function Tracker (84 صفاً)
 
@@ -231,10 +243,10 @@
 | F34 | صفحة تأكيد الطلب (داخل الجلسة) | Implemented | H2 | — | — | — |
 | F35 | عرض تفاصيل طلب لاحقاً (مشترٍ/ضيف) | Missing | H2 | O2 · B6 · S7 | D-1 | — |
 | F36 | سجل الطلبات | Missing | H2 | B6 · S5 · S7 | D-1 | — |
-| F37 | نموذج حالات الطلب | Partially Implemented | H2 | O3 | D-9 | — |
-| F38 | إلغاء الطلب (مشترٍ أو موظف) | Missing | H2 | O3 | D-9 | — |
-| F39 | إدارة الطلبات للموظف (قائمة/تفاصيل/تأكيد/تنفيذ) | Missing | H2 | O1 | — | — |
-| F40 | خط زمني/أحداث الطلب | Missing | H2 | O4 | D-9 | — |
+| F37 | نموذج حالات الطلب | Partially Implemented (إلغاء مبني؛ القبول/التنفيذ COPS-H1/H2) | H2 | O3 · COPS-H1-4 | D-9 ✔ | — |
+| F38 | إلغاء الطلب (مشترٍ أو موظف) | Partially Implemented (الموظف خلف بوابة مغلقة؛ المشتري COPS-H6-3) | H2 | O3 | D-9 ✔ | — |
+| F39 | إدارة الطلبات للموظف (قائمة/تفاصيل/تأكيد/تنفيذ) | Partially Implemented (قائمة/تفاصيل/إلغاء؛ القبول COPS-H1، التنفيذ COPS-H2) | H2 | O1 · COPS-H1-5 | — | — |
+| F40 | خط زمني/أحداث الطلب | Missing | H2 | O4 = COPS-H1-1 | D-9 ✔ | — |
 | F41 | نية دفع COD/الاستلام | Implemented | H3 | — | — | — |
 | F42 | تحصيل COD (موظف) | Partially Implemented | H3 | INV1 | D-8 | — |
 | F43 | دفع إلكتروني مستضاف: بدء + حالة + عودة | Partially Implemented | H3 | GATE-G3 | — | — |
@@ -261,7 +273,7 @@
 | F64 | بريد الشحن/الإلغاء (`order.shipped`/`order.canceled`) | Spree-dependent | H4 | N3 | D-12 | — |
 | F65 | بريد إعادة تعيين كلمة المرور | Spree-dependent | H1 | N5 · B3 | D-1, D-2 | — |
 | F66 | إشعار فشل الدفع للمشتري | Missing | H4 | N3 | D-12 | — |
-| F67 | تنبيه التاجر بطلب ويب جديد | Missing | H2 | N4 | D-12 | — |
+| F67 | تنبيه التاجر بطلب ويب جديد | Missing | H2 | N4 = COPS-H3 | D-OPS-6 ✔ | — |
 | F68 | OTP/تحقق | Partially Implemented | H1 | N1 | D-2, D-12 | — |
 | F69 | منصة الاتصالات (outbox) | Partially Implemented | H1 | N1 | D-2, D-12 | — |
 | F70 | تسجيل/دخول/خروج/جلسة/تجديد | Spree-dependent → Gated (X1 merged) | H1 | B1 · B2 · S1 | D-1, D-6 | — |
@@ -290,8 +302,31 @@
 | R-03 | `/policies/*` تفشل (500) | H0/H5 | X4 + X4-FIX منشورتان في Beta؛ مُخفَّف بتحقق يدوي بصري — يُغلق رسمياً بعد ENV0 |
 | R-04 | sitemap فارغ بصمت | H0 | X3 (#1753 في PR: الفشل يُسجَّل ويرمي خطأ عاماً) |
 | N-01 | COD بلا مستند مالي ولا حجز | H2/H3 | INV1 + CK4 |
-| N-02 | لا واجهة موظف لطلبات الويب | H2 | O1 |
-| N-03 | حالات الطلب `draft/confirmed` فقط ولا إلغاء | H2 | O3 |
+| N-02 | ~~لا واجهة موظف لطلبات الويب~~ — مُعالَج بـO1 (#1766/#1768)؛ يبقى: لا تحديث حي ولا تنبيه | H2 | O1 ✔ · COPS-H3 |
+| N-03 | لا قبول ولا تنفيذ (الإلغاء مبني خلف بوابة مغلقة) | H2 | O3 ✔ · COPS-H1-4 · COPS-H2 |
 | N-04 | لا قناة إشعار للمشتري | H1/H2 | N1/N2 |
 | N-05 | GA4 `purchase` غير مربوط بـCheckout AWJ | H5 | AN1 (يحجب R1) |
 | N-07 | محرك الاسترداد غير قابل للوصول لطلبات المتجر | H4 | RT3 |
+
+## 9. برنامج COPS — AWJ Commerce Operations Horizon
+
+امتداد لهذا المتتبّع لعمليات الطلبات (القبول، التنفيذ، التتبع، التنبيه، إعدادات المتجر، COD، المرتجعات). **العقد:** `ADR-29-COMMERCE-ORDER-OPERATIONS.md` · **الخطة:** `docs/audits/AWJ_COMMERCE_OPERATIONS_AUDIT.md` + `docs/audits/AWJ_COMMERCE_OPERATIONS_H0_REVISION.md` (يحلّ محلّ §E/§G/§H) · **التسليم الحيّ:** `docs/audits/AWJ_COPS_HORIZON_HANDOFF.md`.
+**مستويات الإغلاق:** EC (هندسي) ≠ BOR (جاهزية Beta) ≠ FPC (منتج كامل). الدمج ≠ النشر ≠ التفعيل ≠ التحقق البيئي.
+
+| Slice | العنوان | يعتمد | قرارات | PR | الحالة | Merge | Deploy | Activated | Env |
+|---|---|---|---|---|---|---|---|---|---|
+| COPS-H0 | تدقيق + خطة + Revision 1 | — | — | (وثائق أُدرجت في H1-0) | Done | — | لا ينطبق | لا ينطبق | — |
+| COPS-H1-0 | ADR-29 + ADR-28 Accepted + المتتبّع + Handoff | H0 | R-1 ✔ | (هذا الـPR) | In PR | — | لا ينطبق | لا ينطبق | — |
+| COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ | — | Planned (تفويض H1 ✔؛ نقطة توقف نموذج) | — | — | — | — |
+| COPS-H1-2 | أحداث afterCommit + `feed` + `attention` | H1-1 | R-5 ✔ | — | Planned | — | — | — | — |
+| COPS-H1-3 | أساس إعدادات تشغيل القناة (القبول) | H1-0 | D-OPS-1 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
+| COPS-H1-4 | القبول/الرفض + `commerce.orders.manage` + المُسقِط | H1-1 · H1-3 | R-3 ✔ · R-5 ✔ · R-6 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
+| COPS-H1-5 | واجهة الموظف للقبول/الرفض والخط الزمني | H1-4 | — | — | Planned | — | — | — | — |
+| COPS-H2 | التنفيذ والتتبع (H2-1..H2-6؛ H2-7/H2-8 محجوبتان) | H1-4 | D-OPS-4 ✔ · D-OPS-4b · R-4 · R-7 | — | Not authorized | — | — | — | — |
+| COPS-H3 | تنبيهات التاجر ومساحة الاستقبال (H3-0..H3-7؛ H3-P مستقلة) | H1-2 | D-OPS-6 ✔ · R-8 · R-10 · R-11 | — | Not authorized | — | — | — | — |
+| COPS-H4 | مركز إعدادات المتجر | H1-3 (H4-3) | D-OPS-7 · D-OPS-8 · R-12 | — | Not authorized | — | — | — | — |
+| COPS-H5 | COD محاسبة/مخزون | — | **D-8 · D-10 · R-9** | — | Blocked | — | — | — | — |
+| COPS-H6 | إلغاء/فشل توصيل/مرتجعات | H2 | D-9-A1 · D-OPS-4c · **D-11** | — | Blocked/Not authorized | — | — | — | — |
+| COPS-H7 | إشعارات المشتري | H1-2 | **N1 · D-12** | — | Blocked | — | — | — | — |
+| COPS-H8 | تفعيل لكل مستأجر + E2E + إغلاق | الكل | — | — | Not authorized | — | — | — | — |
+
