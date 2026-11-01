@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Branch;
+use App\Models\JournalLine;
 use App\Models\CashBankAccount;
 use App\Models\CorporateFuelContract;
 use App\Models\FuelCardUsage;
@@ -19,6 +21,7 @@ use App\Models\FuelStationProductPrice;
 use App\Models\FuelTank;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoutingService;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceService;
@@ -40,6 +43,7 @@ class FuelSaleServiceTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+    use CapturesThrowable;
 
     /** @test */
     public function it_finalizes_a_fractional_fuel_sale_once_to_a_credit_invoice_and_exact_fuel_cogs(): void
@@ -495,6 +499,95 @@ class FuelSaleServiceTest extends TestCase
         }
         $this->assertNull($creditBlocked->fresh()->invoice_id);
         $this->assertSame(0, FuelCardUsage::where('fuel_card_id', $unrestrictedCard->id)->count());
+    }
+
+    /** @test FS-07: سقف الائتمان يحسب التعرّض على مجموعة حسابات دور الذمم لا على 1130 وحده. */
+    public function corporate_credit_exposure_follows_the_receivable_role_after_a_remap(): void
+    {
+        $fixture = $this->fixture('fs07');
+        app(FuelStationSettingsService::class)->putStationValues($fixture['station'], [
+            'corporate_credit_enabled' => true,
+            'fuel_price_tax_mode' => 'tax_exclusive',
+        ], $fixture['actor'], 'تفعيل عقد الشركات للاختبار');
+        app(FuelStationProductPriceService::class)->create([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230, 'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        $contracts = app(CorporateFuelContractService::class);
+        $contract = $contracts->activate($contracts->create([
+            'partner_id' => $fixture['customer_id'], 'effective_from' => now()->subMinute()->toIso8601String(),
+            'credit_limit_minor' => 300, 'payment_terms_days' => 30,
+            'station_restriction_mode' => 'selected', 'station_ids' => [$fixture['station']->id],
+            'fuel_restriction_mode' => 'selected', 'fuel_product_ids' => [$fixture['fuelProduct']->id],
+            'reason' => 'عقد ائتمان لاختبار الدور',
+        ], $fixture['actor']), $fixture['actor'], 'اعتماد');
+        $contracts->createPrice($contract, [
+            'fuel_product_id' => $fixture['fuelProduct']->id, 'price_per_liter_minor' => 265, 'tax_mode' => 'tax_inclusive',
+            'effective_from' => now()->subMinute()->toIso8601String(), 'reason' => 'سعر عقد شامل',
+        ], $fixture['actor']);
+        $card = app(FuelCardService::class)->create([
+            'public_identifier' => 'CARD-FS07', 'credential' => 'secret-fs07', 'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id, 'effective_from' => now()->subMinute()->toIso8601String(), 'reason' => 'بطاقة',
+        ], $fixture['actor']);
+        $shift = app(FuelShiftService::class)->open(['fuel_station_id' => $fixture['station']->id, 'opening_float_minor' => 0, 'idempotency_key' => 'fs07-shift'], $fixture['actor']);
+
+        // إعادة تعيين دور الذمم إلى حساب جديد: الفواتير اللاحقة تُرحَّل عليه لا على 1130.
+        $ar = Account::create(['code' => '1198', 'name' => 'ذمم عملاء بديلة', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        app(AccountRoutingService::class)->setMapping('accounts_receivable', $ar->id, $fixture['actor']);
+
+        $sales = app(FuelSaleService::class);
+        $draft = fn (string $key) => $sales->createDraft([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'], 'corporate_fuel_contract_id' => $contract->id, 'fuel_card_id' => $card->id,
+            'quantity_milliliters' => 1000, 'idempotency_key' => $key,
+        ], $fixture['actor']);
+
+        $sales->finalize($draft('fs07-sale-1'), $fixture['actor']);
+        $this->assertSame(265, app(CorporateFuelAuthorizationService::class)->officialExposure($fixture['customer_id']),
+            'التعرّض الرسمي يجب أن يشمل الذمم المرحَّلة على حساب الدور الجديد.');
+
+        $blocked = $draft('fs07-sale-2');
+        $exception = $this->thrown(fn () => $sales->finalize($blocked, $fixture['actor']), 'كان يجب أن يمنع السقف البيع الثاني بعد إعادة تعيين الدور.');
+        $this->assertSame('CORPORATE_CREDIT_LIMIT_EXCEEDED', $exception->getMessage());
+        $this->assertNull($blocked->fresh()->invoice_id);
+    }
+
+    /** @test FS-11: COGS والمخزون يتبعان دورَي cogs وinventory_asset، وتجاوز المحطة الصريح يتقدّم عليهما. */
+    public function fuel_cogs_follows_the_cogs_and_inventory_roles_and_the_station_override_wins(): void
+    {
+        $fixture = $this->fixture('fs11');
+        app(FuelStationProductPriceService::class)->create([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230, 'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        $shift = app(FuelShiftService::class)->open(['fuel_station_id' => $fixture['station']->id, 'opening_float_minor' => 0, 'idempotency_key' => 'fs11-shift'], $fixture['actor']);
+        $cogsRole = Account::create(['code' => '5199', 'name' => 'تكلفة مبيعات بديلة', 'type' => 'expense', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $invRole = Account::create(['code' => '1199', 'name' => 'مخزون بديل', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $routing = app(AccountRoutingService::class);
+        $routing->setMapping('cogs', $cogsRole->id, $fixture['actor']);
+        $routing->setMapping('inventory_asset', $invRole->id, $fixture['actor']);
+
+        $sales = app(FuelSaleService::class);
+        $finalize = fn (string $key) => $sales->finalize($sales->createDraft([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'], 'quantity_milliliters' => 1000, 'idempotency_key' => $key,
+        ], $fixture['actor']), $fixture['actor']);
+
+        $sale = $finalize('fs11-sale-1');
+        $lines = JournalLine::where('journal_entry_id', $sale->cogs_journal_entry_id)->get();
+        $this->assertSame($sale->cogs_minor, (int) $lines->firstWhere('account_id', $cogsRole->id)->debit);
+        $this->assertSame($sale->cogs_minor, (int) $lines->firstWhere('account_id', $invRole->id)->credit);
+        $this->assertCount(2, $lines);
+
+        // تجاوز المحطة الصريح يتقدّم على الدور.
+        $cogsStation = Account::create(['code' => '5198', 'name' => 'تكلفة المحطة', 'type' => 'expense', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $invStation = Account::create(['code' => '1198', 'name' => 'مخزون المحطة', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $fixture['station']->update(['default_cogs_account_id' => $cogsStation->id, 'default_inventory_account_id' => $invStation->id]);
+        $second = $finalize('fs11-sale-2');
+        $lines = JournalLine::where('journal_entry_id', $second->cogs_journal_entry_id)->get();
+        $this->assertNotNull($lines->firstWhere('account_id', $cogsStation->id));
+        $this->assertNotNull($lines->firstWhere('account_id', $invStation->id));
+        $this->assertNull($lines->firstWhere('account_id', $cogsRole->id));
     }
 
     /** @return array<string,mixed> */

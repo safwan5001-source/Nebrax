@@ -17,6 +17,7 @@ use App\Models\ProductWarehouseStock;
 use App\Models\User;
 use App\Models\FuelShiftEvent;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceLinePrecision;
 use App\Services\Accounting\InvoiceService;
@@ -46,6 +47,7 @@ class FuelSaleService
         private CorporateFuelAuthorizationService $corporateAuthorizations,
         private FuelAviAuthorizationService $aviAuthorizations,
         private FuelFleetService $fleet,
+        private AccountRoleResolver $roles,
     ) {}
 
     /** @param array<string,mixed> $attributes */
@@ -391,8 +393,8 @@ class FuelSaleService
         if ($amount === 0) {
             return null;
         }
-        $cogs = $this->account($station->default_cogs_account_id, '5110', ['expense']);
-        $inventory = $this->account($station->default_inventory_account_id, '1140', ['asset']);
+        $cogs = $this->account($station->default_cogs_account_id, 'cogs', ['expense']);
+        $inventory = $this->account($station->default_inventory_account_id, 'inventory_asset', ['asset']);
 
         return $this->ledger->post([
             ['account_id' => $cogs->id, 'debit' => $amount],
@@ -406,9 +408,13 @@ class FuelSaleService
         ]);
     }
 
-    private function account(?string $id, string $fallbackCode, array $allowedTypes): Account
+    /**
+     * FS-11: تجاوز المحطة الصريح يتقدّم؛ وإلا يُحلّ الدور المحاسبي المعتمد للمستأجر (cogs / inventory_asset)
+     * كما يفعل مسار الفوترة العامة، لا الكود الثابت. غياب التعيين = فشل مغلق من المحلِّل بلا سقوط.
+     */
+    private function account(?string $id, string $roleKey, array $allowedTypes): Account
     {
-        $account = $id ? Account::whereKey($id)->first() : Account::where('code', $fallbackCode)->first();
+        $account = $id ? Account::whereKey($id)->first() : $this->roles->resolve($roleKey);
         if (! $account || $account->is_group || ! $account->is_active || ! in_array($account->type, $allowedTypes, true)) {
             throw new RuntimeException('تعيين حساب محطة الوقود غير صالح لعملية البيع.');
         }

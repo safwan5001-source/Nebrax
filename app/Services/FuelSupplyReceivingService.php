@@ -17,6 +17,7 @@ use App\Models\ProcurementDocument;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\LedgerService;
 use App\Tenancy\TenantContext;
@@ -30,14 +31,13 @@ use RuntimeException;
  */
 class FuelSupplyReceivingService
 {
-    private const PAYABLE_CODE = '2110';
-
     public function __construct(
         private InventoryService $inventory,
         private LedgerService $ledger,
         private FuelStationSettingsService $settings,
         private FuelCostBasisService $costBasis,
         private FuelQuantity $quantity,
+        private AccountRoleResolver $roles,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -415,9 +415,10 @@ class FuelSupplyReceivingService
     private function postGrniClearing(FuelSupplierInvoice $invoice, FuelDelivery $delivery, int $value, string $actorId): JournalEntry
     {
         $grni = Account::findOrFail($delivery->grni_account_id);
-        $payable = Account::where('code', self::PAYABLE_CODE)->first();
-        if (! $payable || ! $payable->is_active || $payable->is_group || $payable->type !== 'liability') {
-            throw new RuntimeException('حساب الموردين القياسي غير صالح لترحيل مطابقة GRNI.');
+        // FS-34: دور الموردين المعتمد للمستأجر (accounts_payable) لا الكود 2110؛ غياب التعيين فشل مغلق.
+        $payable = $this->roles->resolve('accounts_payable');
+        if ($payable->type !== 'liability') {
+            throw new RuntimeException('حساب الموردين المعيَّن غير صالح لترحيل مطابقة GRNI.');
         }
 
         return $this->ledger->post([
@@ -434,8 +435,9 @@ class FuelSupplyReceivingService
 
     private function inventoryAccountId(): string
     {
-        $account = Account::where('code', '1140')->first();
-        if (! $account || ! $account->is_active || $account->is_group || $account->type !== 'asset') {
+        // FS-34: دور المخزون المعتمد (inventory_asset) لا الكود 1140.
+        $account = $this->roles->resolve('inventory_asset');
+        if ($account->type !== 'asset') {
             throw new RuntimeException('حساب مخزون الوقود غير صالح للترحيل.');
         }
 
