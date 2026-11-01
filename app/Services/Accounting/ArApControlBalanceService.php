@@ -93,6 +93,22 @@ class ArApControlBalanceService
     }
 
     /**
+     * معرّفات حسابات دور الذمم (عملاء/موردون) بالتعريف نفسه المعتمد في هذا الصنف:
+     * التعيين الحالي ∪ الحساب النظامي ∪ سجلّ تعيينات الدور، بعد استبعاد الحسابات المحذوفة.
+     * قراءة فقط؛ مصدر واحد للمجموعة فلا يعيد مستهلك (كسقف الائتمان) اشتقاقها بنسخته.
+     *
+     * @return list<string>
+     */
+    public function accountIdsForRole(string $roleKey): array
+    {
+        if (! in_array($roleKey, self::roleKeys(), true)) {
+            throw new \InvalidArgumentException("دور ذمم غير معروف: «{$roleKey}».");
+        }
+
+        return array_map('strval', array_keys($this->snapshot()['sets'][$roleKey]));
+    }
+
+    /**
      * @return array{
      *     as_of: string,
      *     roles: array<string, array<string,mixed>>,

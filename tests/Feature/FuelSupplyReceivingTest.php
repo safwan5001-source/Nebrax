@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoutingService;
 use App\Services\Accounting\InventoryService;
 use App\Services\FuelCostBasisService;
 use App\Services\FuelStationSettingsService;
@@ -196,6 +197,40 @@ class FuelSupplyReceivingTest extends TestCase
         $quote = app(FuelCostBasisService::class)->quoteIssue($fixture['fuel'], $fixture['warehouse'], 10000);
         $this->assertSame(1670, $quote['posted_cost_minor']);
         $this->assertNotSame($first->stock_movement_id, $second->stock_movement_id);
+    }
+
+    /** @test FS-34: ترحيل الاستلام ومطابقة GRNI يتبعان دورَي inventory_asset وaccounts_payable لا الكودين 1140/2110. */
+    public function receipt_and_grni_clearing_follow_the_inventory_and_payable_roles(): void
+    {
+        $fixture = $this->fixture();
+        $inventory = Account::create(['code' => '1199', 'name' => 'مخزون بديل', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $payable = Account::create(['code' => '2198', 'name' => 'موردون بديل', 'type' => 'liability', 'normal_balance' => 'credit', 'is_group' => false, 'is_active' => true]);
+        $routing = app(AccountRoutingService::class);
+        $routing->setMapping('inventory_asset', $inventory->id, null);
+        $routing->setMapping('accounts_payable', $payable->id, null);
+
+        $approved = $fixture['service']->approveDelivery(
+            $fixture['service']->createDelivery($this->deliveryData($fixture, 'receipt-role-remap', 2345)),
+            $fixture['owner_id'],
+        );
+        $receiptLines = JournalLine::where('journal_entry_id', $approved->journal_entry_id)->get()->keyBy('account_id');
+        $this->assertSame(2345, (int) $receiptLines[$inventory->id]->debit);
+        $this->assertSame(2345, (int) $receiptLines[$fixture['grni']->id]->credit);
+        $this->assertNull($receiptLines->get(Account::where('code', '1140')->firstOrFail()->id), 'لا ترحيل على 1140 بعد إعادة تعيين الدور.');
+
+        $invoice = $fixture['service']->createSupplierInvoice([
+            'supplier_id' => $fixture['supplier']->id, 'invoice_number' => 'SUP-ROLE-1', 'invoice_date' => '2026-08-23', 'currency' => 'SAR',
+            'created_by' => $fixture['owner_id'],
+            'lines' => [['fuel_product_id' => $fixture['fuel']->id, 'quantity_liters' => '10.000', 'value_minor' => 2345]],
+        ]);
+        $match = $fixture['service']->matchSupplierInvoiceLine($invoice, [
+            'fuel_supplier_invoice_line_id' => $invoice->lines->first()->id, 'fuel_delivery_id' => $approved->id,
+            'quantity_liters' => '10.000', 'idempotency_key' => 'match-role-remap',
+        ], $fixture['owner_id']);
+        $matchLines = JournalLine::where('journal_entry_id', $match->journal_entry_id)->get()->keyBy('account_id');
+        $this->assertSame(2345, (int) $matchLines[$fixture['grni']->id]->debit);
+        $this->assertSame(2345, (int) $matchLines[$payable->id]->credit);
+        $this->assertNull($matchLines->get(Account::where('code', '2110')->firstOrFail()->id), 'لا ترحيل على 2110 بعد إعادة تعيين الدور.');
     }
 
     /** @return array{service:FuelSupplyReceivingService, station:FuelStation, tank:FuelTank, fuel:FuelProduct, product:Product, warehouse:Warehouse, supplier:Partner, grni:Account, owner_id:string} */

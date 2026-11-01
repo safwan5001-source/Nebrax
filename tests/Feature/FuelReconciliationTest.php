@@ -13,6 +13,7 @@ use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoutingService;
 use App\Services\Accounting\InventoryService;
 use App\Services\FuelCostBasisService;
 use App\Services\FuelQuantity;
@@ -396,6 +397,27 @@ class FuelReconciliationTest extends TestCase
             $this->assertSame($fixture['station']->branch_id, $line->branch_id);
         }
         $this->assertSame($fixture['station']->branch_id, \App\Models\StockMovement::findOrFail($approved->stock_movement_id)->branch_id);
+    }
+
+    /** @test FS-34: قيد فقد التسوية يتبع دورَي inventory_count_variance وinventory_asset لا 5180/1140. */
+    public function reconciliation_loss_follows_the_variance_and_inventory_roles(): void
+    {
+        $fixture = $this->fixture();
+        $variance = Account::create(['code' => '5198', 'name' => 'فروق جرد بديلة', 'type' => 'expense', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $inventory = Account::create(['code' => '1199', 'name' => 'مخزون بديل', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $routing = app(AccountRoutingService::class);
+        $routing->setMapping('inventory_count_variance', $variance->id, null);
+        $routing->setMapping('inventory_asset', $inventory->id, null);
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '90.000', 'fs34-role-1');
+        $approved = $fixture['service']->approve($fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id, 'created_by' => $fixture['owner_id'],
+        ]), $fixture['owner_id']);
+
+        $lines = JournalLine::where('journal_entry_id', $approved->journal_entry_id)->get()->keyBy('account_id');
+        $this->assertCount(2, $lines);
+        $this->assertSame(100000, (int) $lines[$variance->id]->debit);
+        $this->assertSame(100000, (int) $lines[$inventory->id]->credit);
     }
 
     /** @return array{service: FuelReconciliationService, station: FuelStation, tank: FuelTank, warehouse: Warehouse|null, branch: Branch, product_id: string, owner_id: string, token: string} */
