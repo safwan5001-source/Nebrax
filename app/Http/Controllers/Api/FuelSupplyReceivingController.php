@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesFuelStationScope;
 use App\Http\Requests\ApproveFuelDeliveryRequest;
 use App\Http\Requests\StoreFuelDeliveryRequest;
 use App\Http\Requests\StoreFuelSupplierInvoiceMatchRequest;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 
 class FuelSupplyReceivingController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(private FuelSupplyReceivingService $service) {}
 
     public function deliveries(Request $request)
@@ -28,17 +31,19 @@ class FuelSupplyReceivingController extends ApiController
             $query->where('status', $request->query('status'));
         }
 
-        return FuelDeliveryResource::collection($this->scopeToActiveBranch($query, $request)->paginate(50));
+        return FuelDeliveryResource::collection($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch($query, $request), ['warehouse_id'])->paginate(50));
     }
 
     public function showDelivery(Request $request, string $id)
     {
-        $delivery = $this->scopeToActiveBranch(FuelDelivery::query(), $request)->with(['station', 'tank', 'fuelProduct', 'warehouse', 'supplier'])->findOrFail($id);
+        $delivery = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelDelivery::query(), $request), ['warehouse_id'])->with(['station', 'tank', 'fuelProduct', 'warehouse', 'supplier'])->findOrFail($id);
         return new FuelDeliveryResource($delivery);
     }
 
     public function storeDelivery(StoreFuelDeliveryRequest $request)
     {
+        $this->accessibleStation($request->validated()['fuel_station_id']);
+
         return $this->domain(fn () => new FuelDeliveryResource($this->service->createDelivery(
             $request->validated() + ['created_by' => $request->user()->id],
         )));
@@ -46,7 +51,8 @@ class FuelSupplyReceivingController extends ApiController
 
     public function approveDelivery(ApproveFuelDeliveryRequest $request, string $id)
     {
-        $delivery = $this->scopeToActiveBranch(FuelDelivery::query(), $request)->findOrFail($id);
+        $delivery = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelDelivery::query(), $request), ['warehouse_id'])->findOrFail($id);
+        $this->accessibleStation($delivery->fuel_station_id);
         return $this->domain(fn () => new FuelDeliveryResource($this->service->approveDelivery($delivery, $request->user()->id)));
     }
 
@@ -78,6 +84,8 @@ class FuelSupplyReceivingController extends ApiController
     public function matchInvoice(StoreFuelSupplierInvoiceMatchRequest $request, string $id)
     {
         $invoice = FuelSupplierInvoice::findOrFail($id);
+        // الاستلام المُطابَق يجب أن يقع في مخازن المستخدم (BranchScoped يحصره بالفرع النشط أصلاً).
+        $this->scopeToAccessibleWarehouses(FuelDelivery::query(), ['warehouse_id'])->findOrFail($request->validated()['fuel_delivery_id']);
         return $this->domain(fn () => new FuelSupplierInvoiceMatchResource(
             $this->service->matchSupplierInvoiceLine($invoice, $request->validated(), $request->user()->id),
         ));
