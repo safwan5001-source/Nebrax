@@ -46,7 +46,7 @@
 | إعادة تشغيل المتأثر بعد تثبيت bcmath ومزامنة `contracts/` ودمج `origin/main` (Fuel*، ApplicationCatalog، TenantApplication، PartnerStatement، الميزة الجديدة، MultiStore، CommerceWorkspaceStorefront*، StorefrontProvision*، RetailCustomerAccounts، StaffChannelPricingSettings، CommerceModuleBoundary، BranchIsolationGuard، InventoryReport/Service، ImportJob) | **533 ناجحاً، 7 متخطّى، 0 إخفاق** |
 | إعادة تشغيل `AppTemplateRegistry`/`BuilderLivePointer`/`AppSchemaNavigationShell` بعد مزامنة `contracts/` | 41/41 |
 | Vitest ذو الصلة (customer-accounts، create-store-dialog، stores) | 56/56 |
-| CI على GitHub (على رأس الكود `c044e28`) | انظر القسم 8 |
+| CI على GitHub (على `fbb6c8d`) | **أخضر بالكامل** — انظر القسم 8 |
 
 **تفصيل الإخفاقات البيئية في التشغيل الكامل الأول (حُلّت دون أي تغيير في الكود):**
 - 35 إخفاقاً في اختبارات الفيول: `Call to undefined function bcmul()` — امتداد bcmath غير مثبّت في بيئة الجلسة (تحذّر منه خطوة الإعداد، وهو مثبّت في CI). بعد تثبيته نجحت.
@@ -69,11 +69,26 @@
 
 ## 6. Branch / PR / SHAs
 - **Branch:** `feat/b2c-accounts-default-new-retail-stores`
-- **PR:** يُضاف بعد الفتح
+- **PR:** #1901 — https://github.com/safwan5001-source/Nebrax/pull/1901
 - **Base (بعد التحديث):** `main` @ `511a19e3f384cae9a62c0fc81a6142080fe6a1db` (كان الفرع قد بدأ من `40b6e35`؛ دُمج `main` بلا تعارض، وفرق الـ PR أمامه ملفاتنا التسعة فقط)
-- **Head (كود):** `c044e2814debe4059bc36734a5025410e0e708e8` — تليه commits التقرير فقط
+- **Head (كود):** `c044e2814debe4059bc36734a5025410e0e708e8`
+- **Head الذي اختُبر في CI:** `fbb6c8db86dcd977e6cf56cb79a8a2c22a3a0b39` (كود مطابق + تقرير). commit هذا التحديث التوثيقي يليه ولا يغيّر كوداً.
 
 ## 7. الإجراء التالي المقترح
 1. مراجعة ChatGPT (التركيز: افتراض `true` مقابل البوابة العامة، وغياب حدث تدقيق عند الإنشاء).
 2. بعد الدمج: إنشاء متجر تجريبي جديد والتحقق أن `GET store/v1/storefront` يعلن `customer_accounts: true` وأن التسجيل يعمل؛ ثم تفعيل المتاجر القائمة (إن رُغب) يدوياً من الشاشة متجراً متجراً.
 3. لاحقاً (اختياري): خيار «تفعيل حسابات العملاء» في حوار إنشاء المتجر.
+
+## 8. نتائج CI الفعلية (PR #1901، على `fbb6c8db86dcd977e6cf56cb79a8a2c22a3a0b39`)
+
+| الفحص | النتيجة | المدة |
+|---|---|---|
+| `php artisan test (L11, sqlite)` | ✅ نجح | 26 دقيقة |
+| `php artisan test (L11, pgsql)` | ✅ نجح | 20 دقيقة |
+| `CI Gate` | ✅ نجح | 27 دقيقة |
+| مراجعة Codex | ✅ اكتملت **بلا ملاحظات** | — |
+| حالة الدمج | `mergeable_state: clean`، لا تعارض | — |
+
+`web build` لم يُشغَّل لأن الفرق لا يمسّ `web/` (مسار Web CI مشروط بمسار `web/`). لا تعليقات مراجعة مفتوحة.
+
+**لم يُدمج، ولم يُنشر، ولم يُغيَّر Railway، ولم يُفعَّل أي متجر قائم.** بانتظار مراجعة ChatGPT.
