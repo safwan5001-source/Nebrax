@@ -382,9 +382,9 @@ class CompatibilityResolverTest extends TestCase
     }
 
     /** @test */
-    public function a_binding_item_prop_on_a_list_shape_container_is_not_checked_against_its_own_empty_props(): void
+    public function a_binding_item_prop_on_a_list_shape_container_is_not_checked_against_its_own_props(): void
     {
-        // ProductList has no props of its own — itemProps there targets a
+        // ProductList's own props (layout/columns, S10a) are display options — itemProps there targets a
         // not-yet-designed per-item template (APP-BUILDER-15/17), so only the
         // resource-field side of itemProps is validated for it.
         $schema = $this->baseSchema();

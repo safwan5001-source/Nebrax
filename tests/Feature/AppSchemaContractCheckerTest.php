@@ -150,6 +150,24 @@ class AppSchemaContractCheckerTest extends TestCase
     }
 
     /** @test */
+    public function product_list_layout_props_are_validated_and_optional(): void
+    {
+        $ok = $this->schema([
+            ['type' => 'ProductList', 'id' => 'a'],
+            ['type' => 'ProductList', 'id' => 'b', 'props' => ['layout' => 'grid', 'columns' => 3]],
+            ['type' => 'ProductList', 'id' => 'c', 'props' => ['layout' => 'vertical']],
+        ]);
+        $this->assertSame([], $this->codes($ok, ContractIssue::ERROR));
+        $this->assertNotContains('unknown_prop', $this->codes($ok, ContractIssue::WARNING));
+
+        $bad = $this->schema([
+            ['type' => 'ProductList', 'id' => 'a', 'props' => ['layout' => 'carousel']],
+            ['type' => 'ProductList', 'id' => 'b', 'props' => ['layout' => 'grid', 'columns' => 'three']],
+        ]);
+        $this->assertSame(['prop_enum_invalid', 'prop_type_mismatch'], $this->codes($bad, ContractIssue::ERROR));
+    }
+
+    /** @test */
     public function a_wrong_typed_or_out_of_enum_prop_blocks_publish_while_unknown_and_missing_only_warn(): void
     {
         $schema = $this->schema([

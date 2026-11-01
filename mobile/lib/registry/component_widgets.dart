@@ -295,19 +295,47 @@ Widget buildProductList(
   SchemaComponent node,
   ActionDispatch onAction,
 ) {
-  return SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final child in node.children)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 12),
-            child: ComponentView(node: child, onAction: onAction),
-          ),
-      ],
-    ),
-  );
+  // S10a (CMP-02): `layout` = horizontal (الافتراضي، السلوك القديم حرفياً) | grid | vertical. قيمة غائبة أو
+  // مجهولة ⇒ أفقي، كاتفاق `Text.style` (خاصية اختيارية تسقط للافتراضي لا رفض).
+  final layout = _stringProp(node, 'layout', fallback: 'horizontal');
+  Widget child(SchemaComponent c) => ComponentView(node: c, onAction: onAction);
+
+  switch (layout) {
+    case 'grid':
+      final columns = _intProp(node, 'columns', fallback: 2).clamp(2, 4);
+      const gap = 12.0;
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          // عرض الخلية يُشتق من العرض المتاح: `Wrap` يحتمل ارتفاعات متفاوتة (مقياس نص كبير) بلا تجاوز.
+          final available = constraints.hasBoundedWidth ? constraints.maxWidth : 360.0;
+          final cell = ((available - gap * (columns - 1)) / columns).floorToDouble();
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [for (final c in node.children) SizedBox(width: cell, child: child(c))],
+          );
+        },
+      );
+    case 'vertical':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final c in node.children)
+            Padding(padding: const EdgeInsetsDirectional.only(bottom: 12), child: child(c)),
+        ],
+      );
+    default:
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final c in node.children)
+              Padding(padding: const EdgeInsetsDirectional.only(end: 12), child: child(c)),
+          ],
+        ),
+      );
+  }
 }
 
 Widget buildProductDetail(

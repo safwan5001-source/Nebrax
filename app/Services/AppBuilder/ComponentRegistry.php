@@ -100,13 +100,18 @@ final class ComponentRegistry
                 type: 'ProductList',
                 version: 1,
                 category: self::CATEGORY_COMMERCE,
-                props: [],
+                props: [
+                    // S10a (CMP-02): خاصيتان اختياريتان إضافيتان. غيابهما = أفقي كما كان. مُشغِّل أقدم لا يعرفهما يعرض الأفقي (تدهور آمن، كاتفاق `Text.style`).
+                    new PropDefinition('layout', PropType::STRING, required: false, label: new Label(ar: 'طريقة العرض', en: 'Layout'), default: 'horizontal', enumValues: ['horizontal', 'grid', 'vertical']),
+                    new PropDefinition('columns', PropType::INTEGER, required: false, label: new Label(ar: 'عدد الأعمدة (الشبكة)', en: 'Columns (grid)'), default: 2),
+                ],
                 childrenRule: ChildrenRule::unboundedAny(suggestedChildType: 'ProductCard'),
                 actionable: false,
                 injectedRuntimeActionParams: [],
-                notes: 'مُموِّج أفقي محدود يرسم أيّ نوع أبناء دون تحقّق فعلي — `ProductCard` تلميحٌ تحريري لا قيد تشغيلي.',
+                notes: 'أفقي (الافتراضي) أو شبكة بـ2..4 أعمدة (`columns` يُقصّ إلى هذا المدى في المشغّل) أو عمودي — يرسم أيّ نوع أبناء دون تحقّق فعلي؛ `ProductCard` تلميحٌ تحريري لا قيد تشغيلي.',
                 label: new Label(ar: 'قائمة المنتجات', en: 'Product List'),
                 bindableResources: ['commerce.products'],
+                listShape: true,
             ),
             new ComponentDefinition(
                 type: 'ProductCard',
@@ -208,6 +213,7 @@ final class ComponentRegistry
                 notes: 'عمود يرسم أبناءه فقط، بلا خصائص خاصة به.',
                 label: new Label(ar: 'محتويات السلة', en: 'Cart List'),
                 bindableResources: ['commerce.cart'],
+                listShape: true,
             ),
             new ComponentDefinition(
                 type: 'CartSummary',
