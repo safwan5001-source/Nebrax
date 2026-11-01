@@ -62,6 +62,13 @@ export const SAMPLE_COMMERCE_PRODUCTS = [
   },
 ];
 
+/** `commerce.categories` sample list (S11) — الحقول كما في `DataResourceRegistry` (لا `name_en` اليوم، فجوة موثّقة). */
+export const SAMPLE_COMMERCE_CATEGORIES = [
+  { id: 'sample-category-1', name: 'المشروبات', description: null, color: null, parent_id: null },
+  { id: 'sample-category-2', name: 'الأدوات', description: 'أدوات منزلية.', color: '#0F6A5A', parent_id: null },
+  { id: 'sample-category-3', name: 'الهدايا', description: null, color: null, parent_id: null },
+];
+
 /** `commerce.cart` sample — shape matches `DataResourceRegistry`'s single-resource fields exactly. */
 export const SAMPLE_COMMERCE_CART = {
   status: 'active',
@@ -99,6 +106,7 @@ export const SAMPLE_COMMERCE_CART = {
 
 /** Keyed by `binding.resource` id, exactly as `resolveNodeBindings`'s `resourceData` parameter expects (`web/src/modules/app-builder/runtime-contract.ts`). */
 export const SAMPLE_RESOURCE_DATA: Record<string, unknown> = {
+  'commerce.categories': SAMPLE_COMMERCE_CATEGORIES,
   'commerce.products': SAMPLE_COMMERCE_PRODUCTS,
   'commerce.cart': SAMPLE_COMMERCE_CART,
 };
