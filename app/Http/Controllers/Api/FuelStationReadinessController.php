@@ -19,6 +19,8 @@ use Illuminate\Http\Request;
 /** Cycle 9 surface; writes delegate to audited domain services only. */
 class FuelStationReadinessController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(
         private readonly FuelStationMaintenanceService $maintenance,
         private readonly FuelStationSafetyService $safety,
@@ -30,8 +32,8 @@ class FuelStationReadinessController extends ApiController
     public function maintenance(Request $request): JsonResponse
     {
         $request->validate(['fuel_station_id' => ['nullable', 'uuid'], 'status' => ['nullable', 'string', 'max:32']]);
-        $schedules = FuelStationMaintenanceSchedule::query()->with('station')->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->orderBy('next_due_at')->paginate(50);
-        $orders = FuelStationWorkOrder::query()->with(['station', 'schedule', 'assignee'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
+        $schedules = $this->restrictToAccessibleStations(FuelStationMaintenanceSchedule::query())->with('station')->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->orderBy('next_due_at')->paginate(50);
+        $orders = $this->restrictToAccessibleStations(FuelStationWorkOrder::query())->with(['station', 'schedule', 'assignee'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
 
         return response()->json(['data' => ['schedules' => $schedules, 'work_orders' => $orders]]);
     }
@@ -44,6 +46,7 @@ class FuelStationReadinessController extends ApiController
             'interval_days' => ['nullable', 'integer', 'min:0'], 'interval_milliliters' => ['nullable', 'integer', 'min:0'],
             'manufacturer_interval' => ['nullable', 'string', 'max:160'], 'instructions' => ['nullable', 'string', 'max:4000'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
+        $this->accessibleStation($data['fuel_station_id']);
         $schedule = $this->domain(fn () => $this->maintenance->createSchedule($data, $request->user()));
 
         return response()->json(['data' => $schedule], 201);
@@ -59,6 +62,7 @@ class FuelStationReadinessController extends ApiController
             'assigned_to' => ['nullable', 'uuid'], 'cost_minor' => ['nullable', 'integer', 'min:0'], 'downtime_minutes' => ['nullable', 'integer', 'min:0'],
             'evidence_reference' => ['nullable', 'string', 'max:500'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
+        $this->accessibleStation($data['fuel_station_id']);
         $order = $this->domain(fn () => $this->maintenance->createWorkOrder($data, $request->user()));
 
         return response()->json(['data' => $order->load(['station', 'schedule', 'assignee'])], 201);
@@ -72,6 +76,7 @@ class FuelStationReadinessController extends ApiController
             'cost_minor' => ['nullable', 'integer', 'min:0'], 'downtime_minutes' => ['nullable', 'integer', 'min:0'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
         $order = FuelStationWorkOrder::query()->findOrFail($id);
+        $this->accessibleStation($order->fuel_station_id);
         $updated = $this->domain(fn () => $this->maintenance->transition($order, $data['status'], $data, $request->user()));
 
         return response()->json(['data' => $updated]);
@@ -82,8 +87,8 @@ class FuelStationReadinessController extends ApiController
         $request->validate(['fuel_station_id' => ['nullable', 'uuid']]);
         $station = $request->query('fuel_station_id');
         return response()->json(['data' => [
-            'inspections' => FuelStationSafetyInspection::query()->with(['station', 'findings.correctiveActions'])->when($station, fn ($q) => $q->where('fuel_station_id', $station))->orderByDesc('scheduled_at')->paginate(50),
-            'permits' => FuelStationSafetyPermit::query()->with('station')->when($station, fn ($q) => $q->where('fuel_station_id', $station))->orderBy('expires_on')->paginate(50),
+            'inspections' => $this->restrictToAccessibleStations(FuelStationSafetyInspection::query())->with(['station', 'findings.correctiveActions'])->when($station, fn ($q) => $q->where('fuel_station_id', $station))->orderByDesc('scheduled_at')->paginate(50),
+            'permits' => $this->restrictToAccessibleStations(FuelStationSafetyPermit::query())->with('station')->when($station, fn ($q) => $q->where('fuel_station_id', $station))->orderBy('expires_on')->paginate(50),
         ]]);
     }
 
@@ -93,6 +98,7 @@ class FuelStationReadinessController extends ApiController
             'fuel_station_id' => ['required', 'uuid'], 'inspection_type' => ['required', 'string', 'max:80'], 'scheduled_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'], 'evidence_reference' => ['nullable', 'string', 'max:500'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
+        $this->accessibleStation($data['fuel_station_id']);
         $inspection = $this->domain(fn () => $this->safety->createInspection($data, $request->user()));
 
         return response()->json(['data' => $inspection], 201);
@@ -107,6 +113,7 @@ class FuelStationReadinessController extends ApiController
             'findings.*.details' => ['nullable', 'string', 'max:5000'], 'findings.*.asset_type' => ['nullable', 'string', 'max:160'], 'findings.*.asset_id' => ['nullable', 'uuid'],
         ]);
         $inspection = FuelStationSafetyInspection::query()->findOrFail($id);
+        $this->accessibleStation($inspection->fuel_station_id);
         $updated = $this->domain(fn () => $this->safety->performInspection($inspection, $data['findings'], $request->user(), $data['reason'] ?? null));
 
         return response()->json(['data' => $updated]);
@@ -119,6 +126,7 @@ class FuelStationReadinessController extends ApiController
             'due_date' => ['nullable', 'date'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
         $finding = FuelStationSafetyFinding::query()->findOrFail($findingId);
+        $this->accessibleStation($finding->inspection->fuel_station_id);
         $action = $this->domain(fn () => $this->safety->createCorrectiveAction($finding, $data, $request->user()));
 
         return response()->json(['data' => $action], 201);
@@ -130,6 +138,7 @@ class FuelStationReadinessController extends ApiController
             'status' => ['required', 'in:in_progress,completed,verified,closed'], 'resolution' => ['nullable', 'string', 'max:5000'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
         $action = FuelStationSafetyCorrectiveAction::query()->findOrFail($id);
+        $this->accessibleStation($action->finding->inspection->fuel_station_id);
         $updated = $this->domain(fn () => $this->safety->transitionCorrectiveAction($action, $data['status'], $data, $request->user()));
 
         return response()->json(['data' => $updated]);
@@ -139,6 +148,7 @@ class FuelStationReadinessController extends ApiController
     {
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
         $inspection = FuelStationSafetyInspection::query()->findOrFail($id);
+        $this->accessibleStation($inspection->fuel_station_id);
         $updated = $this->domain(fn () => $this->safety->verifyInspection($inspection, $request->user(), $data['reason'] ?? null));
 
         return response()->json(['data' => $updated]);
@@ -148,6 +158,7 @@ class FuelStationReadinessController extends ApiController
     {
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
         $inspection = FuelStationSafetyInspection::query()->findOrFail($id);
+        $this->accessibleStation($inspection->fuel_station_id);
         $updated = $this->domain(fn () => $this->safety->closeInspection($inspection, $request->user(), $data['reason'] ?? null));
 
         return response()->json(['data' => $updated]);
@@ -160,6 +171,7 @@ class FuelStationReadinessController extends ApiController
             'issued_on' => ['nullable', 'date'], 'expires_on' => ['nullable', 'date'], 'asset_type' => ['nullable', 'string', 'max:160'], 'asset_id' => ['nullable', 'uuid'],
             'evidence_reference' => ['nullable', 'string', 'max:500'], 'reason' => ['nullable', 'string', 'max:500'],
         ]);
+        $this->accessibleStation($data['fuel_station_id']);
         $permit = $this->domain(fn () => $this->safety->createPermit($data, $request->user()));
 
         return response()->json(['data' => $permit], 201);
@@ -168,7 +180,7 @@ class FuelStationReadinessController extends ApiController
     public function alerts(Request $request): JsonResponse
     {
         $request->validate(['status' => ['nullable', 'in:active,acknowledged,resolved'], 'severity' => ['nullable', 'in:critical,high,medium,low']]);
-        $alerts = FinancialControlAlert::query()->where('rule', 'like', 'fuel.%')
+        $alerts = $this->restrictToAllowedBranches(FinancialControlAlert::query())->where('rule', 'like', 'fuel.%')
             ->when($request->status, fn ($q, $status) => $q->where('status', $status))
             ->when($request->severity, fn ($q, $severity) => $q->where('severity', $severity))
             ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END")
@@ -184,7 +196,7 @@ class FuelStationReadinessController extends ApiController
     public function acknowledgeAlert(Request $request, string $id): JsonResponse
     {
         $data = $request->validate(['note' => ['nullable', 'string', 'max:1000']]);
-        $alert = FinancialControlAlert::query()->findOrFail($id);
+        $alert = $this->restrictToAllowedBranches(FinancialControlAlert::query())->findOrFail($id);
         $updated = $this->domain(fn () => $this->alerts->acknowledge($alert, $data['note'] ?? null, $request->user()));
         return response()->json(['data' => $updated]);
     }
@@ -192,7 +204,7 @@ class FuelStationReadinessController extends ApiController
     public function assignAlert(Request $request, string $id): JsonResponse
     {
         $data = $request->validate(['assigned_to' => ['nullable', 'uuid'], 'reason' => ['nullable', 'string', 'max:500']]);
-        $alert = FinancialControlAlert::query()->findOrFail($id);
+        $alert = $this->restrictToAllowedBranches(FinancialControlAlert::query())->findOrFail($id);
         $updated = $this->domain(fn () => $this->alerts->assign($alert, $data['assigned_to'] ?? null, $data['reason'] ?? null, $request->user()));
         return response()->json(['data' => $updated]);
     }
@@ -219,6 +231,18 @@ class FuelStationReadinessController extends ApiController
     /** @return array<string,mixed> */
     private function reportFilters(Request $request): array
     {
-        return $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'], 'station_id' => ['nullable', 'uuid']]);
+        $filters = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'], 'station_id' => ['nullable', 'uuid']]);
+
+        // مستخدم مقيَّد بفرع/مخزن: محطة محددة تُفحص (404)، وبدونها تُقصر كل التقارير على محطاته المتاحة.
+        $accessible = $this->accessibleStationIds();
+        if ($accessible !== null) {
+            if (! empty($filters['station_id'])) {
+                $this->accessibleStation($filters['station_id']);
+            }
+            $filters['station_ids'] = $accessible;
+            $filters['branch_ids'] = $request->user()->allowedBranchIds();
+        }
+
+        return $filters;
     }
 }
