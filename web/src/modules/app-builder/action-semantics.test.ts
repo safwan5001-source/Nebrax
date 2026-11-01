@@ -49,3 +49,24 @@ describe('action-semantics decode conformance (vs. mobile/lib/actions/app_action
     });
   }
 });
+
+describe('S11 actions (generation 1.2.0)', () => {
+  it('openCategory needs a non-empty string categoryId', () => {
+    expect(decodeAppAction({ type: 'openCategory', params: { categoryId: 'c1' } })).toEqual({ kind: 'OpenCategoryAction', categoryId: 'c1' });
+    expect(decodeAppAction({ type: 'openCategory', params: {} })).toBeNull();
+    expect(decodeAppAction({ type: 'openCategory', params: { categoryId: '' } })).toBeNull();
+    expect(decodeAppAction({ type: 'openCategory', params: { categoryId: 7 } })).toBeNull();
+  });
+
+  it('openSearch takes no params', () => {
+    expect(decodeAppAction({ type: 'openSearch', params: {} })).toEqual({ kind: 'OpenSearchAction' });
+    expect(decodeAppAction({ type: 'openSearch' })).toEqual({ kind: 'OpenSearchAction' });
+  });
+
+  it('Preview is honest: both need live data it cannot reach', () => {
+    expect(resolvePreviewActionOutcome({ type: 'openCategory', params: { categoryId: 'c1' } })).toEqual({ kind: 'requires-live-data', actionType: 'openCategory' });
+    expect(resolvePreviewActionOutcome({ type: 'openSearch', params: {} })).toEqual({ kind: 'requires-live-data', actionType: 'openSearch' });
+    expect(resolvePreviewActionOutcome({ type: 'openCategory', params: {} })).toEqual({ kind: 'inert' });
+  });
+});
+
