@@ -20,6 +20,7 @@ describe('commerce workspace navigation', () => {
       '/app-builder',
       '/commerce/domains',
       '/commerce/delivery',
+      '/commerce/customer-accounts',
       '/commerce/gifting',
       '/commerce/integrations',
       '/commerce/wholesale',
@@ -47,6 +48,19 @@ describe('commerce workspace navigation', () => {
     expect(appBuilder).toBeDefined();
     expect(isNavEntryVisible(appBuilder!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
     expect(isNavEntryVisible(appBuilder!, new Set(['commerce.app_builder']), { role: 'admin' })).toBe(false);
+  });
+
+  it('lists Customer accounts under the channel group, visible only to owners/admins with the storefront capability', () => {
+    const channelItems = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupChannel')?.items;
+    const accounts = channelItems?.find((item) => item.href === '/commerce/customer-accounts');
+    expect(accounts).toMatchObject({
+      labelKey: 'customerAccounts',
+      appKey: 'commerce.storefront',
+      permission: 'commerce.channel_settings.manage',
+    });
+    expect(isNavEntryVisible(accounts!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
+    expect(isNavEntryVisible(accounts!, new Set(), { role: 'owner' })).toBe(true);
+    expect(isNavEntryVisible(accounts!, new Set(['commerce.storefront']), { role: 'owner' })).toBe(false);
   });
 
   it('hides Merchandising from roles without products.view, which every backing route requires', () => {

@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   Tags,
   Store,
+  UserRound,
   Truck,
 } from 'lucide-react';
 import { currentUser } from '@/lib/auth';
@@ -45,6 +46,7 @@ const ICONS: Record<string, typeof Store> = {
   '/commerce/appearance': Paintbrush,
   '/commerce/domains': Globe,
   '/commerce/delivery': Truck,
+  '/commerce/customer-accounts': UserRound,
   '/commerce/gifting': Gift,
   '/commerce/integrations': Plug,
   '/commerce/wholesale': Boxes,
