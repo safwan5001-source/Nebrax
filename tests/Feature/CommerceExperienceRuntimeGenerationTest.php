@@ -182,10 +182,12 @@ class CommerceExperienceRuntimeGenerationTest extends TestCase
     }
 
     /** @test */
-    public function the_production_registry_is_a_single_generation_and_selection_never_crosses_tenants(): void
+    public function the_production_registry_knows_both_generations_and_selection_never_crosses_tenants(): void
     {
-        $this->assertCount(1, app(RuntimeGenerations::class)->all());
+        // AD-04 / S09a: 1.0.0 + 1.1.0 (غلاف التنقل). الجهاز بلا ترويسة يبقى 1.0.0 دائماً.
+        $this->assertCount(2, app(RuntimeGenerations::class)->all());
         $this->assertSame('1.0.0', (string) app(RuntimeGenerations::class)->oldest()->runtimeVersion);
+        $this->assertSame('1.0.0', (string) app(RuntimeGenerations::class)->forRuntime(null)->runtimeVersion);
 
         $a = $this->seedMobileStore('gen-a');
         $b = $this->seedMobileStore('gen-b');

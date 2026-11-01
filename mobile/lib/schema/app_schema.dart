@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'schema_version.dart';
+import 'navigation_shell.dart';
 
 /// Structural/parse-time limits. These exist to keep the schema "bounded in
 /// complexity" (`AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md` §13A-D) and to
@@ -447,15 +448,29 @@ class ThemeTokens {
   }
 }
 
-/// Navigation metadata (horizon MR-04's "navigation"). Deliberately minimal
-/// for MOBILE-RUNTIME-2 — [initialPageId] is the only concept needed to
-/// validate a schema structurally; actual route dispatch is a later task.
+/// Navigation metadata (horizon MR-04's "navigation"). [initialPageId] is the
+/// only structural requirement; AD-04 / S09a adds the optional app shell —
+/// bottom [tabs] and a top [appBar]. Both are new schema features
+/// (`navigation.tabs` / `navigation.appBar`): a runtime generation that does
+/// not declare them rejects a schema that uses them (`CompatibilityResolver`)
+/// instead of silently dropping the shell.
 class SchemaNavigation {
   final String initialPageId;
+  final List<SchemaTab> tabs;
+  final SchemaAppBar? appBar;
 
-  const SchemaNavigation({required this.initialPageId});
+  const SchemaNavigation({required this.initialPageId, this.tabs = const [], this.appBar});
 
-  static const _allowedKeys = {'initialPageId'};
+  /// Tabs the user actually sees, in authored order (hidden ones are kept in
+  /// the document but never shown).
+  List<SchemaTab> get visibleTabs => [for (final tab in tabs) if (!tab.hidden) tab];
+
+  /// `navigation.tabs` / `navigation.appBar` are present in the document —
+  /// i.e. which generation features this schema requires.
+  bool get usesTabs => tabs.isNotEmpty;
+  bool get usesAppBar => appBar != null;
+
+  static const _allowedKeys = {'initialPageId', 'tabs', 'appBar'};
 
   factory SchemaNavigation._fromJson(Map<String, Object?> json) {
     _rejectUnknownKeys(json, _allowedKeys, context: 'navigation');
@@ -463,7 +478,116 @@ class SchemaNavigation {
     if (initial is! String || initial.isEmpty) {
       throw const SchemaFormatException('missing_field', 'navigation.initialPageId is required');
     }
-    return SchemaNavigation(initialPageId: initial);
+
+    var tabs = const <SchemaTab>[];
+    if (json.containsKey('tabs')) {
+      final raw = json['tabs'];
+      if (raw is! List || raw.isEmpty || raw.length > NavigationShell.maxTabs) {
+        throw const SchemaFormatException(
+          'invalid_type',
+          'navigation.tabs must be a list of 1..${NavigationShell.maxTabs} tabs',
+        );
+      }
+      tabs = List.unmodifiable([
+        for (var i = 0; i < raw.length; i++) SchemaTab._fromJson(raw[i], i),
+      ]);
+      if (tabs.where((t) => !t.hidden).length > NavigationShell.maxVisibleTabs) {
+        throw const SchemaFormatException(
+          'invalid_type',
+          'navigation.tabs allows at most ${NavigationShell.maxVisibleTabs} visible tabs',
+        );
+      }
+    }
+
+    SchemaAppBar? appBar;
+    if (json.containsKey('appBar')) {
+      appBar = SchemaAppBar._fromJson(json['appBar']);
+    }
+
+    return SchemaNavigation(initialPageId: initial, tabs: tabs, appBar: appBar);
+  }
+
+  /// Cross-document rules that need the declared pages (called after pages
+  /// are parsed): every tab references a declared page, no page twice.
+  void _validateTabPages(Set<String> pageIds) {
+    final seen = <String>{};
+    for (var i = 0; i < tabs.length; i++) {
+      final pageId = tabs[i].pageId;
+      if (!pageIds.contains(pageId)) {
+        throw SchemaFormatException('missing_field', 'navigation.tabs[$i].pageId must reference a declared page');
+      }
+      if (!seen.add(pageId)) {
+        throw SchemaFormatException('invalid_type', 'navigation.tabs[$i].pageId "$pageId" is used by more than one tab');
+      }
+    }
+  }
+}
+
+/// One bottom-navigation tab (AD-04 / S09a).
+class SchemaTab {
+  final String pageId;
+  final String title;
+  final String icon;
+  final bool hidden;
+
+  const SchemaTab({required this.pageId, required this.title, required this.icon, this.hidden = false});
+
+  factory SchemaTab._fromJson(Object? raw, int index) {
+    final context = 'navigation.tabs[$index]';
+    if (raw is! Map) {
+      throw SchemaFormatException('invalid_type', '$context must be an object');
+    }
+    final json = raw.cast<String, Object?>();
+    _rejectUnknownKeys(json, NavigationShell.tabKeys, context: context);
+
+    final pageId = json['pageId'];
+    if (pageId is! String || pageId.isEmpty) {
+      throw SchemaFormatException('missing_field', '$context.pageId must reference a declared page');
+    }
+    final title = json['title'];
+    if (title is! String || title.trim().isEmpty || title.runes.length > NavigationShell.maxTabTitle) {
+      throw SchemaFormatException(
+        'invalid_type',
+        '$context.title must be a non-empty string up to ${NavigationShell.maxTabTitle} chars',
+      );
+    }
+    final icon = json['icon'];
+    if (icon is! String || !NavigationShell.tabIcons.contains(icon)) {
+      throw SchemaFormatException('invalid_type', '$context.icon is not an allowed icon');
+    }
+    final hidden = json['hidden'];
+    if (json.containsKey('hidden') && hidden is! bool) {
+      throw SchemaFormatException('invalid_type', '$context.hidden must be a boolean');
+    }
+    return SchemaTab(pageId: pageId, title: title, icon: icon, hidden: hidden == true);
+  }
+}
+
+/// The optional top app bar (AD-04 / S09a): a [title] and whether to show the cart.
+class SchemaAppBar {
+  final String? title;
+  final bool showCart;
+
+  const SchemaAppBar({this.title, this.showCart = false});
+
+  factory SchemaAppBar._fromJson(Object? raw) {
+    if (raw is! Map || raw.isEmpty) {
+      throw const SchemaFormatException('invalid_type', 'navigation.appBar must be a non-empty object');
+    }
+    final json = raw.cast<String, Object?>();
+    _rejectUnknownKeys(json, NavigationShell.appBarKeys, context: 'navigation.appBar');
+    final title = json['title'];
+    if (json.containsKey('title') && (title is! String || title.runes.length > NavigationShell.maxAppBarTitle)) {
+      throw const SchemaFormatException(
+        'invalid_type',
+        'navigation.appBar.title must be a string up to ${NavigationShell.maxAppBarTitle} chars',
+      );
+    }
+    final showCart = json['showCart'];
+    if (json.containsKey('showCart') && showCart is! bool) {
+      throw const SchemaFormatException('invalid_type', 'navigation.appBar.showCart must be a boolean');
+    }
+    return SchemaAppBar(title: title as String?, showCart: showCart == true);
   }
 }
 
@@ -595,6 +719,8 @@ class AppSchema {
         'navigation.initialPageId "${navigation.initialPageId}" does not reference a declared page',
       );
     }
+
+    navigation._validateTabPages(pages.keys.toSet());
 
     return AppSchema(
       schemaVersion: schemaVersion,
