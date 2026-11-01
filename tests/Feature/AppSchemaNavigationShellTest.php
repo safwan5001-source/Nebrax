@@ -115,6 +115,30 @@ class AppSchemaNavigationShellTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    /** @test */
+    public function the_shared_fixture_agrees_with_the_parser_and_the_php_constants(): void
+    {
+        $fixture = json_decode(file_get_contents(base_path('contracts/app-builder/navigation-shell.v1.json')), true);
+
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::TAB_ICONS, $fixture['limits']['icons']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::MAX_TABS, $fixture['limits']['max_tabs']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::MAX_VISIBLE_TABS, $fixture['limits']['max_visible_tabs']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::MAX_TAB_TITLE, $fixture['limits']['max_tab_title']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::MAX_APP_BAR_TITLE, $fixture['limits']['max_app_bar_title']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::FEATURE_TABS, $fixture['features']['tabs']);
+        $this->assertSame(\App\Services\AppBuilder\NavigationShell::FEATURE_APP_BAR, $fixture['features']['appBar']);
+
+        foreach ($fixture['cases'] as $case) {
+            $schema = $this->schema($case['navigation'], array_values(array_diff($fixture['pages'], ['home'])));
+            try {
+                $this->parse($schema);
+                $this->assertTrue($case['valid'], "قُبل ما كان يجب رفضه: {$case['name']}");
+            } catch (SchemaFormatException) {
+                $this->assertFalse($case['valid'], "رُفض ما كان يجب قبوله: {$case['name']}");
+            }
+        }
+    }
+
     // ── مولّد العقد (checker) ─────────────────────────────────────────────
 
     /** @test */
