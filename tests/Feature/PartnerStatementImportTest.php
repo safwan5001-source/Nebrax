@@ -537,6 +537,39 @@ class PartnerStatementImportTest extends TestCase
     }
 
     /** @test */
+    public function reading_a_statement_job_requires_partner_visibility_and_the_stored_result_carries_no_partner_data(): void
+    {
+        $job = $this->runJob($this->auth['token'], $this->rows(), $this->hdr());
+        $viewOnly = $this->role('ps-job-view', ['partner_statements.view'], 'jobview@ps-a1.test');
+        $viewAndPartners = $this->role('ps-job-both', ['partner_statements.view', 'partners.view'], 'jobboth@ps-a1.test');
+
+        // بلا partners.view: القراءة المفردة 403 والقائمة تستبعد المجال (Codex #1877 P1).
+        $this->withToken($viewOnly)->getJson("/api/import-jobs/{$job['id']}")->assertForbidden();
+        $this->assertSame([], $this->withToken($viewOnly)->getJson('/api/import-jobs')->assertOk()->json('data'));
+
+        $shown = $this->withToken($viewAndPartners)->getJson("/api/import-jobs/{$job['id']}")->assertOk();
+        $listed = $this->withToken($viewAndPartners)->getJson('/api/import-jobs')->assertOk();
+        $this->assertSame([$job['id']], array_column($listed->json('data'), 'id'));
+
+        // حتى لمن يراها: نتيجة التطبيق بلا اسم الطرف ولا مرجع ولا بيان ولا مبلغ سطر — معرّف المقارنة وعدّادات فقط.
+        foreach ([$shown, $listed] as $response) {
+            $body = (string) $response->getContent();
+            foreach ([$this->customer->name, 'INV-1001', 'PAY-77', 'فاتورة', '115000', '1150'] as $secret) {
+                $this->assertStringNotContainsString($secret, $body, $secret);
+            }
+        }
+        $this->assertSame(['reconciliation_id', 'created', 'updated', 'skipped', 'replayed', 'lines', 'total_rows'], array_keys($shown->json('data.apply_result')));
+
+        // سحب partners.view بعد اكتمال التشغيلة يسري فوراً على القراءة.
+        app(TenantContext::class)->set($this->auth['tenant_id']);
+        Role::query()->where('slug', 'ps-job-both')->update(['permissions' => ['partner_statements.view']]);
+        $this->withToken($viewAndPartners)->getJson("/api/import-jobs/{$job['id']}")->assertForbidden();
+        $this->assertSame([], $this->withToken($viewAndPartners)->getJson('/api/import-jobs')->assertOk()->json('data'));
+        $this->assertSame(['partners.view'], ImportJobDomain::alsoRequires('partner_statement'));
+        $this->assertSame([], ImportJobDomain::alsoRequires('expense_import'));
+    }
+
+    /** @test */
     public function a_user_who_loses_partner_visibility_before_apply_stores_nothing(): void
     {
         $token = $this->role('ps-both-2', ['partner_statements.reconcile', 'partners.view'], 'both2@ps-a1.test');
@@ -545,9 +578,10 @@ class PartnerStatementImportTest extends TestCase
         app(TenantContext::class)->set($this->auth['tenant_id']);
         Role::query()->where('slug', 'ps-both-2')->update(['permissions' => ['partner_statements.reconcile']]);
 
-        $this->withToken($token)->postJson("/api/import-jobs/{$job['id']}/apply", []);
+        // بوابة المجال (`partners.view` الإضافية) ترفض قبل الخدمة؛ ولو تجاوزتها الخدمةُ نفسُها تعيد الفحص (assertAccess) فلا يُخزَّن شيء.
+        $this->withToken($token)->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertForbidden();
         $this->assertSame(0, $this->reconciliations());
-        $this->assertSame('failed', (string) (ImportJob::query()->findOrFail($job['id'])->status->value ?? ImportJob::query()->findOrFail($job['id'])->status));
+        $this->assertSame('ready', (string) (ImportJob::query()->findOrFail($job['id'])->status->value ?? ImportJob::query()->findOrFail($job['id'])->status));
     }
 
     /** @test */

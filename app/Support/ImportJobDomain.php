@@ -46,6 +46,16 @@ final class ImportJobDomain
         self::PARTNER_STATEMENT => ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => null],
     ];
 
+    /**
+     * صلاحياتٌ **إضافية** يشترطها المجال على كل مستوى (عرض/إدارة) فوق صلاحيته الخاصة — لا تُضعف بوابة ولا تُغني عنها. كشف حساب الطرف يعرض هوية الطرف وبياناته في قراءة التشغيلة، فيلزمه
+     * `partners.view` كي لا تكون قراءة التشغيلة (`GET /import-jobs`) باباً خلفياً إلى بيانات طرفٍ لا يراه المستخدم (IMP-PS-A1، Codex #1877 P1). تُفحص عند كل قراءة فيسري سحبها فوراً.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ALSO_REQUIRES = [
+        self::PARTNER_STATEMENT => ['partners.view'],
+    ];
+
     public const PRODUCT_CATALOG = 'product_catalog';
 
     public const PRODUCT_WORKBOOK = 'product_workbook';
@@ -105,6 +115,12 @@ final class ImportJobDomain
             self::STOCK_PERMIT_IMPORT,
             self::PARTNER_STATEMENT,
         ];
+    }
+
+    /** @return list<string> صلاحيات إضافية يشترطها المجال على كل مستوى (قائمة فارغة لأغلب المجالات). */
+    public static function alsoRequires(string $domain): array
+    {
+        return self::ALSO_REQUIRES[$domain] ?? [];
     }
 
     /**

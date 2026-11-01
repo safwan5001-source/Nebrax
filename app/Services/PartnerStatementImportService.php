@@ -142,7 +142,7 @@ class PartnerStatementImportService
         $resolved = $this->options($options);
 
         return DB::transaction(function () use ($file, $resolved, $userId, $importJobId, $maxRows): array {
-            $partner = $this->assertAccess($resolved, $userId);
+            $this->assertAccess($resolved, $userId);
             $parsed = $this->parse($file, $resolved, $maxRows);
 
             if ($parsed['total_rows'] === 0) {
@@ -156,7 +156,7 @@ class PartnerStatementImportService
             $this->lockIdentity($resolved, $hash);
             $existing = $this->existing($resolved, $hash);
             if ($existing !== null) {
-                return $this->result($existing, $parsed, $partner, created: 0, replayed: true);
+                return $this->result($existing, $parsed, created: 0, replayed: true);
             }
 
             $reconciliation = PartnerStatementReconciliation::create([
@@ -180,7 +180,7 @@ class PartnerStatementImportService
                 ], $chunk));
             }
 
-            return $this->result($reconciliation, $parsed, $partner, created: 1, replayed: false);
+            return $this->result($reconciliation, $parsed, created: 1, replayed: false);
         });
     }
 
@@ -669,16 +669,18 @@ class PartnerStatementImportService
         }
     }
 
-    /** @param array<string, mixed> $parsed @return array<string, mixed> */
-    private function result(PartnerStatementReconciliation $reconciliation, array $parsed, Partner $partner, int $created, bool $replayed): array
+    /**
+     * نتيجة التطبيق تُخزَّن على التشغيلة وتُقرأ عبر `GET /import-jobs`: **لا هوية طرف ولا سطور ولا مبالغ** فيها — معرّف المقارنة وعدّادات فقط. بيانات الطرف وسطور كشفه لا تُقرأ إلا من نقاط
+     * المقارنة (PS-A2+) بضوابط رؤية الطرف (Codex #1877 P1)؛ وقراءة التشغيلة نفسها تشترط `partners.view` أيضاً (`ImportJobDomain::alsoRequires`).
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private function result(PartnerStatementReconciliation $reconciliation, array $parsed, int $created, bool $replayed): array
     {
         return [
-            'reconciliation_id' => $reconciliation->id, 'partner_id' => $partner->id, 'partner_name' => $partner->name, 'role' => $reconciliation->role,
-            'period_from' => $reconciliation->period_from->toDateString(), 'period_to' => $reconciliation->period_to->toDateString(),
-            'created' => $created, 'updated' => 0, 'skipped' => $replayed ? 1 : 0, 'replayed' => $replayed,
+            'reconciliation_id' => $reconciliation->id, 'created' => $created, 'updated' => 0, 'skipped' => $replayed ? 1 : 0, 'replayed' => $replayed,
             'lines' => (int) $reconciliation->line_count, 'total_rows' => $parsed['total_rows'],
-            'total_debit_minor' => (int) $reconciliation->total_debit_minor, 'total_credit_minor' => (int) $reconciliation->total_credit_minor,
-            'results' => array_map(fn (array $row): array => $this->rowSummary($row), $parsed['rows']),
         ];
     }
 
