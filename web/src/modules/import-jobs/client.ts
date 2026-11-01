@@ -20,7 +20,8 @@ export type ImportJobDomain =
   | 'stocktake_count'
   | 'expense_import'
   | 'purchase_import'
-  | 'stock_permit_import';
+  | 'stock_permit_import'
+  | 'partner_statement';
 
 /** مطابقٌ حرفياً لـ`App\Support\ImportJobStatus`. `queued` مفردة مُقرَّرة سلفاً بلا مسار كودٍ يبلغها اليوم. */
 export type ImportJobStatus =

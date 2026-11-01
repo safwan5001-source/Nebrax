@@ -1849,6 +1849,7 @@
     "domain_price_list_items": "Price list items",
     "domain_inventory_opening": "Opening balances",
     "domain_stock_permit_import": "Stock permit lines",
+    "domain_partner_statement": "Partner statements",
     "domain_stocktake_count": "Stocktake counts",
     "domain_partner_master": "Customers and suppliers",
     "domain_purchase_import": "Purchases",

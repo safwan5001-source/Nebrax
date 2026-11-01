@@ -71,7 +71,7 @@ class StoreImportJobRequest extends FormRequest
             'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
             'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
             'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
-            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), StocktakeCountImportFields::keys(), ExpenseImportFields::keys(), PurchaseImportFields::keys(), ['ignore']))],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), StocktakeCountImportFields::keys(), ExpenseImportFields::keys(), PurchaseImportFields::keys(), \App\Support\PartnerStatementImportFields::keys(), ['ignore']))],
             // IMP-H3-S2: النوع إلزامي لمجال الأطراف (يحدّد عميلاً أم مورّداً ولا يُستنتج من الملف) ويُرفض لغيره؛ فشلُ غيابه بعد الإنشاء كان سيظهر وقت التطبيق.
             'options.type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_MASTER), Rule::in(PartnerImportService::TYPES)],
             'options.duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
@@ -104,6 +104,16 @@ class StoreImportJobRequest extends FormRequest
             'options.permit_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.reason' => ['sometimes', 'nullable', 'string', 'max:255'],
             'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            // IMP-PS-A1: كشف حساب طرف — الطرف والدور والفترة إلزامية لمجاله (تُجمَّد مع المعاينة)، والسياسات P-1..P-5 اختيارية بقيم معتمدة افتراضية.
+            'options.partner_id' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_STATEMENT), 'nullable', 'uuid'],
+            'options.role' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_STATEMENT), Rule::in(\App\Models\PartnerStatementReconciliation::ROLES)],
+            'options.period_from' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_STATEMENT), 'date_format:Y-m-d'],
+            'options.period_to' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_STATEMENT), 'date_format:Y-m-d'],
+            'options.currency' => ['sometimes', 'nullable', 'string', 'max:16'],
+            'options.amount_direction' => ['sometimes', 'nullable', Rule::in(\App\Support\PartnerStatementImportFields::DIRECTIONS)],
+            'options.date_tolerance_days' => ['sometimes', 'integer', 'min:0', 'max:'.\App\Services\PartnerStatementImportService::MAX_DATE_TOLERANCE_DAYS],
+            'options.amount_tolerance_minor' => ['sometimes', 'integer', 'min:0', 'max:'.\App\Services\PartnerStatementImportService::MAX_AMOUNT_TOLERANCE_MINOR],
+            'options.branch_id' => ['sometimes', 'nullable', 'uuid'],
             'options.apply_product_images' => ['sometimes', 'boolean'],
             'options.approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];

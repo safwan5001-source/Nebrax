@@ -1849,6 +1849,7 @@
     "domain_price_list_items": "بنود قوائم الأسعار",
     "domain_inventory_opening": "الأرصدة الافتتاحية",
     "domain_stock_permit_import": "بنود الأذون المخزنية",
+    "domain_partner_statement": "كشوف حساب الأطراف",
     "domain_stocktake_count": "أعداد الجرد",
     "domain_partner_master": "العملاء والموردون",
     "domain_purchase_import": "المشتريات",
