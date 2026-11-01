@@ -46,7 +46,7 @@ final class RuntimeGenerations
     /** الأجيال الإنتاجية المعروفة: 1.0.0 والجيل 1.1.0 (غلاف التنقل، AD-04 / S09a). */
     public static function current(): self
     {
-        return new self([CapabilityManifest::current(), CapabilityManifest::v110()]);
+        return new self([CapabilityManifest::current(), CapabilityManifest::v110(), CapabilityManifest::v120()]);
     }
 
     /** @return list<CapabilityManifest> تصاعدياً */

@@ -60,6 +60,26 @@ final class ActionRegistry
                 label: new Label(ar: 'فتح المنتج', en: 'Open Product'),
             ),
             new ActionDefinition(
+                type: 'openCategory',
+                version: 1,
+                riskClass: ActionRiskClass::NAVIGATION,
+                params: [
+                    new ActionParamDefinition('categoryId', PropType::STRING, required: true, label: new Label(ar: 'معرّف التصنيف', en: 'Category ID')),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_LIVE,
+                notes: 'الجيل 1.2.0 (S11): يفتح شاشة منتجات تصنيف أصلية. `categoryId` يُحلّ عادةً عبر `$item.id` من ربط `commerce.categories` (`CategoryList`)، أو UUID حرفي. يُفكَّك فقط حين تكون سلسلة غير فارغة.',
+                label: new Label(ar: 'فتح تصنيف', en: 'Open Category'),
+            ),
+            new ActionDefinition(
+                type: 'openSearch',
+                version: 1,
+                riskClass: ActionRiskClass::NAVIGATION,
+                params: [],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'الجيل 1.2.0 (S11): يفتح شاشة بحث أصلية بنتائج حيّة من منتجات المتجر. بلا معاملات، لا يحتاج ربطاً.',
+                label: new Label(ar: 'فتح البحث', en: 'Open Search'),
+            ),
+            new ActionDefinition(
                 type: 'addToCart',
                 version: 1,
                 riskClass: ActionRiskClass::COMMERCE_MUTATION,

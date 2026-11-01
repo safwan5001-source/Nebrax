@@ -18,9 +18,13 @@ class ActionRegistryTest extends TestCase
 {
     public function test_definitions_key_set_matches_runtime_capabilities_actions_exactly(): void
     {
+        $expected = array_keys(RuntimeCapabilities::ACTIONS + RuntimeCapabilities::ACTIONS_V120);
+        $actual = array_keys(ActionRegistry::definitions());
+        sort($expected);
+        sort($actual);
         $this->assertSame(
-            array_keys(RuntimeCapabilities::ACTIONS),
-            array_keys(ActionRegistry::definitions()),
+            $expected,
+            $actual,
             'سجلّ بيانات الإجراءات يجب أن يصف كل هوية إجراء مدعومة فعلياً — لا أكثر ولا أقل.'
         );
     }
@@ -29,7 +33,7 @@ class ActionRegistryTest extends TestCase
     {
         foreach (ActionRegistry::definitions() as $type => $definition) {
             $this->assertSame($type, $definition->type);
-            $this->assertSame(RuntimeCapabilities::ACTIONS[$type], $definition->version);
+            $this->assertSame((RuntimeCapabilities::ACTIONS + RuntimeCapabilities::ACTIONS_V120)[$type], $definition->version);
         }
     }
 
