@@ -32,6 +32,8 @@ class UpdateSalesSettingsRequest extends FormRequest
             ],
             // H4-01 / D-05: سياسة ربط مشتري المتجر بطرف (تُقرأ عند إنشاء نية دفع إلكتروني فقط).
             'commerce_payment_hold_minutes' => ['nullable', 'integer', 'min:'.\App\Support\CommercePaymentHold::MIN_MINUTES, 'max:'.\App\Support\CommercePaymentHold::MAX_MINUTES],
+            // AD-09 / S08a: نافذة أيام ترتيب الشعبية في قوائم منتجات التجارة (سياسة عمل قابلة للضبط).
+            'popularity_window_days' => ['nullable', 'integer', 'min:'.\App\Support\Commerce\ProductPopularity::MIN_DAYS, 'max:'.\App\Support\Commerce\ProductPopularity::MAX_DAYS],
             // H4-03 / D-13: لا يُقبل `on_payment_confirmed` ما دامت بوابة النشر ومرجع EXT-05 مغلقين (لا تفعيل بقرار مستأجر منفرد).
             'commerce_invoice_trigger' => ['nullable', Rule::in(\App\Support\CommerceInvoiceOnPayment::gateOpen() ? \App\Support\CommerceInvoiceOnPayment::TRIGGERS : [\App\Support\CommerceInvoiceOnPayment::TRIGGER_NONE])],
             'commerce_price_tax_mode' => ['nullable', Rule::in(\App\Support\CommerceInvoiceOnPayment::PRICE_MODES)],

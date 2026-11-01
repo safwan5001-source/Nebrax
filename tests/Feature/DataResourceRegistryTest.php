@@ -75,7 +75,7 @@ class DataResourceRegistryTest extends TestCase
 
         $products = $definitions['commerce.products'];
         $this->assertSame(['search', 'category_id'], $products->filterKeys());
-        $this->assertSame(['name', 'sale_price', 'created_at'], $products->sortKeys());
+        $this->assertSame(['name', 'sale_price', 'created_at', 'popularity'], $products->sortKeys());
     }
 
     public function test_only_products_resource_is_paginated(): void

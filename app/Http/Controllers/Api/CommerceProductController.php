@@ -74,7 +74,7 @@ use Illuminate\Http\Request;
  */
 class CommerceProductController extends PublicApiController
 {
-    private const SORTS = ['name' => 'name', 'sale_price' => 'sale_price', 'created_at' => 'created_at'];
+    private const SORTS = ['name' => 'name', 'sale_price' => 'sale_price', 'created_at' => 'created_at', 'popularity' => 'popularity'];
 
     public function index(
         Request $request,
@@ -149,7 +149,10 @@ class CommerceProductController extends PublicApiController
             // H6 Batch G — price sort follows the displayed (channel-resolved) price, not the frozen column.
             $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name', function (Builder $q, string $direction) use ($prices, $channelId): void {
                 \App\Support\Commerce\EffectivePriceOrdering::apply($q, $prices->activeChannelPriceList($channelId)?->id, true, $direction);
-            });
+            }, [
+                // AD-09 / S08a — محسوب من الفواتير المرحّلة؛ `-popularity` الأكثر مبيعاً أولاً.
+                'popularity' => fn (Builder $q, string $direction) => \App\Support\Commerce\ProductPopularity::apply($q, $direction),
+            ]);
         }
 
         $paginator = $query->paginate($this->perPage($request));
