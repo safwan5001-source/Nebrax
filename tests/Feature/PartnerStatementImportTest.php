@@ -596,6 +596,20 @@ class PartnerStatementImportTest extends TestCase
         $this->assertSame(0, $this->reconciliations());
     }
 
+    /** أوراق مصفوفة متداخلة بمسارها: [[مسار, قيمة], ...]. @return list<array{0: string, 1: mixed}> */
+    private function leaves(mixed $value, string $path = ''): array
+    {
+        if (! is_array($value)) {
+            return [[$path, $value]];
+        }
+        $out = [];
+        foreach ($value as $key => $item) {
+            $out = array_merge($out, $this->leaves($item, $path === '' ? (string) $key : $path.'.'.$key));
+        }
+
+        return $out;
+    }
+
     /** @test */
     public function reading_a_statement_job_requires_partner_visibility_and_the_stored_result_carries_no_partner_data(): void
     {
@@ -612,13 +626,36 @@ class PartnerStatementImportTest extends TestCase
         $this->assertSame([$job['id']], array_column($listed->json('data'), 'id'));
 
         // حتى لمن يراها: نتيجة التطبيق بلا اسم الطرف ولا مرجع ولا بيان ولا مبلغ سطر — معرّف المقارنة وعدّادات فقط.
-        foreach ([$shown, $listed] as $response) {
-            $body = (string) $response->getContent();
-            foreach ([$this->customer->name, 'INV-1001', 'PAY-77', 'فاتورة', '115000', '1150'] as $secret) {
-                $this->assertStringNotContainsString($secret, $body, $secret);
+        // الفحص **بنيوي**: على أوراق الـJSON المفكَّك (نصوص تُقارن بالتطابق/الاحتواء للنصوص غير الرقمية، والأرقام بالتساوي الدقيق)، لا بحثاً عن
+        // نص رقمي قصير داخل الجسم الخام — فمعرّفات UUID وبصمات SHA-256 العشوائية قد تحتوي «1150» صدفةً (هشاشة سابقة).
+        $secretText = [$this->customer->name, 'INV-1001', 'PAY-77', 'فاتورة'];
+        $secretAmounts = [115000, 1150, 50000, 500];   // مجاميع/مبالغ سطور الكشف (هللات وريالات)
+        $payloads = [['data' => $shown->json('data')], ['data' => $listed->json('data')]];
+        foreach ($payloads as $payload) {
+            foreach ($this->leaves($payload) as [$path, $value]) {
+                if (is_string($value)) {
+                    foreach ($secretText as $secret) {
+                        $this->assertStringNotContainsString($secret, $value, "{$path} يحمل «{$secret}».");
+                    }
+                } elseif (is_int($value) || is_float($value)) {
+                    $this->assertNotContains($value, $secretAmounts, "{$path} يحمل مبلغ سطر كشف ({$value}).");
+                }
             }
         }
-        $this->assertSame(['reconciliation_id', 'created', 'updated', 'skipped', 'replayed', 'lines', 'total_rows'], array_keys($shown->json('data.apply_result')));
+        // وبنيوياً: مفاتيح نتيجة التطبيق هي هذه السبعة بالضبط وقيمها عدّادات/معرّف/منطقي فقط.
+        $result = $shown->json('data.apply_result');
+        $this->assertSame(['reconciliation_id', 'created', 'updated', 'skipped', 'replayed', 'lines', 'total_rows'], array_keys($result));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $result['reconciliation_id']);
+        $this->assertIsBool($result['replayed']);
+        foreach (['created', 'updated', 'skipped', 'lines', 'total_rows'] as $counter) {
+            $this->assertIsInt($result[$counter], $counter);
+        }
+        foreach ($listed->json('data') as $item) {
+            $this->assertArrayNotHasKey('partner', $item);
+            $this->assertArrayNotHasKey('partner_name', $item);
+            $this->assertArrayNotHasKey('lines', $item);
+            $this->assertArrayNotHasKey('rows', $item);
+        }
 
         // سحب partners.view بعد اكتمال التشغيلة يسري فوراً على القراءة.
         app(TenantContext::class)->set($this->auth['tenant_id']);
