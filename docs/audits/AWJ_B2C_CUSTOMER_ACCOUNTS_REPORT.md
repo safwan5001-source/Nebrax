@@ -146,7 +146,10 @@ Files for this follow-up: `app/Http/Controllers/Api/StorefrontAccountController.
 
 Local results for the affected set (`RetailCustomerAccountsTest` 20, both Retail PostgreSQL concurrency tests, wholesale regression suites, route/capability guards): **SQLite 96 passed / 2 skipped (the PG-only tests); PostgreSQL 98 passed**. Storefront: `tsc` clean, `biome` clean, affected vitest 215 passed.
 
-__FOLLOWUP_CI__
+**CI on `6ecdfbfad7afda68424aad97a3aec5a0cb011525` (code + regression tests, the head that carries both fixes):** `CI Gate` ✅ · `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `storefront (lint + typecheck + test)` ✅ · `web build (Next.js)` ✅ · `docker-context` ✅ · `published footer visual QA` ✅ · `merchant preview visual QA` ✅ after one re-run (first attempt: a `networkidle` timeout in `web/e2e/store-brand-qa.spec.ts` on `/dev/trust-visual` — a surface this PR does not touch; the re-run passed, no code change).
+Earlier on `7342fad` the PostgreSQL job had failed once on `AiActionHistoryListTest` (a query-count assertion off by one, 23 vs 24, unrelated to accounts); it did not reproduce locally on a full parallel PostgreSQL run and did not recur on `6ecdfba`.
+Review threads: both Codex threads replied to and **resolved** after the fixes were verified; Codex's re-review of `7342fad` reported no findings.
+**Final head:** the verified code head is `6ecdfba`; the PR tip is the docs-only commit that records these results (no code changes) — see the PR for its SHA and its CI Gate.
 
 ## 5. Security findings
 
