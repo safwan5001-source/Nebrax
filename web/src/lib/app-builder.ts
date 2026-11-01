@@ -131,12 +131,36 @@ export interface AppSchemaComponent {
   visibility?: VisibilityNode;
 }
 
+/** AD-04 / S09a — أيقونات التبويبات المسموحة (مطابقة لـ`contracts/app-builder/navigation-shell.v1.json`). */
+export const NAV_TAB_ICONS = ['home', 'search', 'category', 'cart', 'favorite', 'person', 'menu', 'orders', 'store', 'offers'] as const;
+export type NavTabIcon = (typeof NAV_TAB_ICONS)[number];
+export const NAV_LIMITS = { maxTabs: 8, maxVisibleTabs: 5, maxTabTitle: 24, maxAppBarTitle: 40 } as const;
+
+export interface AppSchemaTab {
+  pageId: string;
+  title: string;
+  icon: NavTabIcon;
+  hidden?: boolean;
+}
+
+export interface AppSchemaAppBar {
+  title?: string;
+  showCart?: boolean;
+}
+
+/** غلاف التنقل (AD-04): `tabs`/`appBar` اختياريان ويتطلبان جيل Runtime 1.1.0. */
+export interface AppSchemaNavigation {
+  initialPageId: string;
+  tabs?: AppSchemaTab[];
+  appBar?: AppSchemaAppBar;
+}
+
 export interface AppSchema {
   schemaVersion: string;
   minRuntimeVersion: string;
   requiredCapabilities?: Record<string, number>;
   theme?: { tokens?: Record<string, string> };
-  navigation: { initialPageId: string };
+  navigation: AppSchemaNavigation;
   pages: Record<string, AppSchemaComponent>;
 }
 

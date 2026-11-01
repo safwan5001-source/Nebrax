@@ -60,6 +60,8 @@ final class AppSchemaContractChecker
             }
         }
 
+        $this->checkNavigationShell($schema, $pageIds, $issues);
+
         foreach ($idPages as $id => $where) {
             if (count(array_unique($where)) > 1) {
                 $issues[] = new ContractIssue(
@@ -70,6 +72,43 @@ final class AppSchemaContractChecker
         }
 
         return $issues;
+    }
+
+    /**
+     * AD-04 / S09a — مشكلات التبويبات المفهومة للمحرر قبل النشر (المحلل يرفض الشكل نفسه عند التحقق الكامل).
+     *
+     * @param  array<string, mixed>  $schema
+     * @param  list<string>  $pageIds
+     * @param  list<ContractIssue>  $issues
+     */
+    private function checkNavigationShell(array $schema, array $pageIds, array &$issues): void
+    {
+        $tabs = $schema['navigation']['tabs'] ?? null;
+        if (! is_array($tabs) || ! array_is_list($tabs)) {
+            return;
+        }
+        $seen = [];
+        $visible = 0;
+        foreach ($tabs as $index => $tab) {
+            if (! is_array($tab)) {
+                continue;
+            }
+            $pageId = is_string($tab['pageId'] ?? null) ? $tab['pageId'] : '';
+            if ($pageId === '' || ! in_array($pageId, $pageIds, true)) {
+                $issues[] = new ContractIssue('tab_page_missing', ContractIssue::ERROR, $pageId, null, "navigation.tabs.{$index}.pageId", 'التبويب يشير إلى صفحة غير موجودة في التطبيق.');
+            } elseif (isset($seen[$pageId])) {
+                $issues[] = new ContractIssue('tab_duplicate_page', ContractIssue::ERROR, $pageId, null, "navigation.tabs.{$index}.pageId", 'أكثر من تبويب يشير إلى الصفحة نفسها.');
+            }
+            if ($pageId !== '') {
+                $seen[$pageId] = true;
+            }
+            if (! NavigationShell::isHidden($tab)) {
+                $visible++;
+            }
+        }
+        if ($visible > NavigationShell::MAX_VISIBLE_TABS) {
+            $issues[] = new ContractIssue('tabs_too_many_visible', ContractIssue::ERROR, '', null, 'navigation.tabs', 'عدد التبويبات الظاهرة يتجاوز '.NavigationShell::MAX_VISIBLE_TABS.'.');
+        }
     }
 
     /**

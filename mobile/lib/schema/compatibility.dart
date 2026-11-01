@@ -2,6 +2,7 @@ import 'app_schema.dart';
 import 'capability_manifest.dart';
 import 'data_resource_registry.dart';
 import 'visibility_vocabulary.dart';
+import 'navigation_shell.dart';
 
 /// Why a schema was found incompatible with a runtime's capability manifest.
 enum IncompatibilityReason {
@@ -94,6 +95,21 @@ class CompatibilityResolver {
           reason: IncompatibilityReason.missingRequiredCapability,
           message: 'required capability "${entry.key}" v${entry.value} is not available '
               '(have: ${have ?? 'none'})',
+        );
+      }
+    }
+
+    // AD-04 / S09a — ميزات الغلاف ليست قابلة للإسقاط: جيل لا يعلنها لا يستطيع عرض التجربة (فشل مغلق)،
+    // بدل إسقاط التبويبات/الشريط بصمت. يطابق `CompatibilityResolver::resolve` في PHP.
+    final navigation = schema.navigation;
+    for (final feature in [
+      if (navigation.usesTabs) NavigationShell.featureTabs,
+      if (navigation.usesAppBar) NavigationShell.featureAppBar,
+    ]) {
+      if ((manifest.schemaFeatureVersion(feature) ?? 0) < 1) {
+        return IncompatibleExperience(
+          reason: IncompatibilityReason.missingRequiredCapability,
+          message: 'navigation shell feature "$feature" is not available in runtime ${manifest.runtimeVersion}',
         );
       }
     }

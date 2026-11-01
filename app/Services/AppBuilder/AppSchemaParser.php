@@ -49,7 +49,7 @@ final class AppSchemaParser
 
     private const THEME_KEYS = ['tokens'];
 
-    private const NAVIGATION_KEYS = ['initialPageId'];
+    private const NAVIGATION_KEYS = ['initialPageId', 'tabs', 'appBar'];
 
     /**
      * @param  array<string, mixed>  $schema
@@ -105,6 +105,70 @@ final class AppSchemaParser
                 'missing_field',
                 "navigation.initialPageId \"{$initialPageId}\" does not reference a declared page",
             );
+        }
+
+        $this->validateNavigationShell($navigation, $pages);
+    }
+
+    /**
+     * AD-04 / S09a — `navigation.tabs[]` و`navigation.appBar` (القواعد في `NavigationShell`).
+     *
+     * @param  array<string, mixed>  $navigation
+     * @param  array<int|string, mixed>  $pages
+     */
+    private function validateNavigationShell(array $navigation, array $pages): void
+    {
+        if (array_key_exists('tabs', $navigation)) {
+            $tabs = $navigation['tabs'];
+            if (! is_array($tabs) || ! array_is_list($tabs) || $tabs === [] || count($tabs) > NavigationShell::MAX_TABS) {
+                throw new SchemaFormatException('invalid_type', 'navigation.tabs must be a list of 1..' . NavigationShell::MAX_TABS . ' tabs');
+            }
+            $seen = [];
+            $visible = 0;
+            foreach ($tabs as $index => $tab) {
+                if (! $this->isObjectLike($tab)) {
+                    throw new SchemaFormatException('invalid_type', "navigation.tabs[{$index}] must be an object");
+                }
+                $this->rejectUnknownKeys($tab, NavigationShell::TAB_KEYS, "navigation.tabs[{$index}]");
+                $pageId = $tab['pageId'] ?? null;
+                if (! is_string($pageId) || $pageId === '' || ! array_key_exists($pageId, $pages)) {
+                    throw new SchemaFormatException('missing_field', "navigation.tabs[{$index}].pageId must reference a declared page");
+                }
+                if (isset($seen[$pageId])) {
+                    throw new SchemaFormatException('invalid_type', "navigation.tabs[{$index}].pageId \"{$pageId}\" is used by more than one tab");
+                }
+                $seen[$pageId] = true;
+                $title = $tab['title'] ?? null;
+                if (! is_string($title) || trim($title) === '' || mb_strlen($title) > NavigationShell::MAX_TAB_TITLE) {
+                    throw new SchemaFormatException('invalid_type', "navigation.tabs[{$index}].title must be a non-empty string up to " . NavigationShell::MAX_TAB_TITLE . ' chars');
+                }
+                if (! is_string($tab['icon'] ?? null) || ! in_array($tab['icon'], NavigationShell::TAB_ICONS, true)) {
+                    throw new SchemaFormatException('invalid_type', "navigation.tabs[{$index}].icon is not an allowed icon");
+                }
+                if (array_key_exists('hidden', $tab) && ! is_bool($tab['hidden'])) {
+                    throw new SchemaFormatException('invalid_type', "navigation.tabs[{$index}].hidden must be a boolean");
+                }
+                if (! NavigationShell::isHidden($tab)) {
+                    $visible++;
+                }
+            }
+            if ($visible > NavigationShell::MAX_VISIBLE_TABS) {
+                throw new SchemaFormatException('invalid_type', 'navigation.tabs allows at most ' . NavigationShell::MAX_VISIBLE_TABS . ' visible tabs');
+            }
+        }
+
+        if (array_key_exists('appBar', $navigation)) {
+            $appBar = $navigation['appBar'];
+            if (! $this->isObjectLike($appBar)) {
+                throw new SchemaFormatException('invalid_type', 'navigation.appBar must be an object');
+            }
+            $this->rejectUnknownKeys($appBar, NavigationShell::APP_BAR_KEYS, 'navigation.appBar');
+            if (array_key_exists('title', $appBar) && (! is_string($appBar['title']) || mb_strlen($appBar['title']) > NavigationShell::MAX_APP_BAR_TITLE)) {
+                throw new SchemaFormatException('invalid_type', 'navigation.appBar.title must be a string up to ' . NavigationShell::MAX_APP_BAR_TITLE . ' chars');
+            }
+            if (array_key_exists('showCart', $appBar) && ! is_bool($appBar['showCart'])) {
+                throw new SchemaFormatException('invalid_type', 'navigation.appBar.showCart must be a boolean');
+            }
         }
     }
 

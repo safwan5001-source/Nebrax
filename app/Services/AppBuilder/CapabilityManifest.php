@@ -49,6 +49,27 @@ final class CapabilityManifest
         );
     }
 
+    /**
+     * الجيل 1.1.0 (AD-04 / S09a): كل ما في 1.0.0 + غلاف التنقل (`navigation.tabs`/`navigation.appBar`).
+     * يُعلَن هنا قبل أن يبنيه Flutter (S09b): لا جهاز يرسل `X-Runtime-Version: 1.1.0` قبل ذلك، فلا يتأثر أي جهاز قائم؛
+     * وكل ما يستعمل الغلاف يُخدَم فقط لأجهزة تعلن هذا الجيل.
+     */
+    public static function v110(): self
+    {
+        $base = self::current();
+
+        return new self(
+            runtimeVersion: new SchemaVersion(1, 1, 0),
+            minSupportedSchemaVersion: $base->minSupportedSchemaVersion,
+            maxSupportedSchemaVersion: $base->maxSupportedSchemaVersion,
+            components: $base->components,
+            actions: $base->actions,
+            nativeCapabilities: $base->nativeCapabilities,
+            dataResources: $base->dataResources,
+            schemaFeatures: $base->schemaFeatures + [NavigationShell::FEATURE_TABS => 1, NavigationShell::FEATURE_APP_BAR => 1],
+        );
+    }
+
     public function componentVersion(string $type): ?int
     {
         return $this->components[$type] ?? null;

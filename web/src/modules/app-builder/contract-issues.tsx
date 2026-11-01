@@ -9,6 +9,7 @@ type Translate = (key: string, values?: Record<string, string | number>) => stri
 export const KNOWN_ISSUE_CODES = [
   'page_not_root', 'child_not_allowed', 'children_not_allowed', 'prop_type_mismatch', 'prop_enum_invalid',
   'action_param_invalid', 'missing_action_param', 'navigate_target_missing',
+  'tab_page_missing', 'tab_duplicate_page', 'tabs_too_many_visible',
   'duplicate_id_across_pages', 'unknown_prop', 'missing_required_prop', 'action_not_supported', 'unknown_action_param',
 ] as const;
 

@@ -98,7 +98,11 @@ class BuilderCompatReportTest extends TestCase
         $this->assertSame('1.0.0', $compat['min_runtime']);
         $this->assertSame('1.0.0', $compat['full_runtime']);
         $this->assertFalse($compat['has_drops']);
-        $this->assertSame([['runtime' => '1.0.0', 'compatible' => true, 'reason' => null, 'dropped' => []]], $compat['generations']);
+        // الإنتاج يعرف جيلين (1.0.0 و1.1.0 غلاف التنقل، AD-04)؛ مخطط بلا غلاف يعرضه كلاهما بلا إسقاط.
+        $this->assertSame([
+            ['runtime' => '1.0.0', 'compatible' => true, 'reason' => null, 'dropped' => []],
+            ['runtime' => '1.1.0', 'compatible' => true, 'reason' => null, 'dropped' => []],
+        ], $compat['generations']);
     }
 
     /** @test */
