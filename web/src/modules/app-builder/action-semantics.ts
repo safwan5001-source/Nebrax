@@ -14,6 +14,8 @@ import type { AppSchemaActionRef } from '@/lib/app-builder';
 export type DecodedAppAction =
   | { kind: 'NavigateAction'; pageId: string }
   | { kind: 'OpenProductAction'; productId: string }
+  | { kind: 'OpenCategoryAction'; categoryId: string }
+  | { kind: 'OpenSearchAction' }
   | { kind: 'AddToCartAction'; productId: string; variantId: string | null; quantity: number }
   | { kind: 'UpdateCartQuantityAction'; cartItemId: string; quantity: number }
   | { kind: 'RemoveCartItemAction'; cartItemId: string }
@@ -42,6 +44,15 @@ export function decodeAppAction(ref: AppSchemaActionRef): DecodedAppAction | nul
       if (!isNonEmptyString(productId)) return null;
       return { kind: 'OpenProductAction', productId };
     }
+
+    case 'openCategory': {
+      const categoryId = params.categoryId;
+      if (!isNonEmptyString(categoryId)) return null;
+      return { kind: 'OpenCategoryAction', categoryId };
+    }
+
+    case 'openSearch':
+      return { kind: 'OpenSearchAction' };
 
     case 'addToCart': {
       const productId = params.productId;
@@ -120,7 +131,7 @@ const RUNTIME_SUPPORTED_NAVIGATE_PAGE_IDS = new Set(['home', 'cart']);
 export type PreviewActionOutcome =
   | { kind: 'navigate'; pageId: 'home' | 'cart' }
   | { kind: 'navigate-unsupported'; pageId: string }
-  | { kind: 'requires-live-data'; actionType: 'openProduct' | 'addToCart' | 'updateCartQuantity' | 'removeCartItem' }
+  | { kind: 'requires-live-data'; actionType: 'openProduct' | 'openCategory' | 'openSearch' | 'addToCart' | 'updateCartQuantity' | 'removeCartItem' }
   | { kind: 'safe-noop' }
   | { kind: 'inert' };
 
@@ -135,6 +146,11 @@ export function resolvePreviewActionOutcome(ref: AppSchemaActionRef): PreviewAct
         : { kind: 'navigate-unsupported', pageId: decoded.pageId };
     case 'OpenProductAction':
       return { kind: 'requires-live-data', actionType: 'openProduct' };
+    // S11: فتح تصنيف/بحث يجلبان منتجات المتجر الحيّة؛ المعاينة لا تصل إليها فتُعلن عدم التوفر بصدق (كالجهاز في وضع المعاينة).
+    case 'OpenCategoryAction':
+      return { kind: 'requires-live-data', actionType: 'openCategory' };
+    case 'OpenSearchAction':
+      return { kind: 'requires-live-data', actionType: 'openSearch' };
     case 'AddToCartAction':
       return { kind: 'requires-live-data', actionType: 'addToCart' };
     case 'UpdateCartQuantityAction':

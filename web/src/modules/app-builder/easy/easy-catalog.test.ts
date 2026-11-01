@@ -6,7 +6,10 @@ import { cloneWithFreshIds, insertChildAfter } from '@/lib/app-builder';
 import { EASY_CATALOG, isAddable, isAddableOnPage, sectionSummary } from './easy-catalog';
 import { selectionTargetFor, sectionContains } from './editor-mode';
 
-const fixture = JSON.parse(readFileSync(resolve(process.cwd(), '../contracts/app-builder/registry-identifiers.v1.json'), 'utf8')) as { components: string[]; actions: string[] };
+const fixture = JSON.parse(readFileSync(resolve(process.cwd(), '../contracts/app-builder/registry-identifiers.v1.json'), 'utf8')) as { components: string[]; actions: string[]; components_v120: string[]; actions_v120: string[] };
+// الأنواع المعروفة للكتالوج: الجيل 1.0.0 + إضافات 1.2.0 (S11) من العقد المشترك نفسه.
+const knownComponents = [...fixture.components, ...fixture.components_v120];
+const knownActions = [...fixture.actions, ...fixture.actions_v120];
 
 function walk(node: AppSchemaComponent, visit: (n: AppSchemaComponent, parent: AppSchemaComponent | null) => void, parent: AppSchemaComponent | null = null) {
   visit(node, parent);
@@ -35,9 +38,9 @@ describe('Easy Mode catalog', () => {
     const ids: string[] = [];
     walk(root, (n, parent) => {
       ids.push(n.id);
-      expect(fixture.components, `نوع غير معروف ${n.type}`).toContain(n.type);
+      expect(knownComponents, `نوع غير معروف ${n.type}`).toContain(n.type);
       expect(n.type).not.toBe('Page');
-      if (n.action) expect(fixture.actions).toContain(n.action.type);
+      if (n.action) expect(knownActions).toContain(n.action.type);
       if (['Text', 'Image', 'Button', 'Price', 'Quantity', 'CartSummary', 'ProductCard'].includes(n.type)) expect(n.children ?? []).toHaveLength(0);
       if (parent === null) expect(n.id).toMatch(/^section-/);
     });
@@ -51,6 +54,36 @@ describe('Easy Mode catalog', () => {
   it('dump for server-side contract calibration (opt-in)', () => {
     if (!process.env.EASY_CATALOG_DUMP) return;
     writeFileSync(process.env.EASY_CATALOG_DUMP, JSON.stringify(Object.fromEntries(addable.map((e) => [e.key, e.build!()]))));
+  });
+});
+
+describe('S11 sections (categories and search need app generation 1.2.0)', () => {
+  const entry = (key: string) => EASY_CATALOG.find((e) => e.key === key)!;
+
+  it('categories and search are addable but honestly limited, never silently "ready"', () => {
+    for (const key of ['categories', 'search']) {
+      expect(entry(key).status).toBe('limited');
+      expect(entry(key).reasonKey).toBe('easy.reasons.needs120');
+      expect(isAddable(entry(key))).toBe(true);
+    }
+  });
+
+  it('categories live on home (its data is provided there); search works on any page', () => {
+    expect(isAddableOnPage(entry('categories'), 'home')).toBe(true);
+    expect(isAddableOnPage(entry('categories'), 'cart')).toBe(false);
+    expect(isAddableOnPage(entry('search'), 'cart')).toBe(true);
+  });
+
+  it('the categories section binds commerce.categories and each category opens its own products', () => {
+    const list = entry('categories').build!().children![0];
+    expect(list.type).toBe('CategoryList');
+    expect((list as { binding?: { resource: string } }).binding?.resource).toBe('commerce.categories');
+    const button = list.children![0];
+    expect(button.action).toEqual({ type: 'openCategory', params: { categoryId: '$item.id' } });
+  });
+
+  it('the search section opens the native search screen', () => {
+    expect(entry('search').build!().children![0].action).toEqual({ type: 'openSearch', params: {} });
   });
 });
 

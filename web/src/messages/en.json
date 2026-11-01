@@ -8716,6 +8716,7 @@
             "banner": "The image has the image limits; the button is separate because images cannot run actions.",
             "noComponent": "The current mobile app has no component for this section yet.",
             "noScreen": "The current mobile app has no screen for this section yet.",
+            "needs120": "Needs mobile app version 1.2.0 or newer; older installs keep showing your earlier published version.",
           "pageOnly": "This section only works on page: {pages} (its data is provided by that app screen)."
           },
             "hideSection": "Hide section",
@@ -8848,7 +8849,11 @@
             },
             "categories": {
               "name": "Categories",
-              "desc": "Store categories."
+              "desc": "Store categories; tapping one opens its products."
+            },
+            "search": {
+              "name": "Search button",
+              "desc": "A button that opens product search."
             },
             "video": {
               "name": "Video",
