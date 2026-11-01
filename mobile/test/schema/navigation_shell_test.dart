@@ -29,16 +29,20 @@ String _schemaJson(Map<String, Object?> navigation, List<String> pageIds) {
   return encodeSchema(json);
 }
 
-CapabilityManifest _manifest({Map<String, int> features = const {}}) => CapabilityManifest(
+CapabilityManifest _manifest({Map<String, int> features = const {}, SchemaVersion version = const SchemaVersion(1, 1, 0)}) => CapabilityManifest(
   platform: RuntimePlatform.android,
-  runtimeVersion: const SchemaVersion(1, 1, 0),
+  runtimeVersion: version,
   minSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
   maxSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
   components: RuntimeCapabilities.components,
   actions: RuntimeCapabilities.actions,
   nativeCapabilities: RuntimeCapabilities.nativeCapabilities,
   dataResources: RuntimeCapabilities.dataResources,
-  schemaFeatures: {...RuntimeCapabilities.schemaFeatures, ...features},
+  schemaFeatures: {
+    for (final e in RuntimeCapabilities.schemaFeatures.entries)
+      if (!e.key.startsWith('navigation.')) e.key: e.value,
+    ...features,
+  },
 );
 
 void main() {
@@ -97,10 +101,16 @@ void main() {
     }, pageIds);
     const resolver = CompatibilityResolver();
 
-    test('the current 1.0.0 manifest cannot render tabs or appBar (fail closed, never drops them)', () {
+    test('the 1.0.0 generation cannot render tabs or appBar (fail closed, never drops them)', () {
+      final legacy = _manifest(version: const SchemaVersion(1, 0, 0));
+      expect(resolver.resolve(AppSchema.parse(withTabs), legacy), isA<IncompatibleExperience>());
+      expect(resolver.resolve(AppSchema.parse(withBar), legacy), isA<IncompatibleExperience>());
+    });
+
+    test('the current build (1.1.0) renders both', () {
       final current = CapabilityManifest.current(RuntimePlatform.android);
-      expect(resolver.resolve(AppSchema.parse(withTabs), current), isA<IncompatibleExperience>());
-      expect(resolver.resolve(AppSchema.parse(withBar), current), isA<IncompatibleExperience>());
+      expect(resolver.resolve(AppSchema.parse(withTabs), current), isA<RenderableExperience>());
+      expect(resolver.resolve(AppSchema.parse(withBar), current), isA<RenderableExperience>());
     });
 
     test('each key is gated by its own feature', () {

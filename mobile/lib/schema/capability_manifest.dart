@@ -53,7 +53,8 @@ class CapabilityManifest {
   factory CapabilityManifest.current(RuntimePlatform platform) {
     return CapabilityManifest(
       platform: platform,
-      runtimeVersion: const SchemaVersion(1, 0, 0),
+      // AD-04 / S09a-b: الجيل 1.1.0 = ما قبله + غلاف التنقل (`navigation.tabs`/`navigation.appBar`).
+      runtimeVersion: const SchemaVersion(1, 1, 0),
       minSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
       maxSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
       components: RuntimeCapabilities.components,

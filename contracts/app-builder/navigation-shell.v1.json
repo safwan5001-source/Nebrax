@@ -405,5 +405,17 @@
    },
    "valid": false
   }
- ]
+ ],
+ "generation_1_1_0": {
+  "runtime": "1.1.0",
+  "schemaFeatures": {
+   "binding.collect": 1,
+   "navigation.tabs": 1,
+   "navigation.appBar": 1
+  },
+  "dataResources": {
+   "commerce.products": 1,
+   "commerce.cart": 1
+  }
+ }
 }
