@@ -537,6 +537,21 @@ void queryPassthroughTests() {
       expect(a, isNot('commerce.products'));
     });
 
+    test('query values containing delimiters can never collide with a different query', () {
+      final tricky = _binding({'search': 'shoes&sort=name'});
+      final real = _binding({'search': 'shoes', 'sort': 'name'});
+      expect(bindingDataKey(tricky), isNot(bindingDataKey(real)));
+      final tree = _node(
+        type: 'Page',
+        id: 'root',
+        children: [
+          _node(type: 'ProductList', id: 'a', binding: tricky),
+          _node(type: 'ProductList', id: 'b', binding: real),
+        ],
+      );
+      expect(collectBindingRequests(tree, 'commerce.products'), hasLength(2));
+    });
+
     test('collectBindingRequests lists each distinct request once, deep in the tree', () {
       final tree = _node(
         type: 'Page',
