@@ -32,5 +32,7 @@ final class ComponentDefinition
         public readonly string $notes,
         public readonly Label $label,
         public readonly array $bindableResources = [],
+        /** شكل قائمة (يكرّر قالب عنصر لكل سجل): `binding.itemProps` يستهدف قالب العنصر لا خصائص الحاوية. صريح، لا يُستدلّ عليه بخلوّ الخصائص (S10a). */
+        public readonly bool $listShape = false,
     ) {}
 }

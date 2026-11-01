@@ -307,20 +307,36 @@ function CanvasComponentNode({
       );
     }
 
-    case 'ProductList':
+    case 'ProductList': {
+      // S10a (CMP-02): نفس عقد المشغّل — layout غائب/مجهول ⇒ أفقي، columns يُقصّ إلى 2..4 وغير الصحيح ⇒ 2.
+      const layout = stringProp(node, 'layout', 'horizontal');
+      const columns = Math.min(4, Math.max(2, Math.trunc(intProp(node, 'columns', 2))));
+      const renderChild = (child: AppSchemaComponent) => (
+        <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
+      );
+      if (children.length === 0) {
+        return frame(<div className="p-2"><span className="text-xs text-muted">—</span></div>);
+      }
+      if (layout === 'grid') {
+        return frame(
+          <div data-layout="grid" className="grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+            {children.map((child) => <div key={child.id} className="min-w-0">{renderChild(child)}</div>)}
+          </div>
+        );
+      }
+      if (layout === 'vertical') {
+        return frame(
+          <div data-layout="vertical" className="flex flex-col gap-2 p-2">
+            {children.map((child) => <div key={child.id}>{renderChild(child)}</div>)}
+          </div>
+        );
+      }
       return frame(
-        <div className="flex gap-2 overflow-x-auto p-2">
-          {children.length === 0 ? (
-            <span className="text-xs text-muted">—</span>
-          ) : (
-            children.map((child) => (
-              <div key={child.id} className="w-32 shrink-0">
-                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
-              </div>
-            ))
-          )}
+        <div data-layout="horizontal" className="flex gap-2 overflow-x-auto p-2">
+          {children.map((child) => <div key={child.id} className="w-32 shrink-0">{renderChild(child)}</div>)}
         </div>
       );
+    }
 
     case 'ProductCard': {
       const title = stringProp(node, 'title');
