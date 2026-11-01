@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { litersToMilliliters } from '@/lib/fuel-quantity';
+import { useIntentKeys } from '@/lib/intent-key';
 import { isValidRiyal, minorToRiyal, riyalToMinor } from '@/lib/money';
 
 interface Station { id: string; name: string; code: string; status: string }
@@ -36,6 +37,8 @@ export default function FuelSalesPage() {
   const t = useTranslations('fuelStationsSales');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const draftKeys = useIntentKeys();
+  const paymentKeys = useIntentKeys();
   const [sales, setSales] = useState<Sale[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
@@ -90,10 +93,13 @@ export default function FuelSalesPage() {
     if (!stationId || !nozzleId || (!partnerId && !aviAuthorizationId) || !quantity) return;
     setBusy(true); setError(null);
     try {
-      await api('/fuel-stations/sales', { method: 'POST', body: {
+      // FS-08: المفتاح ثابت لإعادة محاولة الحمولة نفسها، ويتبدّل إن تغيّر أي حقل.
+      const draftBody = {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, fuel_shift_id: shiftId || null, partner_id: partnerId || null,
-        fuel_avi_authorization_id: aviAuthorizationId || null, quantity_milliliters: quantity, idempotency_key: crypto.randomUUID(),
-      } });
+        fuel_avi_authorization_id: aviAuthorizationId || null, quantity_milliliters: quantity,
+      };
+      await api('/fuel-stations/sales', { method: 'POST', body: { ...draftBody, idempotency_key: draftKeys.keyFor(draftBody) } });
+      draftKeys.reset();
       success(t('draftCreated')); setDraftOpen(false); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -117,9 +123,11 @@ export default function FuelSalesPage() {
     if (!paySale || !paymentMethodId || !isValidRiyal(paymentAmount)) return;
     setBusy(true); setError(null);
     try {
+      const paymentBody = { payment_method_id: paymentMethodId, amount_minor: riyalToMinor(paymentAmount) };
       await api(`/fuel-stations/sales/${paySale.id}/payments`, { method: 'POST', body: {
-        payment_method_id: paymentMethodId, amount_minor: riyalToMinor(paymentAmount), idempotency_key: crypto.randomUUID(),
+        ...paymentBody, idempotency_key: paymentKeys.keyFor({ sale_id: paySale.id, ...paymentBody }),
       } });
+      paymentKeys.reset();
       success(t('paymentCollected')); setPaySale(null); setPaymentMethodId(''); setPaymentAmount(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }

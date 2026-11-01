@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatMillilitersAsLiters, litersToMilliliters } from '@/lib/fuel-quantity';
+import { useIntentKeys } from '@/lib/intent-key';
 import { asRecordArray, asStringArray, normalizeAviRfidAuthorization, normalizeAviRfidAuthorizations, type AviRfidAuthorization } from '@/lib/fuel-avi-rfid';
 
 interface Partner { id: string; name: string; type: string }
@@ -43,6 +44,7 @@ export default function FuelAviRfidPage() {
   const t = useTranslations('fuelStationsAvi');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const authorizationKeys = useIntentKeys();
   const [tags, setTags] = useState<Tag[]>([]); const [authorizations, setAuthorizations] = useState<Authorization[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]); const [contracts, setContracts] = useState<Contract[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]); const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -106,10 +108,14 @@ export default function FuelAviRfidPage() {
     if (!stationId || !nozzleId || !requested || (!vehicleCredential.trim() && !driverCredential.trim())) return;
     setBusy(true); setError(null);
     try {
-      const result = await api<ApiAuthorizationResponse>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
+      const authorizationBody = {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, vehicle_credential: vehicleCredential || null, driver_credential: driverCredential || null,
-        quantity_milliliters: requested, idempotency_key: crypto.randomUUID(),
+        quantity_milliliters: requested,
+      };
+      const result = await api<ApiAuthorizationResponse>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
+        ...authorizationBody, idempotency_key: authorizationKeys.keyFor(authorizationBody),
       }});
+      authorizationKeys.reset();
       setLastDecision(normalizeAviRfidAuthorization(result?.data)); success(t('decisionRecorded')); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }

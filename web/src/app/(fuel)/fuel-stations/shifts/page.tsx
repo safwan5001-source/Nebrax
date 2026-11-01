@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +40,9 @@ export default function FuelShiftsPage() {
   const t = useTranslations('fuelStationsShifts');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const openKeys = useIntentKeys();
+  const readingKeys = useIntentKeys();
+  const cashKeys = useIntentKeys();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
@@ -105,9 +109,11 @@ export default function FuelShiftsPage() {
     if (!stationId || !isValidRiyal(openingFloat)) return;
     setBusy(true); setError(null);
     try {
+      const openBody = { fuel_station_id: stationId, opening_float_minor: riyalToMinor(openingFloat) };
       const created = await api<{ data: Shift }>('/fuel-stations/shifts/open', {
-        method: 'POST', body: { fuel_station_id: stationId, opening_float_minor: riyalToMinor(openingFloat), idempotency_key: crypto.randomUUID() },
+        method: 'POST', body: { ...openBody, idempotency_key: openKeys.keyFor(openBody) },
       });
+      openKeys.reset();
       const user = currentUser();
       if (user?.id) await api(`/fuel-stations/shifts/${created.data.id}/staff`, { method: 'POST', body: { user_id: user.id, role: 'attendant' } });
       success(t('openedSuccess')); setOpenDialog(false); setStationId(''); setOpeningFloat('0'); await load();
@@ -119,10 +125,12 @@ export default function FuelShiftsPage() {
     setBusy(true); setError(null);
     try {
       const endpoint = readingKind === 'meter' ? 'meter-readings' : 'tank-readings';
-      const body = readingKind === 'meter'
-        ? { fuel_nozzle_id: assetId, reading_stage: readingStage, meter_liters: readingLiters, evidence_key: crypto.randomUUID() }
-        : { fuel_tank_id: assetId, reading_stage: readingStage, reading_type: readingType, quantity_liters: readingLiters, evidence_key: crypto.randomUUID() };
+      const readingBody = readingKind === 'meter'
+        ? { fuel_nozzle_id: assetId, reading_stage: readingStage, meter_liters: readingLiters }
+        : { fuel_tank_id: assetId, reading_stage: readingStage, reading_type: readingType, quantity_liters: readingLiters };
+      const body = { ...readingBody, evidence_key: readingKeys.keyFor({ shift_id: readingShift.id, endpoint, ...readingBody }) };
       await api(`/fuel-stations/shifts/${readingShift.id}/${endpoint}`, { method: 'POST', body });
+      readingKeys.reset();
       success(t('readingSaved')); setReadingShift(null); setAssetId(''); setReadingLiters(''); await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -131,9 +139,11 @@ export default function FuelShiftsPage() {
     if (!cashShift || !isValidRiyal(movementAmount) || movementReason.trim().length < 3) return;
     setBusy(true); setError(null);
     try {
+      const cashBody = { type: movementType, amount_minor: riyalToMinor(movementAmount), reason: movementReason };
       await api(`/fuel-stations/shifts/${cashShift.id}/cash-movements`, {
-        method: 'POST', body: { type: movementType, amount_minor: riyalToMinor(movementAmount), reason: movementReason, idempotency_key: crypto.randomUUID() },
+        method: 'POST', body: { ...cashBody, idempotency_key: cashKeys.keyFor({ shift_id: cashShift.id, ...cashBody }) },
       });
+      cashKeys.reset();
       success(t('movementSaved')); setCashShift(null); setMovementAmount(''); setMovementReason(''); await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
