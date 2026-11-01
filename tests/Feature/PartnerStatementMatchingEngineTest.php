@@ -221,6 +221,30 @@ class PartnerStatementMatchingEngineTest extends TestCase
         $this->assertSame(['needs_review', 'needs_review'], array_column($result['ledger'], 'outcome'));
     }
 
+    /**
+     * Codex #1908 P2 (الثانية): سطر مرجعه يصيب وثيقتين (غامض) **يطلب** وحدتيهما في كشف التعارض؛ سطر آخر يصيب إحداهما بمفتاح آخر (R2) لا يُسند له بصمت.
+     *
+     * @test
+     */
+    public function an_ambiguous_key_line_still_wants_its_units_so_a_competing_key_match_is_not_assigned(): void
+    {
+        // مشتريان بالرقم الداخلي BILL-1 في فرعين، بمرجعي مورد مختلفين.
+        $units = [
+            $this->unit('pa', 'purchase', 'BILL-1', '2026-09-01', 'credit', 10000, external: 'SUP-A'),
+            $this->unit('pb', 'purchase', 'BILL-1', '2026-09-01', 'credit', 10000, external: 'SUP-B'),
+        ];
+        $result = $this->go([
+            $this->line(2, '2026-09-01', debit: 10000, our: 'bill-1'),    // R1 يصيب الاثنين ⇒ غامض
+            $this->line(3, '2026-09-01', debit: 10000, ref: 'sup-a'),     // R2 يصيب pa وحدها
+        ], $units, role: 'supplier');
+        $rows = $this->byLine($result);
+
+        $this->assertSame(['ambiguous', 'ambiguous_multiple_documents_for_reference'], [$rows[2]['outcome'], $rows[2]['explanation']['code']]);
+        $this->assertSame(['ambiguous', 'unit_claimed_by_several_lines', 'R2'], [$rows[3]['outcome'], $rows[3]['explanation']['code'], $rows[3]['rule']]);
+        $this->assertNotContains('matched', array_column($result['statement'], 'outcome'));
+        $this->assertSame(['needs_review', 'needs_review'], array_column($result['ledger'], 'outcome'));
+    }
+
     /** @test */
     public function a_unit_matched_by_a_key_is_not_reused_by_r3_for_another_line(): void
     {
@@ -324,6 +348,74 @@ class PartnerStatementMatchingEngineTest extends TestCase
 
         $this->assertSame('matched', $row['outcome']);
         $this->assertSame([['code' => 'kind_side_mismatch', 'params' => ['kind' => 'payment', 'expected' => 'debit', 'actual' => 'credit']]], $row['warnings']);
+    }
+
+    /**
+     * فحص بالخصائص على سيناريوهات عشوائية **حتمية** (مولّد خطي ثابت البذرة): أنماط الاستعمال المزدوج المتتابعة في المراجعة (مفتاح غامض، R3، مفاتيح متنافسة) تُحرَس بثوابت عامة
+     * لا بحالات مفردة. الثوابت: (١) وحدة تُسنَد لسطر واحد على الأكثر؛ (٢) لا تُسنَد وحدة غير `active`؛ (٣) وحدة مرشّحة لسطر `ambiguous` لا تُطابَق في أي سطر؛
+     * (٤) وحدة دفتر `matched` لها سطر `matched` واحد بالضبط؛ (٥) مخرجات متطابقة عند عكس ترتيب المدخلات.
+     *
+     * @test
+     */
+    public function double_use_invariants_hold_over_deterministic_random_scenarios(): void
+    {
+        $seed = 20261101;
+        $rand = function (int $max) use (&$seed): int {
+            $seed = ($seed * 1103515245 + 12345) & 0x7fffffff;
+
+            return $seed % $max;
+        };
+        $numbers = ['', 'n1', 'n2', 'n3'];
+        $kinds = ['invoice', 'purchase', 'payment', 'credit_note'];
+        $states = ['active', 'active', 'active', 'active', 'neutralised', 'incomplete'];
+
+        for ($case = 0; $case < 400; $case++) {
+            $units = [];
+            foreach (range(1, 1 + $rand(5)) as $i) {
+                $state = $states[$rand(count($states))];
+                $direction = $state === 'neutralised' ? 'none' : (['debit', 'credit'][$rand(2)]);
+                $amount = $state === 'neutralised' ? 0 : [100, 100, 200][$rand(3)];
+                $number = $numbers[1 + $rand(3)];
+                $units[] = $this->unit("u{$i}", $kinds[$rand(4)], $number, '2026-09-0'.(1 + $rand(3)), $direction, $amount, $state, true, ['', 'e1', 'e2'][$rand(3)], $state === 'incomplete' ? ['reversal_outside_window'] : []);
+            }
+            $lines = [];
+            foreach (range(1, 1 + $rand(5)) as $i) {
+                $debit = $rand(2) === 0;
+                $amount = [100, 100, 200][$rand(3)];
+                $lines[] = $this->line(1 + $i, '2026-09-0'.(1 + $rand(3)), $debit ? $amount : 0, $debit ? 0 : $amount, ['', 'e1', 'e2', 'n1'][$rand(4)], $numbers[$rand(4)]);
+            }
+
+            $dateTol = $rand(3);
+            $amountTol = [0, 0, 50][$rand(3)];
+            $result = $this->go($lines, $units, dateTol: $dateTol, amountTol: $amountTol);
+            $assigned = [];
+            $ambiguousCandidates = [];
+            foreach ($result['statement'] as $row) {
+                if (in_array($row['outcome'], ['matched', 'amount_difference', 'date_difference'], true) && $row['unit_key'] !== null && $row['explanation']['code'] !== 'reversed_in_books') {
+                    $assigned[$row['unit_key']][] = $row['ordinal'];
+                    $unit = array_values(array_filter($units, fn (array $u): bool => $u['key'] === $row['unit_key']))[0];
+                    $this->assertSame('active', $unit['state'], "case {$case}: وحدة غير نشطة أُسندت");
+                }
+                if ($row['outcome'] === 'ambiguous') {
+                    foreach ($row['candidates'] ?? [] as $candidate) {
+                        $ambiguousCandidates[$candidate['key']] = true;
+                    }
+                }
+            }
+            foreach ($assigned as $key => $ordinals) {
+                $this->assertCount(1, $ordinals, "case {$case}: الوحدة {$key} أُسندت لأكثر من سطر");
+            }
+            foreach (array_keys($assigned) as $key) {
+                $this->assertArrayNotHasKey($key, $ambiguousCandidates, "case {$case}: الوحدة {$key} مرشّحة لسطر غامض ومع ذلك أُسندت");
+            }
+            foreach ($result['ledger'] as $row) {
+                if ($row['outcome'] === 'matched') {
+                    $matchedLines = array_filter($result['statement'], fn (array $r): bool => $r['outcome'] === 'matched' && $r['unit_key'] === $row['unit_key']);
+                    $this->assertCount(1, $matchedLines, "case {$case}: وحدة دفتر matched بلا سطر matched وحيد");
+                }
+            }
+            $this->assertSame($result, $this->go(array_reverse($lines), array_reverse($units), dateTol: $dateTol, amountTol: $amountTol), "case {$case}: المخرجات تعتمد على ترتيب المدخلات");
+        }
     }
 
     /** @test */

@@ -57,6 +57,7 @@ final class PartnerStatementMatchingEngine
         $claims = [];       // unit key => [ordinal, ...] للنتائج المرتبطة بالوحدة (matched/amount/date)
         $pendingB = [];     // أسطر بلا إصابة مفتاح
         $inReview = [];     // وحدات مرشّحة لسطر غامض — تُعرض «تحتاج مراجعة» لا «مفقودة من الكشف»
+        $wants = [];        // unit key => أسطر غامضة (مرجعها يصيب عدة وثائق) تطلب هذه الوحدة
 
         // ───────────── المرحلة A: المفاتيح (R1 ثم R2) ─────────────
         foreach ($lines as $line) {
@@ -74,6 +75,7 @@ final class PartnerStatementMatchingEngine
                 $results[$ordinal] = $base + $this->row('ambiguous', $rule, 'ambiguous_multiple_documents_for_reference', ['reference_units' => count($hits)], candidates: $this->snapshots($hits));
                 foreach ($hits as $hit) {
                     $inReview[$hit['key']] = true;
+                    $wants[$hit['key']][] = $ordinal;   // السطر الغامض «يطلب» وحداته في كشف التعارض أيضاً (Codex #1908 P2)
                 }
 
                 continue;
@@ -89,13 +91,14 @@ final class PartnerStatementMatchingEngine
         // وحدة مطلوبة من أكثر من سطر ⇒ كل أسطرها ambiguous ولا ترتبط بأيٍّ منها.
         $disputed = [];
         foreach ($claims as $unitKey => $ordinals) {
-            if (count($ordinals) < 2) {
+            $wanting = count($ordinals) + count($wants[$unitKey] ?? []);
+            if ($wanting < 2) {
                 continue;
             }
             $disputed[$unitKey] = true;
             foreach ($ordinals as $ordinal) {
                 $rule = $results[$ordinal]['rule'];
-                $results[$ordinal] = $this->baseOf($results[$ordinal]) + $this->row('ambiguous', $rule, 'unit_claimed_by_several_lines', ['claiming_lines' => count($ordinals)], candidates: $this->snapshots([$byKey[$unitKey]]));
+                $results[$ordinal] = $this->baseOf($results[$ordinal]) + $this->row('ambiguous', $rule, 'unit_claimed_by_several_lines', ['claiming_lines' => $wanting], candidates: $this->snapshots([$byKey[$unitKey]]));
             }
             unset($claims[$unitKey]);
         }
