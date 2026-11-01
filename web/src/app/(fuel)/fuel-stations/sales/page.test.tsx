@@ -77,6 +77,27 @@ describe('FuelSalesPage idempotency (FS-08)', () => {
     expect(second.idempotency_key).toBe(first.idempotency_key);
   });
 
+  it('cancelling and starting a new sale with identical fields is an independent intent with a new key', async () => {
+    render(<FuelSalesPage />);
+    await openAndFill('10.000');
+    api.mockReset();
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (options?.method === 'POST') return Promise.reject(new Error('response lost'));
+      return Promise.resolve({ data: lists[path] ?? [] });
+    });
+
+    fireEvent.click(screen.getByText('createDraft'));
+    await waitFor(() => expect(postedBodies()).toHaveLength(1));
+    await screen.findByText('saveFailed');
+    fireEvent.click(screen.getByText('cancel'));
+    await openAndFill('10.000');
+    fireEvent.click(screen.getByText('createDraft'));
+    await waitFor(() => expect(postedBodies()).toHaveLength(2));
+
+    const [first, second] = postedBodies();
+    expect(second.idempotency_key).not.toBe(first.idempotency_key);
+  });
+
   it('a changed quantity is a different intent and gets a new key', async () => {
     render(<FuelSalesPage />);
     await openAndFill('10.000');
