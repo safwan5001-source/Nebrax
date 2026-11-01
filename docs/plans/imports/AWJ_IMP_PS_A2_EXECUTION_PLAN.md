@@ -1,6 +1,6 @@
 # IMP-PARTNER-STATEMENTS — PS-A2 execution plan (matching engine) + D-PS-08 + period-reconciliation policy
 
-**Status: plan only. No code, no migration, no permission, no catalogue entry and no environment change.** Nothing here starts until the owner approves it explicitly. Written 2026-11-01 after the PS-A1 review (PR #1877); **updated the same day with the owner's answers to D-PS-10..13** (this revision is documentation only, in its own PR). Every "today" claim names the file it was read from.
+**Status: plan only. No code, no migration, no permission, no catalogue entry and no environment change.** Nothing here starts until the owner approves it explicitly. Written 2026-11-01 after the PS-A1 review (PR #1877); **updated the same day with the owner's answers to D-PS-10..14** (this revision is documentation only, in its own PR). Every "today" claim names the file it was read from.
 
 Boundaries that do not move: Track A has no financial effect (no journal entry, document, payment, stock movement or ZATCA artefact); Track B and PS-A3/A4 are out of scope; D-PS-05, D-PS-06, D-PS-07, D-PS-09, D-03, D-06 and D-13 stay open and are not assumed.
 
@@ -14,6 +14,7 @@ Boundaries that do not move: Track A has no financial effect (no journal entry, 
 | **D-PS-11** | **Approved: deferred.** No `orientation` support; v1 uses the counterparty's orientation only | §3.1 |
 | **D-PS-12** | **Approved:** a final reconciliation is final **within its real scope (organisation or branch)**; a one-branch reconciliation is never presented as organisation-wide; non-conflict rules between overlapping scopes are designed **before** PS-A3 builds close | §5 |
 | **D-PS-13** | **Approved:** `accounting.partner_statements` is **not** auto-enabled for legacy tenants; the existing activation mechanism is used and the absence of a decision never enables it | §6 |
+| **D-PS-14** | **Approved:** overlapping statement periods are allowed with a clear warning and an explicit acknowledgement; a **real** conflict between effective finals is prevented at close. Date overlap alone is **not** evidence of a conflict of movements | §5.5 |
 | **Period policy** | **Approved: many drafts for the same tenant + partner + role + period; at most one *effective final* reconciliation per scope. No unique constraint on drafts; no deletion of earlier reconciliations; not an authorisation to touch balances or create entries** | §5 |
 
 ## 2. Ledger source — the one `ReportService::partnerStatement` reads
@@ -104,15 +105,41 @@ For one tuple (partner, role, period) the effective finals must satisfy:
 | branch A | branch A | refused unless `replace` |
 | branch A | branch B | allowed (disjoint scopes) |
 | branch A, B… | organization | **refused** unless `replace` with the explicit list of the branch finals it supersedes (all in one transaction, one event each, reason mandatory) |
-Different but overlapping **periods** of the same partner/role are *not* blocked in v1; closing shows a non-blocking warning naming the overlapping finals and requires an acknowledgement flag (open point **D-PS-14**: hard block instead?).
+Different but overlapping **periods** of the same partner/role are governed by §5.5 (D-PS-14): warning + acknowledgement, and a block only on a real conflict of movements.
 
 ### 5.4 Guarantee in layers
-1. **Service:** every close/void/replace for a tuple takes `pg_advisory_xact_lock(hash(tenant, partner, role, from, to))` — **tuple-wide, not per scope**, so an organisation close and a branch close of the same tuple serialise — then `SELECT … FOR UPDATE` on the effective finals of the tuple and re-checks the table above; transitions are compare-and-swap on `status`. Never catch a unique violation inside a PostgreSQL transaction.
+1. **Service:** every close/void/replace takes `pg_advisory_xact_lock(hash(tenant, partner, role))` — **partner/role-wide** (not per tuple and not per scope), because periods that overlap but differ conflict through shared movements (§5.5), so an organisation close, a branch close and closes of overlapping periods must all serialise — then `SELECT … FOR UPDATE` on the effective finals of the tuple and re-checks the table above; transitions are compare-and-swap on `status`. Never catch a unique violation inside a PostgreSQL transaction.
 2. **Same-scope net:** partial unique index on `(tenant_id, partner_id, role, period_from, period_to, scope_key) WHERE status = 'closed'`, where `scope_key` is `'org'` or the branch UUID (stored at close). Partial indexes work on PostgreSQL and SQLite; drafts and history rows are unconstrained.
 3. **Cross-scope net:** a trigger (PostgreSQL + SQLite, same pattern as the F2 fences) rejects a row becoming `closed` when the table above forbids it (organisation vs any other effective final of the tuple), because a unique index cannot express "org excludes branch". Triggers take no locks beyond the row (MVCC reads), so the advisory lock stays the only serialiser.
 4. **Immutability:** status `CHECK`; a trigger forbids changing lines/policy of a `closed` row.
 - **PostgreSQL fork tests (`pcntl_fork`, failure not skip):** N racers closing different drafts of one scope → exactly one `closed`; org close racing branch close of the same tuple → exactly one wins and the loser is refused; two different branches close concurrently → both succeed (no false blocking); close racing void; replace chains stay linear. SQLite covers the logic, PostgreSQL the race.
 - Close/void/replace change reconciliation status only — **no authority over balances, entries, documents or tax.**
+
+### 5.5 Overlapping periods and real conflicts (D-PS-14, approved)
+**Principle:** overlap of *dates* is a reason to warn, never by itself a reason to block. What is blocked is the same **movement** being claimed by two effective finals, because then one ledger movement would be "reconciled" twice, possibly with different outcomes.
+
+- **Overlap warning (non-blocking, always shown):** at close, the server computes the effective finals of the same partner + role whose period overlaps and whose scope intersects (organisation intersects everything; branch A intersects only branch A). If any exist, close is refused with `overlap_ack_required` and the list, until the caller repeats the request with `acknowledge_overlap = [ids]` — the list must **equal** the server's list at that moment (a stale or partial list is refused, `overlap_ack_stale`). The acknowledgement and the list are stored in the close event. The UI shows the overlapping finals, their periods and scopes.
+- **Claimed movements (the conflict test):** closing writes, in the same transaction, one claim per **ledger unit** the final covered — the entries of the candidate set of the match run it closed on (document-level units from the report source: `entry_id` from D-PS-10; reversed originals and their reversals are claimed as ordinary entries). Table `partner_statement_unit_claims` (`tenant_id`, `reconciliation_id`, `partner_id`, `role`, `unit_key` = journal entry id, `branch_id`, `claimed_at`, `released_at` null while the final is effective; composite tenant FKs; `CompanyWide`; append-only except `released_at`). Drafts and `reviewed` rows never claim.
+- **Real conflict** = a unit that already has an active claim (`released_at IS NULL`) from another final of the same partner + role. Then close is refused with `unit_conflict` naming the conflicting reconciliation ids and a bounded sample of unit refs. Because units are per entry and entries carry their branch, an organisation final and a branch final conflict **only** through genuinely shared movements, and two different-branch finals never do. (§5.3 stays as the stricter rule for the *identical* period tuple.)
+- **Resolution:** `replace = true` with the explicit list of the finals to supersede and a reason; all in one transaction — conflicting finals → `superseded`, their claims `released_at`, the new final's claims written, one event each. Void releases the claims too. A final never silently loses units.
+- **Statement-side duplicates** (the same `reference_key` + amount + direction in another effective final's statement lines, which have no ledger unit — typically `missing_in_books` lines) are a **warning only**, listed in the same acknowledgement; they cannot be a ledger conflict.
+- **Disjoint movements in overlapping dates** (e.g. Jan–Mar and Feb–Apr with no ledger movement dated Feb–Mar for that partner): no claim collides → allowed after acknowledgement. This is the case the owner called out: overlap alone is not conflict.
+- **Documented limits:** (1) a movement posted *after* a final closed is not claimed by it; the final shows "ledger changed since close" (fingerprint) and a later final that covers the date claims it — no conflict. (2) A reversed pair whose original and reversal fall in different finals is split across them (each entry claimed once); the UI flags the pair. (3) Claims are per entry, not per journal line.
+- **Guarantee in layers:** (a) the partner/role-wide advisory lock (§5.4) serialises every close/void/replace; (b) the service pre-checks the claims and overlap list under the lock; (c) **net:** a partial unique index `UNIQUE (tenant_id, partner_id, role, unit_key) WHERE released_at IS NULL` on the claims table (PostgreSQL + SQLite) rejects any second active claim even from raw SQL; never catch a unique violation inside a PostgreSQL transaction (the pre-check makes it unreachable in normal flow).
+
+**How the conflict prevention is tested (PS-A3, SQLite + PostgreSQL):**
+1. *Date overlap alone is not a conflict (negative test):* overlapping periods with disjoint movements → refused without acknowledgement (`overlap_ack_required`), allowed with it; both finals effective; no `unit_conflict`.
+2. *Real conflict:* overlapping periods sharing ≥ 1 movement → `unit_conflict` with ids and sample; allowed only through `replace` listing the conflicting final; afterwards the old final is `superseded`, its claims released, the new claims active, event rows written.
+3. *Stale/partial acknowledgement* (a new overlapping final appeared after the UI loaded) → `overlap_ack_stale`.
+4. *Scopes:* organisation vs branch sharing movements → conflict; branch A vs branch B → both close; identical-tuple org vs branch → §5.3 rule; a restricted actor without a single-branch filter cannot close.
+5. *Drafts:* many drafts over the same units never claim and never conflict.
+6. *Void/supersede release:* after void a new final over the same units closes; claims history kept.
+7. *Reversed pair:* original and reversal both claimed; split across finals is flagged, not a conflict.
+8. *Statement-side duplicates:* warning in the acknowledgement list only.
+9. *DB net:* a raw `INSERT` of a second active claim for the same unit fails on both engines (bypasses the service on purpose); a service-less `released_at` update re-opening an already-released duplicate fails the same index.
+10. *PostgreSQL `pcntl_fork` races (failure, not skip, if `pcntl` is missing):* two closes of different drafts with overlapping periods and a shared unit → exactly one succeeds; two closes with disjoint units → both succeed; close vs void; replace vs concurrent close; org close vs branch close sharing a unit → exactly one wins; zero database errors surfaced to callers.
+11. *Mutation controls (each must fail at least one test):* remove the advisory lock; remove the claim pre-check; drop the partial unique index; make date overlap alone block (breaks the negative test); skip the acknowledgement equality check; release claims on `reviewed` instead of void/supersede.
+12. *Wall / no-effect:* static test (no writer class referenced), row counts of the ledger/document tables and balances unchanged by close, void and replace.
 
 ## 6. D-PS-08 — independent application key
 
@@ -135,7 +162,7 @@ Integration, using the existing architecture only:
 | **PS-A2a** | Catalogue key (`explicit_enable_only`) + gate wiring on A1 routes/domain (D-PS-08, D-PS-13), `disable()` data probe, registered `built` + `explicit_enable_only` so the gate is effective on the A1 routes from the start and no tenant is enabled implicitly | none (decisions recorded) |
 | **PS-A2b** | `PartnerLedgerCandidates` + golden-snapshot/characterisation tests of the report (incl. the reversal/role-filter observation) + the three additive keys (D-PS-10) | none |
 | **PS-A2c** | Matching engine R1–R3, outcomes, reversed-pair netting, match tables/run (with `ledger_scope`), `match`/`matches`/`verify-set` API; counterparty orientation only (D-PS-11); no UI | A2a, A2b |
-| PS-A3 | Review actions, close/replace/void, events, scope-aware constraints (§5.3–5.4), concurrency tests | A2c; D-PS-14 |
+| PS-A3 | Review actions, close/replace/void, events, scope-aware constraints (§5.3–5.4), overlap acknowledgement + unit claims (§5.5), concurrency tests | A2c |
 | PS-A4 | UI | A3 |
 
 ## 8. Test strategy for A2 (SQLite + PostgreSQL)
@@ -148,4 +175,4 @@ Per rule and outcome fixtures; mirror orientation for both roles and for a `both
 | D-PS-11 | `orientation` support | **Approved: deferred** (counterparty orientation only in v1) |
 | D-PS-12 | Final reconciliation scope | **Approved 2026-11-01:** final within its real scope (organisation or branch); no branch reconciliation shown as organisation-wide; non-conflict rules designed before PS-A3 (§5) |
 | D-PS-13 | Legacy-tenant default for the new key | **Approved 2026-11-01:** never implicit; `explicit_enable_only` through the existing mechanism (§6) |
-| D-PS-14 *(new, recommendation first)* | Overlapping but different **periods** for the same partner/role: warn with acknowledgement (recommended) or hard-block the second final? | Open — not assumed |
+| D-PS-14 | Overlapping different periods for the same partner/role | **Approved 2026-11-01:** allowed with a clear warning + explicit acknowledgement; real conflicts between effective finals are prevented at close; date overlap alone is not proof of a movement conflict (§5.5) |

@@ -131,8 +131,8 @@ Owner-confirmed and re-verified in code: the AWJ Assistant already contains real
 | D-PS-11 | Statement orientation | **Approved: deferred** — v1 uses the counterparty's orientation only; no `orientation` option | 2026-11-01 | PS-A2c; plan §3.1 |
 | D-PS-12 | Scope of a final reconciliation | **Approved:** final within its real scope (organisation or branch); a one-branch reconciliation is never shown as organisation-wide; non-conflict rules for overlapping scopes designed before PS-A3 builds close | 2026-11-01 | Plan §5 (scope from the match run, restricted actors cannot close an unscoped run, tuple-wide advisory lock, cross-scope trigger); build in PS-A3 |
 | D-PS-13 | Activation of `accounting.partner_statements` | **Approved:** not auto-enabled for legacy tenants; existing activation mechanism; absence of a decision never enables | 2026-11-01 | Plan §6: additive `explicit_enable_only` catalogue attribute honoured in `statusFor`/`navVisibility`; PS-A2a |
-| D-PS-14 | Overlapping different periods (same partner/role) | **Open** — recommended: warn + acknowledgement, not block | 2026-11-01 | Plan §5.3 |
-| D-PS-05..07, D-PS-09, D-03, D-06, D-13 | Remaining IMP-PARTNER-STATEMENTS / accounting decisions | **Still open — not assumed** (Track B stays blocked). D-PS-14 (overlapping periods) is new and open | 2026-11-01 | — |
+| D-PS-14 | Overlapping different periods (same partner/role) | **Approved (2026-11-01):** overlap allowed with a clear warning and an explicit acknowledgement; real conflicts between effective finals prevented at close; date overlap alone is not evidence of a movement conflict | 2026-11-01 | Plan §5.5: acknowledgement must equal the server's overlap list; conflict = a ledger entry already actively claimed by another final (`partner_statement_unit_claims`, partial unique index, partner/role-wide advisory lock); tests listed there; built in PS-A3 |
+| D-PS-05..07, D-PS-09, D-03, D-06, D-13 | Remaining IMP-PARTNER-STATEMENTS / accounting decisions | **Still open — not assumed** (Track B stays blocked). D-PS-14 approved | 2026-11-01 | — |
 
 ## Deploy log
 
