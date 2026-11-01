@@ -29,6 +29,7 @@ class FuelReconciliationTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+    use CapturesThrowable;
 
     /** @test */
     public function fuel_quantity_conversion_is_exact_without_rounding(): void
@@ -284,7 +285,120 @@ class FuelReconciliationTest extends TestCase
         $this->assertSame(3, FuelStationConfigurationEvent::count());
     }
 
-    /** @return array{service: FuelReconciliationService, station: FuelStation, tank: FuelTank, warehouse: Warehouse|null, branch: Branch, product_id: string, owner_id: string} */
+    /** @test FS-01: خزانان لمنتج واحد — قراءة خزان صحيحة لا تُنتج فقداً كاذباً بل تُرفض. */
+    public function a_second_tank_of_the_same_product_makes_reconciliation_fail_closed_instead_of_fabricating_a_loss(): void
+    {
+        $fixture = $this->fixture(); // 100 ل في المخزن
+        $second = $this->secondTank($fixture, 'T-R2');
+        // الخزانان 50 ل لكل منهما؛ قراءة الخزان الأول صحيحة 50 ل لكن الدفتر يقارنها بـ100 ل.
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '50.000', 'fs01-multi-1');
+
+        $exception = $this->thrown(fn () => $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]), 'كان يجب رفض تسوية خزان واحد مقابل رصيد مخزن يغذّيه أكثر من خزان.');
+        $this->assertStringContainsString('FUEL_RECONCILIATION_MULTI_TANK_UNSUPPORTED', $exception->getMessage());
+
+        $this->assertSame(0, \App\Models\FuelReconciliation::count());
+        $this->assertSame(100000, (int) Product::findOrFail($fixture['product_id'])->quantity_on_hand);
+        $this->assertNotNull($second->id);
+    }
+
+    /** @test FS-01: الخزان المعطّل لا يحجب التسوية (محطة بخزان فعّال وحيد). */
+    public function an_inactive_second_tank_does_not_block_reconciliation(): void
+    {
+        $fixture = $this->fixture();
+        $this->secondTank($fixture, 'T-OLD', 'inactive');
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '100.000', 'fs01-inactive-1');
+
+        $draft = $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]);
+
+        $this->assertSame(0, $draft->variance_milliliters);
+    }
+
+    /** @test FS-01: خزان لمنتج وقود آخر (ديزل مقابل بنزين) لا يحجب — الكتاب مفصول بالمنتج. */
+    public function a_tank_of_a_different_fuel_product_does_not_block_reconciliation(): void
+    {
+        $fixture = $this->fixture();
+        $otherProductId = $this->withToken($fixture['token'])->postJson('/api/products', [
+            'name' => 'ديزل mL', 'type' => 'good', 'unit' => 'mL',
+            'sale_price' => 1000, 'purchase_price' => 10, 'track_inventory' => true,
+        ])->assertCreated()['data']['id'];
+        $otherFuel = \App\Models\FuelProduct::create(['product_id' => $otherProductId, 'code' => 'F-DSL', 'name' => 'ديزل']);
+        $this->secondTank($fixture, 'T-DSL', 'active', $otherFuel->id);
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '90.000', 'fs01-other-product-1');
+
+        $draft = $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]);
+
+        $this->assertSame(-10000, $draft->variance_milliliters);
+    }
+
+    /** @test FS-01: خزان يُضاف بعد المسودة يمنع الاعتماد دون أي أثر مخزني أو محاسبي. */
+    public function a_tank_added_after_the_draft_blocks_approval_with_no_stock_or_ledger_effect(): void
+    {
+        $fixture = $this->fixture();
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '90.000', 'fs01-late-tank-1');
+        $draft = $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]);
+        $this->secondTank($fixture, 'T-LATE');
+        $entries = \App\Models\JournalEntry::count();
+        $movements = \App\Models\StockMovement::count();
+
+        $exception = $this->thrown(fn () => $fixture['service']->approve($draft, $fixture['owner_id']), 'كان يجب رفض الاعتماد بعد إضافة خزان ثانٍ لنفس الكتاب.');
+        $this->assertStringContainsString('FUEL_RECONCILIATION_MULTI_TANK_UNSUPPORTED', $exception->getMessage());
+
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame($entries, \App\Models\JournalEntry::count());
+        $this->assertSame($movements, \App\Models\StockMovement::count());
+        $this->assertSame(100000, (int) Product::findOrFail($fixture['product_id'])->quantity_on_hand);
+    }
+
+    /** @test FS-32: سطور قيد التسوية تأخذ فرع المحطة لا فرع سياق الموافق. */
+    public function reconciliation_journal_lines_carry_the_station_branch_not_the_approvers_active_branch(): void
+    {
+        $fixture = $this->fixture();
+        $other = Branch::create(['code' => 'BR-OTHER', 'name' => 'فرع آخر']);
+        $reading = $this->physicalReading($fixture, $fixture['tank'], '90.000', 'fs32-branch-1');
+        $draft = $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]);
+
+        $context = app(\App\Tenancy\BranchContext::class);
+        $context->set($other->id); // الموافق يعمل ضمن فرع آخر
+        try {
+            $approved = $fixture['service']->approve($draft, $fixture['owner_id']);
+        } finally {
+            $context->forget();
+        }
+
+        $lines = JournalLine::where('journal_entry_id', $approved->journal_entry_id)->get();
+        $this->assertCount(2, $lines);
+        foreach ($lines as $line) {
+            $this->assertSame($fixture['station']->branch_id, $line->branch_id);
+        }
+        $this->assertSame($fixture['station']->branch_id, \App\Models\StockMovement::findOrFail($approved->stock_movement_id)->branch_id);
+    }
+
+    /** @return array{service: FuelReconciliationService, station: FuelStation, tank: FuelTank, warehouse: Warehouse|null, branch: Branch, product_id: string, owner_id: string, token: string} */
     private function fixture(bool $assignWarehouse = true, int $openingQuantity = 100000): array
     {
         $auth = $this->registerTenant();
@@ -337,6 +451,33 @@ class FuelReconciliationTest extends TestCase
             'branch' => $branch,
             'product_id' => $productId,
             'owner_id' => $ownerId,
+            'token' => $auth['token'],
         ];
+    }
+
+    private function secondTank(array $fixture, string $code, string $status = 'active', ?string $fuelProductId = null): FuelTank
+    {
+        return FuelTank::create([
+            'branch_id' => $fixture['branch']->id,
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_product_id' => $fuelProductId ?? $fixture['tank']->fuel_product_id,
+            'code' => $code,
+            'name' => 'خزان إضافي ' . $code,
+            'capacity_milliliters' => 200000,
+            'safe_capacity_milliliters' => 190000,
+            'status' => $status,
+        ]);
+    }
+
+    private function physicalReading(array $fixture, FuelTank $tank, string $liters, string $key): \App\Models\FuelTankReading
+    {
+        return $fixture['service']->recordReading([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $tank->id,
+            'reading_type' => 'physical',
+            'quantity_liters' => $liters,
+            'evidence_key' => $key,
+            'recorded_by' => $fixture['owner_id'],
+        ]);
     }
 }
