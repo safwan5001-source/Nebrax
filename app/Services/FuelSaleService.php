@@ -217,6 +217,7 @@ class FuelSaleService
                     'date' => $postedInvoice->invoice_date->toDateString(),
                     'notes' => "صرف وقود عبر البيع {$sale->number}",
                     'enforce_stock' => true,
+                    InventoryService::FUEL_POOL_META => true,
                 ], $cogsMinor);
                 $cogsEntry = $this->postFuelCogs($station, $cogsMinor, $postedInvoice, $actor);
                 $this->costBasis->recordIssue($fuelProduct, $warehouse, $stockMovement, (int) $sale->quantity_milliliters, $cogsMinor, $cogsEntry);

@@ -4,6 +4,8 @@ namespace App\Services\Reporting;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\FuelInventoryCostState;
+use App\Models\FuelProduct;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\StockPermit;
@@ -146,6 +148,7 @@ class InventoryReportService
             ->groupBy('product_id');
 
         $hideZero = ! empty($filters['hide_zero']);
+        $fuelPools = $this->fuelCostPools($products->pluck('id')->all(), $warehouseIds);
 
         $rows = collect();
         foreach ($products as $product) {
@@ -190,7 +193,10 @@ class InventoryReportService
                 'quantity' => $quantity,
                 'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
                 'avg_cost' => (int) $product->avg_cost,
-                'stock_value' => $quantity * (int) $product->avg_cost,
+                // FS-03: الوقود بالهللات/مل كسرٌ (2.33 ر.س/ل = 0.233 هللة/مل) يُقتطع `avg_cost`
+                // الصحيح فيه إلى 0 فتصير كمية × avg_cost = 0؛ القيمة الدقيقة في مجمّع التكلفة.
+                'stock_value' => isset($fuelPools[(string) $product->id]) ? $fuelPools[(string) $product->id] : $quantity * (int) $product->avg_cost,
+                'value_basis' => isset($fuelPools[(string) $product->id]) ? 'fuel_cost_pool' : 'avg_cost',
             ]);
         }
 
@@ -208,6 +214,40 @@ class InventoryReportService
                 'stock_value' => array_sum(array_column($rows, 'stock_value')),
             ],
         ];
+    }
+
+    /**
+     * FS-03: قيمة مخزون الوقود الدقيقة = مجموع `cost_pool_minor` لحالات التكلفة (مخزن × منتج وقود)،
+     * مقيَّدةً بنطاق المخزن الفعّال حين يُقيَّد المستخدم. المفتاح: `products.id` للمنتجات التي لها
+     * صف `fuel_products` فقط؛ غيرها لا يظهر فيبقى حسابها `كمية × avg_cost` حرفياً.
+     *
+     * @param  array<int,string>  $productIds
+     * @param  array<int,string>|null  $warehouseIds
+     * @return array<string,int>
+     */
+    private function fuelCostPools(array $productIds, ?array $warehouseIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+        $fuelProducts = FuelProduct::query()->whereIn('product_id', $productIds)->pluck('product_id', 'id');
+        if ($fuelProducts->isEmpty()) {
+            return [];
+        }
+
+        $pools = FuelInventoryCostState::query()
+            ->whereIn('fuel_product_id', $fuelProducts->keys())
+            ->when($warehouseIds !== null, fn ($query) => $query->whereIn('warehouse_id', $warehouseIds))
+            ->selectRaw('fuel_product_id, SUM(cost_pool_minor) as pool')
+            ->groupBy('fuel_product_id')
+            ->pluck('pool', 'fuel_product_id');
+
+        $byProduct = [];
+        foreach ($fuelProducts as $fuelProductId => $productId) {
+            $byProduct[(string) $productId] = (int) ($pools[$fuelProductId] ?? 0);
+        }
+
+        return $byProduct;
     }
 
     /**

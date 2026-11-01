@@ -124,7 +124,7 @@ class FuelSaleApiTest extends TestCase
         ], $actor, 'تهيئة API Cycle 5');
         app(FuelCostBasisService::class)->assertReady($fuelProduct, $warehouse);
         $movement = app(InventoryService::class)->applyReceipt($product, 10000, 100, [
-            'warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id,
+            'warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id, InventoryService::FUEL_POOL_META => true,
         ], 1000000);
         app(FuelCostBasisService::class)->recordReceipt($fuelProduct, $warehouse, $movement, 10000, 1000000);
 

@@ -71,7 +71,7 @@ class FuelSupplyReceivingTest extends TestCase
     public function preexisting_fuel_stock_without_an_exact_cost_baseline_blocks_receipt_without_using_product_average_cost(): void
     {
         $fixture = $this->fixture();
-        app(InventoryService::class)->applyReceipt($fixture['product'], 500, 99, ['warehouse_id' => $fixture['warehouse']->id]);
+        app(InventoryService::class)->applyReceipt($fixture['product'], 500, 99, ['warehouse_id' => $fixture['warehouse']->id, InventoryService::FUEL_POOL_META => true]); // رصيد تاريخي بلا baseline تكلفة
         $delivery = $fixture['service']->createDelivery($this->deliveryData($fixture, 'receipt-baseline-required', 2345));
 
         $this->expectException(RuntimeException::class);
