@@ -15,7 +15,7 @@ class FuelStationAuditEvent extends BaseModel
     use BranchScoped;
 
     protected $fillable = [
-        'tenant_id', 'branch_id', 'fuel_station_id', 'actor_id', 'action', 'subject_type', 'subject_id',
+        'tenant_id', 'branch_id', 'fuel_station_id', 'warehouse_id', 'actor_id', 'action', 'subject_type', 'subject_id',
         'before', 'after', 'reason', 'occurred_at',
     ];
 

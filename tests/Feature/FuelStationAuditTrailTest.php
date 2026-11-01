@@ -189,12 +189,59 @@ class FuelStationAuditTrailTest extends TestCase
 
         $seen = collect($this->withToken($managerToken)->getJson(self::BASE . '/audit-events')->assertOk()->json('data'))->pluck('fuel_station_id')->unique()->values()->all();
         $this->assertSame([$own], $seen);
-        $this->withToken($managerToken)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $other)->assertNotFound();
+        // محطة خارج النطاق: قائمة فارغة (لا كشف لوجودها) لا 404 — النطاق على مستوى الحدث.
+        $this->assertSame([], $this->withToken($managerToken)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $other)->assertOk()->json('data'));
 
         // المالك: الفرع النشط يحكم (BranchScoped كأحداث الجاهزية) — الفرع الآخر عبر X-Branch-Id.
         $this->assertCount(1, $this->withToken($token)->withHeader('X-Branch-Id', $branchB->id)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $other)->assertOk()->json('data'));
         $this->assertCount(1, $this->withToken($token)->getJson(self::BASE . '/audit-events?action=station.created')->assertOk()->json('data'));
         $this->withToken($token)->getJson(self::BASE . '/audit-events?subject_type=Hack')->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_scoped_manager_keeps_the_history_of_a_station_after_it_is_deleted_and_never_sees_other_scopes(): void
+    {
+        $f = $this->fixture();
+        $token = $f['owner_token'];
+        $branchB = Branch::create(['code' => 'BR-B2', 'name' => 'فرع ب2']);
+        $warehouseA2 = Warehouse::create(['name' => 'مخزن أ2', 'code' => 'WH-A2X', 'branch_id' => $f['branch']->id]);
+
+        $managerRole = Role::create(['tenant_id' => $f['tenant_id'], 'slug' => 'fuel-audit-manager2', 'name' => 'مدير', 'permissions' => ['fuel_stations.view', 'fuel_stations.manage'], 'is_system' => false]);
+        $manager = User::create(['tenant_id' => $f['tenant_id'], 'name' => 'مدير', 'email' => 'manager2@fuel-audit.test', 'password' => 'password123', 'role' => $managerRole->slug]);
+        $manager->branches()->attach($f['branch']->id);
+        $manager->warehouses()->attach($f['warehouse']->id);
+        $managerToken = $manager->createToken('api')->plainTextToken;
+
+        // محطة في نطاق المدير (فرعه ومخزنه) يحذفها هو بنفسه.
+        $mine = $this->withToken($managerToken)->postJson(self::BASE . '/stations', ['branch_id' => $f['branch']->id, 'warehouse_id' => $f['warehouse']->id, 'code' => 'FS-DEL', 'name' => 'محطة ستُحذف'])->assertCreated()->json('data.id');
+        $this->withToken($managerToken)->deleteJson(self::BASE . '/stations/' . $mine)->assertSuccessful();
+        $this->assertNull(FuelStation::query()->find($mine));
+
+        // محطة في فرعه لكن بمخزن خارج نطاقه، ومحطة بفرع آخر: تُحذفان بيد المالك.
+        $otherWarehouse = $this->withToken($token)->postJson(self::BASE . '/stations', ['branch_id' => $f['branch']->id, 'warehouse_id' => $warehouseA2->id, 'code' => 'FS-WH2', 'name' => 'مخزن آخر'])->assertCreated()->json('data.id');
+        $otherBranch = $this->withToken($token)->postJson(self::BASE . '/stations', ['branch_id' => $branchB->id, 'code' => 'FS-BR2', 'name' => 'فرع آخر'])->assertCreated()->json('data.id');
+        $this->withToken($token)->deleteJson(self::BASE . '/stations/' . $otherWarehouse)->assertSuccessful();
+        $this->withToken($token)->withHeader('X-Branch-Id', $branchB->id)->deleteJson(self::BASE . '/stations/' . $otherBranch)->assertSuccessful();
+
+        $rows = collect($this->withToken($managerToken)->getJson(self::BASE . '/audit-events')->assertOk()->json('data'));
+        $this->assertEqualsCanonicalizing(['station.created', 'station.deleted'], $rows->pluck('action')->all());
+        $this->assertSame([$mine], $rows->pluck('fuel_station_id')->unique()->values()->all());
+        $this->assertCount(2, $this->withToken($managerToken)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $mine)->assertOk()->json('data'));
+        $this->assertSame([], $this->withToken($managerToken)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $otherWarehouse)->assertOk()->json('data'));
+        $this->assertSame([], $this->withToken($managerToken)->getJson(self::BASE . '/audit-events?fuel_station_id=' . $otherBranch)->assertOk()->json('data'));
+    }
+
+    /** @test */
+    public function the_date_filters_accept_dates_and_full_timestamps(): void
+    {
+        $f = $this->fixture();
+        $token = $f['owner_token'];
+        $this->withToken($token)->postJson(self::BASE . '/stations', ['branch_id' => $f['branch']->id, 'code' => 'FS-DATE', 'name' => 'محطة'])->assertCreated();
+        $today = now()->toDateString();
+
+        $this->assertCount(1, $this->withToken($token)->getJson(self::BASE . "/audit-events?from={$today}&to={$today}")->assertOk()->json('data'));
+        $this->assertCount(1, $this->withToken($token)->getJson(self::BASE . '/audit-events?to=' . urlencode(now()->addHour()->toIso8601String()))->assertOk()->json('data'));
+        $this->assertCount(0, $this->withToken($token)->getJson(self::BASE . '/audit-events?to=' . urlencode(now()->subDay()->toIso8601String()))->assertOk()->json('data'));
     }
 
     private function expectModelException(callable $operation, string $class): void

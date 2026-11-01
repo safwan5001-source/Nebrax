@@ -30,6 +30,8 @@ return new class extends Migration
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->uuid('branch_id')->nullable();
             $table->uuid('fuel_station_id')->nullable();
+            // لقطة مخزن المحطة وقت الحدث: تقييد القراءة بنطاق المخزن لا يحتاج بقاء المحطة (قد تُحذف).
+            $table->uuid('warehouse_id')->nullable();
             $table->uuid('actor_id')->nullable();
             $table->string('action', 80); // station.created | tank.updated | device.deleted …
             $table->string('subject_type', 120);

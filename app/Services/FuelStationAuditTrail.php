@@ -47,12 +47,13 @@ class FuelStationAuditTrail
             throw new RuntimeException('سياق المستأجر مطلوب لتسجيل حدث تدقيق محطة الوقود.');
         }
 
-        [$stationId, $branchId] = $this->stationAndBranch($subject);
+        [$stationId, $branchId, $warehouseId] = $this->stationScope($subject);
 
         return FuelStationAuditEvent::create([
             'tenant_id' => $tenantId,
             'branch_id' => $branchId,
             'fuel_station_id' => $stationId,
+            'warehouse_id' => $warehouseId,
             'actor_id' => $actor?->id,
             'action' => $action,
             'subject_type' => $subject::class,
@@ -114,17 +115,18 @@ class FuelStationAuditTrail
         return $values;
     }
 
-    /** @return array{0:?string,1:?string} */
-    private function stationAndBranch(Model $subject): array
+    /** @return array{0:?string,1:?string,2:?string} [المحطة، الفرع، المخزن] لقطة وقت الحدث */
+    private function stationScope(Model $subject): array
     {
         if ($subject instanceof FuelStation) {
-            return [$subject->getKey(), $subject->branch_id];
+            return [$subject->getKey(), $subject->branch_id, $subject->warehouse_id];
         }
         $stationId = $subject->getAttribute('fuel_station_id');
         if ($stationId === null) {
-            return [null, $subject->getAttribute('branch_id')];
+            return [null, $subject->getAttribute('branch_id'), null];
         }
+        $station = FuelStation::query()->whereKey($stationId)->first(['branch_id', 'warehouse_id']);
 
-        return [$stationId, $subject->getAttribute('branch_id') ?? FuelStation::query()->whereKey($stationId)->value('branch_id')];
+        return [$stationId, $subject->getAttribute('branch_id') ?? $station?->branch_id, $station?->warehouse_id];
     }
 }
