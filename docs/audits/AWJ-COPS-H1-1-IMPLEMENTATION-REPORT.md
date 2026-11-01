@@ -5,9 +5,9 @@
 | Slice | COPS-H1-1 — سجل أحداث الطلب append-only + رأس تغذية لكل مستأجر + حراس القاعدة + كتابة أحداث الانتقالات المعتمدة + خط زمني إضافي للموظف |
 | Branch | `claude/cops-h1-1-order-events-feed` |
 | Base SHA | `b5462eea58cbf7f134445aa34acd48796de19c81` (`origin/main` بعد #1902) |
-| PR / Head SHA | تُسجَّل في وصف الـPR (لا يضمّن الملف هاش commit نفسه) |
-| Merge SHA | يُسجَّل في سجلات الإغلاق (`AWJ_COPS_HORIZON_HANDOFF.md` والمتتبّع) بعد الدمج |
-| الحالة | Implemented · (Merged يُسجَّل في الإغلاق) · Not deployed · Not activated · Not env-verified |
+| PR / Head SHA | #1910 · `4da6f14831b04c2d4895fbe6daef8cd89e986d6d` |
+| Merge SHA | `46774c5c2c2aadc8d173017990b206ef6d877d17` (squash، 2026-11-01؛ أب الدمج `00314130e`) |
+| الحالة | **Merged** · Not deployed · Not activated · Not env-verified |
 | العقد | `docs/plans/store/ADR-29-COMMERCE-ORDER-OPERATIONS.md` §2.4 (+ §2.4.1 تعديل H1-1 وقرار P-A) |
 | قرار المالك | **D-H1-1-P = P-A** (2026-11-01، مشروط): بوابة حمل واقعي ≈130 حدثاً/ث/مستأجر + تشخيص الاندفاع منفصل ومُسجَّل |
 
@@ -126,7 +126,7 @@
 الاختبارات: `FuelSupplyReceivingApiTest::authorized_api_creates_and_approves_fuel_delivery_with_explicit_grni_resource_links`، `FuelSupplyReceivingApiTest::supplier_invoice_api_matches_an_approved_delivery_without_a_second_inventory_receipt`، `FuelStationScopeApiTest::matching_a_supplier_invoice_to_a_delivery_outside_the_users_warehouses_is_not_found`.
 - **الدليل لا الافتراض:** مخرجات الفشل تحمل استثناء الاستجابة 500 حرفياً: `Error: Call to undefined function App\Services\bcmul()` في `app/Services/FuelCostBasisService.php:380`.
 - **التحقق المضاد:** ثُبِّت `php8.3-bcmath` محلياً ثم أُعيدت الاختبارات الثلاثة ⇒ **3/3 ناجحة**، ومجموعة `Fuel` كاملة على الفرع ⇒ **107/107 ناجحة**. الخلاصة: السبب غياب الامتداد في هذه البيئة، لا هذا التغيير (الذي لا يمسّ الوقود).
-- **CI:** نتيجة مهمتَي sqlite/pgsql في CI مسجَّلة في وصف الـPR/سجلات الإغلاق بشكل مستقل.
+- **CI (مستقلاً، على الرأس `4da6f14`):** الاختبارات الثلاثة ناجحة على pgsql (`testFinished` بلا `testFailed` في `teamcity.log`)، ومهمة sqlite بلا أي فشل (10,397 ناجحاً، 315 متخطّى، لا اختبار وقود متخطّى، لا `bcmul` في المخرجات). انظر §8.
 
 ## 4.3 (شرط 6) مراجعة الثبات والتنازع والانحدار — PostgreSQL 16 محلياً
 ثلاث تشغيلات كاملة للصنف (9 جولات بوابة + 3 اندفاعات):
@@ -162,6 +162,28 @@
 | حذف طلب بـSQL خام يُبقي أحداثه (لا FK إلى الطلب) | مقصود: سجل التدقيق يبقى؛ الطلب المؤكَّد/الملغى محميّ من الحذف أصلاً |
 | حدث `order.placed` لا يُكتب للمسار القديم `CommerceOrderService::create/confirm` | بلا مستهلك HTTP (اختبارات فقط)؛ موثَّق |
 | خطأ `StorefrontMediaApiTest` المحلي على PG | بيئي (كود لم يُلمس، أخضر على CI) |
+
+## 8. سجل الإغلاق — CI والدمج
+
+| الفحص (run `41361147229` / `41361147265`، رأس `4da6f14`) | النتيجة |
+|---|---|
+| `php artisan test (L11, sqlite)` | ✅ 10,397 ناجحاً · 315 متخطّى · 0 فشل |
+| `php artisan test (L11, pgsql)` | ✅ 10,712 اختباراً · 95,959 تأكيداً · 4 متخطّاة (ليست من H1-1) · 0 `testFailed` — الثمانية في `CommerceOrderEventsPostgresTest` كلها نُفِّذت ونجحت (بما فيها الضابط السلبي) |
+| CI Gate | ✅ |
+| مراجعة Codex على `4da6f14` | مكتملة بلا ملاحظات · لا خيوط مراجعة مفتوحة |
+
+**مقاييس CI المرفوعة (`pgsql-watchdog/cops-h1-1-*.json`، `synchronous_commit=on`, `fsync=on`):**
+
+| | المعدل | p95 المتنازع | p95 الإضافي | max |
+|---|---|---|---|---|
+| بوابة الحمل الواقعي — جولة 1 | 122.0/ث | 28.5ms | **26.3ms** | 36.3ms |
+| جولة 2 | 115.4/ث | 21.3ms | **19.2ms** | 30.4ms |
+| جولة 3 | 120.3/ث | 20.3ms | **18.2ms** | 26.5ms |
+| تشخيص الاندفاع (مكتمل) | 167.9/ث | 90.8ms | 88.3ms | 129.0ms |
+
+البوابة ناجحة في CI بهامش (≤ 53% من الحد 50ms) والمعدل داخل نطاق النموذج (90–170/ث)؛ الاندفاع مطابق للقياس المحلي (§4.3) ⇒ لا انحدار. الأرقام أعلى قليلاً من المحلية (أقراص CI)، ضمن الحد.
+
+**الدمج:** squash بـ`expectedHeadSha` ⇒ `46774c5c2c2aadc8d173017990b206ef6d877d17`. تقدّم `main` بعد تشغيل CI (#1904، #1908، #1911)؛ تحقّقتُ أن ملفات H1-1 في شجرة الدمج مطابقة للرأس حرفياً (diff فارغ)، وأن الهجرتين الجديدتين بالبادئة نفسها `2026_12_27_010000` (وقود/مطابقة كشف الطرف) لا تلمسان `tenants` ولا جداول التغذية (البادئة المشتركة نمط قائم: 47 حالة). CI الدفع على `main` للدمج: run `41364180464`.
 
 ## 7. الشريحة التالية
 بعد دمج H1-1 وسجلات الإغلاق: **توقف** عند نقطة تبديل النموذج. H1-2 (التغذية + الانتباه) ثم H1-3 بنموذج Sonnet بأمر استمرار منفصل.

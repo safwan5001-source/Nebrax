@@ -1,6 +1,6 @@
 # AWJ Store Commerce — Horizon Tracker
 
-**آخر تحديث:** 2026-11-01 (COPS-H1-0: مزامنة صفوف الطلبات O1/O3/O4/N4/F1 وD-9، وإضافة §9 برنامج COPS) · سابقاً 2026-10-26 (سجل ENV0 الجزئي) · **Base الأصلي:** `main@6384ef6342e067407af2edf9c8999033a408186e` (الصفوف المحدَّثة تستند إلى `main@18fc006d4`) · **العقد:** `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1.md`
+**آخر تحديث:** 2026-11-01 (COPS-H1-1 مدموج #1910 ⇒ `46774c5c2`؛ COPS-H1-0: مزامنة صفوف الطلبات O1/O3/O4/N4/F1 وD-9، وإضافة §9 برنامج COPS) · سابقاً 2026-10-26 (سجل ENV0 الجزئي) · **Base الأصلي:** `main@6384ef6342e067407af2edf9c8999033a408186e` (الصفوف المحدَّثة تستند إلى `main@18fc006d4`) · **العقد:** `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1.md`
 **قاعدة التحديث:** تُحدَّث الحالة بدليل (PR/SHA/CI/سجل بيئي) فقط. الدمج ≠ النشر ≠ التحقق البيئي (انظر العقد §2).
 
 **مفتاح الحالة:** `Planned` · `Blocked(D-x)` · `In PR` · `Merged` · `Deployed(env)` · `Env-Verified` · `Closed`.
@@ -63,7 +63,7 @@
 | O1 | واجهة موظف لقراءة طلبات الويب (`commerce.orders.view`) | C | P1 | — | — | #1766 (O1a) · #1768 (O1b) | Claude Code | Merged | ✓ | ؟ | — | التحقق البيئي ضمن BOR لبرنامج COPS (§9) |
 | O2 | `GET store/v1/orders/{id}` للضيف + توحيد المسلسِل | C | P1 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء؛ تجميد شكل `complete` |
 | O3 | دورة حياة الطلب + الإلغاء + اتساق النية/الحجز | C | P1 | O1 | D-9 ✔ | #1770 (ADR-28) · #1774 · #1775 · #1777 · #1780 · #1781 · #1784 · #1785 (جاهزية) | Claude Code | Merged (بوابة `COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقة؛ غير مُفعَّل) | ✓ | ؟ | — | قرار تفعيل Beta منفصل؛ O3d = COPS-H6-1 (D-9-A1 مفتوح) |
-| O4 | خط زمني/أحداث الطلب | C | P1 | O3 | D-9 ✔ · R-2 ✔ | — | Claude Code | Planned → **COPS-H1-1** | — | — | — | يُنفَّذ كـCOPS-H1-1 (أحداث + FeedHead، ADR-29 §2.4) |
+| O4 | خط زمني/أحداث الطلب | C | P1 | O3 | D-9 ✔ · R-2 ✔ | #1910 | Claude Code | **Merged (COPS-H1-1)** | `46774c5c2` | — | — | أحداث + FeedHead + كتلة `timeline` للموظف (ADR-29 §2.4)؛ غير منشور؛ التغذية/الانتباه = COPS-H1-2 |
 | CK1 | مفاتيح العنوان الوطني السعودي في `PATCH checkout/address` | C | P1 | CTP1 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء (#1745 مدموج)؛ إضافي |
 | CK4 | سياسة حجز COD/الاستلام (قابلة للضبط) | C | P1 | O3 | D-10 | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار D-10 |
 | CK5 | عرض الضريبة في السلة/Checkout | C | P2 | ADR ضريبي | — | — | غير مُسنَد (مقترح: Claude Code) | Blocked | — | — | — | بانتظار ADR (TAX/EXT-05) |
@@ -201,6 +201,7 @@
 | O3c | #1781 | `e9761194fd2788bfb40b7c72a025ac475aafb9f2` | 2026-10-29 | — | ؟ | ؟ |
 | O3b fix | #1784 | `ec0236c200ff5d8996c78205ed2bb49bc85ce1b1` | 2026-10-29 | — | ؟ | ؟ |
 | COPS-H1-0 (ADR-29 + ADR-28 Accepted + Handoff، وثائق) | #1896 | `d729fc9be46e404ed58289f75802e7eadca5d560` | 2026-11-01 | لا ينطبق | — | — |
+| COPS-H1-1 (أحداث الطلب append-only + رأس التغذية + حراس + خط زمني للموظف) | #1910 | `46774c5c2c2aadc8d173017990b206ef6d877d17` | 2026-11-01 | لا (لم يُنشر) | — | — |
 | جاهزية إلغاء Beta (وثائق) | #1785 | `01e66d68e8e17c75bb583909dddc8414d0a5a42d` | 2026-10-29 | لا ينطبق | — | — |
 
 ## 7. Function Tracker (84 صفاً)
@@ -318,7 +319,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | COPS-H0 | تدقيق + خطة + Revision 1 | — | — | (وثائق أُدرجت في H1-0) | Done | — | لا ينطبق | لا ينطبق | — |
 | COPS-H1-0 | ADR-29 + ADR-28 Accepted + المتتبّع + Handoff | H0 | R-1 ✔ | #1896 | **Merged** | ✓ `d729fc9be` | لا ينطبق (وثائق) | لا ينطبق | — |
-| COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ · D-H1-1-P ✔ (P-A) | #1910 | In PR — بوابات الصحة والحمل الواقعي ناجحة | — | — | — | — |
+| COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ · D-H1-1-P ✔ (P-A) | #1910 | **Merged** | ✓ `46774c5c2` | لا (لم يُنشر) | لا (لا بوابة تُفتح) | — |
 | COPS-H1-2 | أحداث afterCommit + `feed` + `attention` | H1-1 | R-5 ✔ | — | Planned | — | — | — | — |
 | COPS-H1-3 | أساس إعدادات تشغيل القناة (القبول) | H1-0 | D-OPS-1 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
 | COPS-H1-4 | القبول/الرفض + `commerce.orders.manage` + المُسقِط | H1-1 · H1-3 | R-3 ✔ · R-5 ✔ · R-6 ✔ · R-6b ✔ | — | Planned | — | — | — | — |
