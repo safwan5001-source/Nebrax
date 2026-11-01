@@ -42,10 +42,16 @@
 | الفحص | النتيجة |
 |---|---|
 | `NewRetailStoreAccountsDefaultTest` | 14/14 |
-| مجموعة مركّزة ذات صلة (MultiStore، CommerceWorkspaceStorefront*، StorefrontProvision*، RetailCustomerAccounts، StaffChannelPricingSettings، CommerceModuleBoundary، BranchIsolationGuard، EnsureWebSalesChannel، FlowersEndToEnd، RetailAccountsReadiness، Lifecycle) | 263 ناجحاً، 1 تخطّي (قائم) |
+| `php artisan test` **الكامل** (محلي، sqlite، قبل دمج `main`) | 10285 ناجحاً، 307 متخطّى، **45 إخفاقاً كلها بيئية لا علاقة لها بالتغيير** (انظر أدناه) |
+| إعادة تشغيل المتأثر بعد تثبيت bcmath ومزامنة `contracts/` ودمج `origin/main` (Fuel*، ApplicationCatalog، TenantApplication، PartnerStatement، الميزة الجديدة، MultiStore، CommerceWorkspaceStorefront*، StorefrontProvision*، RetailCustomerAccounts، StaffChannelPricingSettings، CommerceModuleBoundary، BranchIsolationGuard، InventoryReport/Service، ImportJob) | **533 ناجحاً، 7 متخطّى، 0 إخفاق** |
+| إعادة تشغيل `AppTemplateRegistry`/`BuilderLivePointer`/`AppSchemaNavigationShell` بعد مزامنة `contracts/` | 41/41 |
 | Vitest ذو الصلة (customer-accounts، create-store-dialog، stores) | 56/56 |
-| `php artisan test` الكامل (محلي، sqlite) | انظر الخلاصة أدناه |
-| CI على GitHub | انظر صفحة الـ PR |
+| CI على GitHub (على رأس الكود `c044e28`) | انظر القسم 8 |
+
+**تفصيل الإخفاقات البيئية في التشغيل الكامل الأول (حُلّت دون أي تغيير في الكود):**
+- 35 إخفاقاً في اختبارات الفيول: `Call to undefined function bcmul()` — امتداد bcmath غير مثبّت في بيئة الجلسة (تحذّر منه خطوة الإعداد، وهو مثبّت في CI). بعد تثبيته نجحت.
+- 10 إخفاقات (`AppTemplateRegistry`، `BuilderLivePointer`، `AppSchemaNavigationShell`): ملف `contracts/app-builder/archive/*.json` لم أنسخه إلى المشروع المولَّد. بعد المزامنة نجحت.
+- كلتاهما بعيدتان عن ملفات التغيير، ولا يمسّها فرق الـ PR.
 
 لم يُمسّ: الفوترة، القيود، المدفوعات، ZATCA، الدفع كضيف، سلوك الجملة (لا ملف في `Invoice*`/`Ledger*`/`Payment*`/`Zatca*`).
 
@@ -64,8 +70,8 @@
 ## 6. Branch / PR / SHAs
 - **Branch:** `feat/b2c-accounts-default-new-retail-stores`
 - **PR:** يُضاف بعد الفتح
-- **Base:** `main` @ `40b6e35695e1d059af131cf708014964e9c3eee9`
-- **Head:** طرف الفرع في الـ PR
+- **Base (بعد التحديث):** `main` @ `511a19e3f384cae9a62c0fc81a6142080fe6a1db` (كان الفرع قد بدأ من `40b6e35`؛ دُمج `main` بلا تعارض، وفرق الـ PR أمامه ملفاتنا التسعة فقط)
+- **Head (كود):** `c044e2814debe4059bc36734a5025410e0e708e8` — تليه commits التقرير فقط
 
 ## 7. الإجراء التالي المقترح
 1. مراجعة ChatGPT (التركيز: افتراض `true` مقابل البوابة العامة، وغياب حدث تدقيق عند الإنشاء).
