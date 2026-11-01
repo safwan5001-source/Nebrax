@@ -19,6 +19,17 @@ class OpenProductAction extends AppAction {
   const OpenProductAction(this.productId);
 }
 
+/// AD-02 / S11 (الجيل 1.2.0): يفتح شاشة منتجات تصنيف أصلية.
+class OpenCategoryAction extends AppAction {
+  final String categoryId;
+  const OpenCategoryAction(this.categoryId);
+}
+
+/// AD-02 / S11 (الجيل 1.2.0): يفتح شاشة البحث الأصلية.
+class OpenSearchAction extends AppAction {
+  const OpenSearchAction();
+}
+
 class AddToCartAction extends AppAction {
   final String productId;
   final String? variantId;
@@ -70,6 +81,14 @@ AppAction? decodeAction(ActionRef ref) {
       final productId = ref.params['productId'];
       if (productId is! String || productId.isEmpty) return null;
       return OpenProductAction(productId);
+
+    case 'openCategory':
+      final categoryId = ref.params['categoryId'];
+      if (categoryId is! String || categoryId.isEmpty) return null;
+      return OpenCategoryAction(categoryId);
+
+    case 'openSearch':
+      return const OpenSearchAction();
 
     case 'addToCart':
       final productId = ref.params['productId'];

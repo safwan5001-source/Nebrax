@@ -5,13 +5,14 @@ import 'package:flutter/foundation.dart';
 /// their own) — this enum is which of those *screens* is currently shown.
 /// [page] (S06a) is the generic screen that renders any other page the live
 /// Experience declares, identified by [RuntimeState.selectedPageId].
-enum RuntimePage { home, product, cart, page }
+enum RuntimePage { home, product, cart, page, category, search }
 
 class _Visit {
   final RuntimePage page;
   final String? productId;
   final String? pageId;
-  const _Visit(this.page, this.productId, this.pageId);
+  final String? categoryId;
+  const _Visit(this.page, this.productId, this.pageId, [this.categoryId]);
 }
 
 /// App-level ephemeral UI state (MR-06): which screen is showing, which
@@ -30,6 +31,7 @@ class RuntimeState extends ChangeNotifier {
   RuntimePage _page = RuntimePage.home;
   String? _selectedProductId;
   String? _selectedPageId;
+  String? _selectedCategoryId;
   int _cartVersion = 0;
   int _refreshVersion = 0;
   final List<_Visit> _history = [];
@@ -42,6 +44,7 @@ class RuntimeState extends ChangeNotifier {
   RuntimePage get page => _page;
   String? get selectedProductId => _selectedProductId;
   String? get selectedPageId => _selectedPageId;
+  String? get selectedCategoryId => _selectedCategoryId;
   int get cartVersion => _cartVersion;
   int get refreshVersion => _refreshVersion;
   bool get canGoBack => _history.isNotEmpty;
@@ -59,7 +62,7 @@ class RuntimeState extends ChangeNotifier {
     }
   }
 
-  void _pushCurrent() => _history.add(_Visit(_page, _selectedProductId, _selectedPageId));
+  void _pushCurrent() => _history.add(_Visit(_page, _selectedProductId, _selectedPageId, _selectedCategoryId));
 
   void goHome() {
     _explicitNavigation = true;
@@ -67,6 +70,7 @@ class RuntimeState extends ChangeNotifier {
     _page = RuntimePage.home;
     _selectedProductId = null;
     _selectedPageId = null;
+    _selectedCategoryId = null;
     notifyListeners();
   }
 
@@ -82,6 +86,23 @@ class RuntimeState extends ChangeNotifier {
     _explicitNavigation = true;
     _pushCurrent();
     _page = RuntimePage.cart;
+    notifyListeners();
+  }
+
+  /// S11 — شاشة منتجات تصنيف (معرّف التصنيف معامل تنقل لا بيانات).
+  void goToCategory(String categoryId) {
+    _explicitNavigation = true;
+    _pushCurrent();
+    _page = RuntimePage.category;
+    _selectedCategoryId = categoryId;
+    notifyListeners();
+  }
+
+  /// S11 — شاشة البحث الأصلية.
+  void goToSearch() {
+    _explicitNavigation = true;
+    _pushCurrent();
+    _page = RuntimePage.search;
     notifyListeners();
   }
 
@@ -124,6 +145,7 @@ class RuntimeState extends ChangeNotifier {
     _page = previous.page;
     _selectedProductId = previous.productId;
     _selectedPageId = previous.pageId;
+    _selectedCategoryId = previous.categoryId;
     notifyListeners();
   }
 
@@ -134,7 +156,8 @@ class RuntimeState extends ChangeNotifier {
       RuntimePage.home => 'home',
       RuntimePage.cart => 'cart',
       RuntimePage.page => pageId,
-      RuntimePage.product => null,
+      // شاشات التفاصيل (منتج/تصنيف/بحث) تتبع الجذر الذي جاءت منه.
+      RuntimePage.product || RuntimePage.category || RuntimePage.search => null,
     };
     final own = keyOf(_page, _selectedPageId);
     if (own != null) return own;
@@ -157,6 +180,7 @@ class RuntimeState extends ChangeNotifier {
       _page = RuntimePage.cart;
       _selectedProductId = null;
       _selectedPageId = null;
+      _selectedCategoryId = null;
       notifyListeners();
       return true;
     }
@@ -166,6 +190,7 @@ class RuntimeState extends ChangeNotifier {
     _page = RuntimePage.page;
     _selectedProductId = null;
     _selectedPageId = pageId;
+    _selectedCategoryId = null;
     notifyListeners();
     return true;
   }

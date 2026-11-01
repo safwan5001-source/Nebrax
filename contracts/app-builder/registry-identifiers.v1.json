@@ -40,5 +40,25 @@
   "actions_v120": [
     "openCategory",
     "openSearch"
-  ]
+  ],
+  "dataResources_v120": [
+    "commerce.categories"
+  ],
+  "bindableResources": {
+    "ProductList": [
+      "commerce.products"
+    ],
+    "ProductDetail": [
+      "commerce.products"
+    ],
+    "CartList": [
+      "commerce.cart"
+    ],
+    "CartSummary": [
+      "commerce.cart"
+    ],
+    "CategoryList": [
+      "commerce.categories"
+    ]
+  }
 }

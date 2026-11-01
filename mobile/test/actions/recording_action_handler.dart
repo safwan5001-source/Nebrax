@@ -11,6 +11,10 @@ class RecordingActionHandler implements ActionHandler {
   @override
   Future<void> onOpenProduct(OpenProductAction action) async => received.add(action);
   @override
+  Future<void> onOpenCategory(OpenCategoryAction action) async => received.add(action);
+  @override
+  Future<void> onOpenSearch(OpenSearchAction action) async => received.add(action);
+  @override
   Future<void> onAddToCart(AddToCartAction action) async => received.add(action);
   @override
   Future<void> onUpdateCartQuantity(UpdateCartQuantityAction action) async => received.add(action);

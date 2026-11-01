@@ -140,7 +140,10 @@ class _HomeScreenState extends State<HomeScreen> {
       // S08b — كل `binding.query` مميَّز على الصفحة = طلب واحد (التكرار يُجلب مرة). صفحة بلا ربط
       // بالمنتجات (أو خطأ في الشجرة) ⇒ الطلب العاري الوحيد كما كان قبل الشريحة.
       final page = _basePage;
-      var requests = page == null ? const <BindingRequest>[] : collectBindingRequests(page, 'commerce.products');
+      // S11: روابط التصنيفات (الجيل 1.2.0) تُجلب مع المنتجات؛ صفحة بلا أي ربط ⇒ الطلب العاري للمنتجات كما كان.
+      var requests = page == null
+          ? const <BindingRequest>[]
+          : [...collectBindingRequests(page, 'commerce.products'), ...collectBindingRequests(page, 'commerce.categories')];
       if (requests.isEmpty) {
         requests = const [BindingRequest(resource: 'commerce.products', query: {}, key: 'commerce.products')];
       }

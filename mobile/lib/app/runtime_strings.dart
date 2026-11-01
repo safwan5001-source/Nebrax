@@ -40,6 +40,15 @@ class RuntimeStrings {
   final String removeCartLine;
   final String languageToggleLabel;
   final String optionPrefix;
+  // S11 — التصنيفات والبحث
+  final String searchTitle;
+  final String searchHint;
+  final String searchPrompt;
+  final String searchEmpty;
+  final String categoryTitleFallback;
+  final String categoryEmpty;
+  final String categoryLoadError;
+  final String loadMore;
 
   const RuntimeStrings._({
     required this.languageCode,
@@ -63,6 +72,14 @@ class RuntimeStrings {
     required this.removeCartLine,
     required this.languageToggleLabel,
     required this.optionPrefix,
+    required this.searchTitle,
+    required this.searchHint,
+    required this.searchPrompt,
+    required this.searchEmpty,
+    required this.categoryTitleFallback,
+    required this.categoryEmpty,
+    required this.categoryLoadError,
+    required this.loadMore,
   });
 
   /// A simplified but genuinely plural-aware Arabic cart-item count
@@ -103,6 +120,14 @@ class RuntimeStrings {
     removeCartLine: 'إزالة هذا العنصر من السلة',
     languageToggleLabel: 'English',
     optionPrefix: 'خيار',
+    searchTitle: 'بحث',
+    searchHint: 'ابحث عن منتج',
+    searchPrompt: 'اكتب حرفين على الأقل للبحث في المتجر',
+    searchEmpty: 'لا توجد منتجات مطابقة',
+    categoryTitleFallback: 'التصنيف',
+    categoryEmpty: 'لا توجد منتجات في هذا التصنيف',
+    categoryLoadError: 'تعذّر تحميل منتجات التصنيف',
+    loadMore: 'عرض المزيد',
   );
 
   static const RuntimeStrings _en = RuntimeStrings._(
@@ -127,6 +152,14 @@ class RuntimeStrings {
     removeCartLine: 'Remove this item from the cart',
     languageToggleLabel: 'العربية',
     optionPrefix: 'Option',
+    searchTitle: 'Search',
+    searchHint: 'Search for a product',
+    searchPrompt: 'Type at least two characters to search the store',
+    searchEmpty: 'No matching products',
+    categoryTitleFallback: 'Category',
+    categoryEmpty: 'There are no products in this category',
+    categoryLoadError: 'Could not load this category',
+    loadMore: 'Show more',
   );
 
   static RuntimeStrings of(Locale locale) =>

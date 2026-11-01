@@ -761,7 +761,8 @@ void main() {
           // comment for the staged-rollout safety reasoning (PHP's mirror
           // constant deliberately stays empty; nothing here reaches a
           // remotely-fetched schema or an older installed client).
-          expect(manifest.dataResources, {'commerce.products': 1, 'commerce.cart': 1});
+          // S11: الجيل 1.2.0 يضيف `commerce.categories` (يستهلكه `CategoryList` فعلاً).
+          expect(manifest.dataResources, {'commerce.products': 1, 'commerce.cart': 1, 'commerce.categories': 1});
           // AD-04: الجيل 1.1.0 يعرض غلاف التنقل فعلاً (`AwjRuntimeShell`) فيعلن ميزتيه، لا أكثر.
           expect(manifest.schemaFeatures, {'binding.collect': 1, 'navigation.tabs': 1, 'navigation.appBar': 1});
 

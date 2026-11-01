@@ -33,6 +33,7 @@ List<Object?> localizeProductItems(List<Object?> rawProducts, Locale locale) {
 Future<Map<String, Object?>> fetchPageBindingData(CommerceClient client, SchemaComponent page) async {
   final requests = [
     ...collectBindingRequests(page, 'commerce.products'),
+    ...collectBindingRequests(page, 'commerce.categories'),
     ...collectBindingRequests(page, 'commerce.cart'),
   ];
   if (requests.isEmpty) return const {};

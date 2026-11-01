@@ -47,6 +47,16 @@ class RuntimeActionHandler implements ActionHandler {
   }
 
   @override
+  Future<void> onOpenCategory(OpenCategoryAction action) async {
+    state.goToCategory(action.categoryId);
+  }
+
+  @override
+  Future<void> onOpenSearch(OpenSearchAction action) async {
+    state.goToSearch();
+  }
+
+  @override
   Future<void> onAddToCart(AddToCartAction action) async {
     try {
       await client.addCartItem(

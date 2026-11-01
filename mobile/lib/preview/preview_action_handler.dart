@@ -64,6 +64,17 @@ class PreviewActionHandler implements ActionHandler {
     onNotice(PreviewActionNotice.requiresLiveData);
   }
 
+  /// S11: فتح تصنيف/بحث يجلبان منتجات المتجر الحيّة، وجلسة المعاينة لا تصل `commerce/v1` أصلاً.
+  @override
+  Future<void> onOpenCategory(OpenCategoryAction action) async {
+    onNotice(PreviewActionNotice.requiresLiveData);
+  }
+
+  @override
+  Future<void> onOpenSearch(OpenSearchAction action) async {
+    onNotice(PreviewActionNotice.requiresLiveData);
+  }
+
   @override
   Future<void> onAddToCart(AddToCartAction action) async {
     onNotice(PreviewActionNotice.requiresLiveData);

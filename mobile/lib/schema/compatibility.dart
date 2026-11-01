@@ -153,7 +153,7 @@ class CompatibilityResolver {
   ) {
     final unsupportedHere = manifest.componentVersion(node.type) == null ||
         (node.action != null && manifest.actionVersion(node.action!.type) == null) ||
-        (node.binding != null && !_bindingSupported(node.binding!, manifest)) ||
+        (node.binding != null && (!_bindingAllowedOn(node.type, node.binding!) || !_bindingSupported(node.binding!, manifest))) ||
         (node.visibility != null && !_visibilitySupported(node.visibility!, manifest));
     if (unsupportedHere) return null;
 
@@ -197,6 +197,20 @@ class CompatibilityResolver {
   /// required to satisfy this slice's `collect` fail-closed requirement,
   /// and inventing it now would duplicate work a future slice needs to do
   /// anyway when it adds the Component Registry port.
+  /// AD-02 / S11b — يطابق `ComponentDefinition::bindableResources` (PHP): لا يُربط مكوّن إلا بالموارد التي يسمح بها سجلّه.
+  /// كان هذا الفحص مؤجَّلاً (لا سجل مكوّنات في Dart)؛ صار لازماً حين صار `commerce.categories` مورداً مدعوماً (1.2.0) فلا يُربط
+  /// `ProductList` به صامتاً في الجهاز بينما يرفضه الخادم. القائمة نفسها في العقد المشترك `registry-identifiers.v1.json` (`bindableResources`).
+  static const Map<String, List<String>> bindableResources = {
+    'ProductList': ['commerce.products'],
+    'ProductDetail': ['commerce.products'],
+    'CartList': ['commerce.cart'],
+    'CartSummary': ['commerce.cart'],
+    'CategoryList': ['commerce.categories'],
+  };
+
+  bool _bindingAllowedOn(String componentType, SchemaBinding binding) =>
+      (bindableResources[componentType] ?? const <String>[]).contains(binding.resource);
+
   bool _bindingSupported(SchemaBinding binding, CapabilityManifest manifest) {
     if (manifest.resourceVersion(binding.resource) == null) return false;
 
