@@ -1,0 +1,48 @@
+{
+  "key": "blank",
+  "version": 1,
+  "vertical": "general",
+  "name": {
+    "ar": "تطبيق فارغ",
+    "en": "Blank app"
+  },
+  "description": {
+    "ar": "صفحة رئيسية بسيطة تبدأ منها وتبني ما تريد.",
+    "en": "A simple home page to start from and build on."
+  },
+  "schema": {
+    "schemaVersion": "1.0.0",
+    "minRuntimeVersion": "1.0.0",
+    "navigation": {
+      "initialPageId": "home"
+    },
+    "theme": {
+      "tokens": {}
+    },
+    "pages": {
+      "home": {
+        "type": "Page",
+        "id": "home-root",
+        "children": [
+          {
+            "type": "Section",
+            "id": "sec-welcome",
+            "props": {
+              "title": "مرحباً"
+            },
+            "children": [
+              {
+                "type": "Text",
+                "id": "txt-welcome",
+                "props": {
+                  "text": "ابدأ ببناء تطبيقك.",
+                  "style": "body"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

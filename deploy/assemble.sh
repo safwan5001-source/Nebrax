@@ -79,6 +79,9 @@ cp -r "$CORE_DIR/routes/api_storefront.php"      routes/api_storefront.php
 cp -r "$CORE_DIR/routes/api_commerce.php"        routes/api_commerce.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/resources/views/"*              resources/views/ 2>/dev/null || true
+# سجل قوالب التطبيقات (AD-11 / S22a) — يقرؤه AppTemplateRegistry عبر resource_path()؛ غيابه يعني سجلاً فارغاً في الإنتاج.
+mkdir -p resources/app-builder/templates
+cp -r "$CORE_DIR/resources/app-builder/templates/"*.json resources/app-builder/templates/
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/ 2>/dev/null || true
 mkdir -p tests/Fixtures/presentation
 cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true

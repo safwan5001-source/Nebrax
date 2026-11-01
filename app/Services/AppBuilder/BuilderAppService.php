@@ -27,16 +27,21 @@ final class BuilderAppService
     /**
      * @throws RuntimeException مسار إنشاء غير مدعوم.
      */
-    public function create(string $name, ?string $nameEn, string $creationSource, ?string $userId): BuilderApp
+    public function create(string $name, ?string $nameEn, string $creationSource, ?string $userId, ?string $templateKey = null): BuilderApp
     {
         if (! in_array($creationSource, BuilderApp::CREATION_SOURCES, true)) {
             throw new RuntimeException('مسار إنشاء التطبيق غير مدعوم.');
         }
 
-        // مسارات الإنشاء الثلاثة تنتج نفس المحتوى الأدنى الآمن في V1 —
-        // التمايز الحقيقي (تصميم المتجر/القالب) مؤجَّلٌ إلى APP-BUILDER-8/9
-        // (انظر توثيق `BuilderDraftExperience::minimalSafeSchema()`).
+        // بلا قالب: المحتوى الأدنى الآمن كما كان. مع `template_key` (AD-11): نسخة من مخطط القالب في السجل — بلا ارتباط حي به.
         $schema = BuilderDraftExperience::minimalSafeSchema();
+        if ($templateKey !== null) {
+            $template = app(AppTemplateRegistry::class)->find($templateKey);
+            if ($template === null) {
+                throw new RuntimeException('القالب غير موجود.');
+            }
+            $schema = $template['schema'];
+        }
         $this->parser->validate($schema);
 
         return DB::transaction(function () use ($name, $nameEn, $creationSource, $userId, $schema): BuilderApp {

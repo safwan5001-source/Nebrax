@@ -1,0 +1,176 @@
+{
+  "key": "catalog",
+  "version": 1,
+  "vertical": "retail",
+  "name": {
+    "ar": "متجر منتجات",
+    "en": "Product store"
+  },
+  "description": {
+    "ar": "رئيسية بقائمة منتجات حيّة من متجرك (الأحدث أولاً) وصفحة للسلة.",
+    "en": "A home page with a live product list from your store (newest first) and a cart page."
+  },
+  "schema": {
+    "schemaVersion": "1.0.0",
+    "minRuntimeVersion": "1.0.0",
+    "navigation": {
+      "initialPageId": "home"
+    },
+    "theme": {
+      "tokens": {}
+    },
+    "pages": {
+      "home": {
+        "type": "Page",
+        "id": "home-root",
+        "children": [
+          {
+            "type": "Section",
+            "id": "sec-title",
+            "props": {
+              "title": "منتجاتنا"
+            },
+            "children": [
+              {
+                "type": "ProductList",
+                "id": "list-products",
+                "binding": {
+                  "resource": "commerce.products",
+                  "query": {
+                    "sort": "-created_at"
+                  }
+                },
+                "children": [
+                  {
+                    "type": "ProductCard",
+                    "id": "card-template",
+                    "props": {
+                      "title": "$item.display_name",
+                      "amountMinor": "$item.price.amount_minor"
+                    },
+                    "action": {
+                      "type": "openProduct",
+                      "params": {
+                        "productId": "$item.id"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "Button",
+            "id": "btn-cart",
+            "props": {
+              "label": "عرض السلة",
+              "style": "secondary"
+            },
+            "action": {
+              "type": "navigate",
+              "params": {
+                "pageId": "cart"
+              }
+            }
+          }
+        ]
+      },
+      "cart": {
+        "type": "Page",
+        "id": "cart-root",
+        "children": [
+          {
+            "type": "NavigationTarget",
+            "id": "go-home",
+            "props": {
+              "label": "متابعة التسوّق"
+            },
+            "action": {
+              "type": "navigate",
+              "params": {
+                "pageId": "home"
+              }
+            }
+          },
+          {
+            "type": "CartList",
+            "id": "cart-items",
+            "binding": {
+              "resource": "commerce.cart",
+              "collect": "items"
+            },
+            "children": [
+              {
+                "type": "Section",
+                "id": "cart-line-template",
+                "optional": true,
+                "props": {
+                  "title": "$item.product_name"
+                },
+                "children": [
+                  {
+                    "type": "Text",
+                    "id": "cart-line-template-variant",
+                    "optional": true,
+                    "props": {
+                      "text": "$item.variant_descriptor",
+                      "style": "caption"
+                    }
+                  },
+                  {
+                    "type": "Price",
+                    "id": "cart-line-template-price",
+                    "optional": true,
+                    "props": {
+                      "amountMinor": "$item.line_total.amount_minor"
+                    }
+                  },
+                  {
+                    "type": "Quantity",
+                    "id": "cart-line-template-qty",
+                    "optional": true,
+                    "props": {
+                      "value": "$item.quantity",
+                      "min": 1,
+                      "max": 99
+                    },
+                    "action": {
+                      "type": "updateCartQuantity",
+                      "params": {
+                        "cartItemId": "$item.id",
+                        "quantity": "$item.quantity"
+                      }
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "cart-line-template-remove",
+                    "optional": true,
+                    "props": {
+                      "label": "إزالة",
+                      "style": "secondary"
+                    },
+                    "action": {
+                      "type": "removeCartItem",
+                      "params": {
+                        "cartItemId": "$item.id"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "CartSummary",
+            "id": "cart-summary",
+            "props": {
+              "itemCount": 0,
+              "subtotalAmountMinor": 0
+            }
+          }
+        ]
+      }
+    }
+  }
+}
