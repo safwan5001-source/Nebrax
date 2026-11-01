@@ -13,6 +13,7 @@ import 'product_screen.dart';
 import 'runtime_action_handler.dart';
 import 'runtime_config.dart';
 import 'runtime_schema.dart';
+import 'page_screen.dart';
 import 'runtime_state.dart';
 import 'runtime_status_views.dart';
 import 'runtime_strings.dart';
@@ -189,6 +190,13 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
     if (!mounted) return;
     setState(() => _startupDecision = decision);
     widget.onThemeTokensChanged?.call(_liveExperience?.schema.theme.tokens);
+    // S06a: التجربة الحيّة تعلن صفحاتها (للتنقل بين الصفحات المخصّصة)، وتبدأ من
+    // `navigation.initialPageId` مرة واحدة (PAG-02). الافتراضية/غير المتاحة ⇒ كما كانت.
+    final live = _liveExperience;
+    if (live != null) {
+      _state.declarePages(live.pages.keys);
+      _state.startAt(live.schema.navigation.initialPageId);
+    }
   }
 
   /// The live [RenderableExperience] Home/Cart should render instead of the
@@ -209,8 +217,22 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final strings = RuntimeStrings.of(widget.locale);
-    return Scaffold(
+    return PopScope(
+      // S06a: زر الرجوع في النظام يعود خطوة داخل التطبيق قبل أن يغلقه.
+      canPop: !_state.canGoBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _state.goBack();
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: _state.canGoBack
+            ? IconButton(
+                key: const ValueKey('runtime-back'),
+                icon: const BackButtonIcon(),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: _state.goBack,
+              )
+            : null,
         title: const Text('أَوْج — AWJ Mobile Runtime'),
         actions: [
           TextButton(
@@ -224,6 +246,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
         ],
       ),
       body: _buildBody(),
+      ),
     );
   }
 
@@ -260,6 +283,23 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
         locale: widget.locale,
         experience: liveExperience,
       ),
+      RuntimePage.page => liveExperience == null
+          ? HomeScreen(
+              client: _client,
+              state: _state,
+              dispatcher: _dispatcher,
+              locale: widget.locale,
+              experience: null,
+            )
+          : PageScreen(
+              key: ValueKey('page-${_state.selectedPageId}'),
+              pageId: _state.selectedPageId!,
+              experience: liveExperience,
+              client: _client,
+              state: _state,
+              dispatcher: _dispatcher,
+              locale: widget.locale,
+            ),
     };
   }
 }

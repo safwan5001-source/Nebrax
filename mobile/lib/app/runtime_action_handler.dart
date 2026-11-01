@@ -33,10 +33,11 @@ class RuntimeActionHandler implements ActionHandler {
       case 'cart':
         state.goToCart();
       default:
-        // An unrecognized pageId is a schema-authoring mistake, not a
-        // runtime crash — fail safe by doing nothing (same posture as
+        // S06a — a page the live Experience declares opens on the generic page
+        // screen; anything else is a schema-authoring mistake, not a runtime
+        // crash — fail safe by doing nothing (same posture as
         // `ExperienceView`'s unknown-pageId screen).
-        break;
+        state.goToPage(action.pageId);
     }
   }
 

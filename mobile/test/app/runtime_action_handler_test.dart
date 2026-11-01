@@ -18,6 +18,22 @@ CommerceClient _client(FakeCommerceTransport transport) {
 }
 
 void main() {
+  test('onNavigate opens a declared custom page and still ignores undeclared ones (S06a)', () async {
+    final state = RuntimeState()..declarePages(['home', 'cart', 'about']);
+    final handler = RuntimeActionHandler(
+      client: _client(FakeCommerceTransport.always(jsonResponse(200, {'data': {}, 'meta': successMeta()}))),
+      state: state,
+      onError: (_) => fail('should not error'),
+    );
+
+    await handler.onNavigate(const NavigateAction('about'));
+    expect(state.page, RuntimePage.page);
+    expect(state.selectedPageId, 'about');
+
+    await handler.onNavigate(const NavigateAction('ghost'));
+    expect(state.selectedPageId, 'about'); // لم يتغير
+  });
+
   test(
     'onNavigate maps known pageIds and ignores unknown ones (fail-safe)',
     () async {
