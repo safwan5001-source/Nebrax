@@ -128,9 +128,10 @@ class FuelShiftServiceTest extends TestCase
             'opening_float_minor' => 1000,
             'idempotency_key' => 'open-guards-1',
         ], $fixture['actor']);
+        // FS-16: الإعادة بمفتاح مستعمل تُرجع الوردية الأولى بالحمولة نفسها؛ عهدة مختلفة تضارب (تغطيه اختبار الإعادة المخصص).
         $same = $service->open([
             'fuel_station_id' => $fixture['station']->id,
-            'opening_float_minor' => 999999,
+            'opening_float_minor' => 1000,
             'idempotency_key' => 'open-guards-1',
         ], $fixture['actor']);
         $this->assertSame($shift->id, $same->id);
