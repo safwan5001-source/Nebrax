@@ -94,6 +94,25 @@ class BuilderAppArchiveTest extends TestCase
     }
 
     /** @test */
+    public function the_qr_preview_flow_is_blocked_for_archived_apps_including_references_issued_before_archival(): void
+    {
+        $s = $this->store('ar-qr');
+        $id = $this->createApp($s);
+
+        $issued = $this->withToken($s['token'])->postJson("/api/app-builder/apps/{$id}/preview-exchange-references")->assertCreated()->json('reference');
+        $this->archive($s, $id)->assertOk();
+
+        // مرجع صدر قبل الأرشفة لا يتحوّل إلى جلسة جهاز.
+        $this->postJson('/preview/v1/exchange', ['reference' => $issued])->assertStatus(401);
+        // ولا يُصدَر مرجع جديد.
+        $this->withToken($s['token'])->postJson("/api/app-builder/apps/{$id}/preview-exchange-references")->assertStatus(422);
+
+        // بعد إعادة التفعيل يعود إصدار المراجع.
+        $this->withToken($s['token'])->postJson("/api/app-builder/apps/{$id}/unarchive")->assertOk();
+        $this->withToken($s['token'])->postJson("/api/app-builder/apps/{$id}/preview-exchange-references")->assertCreated();
+    }
+
+    /** @test */
     public function an_archived_apps_versions_are_never_served_and_an_older_active_app_is_served_instead(): void
     {
         $s = $this->store('ar-serve');
