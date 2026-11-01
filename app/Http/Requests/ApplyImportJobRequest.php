@@ -83,6 +83,7 @@ class ApplyImportJobRequest extends FormRequest
                 StocktakeCountImportFields::keys(),
                 ExpenseImportFields::keys(),
                 PurchaseImportFields::keys(),
+                \App\Support\PartnerStatementImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.

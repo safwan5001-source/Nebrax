@@ -452,6 +452,22 @@ class PartnerStatementImportTest extends TestCase
     }
 
     /** @test */
+    public function an_explicit_mapping_repeated_at_apply_is_accepted_and_a_changed_one_is_refused(): void
+    {
+        // أعمدة بترتيب غير مألوف وبعناوين لا تُطابَق تلقائياً ⇒ مطابقة صريحة (كل حقول الكشف مسموحة في طلب التطبيق أيضاً، Codex #1877 P2).
+        $rows = [['c1' => '2026-09-01', 'c2' => 'INV-1', 'c3' => 'x', 'c4' => '10.00', 'c5' => '', 'c6' => '10.00', 'c7' => 'SAR', 'c8' => 'invoice']];
+        $mapping = ['0' => 'line_date', '1' => 'reference', '2' => 'our_reference', '3' => 'debit', '4' => 'credit', '5' => 'balance', '6' => 'currency', '7' => 'kind'];
+        $options = $this->hdr() + ['mapping' => $mapping];
+
+        $job = $this->createJob($this->auth['token'], $rows, $options)->assertCreated()->json('data');
+        $changed = $this->withToken($this->auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['mapping' => ['0' => 'line_date', '1' => 'description'] + $mapping]);
+        $this->assertSame('options_frozen', $changed->json('code'));
+
+        $this->withToken($this->auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['mapping' => $mapping])->assertOk();
+        $this->assertSame([1, 1000], [PartnerStatementLine::query()->count(), (int) PartnerStatementLine::query()->value('debit_minor')]);
+    }
+
+    /** @test */
     public function an_unbound_job_and_options_that_differ_from_the_preview_are_refused(): void
     {
         $this->upload($this->auth['token'], '/api/import-jobs', ['domain' => 'partner_statement', 'file' => $this->file($this->rows()), 'options' => $this->hdr()])->assertStatus(422);
