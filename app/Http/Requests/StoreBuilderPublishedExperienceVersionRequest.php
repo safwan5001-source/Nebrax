@@ -15,6 +15,8 @@ class StoreBuilderPublishedExperienceVersionRequest extends FormRequest
     {
         return [
             'note' => ['nullable', 'string', 'max:1000'],
+            // AD-06 / S05c: «نشر وتفعيل» — يجعل النسخة الجديدة هي الحيّة في العملية نفسها (ذرّياً). افتراضه «نشر فقط».
+            'promote' => ['nullable', 'boolean'],
             // AD-01 / S01d: اختياري (متوافق مع المستهلكين الحاليين). إن أُرسل فيجب أن يطابق revision المسودة وقت النشر وإلا 409.
             'expected_draft_revision' => [
                 'nullable',

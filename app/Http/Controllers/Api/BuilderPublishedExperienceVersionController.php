@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreBuilderPublishedExperienceVersionRequest;
 use App\Http\Resources\BuilderPublishedExperienceVersionResource;
 use App\Models\BuilderApp;
+use App\Services\AppBuilder\BuilderLivePointerService;
 use App\Services\AppBuilder\BuilderPublishedExperienceVersionService;
 use App\Services\AppBuilder\CompatibilityReport;
 use App\Services\AppBuilder\DraftChangedSinceReviewException;
+use App\Services\AppBuilder\LivePointerConflictException;
 use App\Services\AppBuilder\SchemaContractViolationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * APP-BUILDER-1 (AB-03) — نشر/استعراض نسخ التجربة المنشورة. `store()` هي
@@ -22,6 +25,7 @@ class BuilderPublishedExperienceVersionController extends ApiController
     public function __construct(
         private readonly BuilderPublishedExperienceVersionService $service,
         private readonly CompatibilityReport $compatibility,
+        private readonly BuilderLivePointerService $livePointer,
     ) {}
 
     public function index(string $appId): JsonResponse
@@ -39,13 +43,29 @@ class BuilderPublishedExperienceVersionController extends ApiController
 
         $expected = $request->validated('expected_draft_revision');
 
+        // AD-06 / S05c: «نشر وتفعيل» — خلف بوابة المؤشر الحي (مغلقة ⇒ 422 صريح لا تجاهل صامت).
+        $promote = (bool) $request->validated('promote');
+        if ($promote && ! BuilderLivePointerService::enabled()) {
+            abort(422, 'تفعيل النسخة عند النشر غير متاح حالياً.');
+        }
+
         try {
-            $version = $this->domain(fn () => $this->service->publish(
-                $app,
-                $request->validated('note'),
-                $request->user()?->id,
-                $expected === null ? null : (int) $expected,
-            ));
+            $version = $this->domain(fn () => DB::transaction(function () use ($app, $request, $expected, $promote) {
+                $published = $this->service->publish(
+                    $app,
+                    $request->validated('note'),
+                    $request->user()?->id,
+                    $expected === null ? null : (int) $expected,
+                );
+                // ذرّي: فشل التفعيل يتراجع معه النشر كله (لا نسخة يتيمة تظن أنها حيّة).
+                if ($promote) {
+                    $this->livePointer->promote($published, $request->user()?->id);
+                }
+
+                return $published;
+            }));
+        } catch (LivePointerConflictException $e) {
+            return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], 409);
         } catch (SchemaContractViolationException $e) {
             return $this->contractViolationResponse($e);
         } catch (DraftChangedSinceReviewException $e) {

@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\CompanyBrowserIdentityController;
 use App\Http\Controllers\Api\AppBuilderRegistryController;
 use App\Http\Controllers\Api\BuilderAppController;
 use App\Http\Controllers\Api\BuilderDraftExperienceController;
+use App\Http\Controllers\Api\BuilderLivePointerController;
 use App\Http\Controllers\Api\BuilderPublishedExperienceVersionController;
 use App\Http\Controllers\Api\PreviewSessionController;
 use App\Http\Controllers\Api\PreviewExchangeReferenceController;
@@ -1489,6 +1490,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('app-builder/apps/{id}/versions/{version}', [BuilderPublishedExperienceVersionController::class, 'show'])
             ->whereUuid('id')->whereNumber('version')
             ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+
+        // AD-06 / S05c: النسخة الحيّة لقناة الجوال (مؤشر + ترقية/تراجع). خلف بوابة نشر `app_builder.live_pointer_enabled`
+        // (مغلقة ⇒ 404). الفعل يغيّر ما يراه العملاء فيتطلب `apps_builder.publish` كالنشر.
+        Route::get('app-builder/live', [BuilderLivePointerController::class, 'show'])
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::post('app-builder/live/rollback', [BuilderLivePointerController::class, 'rollback'])
+            ->middleware([$perm('apps_builder.publish'), $app('commerce.app_builder')]);
+        Route::post('app-builder/apps/{id}/versions/{version}/promote', [BuilderLivePointerController::class, 'promote'])
+            ->whereUuid('id')->whereNumber('version')
+            ->middleware([$perm('apps_builder.publish'), $app('commerce.app_builder')]);
 
         // APP-BUILDER-5: تسلسل ComponentRegistry/ActionRegistry (APP-BUILDER-3) — مصدر
         // Inspector الوصفي. بيانات منصّة ثابتة لا مسار {id}، ونفس بوابتَي الصلاحية/القدرة.
