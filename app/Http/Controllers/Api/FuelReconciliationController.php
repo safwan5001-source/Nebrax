@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Api\Concerns\AuthorizesFuelStationScope;
 use App\Http\Requests\ApproveFuelReconciliationRequest;
 use App\Http\Requests\ListFuelReconciliationsRequest;
 use App\Http\Requests\ListFuelTankReadingsRequest;

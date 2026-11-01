@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Api\Concerns\AuthorizesFuelStationScope;
 use App\Http\Requests\ApproveFuelDeliveryRequest;
 use App\Http\Requests\StoreFuelDeliveryRequest;
 use App\Http\Requests\StoreFuelSupplierInvoiceMatchRequest;
