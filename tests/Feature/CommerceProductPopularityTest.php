@@ -60,7 +60,7 @@ class CommerceProductPopularityTest extends TestCase
         return $p;
     }
 
-    private function sell(array $s, Product $p, int $qty, string $status = 'posted', ?string $date = null, int $unitFactor = 1): void
+    private function sell(array $s, Product $p, int $qty, string $status = 'posted', ?string $date = null, int $unitFactor = 1, ?int $num = null, ?int $den = null): void
     {
         app(TenantContext::class)->set($s['tenant']->id);
         $inv = Invoice::create([
@@ -70,6 +70,7 @@ class CommerceProductPopularityTest extends TestCase
         ]);
         InvoiceLine::create([
             'invoice_id' => $inv->id, 'product_id' => $p->id, 'quantity' => $qty, 'unit_factor' => $unitFactor,
+            'quantity_numerator' => $num, 'quantity_denominator' => $den,
             'unit_price' => 10000, 'tax_rate' => 15, 'line_subtotal' => 0, 'line_discount' => 0, 'line_tax' => 0, 'line_total' => 0,
         ]);
         app(TenantContext::class)->forget();
@@ -120,6 +121,30 @@ class CommerceProductPopularityTest extends TestCase
         $this->sell($s, $piece, 10);
 
         $this->assertSame(['علبة', 'حبة'], $this->names($s, '-popularity'));
+    }
+
+    /** @test */
+    public function rational_quantities_count_their_real_base_units_not_the_placeholder(): void
+    {
+        $s = $this->store('pop-rational');
+        $half = $this->product($s, 'نصف عبوة');   // 1/2 عبوة × معامل 10 = 5 وحدات (السطر يخزّن quantity=1 كعنصر نائب)
+        $six = $this->product($s, 'ست حبات');
+        $this->sell($s, $half, 1, 'posted', null, 10, 1, 2);
+        $this->sell($s, $six, 6);
+
+        $this->assertSame(['ست حبات', 'نصف عبوة'], $this->names($s, '-popularity'));
+    }
+
+    /** @test */
+    public function future_dated_invoices_do_not_count(): void
+    {
+        $s = $this->store('pop-future');
+        $future = $this->product($s, 'مستقبلي');
+        $now = $this->product($s, 'حالي');
+        $this->sell($s, $future, 500, 'posted', now()->addDays(10)->toDateString());
+        $this->sell($s, $now, 1);
+
+        $this->assertSame(['حالي', 'مستقبلي'], $this->names($s, '-popularity'));
     }
 
     /** @test */
