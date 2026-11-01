@@ -183,5 +183,30 @@
   "s": "partial",
   "slice": "S08b",
   "ev": "sort/search/per_page/category_id(UUID حرفي) تصل الطلب من الجهاز ومحاكاة الصدفة؛ المتبقي: category_id عبر $route.categoryId (يحتاج سياق صفحة S06b/c) واختبار جهاز فعلي (#1868)"
+ },
+ "PAG-01": {
+  "s": "closed",
+  "slice": "S06a",
+  "ev": "موجّه صفحات عام: أي صفحة منشورة تُعرض وnavigate يصلها (RuntimeState + PageScreen)، سجل تاريخ وبدء من initialPageId؛ اختبارات Dart (#1872)"
+ },
+ "PAG-02": {
+  "s": "closed",
+  "slice": "S06a",
+  "ev": "التطبيق يبدأ من navigation.initialPageId مع سقوط آمن إلى home، ولا يطغى على تنقل صريح (#1872)"
+ },
+ "PAG-04": {
+  "s": "partial",
+  "slice": "S09a/S09b/S09d",
+  "ev": "navigation.tabs/appBar: عقد مشترك PHP/Dart/ويب + جيل 1.1.0 (#1874)، شريط سفلي وشريط علوي وشارة سلة على الجهاز (#1880)، محرر الغلاف في الوضع السهل (#1879)؛ المتبقي: التحقق على جهاز فعلي والشاشة الافتتاحية (S09c)"
+ },
+ "ONB-01": {
+  "s": "partial",
+  "slice": "S22a",
+  "ev": "سجل قوالب برمجي موحّد في الخادم (blank/catalog/promo) + GET app-builder/templates + إنشاء بـtemplate_key (#1881)؛ المتبقي: منتقي القوالب في الويب وإلغاء قوالب templates.ts (S22b)"
+ },
+ "ONB-04": {
+  "s": "closed",
+  "slice": "S22a",
+  "ev": "بوابة CI في PHP وDart تمرّر كل قالب على CompatibilityResolver ومحلل Dart بلا إسقاط (#1881)"
  }
 }
