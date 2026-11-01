@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\Account;
+use App\Models\FuelProduct;
 use App\Models\Invoice;
 use App\Models\InventoryState;
 use App\Models\Partner;
@@ -34,6 +35,14 @@ use RuntimeException;
  */
 class InventoryService
 {
+    /**
+     * FS-04: منتج الوقود له مجمّع تكلفة دقيق (`FuelInventoryCostState`) لا يكتبه إلا
+     * مسار الوقود المعتمد (استلام/بيع/تسوية). أي حركة عامة عليه (فاتورة/مرتجع/جرد/إذن/
+     * افتتاحي/مشتريات) كانت تحرّك الكمية والمتوسط الصحيح دون المجمّع فينفصل 1140 عنه.
+     * خدمات الوقود وحدها تمرّر هذا المفتاح؛ يحرس ذلك اختبار ساكن.
+     */
+    public const FUEL_POOL_META = 'fuel_pool_managed';
+
     // الحسابان المقابلان يبقيان بالأكواد: `opening_balances` (3130) محجوزٌ
     // صراحةً خارج نطاق ACC-5 حتى يُقرّ موضعه في الإعدادات، و2110 افتراضٌ
     // للاستلام العام تملكه أدوار المشتريات (ACC-4) لا أدوار المخزون.
@@ -94,6 +103,7 @@ class InventoryService
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
         }
+        $this->assertNotFuelPoolManaged($product, $meta);
 
         $date        = $meta['date'] ?? now()->toDateString();
         $warehouseId = $this->resolveWarehouseId($meta);
@@ -150,6 +160,7 @@ class InventoryService
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الإخراج يجب أن تكون موجبة والتكلفة غير سالبة.');
         }
+        $this->assertNotFuelPoolManaged($product, $meta);
         $lineValue = $totalCost ?? ($quantity * $unitCost);
         if ($lineValue < 0) {
             throw new RuntimeException('قيمة الإخراج لا تكون سالبة.');
@@ -247,6 +258,7 @@ class InventoryService
             // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
             // نصفها مرحَّل ونصفها لا. ويقارن بوحدة المخزون لا بوحدة السطر —
             // «طبليتان» و«رصيد ٦٠ كيساً» لا يُقارَنان قبل التحويل.
+            $this->assertNotFuelPoolManaged($product);
             $this->assertStockAvailable($product, $quantity, $warehouseId, $variant);
             $state = $this->resolveInventoryState($product, $variant);
 
@@ -528,6 +540,17 @@ class InventoryService
 
         if ($variant->tenant_id !== $product->tenant_id) {
             throw new RuntimeException('تعارض عزل مستأجر بين المنتج والمتغيّر.');
+        }
+    }
+
+    /** FS-04: يرفض الحركة العامة على منتج وقود ما لم يمرّرها مسار الوقود المعتمد. */
+    protected function assertNotFuelPoolManaged(Product $product, array $meta = []): void
+    {
+        if (($meta[self::FUEL_POOL_META] ?? false) === true) {
+            return;
+        }
+        if (FuelProduct::query()->where('product_id', $product->id)->exists()) {
+            throw new RuntimeException('FUEL_POOL_MANAGED: منتج الوقود يُدار بمجمّع تكلفة خاص ولا يقبل حركة مخزون عامة (فاتورة أو مرتجع أو جرد أو إذن مخزني أو رصيد افتتاحي أو مشتريات)؛ استخدم مسارات محطات الوقود المعتمدة.');
         }
     }
 
