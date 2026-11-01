@@ -404,7 +404,8 @@ php artisan serve
 
 ## عمليات طلب المتجر — COPS (ADR-29، قيد التنفيذ)
 
-برنامج **COPS** (القبول، التنفيذ، التتبع، تنبيه التاجر، إعدادات تشغيل المتجر) عقده `docs/plans/store/ADR-29-COMMERCE-ORDER-OPERATIONS.md` (Accepted)، والتسليم الحيّ `docs/audits/AWJ_COPS_HORIZON_HANDOFF.md`، والحالة في المتتبّع §9. حتى الآن **وثائق فقط** (H1-0)؛ لا قبول ولا تنفيذ ولا تغذية أحداث مبنية بعد. ثوابته لكل شريحة قادمة:
+برنامج **COPS** (القبول، التنفيذ، التتبع، تنبيه التاجر، إعدادات تشغيل المتجر) عقده `docs/plans/store/ADR-29-COMMERCE-ORDER-OPERATIONS.md` (Accepted)، والتسليم الحيّ `docs/audits/AWJ_COPS_HORIZON_HANDOFF.md`، والحالة في المتتبّع §9.
+**H1-1 (سجل الأحداث):** `commerce_order_events` (append-only) + `commerce_order_feed_heads` (صف **قفل** ثابت لكل مستأجر يولد معه بمُشغّل على `tenants`). الكاتب الوحيد `CommerceOrderEventRecorder::append()`: داخل معاملة الانتقال، **آخر كتابة فيها**، يقفل الرأس ثم يُدرج `feed_seq = max+1` بعبارة واحدة، و**لا يلمس `tenants`** (لا قفل ولا FK — وإلا حلقة مع مِرساة الترقيم/الأستاذ). الأنواع: `order.placed` (إتمام Checkout) · `order.cancelled` · `payment.paid` (فرع الانتقال في `completeCaptured`) · `payment.collected` (`markCollected(…, ?User)`). `data` قائمة بيضاء بلا PII. الخط الزمني كتلة `timeline` إضافية في تفاصيل الموظف. لا تضف كتابة حدث إلا عبر الكاتب وفي آخر المعاملة (يحرسه اختبار «الرأس آخر قفل»). ثوابته لكل شريحة قادمة:
 - الأبعاد منفصلة؛ لا عمود حالة دفع/تنفيذ/تشغيل مخزَّن ولا قيمة enum جديدة في `commerce_orders.status`؛ `operational_status` مشتق للعرض فقط.
 - رفض التاجر = `CommerceOrderLifecycleService::cancel()` بسبب `merchant_rejected` (لا مسار ثانٍ)؛ القبول اليدوي خلف `COMMERCE_ORDER_ACCEPTANCE_ENABLED` المغلقة، والطلب الإلكتروني غير المدفوع خارج الطابور والتنبيه.
 - أحداث الطلب تُكتب داخل معاملة الانتقال، و`commerce_order_feed_heads` **آخر قفل** فيها دائماً (اكتمال التغذية بترتيب الالتزام) + مصالحة بالحالة؛ لا قيد ولا حركة مخزون من COPS قبل قرارات D-8/D-10.
