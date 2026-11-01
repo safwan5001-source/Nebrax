@@ -361,6 +361,8 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
         locale: widget.locale,
       ),
       RuntimePage.search => SearchScreen(
+        initialQuery: _state.searchQuery,
+        onQueryChanged: _state.rememberSearchQuery,
         client: _client,
         dispatcher: _dispatcher,
         locale: widget.locale,
