@@ -80,14 +80,85 @@
         "id": "cart-root",
         "children": [
           {
+            "type": "NavigationTarget",
+            "id": "go-home",
+            "props": {
+              "label": "متابعة التسوّق"
+            },
+            "action": {
+              "type": "navigate",
+              "params": {
+                "pageId": "home"
+              }
+            }
+          },
+          {
             "type": "CartList",
-            "id": "cart-list",
+            "id": "cart-items",
+            "binding": {
+              "resource": "commerce.cart",
+              "collect": "items"
+            },
             "children": [
               {
-                "type": "CartSummary",
-                "id": "cart-summary"
+                "type": "Section",
+                "id": "cart-line-template",
+                "optional": true,
+                "props": {
+                  "title": "$item.product_name"
+                },
+                "children": [
+                  {
+                    "type": "Price",
+                    "id": "cart-line-template-price",
+                    "optional": true,
+                    "props": {
+                      "amountMinor": "$item.line_total.amount_minor"
+                    }
+                  },
+                  {
+                    "type": "Quantity",
+                    "id": "cart-line-template-qty",
+                    "optional": true,
+                    "props": {
+                      "value": "$item.quantity",
+                      "min": 1,
+                      "max": 99
+                    },
+                    "action": {
+                      "type": "updateCartQuantity",
+                      "params": {
+                        "cartItemId": "$item.id",
+                        "quantity": "$item.quantity"
+                      }
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "cart-line-template-remove",
+                    "optional": true,
+                    "props": {
+                      "label": "إزالة",
+                      "style": "secondary"
+                    },
+                    "action": {
+                      "type": "removeCartItem",
+                      "params": {
+                        "cartItemId": "$item.id"
+                      }
+                    }
+                  }
+                ]
               }
             ]
+          },
+          {
+            "type": "CartSummary",
+            "id": "cart-summary",
+            "props": {
+              "itemCount": 0,
+              "subtotalAmountMinor": 0
+            }
           }
         ]
       }

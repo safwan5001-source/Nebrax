@@ -141,4 +141,30 @@ class AppTemplateRegistryTest extends TestCase
         $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', ['name' => 'ناشر', 'creation_source' => 'template', 'template_key' => 'promo'])->assertCreated()->json('data.id');
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])->assertCreated();
     }
+
+    /** @test */
+    public function shop_templates_cart_page_binds_real_line_items_with_quantity_and_removal(): void
+    {
+        // مراجعة Codex: صفحة سلة بملخص فقط تُخفي بنود السلة عن المتسوّق؛ قوالب المتجر تربط `commerce.cart` بقالب بند فيه الكمية والحذف.
+        foreach (['catalog', 'promo'] as $key) {
+            $cart = $this->registry()->find($key)['schema']['pages']['cart'];
+            $list = collect($cart['children'])->firstWhere('type', 'CartList');
+            $this->assertNotNull($list, "{$key}: CartList");
+            $this->assertSame(['resource' => 'commerce.cart', 'collect' => 'items'], array_intersect_key($list['binding'], ['resource' => 1, 'collect' => 1]), "{$key}: ربط السلة");
+
+            $flat = [];
+            $walk = function (array $n) use (&$walk, &$flat): void {
+                $flat[] = $n;
+                foreach ($n['children'] ?? [] as $c) {
+                    $walk($c);
+                }
+            };
+            $walk($list);
+            $actions = array_values(array_filter(array_map(fn ($n) => $n['action']['type'] ?? null, $flat)));
+            $this->assertContains('updateCartQuantity', $actions, "{$key}: تعديل الكمية");
+            $this->assertContains('removeCartItem', $actions, "{$key}: حذف البند");
+            // الملخص خارج البنود المكرَّرة (لا يتكرر مع كل بند).
+            $this->assertNotNull(collect($cart['children'])->firstWhere('type', 'CartSummary'), "{$key}: الملخص خارج القائمة");
+        }
+    }
 }
