@@ -110,7 +110,7 @@ test.describe('Customer accounts settings', () => {
     await open(page, { locale: 'en', scenario: { putStatus: 409, putReason: 'customer_accounts_deployment_disabled' } });
     await page.getByRole('switch').click();
     await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('alert')).toContainText('deployment switch is closed');
+    await expect(page.getByTestId('customer-accounts-card').getByRole('alert')).toContainText('deployment switch is closed');
     await expect(page.getByText('Customer accounts setting saved')).toHaveCount(0);
     await expect(page.getByTestId('accounts-status')).toHaveText('Disabled');
     await shot(page, 'en-409');
@@ -129,7 +129,9 @@ test.describe('Customer accounts settings', () => {
     }
     await expect(page.getByTestId('selected-store')).toHaveText('Tulip Outlet');
     await expect(page.getByTestId('accounts-status')).toHaveText('Enabled');
-    expect(requests.filter((r) => r.startsWith('GET /commerce/channels/'))).toEqual([
+    // Dev-mode StrictMode double-invokes effects, so compare the distinct channels in order of first request.
+    const reads = [...new Set(requests.filter((r) => r.startsWith('GET /commerce/channels/')))];
+    expect(reads).toEqual([
       `GET /commerce/channels/${CH_A}/pricing-settings`,
       `GET /commerce/channels/${CH_B}/pricing-settings`,
     ]);
