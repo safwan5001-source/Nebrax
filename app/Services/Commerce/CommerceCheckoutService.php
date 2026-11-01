@@ -7,6 +7,7 @@ use App\Models\CommerceCartItem;
 use App\Models\CommerceCheckout;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Support\CommercePaymentHold;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentMethod;
@@ -622,6 +623,15 @@ final class CommerceCheckoutService
             // منهم. سلةٌ واحدة تدعم طلباً ناجحاً واحداً على الأكثر؛ شراءٌ
             // تالٍ يبدأ سلةً ورمزاً جديدين دوماً (لا إعادة فتح `consumed`).
             $cart->update(['status' => CommerceCart::STATUS_CONSUMED]);
+
+            // COPS-H1-1 (ADR-29 §2.4): آخر كتابة في المعاملة — يقفل رأس التغذية آخراً ولا يلمس `tenants`. الإعادة (replay) لا تصل هنا.
+            app(CommerceOrderEventRecorder::class)->append(
+                $order,
+                CommerceOrderEvent::ORDER_PLACED,
+                $order->customer_identity_id !== null ? CommerceOrderEvent::ACTOR_CUSTOMER : CommerceOrderEvent::ACTOR_GUEST,
+                $order->customer_identity_id !== null ? (string) $order->customer_identity_id : null,
+                ['delivery_method' => (string) $checkout->delivery_method, 'payment_method' => (string) $intent->method],
+            );
 
             return ['order' => $order, 'replayed' => false];
         }, 3);

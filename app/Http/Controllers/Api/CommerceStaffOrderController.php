@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Models\CommerceOrderPosting;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
@@ -115,8 +116,12 @@ class CommerceStaffOrderController extends ApiController
             ? PaymentAttempt::query()->where('payable_key', $intent->payableKey())->orderByDesc('created_at')->limit(20)->get()
             : collect();
         $posting = CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->first();
+        // COPS-H1-1: الخط الزمني — استعلامان ثابتان (الأحداث + أسماء الموظفين الفاعلين) مهما كثرت الأحداث. سقف 200 حدث.
+        $events = CommerceOrderEvent::query()->where('commerce_order_id', $order->id)->orderBy('feed_seq')->limit(200)->get();
+        $actorIds = $events->where('actor_type', CommerceOrderEvent::ACTOR_USER)->pluck('actor_id')->filter()->unique()->values();
+        $userNames = $actorIds->isEmpty() ? [] : User::query()->withTrashed()->where('tenant_id', $order->tenant_id)->whereIn('id', $actorIds)->pluck('name', 'id')->all();
 
-        $data = CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting);
+        $data = CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting, $events, $userNames);
         // O3b: عقد قراءة لإجراء الإلغاء — يغيب كلياً (لا مفتاح) حين البوابة مغلقة أو لا صلاحية؛ استرشادي والقرار لـAPI الإلغاء.
         $action = $actor === null ? null : app(CommerceOrderLifecycleService::class)->cancelAction($order, $actor);
         if ($action !== null) {
