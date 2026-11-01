@@ -80,6 +80,7 @@ class FuelReconciliationService
             $fuelProduct = $this->fuelProduct($tank->fuel_product_id);
             $product = $this->product($fuelProduct);
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
+            $this->assertSingleTankPerBook($fuelProduct, $warehouse);
             $settings = $this->settings->forStation($station);
             $this->assertNoUnsupportedSourceTotals($data);
 
@@ -168,6 +169,8 @@ class FuelReconciliationService
             $product = $this->product($fuelProduct);
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
             $this->lockBookStock($warehouse->id, $product->id);
+            // FS-01: قد يُضاف خزان ثانٍ بعد إنشاء المسودة؛ نعيد الفحص تحت القفل ولا نقبل فرقاً محسوباً على كتاب مشترك.
+            $this->assertSingleTankPerBook($fuelProduct, $warehouse);
             $difference = (int) $reconciliation->variance_milliliters;
             $unitCost = 0; // توافق StockMovement فقط؛ Fuel Cost Basis هو مصدر القيمة.
             $value = 0;
@@ -292,6 +295,24 @@ class FuelReconciliationService
         return ($negative ? -1 : 1) * $this->quantity->litersToMilliliters(ltrim($raw, '+-'));
     }
 
+    /**
+     * FS-01: الكتاب الرسمي (ProductWarehouseStock) بمستوى (مخزن، منتج)، بينما القراءة المادية
+     * لخزان واحد. مع أكثر من خزان غير معطّل يغذّي الكتاب نفسه تُقارَن قراءة خزان برصيد الجميع
+     * فيُنتج فقداً/زيادة كاذبة بقيد فعلي. لا دفتر لكل خزان بعد، فالرفض المغلق هو السلوك الآمن
+     * (لا سياسة محاسبية جديدة): تسوية خزان وحيد لكل (مخزن، منتج) فقط.
+     */
+    private function assertSingleTankPerBook(FuelProduct $fuelProduct, Warehouse $warehouse): void
+    {
+        $stationIds = FuelStation::where('warehouse_id', $warehouse->id)->pluck('id');
+        $tanks = FuelTank::whereIn('fuel_station_id', $stationIds)
+            ->where('fuel_product_id', $fuelProduct->id)
+            ->where('status', '!=', FuelTank::STATUS_INACTIVE)
+            ->count();
+        if ($tanks > 1) {
+            throw new RuntimeException('FUEL_RECONCILIATION_MULTI_TANK_UNSUPPORTED: يوجد أكثر من خزان غير معطّل لنفس منتج الوقود في مخزن المحطة، والتسوية الرسمية تقارن قراءة خزان واحد برصيد المخزن كله. عطّل الخزانات غير المستخدمة أو انتظر دعم دفتر لكل خزان.');
+        }
+    }
+
     private function bookBalance(string $warehouseId, string $productId): int
     {
         return (int) (ProductWarehouseStock::where('warehouse_id', $warehouseId)->where('product_id', $productId)->value('quantity') ?? 0);
@@ -335,7 +356,11 @@ class FuelReconciliationService
             $gain ? ['expense', 'revenue'] : ['expense'],
         );
         $inventory = $this->account($station->default_inventory_account_id, StocktakeService::INVENTORY_ACCOUNT_CODE, ['asset']);
-        $lines = $gain ? [['account_id' => $inventory->id, 'debit' => $amount], ['account_id' => $variance->id, 'credit' => $amount]] : [['account_id' => $variance->id, 'debit' => $amount], ['account_id' => $inventory->id, 'credit' => $amount]];
+        // FS-32: فرع القيد = فرع المحطة (كحركة المخزون ومسار الاستلام) لا فرع سياق الموافق.
+        $branchId = $station->branch_id;
+        $lines = $gain
+            ? [['account_id' => $inventory->id, 'debit' => $amount, 'branch_id' => $branchId], ['account_id' => $variance->id, 'credit' => $amount, 'branch_id' => $branchId]]
+            : [['account_id' => $variance->id, 'debit' => $amount, 'branch_id' => $branchId], ['account_id' => $inventory->id, 'credit' => $amount, 'branch_id' => $branchId]];
         return $this->ledger->post($lines, ['entry_date' => now()->toDateString(), 'description' => $gain ? 'زيادة تسوية وقود' : 'فقد تسوية وقود', 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'created_by' => $approverId]);
     }
 
