@@ -379,6 +379,12 @@ class RetailCustomerAccountsTest extends TestCase
         // an optional field can be explicitly cleared by a partial update
         $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['delivery_notes' => 'ملاحظة'])->assertOk()->assertJsonPath('data.delivery_notes', 'ملاحظة');
         $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['delivery_notes' => null])->assertOk()->assertJsonPath('data.delivery_notes', null);
+        $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['label' => 'المنزل'])->assertOk()->assertJsonPath('data.label', 'المنزل');
+        $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['label' => null, 'district' => 'الشاطئ'])->assertOk()->assertJsonPath('data.label', null);
+        // ...and the cleared values are what is STORED, not just echoed
+        $this->assertNull(CommerceCustomerAddress::query()->withoutGlobalScopes()->find($id)->only(['label'])['label']);
+        $this->assertNull(CommerceCustomerAddress::query()->withoutGlobalScopes()->find($id)->delivery_notes);
+        $this->assertSame('الدمام', CommerceCustomerAddress::query()->withoutGlobalScopes()->find($id)->city); // required fields untouched
 
         $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['city' => 'الخبر'])->assertOk()->assertJsonPath('data.city', 'الخبر');
         $this->api('DELETE', 'account/addresses/'.$id, self::RA, $t1)->assertOk();

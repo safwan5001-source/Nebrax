@@ -127,4 +127,28 @@ describe("AccountAddresses — live address book (B2C-ACCOUNTS)", () => {
     await user.click(screen.getByRole("button", { name: "confirmDelete" }));
     await waitFor(() => expect(actions.deleteAddress).toHaveBeenCalledWith(ID));
   });
+
+  it("editing an address and emptying optional fields submits the cleared values (not an omission)", async () => {
+    actions.listAddresses.mockResolvedValue({
+      kind: "ok",
+      data: [{ ...address, label: "Home", deliveryNotes: "Gate code 1234" }],
+    });
+    const user = userEvent.setup();
+    render(<AccountAddresses />);
+    await screen.findByText("Home");
+
+    await user.click(screen.getByRole("button", { name: "edit" }));
+    expect(screen.getByLabelText("deliveryNotes")).toHaveValue(
+      "Gate code 1234",
+    );
+    await user.clear(screen.getByLabelText("addressLabel"));
+    await user.clear(screen.getByLabelText("deliveryNotes"));
+    await user.click(screen.getByRole("button", { name: "saveAddress" }));
+
+    await waitFor(() => expect(actions.saveAddress).toHaveBeenCalledTimes(1));
+    const [input, id] = actions.saveAddress.mock.calls[0];
+    expect(id).toBe(ID);
+    // the editor passes the emptied optional fields through; the action layer turns them into explicit nulls
+    expect(input).toMatchObject({ label: "", delivery_notes: "" });
+  });
 });

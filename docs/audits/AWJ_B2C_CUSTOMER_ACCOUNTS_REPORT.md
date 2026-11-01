@@ -135,6 +135,19 @@ GitHub Actions for PR #1860 (php sqlite+pgsql, web-ci) start on push; results ar
 
 ---
 
+### 4.5 Review follow-up — Codex P2 findings (fixed in `7342fad`, regression-tested in the next commit)
+
+| Finding | Fix | Regression coverage |
+|---|---|---|
+| **Revalidate the current password under the identity row lock** (`StorefrontAccountController::changePassword`) | The current password is verified against a **fresh, `lockForUpdate()`-ed** `CustomerIdentity` inside the transaction that writes the new one and revokes the other tokens; a session revoked while the request was in flight (e.g. by an e-mailed reset) is refused with 401 before anything is written | `RetailPasswordChangePostgresConcurrencyTest` (new; 3 forked processes × 5 rounds on PostgreSQL: two overlapping changes quoting the same old password + an e-mailed reset). Asserts ≤ 1 winning change, the final password is exactly the last successful writer's, the old password never survives, a reset that wins ends every session, and no 5xx/deadlock. **Verified to fail on the pre-fix controller** (`both changes succeeded: [200,200,200]`) and pass on the fix. Plus the sequential `a_password_change_never_overwrites_a_reset_that_revoked_its_session` feature test |
+| **Preserve explicit clearing of optional address fields** (`addressBody`) | A blank *optional* field (`label`, `region`, `district`, `building_no`, `additional_number`, `postal_code`, `delivery_notes`) is sent as an explicit `null`; a blank *required* field is still omitted; untouched fields are never invented | `account.test.ts` (new, 5 cases), `customer.test.ts` (action body), `AccountAddresses.test.tsx` (editor submits the emptied values for an edit), and the backend feature test now asserts the cleared `label`/`delivery_notes` are **stored as NULL** while required fields are untouched |
+
+Files for this follow-up: `app/Http/Controllers/Api/StorefrontAccountController.php`, `storefront/src/lib/commerce/account.ts` (fixes); `tests/Feature/RetailPasswordChangePostgresConcurrencyTest.php`, `tests/Feature/RetailCustomerAccountsTest.php`, `storefront/src/lib/commerce/__tests__/account.test.ts`, `storefront/src/lib/data/__tests__/customer.test.ts`, `storefront/src/components/account/__tests__/AccountAddresses.test.tsx` (tests); this report. Wholesale authentication and pricing are untouched.
+
+Local results for the affected set (`RetailCustomerAccountsTest` 20, both Retail PostgreSQL concurrency tests, wholesale regression suites, route/capability guards): **SQLite 96 passed / 2 skipped (the PG-only tests); PostgreSQL 98 passed**. Storefront: `tsc` clean, `biome` clean, affected vitest 215 passed.
+
+__FOLLOWUP_CI__
+
 ## 5. Security findings
 
 ### Controls verified (by test)
