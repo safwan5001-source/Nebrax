@@ -185,7 +185,8 @@ class PlatformApplicationOverrideService
                 continue;
             }
 
-            $statuses[$key] = $legacy ? 'enabled' : 'disabled';
+            // نفس دلالة `TenantApplicationService::statusFor()`: `explicit_enable_only` لا يفعّلها الافتراض القديم (D-PS-13).
+            $statuses[$key] = $legacy && ! $application['explicit_enable_only'] ? 'enabled' : 'disabled';
         }
 
         return $statuses;
