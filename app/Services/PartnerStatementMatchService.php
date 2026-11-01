@@ -195,7 +195,7 @@ final class PartnerStatementMatchService
 
     // ═══════════════════════════════ الداخل ═══════════════════════════════
 
-    private function authorize(User $actor, string $reconciliationId, string $permission): PartnerStatementReconciliation
+    public function authorize(User $actor, string $reconciliationId, string $permission): PartnerStatementReconciliation
     {
         $refusal = new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
         // الصلاحيات مستقلة بلا منح ضمني (D-PS-02): التشغيل يقرأ الدفتر والنتائج فيتطلب `reconcile` **و**`view` معاً؛ القراءة والتحقق `view`. الفحص هنا إضافة إلى فحص المسار.
@@ -221,7 +221,7 @@ final class PartnerStatementMatchService
     }
 
     /** @return array<string, mixed> */
-    private function policy(PartnerStatementReconciliation $reconciliation): array
+    public function policy(PartnerStatementReconciliation $reconciliation): array
     {
         $frozen = $reconciliation->policy ?? [];
 
@@ -234,7 +234,7 @@ final class PartnerStatementMatchService
     }
 
     /** @return array{units: list<array<string, mixed>>, scope: array<string, mixed>, fingerprint: string} */
-    private function source(User $actor, PartnerStatementReconciliation $reconciliation): array
+    public function source(User $actor, PartnerStatementReconciliation $reconciliation): array
     {
         $policy = $this->policy($reconciliation);
         $result = $this->candidates->for($actor, [
@@ -301,7 +301,7 @@ final class PartnerStatementMatchService
      * هل نطاق التشغيلة المخزَّنة داخل نطاق القارئ الحالي؟ غير المقيَّد يقرأ كل شيء؛ المقيَّد يقرأ فقط تشغيلة نطاقها فروع محددة كلها ضمن فروعه
      * (تشغيلة «المؤسسة» أو بلا فروع محددة لا يقرؤها المقيَّد).
      */
-    private function readable(User $actor, PartnerStatementMatchRun $run): bool
+    public function readable(User $actor, PartnerStatementMatchRun $run): bool
     {
         $allowed = $actor->allowedBranchIds();
         if ($allowed === null) {
