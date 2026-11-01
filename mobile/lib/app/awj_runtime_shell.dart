@@ -164,8 +164,9 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
 
   void _onStateChanged() {
     // عدّاد السلة في الشريط العلوي (CRT-01) يتبع تغيّر السلة وتحديثات الإقلاع.
-    if (_state.cartVersion != _badgeCartVersion) {
+    if (_state.cartVersion != _badgeCartVersion || _state.refreshVersion != _badgeRefreshVersion) {
       _badgeCartVersion = _state.cartVersion;
+      _badgeRefreshVersion = _state.refreshVersion;
       _refreshCartBadge();
     }
     setState(() {});
@@ -173,6 +174,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
 
   int _cartCount = 0;
   int _badgeCartVersion = 0;
+  int _badgeRefreshVersion = 0; // تحديث صريح/عودة من الخلفية يعيد محاولة العدّاد بعد فشل أول
   int _badgeSeq = 0;
 
   Future<void> _refreshCartBadge() async {
@@ -285,7 +287,8 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
           ],
         ),
         body: _buildBody(),
-        bottomNavigationBar: visibleTabs.isEmpty ? null : _buildTabBar(visibleTabs),
+        // `NavigationBar` يشترط وجهتين على الأقل: تبويب ظاهر واحد لا يُنتج شريطاً (لا معنى للتنقل بين وجهة واحدة).
+        bottomNavigationBar: visibleTabs.length < 2 ? null : _buildTabBar(visibleTabs),
       ),
     );
   }

@@ -188,4 +188,75 @@ void main() {
     expect(find.byKey(const ValueKey('appbar-cart')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const ValueKey('appbar-cart')), matching: find.byType(Text)), findsNothing);
   });
+
+  testWidgets('a single visible tab renders no bar (NavigationBar needs at least two) and never asserts', (tester) async {
+    await tester.pumpWidget(
+      _shell(_client(_experience(navigationExtra: {'tabs': [{'pageId': 'home', 'title': 'Home', 'icon': 'home'}]}))),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('HOME_MARKER'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+
+    // كذلك: تبويبان أحدهما مخفي ⇒ ظاهر واحد فقط.
+    await tester.pumpWidget(
+      _shell(_client(_experience(navigationExtra: {'tabs': [{'pageId': 'home', 'title': 'Home', 'icon': 'home'}, {'pageId': 'shop', 'title': 'Shop', 'icon': 'store', 'hidden': true}]}))),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('the cart badge recovers on an explicit refresh after the first fetch failed', (tester) async {
+    var cartCalls = 0;
+    final client = CommerceClient(
+      config: CommerceConfig(baseUrl: Uri.parse('https://api.example.com/commerce/v1'), storeBearerToken: 't'),
+      sessionStore: InMemorySecureSessionStore(),
+      transport: FakeCommerceTransport((request) async {
+        final last = request.uri.pathSegments.last;
+        if (last == 'experience') {
+          return jsonResponse(200, {
+            'data': {
+              'version': 1,
+              'schema_version': '1',
+              'published_at': '2026-09-25T00:00:00Z',
+              'schema': jsonDecode(_experience(navigationExtra: {'appBar': {'showCart': true}})),
+            },
+            'meta': successMeta(),
+          });
+        }
+        if (last == 'cart') {
+          cartCalls++;
+          if (cartCalls == 1) return jsonResponse(500, errorEnvelope('internal_error', 'offline'));
+          return jsonResponse(200, {
+            'data': {
+              'status': null,
+              'items': [
+                {
+                  'id': 'i1', 'product_id': 'p1', 'product_variant_id': null, 'variant_descriptor': null, 'product_name': 'P',
+                  'unit_key': 'piece', 'unit_name': 'piece', 'quantity': 1, 'unit_price': money(amountMinor: 100),
+                  'line_total': money(amountMinor: 100), 'available': true,
+                },
+              ],
+              'subtotal': money(amountMinor: 100),
+              'currency': 'SAR',
+              'has_unavailable_items': false,
+            },
+            'meta': successMeta(),
+          });
+        }
+        if (last == 'products') return jsonResponse(200, {'data': [], 'meta': paginationMeta()});
+        return jsonResponse(404, errorEnvelope('not_found', 'no fake route'));
+      }),
+    );
+    await tester.pumpWidget(_shell(client));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byKey(const ValueKey('appbar-cart')), matching: find.text('1')), findsNothing);
+
+    // تحديث صريح (أو العودة من الخلفية) يعيد محاولة العدّاد دون تعديل سلة.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byKey(const ValueKey('appbar-cart')), matching: find.text('1')), findsOneWidget);
+  });
 }
