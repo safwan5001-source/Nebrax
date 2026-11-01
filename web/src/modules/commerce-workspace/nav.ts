@@ -40,6 +40,8 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
     items: [
       { href: '/commerce/domains', labelKey: 'domains' },
       { href: '/commerce/delivery', labelKey: 'delivery' },
+      // حسابات عملاء التجزئة لقناة الويب — الخادم يشترط commerce.channel_settings.manage (مالك/مدير) وقدرة المتجر.
+      { href: '/commerce/customer-accounts', labelKey: 'customerAccounts', appKey: 'commerce.storefront', permission: 'commerce.channel_settings.manage' },
       { href: '/commerce/gifting', labelKey: 'gifting', permission: 'commerce.manage' },
       { href: '/commerce/integrations', labelKey: 'integrations' },
     ],
