@@ -60,9 +60,18 @@ class FuelSaleService
 
         try {
             return DB::transaction(function () use ($attributes, $actor, $stationId, $nozzleId, $idempotencyKey, $quantity) {
-                $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $station = FuelStation::lockForUpdate()->findOrFail($stationId);
                 $this->assertStationBranch($station);
+
+                // FS-28: الإعادة تُحسم بالمفتاح قبل أي تقييم جديد (تحضير تفويض AVI يعيد تقييم الاستخدام فيرمي بدل أن يعيد المسودة).
+                $replayed = FuelSale::where('idempotency_key', $idempotencyKey)->first();
+                if ($replayed !== null) {
+                    $this->assertDraftReplayMatches($replayed, $station->id, $nozzleId, $quantity, $attributes);
+
+                    return $replayed;
+                }
+
+                $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
                 $this->assertNozzleForStation($nozzle, $station);
                 $warehouse = $this->warehouse($station);
@@ -72,14 +81,6 @@ class FuelSaleService
                 $this->assertMeterRange($attributes, $quantity);
                 $this->assertOptionalPartner($attributes['partner_id'] ?? null);
                 $this->assertOptionalShift($attributes['fuel_shift_id'] ?? null, $station);
-
-                $existing = FuelSale::where('idempotency_key', $idempotencyKey)->first();
-                if ($existing !== null) {
-                    if ($existing->fuel_station_id !== $station->id || (int) $existing->quantity_milliliters !== $quantity) {
-                        throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لبيع وقود مختلف.');
-                    }
-                    return $existing;
-                }
 
                 $sale = FuelSale::create([
                     'branch_id' => $station->branch_id,
@@ -118,6 +119,35 @@ class FuelSaleService
             });
         } catch (QueryException $exception) {
             throw new RuntimeException('تعذر إنشاء مسودة البيع بسبب تضارب متزامن؛ أعد المحاولة بالمفتاح نفسه.', previous: $exception);
+        }
+    }
+
+    /**
+     * FS-28: إعادة إنشاء مسودة بمفتاح مستعمل: المحطة والفوهة والكمية، وكل مرجع أرسله المستدعي صراحةً (شفت/عميل/عقد/بطاقة/
+     * مركبة/سائق/تفويض AVI) يجب أن يطابق المخزَّن. مفتاح غائب من الإعادة لا يُقارَن (قد يُشتق من تفويض AVI في المرة الأولى).
+     *
+     * @param  array<string,mixed>  $attributes
+     */
+    private function assertDraftReplayMatches(FuelSale $existing, string $stationId, string $nozzleId, int $quantity, array $attributes): void
+    {
+        $different = [];
+        if ($existing->fuel_station_id !== $stationId) {
+            $different[] = 'fuel_station_id';
+        }
+        if ($existing->fuel_nozzle_id !== $nozzleId) {
+            $different[] = 'fuel_nozzle_id';
+        }
+        if ((int) $existing->quantity_milliliters !== $quantity) {
+            $different[] = 'quantity_milliliters';
+        }
+        foreach (['fuel_shift_id', 'partner_id', 'corporate_fuel_contract_id', 'fuel_card_id', 'fuel_fleet_vehicle_id', 'fuel_fleet_driver_id', 'fuel_avi_authorization_id'] as $key) {
+            $incoming = $attributes[$key] ?? null;
+            if ($incoming !== null && $incoming !== '' && (string) $existing->{$key} !== (string) $incoming) {
+                $different[] = $key;
+            }
+        }
+        if ($different !== []) {
+            throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لبيع وقود مختلف ('.implode('، ', $different).').');
         }
     }
 

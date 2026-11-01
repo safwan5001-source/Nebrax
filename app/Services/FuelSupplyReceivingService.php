@@ -59,6 +59,17 @@ class FuelSupplyReceivingService
 
             $existing = FuelDelivery::where('idempotency_key', $key)->first();
             if ($existing !== null) {
+                // FS-16: الإعادة بمفتاح مستعمل تُرجع الكيان الأول فقط إن طابقته الحمولة المادية؛ وإلا تضارب صريح.
+                $this->assertReplayMatches('استلام وقود', [
+                    'fuel_station_id' => [$existing->fuel_station_id, $station->id],
+                    'fuel_tank_id' => [$existing->fuel_tank_id, $tank->id],
+                    'fuel_product_id' => [$existing->fuel_product_id, $fuelProduct->id],
+                    'warehouse_id' => [$existing->warehouse_id, $warehouse->id],
+                    'supplier_id' => [$existing->supplier_id, $supplier->id],
+                    'received_milliliters' => [(int) $existing->received_milliliters, $received],
+                    'received_total_cost_minor' => [(int) $existing->received_total_cost_minor, $totalCost],
+                ]);
+
                 return $existing;
             }
 
@@ -209,6 +220,21 @@ class FuelSupplyReceivingService
             }
             $existing = FuelSupplierInvoice::where('supplier_id', $supplier->id)->where('invoice_number', $number)->first();
             if ($existing !== null) {
+                // FS-16: نفس (المورد، رقم الفاتورة) بمحتوى مختلف ليس إعادة بل تضارب.
+                $incoming = collect(array_values($lines))->map(fn ($line) => [
+                    (string) ($line['fuel_product_id'] ?? ''),
+                    $this->liters($line['quantity_liters'] ?? null, 'كمية سطر الفاتورة'),
+                    $this->positiveInteger($line['value_minor'] ?? null, 'قيمة سطر الفاتورة'),
+                ])->sortBy(fn ($row) => implode('|', $row))->values()->all();
+                $stored = FuelSupplierInvoiceLine::where('fuel_supplier_invoice_id', $existing->id)->get()
+                    ->map(fn ($line) => [(string) $line->fuel_product_id, (int) $line->quantity_milliliters, (int) $line->value_minor])
+                    ->sortBy(fn ($row) => implode('|', $row))->values()->all();
+                $this->assertReplayMatches('فاتورة مورد', [
+                    'invoice_date' => [$existing->invoice_date?->toDateString(), isset($data['invoice_date']) ? \Illuminate\Support\Carbon::parse($data['invoice_date'])->toDateString() : $existing->invoice_date?->toDateString()],
+                    'currency' => [(string) $existing->currency, (string) ($data['currency'] ?? $existing->currency)],
+                    'lines' => [$stored, $incoming],
+                ]);
+
                 return $existing;
             }
 
@@ -267,15 +293,23 @@ class FuelSupplyReceivingService
             if ($key === '') {
                 throw new RuntimeException('مفتاح idempotency مطلوب لمطابقة فاتورة المورد.');
             }
-            $existing = FuelSupplierInvoiceMatch::where('idempotency_key', $key)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
-
             $quantity = $this->liters($data['quantity_liters'] ?? null, 'كمية المطابقة');
             if ($quantity <= 0) {
                 throw new RuntimeException('كمية المطابقة يجب أن تكون موجبة.');
             }
+            $existing = FuelSupplierInvoiceMatch::where('idempotency_key', $key)->first();
+            if ($existing !== null) {
+                // FS-16: مفتاح المطابقة فريد على مستوى المستأجر؛ إعادته على فاتورة/سطر/استلام/كمية مختلفة تضارب لا إعادة.
+                $this->assertReplayMatches('مطابقة فاتورة مورد', [
+                    'fuel_supplier_invoice_id' => [$existing->fuel_supplier_invoice_id, $invoice->id],
+                    'fuel_supplier_invoice_line_id' => [$existing->fuel_supplier_invoice_line_id, $line->id],
+                    'fuel_delivery_id' => [$existing->fuel_delivery_id, $delivery->id],
+                    'matched_quantity_milliliters' => [(int) $existing->matched_quantity_milliliters, $quantity],
+                ]);
+
+                return $existing;
+            }
+
             $deliveryMatchedQuantity = (int) FuelSupplierInvoiceMatch::where('fuel_delivery_id', $delivery->id)->sum('matched_quantity_milliliters');
             $lineMatchedQuantity = (int) $line->matched_quantity_milliliters;
             if ($quantity > $delivery->received_milliliters - $deliveryMatchedQuantity || $quantity > $line->quantity_milliliters - $lineMatchedQuantity) {
@@ -561,5 +595,24 @@ class FuelSupplyReceivingService
         }
 
         return $left + $right;
+    }
+
+    /**
+     * FS-16: مقارنة حمولة إعادة idempotent بما خُزِّن. أي فرق ⇒ استثناء (422) يسمّي الحقول المختلفة، ولا إرجاع صامت
+     * لكيان لا يطابق ما طلبه المستدعي.
+     *
+     * @param  array<string,array{0:mixed,1:mixed}>  $pairs  حقل ⇒ [المخزَّن، الوارد]
+     */
+    private function assertReplayMatches(string $what, array $pairs): void
+    {
+        $different = [];
+        foreach ($pairs as $field => [$stored, $incoming]) {
+            if ($stored !== $incoming && json_encode($stored) !== json_encode($incoming)) {
+                $different[] = $field;
+            }
+        }
+        if ($different !== []) {
+            throw new RuntimeException("مفتاح منع التكرار لـ{$what} استُخدم سابقاً بحمولة مختلفة (".implode('، ', $different).')؛ استعمل مفتاحاً جديداً للعملية الجديدة.');
+        }
     }
 }

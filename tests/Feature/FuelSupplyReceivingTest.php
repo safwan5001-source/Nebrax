@@ -28,6 +28,7 @@ use Tests\TestCase;
 
 class FuelSupplyReceivingTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
     use InteractsWithApi;
 
@@ -234,6 +235,49 @@ class FuelSupplyReceivingTest extends TestCase
     }
 
     /** @return array{service:FuelSupplyReceivingService, station:FuelStation, tank:FuelTank, fuel:FuelProduct, product:Product, warehouse:Warehouse, supplier:Partner, grni:Account, owner_id:string} */
+    /** @test */
+    public function replaying_a_delivery_with_the_same_key_returns_the_first_but_a_different_payload_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $data = $this->deliveryData($fixture, 'replay-delivery', 2345);
+        $first = $fixture['service']->createDelivery($data);
+
+        $this->assertSame($first->id, $fixture['service']->createDelivery($data)->id);
+
+        $changedCost = $this->thrown(fn () => $fixture['service']->createDelivery([...$data, 'received_total_cost_minor' => 9999]), 'قيمة مختلفة بالمفتاح نفسه يجب أن ترفض.');
+        $this->assertStringContainsString('received_total_cost_minor', $changedCost->getMessage());
+        $changedQty = $this->thrown(fn () => $fixture['service']->createDelivery([...$data, 'received_liters' => '5.000', 'dispatched_liters' => '5.000']), 'كمية مختلفة بالمفتاح نفسه يجب أن ترفض.');
+        $this->assertStringContainsString('received_milliliters', $changedQty->getMessage());
+        $this->assertSame(1, \App\Models\FuelDelivery::count());
+    }
+
+    /** @test */
+    public function replaying_a_supplier_invoice_and_a_match_with_a_different_payload_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $approved = $fixture['service']->approveDelivery($fixture['service']->createDelivery($this->deliveryData($fixture, 'replay-inv-delivery', 2345)), $fixture['owner_id']);
+        $payload = [
+            'supplier_id' => $fixture['supplier']->id, 'invoice_number' => 'SUP-REPLAY-1', 'invoice_date' => '2026-08-23', 'currency' => 'SAR',
+            'created_by' => $fixture['owner_id'],
+            'lines' => [['fuel_product_id' => $fixture['fuel']->id, 'quantity_liters' => '10.000', 'value_minor' => 2345]],
+        ];
+        $invoice = $fixture['service']->createSupplierInvoice($payload);
+
+        $this->assertSame($invoice->id, $fixture['service']->createSupplierInvoice($payload)->id);
+        $changed = $this->thrown(fn () => $fixture['service']->createSupplierInvoice([...$payload, 'lines' => [['fuel_product_id' => $fixture['fuel']->id, 'quantity_liters' => '10.000', 'value_minor' => 9999]]]), 'سطر بقيمة مختلفة لنفس رقم الفاتورة يجب أن يرفض.');
+        $this->assertStringContainsString('lines', $changed->getMessage());
+        $this->assertStringContainsString('currency', $this->thrown(fn () => $fixture['service']->createSupplierInvoice([...$payload, 'currency' => 'USD']), 'عملة مختلفة يجب أن ترفض.')->getMessage());
+        $this->assertSame(1, \App\Models\FuelSupplierInvoice::count());
+
+        $matchPayload = ['fuel_supplier_invoice_line_id' => $invoice->lines->first()->id, 'fuel_delivery_id' => $approved->id, 'quantity_liters' => '10.000', 'idempotency_key' => 'replay-match'];
+        $match = $fixture['service']->matchSupplierInvoiceLine($invoice, $matchPayload, $fixture['owner_id']);
+        $this->assertSame($match->id, $fixture['service']->matchSupplierInvoiceLine($invoice, $matchPayload, $fixture['owner_id'])->id);
+
+        $otherQuantity = $this->thrown(fn () => $fixture['service']->matchSupplierInvoiceLine($invoice, [...$matchPayload, 'quantity_liters' => '4.000'], $fixture['owner_id']), 'كمية مطابقة مختلفة بنفس المفتاح يجب أن ترفض.');
+        $this->assertStringContainsString('matched_quantity_milliliters', $otherQuantity->getMessage());
+        $this->assertSame(1, \App\Models\FuelSupplierInvoiceMatch::count());
+    }
+
     private function fixture(bool $configureGrni = true): array
     {
         $auth = $this->registerTenant();
