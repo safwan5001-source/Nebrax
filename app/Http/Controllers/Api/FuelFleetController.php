@@ -6,6 +6,8 @@ use App\Http\Requests\StoreFuelCardRequest;
 use App\Http\Requests\StoreFuelFleetDriverRequest;
 use App\Http\Requests\StoreFuelFleetVehicleRequest;
 use App\Http\Resources\FuelCardResource;
+use App\Http\Resources\FuelFleetDriverResource;
+use App\Http\Resources\FuelFleetVehicleResource;
 use App\Models\FuelCard;
 use App\Models\FuelFleetDriver;
 use App\Models\FuelFleetVehicle;
@@ -20,26 +22,26 @@ class FuelFleetController extends ApiController
     public function vehicles(): JsonResponse
     {
         // المقسَّم يُسلسَل بـ`data` مصفوفةً على مستوى الجذر (كبقية قوائم الوقود)؛ لفّه بـ{data: ...} كان يجعل `data.data` هي القائمة (FS-10).
-        return response()->json(FuelFleetVehicle::query()->with('allowedFuelProducts')->orderByDesc('created_at')->paginate(50));
+        return FuelFleetVehicleResource::collection(FuelFleetVehicle::query()->with('allowedFuelProducts')->orderByDesc('created_at')->paginate(50))->response();
     }
 
     public function storeVehicle(StoreFuelFleetVehicleRequest $request): JsonResponse
     {
         $vehicle = $this->domain(fn () => $this->fleet->createVehicle($request->validated(), $request->user()));
 
-        return response()->json(['data' => $vehicle], 201);
+        return (new FuelFleetVehicleResource($vehicle))->response()->setStatusCode(201);
     }
 
     public function drivers(): JsonResponse
     {
-        return response()->json(FuelFleetDriver::query()->orderByDesc('created_at')->paginate(50));
+        return FuelFleetDriverResource::collection(FuelFleetDriver::query()->orderByDesc('created_at')->paginate(50))->response();
     }
 
     public function storeDriver(StoreFuelFleetDriverRequest $request): JsonResponse
     {
         $driver = $this->domain(fn () => $this->fleet->createDriver($request->validated(), $request->user()));
 
-        return response()->json(['data' => $driver], 201);
+        return (new FuelFleetDriverResource($driver))->response()->setStatusCode(201);
     }
 
     public function cards(): JsonResponse

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\CollectFuelSalePaymentRequest;
 use App\Http\Requests\StoreFuelSaleRequest;
 use App\Http\Requests\StoreFuelStationProductPriceRequest;
+use App\Http\Resources\FuelSalePaymentMethodResource;
 use App\Http\Resources\FuelSaleResource;
+use App\Http\Resources\FuelStationProductPriceResource;
 use App\Models\FuelSale;
 use App\Models\FuelStation;
 use App\Models\FuelStationProductPrice;
@@ -80,7 +82,7 @@ class FuelSaleController extends ApiController
             ->orderBy('name')
             ->get();
 
-        return response()->json(['data' => $methods]);
+        return FuelSalePaymentMethodResource::collection($methods)->response();
     }
 
     public function priceIndex(Request $request): JsonResponse
@@ -93,14 +95,14 @@ class FuelSaleController extends ApiController
             $query->where('fuel_product_id', $request->query('fuel_product_id'));
         }
 
-        return response()->json(['data' => $query->paginate(50)]);
+        return FuelStationProductPriceResource::collection($query->paginate(50))->response();
     }
 
     public function storePrice(StoreFuelStationProductPriceRequest $request): JsonResponse
     {
         $price = $this->domain(fn () => $this->prices->create($request->validated(), $request->user()));
 
-        return response()->json(['data' => $price], 201);
+        return (new FuelStationProductPriceResource($price))->response()->setStatusCode(201);
     }
 
     private function visibleSale(string $id, Request $request): FuelSale
