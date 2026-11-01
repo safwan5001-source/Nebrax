@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_COMMERCE_CART, SAMPLE_COMMERCE_PRODUCTS, SAMPLE_RESOURCE_DATA } from './sample-resource-data';
+import { SAMPLE_COMMERCE_CART, SAMPLE_COMMERCE_CATEGORIES, SAMPLE_COMMERCE_PRODUCTS, SAMPLE_RESOURCE_DATA } from './sample-resource-data';
 
 describe('sample-resource-data — shape matches DataResourceRegistry contracts', () => {
   it('commerce.products entries carry the real list-item fields', () => {
@@ -21,7 +21,16 @@ describe('sample-resource-data — shape matches DataResourceRegistry contracts'
     }
   });
 
+  it('commerce.categories entries carry the real list-item fields (S11)', () => {
+    expect(SAMPLE_COMMERCE_CATEGORIES.length).toBeGreaterThan(1);
+    for (const category of SAMPLE_COMMERCE_CATEGORIES) {
+      expect(typeof category.id).toBe('string');
+      expect(typeof category.name).toBe('string');
+      expect(category.parent_id).toBeNull();
+    }
+  });
+
   it('is keyed exactly by the resource ids resolveNodeBindings expects', () => {
-    expect(Object.keys(SAMPLE_RESOURCE_DATA).sort()).toEqual(['commerce.cart', 'commerce.products']);
+    expect(Object.keys(SAMPLE_RESOURCE_DATA).sort()).toEqual(['commerce.cart', 'commerce.categories', 'commerce.products']);
   });
 });

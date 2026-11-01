@@ -16,7 +16,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppSchemaComponent } from '@/lib/app-builder';
 import { AppBuilderCanvas } from './canvas';
-import { KNOWN_ACTION_TYPES, KNOWN_COMPONENT_TYPES } from './registry-identifiers';
+import { KNOWN_ACTION_TYPES, KNOWN_ACTION_TYPES_V120, KNOWN_COMPONENT_TYPES, KNOWN_COMPONENT_TYPES_V120 } from './registry-identifiers';
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -38,7 +38,7 @@ afterEach(cleanup);
 // needs for `render`/`screen` — unlike `runtime-contract.test.ts` (plain `node` environment) —
 // so this resolves the shared fixture from Vitest's own working directory (`web/`) instead.
 const FIXTURE_PATH = resolve(process.cwd(), '../contracts/app-builder/registry-identifiers.v1.json');
-const fixture: { components: string[]; actions: string[] } = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
+const fixture: { components: string[]; actions: string[]; components_v120: string[]; actions_v120: string[] } = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
 
 describe('registry-identifiers conformance (vs. mobile/lib/schema/registry_identifiers.dart)', () => {
   it('KNOWN_COMPONENT_TYPES matches the shared fixture exactly', () => {
@@ -49,8 +49,13 @@ describe('registry-identifiers conformance (vs. mobile/lib/schema/registry_ident
     expect(new Set(KNOWN_ACTION_TYPES)).toEqual(new Set(fixture.actions));
   });
 
+  it('the 1.2.0 additions match the shared fixture exactly (S11)', () => {
+    expect(new Set(KNOWN_COMPONENT_TYPES_V120)).toEqual(new Set(fixture.components_v120));
+    expect(new Set(KNOWN_ACTION_TYPES_V120)).toEqual(new Set(fixture.actions_v120));
+  });
+
   it('canvas.tsx renders a real case (never the raw-type-string fallback) for every known component type', () => {
-    for (const type of KNOWN_COMPONENT_TYPES) {
+    for (const type of [...KNOWN_COMPONENT_TYPES, ...KNOWN_COMPONENT_TYPES_V120]) {
       const root: AppSchemaComponent = { type, id: 'probe' };
       render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
       // The `default:` branch renders the bare type name as its only text content

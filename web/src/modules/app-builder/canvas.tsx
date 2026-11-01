@@ -307,8 +307,9 @@ function CanvasComponentNode({
       );
     }
 
-    case 'ProductList': {
-      // S10a (CMP-02): نفس عقد المشغّل — layout غائب/مجهول ⇒ أفقي، columns يُقصّ إلى 2..4 وغير الصحيح ⇒ 2.
+    case 'ProductList':
+    case 'CategoryList': {
+      // S10a/S11: نفس عقد المشغّل — layout غائب/مجهول ⇒ أفقي، columns يُقصّ إلى 2..4 وغير الصحيح ⇒ 2. `CategoryList` (جيل 1.2.0) بالتخطيط نفسه.
       const layout = stringProp(node, 'layout', 'horizontal');
       const columns = Math.min(4, Math.max(2, Math.trunc(intProp(node, 'columns', 2))));
       const renderChild = (child: AppSchemaComponent) => (
