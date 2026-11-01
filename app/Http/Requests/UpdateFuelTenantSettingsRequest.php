@@ -42,6 +42,13 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'fuel_sales_allowed_payment_method_ids' => ['sometimes', 'array'],
             'fuel_sales_allowed_payment_method_ids.*' => ['uuid', 'distinct'],
             'fuel_sales_allow_deferred_payment' => ['sometimes', 'boolean'],
+            'avi_rfid_enabled' => ['sometimes', 'boolean'],
+            'avi_driver_identity_required' => ['sometimes', 'boolean'],
+            'avi_enforce_vehicle_tank_capacity' => ['sometimes', 'boolean'],
+            'avi_min_refill_interval_seconds' => ['sometimes', 'integer', 'min:0'],
+            'avi_denial_window_seconds' => ['sometimes', 'integer', 'min:1'],
+            'avi_repeated_denial_threshold' => ['sometimes', 'integer', 'min:1'],
+            'avi_authorization_ttl_seconds' => ['sometimes', 'integer', 'min:1'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }
