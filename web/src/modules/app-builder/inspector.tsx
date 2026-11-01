@@ -316,6 +316,7 @@ function BindingEditor({
     <div className="border-t border-border pt-3">
       <p className="mb-1 text-xs font-medium text-muted">{t('binding.title')}</p>
       <Select
+        aria-label={t('binding.resourceLabel')}
         value={resourceId}
         onChange={(event) => onChange(event.target.value ? { resource: event.target.value } : undefined)}
         className="h-8 text-xs"
@@ -388,6 +389,7 @@ function BindingEditor({
                 <div key={prop.key} className="flex items-center gap-1.5">
                   <span className="w-24 shrink-0 truncate text-xs text-text">{prop.key}</span>
                   <Select
+                    aria-label={prop.key}
                     className="h-8 flex-1 text-xs"
                     value={binding?.itemProps?.[prop.key] ?? ''}
                     onChange={(event) => setItemProp(prop.key, event.target.value)}
@@ -483,6 +485,7 @@ function VisibilityEditor({
       <p className="mb-1 text-xs font-medium text-muted">{t('visibility.title')}</p>
 
       <Select
+        aria-label={t('visibility.title')}
         className="mb-2 h-8 text-xs"
         value={leaves.length === 0 ? '' : combinator}
         onChange={(event) => {
@@ -692,7 +695,7 @@ export function Inspector({
     <div className="space-y-4 p-3">
       <div>
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-text" title={definition.type}>{registryLabel(definition.label, locale)}</h3>
+          <h2 className="font-semibold text-text" title={definition.type}>{registryLabel(definition.label, locale)}</h2>
           <Badge tone="muted">{definition.category}</Badge>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">{definition.notes}</p>
@@ -727,7 +730,7 @@ export function Inspector({
       {definition.actionable ? (
         <div>
           <p className="mb-1 text-xs font-medium text-muted">{t('actionTitle')}</p>
-          <Select value={node.action?.type ?? ''} onChange={(event) => attachAction(event.target.value)} className="mb-2 h-8 text-xs">
+          <Select aria-label={t('actionTitle')} value={node.action?.type ?? ''} onChange={(event) => attachAction(event.target.value)} className="mb-2 h-8 text-xs">
             <option value="">{t('noAction')}</option>
             {actionTypeOptions.map((type) => (
               <option key={type} value={type} title={type}>{registries ? registryLabel(registries.actions[type].label, locale) : type}</option>
@@ -782,7 +785,7 @@ export function Inspector({
         <div className="border-t border-border pt-3">
           <p className="mb-1 text-xs font-medium text-muted">{t('addChildTitle')}</p>
           <div className="flex items-center gap-1.5">
-            <Select value={addType} onChange={(event) => setAddType(event.target.value)} className="h-8 text-xs">
+            <Select aria-label={t('addChildTitle')} value={addType} onChange={(event) => setAddType(event.target.value)} className="h-8 text-xs">
               <option value="">{t('addChildPlaceholder')}</option>
               {componentTypeOptions.map((type) => (
                 <option key={type} value={type} title={type}>{registries ? registryLabel(registries.components[type].label, locale) : type}</option>

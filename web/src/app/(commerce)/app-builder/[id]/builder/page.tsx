@@ -887,7 +887,7 @@ export default function AppBuilderWorkspacePage() {
                     )}
                   >
                     <span className="truncate">{pageId}</span>
-                    {isInitial ? <Badge tone="muted" className="ms-auto shrink-0">{t('initialPageBadge')}</Badge> : null}
+                    {isInitial ? <Badge tone="muted" className={cn('ms-auto shrink-0', pageId === selectedPageId && 'bg-transparent text-primary')}>{t('initialPageBadge')}</Badge> : null}
                   </button>
                   {!isInitial ? (
                     <Button
@@ -1273,7 +1273,7 @@ export default function AppBuilderWorkspacePage() {
         <Button asChild variant="ghost" size="sm" className="shrink-0">
           <Link href="/commerce">{t('backToCommerce')}</Link>
         </Button>
-        <p className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</p>
+        <h1 className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</h1>
         {statusBadge}
 
         {/* V2 — الوضع السهل/المتقدم: يبدّل العرض فقط؛ المسودة واحدة ولا شيء يُمسح عند التبديل. */}
@@ -1435,7 +1435,7 @@ export default function AppBuilderWorkspacePage() {
       ) : (
       /* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */
       <div className="flex min-h-0 flex-1 flex-col min-[744px]:flex-row [@media(max-height:500px)]:flex-row">
-        <aside className="hidden w-60 shrink-0 overflow-hidden border-e border-border bg-surface lg:block">
+        <aside aria-label={t('landmarks.structure')} className="hidden w-60 shrink-0 overflow-hidden border-e border-border bg-surface lg:block">
           {isDraftView ? structurePanel : readOnlyPagePanel}
         </aside>
 
@@ -1491,7 +1491,7 @@ export default function AppBuilderWorkspacePage() {
           </div>
         </div>
 
-        <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">
+        <aside aria-label={t('landmarks.inspector')} className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">
           {isDraftView ? inspectorPanel : readOnlyNotice}
         </aside>
 
@@ -1517,6 +1517,7 @@ export default function AppBuilderWorkspacePage() {
 
         {isDraftView && isWideBuilderViewport && showInlinePreview ? (
           <aside
+            aria-label={t('preview.inlineTitle')}
             data-testid="inline-mobile-preview"
             className="flex w-[420px] shrink-0 flex-col overflow-hidden border-s border-border bg-background"
           >
