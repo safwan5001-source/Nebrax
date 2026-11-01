@@ -32,6 +32,7 @@ class RuntimeState extends ChangeNotifier {
   String? _selectedProductId;
   String? _selectedPageId;
   String? _selectedCategoryId;
+  String _searchQuery = '';
   int _cartVersion = 0;
   int _refreshVersion = 0;
   final List<_Visit> _history = [];
@@ -45,6 +46,12 @@ class RuntimeState extends ChangeNotifier {
   String? get selectedProductId => _selectedProductId;
   String? get selectedPageId => _selectedPageId;
   String? get selectedCategoryId => _selectedCategoryId;
+
+  /// آخر نص بحث كتبه المتسوق: يبقى عبر فتح منتج والرجوع (فيعود إلى نتائجه لا إلى شاشة فارغة) ويُصفَّر عند فتح بحث جديد.
+  String get searchQuery => _searchQuery;
+
+  /// تخزين صامت (بلا إشعار): تكتبه شاشة البحث نفسها أثناء الكتابة فلا يعيد بناء الغلاف.
+  void rememberSearchQuery(String query) => _searchQuery = query;
   int get cartVersion => _cartVersion;
   int get refreshVersion => _refreshVersion;
   bool get canGoBack => _history.isNotEmpty;
@@ -103,6 +110,7 @@ class RuntimeState extends ChangeNotifier {
     _explicitNavigation = true;
     _pushCurrent();
     _page = RuntimePage.search;
+    _searchQuery = ''; // إجراء openSearch = بحث جديد؛ الرجوع من منتج لا يمرّ من هنا فيحتفظ بالنص.
     notifyListeners();
   }
 

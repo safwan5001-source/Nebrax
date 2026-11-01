@@ -21,7 +21,7 @@ import { DialogError } from '@/components/fuel-stations/dialog-error';
 interface Partner { id: string; name: string; type: string }
 interface Contract {
   id: string; number: string; partner_id: string; status: 'draft' | 'active' | 'suspended' | 'expired' | 'cancelled';
-  effective_from: string; credit_limit_minor: number; payment_terms_days: number;
+  effective_from: string; credit_limit_minor?: number; payment_terms_days: number;
 }
 
 const STATUS_TONE: Record<Contract['status'], 'positive' | 'warning' | 'negative' | 'neutral'> = {
@@ -75,7 +75,7 @@ export default function CorporateFuelContractsPage() {
     { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num font-medium">{row.original.number}</span> },
     { id: 'partner', header: t('customer'), cell: ({ row }) => partnerName(row.original.partner_id) },
     { accessorKey: 'status', header: t('status'), cell: ({ row }) => <Badge tone={STATUS_TONE[row.original.status]}>{statusLabel(row.original.status)}</Badge> },
-    { accessorKey: 'credit_limit_minor', header: t('creditLimit'), cell: ({ row }) => <span className="num text-end">{formatMinorRiyal(row.original.credit_limit_minor)}</span> },
+    { accessorKey: 'credit_limit_minor', header: t('creditLimit'), cell: ({ row }) => <span className="num text-end">{row.original.credit_limit_minor === undefined ? '—' : formatMinorRiyal(row.original.credit_limit_minor)}</span> },
     { accessorKey: 'payment_terms_days', header: t('paymentTerms'), cell: ({ row }) => <span>{t('days', { count: row.original.payment_terms_days })}</span> },
     { accessorKey: 'effective_from', header: t('effectiveFrom'), cell: ({ row }) => <span className="num">{formatDate(row.original.effective_from)}</span> },
     { id: 'actions', header: t('actions'), cell: ({ row }) => <div className="flex flex-wrap justify-end gap-1.5">

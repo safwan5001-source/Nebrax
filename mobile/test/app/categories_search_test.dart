@@ -80,7 +80,16 @@ void main() {
       expect(state.selectedCategoryId, 'c1');
       state.goHome();
 
+      // نص البحث يبقى عبر فتح منتج والرجوع، ويُصفَّر عند بحث جديد (openSearch).
       state.goToSearch();
+      state.rememberSearchQuery('shoes');
+      state.goToProduct('p1');
+      state.goBack();
+      expect(state.page, RuntimePage.search);
+      expect(state.searchQuery, 'shoes');
+      state.goHome();
+      state.goToSearch();
+      expect(state.searchQuery, '', reason: 'بحث جديد لا يرث نص السابق');
       expect(state.page, RuntimePage.search);
       expect(state.activeRootPageId, 'home', reason: 'البحث تفصيلة تتبع الجذر الذي جاءت منه');
       state.goHome();
@@ -394,6 +403,63 @@ void main() {
       await tester.enterText(find.byType(TextField), '');
       await tester.pump();
       expect(find.text('Type at least two characters to search the store'), findsOneWidget);
+    });
+
+    testWidgets('a new search while "Show more" is in flight never leaves a stuck pagination spinner (Codex P2)', (tester) async {
+      final gate = Completer<void>();
+      final client = buildFakeCommerceClient(
+        handler: (request) async {
+          final q = request.uri.queryParameters['search'];
+          final page = request.uri.queryParameters['page'];
+          if (q == 'aa' && page == '2') await gate.future;
+          return jsonResponse(200, {
+            'data': [_product('p-$q-$page', 'نتيجة $q $page')],
+            'meta': paginationMeta(page: int.parse(page ?? '1'), perPage: 24, total: 50, lastPage: 3, hasMore: true),
+          });
+        },
+      );
+      await pump(tester, client);
+
+      await tester.enterText(find.byType(TextField), 'aa');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show more')); // طلب الصفحة 2 معلَّق
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), 'bb');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('نتيجة bb 1'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'لا مؤشر ترقيم عالق');
+      expect(find.text('Show more'), findsOneWidget, reason: 'والزر قابل للاستعمال للبحث الجديد');
+    });
+
+    testWidgets('returning with a remembered query restores the results immediately, and typing reports the text', (tester) async {
+      final seen = <Uri>[];
+      final typed = <String>[];
+      final client = clientFor(seen);
+      await tester.pumpWidget(
+        _host(SearchScreen(
+          client: client,
+          dispatcher: AppActionDispatcher(RecordingActionHandler()),
+          locale: const Locale('en'),
+          initialQuery: 'shoes',
+          onQueryChanged: typed.add,
+        )),
+      );
+      await tester.pumpAndSettle();
+
+      expect(seen.single.queryParameters['search'], 'shoes', reason: 'بلا انتظار تأجيل الكتابة');
+      expect(find.text('نتيجة shoes'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'shoes');
+
+      await tester.enterText(find.byType(TextField), 'bags');
+      expect(typed, ['bags']);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('disposing with a pending debounce timer or request does not throw', (tester) async {

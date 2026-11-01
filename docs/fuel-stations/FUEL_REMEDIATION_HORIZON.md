@@ -42,7 +42,7 @@
 | PR-2c | FS-05 (صيانة/سلامة/تنبيهات/لوحة/تقارير) | **مدموجة** | [#1864](https://github.com/safwan5001-source/Nebrax/pull/1864) | `c43559f` | `337c50f` | `a6a24e3` |
 | PR-2d | FS-44 (تأكيد/إسناد تنبيهات الوقود 500: استيراد ناقص) | **مدموجة** | [#1866](https://github.com/safwan5001-source/Nebrax/pull/1866) | `a6a24e3` | `d351db4` | `bfeebea` |
 | PR-3 | FS-06, 20, 21, 24, 26 | **محجوبة: قرار مالك** | — | — | — | — |
-| PR-4a | FS-03, FS-04 | قيد المراجعة | (يُملأ) | `cca2b87` | (يُملأ) | — |
+| PR-4a | FS-03, FS-04 | **مدموجة** | [#1895](https://github.com/safwan5001-source/Nebrax/pull/1895) | `cca2b87` | `cd7f901` | `61035c0` |
 | PR-4b | FS-17 | **محجوبة: قرار مالك** | — | — | — | — |
 | PR-5 | FS-07, 11, 34 | مخطَّطة | — | — | — | — |
 | PR-6a | FS-08 (مفتاح idempotency ثابت لكل نية) | **مدموجة** | [#1875](https://github.com/safwan5001-source/Nebrax/pull/1875) | `43dcc13` | `bea2ea8` | `e337737` |
@@ -52,7 +52,9 @@
 | PR-9 | FS-15, 16 (+INV-08/09/11/13) | مخطَّطة | — | — | — | — |
 | PR-10 | FS-18, 19 (+INV-12) | مخطَّطة | — | — | — | — |
 | PR-11 | واجهات ناقصة (UX-16) | **محجوبة: أولويات المالك** | — | — | — | — |
-| PR-12 | FS-22, 23, 35 | مخطَّطة | — | — | — | — |
+| PR-12a | FS-23 (حجب التكلفة/الهامش/سقف الائتمان) | **مدموجة** | [#1899](https://github.com/safwan5001-source/Nebrax/pull/1899) | `61035c0` | `4221d36` | `7abbd9d` |
+| PR-12b | FS-35 (Resources بدل النماذج الخام) | قيد المراجعة | (يُملأ) | `7abbd9d` | (يُملأ) | — |
+| PR-12c | FS-22 (سجل تدقيق بالفاعل للبيانات الرئيسية/الأجهزة) | **محجوبة: تحتاج هجرة (جدول أحداث) ← تفويض مالك** | — | — | — | — |
 | PR-13 | FS-33 (+INV-14/15) | مخطَّطة (قد تحتاج هجرة ← اعتماد) | — | — | — | — |
 | PR-14 | FS-31 وبقية UX | مخطَّطة | — | — | — | — |
 
@@ -146,3 +148,20 @@
 - **أثر سلوكي مقصود:** جرد مخزني أو إذن مخزني أو مشتريات أو فاتورة عامة تلمس منتج وقود تُرفض برسالة تحيل إلى مسارات الوقود (جرد بفرق غير صفري يُرفض كاملاً). هذا اتجاه فشل-مغلق أوصى به التدقيق.
 - **ملاحظة جديدة (FS-47، غير مُصلَحة):** أسطح قراءة أخرى ما زالت `كمية × avg_cost`: لوحة المخزون (`InventoryController`)، مساحة العمل (`InventoryWorkspaceQuery`)، مرشحات/تصدير الأرصدة، `DiagnoseInventoryCommand`، ومحوّلات `Product::avg_cost` في الموارد — تعرض قيمة الوقود 0 هناك. تُعالج بشريحة تقارير مستقلة.
 - **التالي:** PR-12 (FS-22, FS-23, FS-35, SEC-12).
+
+### PR-12a — حجب التكلفة والهامش وسقف الائتمان (FS-23)
+- **الخلل (مؤكد):** `FuelSaleResource` يعيد `cogs_minor`/`cogs`، ولوحة الوقود وتقاريره تعيد `gross_margin_minor` و`cogs_minor` و`margin_minor` و`value_minor`، و`CorporateFuelContractResource` يعيد `credit_limit_minor` — كلها لمن يملك صلاحيات العرض التشغيلية فقط (`fuel.sale.view`، `fuel.reports.view`، `fuel.contract.view`) دون `products.view_cost` ولا `fuel.credit.view`.
+- **الإصلاح (بلا صلاحيات جديدة):** `App\Support\FuelCostVisibility` فوق `SensitiveCostPolicy` القائمة: التكلفة/الهامش = `products.view_cost`، وسقف الائتمان = `fuel.credit.view`. المفتاح يُحذف كاملاً (لا قيمة فارغة): موارد البيع والعقد، ولوحة الوقود، وكل تقارير الوقود (حذف متكرر لمفاتيح التكلفة)، وتقرير `profitability` يرفض 403 لغير المخوّل لأنه هامش بالكامل. owner/admin عبر `*`. الواجهة: بطاقة «هامش إجمالي» تُخفى عند غياب القيمة، وعمود سقف الائتمان يعرض «—».
+- **الملفات:** `FuelCostVisibility` (جديد)، `FuelSaleResource`، `CorporateFuelContractResource`، `FuelStationReadinessController`، صفحتان في الويب. لا هجرة ولا تغيير صلاحيات/مصفوفة أدوار.
+- **الاختبارات:** `FuelCostVisibilityTest` (5): هامش اللوحة، رفض الربحية وبقاء بقية التقارير، حذف مفاتيح التكلفة بأي عمق، مورد البيع (cogs)، مورد العقد (credit)؛ 4 منها تفشل على `main`. اختبار ويب واحد لبطاقة الهامش (يفشل على `main`). انحدار محلي: 397 اختباراً ناجحاً (وقود/عقود/تقارير) + اختبارات PR-7 بعد مزامنة بيئة الاختبار؛ ويب: ملفات الوقود ناجحة.
+- **خارج الشريحة (سطوح قد تكشف الائتمان):** إعداد `default_corporate_credit_limit_minor` في `GET fuel-stations/settings` (تحت `fuel_stations.view`)، و`credit-exposure` محروس أصلاً بـ`fuel.credit.view`. يُراجع مع FS-35.
+- **قرار مالك مطلوب (PR-12c / FS-22):** سجل تدقيق بالفاعل لتعديلات المحطات/الخزانات/المضخات/الفوهات/الأجهزة يحتاج جدول أحداث append-only جديداً (هجرة إضافية). لن يُنفَّذ قبل تفويض صريح للهجرة.
+- **التالي:** PR-12b (FS-35).
+
+### PR-12b — قوائم حقول صريحة (Resources) بدل النماذج الخام (FS-35)
+- **الخلل (مؤكد):** (1) أوامر الصيانة تحمّل `assignee` (والتحويل: `assignee`/`reporter`/`verifier`، والسلامة: `assignee`/`verifier`) كنموذج `User` كامل — البريد والدور والمستأجر — لكل من يملك `fuel.maintenance.view`. (2) `GET stations/{id}/sale-payment-methods` يعيد صفوف `PaymentMethod` الخام بما فيها `cash_bank_account_id` (ربط حساب الأستاذ) وإعدادات الدفع الإلكتروني. (3) الأسطول والأسعار تعيد النماذج الخام: `tenant_id`، `created_by`، `approved_by`، ورقم الهيكل `vin` وجوال السائق `mobile` وربط الموظف `employee_id` لكل من يملك `fuel.fleet.view`.
+- **الإصلاح:** أربعة موارد جديدة بقوائم بيضاء: `FuelFleetVehicleResource` و`FuelFleetDriverResource` (الحقول الحساسة `vin`/`mobile`/`employee_id` لمن يملك `fuel.fleet.manage` فقط)، `FuelSalePaymentMethodResource` (id، name، name_en، settlement_type، is_active)، `FuelStationProductPriceResource`. وعلاقات المستخدمين في الصيانة/السلامة تُحمَّل `id,name` فقط. أشكال الاستجابة: قوائم الأسطول والأسعار والطرق `{data:[…], links, meta}` (للأسعار كان `data.data` وتتحمله شاشة الإعدادات أصلاً).
+- **الملفات:** 4 موارد + `FuelFleetController`/`FuelSaleController`/`FuelStationReadinessController` + `FuelStationMaintenanceService`/`FuelStationSafetyService` (سطرا تحميل علاقات). لا هجرة ولا صلاحيات جديدة.
+- **الاختبارات:** `FuelResponseShapeTest` (3): الإسناد `id`/`name` فقط وعدم ظهور البريد في أي مكان، طرق الدفع بخمسة حقول فقط، الأسطول بلا الحقول الداخلية/الحساسة لغير المدير وبالحقول الكاملة (عدا `tenant_id`) للمدير. الثلاثة تفشل على `main`.
+- **ملاحظة:** `identifier` للسائق يبقى ظاهراً لمن يملك `fuel.fleet.view` لأن شاشة AVI تعرضه. لا تغيير في `GET fuel-stations/settings` (يتضمن `default_corporate_credit_limit_minor`) — يبقى بنداً لمراجعة سياسة لاحقة.
+- **التالي:** PR-13 (FS-33).

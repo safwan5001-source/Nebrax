@@ -16,7 +16,20 @@ class SearchScreen extends StatefulWidget {
   final AppActionDispatcher dispatcher;
   final Locale locale;
 
-  const SearchScreen({super.key, required this.client, required this.dispatcher, required this.locale});
+  /// نص البحث عند الفتح (يعيده الرجوع من منتج): يُنفَّذ فوراً بلا تأجيل إن بلغ الحدّ الأدنى.
+  final String initialQuery;
+
+  /// يُستدعى بكل تغيير في النص ليحفظه الغلاف (يعيده الرجوع من منتج).
+  final ValueChanged<String>? onQueryChanged;
+
+  const SearchScreen({
+    super.key,
+    required this.client,
+    required this.dispatcher,
+    required this.locale,
+    this.initialQuery = '',
+    this.onQueryChanged,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -39,6 +52,19 @@ class _SearchScreenState extends State<SearchScreen> {
   int _seq = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.initialQuery;
+    final query = _normalized(widget.initialQuery);
+    if (query.length >= _minQueryLength) {
+      // رجوع إلى بحث سابق: النتائج تُجلب فوراً (لا تأجيل ضغطات).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _search(query);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _seq++;
@@ -53,6 +79,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onChanged(String raw) {
     _timer?.cancel();
+    widget.onQueryChanged?.call(raw);
     final query = _normalized(raw);
     if (query.length < _minQueryLength) {
       // أقل من الحدّ الأدنى: تُلغى الطلبات الجارية وتعود الشاشة لحالة الإرشاد.
@@ -63,6 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _activeQuery = '';
         _error = null;
         _loading = false;
+        _loadingMore = false; // طلب «عرض المزيد» القديم أُبطل ولن يصفّر العلم.
       });
       return;
     }
@@ -79,6 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final seq = ++_seq;
     setState(() {
       _loading = true;
+      _loadingMore = false; // بحث جديد يُبطل أي ترقيم جارٍ للبحث السابق.
       _error = null;
       _activeQuery = query;
       _items.clear();

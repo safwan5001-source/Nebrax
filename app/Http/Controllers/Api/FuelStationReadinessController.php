@@ -15,6 +15,7 @@ use App\Services\FuelStationSafetyService;
 use App\Services\Reporting\FuelStationReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\FuelCostVisibility;
 
 /** Cycle 9 surface; writes delegate to audited domain services only. */
 class FuelStationReadinessController extends ApiController
@@ -33,7 +34,7 @@ class FuelStationReadinessController extends ApiController
     {
         $request->validate(['fuel_station_id' => ['nullable', 'uuid'], 'status' => ['nullable', 'string', 'max:32']]);
         $schedules = $this->restrictToAccessibleStations(FuelStationMaintenanceSchedule::query())->with('station')->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->orderBy('next_due_at')->paginate(50);
-        $orders = $this->restrictToAccessibleStations(FuelStationWorkOrder::query())->with(['station', 'schedule', 'assignee'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
+        $orders = $this->restrictToAccessibleStations(FuelStationWorkOrder::query())->with(['station', 'schedule', 'assignee:id,name'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
 
         return response()->json(['data' => ['schedules' => $schedules, 'work_orders' => $orders]]);
     }
@@ -65,7 +66,7 @@ class FuelStationReadinessController extends ApiController
         $this->accessibleStation($data['fuel_station_id']);
         $order = $this->domain(fn () => $this->maintenance->createWorkOrder($data, $request->user()));
 
-        return response()->json(['data' => $order->load(['station', 'schedule', 'assignee'])], 201);
+        return response()->json(['data' => $order->load(['station', 'schedule', 'assignee:id,name'])], 201);
     }
 
     public function transitionWorkOrder(Request $request, string $id): JsonResponse
@@ -211,12 +212,18 @@ class FuelStationReadinessController extends ApiController
 
     public function dashboard(Request $request): JsonResponse
     {
-        return response()->json(['data' => $this->reports->dashboard($this->reportFilters($request))]);
+        return response()->json(['data' => FuelCostVisibility::redactReport(
+            $this->reports->dashboard($this->reportFilters($request)),
+            FuelCostVisibility::canSeeCost($request->user()),
+        )]);
     }
 
     public function report(Request $request, string $family): JsonResponse
     {
         $filters = $this->reportFilters($request);
+        $canSeeCost = FuelCostVisibility::canSeeCost($request->user());
+        // FS-23: تقرير الربحية هامش وتكلفة بالكامل — لا يُعرض بلا صلاحية التكلفة.
+        abort_if($family === 'profitability' && ! $canSeeCost, 403, 'ليس لديك صلاحية عرض تكلفة وهامش الوقود.');
         $data = match ($family) {
             'sales' => $this->reports->sales((string) $request->query('dimension', 'station'), $filters),
             'inventory' => $this->reports->inventory($filters),
@@ -225,7 +232,7 @@ class FuelStationReadinessController extends ApiController
             'devices' => $this->reports->devices($filters), 'maintenance' => $this->reports->maintenance($filters),
             'safety' => $this->reports->safety($filters), default => abort(404),
         };
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => FuelCostVisibility::redactReport($data, $canSeeCost)]);
     }
 
     /** @return array<string,mixed> */
