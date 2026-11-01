@@ -21,7 +21,7 @@ class PartnerStatementReconciliation extends BaseModel implements CompanyWide
     public const STATUS_DRAFT = 'draft';
 
     protected $fillable = [
-        'tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'status', 'original_filename', 'file_sha256',
+        'tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'status', 'original_filename', 'file_sha256', 'identity_sha256',
         'source_import_job_id', 'line_count', 'total_debit_minor', 'total_credit_minor', 'policy', 'checks', 'created_by',
     ];
 

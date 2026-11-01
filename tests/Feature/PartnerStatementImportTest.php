@@ -436,6 +436,41 @@ class PartnerStatementImportTest extends TestCase
         $this->assertSame($first['apply_result']['reconciliation_id'], $preview['existing_reconciliation_id']);
     }
 
+    /**
+     * مراجعة #1877: الملف نفسه بتفسير مختلف (اتجاه مصحَّح، تسامح، ربط أعمدة) لا يعيد المسودة السابقة بصمت — لا حبس في مسودة فُسِّرت خطأً (لا إلغاء قبل PS-A3)،
+     * والمسودة السابقة تبقى كما هي، وتفسير مطابق تماماً يعيد الأولى.
+     *
+     * @test
+     */
+    public function the_same_file_under_a_different_interpretation_is_a_new_draft_and_the_old_one_is_untouched(): void
+    {
+        $rows = $this->oneColumn(['1150.00', '-500.00']);
+        $wrong = $this->runJob($this->auth['token'], $rows, $this->hdr(['amount_direction' => 'positive_is_credit']));
+        $fixed = $this->runJob($this->auth['token'], $rows, $this->hdr(['amount_direction' => 'positive_is_debit']));
+
+        $this->assertNotSame($wrong['apply_result']['reconciliation_id'], $fixed['apply_result']['reconciliation_id']);
+        $this->assertFalse($fixed['apply_result']['replayed']);
+        $this->assertSame(2, $this->reconciliations());
+
+        $old = PartnerStatementReconciliation::query()->findOrFail($wrong['apply_result']['reconciliation_id']);
+        $new = PartnerStatementReconciliation::query()->findOrFail($fixed['apply_result']['reconciliation_id']);
+        $this->assertSame($old->file_sha256, $new->file_sha256, 'الملف نفسه.');
+        $this->assertNotSame($old->identity_sha256, $new->identity_sha256);
+        $this->assertSame([50000, 115000], [(int) $old->total_debit_minor, (int) $old->total_credit_minor], 'الاتجاه الخاطئ يبقى كما خُزِّن.');
+        $this->assertSame([115000, 50000], [(int) $new->total_debit_minor, (int) $new->total_credit_minor]);
+        $this->assertSame('draft', $old->status, 'المسودة السابقة تبقى مسودة بلا تعديل ولا حذف.');
+
+        // تفسير مطابق تماماً (الملف والاتجاه) يعيد المسودة المصحَّحة لا ثالثة.
+        $again = $this->runJob($this->auth['token'], $rows, $this->hdr(['amount_direction' => 'positive_is_debit']));
+        $this->assertTrue($again['apply_result']['replayed']);
+        $this->assertSame($fixed['apply_result']['reconciliation_id'], $again['apply_result']['reconciliation_id']);
+
+        // تسامح مختلف على الملف نفسه تفسيرٌ آخر (السياسة المجمَّدة جزء من الهوية).
+        $tolerant = $this->runJob($this->auth['token'], $rows, $this->hdr(['amount_direction' => 'positive_is_debit', 'date_tolerance_days' => 7]));
+        $this->assertFalse($tolerant['apply_result']['replayed']);
+        $this->assertSame(3, $this->reconciliations());
+    }
+
     /** @test */
     public function a_different_file_period_role_or_partner_is_a_separate_reconciliation(): void
     {

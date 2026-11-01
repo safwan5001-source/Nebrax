@@ -6,8 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * IMP-PS-A1 — تجهيز مقارنة كشوف حساب الأطراف (D-PS-03: CompanyWide). **جدولان إضافيان فقط، بلا مساس بأي جدول قائم ولا بالأستاذ.**
- *  - `partner_statement_reconciliations`: رأس مقارنة (طرف · دور · فترة · سياسات مجمَّدة · بصمة الملف). الفريد (المؤسسة، الطرف، الدور، الفترة، بصمة الملف) يجعل
- *    إعادة رفع الملف نفسه تعيد المقارنة القائمة لا تنشئ ثانية.
+ *  - `partner_statement_reconciliations`: رأس مقارنة (طرف · دور · فترة · سياسات مجمَّدة · بصمة الملف). الفريد (المؤسسة، الطرف، الدور، الفترة، **هوية التفسير**) يجعل
+ *    إعادة رفع الملف نفسه **بالتفسير نفسه** تعيد المقارنة القائمة لا تنشئ ثانية؛ أما الملف نفسه بتفسير مختلف (اتجاه المبلغ، ربط الأعمدة، التسامحات، الفرع) فمسودة جديدة،
+ *    فلا يُحبس المستخدم في مسودة فُسِّر ملفها خطأً. لا فريد على المسودات يمنع تعددها (قرار المالك: عدة مسودات، مطابقة نهائية واحدة).
  *  - `partner_statement_lines`: سطور الكشف كما طُبعت عند الطرف الآخر (مدين/دائن بالهللات)، غير قابلة للتعديل بعد الإنشاء (حارس النموذج). الربط بالرأس مفتاح أجنبي
  *    مركّب (tenant_id, id) فلا يشير سطرٌ إلى رأس مؤسسة أخرى حتى بالخطأ.
  * لا مفتاح أجنبي إلى جداول القيود. `down()` يرفض إن وُجد أي صف (لا حذف صامت لبيانات استُوردت).
@@ -26,7 +27,8 @@ return new class extends Migration
             $table->string('currency', 3)->default('SAR');    // D-PS-01: SAR فقط في V1
             $table->string('status', 16)->default('draft');
             $table->string('original_filename', 255)->nullable();
-            $table->char('file_sha256', 64);
+            $table->char('file_sha256', 64);                  // بصمة بايتات الملف (معلومة وتتبّع «الملف نفسه»)
+            $table->char('identity_sha256', 64);              // هوية التفسير: الملف + ربط الأعمدة + السياسات المجمَّدة (اتجاه المبلغ، التسامحات، الفرع)
             $table->foreignUuid('source_import_job_id')->nullable()->constrained('import_jobs')->nullOnDelete();
             $table->unsignedInteger('line_count')->default(0);
             $table->bigInteger('total_debit_minor')->default(0);
@@ -37,7 +39,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'id'], 'partner_stmt_recon_tenant_id_unique');
-            $table->unique(['tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'file_sha256'], 'partner_stmt_recon_idem_unique');
+            $table->unique(['tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'identity_sha256'], 'partner_stmt_recon_idem_unique');
+            $table->index(['tenant_id', 'partner_id', 'role', 'file_sha256'], 'partner_stmt_recon_file_idx');
             $table->index(['tenant_id', 'partner_id', 'role'], 'partner_stmt_recon_partner_idx');
         });
 

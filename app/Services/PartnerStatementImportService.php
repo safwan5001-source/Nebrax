@@ -30,7 +30,8 @@ use RuntimeException;
  *  - **القرارات المعتمدة (2026-11-01):** D-PS-01 ريال فقط (عملة أخرى في الخيارات أو الصف ⇒ رفض، بلا تحويل) · D-PS-02 صلاحيات `partner_statements.*` مستقلة (على بوابة المجال)
  *    + `partners.view` هنا · D-PS-03 `CompanyWide` والطرف يُحلّ كما يفعل `ReportService::partnerStatement` · P-1 تسامح التاريخ ٣ أيام (0–30) · P-2 تسامح المبلغ ٠ هللة (لا نسبة)
  *    · P-3 اتجاه العمود الواحد إلزامي ومُعلَن · P-4 المعكوسة تدخل المطابقة وفق مصدر التقرير بلا مضاعفة (تُسجَّل في السياسة، تستعملها PS-A2) · P-5 الطرف على مستوى المؤسسة وفلتر فرع اختياري ضمن صلاحيات الفاعل.
- *  - **إعادة رفع الملف نفسه** (بصمة المحتوى) لنفس الطرف والدور والفترة تعيد المقارنة القائمة (`replayed`) ولا تنشئ ثانية؛ القفل الاستشاري + الفهرس الفريد.
+ *  - **إعادة رفع الملف نفسه بالتفسير نفسه** (بصمة الملف + ربط الأعمدة + السياسات المجمَّدة) لنفس الطرف والدور والفترة تعيد المقارنة القائمة (`replayed`) ولا تنشئ ثانية؛ تفسيرٌ مختلف
+ *    (اتجاه مصحَّح، تسامح، فرع) مسودة جديدة لا يُحبس المستخدم بسابقتها الخاطئة؛ القفل الاستشاري + الفهرس الفريد.
  *  - **عدم كشف الأطراف:** طرفٌ غير موجود/من مؤسسة أخرى/غير مرئي للفاعل/لا يطابق الدور ⇒ رسالة واحدة متطابقة؛ والفاعل بلا `partners.view` يُرفض بها قبل أي قراءة.
  *  - الرسائل بنص عربي وأرقام صفوف كما في Excel (العناوين صف ١).
  */
@@ -114,7 +115,7 @@ class PartnerStatementImportService
         $partner = $this->assertAccess($resolved, $userId);
         $parsed = $this->parse($file, $resolved, $maxRows);
         $rows = array_slice($parsed['rows'], 0, self::PREVIEW_ROW_LIMIT);
-        $existing = $this->existing($resolved, $this->fileHash($file));
+        $existing = $this->existing($resolved, $this->identityHash($this->fileHash($file), $resolved, $parsed['mapping']));
 
         return [
             'partner_id' => $resolved['partner_id'], 'partner_name' => $partner->name, 'role' => $resolved['role'],
@@ -153,8 +154,9 @@ class PartnerStatementImportService
             }
 
             $hash = $this->fileHash($file);
-            $this->lockIdentity($resolved, $hash);
-            $existing = $this->existing($resolved, $hash);
+            $identity = $this->identityHash($hash, $resolved, $parsed['mapping']);
+            $this->lockIdentity($resolved, $identity);
+            $existing = $this->existing($resolved, $identity);
             if ($existing !== null) {
                 return $this->result($existing, $parsed, created: 0, replayed: true);
             }
@@ -163,7 +165,7 @@ class PartnerStatementImportService
                 'partner_id' => $resolved['partner_id'], 'role' => $resolved['role'],
                 'period_from' => $resolved['period_from'], 'period_to' => $resolved['period_to'], 'currency' => 'SAR',
                 'status' => PartnerStatementReconciliation::STATUS_DRAFT, 'original_filename' => mb_substr((string) $file->getClientOriginalName(), 0, 255) ?: null,
-                'file_sha256' => $hash, 'source_import_job_id' => $importJobId, 'line_count' => count($parsed['rows']),
+                'file_sha256' => $hash, 'identity_sha256' => $identity, 'source_import_job_id' => $importJobId, 'line_count' => count($parsed['rows']),
                 'total_debit_minor' => $parsed['total_debit'], 'total_credit_minor' => $parsed['total_credit'],
                 'policy' => $this->policy($resolved), 'checks' => $parsed['checks'], 'created_by' => $userId,
             ]);
@@ -650,21 +652,35 @@ class PartnerStatementImportService
     // ═══════════════════════════════════════════════════════════════
 
     /** @param array<string, mixed> $options */
-    private function existing(array $options, string $hash): ?PartnerStatementReconciliation
+    private function existing(array $options, string $identity): ?PartnerStatementReconciliation
     {
         return PartnerStatementReconciliation::query()
             ->where('partner_id', $options['partner_id'])->where('role', $options['role'])
             ->whereDate('period_from', $options['period_from'])->whereDate('period_to', $options['period_to'])
-            ->where('file_sha256', $hash)
+            ->where('identity_sha256', $identity)
             ->first();
     }
 
+    /**
+     * هوية التفسير: بصمة الملف + ربط الأعمدة الفعلي + السياسات المجمَّدة (اتجاه المبلغ، التسامحات، الفرع). الملف نفسه بتفسير مختلف (مثلاً اتجاه مصحَّح) مسودة جديدة؛ لا يُعاد
+     * إليه تفسيرٌ سابق بصمت. بلا تعديل أو حذف للمسودة السابقة (قرار المالك: عدة مسودات مسموحة، المطابقة النهائية الواحدة تُفرض في PS-A3).
+     *
+     * @param  array<string, mixed>  $options
+     * @param  array<int, string|null>  $mapping
+     */
+    private function identityHash(string $fileHash, array $options, array $mapping): string
+    {
+        ksort($mapping);
+
+        return hash('sha256', json_encode(['file' => $fileHash, 'mapping' => $mapping, 'policy' => $this->policy($options)], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
     /** قفل استشاري على هوية الرفع داخل المعاملة: متسابقان على الملف نفسه يتسلسلان فيرى الثاني الأول (والفهرس الفريد شبكة أخيرة، لا يُلتقط خطؤه داخل معاملة PostgreSQL). @param array<string, mixed> $options */
-    private function lockIdentity(array $options, string $hash): void
+    private function lockIdentity(array $options, string $identity): void
     {
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
-                'partner-statement:'.$this->tenantContext->id().':'.$options['partner_id'].':'.$options['role'].':'.$options['period_from'].':'.$options['period_to'].':'.$hash,
+                'partner-statement:'.$this->tenantContext->id().':'.$options['partner_id'].':'.$options['role'].':'.$options['period_from'].':'.$options['period_to'].':'.$identity,
             ]);
         }
     }
