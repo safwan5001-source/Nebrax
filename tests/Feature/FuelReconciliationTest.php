@@ -457,7 +457,7 @@ class FuelReconciliationTest extends TestCase
             // مسار الاستلام الحقيقي يهيئ state صفرياً قبل تحديث رصيد المخزن.
             $costBasis->assertReady($fuel, $warehouse);
             if ($openingQuantity > 0) {
-                $openingMovement = app(InventoryService::class)->applyReceipt($product, $openingQuantity, 10, ['warehouse_id' => $warehouse->id]);
+                $openingMovement = app(InventoryService::class)->applyReceipt($product, $openingQuantity, 10, ['warehouse_id' => $warehouse->id, InventoryService::FUEL_POOL_META => true]);
                 // fixture موثوق: يثبت cost basis صريحاً بدلاً من اشتقاقه من avg_cost أثناء الاختبار.
                 $costBasis->recordReceipt($fuel, $warehouse, $openingMovement, $openingQuantity, $openingQuantity * 10);
             }

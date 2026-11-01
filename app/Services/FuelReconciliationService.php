@@ -344,7 +344,7 @@ class FuelReconciliationService
     /** @return array<string,mixed> */
     private function movementMeta(FuelReconciliation $r, Warehouse $warehouse): array
     {
-        return ['warehouse_id' => $warehouse->id, 'date' => now()->toDateString(), 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'notes' => 'تسوية وقود معتمدة'];
+        return ['warehouse_id' => $warehouse->id, 'date' => now()->toDateString(), 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'notes' => 'تسوية وقود معتمدة', InventoryService::FUEL_POOL_META => true];
     }
 
     private function postEntry(FuelReconciliation $r, FuelStation $station, int $amount, bool $gain, string $approverId): ?\App\Models\JournalEntry

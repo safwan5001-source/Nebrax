@@ -626,7 +626,7 @@ class FuelSaleServiceTest extends TestCase
         ]);
         app(FuelCostBasisService::class)->assertReady($fuelProduct, $warehouse);
         $movement = app(InventoryService::class)->applyReceipt($product, 10000, 100, [
-            'warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id, 'notes' => 'رصيد اختبار للبيع',
+            'warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id, 'notes' => 'رصيد اختبار للبيع', InventoryService::FUEL_POOL_META => true,
         ], 1000000);
         app(FuelCostBasisService::class)->recordReceipt($fuelProduct, $warehouse, $movement, 10000, 1000000);
 

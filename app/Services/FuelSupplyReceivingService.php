@@ -135,6 +135,7 @@ class FuelSupplyReceivingService
                     'source_id' => $delivery->id,
                     'date' => $delivery->received_at->toDateString(),
                     'notes' => "استلام وقود {$delivery->delivery_note_number}",
+                    InventoryService::FUEL_POOL_META => true,
                 ],
                 (int) $delivery->received_total_cost_minor,
             );

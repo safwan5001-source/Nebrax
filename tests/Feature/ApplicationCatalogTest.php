@@ -39,6 +39,8 @@ class ApplicationCatalogTest extends TestCase
             'purchases.cycle',
             'accounting.ledger',
             'accounting.cheques',
+            // IMP-PARTNER-STATEMENTS PS-A2a (D-PS-08): كشوف حساب الأطراف — explicit_enable_only (D-PS-13).
+            'accounting.partner_statements',
             'finance.operations',
             'hr.employees',
             'hr.requests',
@@ -75,7 +77,7 @@ class ApplicationCatalogTest extends TestCase
         sort($expectedKeys);
 
         $this->assertSame($expectedKeys, $actualKeys);
-        $this->assertCount(45, ApplicationCatalog::all());
+        $this->assertCount(46, ApplicationCatalog::all());
         $this->assertSame([], ApplicationCatalog::validationErrors());
     }
 
