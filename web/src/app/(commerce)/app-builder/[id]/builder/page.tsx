@@ -30,6 +30,7 @@ import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semant
 import { EasyCatalogDialog } from '@/modules/app-builder/easy/easy-catalog-dialog';
 import { EasyIdentityPanel } from '@/modules/app-builder/easy/easy-identity-panel';
 import { EasyPageActions } from '@/modules/app-builder/easy/easy-page-actions';
+import { EasyShellPanel } from '@/modules/app-builder/easy/easy-shell-panel';
 import { EasySelectionBar } from '@/modules/app-builder/easy/easy-selection-bar';
 import { EasySectionsPanel } from '@/modules/app-builder/easy/easy-sections-panel';
 import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } from '@/modules/app-builder/easy/editor-mode';
@@ -52,7 +53,7 @@ import { useUnsavedChangesGuard } from '@/modules/app-builder/unsaved-guard';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
-type StructureMode = 'pages' | 'theme' | 'identity';
+type StructureMode = 'pages' | 'theme' | 'identity' | 'shell';
 /**
  * MOBILE-PREVIEW-3 — المحور العلوي الجديد المستقل عن `PreviewState` أدناه: `design` هو
  * سطح التحرير الحالي بلا أي تغيير (`AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md` §2/6).
@@ -832,7 +833,7 @@ export default function AppBuilderWorkspacePage() {
   const structurePanel = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
-        {((editorMode === 'easy' ? ['pages', 'theme', 'identity'] : ['pages', 'theme']) as StructureMode[]).map((mode) => (
+        {((editorMode === 'easy' ? ['pages', 'theme', 'identity', 'shell'] : ['pages', 'theme']) as StructureMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
@@ -843,7 +844,7 @@ export default function AppBuilderWorkspacePage() {
               structureMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
             )}
           >
-            {mode === 'pages' ? t('pagesTitle') : mode === 'theme' ? t('theme.tabLabel') : t('easy.identity.tab')}
+            {mode === 'pages' ? t('pagesTitle') : mode === 'theme' ? t('theme.tabLabel') : mode === 'shell' ? t('easy.shell.tab') : t('easy.identity.tab')}
           </button>
         ))}
       </div>
@@ -986,6 +987,18 @@ export default function AppBuilderWorkspacePage() {
           </>
           )}
         </>
+      ) : structureMode === 'shell' && schema ? (
+        <EasyShellPanel
+          schema={schema}
+          pageLabel={(id) => metaOf(schema)?.pages?.[id]?.title?.trim() || id}
+          canManage={canManage}
+          onEdit={(edit) => {
+            // تعديل مرفوض (حد مخالف ⇒ null) لا يلوّث السجل ولا يعلّم المسودة «غير محفوظة».
+            const next = edit(schema);
+            if (next && next !== schema) applyPagesEdit(() => next);
+          }}
+          t={t}
+        />
       ) : structureMode === 'identity' ? (
         <EasyIdentityPanel name={app.name} nameEn={app.name_en} canManage={canManage} saving={renaming} onSave={renameApp} t={t} />
       ) : (
