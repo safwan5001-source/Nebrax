@@ -11,9 +11,9 @@ use App\Models\FuelTank;
 use App\Models\FuelTankReading;
 use App\Models\ProductWarehouseStock;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\LedgerService;
-use App\Services\Accounting\StocktakeService;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +33,7 @@ class FuelReconciliationService
         private FuelCostBasisService $costBasis,
         private InventoryService $inventory,
         private LedgerService $ledger,
+        private AccountRoleResolver $roles,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -352,10 +353,10 @@ class FuelReconciliationService
         $settings = $this->settings->forStation($station);
         $variance = $this->account(
             $settings[$gain ? 'inventory_gain_account_id' : 'inventory_variance_account_id'] ?? null,
-            StocktakeService::VARIANCE_ACCOUNT_CODE,
+            'inventory_count_variance',
             $gain ? ['expense', 'revenue'] : ['expense'],
         );
-        $inventory = $this->account($station->default_inventory_account_id, StocktakeService::INVENTORY_ACCOUNT_CODE, ['asset']);
+        $inventory = $this->account($station->default_inventory_account_id, 'inventory_asset', ['asset']);
         // FS-32: فرع القيد = فرع المحطة (كحركة المخزون ومسار الاستلام) لا فرع سياق الموافق.
         $branchId = $station->branch_id;
         $lines = $gain
@@ -365,9 +366,10 @@ class FuelReconciliationService
     }
 
     /** @param array<int, string> $allowedTypes */
-    private function account(?string $id, string $fallbackCode, array $allowedTypes): Account
+    /** FS-34: تجاوز المحطة/الإعداد الصريح يتقدّم؛ وإلا الدور المحاسبي المعتمد (لا الكود الثابت). */
+    private function account(?string $id, string $roleKey, array $allowedTypes): Account
     {
-        $account = $id ? Account::whereKey($id)->first() : Account::where('code', $fallbackCode)->first();
+        $account = $id ? Account::whereKey($id)->first() : $this->roles->resolve($roleKey);
         if (! $account || $account->is_group || ! $account->is_active || ! in_array($account->type, $allowedTypes, true)) {
             throw new RuntimeException('حساب فرق أو مخزون الوقود غير صالح للترحيل أو لا يملك الاتجاه المحاسبي المطلوب.');
         }

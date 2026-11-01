@@ -571,6 +571,12 @@ php artisan serve
 - **سلة/Checkout:** `EstablishRetailCustomerIfPresent` (اختياري، يقبل الفشل كضيف) يجعل سلة المتسوّق المسجَّل وطلبه ملكاً لحسابه عبر آلية `CustomerContext` القائمة؛ مضيف بلا حسابات أو قناة جملة أو رمز غير صالح = سلوك الضيف حرفياً. لا تغيير في الدفع/الفوترة/القيود/ZATCA.
 - **الواجهة (`storefront/`):** الرمز في كوكي `awj_account_session` (HttpOnly، SameSite=Lax، Secure إنتاجاً، بلا Domain) تكتبه Server Actions (`lib/data/customer.ts`)؛ كوكي تلميح غير سرّي `awj_account_hint=1` وحده يقرؤه المتصفح ليتجنّب أي طلب لمن لا جلسة له. `AccountsGate` يسأل الـAPI (`customer_accounts === true` وإلا إشعار «غير متاح») فمتجر لم يُفعَّل يبقى كما كان. CSRF: Server Actions (فحص Origin إطاري) + SameSite؛ والـAPI لا يُستدعى من المتصفح إطلاقاً.
 
+## جاهزية تفعيل حسابات التجزئة — B2C-ACTIVATION-READINESS (كل شيء مغلق افتراضياً)
+
+- **هوية زائر موقَّعة لمحدِّدات المصادقة** (`App\Support\StorefrontClientIdentity` + `storefront/src/lib/commerce/client-attestation.ts`): مغلقة (`STOREFRONT_SIGNED_CLIENT_IP_ENABLED=false`)؛ مغلقةً تبقى سلة `tenant|ip` المشتركة حرفياً. **لا تُقرأ أي ترويسة IP عامة في Laravel** (`X-Forwarded-For`/`X-Real-IP`… خاملة). المصدر الوحيد ترويسة يوقّعها خادم المتجر (HMAC بمفتاح مشتق من سرّ البوابة، مربوط بالمضيف والعنوان والطابع الزمني، ±60ث) **بعد أن يعلن المشغّل** مصدراً موثوقاً في `STOREFRONT_CLIENT_IP_SOURCE` (`vercel` | `real-ip` | `xff-right:N`)؛ العناوين الخاصة/المحجوزة تُرفض وIPv6 يُجمَّع /64. يخص login/register/verify/resend/forgot/reset **على مضيف تجزئة مفتوح وجملة مغلقة فقط** — مضيف الجملة يبقى على حدّه الأصلي. حدّ البريد لكل حساب لا يُمسّ، وسقف المتجر = الحدّ × `backstop_multiplier` (10).
+- **لا تفتح العلم قبل الدليل التشغيلي** (مصدر العنوان على Railway غير مُثبَت من المستودع): `docs/audits/AWJ_B2C_ACTIVATION_READINESS_REPORT.md`.
+- **`php artisan commerce:retail-accounts-readiness`**: فحص قراءة فقط (بوابات، ناقل البريد، المرسِل، نطاق الروابط لكل متجر مفعَّل)، لا يرسل بريداً ولا يطبع سراً؛ يخرج بـ1 عند وجود مانع.
+
 ## وقت إصدار الفاتورة (`invoices.issued_at`) — REM-13a
 
 لحظة الإصدار القانونية للفاتورة تُلتقط **مرة واحدة** في `InvoiceService::post()` (داخل معاملة الترحيل بعد القفلين وقبل `ZatcaService::buildFor`)، وتُخزَّن UTC بدقة ثانية، **ثابتة** (حارس `Invoice::booted`)، ولا تدخل `$fillable`.

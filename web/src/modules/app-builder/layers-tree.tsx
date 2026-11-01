@@ -65,45 +65,15 @@ function TreeRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex min-h-8 items-center gap-1', isDragging && 'opacity-60')}
     >
-      {reorderable ? (
-        <div className="flex shrink-0 items-center gap-0.5" style={{ marginInlineStart: `${depth * 16}px` }}>
-          <button
-            type="button"
-            disabled={index === 0}
-            onClick={() => onMove(node.id, 'up')}
-            aria-label={t('moveUpLabel')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <ArrowUp className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            disabled={index === count - 1}
-            onClick={() => onMove(node.id, 'down')}
-            aria-label={t('moveDownLabel')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <ArrowDown className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label={t('dragLabel')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-          </button>
-        </div>
-      ) : (
-        <span style={{ width: `${depth * 16}px` }} className="shrink-0" />
-      )}
+      {reorderable ? null : <span style={{ width: `${depth * 16}px` }} className="shrink-0" />}
       <div
         role="treeitem"
         aria-selected={selected}
         tabIndex={0}
         onClick={() => onSelect(node.id)}
         onKeyDown={(event) => {
+          // أزرار إعادة الترتيب داخل العنصر: لا نصادر Enter/Space الخاصين بها.
+          if (event.target !== event.currentTarget) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onSelect(node.id);
@@ -114,8 +84,40 @@ function TreeRow({
           selected ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
         )}
       >
-        <span className="shrink-0 text-xs text-muted" title={node.type}>{typeLabel}</span>
-        {label ? <span className="truncate text-xs text-muted">· {label}</span> : null}
+          {reorderable ? (
+            <div className="flex shrink-0 items-center gap-0.5" style={{ marginInlineStart: `${depth * 16}px` }}>
+              <button
+                type="button"
+                disabled={index === 0}
+                onClick={(event) => { event.stopPropagation(); onMove(node.id, 'up'); }}
+                aria-label={t('moveUpLabel')}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowUp className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                disabled={index === count - 1}
+                onClick={(event) => { event.stopPropagation(); onMove(node.id, 'down'); }}
+                aria-label={t('moveDownLabel')}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowDown className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={t('dragLabel')}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted"
+                onClick={(event) => event.stopPropagation()}
+                {...attributes}
+                {...listeners}
+              >
+                <GripVertical className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
+        <span className={cn('shrink-0 text-xs', selected ? 'text-primary' : 'text-muted')} title={node.type}>{typeLabel}</span>
+        {label ? <span className={cn('truncate text-xs', selected ? 'text-primary' : 'text-muted')}>· {label}</span> : null}
         {marker ? <span className="ms-auto"><IssueDot severity={marker} label={marker === 'error' ? t('issues.blocking') : t('issues.warning')} /></span> : null}
       </div>
     </div>
@@ -157,7 +159,8 @@ function ChildrenGroup({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    // `accessibility.container`: منطقة الإعلان الحيّة لـdnd-kit كانت تُركَّب داخل `role="tree"` (axe `aria-required-children`)؛ تُنقل إلى body.
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ container: typeof document === 'undefined' ? undefined : document.body }}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         {children.map((child, index) => (
           <React.Fragment key={child.id}>

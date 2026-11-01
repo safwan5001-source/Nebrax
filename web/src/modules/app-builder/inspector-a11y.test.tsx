@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import en from '@/messages/en.json';
 import ar from '@/messages/ar.json';
 import type { AppBuilderRegistries, AppSchemaComponent } from '@/lib/app-builder';
+import { axe } from 'jest-axe';
 import { Inspector } from './inspector';
 
 const label = (en_: string, ar_ = en_) => ({ en: en_, ar: ar_ });
@@ -81,5 +82,35 @@ describe('Inspector accessibility (UX-03)', () => {
     for (const b of within(group).getAllByRole('button')) {
       expect(b.getAttribute('aria-label') ?? '').toMatch(/\p{Script=Arabic}/u);
     }
+  });
+
+  it('has no axe violations with props, list, action, binding and visibility editors open', async () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="en" messages={{ appBuilder: en.appBuilder }}>
+        <Inspector
+          node={{
+            ...node,
+            binding: { resource: 'commerce.products', itemProps: {} } as never,
+            visibility: { signal: 'cart.itemCount', operator: 'equals', value: 1 } as never,
+          }}
+          registries={{
+            ...registries,
+            components: { ...registries.components, Promo: { ...registries.components.Promo, bindable_resources: ['commerce.products'] } },
+            resources: {
+              'commerce.products': { id: 'commerce.products', version: 1, shape: 'list', paginated: true, fields: [], query_params: [{ key: 'search', kind: 'filter' }, { key: 'popularity', kind: 'sort' }] },
+            },
+            visibility_signals: ['cart.itemCount'],
+            visibility_operators: [{ type: 'equals', value_arity: 'single' }],
+          }}
+          pageIds={['home']}
+          onChange={vi.fn()}
+          onAddChild={vi.fn()}
+          onRemove={vi.fn()}
+          canRemove
+        />
+      </NextIntlClientProvider>,
+    );
+    const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html.slice(0, 120)).join(' | ')}`)).toEqual([]);
   });
 });

@@ -39,7 +39,7 @@ abstract class PublicApiController extends Controller
      *
      * @param  array<string, string>  $allowed  مفتاح العميل → عمود قاعدة البيانات
      */
-    protected function applySort(Builder $query, ?string $sort, array $allowed, string $default, ?\Closure $priceSort = null): void
+    protected function applySort(Builder $query, ?string $sort, array $allowed, string $default, ?\Closure $priceSort = null, array $customSorts = []): void
     {
         $sort = trim((string) ($sort ?? ''));
         if ($sort === '') {
@@ -53,6 +53,13 @@ abstract class PublicApiController extends Controller
             throw ValidationException::withMessages([
                 'sort' => "حقل فرز غير مدعوم: «{$field}».",
             ]);
+        }
+
+        // AD-09 — ترتيب محسوب بمحوّل صريح (مثل `popularity`): يأخذ (Builder, direction) ويتولّى الترتيب بنفسه.
+        if (isset($customSorts[$field])) {
+            $customSorts[$field]($query, $direction);
+
+            return;
         }
 
         // H6 Batch G — `sale_price` is ordered by the displayed (effective) price via the caller's hook, never by the

@@ -18,6 +18,7 @@ import {
   applyAwjSetCookie,
   getAwjCartToken,
 } from "./cart-cookies";
+import { clientIpAttestation } from "./client-attestation";
 
 export const FORWARDED_HOST_HEADER = "X-Storefront-Forwarded-Host";
 export const GATEWAY_SECRET_HEADER = "X-Storefront-Gateway-Secret";
@@ -357,6 +358,21 @@ export async function storefrontBuyerRequest<T>(
   }
   if (options?.token) {
     requestHeaders[BUYER_TOKEN_HEADER] = options.token;
+  }
+  /*
+   * B2C ACTIVATION READINESS — mutations only (login / register / reset …): a signed visitor-address attestation so the
+   * API's per-visitor auth brakes can tell shoppers apart. Empty unless the operator named a trusted address source
+   * (`STOREFRONT_CLIENT_IP_SOURCE`); a plain `X-Forwarded-For` is never forwarded or trusted. See `client-attestation.ts`.
+   */
+  if (method !== "GET" && process.env.STOREFRONT_CLIENT_IP_SOURCE) {
+    try {
+      Object.assign(
+        requestHeaders,
+        clientIpAttestation(secret, hostname, await headers()),
+      );
+    } catch {
+      // No request scope / unreadable headers: send no attestation (the API keeps its legacy brake).
+    }
   }
   if (options?.body !== undefined) {
     requestHeaders["Content-Type"] = "application/json";

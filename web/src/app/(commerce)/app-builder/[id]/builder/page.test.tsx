@@ -3,6 +3,7 @@ import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { axe } from 'jest-axe';
 import AppBuilderWorkspacePage from './page';
 
 const { api, currentUser, translate } = vi.hoisted(() => {
@@ -550,6 +551,24 @@ describe('AppBuilderWorkspacePage', () => {
     expect(screen.getAllByText(/123\.45/).length).toBeGreaterThan(0);
     // Inspector defaults to the page root's own definition.
     expect(screen.getAllByText('This component has no properties.').length).toBeGreaterThan(0);
+  });
+
+  it('has no axe violations in the loaded workspace (advanced mode, UX-03)', async () => {
+    mockApi();
+    const { container } = render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    // التباين اللوني لا يُحسب في jsdom (لا تخطيط ولا ألوان محسوبة) فيُعطَّل صراحةً؛ باقي القواعد فعّالة.
+    const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+
+  it('has no axe violations in Easy mode either (UX-03)', async () => {
+    for (const user of ['anonymous', 'u1', 'u3']) window.localStorage.setItem(`awj.appBuilder.editorMode.v1.${user}.app-1`, 'easy');
+    mockApi();
+    const { container } = render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+    const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
   });
 
   it('selecting a component in the layers tree updates the Inspector with its props and action', async () => {

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Account;
 use App\Models\CorporateFuelContract;
 use App\Models\CorporateFuelCreditLock;
 use App\Models\FuelCard;
@@ -15,6 +14,7 @@ use App\Models\FuelStation;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\User;
+use App\Services\Accounting\ArApControlBalanceService;
 use App\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -27,11 +27,10 @@ use RuntimeException;
  */
 class CorporateFuelAuthorizationService
 {
-    private const RECEIVABLE_ACCOUNT = '1130';
-
     public function __construct(
         protected CorporateFuelContractService $contracts,
         protected FuelStationSettingsService $settings,
+        protected ArApControlBalanceService $arControl,
     ) {}
 
     /**
@@ -157,11 +156,13 @@ class CorporateFuelAuthorizationService
 
     public function officialExposure(string $partnerId): int
     {
-        $account = Account::where('code', self::RECEIVABLE_ACCOUNT)->first();
-        if ($account === null) {
-            throw new RuntimeException('لا يمكن فحص ائتمان الشركات قبل تعيين حساب العملاء 1130.');
+        // FS-07: التعرّض = كل ذمم العميل على مجموعة حسابات دور `accounts_receivable` (التعيين الحالي ∪ 1130 ∪ السجلّ)،
+        // لا الحساب 1130 وحده؛ فبعد إعادة تعيين الدور تُرحَّل الفواتير إلى الحساب الجديد ولا يُفلت التعرّض من السقف.
+        $accountIds = $this->arControl->accountIdsForRole('accounts_receivable');
+        if ($accountIds === []) {
+            throw new RuntimeException('لا يمكن فحص ائتمان الشركات قبل تعيين حساب العملاء.');
         }
-        $balance = JournalLine::where('account_id', $account->id)
+        $balance = JournalLine::whereIn('account_id', $accountIds)
             ->where('partner_type', Partner::class)
             ->where('partner_id', $partnerId)
             ->selectRaw('COALESCE(SUM(debit - credit), 0) AS balance')
