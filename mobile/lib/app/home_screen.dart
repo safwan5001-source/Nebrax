@@ -74,6 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     widget.state.addListener(_onStateChanged);
+    // نبدأ من إصدار التحديث الحالي: إشعار تنقّل عابر (مثل `startAt`) لا يجوز أن يطلق تحميلاً ثانياً.
+    _lastHandledRefreshVersion = widget.state.refreshVersion;
     _resolveSchema();
     _loadProducts();
   }

@@ -211,4 +211,42 @@ void main() {
     expect(find.text('NEW_ITEM'), findsOneWidget);
     expect(find.text('OLD_ITEM'), findsNothing);
   });
+
+  testWidgets('switching to the initial page while Home still has requests in flight never throws after dispose', (tester) async {
+    final slowHome = Completer<void>();
+    var homeProductCalls = 0;
+    final client = CommerceClient(
+      config: CommerceConfig(baseUrl: Uri.parse('https://api.example.com/commerce/v1'), storeBearerToken: 't'),
+      sessionStore: InMemorySecureSessionStore(),
+      transport: FakeCommerceTransport((request) async {
+        final last = request.uri.pathSegments.last;
+        if (last == 'experience') {
+          return jsonResponse(200, {
+            'data': {
+              'version': 1,
+              'schema_version': '1',
+              'published_at': '2026-09-25T00:00:00Z',
+              'schema': jsonDecode(_experience(initialPageId: 'about')),
+            },
+            'meta': successMeta(),
+          });
+        }
+        if (last == 'products') {
+          // أول طلب منتجات هو تحميل Home قبل وصول التجربة: يبقى عالقاً حتى بعد الانتقال إلى الصفحة الأولية.
+          if (++homeProductCalls == 1) await slowHome.future;
+          return jsonResponse(200, {'data': [], 'meta': paginationMeta()});
+        }
+        return jsonResponse(404, errorEnvelope('not_found', 'no fake route'));
+      }),
+    );
+
+    await tester.pumpWidget(_shell(client));
+    await tester.pumpAndSettle();
+    expect(find.text('ABOUT_MARKER'), findsOneWidget); // انتقل إلى الصفحة الأولية وفُكّ Home
+
+    slowHome.complete(); // يصل ردّ Home بعد التفكيك
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('ABOUT_MARKER'), findsOneWidget);
+  });
 }
