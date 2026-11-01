@@ -64,3 +64,29 @@ describe('riyalToMinor decimal comma (was 1,5 -> 15 SAR)', () => {
     expect(Number.isNaN(riyalToMinor('abc'))).toBe(true);
   });
 });
+
+describe('the six ambiguous shapes, liters vs riyal (owner checklist)', () => {
+  // [المدخل, اللترات → mL (null = مرفوض), الريال → هللات (NaN = مرفوض)]
+  const cases: Array<[string, number | null, number]> = [
+    ['1,5', 1500, 150], // فاصلة عشرية صريحة
+    ['1.5', 1500, 150], // نقطة عشرية (صيغة النظام نفسه)
+    ['1,500', null, 150000], // لتر: 1.5 أم 1500 ملتبسة ⇒ رفض؛ ريال: 3 منازل لا تكون عشرية ⇒ آلاف
+    ['1.500', 1500, Number.NaN], // لتر: النقطة عشرية (صيغة النظام، 3 منازل)؛ ريال: منزلان كحد أقصى ⇒ رفض بدل قراءتها 1500
+    ['1,234.56', 1_234_560, 123456], // الفاصلة آلاف والنقطة عشرية
+    ['1.234,56', 1_234_560, 123456], // النقطة آلاف والفاصلة عشرية
+  ];
+
+  it.each(cases)('%s', (input, liters, riyalMinor) => {
+    expect(litersToMilliliters(input)).toBe(liters);
+    if (Number.isNaN(riyalMinor)) expect(Number.isNaN(riyalToMinor(input))).toBe(true);
+    else expect(riyalToMinor(input)).toBe(riyalMinor);
+  });
+
+  it('never silently turns a value into a different one: only one reading per accepted shape', () => {
+    // الصيغ المقبولة للتر تعطي قراءة واحدة؛ والملتبس يُرفض بدل التخمين.
+    expect(litersToMilliliters('1,5')).not.toBe(litersToMilliliters('15'));
+    expect(riyalToMinor('1,5')).not.toBe(riyalToMinor('15'));
+    expect(litersToMilliliters('1.234.567')).toBeNull();
+    expect(Number.isNaN(riyalToMinor('1.234.567'))).toBe(true);
+  });
+});
