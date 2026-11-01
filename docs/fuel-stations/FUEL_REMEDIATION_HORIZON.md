@@ -52,8 +52,8 @@
 | PR-9 | FS-15, 16 (+INV-08/09/11/13) | مخطَّطة | — | — | — | — |
 | PR-10 | FS-18, 19 (+INV-12) | مخطَّطة | — | — | — | — |
 | PR-11 | واجهات ناقصة (UX-16) | **محجوبة: أولويات المالك** | — | — | — | — |
-| PR-12a | FS-23 (حجب التكلفة/الهامش/سقف الائتمان) | قيد المراجعة | (يُملأ) | `61035c0` | (يُملأ) | — |
-| PR-12b | FS-35 (Resources بدل النماذج الخام) | مخطَّطة | — | — | — | — |
+| PR-12a | FS-23 (حجب التكلفة/الهامش/سقف الائتمان) | **مدموجة** | [#1899](https://github.com/safwan5001-source/Nebrax/pull/1899) | `61035c0` | `4221d36` | `7abbd9d` |
+| PR-12b | FS-35 (Resources بدل النماذج الخام) | قيد المراجعة | (يُملأ) | `7abbd9d` | (يُملأ) | — |
 | PR-12c | FS-22 (سجل تدقيق بالفاعل للبيانات الرئيسية/الأجهزة) | **محجوبة: تحتاج هجرة (جدول أحداث) ← تفويض مالك** | — | — | — | — |
 | PR-13 | FS-33 (+INV-14/15) | مخطَّطة (قد تحتاج هجرة ← اعتماد) | — | — | — | — |
 | PR-14 | FS-31 وبقية UX | مخطَّطة | — | — | — | — |
@@ -157,3 +157,11 @@
 - **خارج الشريحة (سطوح قد تكشف الائتمان):** إعداد `default_corporate_credit_limit_minor` في `GET fuel-stations/settings` (تحت `fuel_stations.view`)، و`credit-exposure` محروس أصلاً بـ`fuel.credit.view`. يُراجع مع FS-35.
 - **قرار مالك مطلوب (PR-12c / FS-22):** سجل تدقيق بالفاعل لتعديلات المحطات/الخزانات/المضخات/الفوهات/الأجهزة يحتاج جدول أحداث append-only جديداً (هجرة إضافية). لن يُنفَّذ قبل تفويض صريح للهجرة.
 - **التالي:** PR-12b (FS-35).
+
+### PR-12b — قوائم حقول صريحة (Resources) بدل النماذج الخام (FS-35)
+- **الخلل (مؤكد):** (1) أوامر الصيانة تحمّل `assignee` (والتحويل: `assignee`/`reporter`/`verifier`، والسلامة: `assignee`/`verifier`) كنموذج `User` كامل — البريد والدور والمستأجر — لكل من يملك `fuel.maintenance.view`. (2) `GET stations/{id}/sale-payment-methods` يعيد صفوف `PaymentMethod` الخام بما فيها `cash_bank_account_id` (ربط حساب الأستاذ) وإعدادات الدفع الإلكتروني. (3) الأسطول والأسعار تعيد النماذج الخام: `tenant_id`، `created_by`، `approved_by`، ورقم الهيكل `vin` وجوال السائق `mobile` وربط الموظف `employee_id` لكل من يملك `fuel.fleet.view`.
+- **الإصلاح:** أربعة موارد جديدة بقوائم بيضاء: `FuelFleetVehicleResource` و`FuelFleetDriverResource` (الحقول الحساسة `vin`/`mobile`/`employee_id` لمن يملك `fuel.fleet.manage` فقط)، `FuelSalePaymentMethodResource` (id، name، name_en، settlement_type، is_active)، `FuelStationProductPriceResource`. وعلاقات المستخدمين في الصيانة/السلامة تُحمَّل `id,name` فقط. أشكال الاستجابة: قوائم الأسطول والأسعار والطرق `{data:[…], links, meta}` (للأسعار كان `data.data` وتتحمله شاشة الإعدادات أصلاً).
+- **الملفات:** 4 موارد + `FuelFleetController`/`FuelSaleController`/`FuelStationReadinessController` + `FuelStationMaintenanceService`/`FuelStationSafetyService` (سطرا تحميل علاقات). لا هجرة ولا صلاحيات جديدة.
+- **الاختبارات:** `FuelResponseShapeTest` (3): الإسناد `id`/`name` فقط وعدم ظهور البريد في أي مكان، طرق الدفع بخمسة حقول فقط، الأسطول بلا الحقول الداخلية/الحساسة لغير المدير وبالحقول الكاملة (عدا `tenant_id`) للمدير. الثلاثة تفشل على `main`.
+- **ملاحظة:** `identifier` للسائق يبقى ظاهراً لمن يملك `fuel.fleet.view` لأن شاشة AVI تعرضه. لا تغيير في `GET fuel-stations/settings` (يتضمن `default_corporate_credit_limit_minor`) — يبقى بنداً لمراجعة سياسة لاحقة.
+- **التالي:** PR-13 (FS-33).
