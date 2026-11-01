@@ -167,4 +167,16 @@ class AppTemplateRegistryTest extends TestCase
             $this->assertNotNull(collect($cart['children'])->firstWhere('type', 'CartSummary'), "{$key}: الملخص خارج القائمة");
         }
     }
+
+    /** @test */
+    public function shop_templates_mirror_the_bundled_runtime_page_for_localized_names_and_variant_descriptors(): void
+    {
+        // مراجعة Codex: العنوان من `display_name` (يختار اللغة في الجهاز) وبند السلة يعرض `variant_descriptor` كما في الصفحة المضمَّنة.
+        foreach (['catalog', 'promo'] as $key) {
+            $json = json_encode($this->registry()->find($key)['schema']);
+            $this->assertStringNotContainsString('$item.name', $json, "{$key}: العنوان يجب أن يستعمل display_name");
+            $this->assertStringContainsString('$item.display_name', $json, "{$key}: display_name");
+            $this->assertStringContainsString('$item.variant_descriptor', $json, "{$key}: variant_descriptor");
+        }
+    }
 }

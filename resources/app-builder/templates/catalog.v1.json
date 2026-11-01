@@ -45,7 +45,7 @@
                     "type": "ProductCard",
                     "id": "card-template",
                     "props": {
-                      "title": "$item.name",
+                      "title": "$item.display_name",
                       "amountMinor": "$item.price.amount_minor"
                     },
                     "action": {
@@ -108,6 +108,15 @@
                   "title": "$item.product_name"
                 },
                 "children": [
+                  {
+                    "type": "Text",
+                    "id": "cart-line-template-variant",
+                    "optional": true,
+                    "props": {
+                      "text": "$item.variant_descriptor",
+                      "style": "caption"
+                    }
+                  },
                   {
                     "type": "Price",
                     "id": "cart-line-template-price",

@@ -21,3 +21,4 @@
 - **P1 — تجميع الإنتاج:** `deploy/assemble.sh` (الذي يبني صورة Docker ثم يحذف `/core`) لم يكن ينسخ `resources/app-builder/templates`، فيعود السجل فارغاً في الإنتاج وتُرفض كل القوالب. أُضيفت خطوة النسخ كما في CI و`setup.sh`.
 - **P2 — بوابة Dart:** مرشّحا `mobile-ci.yml` (push/PR) لم يشملا القوالب فلا يعمل اختبار Dart عند تغيير قالب وحده؛ أُضيف `resources/app-builder/templates/**` للمرشّحين.
 - **P2 — سلة القوالب:** صفحة السلة في `catalog` و`promo` كانت ملخصاً فقط (لا بنود). صارت تربط `commerce.cart` (`collect: items`) بقالب بند فيه السعر وتعديل الكمية (`updateCartQuantity`) والحذف (`removeCartItem`) والملخص خارج البنود؛ اختبار PHP جديد وبوابة Dart نفسها (متوافق بلا إسقاط).
+- **جولة ثانية (P2 × 2):** عنوان بطاقة المنتج صار `$item.display_name` (الذي يختار الجهاز لغته من `name`/`name_en`) بدل `$item.name`، وبند السلة يعرض `variant_descriptor` — مطابقان للصفحتين المضمَّنتين في Flutter (اختبار PHP يحرس الثلاثة).
