@@ -25,7 +25,7 @@
 |---|---|
 | `PartnerStatement*` (SQLite) | 47 passed (610 assertions) + 2 PostgreSQL-only skipped |
 | `PartnerStatement* + ApplicationCatalog + TenantApplication` (PostgreSQL) | 76 passed (766 assertions) |
-| Wider backend filter (`Application|Platform|Import|Nav|Entitlement|Rbac|Branch|Commercial|Role`, SQLite) | see the CI section below |
+| Wider backend filter (`Application|Platform|Import|Nav|Entitlement|Rbac|Branch|Commercial|Role`, SQLite) | 1804 passed, 40 skipped (PostgreSQL-only), **5 failed — all `Fuel*` tests that call `bcmul`/`bcadd` (no `bcmath` in this sandbox; CI has it)**; no application/platform/import/RBAC/branch/entitlement failure |
 | Web `components/platform`, `modules/imports`, `modules/roles` | 174 passed; 1 failure in `confirm-dialog.test.tsx` that **also fails on a clean `main` in this sandbox** (focus-trap in jsdom) — file untouched |
 - **Mutation controls (each fails ≥ 1 test, then restored):** `statusFor` rule removed (3) · `navVisibility` rule removed (1) · override-summary parity removed (1) · job-domain `app` binding removed (3) · data probe removed (2) · route middleware removed (5). Restored run: 47 passed.
 - **New-test coverage:** catalogue shape and uniqueness of the attribute · legacy tenant undecided ⇒ disabled while `purchases.cycle`/`hr.employees` stay enabled · new tenant undecided ⇒ disabled · explicit enable opens the four routes + nav + audit event · RBAC independence both ways · disable without data ⇒ 403 everywhere · disable with data ⇒ suspended (GET 200, POST 403) · per-tenant isolation · platform summary parity · import jobs: disabled blocks read/apply/list and writes nothing, re-enable restores, suspended keeps reads and refuses new jobs.
@@ -34,7 +34,7 @@
 1. **The key is visible but off by default everywhere.** `GET /applications` and `/applications/nav-state` list it (`enabled:false`); no sidebar entry exists (no screen yet), so nothing in the UI links to it. Tenants must enable it explicitly until the owner decides otherwise.
 2. **`suspended` blocks `inspect`/`preview`** (they are POST) — consistent with the platform rule "GET/HEAD only", even though both are read-only computations. Accepted; revisit only if the owner wants preview under suspension.
 3. **Commercial entitlements untouched** (operational gate). If the owner later wants plan-based sales of this capability, it becomes a separate commercial decision.
-4. **Shared code touched:** `ApplicationCatalog`, `TenantApplicationService`, `PlatformApplicationOverrideService`. The new attribute defaults to `false` and only one key sets it; the existing application/platform/entitlement suites were re-run (see CI).
+4. **Shared code touched:** `ApplicationCatalog`, `TenantApplicationService`, `PlatformApplicationOverrideService`. The new attribute defaults to `false` and only one key sets it; the existing application/platform/entitlement/import/RBAC suites were re-run locally (above) and run in CI.
 5. Local note: the PS-A1 sandbox failures (no `bcmath`, missing mirror folders) are environmental; CI is the authority.
 
 ## Next step (on owner approval, not started)
