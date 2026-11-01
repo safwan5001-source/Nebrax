@@ -52,6 +52,7 @@ class BuilderPublishRuntimeGenerationTest extends TestCase
     /** @test */
     public function a_draft_needing_a_newer_generation_is_rejected_when_only_the_current_generation_exists(): void
     {
+        $this->app->instance(RuntimeGenerations::class, new RuntimeGenerations([CapabilityManifest::current()]));
         [$auth, $appId] = $this->appWithDraft('pub-gen-1', '1.1.0');
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])->assertStatus(422);

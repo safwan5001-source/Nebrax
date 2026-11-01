@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +40,9 @@ export default function FuelShiftsPage() {
   const t = useTranslations('fuelStationsShifts');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const openKeys = useIntentKeys();
+  const readingKeys = useIntentKeys();
+  const cashKeys = useIntentKeys();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
@@ -105,9 +109,11 @@ export default function FuelShiftsPage() {
     if (!stationId || !isValidRiyal(openingFloat)) return;
     setBusy(true); setError(null);
     try {
+      const openBody = { fuel_station_id: stationId, opening_float_minor: riyalToMinor(openingFloat) };
       const created = await api<{ data: Shift }>('/fuel-stations/shifts/open', {
-        method: 'POST', body: { fuel_station_id: stationId, opening_float_minor: riyalToMinor(openingFloat), idempotency_key: crypto.randomUUID() },
+        method: 'POST', body: { ...openBody, idempotency_key: openKeys.keyFor(openBody) },
       });
+      openKeys.reset();
       const user = currentUser();
       if (user?.id) await api(`/fuel-stations/shifts/${created.data.id}/staff`, { method: 'POST', body: { user_id: user.id, role: 'attendant' } });
       success(t('openedSuccess')); setOpenDialog(false); setStationId(''); setOpeningFloat('0'); await load();
@@ -119,10 +125,12 @@ export default function FuelShiftsPage() {
     setBusy(true); setError(null);
     try {
       const endpoint = readingKind === 'meter' ? 'meter-readings' : 'tank-readings';
-      const body = readingKind === 'meter'
-        ? { fuel_nozzle_id: assetId, reading_stage: readingStage, meter_liters: readingLiters, evidence_key: crypto.randomUUID() }
-        : { fuel_tank_id: assetId, reading_stage: readingStage, reading_type: readingType, quantity_liters: readingLiters, evidence_key: crypto.randomUUID() };
+      const readingBody = readingKind === 'meter'
+        ? { fuel_nozzle_id: assetId, reading_stage: readingStage, meter_liters: readingLiters }
+        : { fuel_tank_id: assetId, reading_stage: readingStage, reading_type: readingType, quantity_liters: readingLiters };
+      const body = { ...readingBody, evidence_key: readingKeys.keyFor({ shift_id: readingShift.id, endpoint, ...readingBody }) };
       await api(`/fuel-stations/shifts/${readingShift.id}/${endpoint}`, { method: 'POST', body });
+      readingKeys.reset();
       success(t('readingSaved')); setReadingShift(null); setAssetId(''); setReadingLiters(''); await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -131,9 +139,11 @@ export default function FuelShiftsPage() {
     if (!cashShift || !isValidRiyal(movementAmount) || movementReason.trim().length < 3) return;
     setBusy(true); setError(null);
     try {
+      const cashBody = { type: movementType, amount_minor: riyalToMinor(movementAmount), reason: movementReason };
       await api(`/fuel-stations/shifts/${cashShift.id}/cash-movements`, {
-        method: 'POST', body: { type: movementType, amount_minor: riyalToMinor(movementAmount), reason: movementReason, idempotency_key: crypto.randomUUID() },
+        method: 'POST', body: { ...cashBody, idempotency_key: cashKeys.keyFor({ shift_id: cashShift.id, ...cashBody }) },
       });
+      cashKeys.reset();
       success(t('movementSaved')); setCashShift(null); setMovementAmount(''); setMovementReason(''); await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -175,8 +185,8 @@ export default function FuelShiftsPage() {
     { id: 'status', header: t('status'), cell: ({ row }) => <Badge tone={row.original.status === 'open' ? 'warning' : row.original.cash_variance?.status === 'pending_review' ? 'warning' : 'positive'}>{statusLabel[row.original.status]}</Badge> },
     { id: 'actions', header: t('actions'), cell: ({ row }) => <div className="flex flex-wrap justify-end gap-1.5">
       <Button variant="ghost" size="sm" onClick={() => setAuditShift(row.original)} aria-label={t('audit')}><History className="h-3.5 w-3.5" strokeWidth={1.7} />{t('audit')}</Button>
-      {row.original.status === 'open' && can('fuel.shift.open') && <Button variant="outline" size="sm" onClick={() => { setReadingShift(row.original); setReadingKind('meter'); setReadingStage('opening'); setAssetId(''); setReadingLiters(''); setError(null); }}><Gauge className="h-3.5 w-3.5" strokeWidth={1.7} />{t('recordReading')}</Button>}
-      {row.original.status === 'open' && can('fuel.shift.cash_count') && <Button variant="outline" size="sm" onClick={() => { setCashShift(row.original); setMovementType('cash_in'); setMovementAmount(''); setMovementReason(''); setError(null); }}><WalletCards className="h-3.5 w-3.5" strokeWidth={1.7} />{t('cashMovement')}</Button>}
+      {row.original.status === 'open' && can('fuel.shift.open') && <Button variant="outline" size="sm" onClick={() => { readingKeys.reset(); setReadingShift(row.original); setReadingKind('meter'); setReadingStage('opening'); setAssetId(''); setReadingLiters(''); setError(null); }}><Gauge className="h-3.5 w-3.5" strokeWidth={1.7} />{t('recordReading')}</Button>}
+      {row.original.status === 'open' && can('fuel.shift.cash_count') && <Button variant="outline" size="sm" onClick={() => { cashKeys.reset(); setCashShift(row.original); setMovementType('cash_in'); setMovementAmount(''); setMovementReason(''); setError(null); }}><WalletCards className="h-3.5 w-3.5" strokeWidth={1.7} />{t('cashMovement')}</Button>}
       {row.original.status === 'open' && can('fuel.shift.close') && can('fuel.shift.cash_count') && <Button variant="outline" size="sm" onClick={() => { setCloseShift(row.original); setCountedCash(''); setClosingNote(''); setError(null); }}><LockKeyhole className="h-3.5 w-3.5" strokeWidth={1.7} />{t('close')}</Button>}
       {row.original.cash_variance?.status === 'pending_review' && !row.original.cash_variance.reviewed_by && can('fuel.shift.cash_variance_review') && <Button variant="outline" size="sm" onClick={() => { setReviewShift(row.original); setReviewNote(''); setError(null); }}><ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('reviewVariance')}</Button>}
       {row.original.status === 'closed' && can('fuel.shift.approve') && <Button variant="outline" size="sm" onClick={() => { setApproveShift(row.original); setApprovalNote(''); setError(null); }}><ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('approve')}</Button>}
@@ -188,7 +198,7 @@ export default function FuelShiftsPage() {
   return <div className="space-y-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div>
-      <Button disabled={!can('fuel.shift.open') || stations.length === 0} title={!can('fuel.shift.open') ? t('openPermissionHint') : stations.length === 0 ? t('noStationHint') : undefined} onClick={() => { setOpenDialog(true); setStationId(''); setOpeningFloat('0'); setError(null); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('open')}</Button>
+      <Button disabled={!can('fuel.shift.open') || stations.length === 0} title={!can('fuel.shift.open') ? t('openPermissionHint') : stations.length === 0 ? t('noStationHint') : undefined} onClick={() => { openKeys.reset(); setOpenDialog(true); setStationId(''); setOpeningFloat('0'); setError(null); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('open')}</Button>
     </div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Summary icon={<Gauge />} label={t('summaryOpen')} value={String(shifts.filter((shift) => shift.status === 'open').length)} />

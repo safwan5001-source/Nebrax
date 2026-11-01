@@ -264,6 +264,9 @@ function ActionParamRow({
 // لم تُبنَ بعد؛ يُترَك الحقل قابلاً للربط لاحقاً حين تُبنى (مهمة منفصلة).
 const UNRESOLVABLE_QUERY_KEYS = new Set(['category_id']);
 
+/** ترتيبات لها تسمية بشرية في الرسائل؛ ما عداها يُعرض بمفتاحه الخام. */
+const KNOWN_SORT_KEYS = new Set(['name', 'sale_price', 'created_at', 'popularity']);
+
 function BindingEditor({
   binding,
   bindableResourceIds,
@@ -361,7 +364,7 @@ function BindingEditor({
                     >
                       <option value="">{t('binding.sortNoneOption')}</option>
                       {sortParams.map((param) => (
-                        <option key={param.key} value={param.key}>{param.key}</option>
+                        <option key={param.key} value={param.key}>{KNOWN_SORT_KEYS.has(param.key) ? t(`binding.sortOption.${param.key}`) : param.key}</option>
                       ))}
                     </Select>
                     {currentSortKey ? (

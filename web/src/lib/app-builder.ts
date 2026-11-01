@@ -131,12 +131,36 @@ export interface AppSchemaComponent {
   visibility?: VisibilityNode;
 }
 
+/** AD-04 / S09a — أيقونات التبويبات المسموحة (مطابقة لـ`contracts/app-builder/navigation-shell.v1.json`). */
+export const NAV_TAB_ICONS = ['home', 'search', 'category', 'cart', 'favorite', 'person', 'menu', 'orders', 'store', 'offers'] as const;
+export type NavTabIcon = (typeof NAV_TAB_ICONS)[number];
+export const NAV_LIMITS = { maxTabs: 8, maxVisibleTabs: 5, maxTabTitle: 24, maxAppBarTitle: 40 } as const;
+
+export interface AppSchemaTab {
+  pageId: string;
+  title: string;
+  icon: NavTabIcon;
+  hidden?: boolean;
+}
+
+export interface AppSchemaAppBar {
+  title?: string;
+  showCart?: boolean;
+}
+
+/** غلاف التنقل (AD-04): `tabs`/`appBar` اختياريان ويتطلبان جيل Runtime 1.1.0. */
+export interface AppSchemaNavigation {
+  initialPageId: string;
+  tabs?: AppSchemaTab[];
+  appBar?: AppSchemaAppBar;
+}
+
 export interface AppSchema {
   schemaVersion: string;
   minRuntimeVersion: string;
   requiredCapabilities?: Record<string, number>;
   theme?: { tokens?: Record<string, string> };
-  navigation: { initialPageId: string };
+  navigation: AppSchemaNavigation;
   pages: Record<string, AppSchemaComponent>;
 }
 
@@ -552,7 +576,90 @@ export function removePage(schema: AppSchema, pageId: string): AppSchema {
   if (schema.navigation.initialPageId === pageId) return schema;
   const nextPages = { ...schema.pages };
   delete nextPages[pageId];
-  return { ...schema, pages: nextPages };
+  // AD-04: تبويب يشير إلى الصفحة المحذوفة يُحذف معها (وإلا صار `tab_page_missing` حاجباً للنشر).
+  return removeNavTab({ ...schema, pages: nextPages }, pageId);
+}
+
+// ── غلاف التنقل (AD-04 / S09d): تبويبات سفلية وشريط علوي ─────────────────────────────────────
+
+const clampChars = (value: string, max: number): string => Array.from(value).slice(0, max).join('');
+
+/** عدد التبويبات الظاهرة (غير المخفية). */
+export function visibleTabCount(schema: AppSchema): number {
+  return (schema.navigation.tabs ?? []).filter((tab) => tab.hidden !== true).length;
+}
+
+function withTabs(schema: AppSchema, tabs: AppSchemaTab[]): AppSchema {
+  const { tabs: _drop, ...rest } = schema.navigation;
+  void _drop;
+  return { ...schema, navigation: tabs.length > 0 ? { ...rest, tabs } : rest };
+}
+
+/** يستبدل التبويبات كلها؛ القائمة الفارغة تحذف المفتاح (لا `tabs: []` — يرفضها المحلل). */
+export function setNavTabs(schema: AppSchema, tabs: AppSchemaTab[]): AppSchema {
+  return withTabs(schema, tabs);
+}
+
+/**
+ * يضيف تبويباً لصفحة معلنة. `null` إن كانت الصفحة غير معلنة أو لها تبويب أصلاً أو تجاوز الظاهرون الحد (5)،
+ * أو بلغ العدد الكلي الحد (8). العنوان يُقصّ إلى 24 حرفاً.
+ */
+export function addNavTab(schema: AppSchema, pageId: string, title: string, options: { hidden?: boolean; icon?: NavTabIcon } = {}): AppSchema | null {
+  const tabs = schema.navigation.tabs ?? [];
+  if (!(pageId in schema.pages) || tabs.some((tab) => tab.pageId === pageId) || tabs.length >= NAV_LIMITS.maxTabs) return null;
+  if (options.hidden !== true && visibleTabCount(schema) >= NAV_LIMITS.maxVisibleTabs) return null;
+  const tab: AppSchemaTab = { pageId, title: clampChars(title, NAV_LIMITS.maxTabTitle), icon: options.icon ?? 'home' };
+  if (options.hidden === true) tab.hidden = true;
+  return withTabs(schema, [...tabs, tab]);
+}
+
+/** يعدّل عنوان/أيقونة/إخفاء تبويب. `null` إن لم يوجد التبويب أو جعل تعديلُ الإظهار الظاهرين فوق الحد. */
+export function updateNavTab(schema: AppSchema, pageId: string, patch: { title?: string; icon?: NavTabIcon; hidden?: boolean }): AppSchema | null {
+  const tabs = schema.navigation.tabs ?? [];
+  const index = tabs.findIndex((tab) => tab.pageId === pageId);
+  if (index < 0) return null;
+  if (patch.hidden === false && tabs[index].hidden === true && visibleTabCount(schema) >= NAV_LIMITS.maxVisibleTabs) return null;
+  const next: AppSchemaTab = { ...tabs[index] };
+  if (patch.title !== undefined) next.title = clampChars(patch.title, NAV_LIMITS.maxTabTitle);
+  if (patch.icon !== undefined) next.icon = patch.icon;
+  if (patch.hidden !== undefined) {
+    if (patch.hidden) next.hidden = true;
+    else delete next.hidden;
+  }
+  return withTabs(schema, tabs.map((tab, i) => (i === index ? next : tab)));
+}
+
+export function removeNavTab(schema: AppSchema, pageId: string): AppSchema {
+  const tabs = schema.navigation.tabs;
+  if (!tabs || !tabs.some((tab) => tab.pageId === pageId)) return schema;
+  return withTabs(schema, tabs.filter((tab) => tab.pageId !== pageId));
+}
+
+/** يحرّك تبويباً خطوة؛ خارج الحدود يعيد المخطط نفسه. */
+export function moveNavTab(schema: AppSchema, pageId: string, direction: 'up' | 'down'): AppSchema {
+  const tabs = schema.navigation.tabs ?? [];
+  const index = tabs.findIndex((tab) => tab.pageId === pageId);
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || target < 0 || target >= tabs.length) return schema;
+  const next = [...tabs];
+  [next[index], next[target]] = [next[target], next[index]];
+  return withTabs(schema, next);
+}
+
+/**
+ * يضبط الشريط العلوي. كائن بلا قيم مفيدة (لا عنوان غير فارغ ولا `showCart` معلن) يحذف المفتاح — المحلل يرفض `appBar: {}`
+ * (PHP يفكّه إلى `[]`). العنوان يُقصّ إلى 40 حرفاً.
+ */
+export function setAppBar(schema: AppSchema, appBar: AppSchemaAppBar | undefined): AppSchema {
+  const { appBar: _drop, ...rest } = schema.navigation;
+  void _drop;
+  const next: AppSchemaAppBar = {};
+  // النص الخام يُحفظ كما كُتب (المسافات أثناء الكتابة لا تُقصّ — مراجعة Codex)؛ العنوان الفارغ/المسافات وحدها يُحذف.
+  const title = appBar?.title;
+  if (typeof title === 'string' && title.trim() !== '') next.title = clampChars(title, NAV_LIMITS.maxAppBarTitle);
+  // `showCart: false` هو الافتراضي = غياب المفتاح؛ لا يُخزَّن صراحةً كي يعود «إلغاء التحديد + مسح العنوان» إلى لا شريط (توافق 1.0.0).
+  if (appBar?.showCart === true) next.showCart = true;
+  return { ...schema, navigation: Object.keys(next).length > 0 ? { ...rest, appBar: next } : rest };
 }
 
 /** يجعل صفحة بمعرّفها هي الصفحة الرئيسية — صامتة إن لم تكن الصفحة معرَّفة أصلاً. */

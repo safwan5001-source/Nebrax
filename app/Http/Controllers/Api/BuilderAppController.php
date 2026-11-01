@@ -36,6 +36,7 @@ class BuilderAppController extends ApiController
             $data['name_en'] ?? null,
             $data['creation_source'],
             $request->user()?->id,
+            $data['template_key'] ?? null,
         ));
 
         return response()->json(['data' => new BuilderAppResource($app)], 201);

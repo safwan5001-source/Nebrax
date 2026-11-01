@@ -198,6 +198,17 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.pageTitleHint': 'Editor only',
     'easy.selectionBar.delete': 'Bar delete',
     'easy.identity.tab': 'Identity',
+    'easy.shell.tab': 'Shell',
+    'easy.shell.enableTabs': 'Enable bottom tabs',
+    'easy.shell.versionNote': 'Needs app version 1.1.0 or later.',
+    'easy.shell.tabsTitle': 'Bottom tabs',
+    'easy.shell.tabsHint': 'Up to 5 visible tabs.',
+    'easy.shell.barTitle': 'Top bar',
+    'easy.shell.barText': 'Top bar title',
+    'easy.shell.barTextPlaceholder': 'Default',
+    'easy.shell.showCart': 'Show cart button',
+    'easy.shell.tabTitle': 'Title of tab {page}',
+    'easy.shell.visibleCount': '{n}/{max} visible',
     'easy.identity.name': 'App name (Arabic)',
     'easy.identity.nameEn': 'App name (English)',
     'easy.identity.save': 'Save name',
@@ -569,6 +580,25 @@ describe('AppBuilderWorkspacePage', () => {
     await screen.findAllByText('Featured');
     const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+
+  it('Easy mode Shell tab: enabling tabs and a top bar title is saved in navigation (AD-04)', async () => {
+    for (const user of ['anonymous', 'u1', 'u3']) window.localStorage.setItem(`awj.appBuilder.editorMode.v1.${user}.app-1`, 'easy');
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+
+    await userEvent.setup().click(screen.getAllByRole('button', { name: 'Shell' })[0]);
+    await userEvent.setup().click((await screen.findAllByRole('button', { name: 'Enable bottom tabs' }))[0]);
+    expect(screen.getAllByText('Unsaved changes').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getAllByLabelText('Top bar title')[0], { target: { value: 'متجري' } });
+
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+    const put = api.mock.calls.filter((c) => String(c[0]).endsWith('/draft') && c[1]?.method === 'PUT').map((c) => c[1].body as { schema: { navigation: { initialPageId: string; tabs?: { pageId: string }[]; appBar?: { title?: string } } } });
+    const nav = put[put.length - 1].schema.navigation;
+    expect(nav.tabs?.map((t) => t.pageId)).toEqual([nav.initialPageId]);
+    expect(nav.appBar).toEqual({ title: 'متجري' });
   });
 
   it('selecting a component in the layers tree updates the Inspector with its props and action', async () => {

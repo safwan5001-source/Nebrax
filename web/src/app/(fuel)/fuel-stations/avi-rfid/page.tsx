@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatMillilitersAsLiters, litersToMilliliters } from '@/lib/fuel-quantity';
+import { useIntentKeys } from '@/lib/intent-key';
 import { asRecordArray, asStringArray, normalizeAviRfidAuthorization, normalizeAviRfidAuthorizations, type AviRfidAuthorization } from '@/lib/fuel-avi-rfid';
 
 interface Partner { id: string; name: string; type: string }
@@ -43,6 +44,7 @@ export default function FuelAviRfidPage() {
   const t = useTranslations('fuelStationsAvi');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const authorizationKeys = useIntentKeys();
   const [tags, setTags] = useState<Tag[]>([]); const [authorizations, setAuthorizations] = useState<Authorization[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]); const [contracts, setContracts] = useState<Contract[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]); const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -106,10 +108,14 @@ export default function FuelAviRfidPage() {
     if (!stationId || !nozzleId || !requested || (!vehicleCredential.trim() && !driverCredential.trim())) return;
     setBusy(true); setError(null);
     try {
-      const result = await api<ApiAuthorizationResponse>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
+      const authorizationBody = {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, vehicle_credential: vehicleCredential || null, driver_credential: driverCredential || null,
-        quantity_milliliters: requested, idempotency_key: crypto.randomUUID(),
+        quantity_milliliters: requested,
+      };
+      const result = await api<ApiAuthorizationResponse>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
+        ...authorizationBody, idempotency_key: authorizationKeys.keyFor(authorizationBody),
       }});
+      authorizationKeys.reset();
       setLastDecision(normalizeAviRfidAuthorization(result?.data)); success(t('decisionRecorded')); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -133,7 +139,7 @@ export default function FuelAviRfidPage() {
 
   if (loading && tags.length === 0) return <div className="space-y-4"><Skeleton className="h-9 w-72" /><Skeleton className="h-64 w-full" /></div>;
   return <div className="space-y-5">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!can('fuel.avi.authorize')} title={!can('fuel.avi.authorize') ? t('noPermission') : undefined} onClick={() => { resetAuthorizationForm(); setAuthorizationOpen(true); setError(null); }}><ShieldCheck className="h-4 w-4" />{t('authorize')}</Button><Button disabled={!can('fuel.avi.manage')} title={!can('fuel.avi.manage') ? t('noPermission') : undefined} onClick={() => { resetTagForm(); setTagOpen(true); setError(null); }}><Plus className="h-4 w-4" />{t('newTag')}</Button></div></div>
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!can('fuel.avi.authorize')} title={!can('fuel.avi.authorize') ? t('noPermission') : undefined} onClick={() => { resetAuthorizationForm(); authorizationKeys.reset(); setAuthorizationOpen(true); setError(null); }}><ShieldCheck className="h-4 w-4" />{t('authorize')}</Button><Button disabled={!can('fuel.avi.manage')} title={!can('fuel.avi.manage') ? t('noPermission') : undefined} onClick={() => { resetTagForm(); setTagOpen(true); setError(null); }}><Plus className="h-4 w-4" />{t('newTag')}</Button></div></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={<Fingerprint />} label={t('totalTags')} value={String(tags.length)} /><Metric icon={<KeyRound />} label={t('activeTags')} value={String(tags.filter((tag) => tag.status === 'active').length)} /><Metric icon={<BadgeCheck />} label={t('approved')} value={String(authorizations.filter((item) => item.decision === 'approved').length)} /><Metric icon={<CircleAlert />} label={t('denied')} value={String(authorizations.filter((item) => item.decision === 'denied').length)} /></div>
     <p className="rounded-md border border-border bg-primary-soft px-3 py-2 text-xs text-text">{t('separationNotice')}</p>
     {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}

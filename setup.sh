@@ -108,6 +108,9 @@ cp -r "$CORE_DIR/contracts/app-builder/"*.json   contracts/app-builder/
 # أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
 mkdir -p contracts/app-builder/archive
 cp -r "$CORE_DIR/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
+# سجل قوالب التطبيقات (AD-11 / S22a) — يقرؤه AppTemplateRegistry عبر resource_path() (تطابق ci.yml).
+mkdir -p resources/app-builder/templates
+cp -r "$CORE_DIR/resources/app-builder/templates/"*.json resources/app-builder/templates/
 # عقد رحلة الورود والهدايا (FLOWERS-H16) — يقارنه FlowersEndToEndJourneyTest ويقرؤه اختبار واجهة المتجر.
 cp -r "$CORE_DIR/contracts/flowers-journey/"*.json contracts/flowers-journey/
 # عقد رحلة التاجر الإدارية (FLOWERS-H2-15) — يقارنه FlowersMerchantAdminJourneyTest وتقرؤه واجهة الإدارة.

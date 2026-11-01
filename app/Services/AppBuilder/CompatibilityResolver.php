@@ -70,6 +70,18 @@ final class CompatibilityResolver
             }
         }
 
+        // AD-04 / S09a — ميزات الغلاف (`navigation.tabs`/`navigation.appBar`) ليست قابلة للإسقاط: جيل لا يعلنها
+        // لا يستطيع عرض التجربة (فشل مغلق، فلا تُخدَم لجهاز لا يعرضها) بدل إسقاط التبويبات بصمت.
+        $navigation = is_array($schema['navigation'] ?? null) ? $schema['navigation'] : [];
+        foreach (NavigationShell::requiredFeatures($navigation) as $feature) {
+            if (($manifest->schemaFeatureVersion($feature) ?? 0) < 1) {
+                return CompatibilityResult::incompatible(
+                    CompatibilityResult::REASON_MISSING_REQUIRED_CAPABILITY,
+                    "navigation shell feature \"{$feature}\" is not available in runtime {$manifest->runtimeVersion}",
+                );
+            }
+        }
+
         $fallbacks = [];
         foreach (($schema['pages'] ?? []) as $pageId => $root) {
             $requiredFailure = null;

@@ -109,6 +109,87 @@ ActionRef? substituteItemRefsInAction(ActionRef? action, Object? item) {
   return ActionRef(type: action.type, params: substituteItemRefsInProps(action.params, item));
 }
 
+// ── AD-09 / S08b — `binding.query` يصل إلى الطلب ─────────────────────────────
+
+/// الاستعلام الذي يُرسَل فعلاً لمورد: مفاتيح العقد فقط (`search`, `sort`,
+/// `category_id`, `per_page`) بأشكال قيم آمنة. أي شيء آخر (مفتاح مجهول، `id`،
+/// `page`، مرجع سياق `$route.*` لا مصدر له بعد، قيمة بشكل خاطئ) **يُسقَط ولا يُرسَل**
+/// — الفشل المغلق: لا نمرّر نصاً حراً من التاجر إلى الخادم خارج العقد. الخادم
+/// يعيد التحقق على أي حال. `per_page` يُقيَّد بـ1..100 (سقف الخادم).
+Map<String, String> sanitizedBindingQuery(SchemaBinding binding) {
+  final out = <String, String>{};
+  final query = binding.query;
+
+  final search = query['search'];
+  if (search is String) {
+    final trimmed = search.trim();
+    if (trimmed.isNotEmpty) {
+      out['search'] = trimmed.length > 120 ? trimmed.substring(0, 120) : trimmed;
+    }
+  }
+
+  final sort = query['sort'];
+  if (sort is String && RegExp(r'^-?[a-z_]{1,40}$').hasMatch(sort)) {
+    out['sort'] = sort;
+  }
+
+  final category = query['category_id'];
+  if (category is String &&
+      RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(category)) {
+    out['category_id'] = category;
+  }
+
+  final perPage = query['per_page'];
+  if (perPage is int) {
+    out['per_page'] = (perPage < 1 ? 1 : (perPage > 100 ? 100 : perPage)).toString();
+  }
+
+  return out;
+}
+
+/// مفتاح البيانات لربطٍ ما: معرّف المورد وحده حين لا استعلام فعّال (يطابق سلوك
+/// ما قبل S08b حرفياً)، وإلا `resource?k=v&…` بمفاتيح مرتَّبة (قانوني، لا يتأثر
+/// بترتيب المفاتيح في المخطط).
+String bindingDataKey(SchemaBinding binding) {
+  final query = sanitizedBindingQuery(binding);
+  if (query.isEmpty) return binding.resource;
+  final keys = query.keys.toList()..sort();
+  // القيم مرمَّزة: `search="a&sort=b"` لا يتطابق أبداً مع استعلامين منفصلين (فريد غير ملتبس).
+  return '${binding.resource}?${keys.map((k) => '$k=${Uri.encodeQueryComponent(query[k]!)}').join('&')}';
+}
+
+/// طلب بيانات مميَّز لمورد: [resource] + [query] المنقّى + [key] القانوني.
+class BindingRequest {
+  final String resource;
+  final Map<String, String> query;
+  final String key;
+
+  const BindingRequest({required this.resource, required this.query, required this.key});
+}
+
+/// كل الطلبات **المميَّزة** لـ[resource] تحت [root] (بعمق الشجرة)، بترتيب الظهور.
+/// الشاشة تجلب كل طلب مرة واحدة وتمرّر الخريطة `key → data` إلى
+/// [resolveNodeBindings].
+List<BindingRequest> collectBindingRequests(SchemaComponent root, String resource) {
+  final seen = <String, BindingRequest>{};
+  void visit(SchemaComponent node) {
+    final binding = node.binding;
+    if (binding != null && binding.resource == resource) {
+      final key = bindingDataKey(binding);
+      seen.putIfAbsent(
+        key,
+        () => BindingRequest(resource: resource, query: sanitizedBindingQuery(binding), key: key),
+      );
+    }
+    for (final child in node.children) {
+      visit(child);
+    }
+  }
+
+  visit(root);
+  return seen.values.toList();
+}
+
 /// Resolves every `binding` node under (and including) [root] against
 /// already-fetched raw resource data, producing an ordinary, fully-literal
 /// [SchemaComponent] tree. [resourceData] maps a `binding.resource` id
@@ -131,7 +212,8 @@ SchemaComponent _resolveBoundNode(
   SchemaBinding binding,
   Map<String, Object?> resourceData,
 ) {
-  final resolvedResource = resourceData[binding.resource];
+  // S08b: بيانات الاستعلام المحدّد أولاً، ثم المورد العاري (توافق مع المستدعين الأقدم).
+  final resolvedResource = resourceData[bindingDataKey(binding)] ?? resourceData[binding.resource];
 
   // A `collect` binding always means "repeat" — that is its entire purpose,
   // already proven safe for this schema by `CompatibilityResolver` (the

@@ -19,6 +19,20 @@ class StoreBuilderAppRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'name_en' => ['nullable', 'string', 'max:255'],
             'creation_source' => ['required', Rule::in(BuilderApp::CREATION_SOURCES)],
+            // AD-11: مفتاح قالب من السجل؛ لا يُقبل إلا مع `creation_source = template`.
+            'template_key' => [
+                'nullable', 'string', 'max:40',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null) {
+                        return;
+                    }
+                    if ($this->input('creation_source') !== 'template') {
+                        $fail('template_key لا يُستعمل إلا مع creation_source = template.');
+                    } elseif (app(\App\Services\AppBuilder\AppTemplateRegistry::class)->find((string) $value) === null) {
+                        $fail('القالب غير موجود.');
+                    }
+                },
+            ],
         ];
     }
 }

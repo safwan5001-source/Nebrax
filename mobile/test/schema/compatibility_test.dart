@@ -762,7 +762,8 @@ void main() {
           // constant deliberately stays empty; nothing here reaches a
           // remotely-fetched schema or an older installed client).
           expect(manifest.dataResources, {'commerce.products': 1, 'commerce.cart': 1});
-          expect(manifest.schemaFeatures, {'binding.collect': 1});
+          // AD-04: الجيل 1.1.0 يعرض غلاف التنقل فعلاً (`AwjRuntimeShell`) فيعلن ميزتيه، لا أكثر.
+          expect(manifest.schemaFeatures, {'binding.collect': 1, 'navigation.tabs': 1, 'navigation.appBar': 1});
 
           // `visibility` stays undeclared: no bundled schema uses it yet,
           // and declaring it without a real use would be capability theatre,

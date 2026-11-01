@@ -1,0 +1,421 @@
+{
+ "contract": "app-builder.navigation-shell",
+ "version": 1,
+ "decision": "AD-04 / S09a — navigation.tabs[] + navigation.appBar",
+ "pages": [
+  "home",
+  "shop",
+  "about",
+  "p4",
+  "p5",
+  "p6"
+ ],
+ "limits": {
+  "max_tabs": 8,
+  "max_visible_tabs": 5,
+  "max_tab_title": 24,
+  "max_app_bar_title": 40,
+  "icons": [
+   "home",
+   "search",
+   "category",
+   "cart",
+   "favorite",
+   "person",
+   "menu",
+   "orders",
+   "store",
+   "offers"
+  ]
+ },
+ "features": {
+  "tabs": "navigation.tabs",
+  "appBar": "navigation.appBar"
+ },
+ "cases": [
+  {
+   "name": "no shell keys",
+   "navigation": {},
+   "valid": true
+  },
+  {
+   "name": "valid tabs + appBar",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "الرئيسية",
+      "icon": "home"
+     },
+     {
+      "pageId": "shop",
+      "title": "المتجر",
+      "icon": "store"
+     },
+     {
+      "pageId": "about",
+      "title": "عنّا",
+      "icon": "menu",
+      "hidden": true
+     }
+    ],
+    "appBar": {
+     "title": "متجري",
+     "showCart": true
+    }
+   },
+   "valid": true
+  },
+  {
+   "name": "appBar only",
+   "navigation": {
+    "appBar": {
+     "showCart": false
+    }
+   },
+   "valid": true
+  },
+  {
+   "name": "empty appBar object (PHP decodes {} to [] and would serve it as an array — rejected)",
+   "navigation": {
+    "appBar": {}
+   },
+   "valid": false
+  },
+  {
+   "name": "5 visible + 1 hidden",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "تhome",
+      "icon": "home"
+     },
+     {
+      "pageId": "shop",
+      "title": "تshop",
+      "icon": "home"
+     },
+     {
+      "pageId": "about",
+      "title": "تabout",
+      "icon": "home"
+     },
+     {
+      "pageId": "p4",
+      "title": "تp4",
+      "icon": "home"
+     },
+     {
+      "pageId": "p5",
+      "title": "تp5",
+      "icon": "home"
+     },
+     {
+      "pageId": "p6",
+      "title": "م",
+      "icon": "menu",
+      "hidden": true
+     }
+    ]
+   },
+   "valid": true
+  },
+  {
+   "name": "tabs not a list (object)",
+   "navigation": {
+    "tabs": {
+     "a": {
+      "pageId": "home",
+      "title": "ع",
+      "icon": "home"
+     }
+    }
+   },
+   "valid": false
+  },
+  {
+   "name": "empty tabs",
+   "navigation": {
+    "tabs": []
+   },
+   "valid": false
+  },
+  {
+   "name": "unknown tab key",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "ع",
+      "icon": "home",
+      "evil": 1
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "missing title",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "blank title",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": " ",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "25-char title",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "ااااااااااااااااااااااااا",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "24-char title ok",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "اااااااااااااااااااااااا",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": true
+  },
+  {
+   "name": "unknown icon",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "x",
+      "icon": "rocket"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "hidden not bool",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "ع",
+      "icon": "home",
+      "hidden": "yes"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "page not declared",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "ghost",
+      "title": "ع",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "duplicate page",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "ع",
+      "icon": "home"
+     },
+     {
+      "pageId": "home",
+      "title": "تكرار",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "6 visible",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "تhome",
+      "icon": "home"
+     },
+     {
+      "pageId": "shop",
+      "title": "تshop",
+      "icon": "home"
+     },
+     {
+      "pageId": "about",
+      "title": "تabout",
+      "icon": "home"
+     },
+     {
+      "pageId": "p4",
+      "title": "تp4",
+      "icon": "home"
+     },
+     {
+      "pageId": "p5",
+      "title": "تp5",
+      "icon": "home"
+     },
+     {
+      "pageId": "p6",
+      "title": "تp6",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "9 tabs total",
+   "navigation": {
+    "tabs": [
+     {
+      "pageId": "home",
+      "title": "تhome",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "shop",
+      "title": "تshop",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "about",
+      "title": "تabout",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "p4",
+      "title": "تp4",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "p5",
+      "title": "تp5",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "p6",
+      "title": "تp6",
+      "icon": "home",
+      "hidden": true
+     },
+     {
+      "pageId": "x1",
+      "title": "ع",
+      "icon": "home"
+     },
+     {
+      "pageId": "x2",
+      "title": "ع",
+      "icon": "home"
+     },
+     {
+      "pageId": "x3",
+      "title": "ع",
+      "icon": "home"
+     }
+    ]
+   },
+   "valid": false
+  },
+  {
+   "name": "appBar not object",
+   "navigation": {
+    "appBar": "x"
+   },
+   "valid": false
+  },
+  {
+   "name": "appBar unknown key",
+   "navigation": {
+    "appBar": {
+     "title": "a",
+     "evil": true
+    }
+   },
+   "valid": false
+  },
+  {
+   "name": "appBar 41-char title",
+   "navigation": {
+    "appBar": {
+     "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   "valid": false
+  },
+  {
+   "name": "appBar 40-char title ok",
+   "navigation": {
+    "appBar": {
+     "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   "valid": true
+  },
+  {
+   "name": "appBar showCart not bool",
+   "navigation": {
+    "appBar": {
+     "showCart": "yes"
+    }
+   },
+   "valid": false
+  }
+ ],
+ "generation_1_1_0": {
+  "runtime": "1.1.0",
+  "schemaFeatures": {
+   "binding.collect": 1,
+   "navigation.tabs": 1,
+   "navigation.appBar": 1
+  },
+  "dataResources": {
+   "commerce.products": 1,
+   "commerce.cart": 1
+  }
+ }
+}

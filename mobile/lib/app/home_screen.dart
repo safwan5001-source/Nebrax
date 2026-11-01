@@ -5,6 +5,7 @@ import '../commerce/commerce.dart';
 import '../registry/registry.dart';
 import '../schema/schema.dart';
 import 'binding_resolution.dart';
+import 'page_bindings.dart';
 import 'experience_hydration.dart';
 import 'runtime_schema.dart';
 import 'runtime_state.dart';
@@ -60,15 +61,21 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   SchemaComponent? _basePage;
   String? _incompatibleMessage;
-  List<Object?>? _products;
+  /// بيانات كل طلب منتجات مميَّز مفتاحها [bindingDataKey] (S08b): قائمتان بترتيبين مختلفين تحملان بياناتهما الخاصة.
+  Map<String, List<Object?>>? _products;
   String? _errorMessage;
   bool _loading = true;
   int _lastHandledRefreshVersion = -1;
+
+  /// رقم تسلسلي للتحميل: تحميل أقدم ما زال في الطريق (تجربة سابقة/إعادة مشبوهة) لا يستبدل نتائج الأحدث.
+  int _loadSeq = 0;
 
   @override
   void initState() {
     super.initState();
     widget.state.addListener(_onStateChanged);
+    // نبدأ من إصدار التحديث الحالي: إشعار تنقّل عابر (مثل `startAt`) لا يجوز أن يطلق تحميلاً ثانياً.
+    _lastHandledRefreshVersion = widget.state.refreshVersion;
     _resolveSchema();
     _loadProducts();
   }
@@ -84,6 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // recomputed then too, not only in `initState`.
     if (!identical(oldWidget.experience, widget.experience)) {
       _resolveSchema();
+      // الاستعلامات تأتي من الصفحة المنشورة، فتغيّر التجربة يعيد الجلب (وإلا بقيت بيانات الصفحة المضمَّنة).
+      _loadProducts();
     }
   }
 
@@ -125,25 +134,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadProducts() async {
+    final seq = ++_loadSeq;
     setState(() => _loading = true);
     try {
-      final raw = await widget.client.fetchBindingResource('commerce.products');
+      // S08b — كل `binding.query` مميَّز على الصفحة = طلب واحد (التكرار يُجلب مرة). صفحة بلا ربط
+      // بالمنتجات (أو خطأ في الشجرة) ⇒ الطلب العاري الوحيد كما كان قبل الشريحة.
+      final page = _basePage;
+      var requests = page == null ? const <BindingRequest>[] : collectBindingRequests(page, 'commerce.products');
+      if (requests.isEmpty) {
+        requests = const [BindingRequest(resource: 'commerce.products', query: {}, key: 'commerce.products')];
+      }
+      final fetched = await Future.wait([
+        for (final request in requests)
+          widget.client.fetchBindingResource(
+            request.resource,
+            query: request.query.isEmpty ? null : request.query,
+          ),
+      ]);
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
-        _products = raw is List ? raw : const [];
+        _products = {
+          for (var i = 0; i < requests.length; i++)
+            requests[i].key: fetched[i] is List ? List<Object?>.of(fetched[i] as List) : const <Object?>[],
+        };
         _errorMessage = null;
         _loading = false;
       });
     } on CommerceApiException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } on CommerceProtocolException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted || seq != _loadSeq) return;
       // Any other transport failure (no network, DNS, an unconfigured
       // placeholder Commerce host — see `runtime_config.dart`) — this proof
       // has no real deployed tenant to point at by default.
@@ -169,23 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [widget.locale] but does **not** refetch — recomputes `display_name`
   /// fresh on every build, exactly like `localizedProductName` was already
   /// called fresh on every build before this screen used bindings.
-  List<Object?> _localizeProducts(List<Object?> rawProducts) {
-    return [
-      for (final entry in rawProducts)
-        if (entry is Map) _withDisplayName(entry.cast<String, Object?>()),
-    ];
-  }
-
-  Map<String, Object?> _withDisplayName(Map<String, Object?> item) {
-    return {
-      ...item,
-      'display_name': localizedProductName(
-        item['name'] is String ? item['name'] as String : '',
-        item['name_en'] is String ? item['name_en'] as String : null,
-        widget.locale,
-      ),
-    };
-  }
+  List<Object?> _localizeProducts(List<Object?> rawProducts) => localizeProductItems(rawProducts, widget.locale);
 
   @override
   Widget build(BuildContext context) {
@@ -215,7 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
       (node) => withProp(node, 'label', strings.goToCart),
     );
     hydrated = resolveNodeBindings(hydrated, {
-      'commerce.products': _localizeProducts(_products ?? const <Object?>[]),
+      for (final entry in (_products ?? const <String, List<Object?>>{}).entries)
+        entry.key: _localizeProducts(entry.value),
     });
     return ComponentView(node: hydrated, onAction: widget.dispatcher.dispatch);
   }

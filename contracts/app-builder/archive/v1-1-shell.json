@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "requiredCapabilities": null,
+  "theme": {
+    "tokens": {
+      "colorPrimary": "#0F6A5A"
+    }
+  },
+  "navigation": {
+    "initialPageId": "home",
+    "tabs": [
+      {
+        "pageId": "home",
+        "title": "الرئيسية",
+        "icon": "home"
+      },
+      {
+        "pageId": "shop",
+        "title": "المتجر",
+        "icon": "store"
+      },
+      {
+        "pageId": "cart",
+        "title": "السلة",
+        "icon": "cart",
+        "hidden": true
+      }
+    ],
+    "appBar": {
+      "title": "متجري",
+      "showCart": true
+    }
+  },
+  "pages": {
+    "home": {
+      "type": "Page",
+      "id": "home-root",
+      "optional": false,
+      "props": null,
+      "children": [
+        {
+          "type": "Text",
+          "id": "h",
+          "optional": false,
+          "props": {
+            "text": "مرحباً"
+          },
+          "children": null,
+          "action": null
+        }
+      ],
+      "action": null
+    },
+    "shop": {
+      "type": "Page",
+      "id": "shop-root",
+      "optional": false,
+      "props": null,
+      "children": [],
+      "action": null
+    },
+    "cart": {
+      "type": "Page",
+      "id": "cart-root",
+      "optional": false,
+      "props": null,
+      "children": [],
+      "action": null
+    }
+  }
+}

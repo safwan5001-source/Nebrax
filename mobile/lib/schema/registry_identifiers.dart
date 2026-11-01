@@ -126,5 +126,10 @@ class RuntimeCapabilities {
   /// `evaluateVisibility`/`pruneInvisible` were built in slice 3. PHP's
   /// `RuntimeCapabilities::SCHEMA_FEATURES` stays empty for both keys, for
   /// the identical reasons documented on [dataResources].
-  static const Map<String, int> schemaFeatures = {'binding.collect': 1};
+  static const Map<String, int> schemaFeatures = {
+    'binding.collect': 1,
+    // AD-04 / S09b — غلاف التنقل (الجيل 1.1.0): تبويبات سفلية وشريط علوي يعرضهما `AwjRuntimeShell`.
+    'navigation.tabs': 1,
+    'navigation.appBar': 1,
+  };
 }
