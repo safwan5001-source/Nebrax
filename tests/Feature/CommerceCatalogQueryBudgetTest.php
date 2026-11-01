@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
 use App\Models\Product;
 use App\Models\ProductMedia;
@@ -57,12 +58,23 @@ class CommerceCatalogQueryBudgetTest extends TestCase
         app(TenantContext::class)->forget();
     }
 
+    /** نشر التصنيف على قناة الجوال (بوابة COM-CATALOG-2): بلا صف نشر تُرجَع قائمة فارغة فلا يُقاس تسلسل أي صف. */
+    private function publishCategory(array $store, ProductCategory $category): void
+    {
+        CommerceCategoryListing::create([
+            'tenant_id' => $store['tenant']->id, 'category_id' => $category->id,
+            'sales_channel_id' => $store['channel']->id, 'is_published' => true,
+        ]);
+    }
+
     private function addCategories(array $store, int $count): void
     {
         app(TenantContext::class)->set($store['tenant']->id);
         for ($i = 0; $i < $count; $i++) {
             $parent = ProductCategory::create(['name' => 'جذر '.Str::random(5), 'is_active' => true]);
-            ProductCategory::create(['name' => 'فرع '.Str::random(5), 'is_active' => true, 'parent_id' => $parent->id]);
+            $this->publishCategory($store, $parent);
+            $child = ProductCategory::create(['name' => 'فرع '.Str::random(5), 'is_active' => true, 'parent_id' => $parent->id]);
+            $this->publishCategory($store, $child);
         }
         app(TenantContext::class)->forget();
     }
@@ -117,6 +129,9 @@ class CommerceCatalogQueryBudgetTest extends TestCase
         $manyCategory = $this->categoryWith($many, 20);
         $manyCount = $this->queries($many, '/commerce/v1/products?per_page=50&category_id='.$manyCategory);
 
+        // القياس على صفوف حقيقية (تصنيف منشور) لا استجابة فارغة.
+        $this->assertCount(3, $this->getJson('/commerce/v1/products?per_page=50&category_id='.$fewCategory, ['Authorization' => 'Bearer '.$few['token']])->json('data'));
+        $this->assertCount(20, $this->getJson('/commerce/v1/products?per_page=50&category_id='.$manyCategory, ['Authorization' => 'Bearer '.$many['token']])->json('data'));
         $this->assertSame($fewCount, $manyCount);
     }
 
@@ -130,6 +145,9 @@ class CommerceCatalogQueryBudgetTest extends TestCase
         $this->addCategories($many, 15);
         $manyCount = $this->queries($many, '/commerce/v1/categories');
 
+        // القياس على جذور منشورة فعلاً (2 ثم 15) بفروعها، لا استجابة فارغة.
+        $this->assertCount(2, $this->getJson('/commerce/v1/categories', ['Authorization' => 'Bearer '.$few['token']])->json('data'));
+        $this->assertCount(15, $this->getJson('/commerce/v1/categories', ['Authorization' => 'Bearer '.$many['token']])->json('data'));
         $this->assertSame($fewCount, $manyCount, 'شجرة التصنيفات: استعلامات نمت بزيادة التصنيفات — N+1');
     }
 
@@ -195,6 +213,7 @@ class CommerceCatalogQueryBudgetTest extends TestCase
     {
         app(TenantContext::class)->set($store['tenant']->id);
         $category = ProductCategory::create(['name' => 'تصنيف', 'is_active' => true]);
+        $this->publishCategory($store, $category);
         app(TenantContext::class)->forget();
         $this->addProducts($store, $products, $category->id);
 
