@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FuelCostVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,7 +17,8 @@ class CorporateFuelContractResource extends JsonResource
             'status' => $this->status,
             'effective_from' => $this->effective_from?->toIso8601String(),
             'effective_until' => $this->effective_until?->toIso8601String(),
-            'credit_limit_minor' => (int) $this->credit_limit_minor,
+            // FS-23: سقف الائتمان يحتاج `fuel.credit.view` لا `fuel.contract.view` وحدها.
+            'credit_limit_minor' => $this->when(FuelCostVisibility::canSeeCredit($request->user()), fn () => (int) $this->credit_limit_minor),
             'payment_terms_days' => (int) $this->payment_terms_days,
             'station_restriction_mode' => $this->station_restriction_mode,
             'fuel_restriction_mode' => $this->fuel_restriction_mode,
