@@ -6,6 +6,7 @@ use App\Models\FinancialControlAlert;
 use App\Models\FuelStation;
 use App\Models\FuelStationDevice;
 use App\Models\FuelStationMaintenanceSchedule;
+use App\Models\FuelStationReadinessEvent;
 use App\Models\FuelStationSafetyCorrectiveAction;
 use App\Models\FuelStationSafetyPermit;
 use App\Models\FuelStationWorkOrder;
