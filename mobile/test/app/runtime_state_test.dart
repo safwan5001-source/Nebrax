@@ -115,6 +115,27 @@ void main() {
       expect(state.page, RuntimePage.home);
     });
 
+    test('startAt yields to an explicit navigation that already happened (cold-start deep link / notification)', () {
+      for (final navigate in <void Function(RuntimeState)>[
+        (s) => s.goToProduct('p1'),
+        (s) => s.goToCart(),
+        (s) => s.goHome(),
+      ]) {
+        final state = RuntimeState()..declarePages(['about']);
+        navigate(state);
+        final page = state.page;
+        final product = state.selectedProductId;
+        state.startAt('about');
+        expect(state.page, page, reason: 'startAt must not override the explicit destination');
+        expect(state.selectedProductId, product);
+      }
+      final deep = RuntimeState()..declarePages(['about']);
+      deep.declarePages(['about']);
+      expect(deep.goToPage('about'), isTrue);
+      deep.startAt('cart');
+      expect(deep.page, RuntimePage.page);
+    });
+
     test('startAt ignores undeclared, home and null', () {
       final state = RuntimeState()..declarePages(['about']);
       state.startAt('nope');

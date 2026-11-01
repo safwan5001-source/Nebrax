@@ -44,6 +44,9 @@ class _PageScreenState extends State<PageScreen> {
   int _lastRefresh = 0;
   int _lastCart = 0;
 
+  /// رقم تسلسلي: تحميل أقدم يصل متأخراً (تحديث ثم تغيّر السلة) لا يستبدل بيانات الأحدث ولا أخطاءه.
+  int _loadSeq = 0;
+
   SchemaComponent? get _page => widget.experience.pages[widget.pageId];
 
   @override
@@ -78,6 +81,7 @@ class _PageScreenState extends State<PageScreen> {
 
   Future<void> _load() async {
     final page = _page;
+    final seq = ++_loadSeq;
     if (page == null) {
       setState(() => _loading = false);
       return;
@@ -88,25 +92,25 @@ class _PageScreenState extends State<PageScreen> {
     });
     try {
       final data = await fetchPageBindingData(widget.client, page);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _data = data;
         _loading = false;
       });
     } on CommerceApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } on CommerceProtocolException catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;

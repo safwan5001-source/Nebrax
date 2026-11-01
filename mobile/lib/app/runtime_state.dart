@@ -36,6 +36,9 @@ class RuntimeState extends ChangeNotifier {
   Set<String> _declaredPageIds = const {};
   bool _started = false;
 
+  /// تنقّل صريح حدث (رابط عميق/إشعار/إجراء) — الوجهة الأولية لا تطغى عليه (`startAt`).
+  bool _explicitNavigation = false;
+
   RuntimePage get page => _page;
   String? get selectedProductId => _selectedProductId;
   String? get selectedPageId => _selectedPageId;
@@ -59,6 +62,7 @@ class RuntimeState extends ChangeNotifier {
   void _pushCurrent() => _history.add(_Visit(_page, _selectedProductId, _selectedPageId));
 
   void goHome() {
+    _explicitNavigation = true;
     _history.clear();
     _page = RuntimePage.home;
     _selectedProductId = null;
@@ -67,6 +71,7 @@ class RuntimeState extends ChangeNotifier {
   }
 
   void goToProduct(String productId) {
+    _explicitNavigation = true;
     _pushCurrent();
     _page = RuntimePage.product;
     _selectedProductId = productId;
@@ -74,6 +79,7 @@ class RuntimeState extends ChangeNotifier {
   }
 
   void goToCart() {
+    _explicitNavigation = true;
     _pushCurrent();
     _page = RuntimePage.cart;
     notifyListeners();
@@ -84,6 +90,7 @@ class RuntimeState extends ChangeNotifier {
   /// maps them), and an undeclared id is ignored.
   bool goToPage(String pageId) {
     if (pageId == 'home' || pageId == 'cart' || !_declaredPageIds.contains(pageId)) return false;
+    _explicitNavigation = true;
     _pushCurrent();
     _page = RuntimePage.page;
     _selectedPageId = pageId;
@@ -95,7 +102,8 @@ class RuntimeState extends ChangeNotifier {
   /// only for a declared custom page or `cart`, only once per session, and
   /// without a history entry (the initial page is the root, not a detour).
   void startAt(String? pageId) {
-    if (_started || pageId == null || pageId == 'home') return;
+    // رابط عميق/إشعار بارد يُرسَل قبل اكتمال الإقلاع: وجهته الصريحة تتقدّم على الصفحة الأولية.
+    if (_started || _explicitNavigation || pageId == null || pageId == 'home') return;
     if (pageId == 'cart') {
       _started = true;
       _page = RuntimePage.cart;
@@ -111,6 +119,7 @@ class RuntimeState extends ChangeNotifier {
 
   void goBack() {
     if (_history.isEmpty) return;
+    _explicitNavigation = true;
     final previous = _history.removeLast();
     _page = previous.page;
     _selectedProductId = previous.productId;
