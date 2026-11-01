@@ -126,5 +126,9 @@ class ComponentRegistryTest extends TestCase
                 "bindableResources لـ{$type} خارج نطاق ADR-01 V1."
             );
         }
+
+        // العقد المشترك مع Dart (`CompatibilityResolver.bindableResources`): نفس الخريطة حرفياً، فلا يقبل جهاز ربطاً يرفضه الخادم.
+        $fixture = json_decode((string) file_get_contents(base_path('contracts/app-builder/registry-identifiers.v1.json')), true);
+        $this->assertEquals($expected, $fixture['bindableResources']);
     }
 }

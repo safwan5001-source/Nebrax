@@ -53,16 +53,44 @@ class CapabilityManifest {
   factory CapabilityManifest.current(RuntimePlatform platform) {
     return CapabilityManifest(
       platform: platform,
-      // AD-04 / S09a-b: الجيل 1.1.0 = ما قبله + غلاف التنقل (`navigation.tabs`/`navigation.appBar`).
-      runtimeVersion: const SchemaVersion(1, 1, 0),
+      // AD-02 / S11b: الجيل 1.2.0 = 1.1.0 (غلاف التنقل، AD-04) + التصنيفات والبحث.
+      runtimeVersion: const SchemaVersion(1, 2, 0),
       minSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
       maxSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
-      components: RuntimeCapabilities.components,
-      actions: RuntimeCapabilities.actions,
+      components: {...RuntimeCapabilities.components, ...RuntimeCapabilities.componentsV120},
+      actions: {...RuntimeCapabilities.actions, ...RuntimeCapabilities.actionsV120},
       nativeCapabilities: RuntimeCapabilities.nativeCapabilities,
-      dataResources: RuntimeCapabilities.dataResources,
+      dataResources: {...RuntimeCapabilities.dataResources, ...RuntimeCapabilities.dataResourcesV120},
       schemaFeatures: RuntimeCapabilities.schemaFeatures,
     );
+  }
+
+  /// مانيفست جيلٍ سابق معروف (للاختبارات وأرشيف التوافق CPT-05): `1.0.0` و`1.1.0` و`1.2.0` كما أُعلنت حرفياً
+  /// (تطابق `CapabilityManifest::current()/v110()/v120()` في الخادم). جيل مجهول ⇒ `null`.
+  static CapabilityManifest? generation(RuntimePlatform platform, String version) {
+    CapabilityManifest build({required SchemaVersion v, bool shell = false, bool categories = false}) {
+      return CapabilityManifest(
+        platform: platform,
+        runtimeVersion: v,
+        minSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
+        maxSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
+        components: {...RuntimeCapabilities.components, if (categories) ...RuntimeCapabilities.componentsV120},
+        actions: {...RuntimeCapabilities.actions, if (categories) ...RuntimeCapabilities.actionsV120},
+        nativeCapabilities: RuntimeCapabilities.nativeCapabilities,
+        dataResources: {...RuntimeCapabilities.dataResources, if (categories) ...RuntimeCapabilities.dataResourcesV120},
+        schemaFeatures: {
+          for (final e in RuntimeCapabilities.schemaFeatures.entries)
+            if (shell || (e.key != 'navigation.tabs' && e.key != 'navigation.appBar')) e.key: e.value,
+        },
+      );
+    }
+
+    return switch (version) {
+      '1.0.0' => build(v: const SchemaVersion(1, 0, 0)),
+      '1.1.0' => build(v: const SchemaVersion(1, 1, 0), shell: true),
+      '1.2.0' => build(v: const SchemaVersion(1, 2, 0), shell: true, categories: true),
+      _ => null,
+    };
   }
 
   int? componentVersion(String type) => components[type];

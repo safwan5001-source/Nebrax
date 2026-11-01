@@ -33,6 +33,7 @@ class ComponentRegistry {
     'Text': widgets.buildText,
     'Image': widgets.buildImage,
     'ProductList': widgets.buildProductList,
+    'CategoryList': widgets.buildCategoryList,
     'ProductCard': widgets.buildProductCard,
     'ProductDetail': widgets.buildProductDetail,
     'Price': widgets.buildPrice,

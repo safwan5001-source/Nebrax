@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "requiredCapabilities": null,
+  "theme": {
+    "tokens": {
+      "colorPrimary": "#0F6A5A"
+    }
+  },
+  "navigation": {
+    "initialPageId": "home"
+  },
+  "pages": {
+    "home": {
+      "type": "Page",
+      "id": "home-root",
+      "optional": false,
+      "props": null,
+      "children": [
+        {
+          "type": "Button",
+          "id": "search-btn",
+          "optional": false,
+          "props": {
+            "label": "بحث"
+          },
+          "children": null,
+          "action": {
+            "type": "openSearch",
+            "params": {}
+          }
+        },
+        {
+          "type": "CategoryList",
+          "id": "cats",
+          "optional": false,
+          "props": {
+            "layout": "grid",
+            "columns": 3
+          },
+          "children": [
+            {
+              "type": "Button",
+              "id": "cat-btn",
+              "optional": false,
+              "props": {
+                "label": "$item.name"
+              },
+              "children": null,
+              "action": {
+                "type": "openCategory",
+                "params": {
+                  "categoryId": "$item.id"
+                }
+              }
+            }
+          ],
+          "binding": {
+            "resource": "commerce.categories",
+            "itemProps": {}
+          },
+          "action": null
+        }
+      ],
+      "action": null
+    }
+  }
+}

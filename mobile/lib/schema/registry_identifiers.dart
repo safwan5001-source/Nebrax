@@ -45,6 +45,15 @@ class RuntimeCapabilities {
     'refresh': 1,
   };
 
+  /// AD-02 / S11 — إضافات الجيل 1.2.0 (التصنيفات والبحث) فوق جيل 1.1.0. **منفصلة عن [components]/[actions]/[dataResources]**
+  /// (تصف الجيل 1.0.0 المجمَّد، CPT-05) كما في الخادم (`RuntimeCapabilities::*_V120`)؛ يضمّها
+  /// `CapabilityManifest.current` وحدها.
+  static const Map<String, int> componentsV120 = {'CategoryList': 1};
+
+  static const Map<String, int> actionsV120 = {'openCategory': 1, 'openSearch': 1};
+
+  static const Map<String, int> dataResourcesV120 = {'commerce.categories': 1};
+
   /// Native (non-renderable, non-dispatchable) capabilities this runtime
   /// build can prove — distinct from [components]/[actions] because a
   /// capability like push routing is never a schema component nor an
