@@ -117,6 +117,12 @@ class ImportJobAccess
             abort(403, 'ليس لديك صلاحية لتنفيذ هذا الإجراء.');
         }
 
+        foreach (ImportJobDomain::alsoRequires($domain) as $permission) {
+            if (! Rbac::allows((string) $user->role, $permission)) {
+                abort(403, 'ليس لديك صلاحية لتنفيذ هذا الإجراء.');
+            }
+        }
+
         if ($gates['app'] !== null) {
             $this->applications->authorize($request, $gates['app']);
         }

@@ -117,6 +117,10 @@ Rules proposed (all pending §9):
 Static architecture test for the Track A wall; cross-tenant partner/reconciliation access (list, show, close, match); permission matrix (view vs reconcile vs none); idempotent re-upload; sign-convention matrix (customer/supplier × one/two columns); matching ladder with ambiguity; many-to-one explicit sum; period/branch filters equal to `partnerStatement` for the same inputs (parity test against the report); PostgreSQL real-fork race for create and for two reviewers confirming the same line; mutation controls for each guard.
 
 ## 9. Decisions needed (owner) — recommendation first
+
+> **2026-11-01 — approved by the owner: D-PS-01..04** (SAR only; independent `partner_statements.*` permissions with no implicit grant; `CompanyWide` with tenant isolation and the existing partner-visibility controls; policies P-1..P-5 as in §4.3, P-4/P-5 as clarified in the Tracker decision log). **D-PS-05..09, D-03, D-06 and D-13 remain open and are not assumed.**
+>
+> **Update 2026-11-01 (later): D-PS-08 approved** (independent application-catalogue key) **and the period-reconciliation policy approved** (many drafts per scope, one effective final). Design in [`AWJ_IMP_PS_A2_EXECUTION_PLAN.md`](AWJ_IMP_PS_A2_EXECUTION_PLAN.md). Still open: D-PS-05..07, D-PS-09, D-03, D-06, D-13.
 | ID | Question | Recommendation |
 |---|---|---|
 | D-PS-01 | Is v1 SAR-only with other currencies rejected? | Yes |

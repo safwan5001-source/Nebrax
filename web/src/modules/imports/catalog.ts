@@ -45,6 +45,7 @@ export const HUB_JOB_DOMAINS: ImportJobDomain[] = [
   'price_list_items',
   'inventory_opening',
   'stock_permit_import',
+  'partner_statement',
   'stocktake_count',
   'partner_master',
   'purchase_import',

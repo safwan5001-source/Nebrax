@@ -42,6 +42,18 @@ final class ImportJobDomain
         self::PURCHASE_IMPORT => ['view' => 'purchases.view', 'manage' => 'purchases.manage', 'app' => 'purchases.cycle'],
         // IMP-H7-S3: `POST stock-permits` المباشرة محروسة بـ`products.manage` + `inventory.core` (القراءة `products.view`) — البوابات نفسها لا أضعف؛ ويُفحص مخزن الفاعل في الخدمة.
         self::STOCK_PERMIT_IMPORT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
+        // IMP-PS-A1 (D-PS-02): صلاحيتان مستقلتان بلا منح ضمني. `app = null` عمداً: مفتاح التطبيق لم يُحسم (D-PS-08 مفتوح) فلا يُخترع مفتاحٌ ولا يُستعار؛ والطرف يُحلّ بـ`partners.view` في الخدمة.
+        self::PARTNER_STATEMENT => ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => null],
+    ];
+
+    /**
+     * صلاحياتٌ **إضافية** يشترطها المجال على كل مستوى (عرض/إدارة) فوق صلاحيته الخاصة — لا تُضعف بوابة ولا تُغني عنها. كشف حساب الطرف يعرض هوية الطرف وبياناته في قراءة التشغيلة، فيلزمه
+     * `partners.view` كي لا تكون قراءة التشغيلة (`GET /import-jobs`) باباً خلفياً إلى بيانات طرفٍ لا يراه المستخدم (IMP-PS-A1، Codex #1877 P1). تُفحص عند كل قراءة فيسري سحبها فوراً.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ALSO_REQUIRES = [
+        self::PARTNER_STATEMENT => ['partners.view'],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -74,6 +86,9 @@ final class ImportJobDomain
     /** مسودة إذنٍ مخزني واحد من ملف (IMP-H7-S3): وحدتها الملف كله ذرّياً، بلا ترحيل ولا قيد ولا حركة مخزون، ولا مسار ذكاء اصطناعي (D-09). */
     public const STOCK_PERMIT_IMPORT = 'stock_permit_import';
 
+    /** كشف حساب طرف (عميل/مورّد) مستورد من الطرف الآخر (IMP-PS-A1): وحدته الملف كله ذرّياً؛ **تجهيز مقارنة فقط** — لا قيد ولا مستند ولا رصيد ولا حركة مخزون ولا مسار ذكاء اصطناعي. */
+    public const PARTNER_STATEMENT = 'partner_statement';
+
     /** @return list<string> */
     /**
      * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
@@ -82,7 +97,7 @@ final class ImportJobDomain
      *
      * @var list<string>
      */
-    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT, self::PURCHASE_IMPORT, self::STOCK_PERMIT_IMPORT];
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT, self::PURCHASE_IMPORT, self::STOCK_PERMIT_IMPORT, self::PARTNER_STATEMENT];
 
     public static function values(): array
     {
@@ -98,7 +113,14 @@ final class ImportJobDomain
             self::EXPENSE_IMPORT,
             self::PURCHASE_IMPORT,
             self::STOCK_PERMIT_IMPORT,
+            self::PARTNER_STATEMENT,
         ];
+    }
+
+    /** @return list<string> صلاحيات إضافية يشترطها المجال على كل مستوى (قائمة فارغة لأغلب المجالات). */
+    public static function alsoRequires(string $domain): array
+    {
+        return self::ALSO_REQUIRES[$domain] ?? [];
     }
 
     /**

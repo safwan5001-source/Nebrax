@@ -83,6 +83,7 @@ class ApplyImportJobRequest extends FormRequest
                 StocktakeCountImportFields::keys(),
                 ExpenseImportFields::keys(),
                 PurchaseImportFields::keys(),
+                \App\Support\PartnerStatementImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.
@@ -117,6 +118,16 @@ class ApplyImportJobRequest extends FormRequest
             'permit_date' => ['sometimes', 'date_format:Y-m-d'],
             'reason' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            // IMP-PS-A1 — خيارات `partner_statement` (مجمَّدة مع المعاينة؛ هنا للمقارنة القانونية لا للتغيير).
+            'partner_id' => ['sometimes', 'uuid'],
+            'role' => ['sometimes', Rule::in(\App\Models\PartnerStatementReconciliation::ROLES)],
+            'period_from' => ['sometimes', 'date_format:Y-m-d'],
+            'period_to' => ['sometimes', 'date_format:Y-m-d'],
+            'currency' => ['sometimes', 'nullable', 'string', 'max:16'],
+            'amount_direction' => ['sometimes', 'nullable', Rule::in(\App\Support\PartnerStatementImportFields::DIRECTIONS)],
+            'date_tolerance_days' => ['sometimes', 'integer', 'min:0', 'max:'.\App\Services\PartnerStatementImportService::MAX_DATE_TOLERANCE_DAYS],
+            'amount_tolerance_minor' => ['sometimes', 'integer', 'min:0', 'max:'.\App\Services\PartnerStatementImportService::MAX_AMOUNT_TOLERANCE_MINOR],
+            'branch_id' => ['sometimes', 'nullable', 'uuid'],
             'apply_product_images' => ['sometimes', 'boolean'],
             'approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];
@@ -143,7 +154,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id', 'permit_type', 'permit_date'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id', 'permit_type', 'permit_date', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'amount_direction', 'date_tolerance_days', 'amount_tolerance_minor'] as $key) {
             // قيمة null الصريحة لنسبة الضريبة = غياب (تفضيل المؤسسة)، لا نصّاً فارغاً يخالف المجمَّد.
             if ($this->has($key) && ! ($key === 'default_tax_rate' && $this->input($key) === null)) {
                 $options[$key] = $this->string($key)->toString();
@@ -169,6 +180,9 @@ class ApplyImportJobRequest extends FormRequest
         // IMP-H7-S3 — رأس إذن المخزون: الفارغ = غياب (null) كي يقارَن بالمجمَّد قانونياً لا نصّياً.
         if ($this->has('target_warehouse_id')) {
             $options['target_warehouse_id'] = $this->string('target_warehouse_id')->toString() ?: null;
+        }
+        if ($this->has('branch_id')) {
+            $options['branch_id'] = $this->string('branch_id')->toString() ?: null;
         }
         if ($this->has('reason')) {
             $options['reason'] = $this->input('reason');
