@@ -1,6 +1,8 @@
 // الـ API يعيد المبالغ بالريال كنص ("1150.00"). نعرضها بفواصل آلاف + رمز الريال السعودي الرسمي.
 // (التحويل من الهللات يتم في طبقة الـ API؛ هنا تنسيق العرض فقط.)
 // U+20C1 SAUDI RIYAL SIGN — الرمز الرسمي المشفّر في Unicode 17.0.
+import { normalizeDecimalInput } from '@/lib/decimal-input';
+
 export const SAUDI_RIYAL_SYMBOL = '\u20C1';
 
 const formatter = new Intl.NumberFormat('en-US', {
@@ -80,11 +82,10 @@ export function riyalToMinor(input: string | number): number {
   let s = String(input).trim();
   if (!s) return 0;
 
-  // تطبيع: أرقام عربية-هندية → لاتينية، فاصلة عشرية عربية → نقطة، إزالة فواصل الآلاف والمسافات
-  s = s
-    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-    .replace(/[٫]/g, '.')
-    .replace(/[,٬\s]/g, '');
+  // تطبيع: الأرقام العربية-الهندية والفاصلة العشرية العربية، وفاصلة `1,5` عشرية و`1,500` آلاف (decimal-input).
+  const normalized = normalizeDecimalInput(s, 2);
+  if (normalized === null) return NaN;
+  s = normalized;
 
   if (!/^-?\d+(\.\d{1,2})?$/.test(s) || s.replace('-', '').replace('.', '').length > 15) {
     return NaN; // مدخل مشوّه أو أكبر من النطاق الآمن — على النموذج رفضه لا إرساله

@@ -100,15 +100,15 @@ void main() {
   test('the runtime declares exactly what the server records for generation 1.1.0 (shared fixture)', () {
     final fixture = (jsonDecode(File('../contracts/app-builder/navigation-shell.v1.json').readAsStringSync()) as Map<String, Object?>)['generation_1_1_0']!
         as Map<String, Object?>;
-    final m = CapabilityManifest.current(RuntimePlatform.android);
+    final m = CapabilityManifest.generation(RuntimePlatform.android, '1.1.0')!;
     expect(m.runtimeVersion.toString(), fixture['runtime']);
     expect(m.schemaFeatures, (fixture['schemaFeatures']! as Map).cast<String, int>());
     expect(m.dataResources, (fixture['dataResources']! as Map).cast<String, int>());
   });
 
-  test('the runtime declares generation 1.1.0 with both shell features', () {
+  test('the runtime declares the shell features (generation 1.1.0, kept cumulatively by the current 1.2.0)', () {
     final m = CapabilityManifest.current(RuntimePlatform.android);
-    expect(m.runtimeVersion.toString(), '1.1.0');
+    expect(m.runtimeVersion.toString(), '1.2.0');
     expect(m.schemaFeatureVersion(NavigationShell.featureTabs), 1);
     expect(m.schemaFeatureVersion(NavigationShell.featureAppBar), 1);
     expect(m.schemaFeatureVersion('binding.collect'), 1); // لا شيء مما سبق سقط

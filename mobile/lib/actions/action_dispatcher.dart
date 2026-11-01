@@ -13,6 +13,8 @@ import 'app_action.dart';
 abstract class ActionHandler {
   Future<void> onNavigate(NavigateAction action);
   Future<void> onOpenProduct(OpenProductAction action);
+  Future<void> onOpenCategory(OpenCategoryAction action);
+  Future<void> onOpenSearch(OpenSearchAction action);
   Future<void> onAddToCart(AddToCartAction action);
   Future<void> onUpdateCartQuantity(UpdateCartQuantityAction action);
   Future<void> onRemoveCartItem(RemoveCartItemAction action);
@@ -31,6 +33,10 @@ class NoopActionHandler implements ActionHandler {
   Future<void> onNavigate(NavigateAction action) async {}
   @override
   Future<void> onOpenProduct(OpenProductAction action) async {}
+  @override
+  Future<void> onOpenCategory(OpenCategoryAction action) async {}
+  @override
+  Future<void> onOpenSearch(OpenSearchAction action) async {}
   @override
   Future<void> onAddToCart(AddToCartAction action) async {}
   @override
@@ -58,6 +64,10 @@ class AppActionDispatcher {
         await handler.onNavigate(a);
       case OpenProductAction a:
         await handler.onOpenProduct(a);
+      case OpenCategoryAction a:
+        await handler.onOpenCategory(a);
+      case OpenSearchAction a:
+        await handler.onOpenSearch(a);
       case AddToCartAction a:
         await handler.onAddToCart(a);
       case UpdateCartQuantityAction a:

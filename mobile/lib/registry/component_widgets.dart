@@ -294,7 +294,17 @@ Widget buildProductList(
   BuildContext context,
   SchemaComponent node,
   ActionDispatch onAction,
-) {
+) => _buildListLayout(node, onAction);
+
+/// AD-02 / S11 (الجيل 1.2.0): قائمة التصنيفات — نفس تخطيط [buildProductList] (أفقي/شبكة/عمودي) وبالاتفاق نفسه، فالتصنيفات
+/// تُكرَّر بقالب عنصر (عادةً `Button` بإجراء `openCategory`) بعد أن يحلّ خط الربط `$item.*`.
+Widget buildCategoryList(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) => _buildListLayout(node, onAction);
+
+Widget _buildListLayout(SchemaComponent node, ActionDispatch onAction) {
   // S10a (CMP-02): `layout` = horizontal (الافتراضي، السلوك القديم حرفياً) | grid | vertical. قيمة غائبة أو
   // مجهولة ⇒ أفقي، كاتفاق `Text.style` (خاصية اختيارية تسقط للافتراضي لا رفض).
   final layout = _stringProp(node, 'layout', fallback: 'horizontal');
