@@ -120,6 +120,36 @@ class PartnerStatementReversalCharacterizationTest extends TestCase
     }
 
     /**
+     * Codex #1898 P2: عكس رصيد افتتاحي — دوره دور الأصل (طبيعة سطر الأصل) لا اتجاه سطر العكس المقلوب، وإلا ظهر دائنٌ وهمي في كشف المورد ولم يتصفّر كشف العميل.
+     *
+     * @test
+     */
+    public function a_reversed_opening_balance_keeps_the_role_of_its_original(): void
+    {
+        $ledger = app(LedgerService::class);
+        $post = fn (int $debit, int $credit, string $date) => $ledger->post([
+            ['account_id' => Account::where('code', $debit > 0 ? '1130' : '2110')->firstOrFail()->id, 'debit' => $debit, 'credit' => $credit, 'partner_type' => Partner::class, 'partner_id' => $this->both->id],
+            ['account_id' => Account::where('code', '3110')->firstOrFail()->id, 'debit' => $credit, 'credit' => $debit],
+        ], ['entry_date' => $date, 'description' => 'رصيد افتتاحي', 'source_type' => Partner::class, 'source_id' => $this->both->id]);
+
+        $customerOpening = $post(50000, 0, '2026-08-01');   // مدين ⇒ عميل
+        $supplierOpening = $post(0, 30000, '2026-08-02');   // دائن ⇒ مورد
+        $ledger->reverse($customerOpening, '2026-08-10', 'عكس افتتاحي العميل');
+
+        $customer = $this->reports->partnerStatement($this->both->id, ['partner_role' => 'customer']);
+        $supplier = $this->reports->partnerStatement($this->both->id, ['partner_role' => 'supplier']);
+
+        $this->assertSame([['2026-08-01', 50000, 0], ['2026-08-10', 0, 50000]], $this->shape($customer));
+        $this->assertSame(0, $customer['closing_balance'], 'افتتاحي العميل المعكوس يتصفّر في كشف العميل.');
+        $this->assertSame([['2026-08-02', 0, 30000]], $this->shape($supplier), 'لا دائن وهمي: عاكس افتتاحي العميل لا يظهر في كشف المورد.');
+        $this->assertSame(-30000, $supplier['closing_balance']);
+
+        $ledger->reverse($supplierOpening, '2026-08-12', 'عكس افتتاحي المورد');
+        $this->assertSame([['2026-08-02', 0, 30000], ['2026-08-12', 30000, 0]], $this->shape($this->reports->partnerStatement($this->both->id, ['partner_role' => 'supplier'])));
+        $this->assertCount(2, $this->reports->partnerStatement($this->both->id, ['partner_role' => 'customer'])['rows'], 'عاكس افتتاحي المورد لا يدخل كشف العميل.');
+    }
+
+    /**
      * يثبّت السلوك القائم الذي لا يغيّره الإصلاح: قيد يدوي موسوم بالطرف بلا مصدر وبلا أصل معكوس يبقى خارج كشف الدور (لا دور له).
      *
      * @test

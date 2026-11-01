@@ -684,11 +684,16 @@ class ReportService
             // قيد العكس يُنشأ بلا مصدر (`LedgerService::reverse`)، فكان سطره يسقط من كشف الدور ويبقى الأصل بلا ما يعادله. دوره هو دور أصله (PS-A2b).
             $effective = $this->effectiveEntrySources($lines);
             $sourceRoles = $this->partnerStatementSourceRoles($lines, $effective);
-            $lines = $lines->filter(function (JournalLine $line) use ($sourceRoles, $role, $effective) {
-                [$type, $id] = $effective[$line->journal_entry_id] ?? [null, null];
+            $openingRoots = $this->openingRootRoles($effective, $partnerId);
+            $lines = $lines->filter(function (JournalLine $line) use ($sourceRoles, $role, $effective, $openingRoots) {
+                [$type, $id, $root] = $effective[$line->journal_entry_id] ?? [null, null, null];
                 $key = ($type ?? '') . '#' . ($id ?? '');
                 // الرصيد الافتتاحي للطرف يُفصل بطبيعة السطر: مدين للعميل، دائن للمورد.
                 if ($type === Partner::class) {
+                    // عكس رصيد افتتاحي يتبع طبيعة **الأصل** لا اتجاهه المقلوب (وإلا نُسب دائنٌ وهمي للمورد).
+                    if ($root !== null && $root !== $line->journal_entry_id) {
+                        return ($openingRoots[$root] ?? null) === $role;
+                    }
                     return $role === 'supplier' ? $line->credit > $line->debit : $line->debit >= $line->credit;
                 }
                 return ($sourceRoles[$key] ?? null) === $role;
@@ -790,7 +795,9 @@ class ReportService
      * المصدر الفعّال لكل قيد ظاهر في الكشف: `[source_type, source_id]` من القيد نفسه إن وُجد، وإلا (قيد عكس) من أول سلف في سلسلة `reversal_of` له مصدر.
      * قراءة فقط بسقف عمق صغير؛ قيد بلا مصدر وبلا أصل (يدوي) يبقى `[null, null]` كما كان.
      *
-     * @return array<string, array{0: ?string, 1: ?string}> مفتاحه معرّف القيد
+     * العنصر الثالث: معرّف القيد **الجذر** (صاحب المصدر) الذي وصلنا إليه — القيد نفسه إن كان ذا مصدر.
+     *
+     * @return array<string, array{0: ?string, 1: ?string, 2: ?string}> مفتاحه معرّف القيد
      */
     protected function effectiveEntrySources(Collection $lines): array
     {
@@ -799,11 +806,11 @@ class ReportService
         foreach ($lines as $line) {
             $entry = $line->entry;
             if ($entry->source_type !== null && $entry->source_id !== null) {
-                $effective[$line->journal_entry_id] = [$entry->source_type, (string) $entry->source_id];
+                $effective[$line->journal_entry_id] = [$entry->source_type, (string) $entry->source_id, (string) $line->journal_entry_id];
             } elseif ($entry->reversal_of !== null) {
                 $pending[$line->journal_entry_id] = (string) $entry->reversal_of;
             } else {
-                $effective[$line->journal_entry_id] = [null, null];
+                $effective[$line->journal_entry_id] = [null, null, null];
             }
         }
 
@@ -813,22 +820,49 @@ class ReportService
             foreach ($pending as $entryId => $parentId) {
                 $parent = $parents->get($parentId);
                 if ($parent === null) {
-                    $effective[$entryId] = [null, null];
+                    $effective[$entryId] = [null, null, null];
                 } elseif ($parent->source_type !== null && $parent->source_id !== null) {
-                    $effective[$entryId] = [$parent->source_type, (string) $parent->source_id];
+                    $effective[$entryId] = [$parent->source_type, (string) $parent->source_id, (string) $parent->id];
                 } elseif ($parent->reversal_of !== null) {
                     $next[$entryId] = (string) $parent->reversal_of;
                 } else {
-                    $effective[$entryId] = [null, null];
+                    $effective[$entryId] = [null, null, null];
                 }
             }
             $pending = $next;
         }
         foreach ($pending as $entryId => $_) {
-            $effective[$entryId] = [null, null];
+            $effective[$entryId] = [null, null, null];
         }
 
         return $effective;
+    }
+
+    /**
+     * دور كل **أصل رصيد افتتاحي** وصلنا إليه عبر سلسلة عكس: صافي سطر الطرف في قيد الأصل (مدين ⇒ عميل، دائن ⇒ مورد) — نفس قاعدة الافتتاحي غير المعكوس.
+     *
+     * @param  array<string, array{0: ?string, 1: ?string, 2: ?string}>  $effective
+     * @return array<string, 'customer'|'supplier'> مفتاحه معرّف قيد الأصل
+     */
+    protected function openingRootRoles(array $effective, string $partnerId): array
+    {
+        $roots = [];
+        foreach ($effective as $entryId => [$type, , $root]) {
+            if ($type === Partner::class && $root !== null && $root !== $entryId) {
+                $roots[$root] = true;
+            }
+        }
+        if ($roots === []) {
+            return [];
+        }
+
+        $net = [];
+        foreach (JournalLine::query()->whereIn('journal_entry_id', array_keys($roots))
+            ->where('partner_type', Partner::class)->where('partner_id', $partnerId)->get(['journal_entry_id', 'debit', 'credit']) as $line) {
+            $net[$line->journal_entry_id] = ($net[$line->journal_entry_id] ?? 0) + (int) $line->debit - (int) $line->credit;
+        }
+
+        return array_map(fn (int $value): string => $value >= 0 ? 'customer' : 'supplier', $net);
     }
 
     /**

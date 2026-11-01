@@ -11,10 +11,11 @@
 | `both` partner, invoice 1,150.00 reversed + invoice 230.00, `partner_role=customer` | reversal row **missing** — customer statement overstated | rows identical to the unfiltered statement; closing 230.00 |
 | supplier purchase reversed, `partner_role=supplier` | reversal row missing | reversal row present; closing 0 |
 | the reversed purchase seen with `partner_role=customer` | (not shown) | still not shown (no leak) |
+| a reversed **opening balance** (debit ⇒ customer nature; credit ⇒ supplier nature) | reversal line dropped from both | reversal follows the **original's** nature (never the flipped direction of the reversing line — Codex #1898 P2, fixed in the same PR with its own test); no phantom payable in the supplier statement |
 | unfiltered statement | original + reversal, nets to 0 | unchanged |
 | manual, source-less entry tagged to the partner, any `partner_role` | excluded | **still excluded** (pinned by a test; the fix does not widen it) |
 
-**Fix (narrowest possible):** `ReportService::effectiveEntrySources()` resolves a source-less reversal entry to the source of the nearest ancestor reached through `reversal_of` (batched lookups, depth cap 8, chains such as reverse-of-reverse handled); the role filter and `partnerStatementSourceRoles()` use that effective source. Nothing is written, no entry or balance changes, the unfiltered report is untouched, and the opening-balance special case now also covers a reversed opening entry.
+**Fix (narrowest possible):** `ReportService::effectiveEntrySources()` resolves a source-less reversal entry to the source of the nearest ancestor reached through `reversal_of` (batched lookups, depth cap 8, chains such as reverse-of-reverse handled); the role filter and `partnerStatementSourceRoles()` use that effective source. Nothing is written, no entry or balance changes, the unfiltered report is untouched, and a reversed opening balance takes the role of its original (`openingRootRoles()`: net of the partner line on the root entry — debit ⇒ customer, credit ⇒ supplier), not the flipped direction of the reversing line.
 
 **Isolation of the behavioural change:** the only report output that changes is a **role-filtered statement of a partner that has a reversed document**; it now nets that document to zero exactly as the unfiltered statement already did. Everything else is held by the golden snapshot (§3). This is a read-side correction of a report the owner asked to verify; it is reported here and in the Tracker so it is not mistaken for a silent change. Note: the pre-existing role-filtered statements of such partners that someone exported earlier were overstated by the reversed amounts.
 
@@ -35,9 +36,9 @@ Each service row of `partnerStatement` gains `entry_id`, `entry_status` (`posted
 ## 5. Tests and verification
 | Run | Result |
 |---|---|
-| `PartnerLedgerCandidatesTest` + `PartnerStatementReversalCharacterizationTest` + `PartnerStatementReportGoldenTest` | SQLite 20 passed · PostgreSQL 20 passed |
-| Characterization **before** the fix | 2 of 4 failed (invoice and purchase role-filtered reversal) — then green after |
-| Mutation controls (each fails ≥ 1 test) | role filter ignoring the original's source (12 fail) · new keys removed (10) · golden: description / running balance altered inside `partnerStatement` · neutralisation removed · auth guard removed · view-permission check removed (needed a test that grants `partners.view` alone — added) · restricted-set mislabel |
+| `PartnerLedgerCandidatesTest` + `PartnerStatementReversalCharacterizationTest` (5) + `PartnerStatementReportGoldenTest` + `ReportStatementsTest` | SQLite 26 passed · PostgreSQL 26 passed |
+| Characterization **before** the fix | 2 of 4 failed (invoice and purchase role-filtered reversal) — then green after; the opening-balance case (added after Codex's review) failed before its fix and is green after |
+| Mutation controls (each fails ≥ 1 test) | role filter ignoring the original's source (12 fail) · new keys removed (10) · golden: description / running balance altered inside `partnerStatement` · neutralisation removed · auth guard removed · view-permission check removed (needed a test that grants `partners.view` alone — added) · restricted-set mislabel · opening reversal classified by the reversed direction (the Codex bug) |
 | Wider local filter (report / statement / fiscal-close / AR-AP / purchase / branch / ledger / partner / RBAC) | 1089 passed, 17 skipped (PostgreSQL-only), **5 failed — all `Fuel*` tests that call `bcmul`/`bcadd` (no `bcmath` in this sandbox; CI has it)**; no report/statement/ledger/branch/RBAC failure |
 - Financial no-effect: nothing is written by the candidate source or by the report change; the source files are statically checked and row counts of 9 financial/staging tables and account balances are unchanged by a call.
 
