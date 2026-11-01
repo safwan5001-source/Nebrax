@@ -54,6 +54,18 @@ return [
         'write_per_minute' => (int) env('STOREFRONT_GATEWAY_WRITE_LIMIT', 120),
     ],
 
+    /*
+     * B2C ACTIVATION READINESS — هوية زائر موقَّعة لمحدِّدات مصادقة المتجر (login/register/verify/resend/forgot/reset).
+     * مغلقة افتراضياً: تُفعَّل فقط بقرار تشغيلي بعد التحقق من مصدر العنوان الموثوق في بيئة خادم المتجر (راجع
+     * docs/audits/AWJ_B2C_ACTIVATION_READINESS_REPORT.md). لا تُقرأ أي ترويسة IP عامة؛ الاستثناء الوحيد ترويسة يوقّعها خادم المتجر.
+     * `backstop_multiplier`: سقف المتجر كله = الحدّ لكل زائر × هذا المضاعف (يبقى كابحاً لرشّ بيانات الاعتماد الموزّع).
+     */
+    'client_identity' => [
+        'enabled' => (bool) env('STOREFRONT_SIGNED_CLIENT_IP_ENABLED', false),
+        'max_skew_seconds' => (int) env('STOREFRONT_SIGNED_CLIENT_IP_MAX_SKEW', 60),
+        'backstop_multiplier' => (int) env('STOREFRONT_SIGNED_CLIENT_IP_BACKSTOP_MULTIPLIER', 10),
+    ],
+
     'managed_base_domain' => env('AWJ_STOREFRONT_BASE_DOMAIN', 'store.awj.app'),
 
     /*

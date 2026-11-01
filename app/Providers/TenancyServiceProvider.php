@@ -10,6 +10,7 @@ use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\Dns\DnsTxtResolver;
 use App\Support\Dns\NativeDnsTxtResolver;
 use App\Support\RevisionBuffer;
+use App\Support\StorefrontClientIdentity;
 use App\Support\SlowRequestMetrics;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchSharing;
@@ -190,7 +191,7 @@ class TenancyServiceProvider extends ServiceProvider
             $email = Str::lower(trim((string) $request->input('email')));
 
             return [
-                Limit::perMinute(10)->by("storefront-buyer-register|{$tenant}|ip|{$request->ip()}"),
+                ...StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-register', (string) $tenant, 10),
                 Limit::perMinute(3)->by("storefront-buyer-register|{$tenant}|email|{$email}"),
             ];
         });
@@ -200,7 +201,7 @@ class TenancyServiceProvider extends ServiceProvider
             $email = Str::lower(trim((string) $request->input('email')));
 
             return [
-                Limit::perMinute(20)->by("storefront-buyer-login|{$tenant}|ip|{$request->ip()}"),
+                ...StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-login', (string) $tenant, 20),
                 Limit::perMinute(5)->by("storefront-buyer-login|{$tenant}|email|{$email}"),
             ];
         });
@@ -213,22 +214,22 @@ class TenancyServiceProvider extends ServiceProvider
             $email = Str::lower(trim((string) $request->input('email')));
 
             return [
-                Limit::perMinute(20)->by("storefront-buyer-reset-request|{$tenant}|ip|{$request->ip()}"),
+                ...StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-reset-request', (string) $tenant, 20),
                 Limit::perMinute(3)->by("storefront-buyer-reset-request|{$tenant}|email|{$email}"),
             ];
         });
-        RateLimiter::for('storefront-buyer-reset', function (Request $request): Limit {
+        RateLimiter::for('storefront-buyer-reset', function (Request $request): array {
             $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
 
-            return Limit::perMinute(30)->by("storefront-buyer-reset|{$tenant}|ip|{$request->ip()}");
+            return StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-reset', (string) $tenant, 30);
         });
 
         // H6 Batch H — verification link consumption (per tenant+IP) and resend (per tenant+IP and per address:
         // a third party cannot mail-bomb an address by repeating the request).
-        RateLimiter::for('storefront-buyer-verify', function (Request $request): Limit {
+        RateLimiter::for('storefront-buyer-verify', function (Request $request): array {
             $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
 
-            return Limit::perMinute(30)->by("storefront-buyer-verify|{$tenant}|ip|{$request->ip()}");
+            return StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-verify', (string) $tenant, 30);
         });
 
         RateLimiter::for('storefront-buyer-resend', function (Request $request): array {
@@ -236,7 +237,7 @@ class TenancyServiceProvider extends ServiceProvider
             $email = Str::lower(trim((string) $request->input('email')));
 
             return [
-                Limit::perMinute(10)->by("storefront-buyer-resend|{$tenant}|ip|{$request->ip()}"),
+                ...StorefrontClientIdentity::networkLimits($request, 'storefront-buyer-resend', (string) $tenant, 10),
                 Limit::perHour(3)->by("storefront-buyer-resend|{$tenant}|email|{$email}"),
             ];
         });
