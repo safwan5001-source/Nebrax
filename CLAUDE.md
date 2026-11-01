@@ -402,6 +402,13 @@ php artisan serve
 
 الطلب الملغى يقرؤه المشتري `status: "cancelled"` + `cancellation: {cancelled_at}` في **كل** مسارات القراءة العامة (`/commerce/v1` ضيف/عميل قائمة وتفاصيل، و`/store/v1` الإتمام/الإعادة) عبر `CommerceOrderSerializer::publicStatus()`/`cancellationBlock()`؛ عمود `commerce_orders.status` يبقى `confirmed` (مصدر الحقيقة `cancelled_at`). غير الملغى **حرفياً كما كان** (لا مفتاح `cancellation`). السبب والملاحظة والفاعل للموظف وحده (`CommerceOrderStaffSerializer`). إضافة قيمة `cancelled` إلى enum العميل **تغيير مقصود** يخص العملاء الصارمين (موثَّق في OpenAPI والتقرير). الواجهة: `AccountOrderStatus` يستبدل الرحلة بإشعار الإلغاء (لا ادّعاء استرداد)، وتُخفى ملاحظة «لم يُدفع» للملغى. لا تفعيل للإلغاء (`COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقة). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3c-IMPLEMENTATION-REPORT.md`.
 
+## عمليات طلب المتجر — COPS (ADR-29، قيد التنفيذ)
+
+برنامج **COPS** (القبول، التنفيذ، التتبع، تنبيه التاجر، إعدادات تشغيل المتجر) عقده `docs/plans/store/ADR-29-COMMERCE-ORDER-OPERATIONS.md` (Accepted)، والتسليم الحيّ `docs/audits/AWJ_COPS_HORIZON_HANDOFF.md`، والحالة في المتتبّع §9. حتى الآن **وثائق فقط** (H1-0)؛ لا قبول ولا تنفيذ ولا تغذية أحداث مبنية بعد. ثوابته لكل شريحة قادمة:
+- الأبعاد منفصلة؛ لا عمود حالة دفع/تنفيذ/تشغيل مخزَّن ولا قيمة enum جديدة في `commerce_orders.status`؛ `operational_status` مشتق للعرض فقط.
+- رفض التاجر = `CommerceOrderLifecycleService::cancel()` بسبب `merchant_rejected` (لا مسار ثانٍ)؛ القبول اليدوي خلف `COMMERCE_ORDER_ACCEPTANCE_ENABLED` المغلقة، والطلب الإلكتروني غير المدفوع خارج الطابور والتنبيه.
+- أحداث الطلب تُكتب داخل معاملة الانتقال، و`commerce_order_feed_heads` **آخر قفل** فيها دائماً (اكتمال التغذية بترتيب الالتزام) + مصالحة بالحالة؛ لا قيد ولا حركة مخزون من COPS قبل قرارات D-8/D-10.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

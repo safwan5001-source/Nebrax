@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\FuelQuantity;
+use App\Support\FuelCostVisibility;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -59,8 +60,9 @@ class FuelSaleResource extends JsonResource
             'invoice_remaining_minor' => $this->whenLoaded('invoice', fn () => $this->invoice === null ? null : max(0, (int) $this->invoice->total - (int) $this->invoice->paid_amount)),
             'stock_movement_id' => $this->stock_movement_id,
             'cogs_journal_entry_id' => $this->cogs_journal_entry_id,
-            'cogs_minor' => $this->cogs_minor === null ? null : (int) $this->cogs_minor,
-            'cogs' => $this->cogs_minor === null ? null : Money::toRiyal((int) $this->cogs_minor),
+            // FS-23: التكلفة لا تظهر لمجرد `fuel.sale.view`؛ تحتاج `products.view_cost` (المفتاح يُحذف كاملاً).
+            'cogs_minor' => $this->when(FuelCostVisibility::canSeeCost($request->user()), fn () => $this->cogs_minor === null ? null : (int) $this->cogs_minor),
+            'cogs' => $this->when(FuelCostVisibility::canSeeCost($request->user()), fn () => $this->cogs_minor === null ? null : Money::toRiyal((int) $this->cogs_minor)),
             'payment_status' => $this->payment_status,
             'paid_minor' => (int) $this->paid_minor,
             'paid' => Money::toRiyal((int) $this->paid_minor),
