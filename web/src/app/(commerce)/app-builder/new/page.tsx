@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { FilePlus, LayoutTemplate, Palette } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,8 @@ import { CardTitleLevel } from '@/components/ui/card';
 import { FieldGrid, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { type AppSchema, type CreationSource } from '@/lib/app-builder';
-import { APP_BUILDER_TEMPLATES } from '@/modules/app-builder/templates';
+import { type CreationSource } from '@/lib/app-builder';
+import { fetchAppTemplates, localizedText, type AppTemplateMeta } from '@/modules/app-builder/template-catalog';
 
 interface PathOption {
   source: CreationSource;
@@ -46,13 +46,29 @@ export default function NewAppBuilderPage() {
   const t = useTranslations('appBuilder.new');
   const tc = useTranslations('common');
   const router = useRouter();
+  const locale = useLocale();
 
+  const [templates, setTemplates] = useState<AppTemplateMeta[] | null>(null);
+  const [templatesFailed, setTemplatesFailed] = useState(false);
   const [source, setSource] = useState<CreationSource | null>(null);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // آلية واحدة تطلق الجلب: التأثير يعتمد على رقم المحاولة، و«إعادة المحاولة» تزيده فقط (لا طلبان متزامنان).
+  // `cancelled` يمنع نتيجة طلب قديم (تغيّر المسار أثناءه) من الكتابة فوق الحالة.
+  const [templatesAttempt, setTemplatesAttempt] = useState(0);
+  React.useEffect(() => {
+    if (source !== 'template' || templates !== null) return;
+    let cancelled = false;
+    setTemplatesFailed(false);
+    fetchAppTemplates()
+      .then((loaded) => { if (!cancelled) setTemplates(loaded); })
+      .catch(() => { if (!cancelled) setTemplatesFailed(true); });
+    return () => { cancelled = true; };
+  }, [source, templates, templatesAttempt]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -74,26 +90,19 @@ export default function NewAppBuilderPage() {
     try {
       const response = await api<{ data: { id: string } }>('/app-builder/apps', {
         method: 'POST',
-        body: { name: name.trim(), name_en: nameEn.trim() || undefined, creation_source: source },
+        body: {
+          name: name.trim(),
+          name_en: nameEn.trim() || undefined,
+          creation_source: source,
+          // AD-11: الخادم يزرع القالب ذرّياً مع إنشاء التطبيق؛ فشله يُعرض ولا يترك تطبيقاً بقشرة فارغة.
+          ...(source === 'template' ? { template_key: templateId } : {}),
+        },
       });
-      const templateSchema = source === 'template' ? APP_BUILDER_TEMPLATES.find((tpl) => tpl.id === templateId)?.schema : null;
-      if (templateSchema) {
-        // The app is already created at this point; a failure here leaves it on the safe
-        // minimal shell instead of the chosen template rather than losing the app itself —
-        // navigate through regardless, matching the Builder workspace's own "Use My Store
-        // Design" failure posture (fail into a safe existing state, never block navigation).
-        await seedTemplate(response.data.id, templateSchema).catch(() => undefined);
-      }
       router.push(`/app-builder/${response.data.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
       setSaving(false);
     }
-  }
-
-  async function seedTemplate(appId: string, schema: AppSchema) {
-    // AD-01: المسودة الجديدة عند revision 0؛ نبذرها بأساس صريح.
-    await api(`/app-builder/apps/${appId}/draft`, { method: 'PUT', body: { schema, base_revision: 0 } });
   }
 
   return (
@@ -153,28 +162,39 @@ export default function NewAppBuilderPage() {
 
           {source === 'template' ? (
             <FormSection title={t('templateSectionTitle')}>
-              <div role="radiogroup" aria-label={t('templateSectionTitle')} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {APP_BUILDER_TEMPLATES.map((template) => {
-                  const selected = templateId === template.id;
-                  return (
-                    <button
-                      key={template.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setTemplateId(template.id)}
-                      className={cn(
-                        'flex flex-col items-start gap-1.5 rounded border p-4 text-start transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                        selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-background'
-                      )}
-                    >
-                      <span className="font-medium text-text">{t(`templates.${template.nameKey}`)}</span>
-                      <span className="text-xs leading-relaxed text-muted">{t(`templates.${template.descriptionKey}`)}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {templatesFailed ? (
+                <div className="flex items-center gap-3 text-sm text-muted">
+                  <span role="alert">{t('templatesLoadFailed')}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setTemplatesAttempt((n) => n + 1)}>{t('templatesRetry')}</Button>
+                </div>
+              ) : templates === null ? (
+                <p className="text-sm text-muted" role="status">{t('templatesLoading')}</p>
+              ) : templates.length === 0 ? (
+                <p className="text-sm text-muted">{t('templatesEmpty')}</p>
+              ) : (
+                <div role="radiogroup" aria-label={t('templateSectionTitle')} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {templates.map((template) => {
+                    const selected = templateId === template.key;
+                    return (
+                      <button
+                        key={template.key}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setTemplateId(template.key)}
+                        className={cn(
+                          'flex flex-col items-start gap-1.5 rounded border p-4 text-start transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                          selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-background'
+                        )}
+                      >
+                        <span className="font-medium text-text">{localizedText(template.name, locale)}</span>
+                        <span className="text-xs leading-relaxed text-muted">{localizedText(template.description, locale)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </FormSection>
           ) : null}
 
