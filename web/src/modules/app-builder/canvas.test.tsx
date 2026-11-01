@@ -312,3 +312,37 @@ describe('AppBuilderCanvas — MOBILE-PREVIEW-3 interactive=false (App Preview s
     expect(onSelect).not.toHaveBeenCalled();
   });
 });
+
+describe('AppBuilderCanvas — S10a ProductList layout', () => {
+  const card = (n: number): AppSchemaComponent => ({ type: 'ProductCard', id: `c${n}`, props: { title: `P${n}`, amountMinor: 1000 } });
+  const renderList = (props?: Record<string, unknown>) => {
+    const root: AppSchemaComponent = {
+      type: 'Page', id: 'root',
+      children: [{ type: 'ProductList', id: 'pl', props, children: [card(1), card(2), card(3), card(4)] } as AppSchemaComponent],
+    };
+    return render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+  };
+
+  it('defaults to the horizontal scroller and ignores unknown layouts', () => {
+    const { container, unmount } = renderList();
+    expect(container.querySelector('[data-layout="horizontal"]')).toBeTruthy();
+    unmount();
+    const second = renderList({ layout: 'diagonal' });
+    expect(second.container.querySelector('[data-layout="horizontal"]')).toBeTruthy();
+  });
+
+  it('renders a grid with the requested columns, clamped to 2..4', () => {
+    const grid = renderList({ layout: 'grid', columns: 3 }).container.querySelector('[data-layout="grid"]') as HTMLElement;
+    expect(grid.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+    cleanup();
+    const clampedHigh = renderList({ layout: 'grid', columns: 99 }).container.querySelector('[data-layout="grid"]') as HTMLElement;
+    expect(clampedHigh.style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
+    cleanup();
+    const bad = renderList({ layout: 'grid', columns: 'x' }).container.querySelector('[data-layout="grid"]') as HTMLElement;
+    expect(bad.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+  });
+
+  it('renders the vertical stack', () => {
+    expect(renderList({ layout: 'vertical' }).container.querySelector('[data-layout="vertical"]')).toBeTruthy();
+  });
+});

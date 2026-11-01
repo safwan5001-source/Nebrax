@@ -215,6 +215,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('ProductList layout (S10a)', () {
+    List<SchemaComponent> cards(int n) => [
+          for (var i = 0; i < n; i++)
+            node(type: 'ProductCard', id: 'p$i', props: {'title': 'منتج $i', 'amountMinor': 1000 + i}),
+        ];
+
+    Future<void> pumpWide(WidgetTester tester, SchemaComponent list, {double width = 400, double scale = 1}) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(size: Size(width, 900), textScaler: TextScaler.linear(scale)),
+            child: Scaffold(body: SingleChildScrollView(child: ComponentView(node: list, onAction: (_) async {}))),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('grid lays cards out in the requested number of columns', (tester) async {
+      await pumpWide(tester, node(type: 'ProductList', props: {'layout': 'grid', 'columns': 3}, children: cards(6)));
+      final xs = {for (var i = 0; i < 6; i++) tester.getTopLeft(find.text('منتج $i')).dx.round()};
+      expect(xs.length, 3, reason: 'six cards in three columns share three distinct x offsets');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('columns are clamped to 2..4 and a bad value falls back to 2', (tester) async {
+      await pumpWide(tester, node(type: 'ProductList', props: {'layout': 'grid', 'columns': 99}, children: cards(8)));
+      expect({for (var i = 0; i < 8; i++) tester.getTopLeft(find.text('منتج $i')).dx.round()}.length, 4);
+      await pumpWide(tester, node(type: 'ProductList', props: {'layout': 'grid', 'columns': 'x'}, children: cards(4)));
+      expect({for (var i = 0; i < 4; i++) tester.getTopLeft(find.text('منتج $i')).dx.round()}.length, 2);
+    });
+
+    testWidgets('vertical stacks cards in a single column at full width', (tester) async {
+      await pumpWide(tester, node(type: 'ProductList', props: {'layout': 'vertical'}, children: cards(3)));
+      expect({for (var i = 0; i < 3; i++) tester.getTopLeft(find.text('منتج $i')).dx.round()}.length, 1);
+      final ys = [for (var i = 0; i < 3; i++) tester.getTopLeft(find.text('منتج $i')).dy];
+      expect(ys[0] < ys[1] && ys[1] < ys[2], isTrue);
+    });
+
+    testWidgets('missing or unknown layout keeps the horizontal scroller (backward compatible)', (tester) async {
+      await pumpWide(tester, node(type: 'ProductList', children: cards(2)));
+      expect(find.byType(SingleChildScrollView), findsWidgets);
+      final ys = {for (var i = 0; i < 2; i++) tester.getTopLeft(find.text('منتج $i')).dy.round()};
+      expect(ys.length, 1, reason: 'horizontal: same row');
+      await pumpWide(tester, node(type: 'ProductList', props: {'layout': 'diagonal'}, children: cards(2)));
+      expect({for (var i = 0; i < 2; i++) tester.getTopLeft(find.text('منتج $i')).dy.round()}.length, 1);
+    });
+
+    testWidgets('grid survives an accessibility text scale without overflow', (tester) async {
+      await pumpWide(
+        tester,
+        node(type: 'ProductList', props: {'layout': 'grid', 'columns': 4}, children: cards(8)),
+        width: 360,
+        scale: 2,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   testWidgets('ExperienceView renders the requested page and routes taps through the dispatcher',
       (tester) async {
     final handler = RecordingActionHandler();

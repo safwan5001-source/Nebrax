@@ -188,15 +188,16 @@ final class CompatibilityResolver
             return false;
         }
 
-        // `ProductList`/`CartList` (شكل قائمة) لا يعلنان أيّ `props` خاصة بهما —
-        // `itemProps` هناك يستهدف قالب عنصر لم يُحسم شكله بعد (`APP-BUILDER-15`/
-        // `17`)، فالتحقّق من مطابقة `propKey` لخصائص المكوّن نفسه يُطبَّق فقط
-        // حين يُعلن المكوّن (شكل مفرد، مثل `ProductDetail`/`CartSummary`) خصائصه
-        // فعلياً — تحقّق صحة حقل المورد المقروء يبقى إلزامياً في الحالتين.
+        // `ProductList`/`CartList` (شكل قائمة = `listShape`) `itemProps` عندها يستهدف قالب العنصر
+        // لا خصائص الحاوية (`APP-BUILDER-15`/`17`)، فالتحقّق من مطابقة `propKey` لخصائص المكوّن نفسه يُطبَّق فقط على
+        // الشكل المفرد (مثل `ProductDetail`/`CartSummary`). كان «شكل القائمة» يُستدلّ عليه بخلوّ `props`؛
+        // S10a أضافت لـ`ProductList` خصائص عرض (`layout`/`columns`) فصار الشكل علامةً صريحة `listShape` على التعريف — تحقّق صحة
+        // حقل المورد المقروء يبقى إلزامياً في الحالتين.
+        $isListShape = $component->listShape;
         $componentPropKeys = array_map(fn (PropDefinition $prop) => $prop->key, $component->props);
         $readableFields = $resource->readableFieldKeys();
         foreach (($binding['itemProps'] ?? []) as $propKey => $fieldPath) {
-            if ($componentPropKeys !== [] && ! in_array($propKey, $componentPropKeys, true)) {
+            if (! $isListShape && $componentPropKeys !== [] && ! in_array($propKey, $componentPropKeys, true)) {
                 return false;
             }
             $topSegment = explode('.', (string) $fieldPath, 2)[0];
