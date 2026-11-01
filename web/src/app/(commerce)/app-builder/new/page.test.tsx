@@ -5,6 +5,22 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NewAppBuilderPage from './page';
 
+const TEMPLATES = [
+  { key: 'blank', version: 1, vertical: null, name: { ar: 'فارغ', en: 'Blank' }, description: { ar: 'صفحة واحدة', en: 'One home page.' }, min_runtime: '1.0.0' },
+  { key: 'catalog', version: 1, vertical: 'retail', name: { ar: 'متجر منتجات', en: 'Product store' }, description: { ar: 'منتجات حيّة', en: 'Live products + cart.' }, min_runtime: '1.0.0' },
+];
+
+/** api مزيَّف: الدليل يعيد القوالب، الإنشاء يعيد معرّفاً، وكل ما سواه يُسجَّل. */
+function mockApi(calls: { path: string; options?: { method?: string; body?: unknown } }[] = []) {
+  api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+    calls.push({ path, options });
+    if (path === '/app-builder/templates') return Promise.resolve({ data: TEMPLATES });
+    if (path === '/app-builder/apps') return Promise.resolve({ data: { id: 'app-42' } });
+    return Promise.resolve({ data: {} });
+  });
+  return calls;
+}
+
 const { api, push, translate } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     title: 'Create app',
@@ -30,16 +46,16 @@ const { api, push, translate } = vi.hoisted(() => {
     saveFailed: 'Could not save.',
     templateSectionTitle: 'Template',
     templateRequired: 'Choose a template first.',
-    'templates.blankName': 'Blank',
-    'templates.blankDescription': 'One home page.',
-    'templates.catalogName': 'Catalog',
-    'templates.catalogDescription': 'Featured products + cart.',
+    templatesLoading: 'Loading templates…',
+    templatesLoadFailed: 'Could not load templates.',
+    templatesRetry: 'Retry',
+    templatesEmpty: 'No templates are available.',
   };
   const translator = Object.assign((key: string) => strings[key] ?? key, { raw: () => ({}) });
   return { api: vi.fn(), push: vi.fn(), translate: translator };
 });
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'en' }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -97,8 +113,9 @@ describe('NewAppBuilderPage', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/app-builder/app-42'));
   });
 
-  it('choosing the template path requires picking a template before Create is enabled', async () => {
+  it('choosing the template path loads the server registry and requires a pick before Create is enabled', async () => {
     const user = userEvent.setup();
+    mockApi();
     render(<NewAppBuilderPage />);
 
     await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
@@ -106,50 +123,90 @@ describe('NewAppBuilderPage', () => {
     // Name is filled but no template chosen yet — Create stays disabled.
     expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
 
-    await user.click(screen.getByRole('radio', { name: /Blank/ }));
+    await user.click(await screen.findByRole('radio', { name: /Blank/ }));
     expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(api).toHaveBeenCalledWith('/app-builder/templates');
   });
 
-  it('creating an app from a template seeds the draft with the chosen template schema, then redirects', async () => {
+  it('does not fetch templates for the other paths', async () => {
     const user = userEvent.setup();
-    const calls: { path: string; options?: { method?: string; body?: unknown } }[] = [];
-    api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
-      calls.push({ path, options });
-      if (path === '/app-builder/apps') return Promise.resolve({ data: { id: 'app-42' } });
-      return Promise.resolve({ data: {} });
-    });
+    mockApi();
+    render(<NewAppBuilderPage />);
+
+    await user.click(screen.getByRole('radio', { name: /Start from scratch/ }));
+    expect(api).not.toHaveBeenCalledWith('/app-builder/templates');
+  });
+
+  it('creating from a template sends template_key and lets the server seed the draft (no client draft write)', async () => {
+    const user = userEvent.setup();
+    const calls = mockApi();
     render(<NewAppBuilderPage />);
 
     await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
-    await user.click(screen.getByRole('radio', { name: /Catalog/ }));
+    await user.click(await screen.findByRole('radio', { name: /Product store/ }));
     await user.type(screen.getByLabelText('Name (Arabic)'), 'تطبيقي');
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/app-builder/app-42'));
 
     const createCall = calls.find((c) => c.path === '/app-builder/apps');
-    expect(createCall?.options?.body).toEqual({ name: 'تطبيقي', name_en: undefined, creation_source: 'template' });
-
-    const seedCall = calls.find((c) => c.path === '/app-builder/apps/app-42/draft');
-    expect(seedCall).toBeTruthy();
-    expect(seedCall?.options?.method).toBe('PUT');
-    const seededSchema = seedCall?.options?.body as { schema?: { pages?: Record<string, unknown> }; base_revision?: number };
-    // AD-01: بذر المسودة الجديدة بأساس صريح (revision 0).
-    expect(seededSchema.base_revision).toBe(0);
-    expect(Object.keys(seededSchema.schema?.pages ?? {})).toEqual(['home', 'cart']);
+    expect(createCall?.options?.body).toEqual({
+      name: 'تطبيقي', name_en: undefined, creation_source: 'template', template_key: 'catalog',
+    });
+    expect(calls.some((c) => c.path.endsWith('/draft'))).toBe(false);
   });
 
-  it('shows a save-failed message when the API rejects the request', async () => {
+  it('a non-template creation never sends template_key', async () => {
     const user = userEvent.setup();
-    const { ApiError } = await import('@/lib/api');
-    api.mockRejectedValue(new ApiError(422, 'Could not save.', null));
+    const calls = mockApi();
     render(<NewAppBuilderPage />);
 
+    // اختر قالباً ثم غيّر المسار: لا يتسرّب المفتاح.
+    await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
+    await user.click(await screen.findByRole('radio', { name: /Blank/ }));
     await user.click(screen.getByRole('radio', { name: /Start from scratch/ }));
     await user.type(screen.getByLabelText('Name (Arabic)'), 'تطبيقي');
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
-    expect(await screen.findByText('Could not save.')).toBeTruthy();
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    const body = calls.find((c) => c.path === '/app-builder/apps')?.options?.body as Record<string, unknown>;
+    expect('template_key' in body).toBe(false);
+  });
+
+  it('shows a visible error with retry when the registry cannot be loaded', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    api.mockImplementation((path: string) => {
+      if (path === '/app-builder/templates') {
+        attempts += 1;
+        return attempts === 1 ? Promise.reject(new Error('down')) : Promise.resolve({ data: TEMPLATES });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    render(<NewAppBuilderPage />);
+
+    await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not load templates.');
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('radio', { name: /Blank/ })).toBeTruthy();
+  });
+
+  it('a server rejection of the creation is shown and does not navigate (no half-built app is hidden)', async () => {
+    const user = userEvent.setup();
+    const { ApiError } = await import('@/lib/api');
+    api.mockImplementation((path: string) => {
+      if (path === '/app-builder/templates') return Promise.resolve({ data: TEMPLATES });
+      return Promise.reject(new ApiError(422, 'القالب غير معروف.', null));
+    });
+    render(<NewAppBuilderPage />);
+
+    await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
+    await user.click(await screen.findByRole('radio', { name: /Blank/ }));
+    await user.type(screen.getByLabelText('Name (Arabic)'), 'تطبيقي');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect((await screen.findByText('القالب غير معروف.'))).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
   });
 });

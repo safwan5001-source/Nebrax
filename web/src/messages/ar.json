@@ -8492,13 +8492,11 @@
       "scratchTitle": "البدء من الصفر",
       "scratchDescription": "تطبيق فارغ بحدٍّ أدنى آمن — صفحة رئيسية واحدة جاهزة للتعديل.",
       "templateSectionTitle": "القالب",
+      "templatesLoading": "جارٍ تحميل القوالب…",
+      "templatesLoadFailed": "تعذّر تحميل القوالب.",
+      "templatesRetry": "إعادة المحاولة",
+      "templatesEmpty": "لا توجد قوالب متاحة.",
       "templateRequired": "اختر قالباً أولاً.",
-      "templates": {
-        "blankName": "فارغ",
-        "blankDescription": "صفحة رئيسية واحدة برسالة ترحيب قصيرة — أبسط نقطة بداية حقيقية.",
-        "catalogName": "كتالوج",
-        "catalogDescription": "صفحة منتجات مميّزة مرتبطة بصفحة سلة — تُظهر تنقّلاً حقيقياً بين الصفحات."
-      },
       "nameLabel": "الاسم (عربي)",
       "namePlaceholder": "اسم التطبيق",
       "nameEnLabel": "الاسم (إنجليزي، اختياري)",

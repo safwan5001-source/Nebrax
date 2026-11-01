@@ -8492,13 +8492,11 @@
       "scratchTitle": "Start from scratch",
       "scratchDescription": "A blank, safe minimum app — one home page ready to edit.",
       "templateSectionTitle": "Template",
+      "templatesLoading": "Loading templates…",
+      "templatesLoadFailed": "Could not load templates.",
+      "templatesRetry": "Retry",
+      "templatesEmpty": "No templates are available.",
       "templateRequired": "Choose a template first.",
-      "templates": {
-        "blankName": "Blank",
-        "blankDescription": "One home page with a short welcome message — the simplest real starting point.",
-        "catalogName": "Catalog",
-        "catalogDescription": "A featured-products page linked to a cart page — demonstrates real page-to-page navigation."
-      },
       "nameLabel": "Name (Arabic)",
       "namePlaceholder": "App name",
       "nameEnLabel": "Name (English, optional)",
