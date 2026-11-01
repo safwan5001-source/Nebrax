@@ -166,6 +166,9 @@ function ChannelAccountsCard({ store, channelId }: { store: CommerceStoreOption;
   // Turning ON is impossible (server 409) while the deployment gate is closed; turning OFF is always allowed.
   const blockedOn = !persisted.customer_accounts_enabled && !deploymentOn;
   const lastChange = (persisted.recent_changes ?? []).find((event) => event.changes && 'customer_accounts_enabled' in event.changes);
+  // A wholesale-marked channel keeps buyer-only rules of its own (shared sign-in via the wholesale gate, approved-buyer
+  // cart/checkout): copy about guest checkout would be false there, so it is qualified instead.
+  const wholesale = persisted.wholesale_membership_enabled === true;
   const valueText = (value: unknown) => (value === true ? t('valueOn') : t('valueOff'));
 
   return (
@@ -206,10 +209,10 @@ function ChannelAccountsCard({ store, channelId }: { store: CommerceStoreOption;
           data-testid="status-body"
         >
           <Info aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
-          <span>{t(`statusBody.${status}` as CustomerAccountsMessageKey)}</span>
+          <span>{t(`${wholesale ? 'statusBodyWholesale' : 'statusBody'}.${status}` as CustomerAccountsMessageKey)}</span>
         </p>
 
-        {dirty && !shown ? <p className="text-xs leading-relaxed text-muted">{t('turnOffNote')} {t('guestNote')}</p> : null}
+        {dirty && !shown ? <p className="text-xs leading-relaxed text-muted">{wholesale ? t('turnOffNoteWholesale') : `${t('turnOffNote')} ${t('guestNote')}`}</p> : null}
 
         {error ? <p role="alert" className="text-sm text-negative">{error}</p> : null}
 

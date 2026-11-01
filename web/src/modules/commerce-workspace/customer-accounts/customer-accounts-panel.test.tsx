@@ -242,6 +242,35 @@ describe('CustomerAccountsScreen', () => {
     expect((toggle() as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('a wholesale-marked channel never promises guest checkout and states that wholesale rules are independent (ar + en)', async () => {
+    for (const lang of ['en', 'ar'] as const) {
+      locale.current = lang;
+      apiMock.mockReset();
+      apiMock.mockResolvedValue({ data: settings({ wholesale_membership_enabled: true, customer_accounts_enabled: true }) });
+      const view = mount();
+      await screen.findByTestId('customer-accounts-card');
+      const body = screen.getByTestId('status-body').textContent ?? '';
+      expect(body, lang).not.toMatch(/Guest checkout remains|الشراء كضيف يبقى/);
+      expect(body, lang).toMatch(lang === 'en' ? /marked wholesale/ : /قناة جملة/);
+      fireEvent.click(toggle());
+      expect(screen.queryByText(/Guest checkout stays|الشراء كضيف يبقى/), lang).toBeNull();
+      expect(screen.getByText(lang === 'en' ? /approved wholesale buyers/ : /مشتري الجملة المعتمدين/), lang).toBeTruthy();
+      view.unmount();
+    }
+  });
+
+  it('saving on a wholesale-marked channel still sends only {customer_accounts_enabled}', async () => {
+    apiMock.mockImplementation((_path: string, options?: { method?: string }) =>
+      Promise.resolve({ data: settings({ wholesale_membership_enabled: true, customer_accounts_enabled: options?.method === 'PUT' }) }),
+    );
+    mount();
+    await screen.findByTestId('customer-accounts-card');
+    fireEvent.click(toggle());
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Customer accounts setting saved');
+    expect(puts()[0][1]).toEqual({ method: 'PUT', body: { customer_accounts_enabled: true } });
+  });
+
   it('turning off explains the consequences before saving', async () => {
     apiMock.mockResolvedValue({ data: settings({ customer_accounts_enabled: true }) });
     mount();
@@ -377,7 +406,10 @@ describe('messages and layout guards', () => {
 
   it('touches no wholesale control, tenant or accounting path', () => {
     const files = ['api.ts', 'customer-accounts-panel.tsx'].map((name) => readFileSync(join(__dirname, name), 'utf8')).join('\n');
-    expect(files).not.toMatch(/wholesale_membership_enabled|default_price_list_id|tenant_id|localStorage/);
+    // The wholesale flag is READ (to qualify copy) but never written: no write path or body may mention it.
+    expect(files).not.toMatch(/default_price_list_id|tenant_id|localStorage/);
+    expect(files.match(/wholesale_membership_enabled/g)?.length).toBe(2); // optional read-only type field + the one read
+    expect(files).not.toMatch(/body:\s*\{[^}]*wholesale/);
   });
 });
 

@@ -22,6 +22,8 @@ export type CustomerAccountSettings = {
   customer_accounts_enabled: boolean;
   /** Deployment master switch (`commerce.retail_accounts_enabled`), read-only. */
   customer_accounts_deployment_enabled: boolean;
+  /** Read-only here: a wholesale-marked channel keeps its own buyer-only rules (sign-in via the wholesale gate, no guest checkout). */
+  wholesale_membership_enabled?: boolean;
   recent_changes?: CustomerAccountChange[];
 };
 
