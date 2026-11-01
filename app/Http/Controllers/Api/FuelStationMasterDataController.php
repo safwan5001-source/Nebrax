@@ -21,31 +21,39 @@ use Illuminate\Http\JsonResponse;
  */
 class FuelStationMasterDataController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(private FuelStationMasterDataService $masterData) {}
 
     public function indexStations(): JsonResponse
     {
-        return FuelStationResource::collection(FuelStation::with($this->stationRelations())->orderBy('code')->get())->response();
+        return FuelStationResource::collection($this->restrictToAccessibleStations(FuelStation::with($this->stationRelations()), 'id')->orderBy('code')->get())->response();
     }
 
     public function showStation(string $id): JsonResponse
     {
-        return (new FuelStationResource(FuelStation::with($this->stationRelations())->findOrFail($id)))->response();
+        return (new FuelStationResource($this->restrictToAccessibleStations(FuelStation::with($this->stationRelations()), 'id')->findOrFail($id)))->response();
     }
 
     public function storeStation(FuelStationMasterDataRequest $request): JsonResponse
     {
+        $data = $request->validated();
+        $this->assertRecordAccessible($data['branch_id'], [$data['warehouse_id'] ?? null]);
+
         return (new FuelStationResource($this->domain(fn () => $this->masterData->createStation($request->validated()))->load($this->stationRelations())))->response()->setStatusCode(201);
     }
 
     public function updateStation(FuelStationMasterDataRequest $request, string $id): JsonResponse
     {
-        return (new FuelStationResource($this->domain(fn () => $this->masterData->updateStation(FuelStation::findOrFail($id), $request->validated()))->load($this->stationRelations())))->response();
+        $station = $this->stationForUpdate($id, $request->validated());
+
+        return (new FuelStationResource($this->domain(fn () => $this->masterData->updateStation($station, $request->validated()))->load($this->stationRelations())))->response();
     }
 
     public function destroyStation(string $id): JsonResponse
     {
-        $this->domain(fn () => $this->masterData->deleteStation(FuelStation::findOrFail($id)));
+        $station = $this->accessibleStation($id);
+        $this->domain(fn () => $this->masterData->deleteStation($station));
 
         return response()->json(['message' => 'deleted']);
     }
@@ -79,83 +87,138 @@ class FuelStationMasterDataController extends ApiController
 
     public function indexTanks(): JsonResponse
     {
-        return FuelTankResource::collection(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints'])->orderBy('code')->get())->response();
+        return FuelTankResource::collection($this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->orderBy('code')->get())->response();
     }
 
     public function showTank(string $id): JsonResponse
     {
-        return (new FuelTankResource(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints'])->findOrFail($id)))->response();
+        return (new FuelTankResource($this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->findOrFail($id)))->response();
     }
 
     public function storeTank(FuelStationMasterDataRequest $request): JsonResponse
     {
+        $this->accessibleStation($request->validated()['fuel_station_id']);
+
         return (new FuelTankResource($this->domain(fn () => $this->masterData->createTank($request->validated()))->load(['station', 'fuelProduct', 'calibrationPoints'])))->response()->setStatusCode(201);
     }
 
     public function updateTank(FuelStationMasterDataRequest $request, string $id): JsonResponse
     {
-        return (new FuelTankResource($this->domain(fn () => $this->masterData->updateTank(FuelTank::findOrFail($id), $request->validated()))->load(['station', 'fuelProduct', 'calibrationPoints'])))->response();
+        $tank = $this->childForUpdate(FuelTank::class, $id, $request->validated());
+
+        return (new FuelTankResource($this->domain(fn () => $this->masterData->updateTank($tank, $request->validated()))->load(['station', 'fuelProduct', 'calibrationPoints'])))->response();
     }
 
     public function destroyTank(string $id): JsonResponse
     {
-        $this->domain(fn () => $this->masterData->deleteTank(FuelTank::findOrFail($id)));
+        $tank = $this->childForUpdate(FuelTank::class, $id, []);
+        $this->domain(fn () => $this->masterData->deleteTank($tank));
 
         return response()->json(['message' => 'deleted']);
     }
 
     public function indexPumps(): JsonResponse
     {
-        return FuelPumpResource::collection(FuelPump::with('station')->withCount('nozzles')->orderBy('pump_number')->get())->response();
+        return FuelPumpResource::collection($this->restrictToAccessibleStations(FuelPump::with('station')->withCount('nozzles'))->orderBy('pump_number')->get())->response();
     }
 
     public function showPump(string $id): JsonResponse
     {
-        return (new FuelPumpResource(FuelPump::with('station')->withCount('nozzles')->findOrFail($id)))->response();
+        return (new FuelPumpResource($this->restrictToAccessibleStations(FuelPump::with('station')->withCount('nozzles'))->findOrFail($id)))->response();
     }
 
     public function storePump(FuelStationMasterDataRequest $request): JsonResponse
     {
+        $this->accessibleStation($request->validated()['fuel_station_id']);
+
         return (new FuelPumpResource($this->domain(fn () => $this->masterData->createPump($request->validated()))->load('station')->loadCount('nozzles')))->response()->setStatusCode(201);
     }
 
     public function updatePump(FuelStationMasterDataRequest $request, string $id): JsonResponse
     {
-        return (new FuelPumpResource($this->domain(fn () => $this->masterData->updatePump(FuelPump::findOrFail($id), $request->validated()))->load('station')->loadCount('nozzles')))->response();
+        $pump = $this->childForUpdate(FuelPump::class, $id, $request->validated());
+
+        return (new FuelPumpResource($this->domain(fn () => $this->masterData->updatePump($pump, $request->validated()))->load('station')->loadCount('nozzles')))->response();
     }
 
     public function destroyPump(string $id): JsonResponse
     {
-        $this->domain(fn () => $this->masterData->deletePump(FuelPump::findOrFail($id)));
+        $pump = $this->childForUpdate(FuelPump::class, $id, []);
+        $this->domain(fn () => $this->masterData->deletePump($pump));
 
         return response()->json(['message' => 'deleted']);
     }
 
     public function indexNozzles(): JsonResponse
     {
-        return FuelNozzleResource::collection(FuelNozzle::with(['pump', 'tank', 'fuelProduct'])->orderBy('nozzle_number')->get())->response();
+        return FuelNozzleResource::collection($this->restrictToAccessibleStations(FuelNozzle::with(['pump', 'tank', 'fuelProduct']))->orderBy('nozzle_number')->get())->response();
     }
 
     public function showNozzle(string $id): JsonResponse
     {
-        return (new FuelNozzleResource(FuelNozzle::with(['pump', 'tank', 'fuelProduct'])->findOrFail($id)))->response();
+        return (new FuelNozzleResource($this->restrictToAccessibleStations(FuelNozzle::with(['pump', 'tank', 'fuelProduct']))->findOrFail($id)))->response();
     }
 
     public function storeNozzle(FuelStationMasterDataRequest $request): JsonResponse
     {
+        $this->accessibleStation(FuelPump::findOrFail($request->validated()['fuel_pump_id'])->fuel_station_id);
+
         return (new FuelNozzleResource($this->domain(fn () => $this->masterData->createNozzle($request->validated()))->load(['pump', 'tank', 'fuelProduct'])))->response()->setStatusCode(201);
     }
 
     public function updateNozzle(FuelStationMasterDataRequest $request, string $id): JsonResponse
     {
-        return (new FuelNozzleResource($this->domain(fn () => $this->masterData->updateNozzle(FuelNozzle::findOrFail($id), $request->validated()))))->response();
+        $nozzle = $this->nozzleForUpdate($id, $request->validated());
+
+        return (new FuelNozzleResource($this->domain(fn () => $this->masterData->updateNozzle($nozzle, $request->validated()))))->response();
     }
 
     public function destroyNozzle(string $id): JsonResponse
     {
-        $this->domain(fn () => $this->masterData->deleteNozzle(FuelNozzle::findOrFail($id)));
+        $nozzle = $this->nozzleForUpdate($id, []);
+        $this->domain(fn () => $this->masterData->deleteNozzle($nozzle));
 
         return response()->json(['message' => 'deleted']);
+    }
+
+    /** محطة مستهدفة بالتعديل: ضمن نطاق المستخدم، وأي فرع/مخزن جديد في الجسم ضمن نطاقه أيضاً. */
+    private function stationForUpdate(string $id, array $data): FuelStation
+    {
+        $station = $this->accessibleStation($id);
+        if (array_key_exists('branch_id', $data) || array_key_exists('warehouse_id', $data)) {
+            $this->assertRecordAccessible($data['branch_id'] ?? $station->branch_id, [array_key_exists('warehouse_id', $data) ? $data['warehouse_id'] : $station->warehouse_id]);
+        }
+
+        return $station;
+    }
+
+    /**
+     * خزان/مضخة مستهدف: محطته ضمن نطاق المستخدم، وإن نُقل إلى محطة أخرى فالوجهة ضمن نطاقه أيضاً.
+     *
+     * @template T of \Illuminate\Database\Eloquent\Model
+     * @param  class-string<T>  $class
+     * @return T
+     */
+    private function childForUpdate(string $class, string $id, array $data)
+    {
+        $record = $class::findOrFail($id);
+        $this->accessibleStation($record->fuel_station_id);
+        if (isset($data['fuel_station_id'])) {
+            $this->accessibleStation($data['fuel_station_id']);
+        }
+
+        return $record;
+    }
+
+    /** فوهة مستهدفة: محطتها ضمن النطاق، وأي مضخة جديدة في الجسم تقع في محطة ضمن النطاق. */
+    private function nozzleForUpdate(string $id, array $data): FuelNozzle
+    {
+        $nozzle = $this->childForUpdate(FuelNozzle::class, $id, []);
+        if (isset($data['fuel_pump_id'])) {
+            $this->accessibleStation(FuelPump::findOrFail($data['fuel_pump_id'])->fuel_station_id);
+        }
+
+        return $nozzle;
     }
 
     /** @return list<string> */
