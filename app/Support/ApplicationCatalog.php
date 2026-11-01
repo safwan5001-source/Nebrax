@@ -47,7 +47,12 @@ final class ApplicationCatalog
      * الافتراض قد يكذب على قدرةٍ جديدة تُحرَس تجارياً، يوازن `ApplicationAccessGateGuardTest`
      * هذا الإعلان بالـ middleware المسجَّل على المسارات ويُفشل الـ CI عند الاختلاف.
      *
-     * @var array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string}>
+     * `explicit_enable_only` (افتراضه `false`) يعني: لا قرار مخزَّناً ⇒ **معطّلة** لكل المستأجرين بمن فيهم المسجَّلون قبل
+     * `ENFORCEMENT_CUTOVER_AT`؛ فلا يُفعِّلها «الافتراض القديم» ضمنياً. التفعيل يبقى بالمسارات القائمة وحدها (`enable()` من
+     * `/applications/enable` أو لوحة المنصة) وهي تكتب الصف وسجل التدقيق. يُقرأ في `TenantApplicationService::statusFor()`/`navVisibility()`
+     * وفي ملخص تجاوزات المنصة فقط؛ لا نظام تفعيل ثانٍ.
+     *
+     * @var array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string,explicit_enable_only?:bool}>
      */
     private const APPLICATIONS = [
         // ────────────────────────── المبيعات ونقطة البيع ──────────────────────────
@@ -171,6 +176,16 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['accounting.ledger'],
+        ],
+        // IMP-PARTNER-STATEMENTS PS-A2a (D-PS-08/D-PS-13): كشوف حساب العملاء والموردين (استيراد ثم مطابقة). مجموعة `accounting` لأنها
+        // تُطابق الأستاذ وتخدم الدورين معاً. `explicit_enable_only`: لا تُفعَّل ضمنياً لأي مستأجر؛ `RBAC` (`partner_statements.*` + `partners.view`)
+        // مستقل وإلزامي ولا يمنحه التفعيل.
+        'accounting.partner_statements' => [
+            'group' => 'accounting',
+            'maturity' => self::MATURITY_BUILT,
+            'mandatory' => false,
+            'dependencies' => ['accounting.ledger'],
+            'explicit_enable_only' => true,
         ],
 
         // ───────────────────────── الموارد البشرية ─────────────────────────
@@ -380,7 +395,7 @@ final class ApplicationCatalog
         ],
     ];
 
-    /** @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}> */
+    /** @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string,explicit_enable_only:bool}> */
     public static function all(): array
     {
         return array_map(
@@ -395,7 +410,7 @@ final class ApplicationCatalog
         return array_keys(self::APPLICATIONS);
     }
 
-    /** @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}|null */
+    /** @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string,explicit_enable_only:bool}|null */
     public static function find(string $key): ?array
     {
         $application = self::APPLICATIONS[$key] ?? null;
@@ -409,18 +424,27 @@ final class ApplicationCatalog
         return self::find($key)['access'] ?? self::ACCESS_OPERATIONAL;
     }
 
+    /**
+     * هل تتطلب القدرة قراراً صريحاً للتفعيل (لا افتراض «مستأجر قديم مفعَّل») — D-PS-13؟ المفتاح المجهول `false`.
+     */
+    public static function isExplicitEnableOnly(string $key): bool
+    {
+        return self::find($key)['explicit_enable_only'] ?? false;
+    }
+
     public static function isCommerciallyGated(string $key): bool
     {
         return self::accessGateFor($key) === self::ACCESS_COMMERCIAL;
     }
 
     /**
-     * @param  array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string}  $application
-     * @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}
+     * @param  array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string,explicit_enable_only?:bool}  $application
+     * @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string,explicit_enable_only:bool}
      */
     private static function withAccessDefault(array $application): array
     {
         $application['access'] ??= self::ACCESS_OPERATIONAL;
+        $application['explicit_enable_only'] ??= false;
 
         return $application;
     }
@@ -478,6 +502,11 @@ final class ApplicationCatalog
             // القدرة غير المبنية لا مسارات لها تُحرَس، فإعلانها تجارياً وعدٌ لا سند له.
             if ($application['access'] === self::ACCESS_COMMERCIAL && $application['maturity'] !== self::MATURITY_BUILT) {
                 $errors[] = "{$key}: بوابة تجارية على قدرة غير مبنية.";
+            }
+
+            // `explicit_enable_only` يُقرأ حيث تُقرأ حالة «بلا قرار»؛ القدرة غير المبنية تُعامَل مفعّلة دوماً والإلزامية مفعّلة دوماً، فالسمة هناك وعدٌ لا سند له.
+            if ($application['explicit_enable_only'] && ($application['maturity'] !== self::MATURITY_BUILT || $application['mandatory'])) {
+                $errors[] = "{$key}: explicit_enable_only يلزمه قدرة مبنية غير إلزامية.";
             }
 
             if ($application['mandatory'] && $application['maturity'] !== self::MATURITY_BUILT) {

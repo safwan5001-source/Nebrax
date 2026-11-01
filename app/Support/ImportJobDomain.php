@@ -43,7 +43,7 @@ final class ImportJobDomain
         // IMP-H7-S3: `POST stock-permits` المباشرة محروسة بـ`products.manage` + `inventory.core` (القراءة `products.view`) — البوابات نفسها لا أضعف؛ ويُفحص مخزن الفاعل في الخدمة.
         self::STOCK_PERMIT_IMPORT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
         // IMP-PS-A1 (D-PS-02): صلاحيتان مستقلتان بلا منح ضمني. `app = null` عمداً: مفتاح التطبيق لم يُحسم (D-PS-08 مفتوح) فلا يُخترع مفتاحٌ ولا يُستعار؛ والطرف يُحلّ بـ`partners.view` في الخدمة.
-        self::PARTNER_STATEMENT => ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => null],
+        self::PARTNER_STATEMENT => ['view' => 'partner_statements.view', 'manage' => 'partner_statements.reconcile', 'app' => 'accounting.partner_statements'],
     ];
 
     /**

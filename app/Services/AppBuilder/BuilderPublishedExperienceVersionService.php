@@ -51,6 +51,10 @@ final class BuilderPublishedExperienceVersionService
         return DB::transaction(function () use ($app, $note, $userId, $expectedDraftRevision): BuilderPublishedExperienceVersion {
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
 
+            if ($lockedApp->isArchived()) {
+                throw new RuntimeException('التطبيق مؤرشف؛ أعد تفعيله قبل النشر.');
+            }
+
             // DRF-07: حدّ النسخ المنشورة لكل تطبيق (PlanGate) على الصف المقفول.
             $this->quota->assertCanPublish($lockedApp);
 

@@ -71,7 +71,7 @@ class FuelSupplyReceivingTest extends TestCase
     public function preexisting_fuel_stock_without_an_exact_cost_baseline_blocks_receipt_without_using_product_average_cost(): void
     {
         $fixture = $this->fixture();
-        app(InventoryService::class)->applyReceipt($fixture['product'], 500, 99, ['warehouse_id' => $fixture['warehouse']->id]);
+        app(InventoryService::class)->applyReceipt($fixture['product'], 500, 99, ['warehouse_id' => $fixture['warehouse']->id, InventoryService::FUEL_POOL_META => true]); // رصيد تاريخي بلا baseline تكلفة
         $delivery = $fixture['service']->createDelivery($this->deliveryData($fixture, 'receipt-baseline-required', 2345));
 
         $this->expectException(RuntimeException::class);
@@ -164,12 +164,12 @@ class FuelSupplyReceivingTest extends TestCase
         $this->assertSame(0, $firstQuote['posted_cost_minor']);
         $this->assertSame('469', $firstQuote['remainder_numerator']);
         $this->assertSame('2000', $firstQuote['remainder_denominator']);
-        $firstMovement = app(InventoryService::class)->applyIssue($fixture['product']->fresh(), 1, 0, ['warehouse_id' => $fixture['warehouse']->id]);
+        $firstMovement = app(InventoryService::class)->applyIssue($fixture['product']->fresh(), 1, 0, ['warehouse_id' => $fixture['warehouse']->id, InventoryService::FUEL_POOL_META => true]);
         $basis->recordIssue($fixture['fuel'], $fixture['warehouse'], $firstMovement, 1, 0);
 
         $finalQuote = $basis->quoteIssue($fixture['fuel'], $fixture['warehouse'], 9999);
         $this->assertSame(2345, $finalQuote['posted_cost_minor']);
-        $finalMovement = app(InventoryService::class)->applyIssue($fixture['product']->fresh(), 9999, 0, ['warehouse_id' => $fixture['warehouse']->id], 2345);
+        $finalMovement = app(InventoryService::class)->applyIssue($fixture['product']->fresh(), 9999, 0, ['warehouse_id' => $fixture['warehouse']->id, InventoryService::FUEL_POOL_META => true], 2345);
         $basis->recordIssue($fixture['fuel'], $fixture['warehouse'], $finalMovement, 9999, 2345);
 
         $state = FuelInventoryCostState::where('warehouse_id', $fixture['warehouse']->id)->where('fuel_product_id', $fixture['fuel']->id)->firstOrFail();

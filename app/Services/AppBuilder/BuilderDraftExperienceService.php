@@ -2,6 +2,7 @@
 
 namespace App\Services\AppBuilder;
 
+use App\Models\BuilderApp;
 use App\Models\BuilderDraftExperience;
 use Illuminate\Support\Facades\DB;
 
@@ -51,6 +52,11 @@ final class BuilderDraftExperienceService
                 ->whereKey($draft->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // S05d: تطبيق مؤرشف لا يُحرَّر (القراءة مسموحة). قراءة بلا قفل؛ لا يقفل أي مسار آخر المسودة ثم التطبيق.
+            if (BuilderApp::query()->whereKey($locked->builder_app_id)->whereNotNull('archived_at')->exists()) {
+                throw new \RuntimeException('التطبيق مؤرشف؛ أعد تفعيله قبل التعديل.');
+            }
 
             if ((int) $locked->revision !== $baseRevision) {
                 throw new DraftRevisionConflictException(

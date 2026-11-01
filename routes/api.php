@@ -1472,6 +1472,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::patch('app-builder/apps/{id}', [BuilderAppController::class, 'update'])
             ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
 
+        // AD-06 / S05d: أرشفة (soft) بدل الحذف؛ لا يُؤرشف الحيّ.
+        Route::post('app-builder/apps/{id}/archive', [BuilderAppController::class, 'archive'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+        Route::post('app-builder/apps/{id}/unarchive', [BuilderAppController::class, 'unarchive'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+
         Route::get('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
         Route::put('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'update'])
@@ -1741,11 +1747,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('stock-permits/import/preview', [StockPermitImportController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
 
         // IMP-PS-A1: استيراد كشف حساب طرف (تجهيز مقارنة — لا أثر مالي). صلاحية مستقلة بلا منح ضمني (D-PS-02)؛ `partners.view` ورؤية الطرف تُفحصان في الخدمة.
-        // لا مفتاح قدرة تطبيق (D-PS-08 مفتوح). التنفيذ عبر `POST import-jobs` (مجال `partner_statement`) المربوط بالمعاينة فقط.
-        Route::get('partner-statements/import/template', [PartnerStatementImportController::class, 'template'])->middleware($perm('partner_statements.reconcile'));
-        Route::get('partner-statements/import/fields', [PartnerStatementImportController::class, 'fields'])->middleware($perm('partner_statements.reconcile'));
-        Route::post('partner-statements/import/inspect', [PartnerStatementImportController::class, 'inspect'])->middleware([$perm('partner_statements.reconcile'), EnsureImportFilesScanned::class]);
-        Route::post('partner-statements/import/preview', [PartnerStatementImportController::class, 'preview'])->middleware([$perm('partner_statements.reconcile'), EnsureImportFilesScanned::class]);
+        // PS-A2a: مفتاح القدرة `accounting.partner_statements` (D-PS-08) مع `explicit_enable_only` (D-PS-13) — RBAC يبقى مستقلاً. التنفيذ عبر `POST import-jobs` (مجال `partner_statement`) المربوط بالمعاينة فقط.
+        Route::get('partner-statements/import/template', [PartnerStatementImportController::class, 'template'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements')]);
+        Route::get('partner-statements/import/fields', [PartnerStatementImportController::class, 'fields'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements')]);
+        Route::post('partner-statements/import/inspect', [PartnerStatementImportController::class, 'inspect'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
+        Route::post('partner-statements/import/preview', [PartnerStatementImportController::class, 'preview'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
         Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

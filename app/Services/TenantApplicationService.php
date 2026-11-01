@@ -9,6 +9,7 @@ use App\Models\EmployeeCustody;
 use App\Models\Expense;
 use App\Models\FuelStation;
 use App\Models\Payment;
+use App\Models\PartnerStatementReconciliation;
 use App\Models\PosSession;
 use App\Models\Purchase;
 use App\Models\StockMovement;
@@ -81,6 +82,8 @@ class TenantApplicationService
             // التاريخ عند إيقاف التطبيق؛ يصبح الوصول قراءة فقط مثل بقية المجالات.
             'fuel_stations.core' => fn () => FuelStation::query()->exists(),
             'compliance.zatca' => fn () => ZatcaCredential::query()->exists(),
+            // PS-A2a: كشف مستورد (مسودة فأكثر) = بيانات حقيقية؛ الإيقاف يحوّل القدرة إلى قراءة فقط ولا يخفي التاريخ (D-PS-08).
+            'accounting.partner_statements' => fn () => PartnerStatementReconciliation::query()->exists(),
         ];
     }
 
@@ -158,6 +161,11 @@ class TenantApplicationService
             return $status;
         }
 
+        // D-PS-13: قدرة `explicit_enable_only` لا يفعّلها الافتراض القديم — غياب القرار ⇒ معطّلة لكل المستأجرين.
+        if (ApplicationCatalog::isExplicitEnableOnly($key)) {
+            return 'disabled';
+        }
+
         return $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
     }
 
@@ -198,7 +206,7 @@ class TenantApplicationService
         foreach ($navigable as $key => $application) {
             $status = $application['mandatory']
                 ? 'enabled'
-                : ($rows->get($key)?->status ?? ($grandfathered ? 'enabled' : 'disabled'));
+                : ($rows->get($key)?->status ?? ($grandfathered && ! $application['explicit_enable_only'] ? 'enabled' : 'disabled'));
             $enabled = $status !== 'disabled';
 
             $entitled = $application['access'] !== ApplicationCatalog::ACCESS_COMMERCIAL

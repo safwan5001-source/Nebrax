@@ -43,6 +43,9 @@ class PreviewExchangeService
             // DRF-07: يُحسب المرجع غير المستهلَك ضمن الجلسات النشطة (يتحوّل إلى جلسة جهاز) — الحدّ عند الإصدار الموثَّق
             // لا عند التبادل العام، فلا يفشل الجهاز برفض غامض. على صفّ التطبيق المقفول.
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            if ($lockedApp->isArchived()) {
+                throw new RuntimeException('التطبيق مؤرشف ولا تُصدر له مراجع معاينة.');
+            }
             $this->quota->assertCanIssuePreview($lockedApp);
 
             return $this->createReference($lockedApp, $issuer, $deviceLabel);
@@ -135,6 +138,13 @@ class PreviewExchangeService
             $app = BuilderApp::withoutGlobalScope(TenantScope::class)->find($record->builder_app_id);
             if ($app === null) {
                 $this->recordRejected($record, 'app_missing');
+
+                return null;
+            }
+
+            // S05d: مرجع صدر قبل الأرشفة لا يتحوّل إلى جلسة جهاز بعدها.
+            if ($app->isArchived()) {
+                $this->recordRejected($record, 'app_archived');
 
                 return null;
             }

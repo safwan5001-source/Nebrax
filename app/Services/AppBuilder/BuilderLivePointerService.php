@@ -75,7 +75,10 @@ final class BuilderLivePointerService
 
         return DB::transaction(function () use ($version, $actorId, $reason, $action, $expectedCurrentVersionId, $channel): BuilderLivePointer {
             // 1) قفل التطبيق الهدف، ثم إعادة قراءة النسخة بعد القفل.
-            BuilderApp::query()->whereKey($version->builder_app_id)->lockForUpdate()->firstOrFail();
+            $lockedApp = BuilderApp::query()->whereKey($version->builder_app_id)->lockForUpdate()->firstOrFail();
+            if ($lockedApp->isArchived()) {
+                throw new RuntimeException('التطبيق مؤرشف ولا يمكن جعل نسخة منه حيّة.');
+            }
             $target = BuilderPublishedExperienceVersion::query()->whereKey($version->id)->firstOrFail();
 
             $this->assertRenderable($target);

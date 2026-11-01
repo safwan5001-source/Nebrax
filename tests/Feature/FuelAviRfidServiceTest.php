@@ -233,7 +233,7 @@ class FuelAviRfidServiceTest extends TestCase
             'name' => 'سائق AVI', 'identifier' => 'DRV-' . $suffix, 'status' => FuelFleetDriver::STATUS_ACTIVE,
         ]);
         app(FuelCostBasisService::class)->assertReady($fuelProduct, $warehouse);
-        $movement = app(InventoryService::class)->applyReceipt($product, 20000, 100, ['warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id], 2000000);
+        $movement = app(InventoryService::class)->applyReceipt($product, 20000, 100, ['warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id, InventoryService::FUEL_POOL_META => true], 2000000);
         app(FuelCostBasisService::class)->recordReceipt($fuelProduct, $warehouse, $movement, 20000, 2000000);
 
         return compact('actor', 'branch', 'warehouse', 'customer', 'product', 'fuelProduct', 'station', 'tank', 'pump', 'nozzle', 'contract', 'vehicle', 'driver');
