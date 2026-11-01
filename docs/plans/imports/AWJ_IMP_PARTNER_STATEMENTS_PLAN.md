@@ -120,7 +120,7 @@ Static architecture test for the Track A wall; cross-tenant partner/reconciliati
 
 > **2026-11-01 — approved by the owner: D-PS-01..04** (SAR only; independent `partner_statements.*` permissions with no implicit grant; `CompanyWide` with tenant isolation and the existing partner-visibility controls; policies P-1..P-5 as in §4.3, P-4/P-5 as clarified in the Tracker decision log). **D-PS-05..09, D-03, D-06 and D-13 remain open and are not assumed.**
 >
-> **Update 2026-11-01 (later): D-PS-08 approved** (independent application-catalogue key) **and the period-reconciliation policy approved** (many drafts per scope, one effective final). Design in [`AWJ_IMP_PS_A2_EXECUTION_PLAN.md`](AWJ_IMP_PS_A2_EXECUTION_PLAN.md). Still open: D-PS-05..07, D-PS-09, D-03, D-06, D-13.
+> **Update 2026-11-01 (later): D-PS-08 approved** (independent application-catalogue key) **and the period-reconciliation policy approved** (many drafts per scope, one effective final). Design in [`AWJ_IMP_PS_A2_EXECUTION_PLAN.md`](AWJ_IMP_PS_A2_EXECUTION_PLAN.md). Later the same day: **D-PS-10 approved** (additive source keys), **D-PS-11 deferred** (counterparty orientation only), **D-PS-12 approved** (final within its real scope), **D-PS-13 approved** (no implicit activation for legacy tenants). **D-PS-14 approved** (overlap allowed with warning + acknowledgement; real conflicts between effective finals prevented at close, plan §5.5). Still open: D-PS-05..07, D-PS-09, D-03, D-06, D-13.
 | ID | Question | Recommendation |
 |---|---|---|
 | D-PS-01 | Is v1 SAR-only with other currencies rejected? | Yes |
