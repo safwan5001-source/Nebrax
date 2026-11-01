@@ -68,12 +68,37 @@ final class BuilderLivePointerService
         string $action = BuilderLivePointerEvent::ACTION_PROMOTE,
         ?string $expectedCurrentVersionId = null,
     ): BuilderLivePointer {
+        return $this->perform($version, $actorId, $reason, $action, $expectedCurrentVersionId, createOnly: false)[0];
+    }
+
+    /**
+     * إنشاء مؤشر **فقط إن لم يوجد** (للهجرة): يفحص الغياب تحت أقفال الكتابة نفسها (التطبيق ثم المؤشر)، فإن أنشأه كاتب آخر بين التخطيط والتنفيذ
+     * (ترقية مدير مثلاً) **يتخطّى ولا يحدّث** — فلا تُمحى ترقية متعمَّدة.
+     *
+     * @return bool هل أُنشئ المؤشر فعلاً (false = كان موجوداً فتُرك كما هو).
+     *
+     * @throws RuntimeException لا قناة جوال، أو النسخة لا تصلح للرندر.
+     */
+    public function createIfAbsent(BuilderPublishedExperienceVersion $version, ?string $actorId, ?string $reason = null): bool
+    {
+        return $this->perform($version, $actorId, $reason, BuilderLivePointerEvent::ACTION_PROMOTE, null, createOnly: true)[1];
+    }
+
+    /** @return array{0: BuilderLivePointer, 1: bool} المؤشر، وهل كتبت العملية شيئاً (مؤشراً جديداً أو تحريكاً). */
+    private function perform(
+        BuilderPublishedExperienceVersion $version,
+        ?string $actorId,
+        ?string $reason,
+        string $action,
+        ?string $expectedCurrentVersionId,
+        bool $createOnly,
+    ): array {
         $channel = $this->channel();
         if ($channel === null) {
             throw new RuntimeException('لا توجد قناة جوال نشطة لهذا المستأجر.');
         }
 
-        return DB::transaction(function () use ($version, $actorId, $reason, $action, $expectedCurrentVersionId, $channel): BuilderLivePointer {
+        return DB::transaction(function () use ($version, $actorId, $reason, $action, $expectedCurrentVersionId, $createOnly, $channel): array {
             // 1) قفل التطبيق الهدف، ثم إعادة قراءة النسخة بعد القفل.
             $lockedApp = BuilderApp::query()->whereKey($version->builder_app_id)->lockForUpdate()->firstOrFail();
             if ($lockedApp->isArchived()) {
@@ -86,6 +111,10 @@ final class BuilderLivePointerService
             // 2) قفل المؤشر (أو إنشاؤه كسولاً دون سباق).
             $pointer = BuilderLivePointer::query()->where('sales_channel_id', $channel->id)->lockForUpdate()->first();
             $fromId = $pointer?->live_version_id;
+
+            if ($createOnly && $pointer !== null) {
+                return [$pointer, false]; // موجود: لا يُمسّ.
+            }
 
             if ($expectedCurrentVersionId !== null && $fromId !== $expectedCurrentVersionId) {
                 throw new LivePointerConflictException('pointer_changed', 'تغيّرت النسخة الحيّة أثناء العملية. أعد التحميل وحاول مجدداً.');
@@ -105,13 +134,16 @@ final class BuilderLivePointerService
                 ]);
                 $pointer = BuilderLivePointer::query()->where('sales_channel_id', $channel->id)->lockForUpdate()->firstOrFail();
                 if ($inserted === 0) {
+                    if ($createOnly) {
+                        return [$pointer, false]; // خسرنا سباق الإنشاء: كاتب آخر أنشأه، فلا نحدّثه.
+                    }
                     // خسرنا سباق الإنشاء: المؤشر موجود الآن، فنحدّثه كما لو كان قائماً.
                     $fromId = $pointer->live_version_id;
                 }
             }
 
             if ($pointer->live_version_id === $target->id && $fromId === $target->id) {
-                return $pointer; // idempotent: لا حدث.
+                return [$pointer, false]; // idempotent: لا حدث.
             }
 
             if ($pointer->live_version_id !== $target->id) {
@@ -131,7 +163,7 @@ final class BuilderLivePointerService
                 'reason' => $reason,
             ]);
 
-            return $pointer->refresh();
+            return [$pointer->refresh(), true];
         });
     }
 

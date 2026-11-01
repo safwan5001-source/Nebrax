@@ -200,6 +200,7 @@
 | O3b | #1780 | `f3d9f563503cadae17be16baec76c83fad3a7b8d` | 2026-10-28 | — | ؟ | ؟ |
 | O3c | #1781 | `e9761194fd2788bfb40b7c72a025ac475aafb9f2` | 2026-10-29 | — | ؟ | ؟ |
 | O3b fix | #1784 | `ec0236c200ff5d8996c78205ed2bb49bc85ce1b1` | 2026-10-29 | — | ؟ | ؟ |
+| COPS-H1-0 (ADR-29 + ADR-28 Accepted + Handoff، وثائق) | #1896 | `d729fc9be46e404ed58289f75802e7eadca5d560` | 2026-11-01 | لا ينطبق | — | — |
 | جاهزية إلغاء Beta (وثائق) | #1785 | `01e66d68e8e17c75bb583909dddc8414d0a5a42d` | 2026-10-29 | لا ينطبق | — | — |
 
 ## 7. Function Tracker (84 صفاً)
@@ -316,7 +317,7 @@
 | Slice | العنوان | يعتمد | قرارات | PR | الحالة | Merge | Deploy | Activated | Env |
 |---|---|---|---|---|---|---|---|---|---|
 | COPS-H0 | تدقيق + خطة + Revision 1 | — | — | (وثائق أُدرجت في H1-0) | Done | — | لا ينطبق | لا ينطبق | — |
-| COPS-H1-0 | ADR-29 + ADR-28 Accepted + المتتبّع + Handoff | H0 | R-1 ✔ | (هذا الـPR) | In PR | — | لا ينطبق | لا ينطبق | — |
+| COPS-H1-0 | ADR-29 + ADR-28 Accepted + المتتبّع + Handoff | H0 | R-1 ✔ | #1896 | **Merged** | ✓ `d729fc9be` | لا ينطبق (وثائق) | لا ينطبق | — |
 | COPS-H1-1 | `commerce_order_events` + FeedHead + حراس + بوابات PG | H1-0 | R-2 ✔ | — | Planned (تفويض H1 ✔؛ نقطة توقف نموذج) | — | — | — | — |
 | COPS-H1-2 | أحداث afterCommit + `feed` + `attention` | H1-1 | R-5 ✔ | — | Planned | — | — | — | — |
 | COPS-H1-3 | أساس إعدادات تشغيل القناة (القبول) | H1-0 | D-OPS-1 ✔ · R-6b ✔ | — | Planned | — | — | — | — |

@@ -17,10 +17,14 @@ class ComponentRegistryTest extends TestCase
 {
     public function test_definitions_key_set_matches_runtime_capabilities_components_exactly(): void
     {
+        $expected = array_keys(RuntimeCapabilities::COMPONENTS + RuntimeCapabilities::COMPONENTS_V120);
+        $actual = array_keys(ComponentRegistry::definitions());
+        sort($expected);
+        sort($actual);
         $this->assertSame(
-            array_keys(RuntimeCapabilities::COMPONENTS),
-            array_keys(ComponentRegistry::definitions()),
-            'سجلّ بيانات المكوّنات يجب أن يصف كل هوية مكوّن مدعومة فعلياً — لا أكثر ولا أقل.'
+            $expected,
+            $actual,
+            'سجلّ بيانات المكوّنات يجب أن يصف كل هوية مكوّن مدعومة فعلياً (الجيل 1.0.0 + إضافات 1.2.0) — لا أكثر ولا أقل.'
         );
     }
 
@@ -28,7 +32,7 @@ class ComponentRegistryTest extends TestCase
     {
         foreach (ComponentRegistry::definitions() as $type => $definition) {
             $this->assertSame($type, $definition->type);
-            $this->assertSame(RuntimeCapabilities::COMPONENTS[$type], $definition->version);
+            $this->assertSame((RuntimeCapabilities::COMPONENTS + RuntimeCapabilities::COMPONENTS_V120)[$type], $definition->version);
         }
     }
 
@@ -104,10 +108,11 @@ class ComponentRegistryTest extends TestCase
         }
     }
 
-    /** ADR-01 (APP-BUILDER-14) — نطاق V1 المُقفَل لمكوّنات الربط فقط. */
-    public function test_only_the_four_adr_01_components_declare_bindable_resources(): void
+    /** ADR-01 (APP-BUILDER-14) — نطاق مكوّنات الربط المُقفَل: الأربعة الأصلية + `CategoryList` (جيل 1.2.0، S11). */
+    public function test_only_the_adr_01_components_and_category_list_declare_bindable_resources(): void
     {
         $expected = [
+            'CategoryList' => ['commerce.categories'],
             'ProductList' => ['commerce.products'],
             'ProductDetail' => ['commerce.products'],
             'CartList' => ['commerce.cart'],

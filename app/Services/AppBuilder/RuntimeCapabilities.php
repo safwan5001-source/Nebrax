@@ -50,6 +50,20 @@ final class RuntimeCapabilities
         'refresh' => 1,
     ];
 
+    /**
+     * إضافات الجيل 1.2.0 (AD-02 / S11: التصنيفات والبحث) فوق جيل 1.1.0 — **لا تُدمج في الثوابت أعلاه** لأنها تصف الجيل 1.0.0 المجمَّد
+     * (CPT-05). يعلنها `CapabilityManifest::v120()` فقط؛ ولا جهاز يطلب هذا الجيل قبل أن يبنيه Flutter (S11b).
+     *
+     * @var array<string, int>
+     */
+    public const COMPONENTS_V120 = ['CategoryList' => 1];
+
+    /** @var array<string, int> */
+    public const ACTIONS_V120 = ['openCategory' => 1, 'openSearch' => 1];
+
+    /** @var array<string, int> */
+    public const DATA_RESOURCES_V120 = ['commerce.categories' => 1];
+
     /** @var array<string, int> */
     public const NATIVE_CAPABILITIES = [
         'push.notifications' => 1,
