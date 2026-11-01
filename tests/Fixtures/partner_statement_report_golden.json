@@ -1,0 +1,335 @@
+{
+    "unfiltered": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 0,
+        "rows": [
+            {
+                "date": "2026-08-15",
+                "number": "JE-2026-00001",
+                "description": "رصيد افتتاحي",
+                "debit": 50000,
+                "credit": 0,
+                "balance": 50000,
+                "source": {
+                    "kind": "opening",
+                    "id": "U1",
+                    "label": "رصيد افتتاحي",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-01",
+                "number": "JE-2026-00002",
+                "description": "فاتورة مبيعات INV-2026-00001",
+                "debit": 230000,
+                "credit": 0,
+                "balance": 280000,
+                "source": {
+                    "kind": "invoice",
+                    "id": "U2",
+                    "label": "فاتورة مبيعات INV-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-03",
+                "number": "JE-2026-00003",
+                "description": "سند قبض REC-2026-00001",
+                "debit": 0,
+                "credit": 100000,
+                "balance": 180000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U3",
+                    "label": "سند قبض REC-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "invoice",
+                            "id": "U2",
+                            "number": "INV-2026-00001",
+                            "amount": 100000
+                        }
+                    ]
+                }
+            },
+            {
+                "date": "2026-09-05",
+                "number": "JE-2026-00004",
+                "description": "فاتورة مشتريات BILL-2026-00001",
+                "debit": 0,
+                "credit": 115000,
+                "balance": 65000,
+                "source": {
+                    "kind": "purchase",
+                    "id": "U4",
+                    "label": "فاتورة مشتريات BILL-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-08",
+                "number": "JE-2026-00005",
+                "description": "سند صرف PAY-2026-00001",
+                "debit": 40000,
+                "credit": 0,
+                "balance": 105000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U5",
+                    "label": "سند صرف PAY-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "purchase",
+                            "id": "U4",
+                            "number": "BILL-2026-00001",
+                            "amount": 40000
+                        }
+                    ]
+                }
+            },
+            {
+                "date": "2026-09-10",
+                "number": "JE-2026-00006",
+                "description": "قيد يدوي",
+                "debit": 7000,
+                "credit": 0,
+                "balance": 112000,
+                "source": null
+            }
+        ],
+        "closing_balance": 112000
+    },
+    "period": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 280000,
+        "rows": [
+            {
+                "date": "2026-09-03",
+                "number": "JE-2026-00003",
+                "description": "سند قبض REC-2026-00001",
+                "debit": 0,
+                "credit": 100000,
+                "balance": 180000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U3",
+                    "label": "سند قبض REC-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "invoice",
+                            "id": "U2",
+                            "number": "INV-2026-00001",
+                            "amount": 100000
+                        }
+                    ]
+                }
+            },
+            {
+                "date": "2026-09-05",
+                "number": "JE-2026-00004",
+                "description": "فاتورة مشتريات BILL-2026-00001",
+                "debit": 0,
+                "credit": 115000,
+                "balance": 65000,
+                "source": {
+                    "kind": "purchase",
+                    "id": "U4",
+                    "label": "فاتورة مشتريات BILL-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-08",
+                "number": "JE-2026-00005",
+                "description": "سند صرف PAY-2026-00001",
+                "debit": 40000,
+                "credit": 0,
+                "balance": 105000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U5",
+                    "label": "سند صرف PAY-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "purchase",
+                            "id": "U4",
+                            "number": "BILL-2026-00001",
+                            "amount": 40000
+                        }
+                    ]
+                }
+            }
+        ],
+        "closing_balance": 105000
+    },
+    "customer": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 0,
+        "rows": [
+            {
+                "date": "2026-08-15",
+                "number": "JE-2026-00001",
+                "description": "رصيد افتتاحي",
+                "debit": 50000,
+                "credit": 0,
+                "balance": 50000,
+                "source": {
+                    "kind": "opening",
+                    "id": "U1",
+                    "label": "رصيد افتتاحي",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-01",
+                "number": "JE-2026-00002",
+                "description": "فاتورة مبيعات INV-2026-00001",
+                "debit": 230000,
+                "credit": 0,
+                "balance": 280000,
+                "source": {
+                    "kind": "invoice",
+                    "id": "U2",
+                    "label": "فاتورة مبيعات INV-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-03",
+                "number": "JE-2026-00003",
+                "description": "سند قبض REC-2026-00001",
+                "debit": 0,
+                "credit": 100000,
+                "balance": 180000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U3",
+                    "label": "سند قبض REC-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "invoice",
+                            "id": "U2",
+                            "number": "INV-2026-00001",
+                            "amount": 100000
+                        }
+                    ]
+                }
+            }
+        ],
+        "closing_balance": 180000
+    },
+    "supplier": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 0,
+        "rows": [
+            {
+                "date": "2026-09-05",
+                "number": "JE-2026-00004",
+                "description": "فاتورة مشتريات BILL-2026-00001",
+                "debit": 0,
+                "credit": 115000,
+                "balance": -115000,
+                "source": {
+                    "kind": "purchase",
+                    "id": "U4",
+                    "label": "فاتورة مشتريات BILL-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-08",
+                "number": "JE-2026-00005",
+                "description": "سند صرف PAY-2026-00001",
+                "debit": 40000,
+                "credit": 0,
+                "balance": -75000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U5",
+                    "label": "سند صرف PAY-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "purchase",
+                            "id": "U4",
+                            "number": "BILL-2026-00001",
+                            "amount": 40000
+                        }
+                    ]
+                }
+            }
+        ],
+        "closing_balance": -75000
+    },
+    "customer_period": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 50000,
+        "rows": [
+            {
+                "date": "2026-09-01",
+                "number": "JE-2026-00002",
+                "description": "فاتورة مبيعات INV-2026-00001",
+                "debit": 230000,
+                "credit": 0,
+                "balance": 280000,
+                "source": {
+                    "kind": "invoice",
+                    "id": "U2",
+                    "label": "فاتورة مبيعات INV-2026-00001",
+                    "allocations": []
+                }
+            },
+            {
+                "date": "2026-09-03",
+                "number": "JE-2026-00003",
+                "description": "سند قبض REC-2026-00001",
+                "debit": 0,
+                "credit": 100000,
+                "balance": 180000,
+                "source": {
+                    "kind": "payment",
+                    "id": "U3",
+                    "label": "سند قبض REC-2026-00001",
+                    "allocations": [
+                        {
+                            "kind": "invoice",
+                            "id": "U2",
+                            "number": "INV-2026-00001",
+                            "amount": 100000
+                        }
+                    ]
+                }
+            }
+        ],
+        "closing_balance": 180000
+    },
+    "other_branch": {
+        "partner": {
+            "id": "U1",
+            "name": "طرف مزدوج",
+            "type": "both"
+        },
+        "opening_balance": 0,
+        "rows": [],
+        "closing_balance": 0
+    }
+}
