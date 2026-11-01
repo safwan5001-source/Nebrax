@@ -111,7 +111,9 @@ class CommerceExperienceController extends PublicApiController
      */
     private function candidates(int $limit)
     {
-        $query = BuilderPublishedExperienceVersion::query();
+        // S05d: نسخ التطبيقات المؤرشفة لا تُخدَم أبداً (لا بالمؤشر ولا بالانتقاء القديم).
+        $query = BuilderPublishedExperienceVersion::query()
+            ->whereHas('app', fn ($app) => $app->whereNull('archived_at'));
 
         if (BuilderLivePointerService::enabled() && $this->storefront->isEstablished()) {
             $pointer = $this->pointers->current($this->storefront->salesChannelId());
