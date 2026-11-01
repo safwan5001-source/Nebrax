@@ -36,6 +36,7 @@ Date: 2026-11-01 · Owner decisions applied: D-PS-01..04, P-1..P-5, **D-PS-08 (a
 ### Fix (inside PS-A1 scope only)
 - `identity_sha256` = SHA-256({file hash, effective column mapping, frozen policy}). Unique index `partner_stmt_recon_idem_unique` is now `(tenant_id, partner_id, role, period_from, period_to, identity_sha256)`; `file_sha256` kept and indexed (informational — "same file seen before"). Advisory lock, `existing()` and preview use the identity. Same file + same interpretation ⇒ replay (unchanged behaviour and test); same file + different interpretation ⇒ a new draft; the earlier draft is untouched. No unique constraint limits drafts per scope.
 - Regression test added; mutation control (identity reverted to the file hash) fails it.
+- **Codex P2 on the fix (valid, fixed):** the identity hashed the mapping including `null` entries (`autoMap` lists ignored columns as `null`, an explicit mapping may omit them), so the same interpretation could yield two identities. `null` entries are now dropped before hashing; test `an_ignored_column_listed_as_null_or_omitted_is_the_same_interpretation` (mutation-checked).
 
 ## 3. Files changed by the review fix
 `database/migrations/2026_12_25_010000_create_partner_statement_tables.php` · `app/Models/PartnerStatementReconciliation.php` · `app/Services/PartnerStatementImportService.php` · `tests/Feature/PartnerStatementImportTest.php` · `docs/plans/imports/reports/IMP-PS-A1-REPORT.md` · `docs/plans/imports/AWJ_UNIFIED_IMPORT_HORIZON_TRACKER.md` · `docs/plans/imports/AWJ_IMP_PARTNER_STATEMENTS_PLAN.md` · new `docs/plans/imports/AWJ_IMP_PS_A2_EXECUTION_PLAN.md` · new `docs/plans/imports/reports/IMP-PS-A1-REVIEW-AND-A2-HANDOFF.md`. No application code outside the statement feature, no API change, no permission change.
@@ -43,8 +44,8 @@ Date: 2026-11-01 · Owner decisions applied: D-PS-01..04, P-1..P-5, **D-PS-08 (a
 ## 4. Tests
 | Run | Result |
 |---|---|
-| `PartnerStatementImportTest` (SQLite) | 35 passed (519 assertions) |
-| `PartnerStatementImport*` (PostgreSQL, includes the 6-process race and the 4-file case) | 37 passed (531 assertions) |
+| `PartnerStatementImportTest` (SQLite) | 36 passed (531 assertions) |
+| `PartnerStatementImport*` (PostgreSQL, includes the 6-process race and the 4-file case) | 38 passed (543 assertions) |
 | Mutation control for the fix | fails as intended |
 | Import / RBAC / ApplicationCatalog / BranchIsolationGuard filter (SQLite) | 739 passed, 32 skipped (PG-only), 0 failed |
 | CI on the new head | pending at the time of writing — see the PR checks (SQLite, PostgreSQL, web build, CI Gate) |

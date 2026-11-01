@@ -670,6 +670,8 @@ class PartnerStatementImportService
      */
     private function identityHash(string $fileHash, array $options, array $mapping): string
     {
+        // الأعمدة المتجاهَلة (null) لا تدخل الهوية: الربط التلقائي يذكرها والصريح قد يحذفها، والتحليل يعاملهما سواءً.
+        $mapping = array_filter($mapping, static fn ($key): bool => $key !== null);
         ksort($mapping);
 
         return hash('sha256', json_encode(['file' => $fileHash, 'mapping' => $mapping, 'policy' => $this->policy($options)], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));

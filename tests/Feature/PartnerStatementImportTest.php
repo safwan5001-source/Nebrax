@@ -471,6 +471,31 @@ class PartnerStatementImportTest extends TestCase
         $this->assertSame(3, $this->reconciliations());
     }
 
+    /**
+     * Codex #1877 P2: الربط التلقائي يذكر العمود المتجاهَل بـnull والصريح قد يحذفه؛ التحليل يعاملهما سواءً فلا يجوز أن تختلف الهوية (مسودتان متطابقتان).
+     *
+     * @test
+     */
+    public function an_ignored_column_listed_as_null_or_omitted_is_the_same_interpretation(): void
+    {
+        $rows = $this->rows();
+        foreach ($rows as &$row) {
+            $row['ملاحظات داخلية'] = 'x';   // عمود غير معروف ⇒ يُتجاهل
+        }
+        unset($row);
+
+        $auto = $this->runJob($this->auth['token'], $rows, $this->hdr());
+        $automatic = $this->preview($this->auth['token'], $rows, $this->hdr())->assertOk()->json('data.mapping');
+        $this->assertContains(null, $automatic, 'الربط التلقائي يحمل مدخلاً null للعمود المتجاهَل.');
+
+        $explicit = array_filter($automatic, static fn ($key): bool => $key !== null);
+        $second = $this->runJob($this->auth['token'], $rows, $this->hdr(['mapping' => $explicit]));
+
+        $this->assertTrue($second['apply_result']['replayed']);
+        $this->assertSame($auto['apply_result']['reconciliation_id'], $second['apply_result']['reconciliation_id']);
+        $this->assertSame(1, $this->reconciliations());
+    }
+
     /** @test */
     public function a_different_file_period_role_or_partner_is_a_separate_reconciliation(): void
     {
