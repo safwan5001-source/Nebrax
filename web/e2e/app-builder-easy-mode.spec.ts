@@ -258,6 +258,29 @@ test.describe('App Builder — Easy Mode V2 (real browser)', () => {
     });
   }
 
+  // UX-03 — axe-core في متصفح حقيقي (يشمل التباين اللوني الذي لا يحسبه jsdom): Easy ثم Advanced بعقدة محددة.
+  for (const viewport of [VIEWPORTS[0], VIEWPORTS[3]]) {
+    test(`axe-core (all rules incl. color-contrast) reports no violations on Easy and Advanced — ${viewport.width}px`, async ({ page }) => {
+      await open(page, { locale: 'en', viewport });
+      await page.addScriptTag({ path: require.resolve('axe-core') });
+      const run = async (label: string) => {
+        const violations = await page.evaluate(async () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = await (window as any).axe.run(document, { resultTypes: ['violations'] });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return result.violations.map((v: any) => `${v.id}[${v.impact}]: ${v.nodes.map((n: any) => n.target.join(' ')).join(' | ')}`);
+        });
+        return { label, violations };
+      };
+      const easy = await run('easy');
+      await visibleSections(page).getByRole('listitem').first().getByRole('button').first().click();
+      const easySelected = await run('easySelected');
+      await page.getByRole('button', { name: 'Advanced' }).click();
+      const advanced = await run('advanced');
+      expect([easy, easySelected, advanced].filter((r) => r.violations.length > 0)).toEqual([]);
+    });
+  }
+
   // UX-09/10 — جوال أفقي وآيباد عمودي: المعاينة والأدوات معاً دون حجب (لقطات + حدود هندسية للمعاينة).
   for (const viewport of [{ width: 844, height: 390 }, { width: 834, height: 1194 }, { width: 744, height: 1133 }] as const) {
     test(`preview stays usable next to the tools — ${viewport.width}x${viewport.height}`, async ({ page }) => {

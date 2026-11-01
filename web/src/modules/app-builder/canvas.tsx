@@ -180,9 +180,14 @@ function NodeFrame({
     );
   }
 
+  // وضع «تصميم»: العقدة قد تحوي عقداً مبنية بالطريقة نفسها (قسم يضم بطاقات)، و`role="button"` يمنع
+  // الأبناء التفاعليين (axe `nested-interactive`). لذا `group` مُسمّى بنوعه يُركَّز عليه ويُحدَّد بـEnter/Space،
+  // و`aria-current` يعلن المحدّد.
   return (
     <div
-      role="button"
+      role="group"
+      aria-label={typeLabel}
+      aria-current={selected ? 'true' : undefined}
       tabIndex={0}
       onClick={(event) => {
         event.stopPropagation();

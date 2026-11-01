@@ -8900,6 +8900,10 @@
       },
       "noProps": "This component has no properties.",
       "actionTitle": "Action",
+      "landmarks": {
+        "structure": "Pages and layers",
+        "inspector": "Properties panel"
+      },
       "noAction": "No action",
       "injectedParamNote": "Some parameters are injected by the runtime automatically and aren't editable here.",
       "binding": {

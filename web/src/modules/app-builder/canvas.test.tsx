@@ -152,7 +152,7 @@ describe('AppBuilderCanvas — LIVE-PREVIEW-4 action inert/wired parity', () => 
 
     render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
 
-    const wrapper = screen.getByText('بلا فعل').closest('[role="button"]');
+    const wrapper = screen.getByText('بلا فعل').closest('[tabindex="0"]');
     expect(wrapper?.className).toContain('opacity-50');
   });
 
@@ -167,7 +167,7 @@ describe('AppBuilderCanvas — LIVE-PREVIEW-4 action inert/wired parity', () => 
 
     render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
 
-    const wrapper = screen.getByText('مع فعل').closest('[role="button"]');
+    const wrapper = screen.getByText('مع فعل').closest('[tabindex="0"]');
     expect(wrapper?.className).not.toContain('opacity-50');
   });
 });
@@ -220,7 +220,7 @@ describe('AppBuilderCanvas — MOBILE-PREVIEW-3 interactive=false (App Preview s
 
     render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={onSelect} />);
 
-    const wrapper = screen.getByText('نص').closest('[role="button"]');
+    const wrapper = screen.getByText('نص').closest('[tabindex="0"]');
     expect(wrapper).toBeTruthy();
     fireEvent.click(screen.getByText('نص'));
     expect(onSelect).toHaveBeenCalledWith('txt-1');

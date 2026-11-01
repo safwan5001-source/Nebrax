@@ -8900,6 +8900,10 @@
       },
       "noProps": "لا خصائص لهذا المكوّن.",
       "actionTitle": "الإجراء",
+      "landmarks": {
+        "structure": "الصفحات والطبقات",
+        "inspector": "لوحة الخصائص"
+      },
       "noAction": "بلا إجراء",
       "injectedParamNote": "بعض المعاملات يُلحقها التشغيل تلقائياً ولا تُحرَّر هنا.",
       "binding": {
