@@ -76,11 +76,11 @@
    "valid": true
   },
   {
-   "name": "empty appBar object",
+   "name": "empty appBar object (PHP decodes {} to [] and would serve it as an array — rejected)",
    "navigation": {
     "appBar": {}
    },
-   "valid": true
+   "valid": false
   },
   {
    "name": "5 visible + 1 hidden",

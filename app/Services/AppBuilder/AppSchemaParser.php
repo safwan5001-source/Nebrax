@@ -159,8 +159,9 @@ final class AppSchemaParser
 
         if (array_key_exists('appBar', $navigation)) {
             $appBar = $navigation['appBar'];
-            if (! $this->isObjectLike($appBar)) {
-                throw new SchemaFormatException('invalid_type', 'navigation.appBar must be an object');
+            // كائن غير فارغ فقط: PHP يفك `{}` إلى `[]` ويعيدها مصفوفةً للجهاز فيرفضها محلل Dart (كائن مطلوب).
+            if (! $this->isObjectLike($appBar) || $appBar === []) {
+                throw new SchemaFormatException('invalid_type', 'navigation.appBar must be a non-empty object');
             }
             $this->rejectUnknownKeys($appBar, NavigationShell::APP_BAR_KEYS, 'navigation.appBar');
             if (array_key_exists('title', $appBar) && (! is_string($appBar['title']) || mb_strlen($appBar['title']) > NavigationShell::MAX_APP_BAR_TITLE)) {

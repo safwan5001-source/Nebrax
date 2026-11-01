@@ -133,6 +133,13 @@ class AppSchemaNavigationShellTest extends TestCase
             try {
                 $this->parse($schema);
                 $this->assertTrue($case['valid'], "قُبل ما كان يجب رفضه: {$case['name']}");
+                // رحلة الخادم→الجهاز: فك JSON إلى مصفوفات PHP ثم ترميزه لا يغيّر الشكل (كائن فارغ `{}` يصير `[]` ويكسر Dart).
+                $served = json_decode(json_encode(json_decode(json_encode($case['navigation']), true)), true);
+                $this->assertSame(
+                    json_encode($case['navigation'], JSON_UNESCAPED_UNICODE),
+                    json_encode($served, JSON_UNESCAPED_UNICODE),
+                    "رحلة الخادم تغيّر شكل حالة صالحة: {$case['name']}",
+                );
             } catch (SchemaFormatException) {
                 $this->assertFalse($case['valid'], "رُفض ما كان يجب قبوله: {$case['name']}");
             }

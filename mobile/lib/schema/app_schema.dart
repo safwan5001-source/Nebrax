@@ -571,8 +571,8 @@ class SchemaAppBar {
   const SchemaAppBar({this.title, this.showCart = false});
 
   factory SchemaAppBar._fromJson(Object? raw) {
-    if (raw is! Map) {
-      throw const SchemaFormatException('invalid_type', 'navigation.appBar must be an object');
+    if (raw is! Map || raw.isEmpty) {
+      throw const SchemaFormatException('invalid_type', 'navigation.appBar must be a non-empty object');
     }
     final json = raw.cast<String, Object?>();
     _rejectUnknownKeys(json, NavigationShell.appBarKeys, context: 'navigation.appBar');
