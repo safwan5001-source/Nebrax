@@ -60,7 +60,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   SchemaComponent? _basePage;
   String? _incompatibleMessage;
-  List<Object?>? _products;
+  /// بيانات كل طلب منتجات مميَّز مفتاحها [bindingDataKey] (S08b): قائمتان بترتيبين مختلفين تحملان بياناتهما الخاصة.
+  Map<String, List<Object?>>? _products;
   String? _errorMessage;
   bool _loading = true;
   int _lastHandledRefreshVersion = -1;
@@ -127,9 +128,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProducts() async {
     setState(() => _loading = true);
     try {
-      final raw = await widget.client.fetchBindingResource('commerce.products');
+      // S08b — كل `binding.query` مميَّز على الصفحة = طلب واحد (التكرار يُجلب مرة). صفحة بلا ربط
+      // بالمنتجات (أو خطأ في الشجرة) ⇒ الطلب العاري الوحيد كما كان قبل الشريحة.
+      final page = _basePage;
+      var requests = page == null ? const <BindingRequest>[] : collectBindingRequests(page, 'commerce.products');
+      if (requests.isEmpty) {
+        requests = const [BindingRequest(resource: 'commerce.products', query: {}, key: 'commerce.products')];
+      }
+      final fetched = await Future.wait([
+        for (final request in requests)
+          widget.client.fetchBindingResource(
+            request.resource,
+            query: request.query.isEmpty ? null : request.query,
+          ),
+      ]);
       setState(() {
-        _products = raw is List ? raw : const [];
+        _products = {
+          for (var i = 0; i < requests.length; i++)
+            requests[i].key: fetched[i] is List ? List<Object?>.of(fetched[i] as List) : const <Object?>[],
+        };
         _errorMessage = null;
         _loading = false;
       });
@@ -215,7 +232,8 @@ class _HomeScreenState extends State<HomeScreen> {
       (node) => withProp(node, 'label', strings.goToCart),
     );
     hydrated = resolveNodeBindings(hydrated, {
-      'commerce.products': _localizeProducts(_products ?? const <Object?>[]),
+      for (final entry in (_products ?? const <String, List<Object?>>{}).entries)
+        entry.key: _localizeProducts(entry.value),
     });
     return ComponentView(node: hydrated, onAction: widget.dispatcher.dispatch);
   }

@@ -45,6 +45,7 @@ SchemaComponent _node({
 }
 
 void main() {
+  queryPassthroughTests();
   group('readFieldPath', () {
     test('reads a top-level field', () {
       expect(readFieldPath({'id': 'p1'}, 'id'), 'p1');
@@ -472,6 +473,129 @@ void main() {
     test('keeps a node with no visibility condition unaffected', () {
       final root = _node(type: 'Text', id: 'plain');
       expect(pruneInvisible(root, const {})!.id, 'plain');
+    });
+  });
+}
+
+SchemaBinding _binding(Map<String, Object?> query, {String resource = 'commerce.products'}) =>
+    SchemaBinding(resource: resource, query: query, itemProps: const {});
+
+void queryPassthroughTests() {
+  group('binding query passthrough (AD-09 / S08b)', () {
+    test('only the contract keys pass, with safe value shapes', () {
+      final q = sanitizedBindingQuery(
+        _binding({
+          'search': '  shoes ',
+          'sort': '-popularity',
+          'category_id': '11111111-2222-3333-4444-555555555555',
+          'per_page': 20,
+          'id': 'x',
+          'page': 3,
+          'evil': 'drop table',
+        }),
+      );
+      expect(q, {
+        'search': 'shoes',
+        'sort': '-popularity',
+        'category_id': '11111111-2222-3333-4444-555555555555',
+        'per_page': '20',
+      });
+    });
+
+    test('per_page is clamped to 1..100 and non-integers are dropped', () {
+      expect(sanitizedBindingQuery(_binding({'per_page': 500}))['per_page'], '100');
+      expect(sanitizedBindingQuery(_binding({'per_page': 0}))['per_page'], '1');
+      expect(sanitizedBindingQuery(_binding({'per_page': '12'})).containsKey('per_page'), isFalse);
+      expect(sanitizedBindingQuery(_binding({'per_page': 2.5})).containsKey('per_page'), isFalse);
+    });
+
+    test('route references and malformed values are dropped, never sent', () {
+      final q = sanitizedBindingQuery(
+        _binding({
+          'category_id': r'$route.categoryId',
+          'sort': 'name; drop',
+          'search': '',
+        }),
+      );
+      expect(q, isEmpty);
+    });
+
+    test('search is capped at 120 chars', () {
+      final q = sanitizedBindingQuery(_binding({'search': 'a' * 300}));
+      expect(q['search']!.length, 120);
+    });
+
+    test('data key equals the bare resource id when no query applies (back-compat)', () {
+      expect(bindingDataKey(_binding(const {})), 'commerce.products');
+      expect(bindingDataKey(_binding({'id': 'x'})), 'commerce.products');
+    });
+
+    test('data key is canonical regardless of query key order', () {
+      final a = bindingDataKey(_binding({'sort': 'name', 'per_page': 5}));
+      final b = bindingDataKey(_binding({'per_page': 5, 'sort': 'name'}));
+      expect(a, b);
+      expect(a, isNot('commerce.products'));
+    });
+
+    test('collectBindingRequests lists each distinct request once, deep in the tree', () {
+      final tree = _node(
+        type: 'Page',
+        id: 'root',
+        children: [
+          _node(type: 'ProductList', id: 'a', binding: _binding({'sort': '-popularity'})),
+          _node(
+            type: 'Column',
+            id: 'c',
+            children: [
+              _node(type: 'ProductList', id: 'b', binding: _binding({'sort': '-popularity'})),
+              _node(type: 'ProductList', id: 'd', binding: _binding(const {})),
+            ],
+          ),
+        ],
+      );
+      final requests = collectBindingRequests(tree, 'commerce.products');
+      expect(requests.map((r) => r.key).toSet(), {bindingDataKey(_binding({'sort': '-popularity'})), 'commerce.products'});
+      expect(requests, hasLength(2));
+    });
+
+    test('two bound lists with different queries resolve to their own data', () {
+      final top = _binding({'sort': '-popularity'});
+      final newest = _binding({'sort': '-created_at'});
+      final template = _node(type: 'Text', id: 't', props: const {'text': r'$item.name'});
+      final tree = _node(
+        type: 'Page',
+        id: 'root',
+        children: [
+          _node(type: 'ProductList', id: 'top', binding: top, children: [template]),
+          _node(type: 'ProductList', id: 'new', binding: newest, children: [template]),
+        ],
+      );
+      final resolved = resolveNodeBindings(tree, {
+        bindingDataKey(top): [
+          {'id': '1', 'name': 'Hot'},
+        ],
+        bindingDataKey(newest): [
+          {'id': '2', 'name': 'Fresh'},
+        ],
+      });
+      expect(resolved.children[0].children.single.props['text'], 'Hot');
+      expect(resolved.children[1].children.single.props['text'], 'Fresh');
+    });
+
+    test('a bare resource entry still resolves a bound node (older callers)', () {
+      final b = _binding({'sort': 'name'});
+      final tree = _node(
+        type: 'ProductList',
+        id: 'l',
+        binding: b,
+        children: [_node(type: 'Text', id: 't', props: const {'text': r'$item.name'})],
+      );
+      final resolved = resolveNodeBindings(tree, {
+        'commerce.products': [
+          {'id': '1', 'name': 'Only'},
+        ],
+      });
+      expect(resolved.children.single.props['text'], 'Only');
     });
   });
 }
