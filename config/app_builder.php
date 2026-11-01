@@ -15,4 +15,11 @@ return [
 
     /* AD-05 (S20a): سقف بيانات المحرر (`editor_meta`، JSON بايت) عند الحفظ. */
     'max_editor_meta_bytes' => (int) env('APP_BUILDER_MAX_EDITOR_META_BYTES', 65536),
+
+    /*
+     | AD-06 (S05c): بوابة نشر المؤشر الحي (`live_version_id` لكل قناة جوال). مغلقة افتراضياً ⇒ نقاط الإدارة 404 ويبقى
+     | `GET commerce/v1/experience` على السلوك المؤقت (أحدث نشر عبر تطبيقات المستأجر). مفتوحةً: قناة لها مؤشر تُخدَم منه،
+     | وقناة بلا مؤشر تبقى على السلوك القديم حتى تُرقّى نسخة صراحةً. لا تُفتح لمستأجر حي قبل قرار تفعيل منسَّق.
+     */
+    'live_pointer_enabled' => (bool) env('APP_BUILDER_LIVE_POINTER_ENABLED', false),
 ];

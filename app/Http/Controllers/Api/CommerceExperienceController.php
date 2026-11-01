@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\BuilderPublishedExperienceVersion;
+use App\Services\AppBuilder\BuilderLivePointerService;
 use App\Services\AppBuilder\AppSchemaParser;
 use App\Services\AppBuilder\CompatibilityResolver;
 use App\Services\AppBuilder\RuntimeGenerations;
 use App\Services\AppBuilder\SchemaFormatException;
 use App\Support\PublicApiResponse;
+use App\Tenancy\StorefrontContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,6 +51,8 @@ class CommerceExperienceController extends PublicApiController
         private readonly RuntimeGenerations $generations,
         private readonly AppSchemaParser $parser,
         private readonly CompatibilityResolver $resolver,
+        private readonly BuilderLivePointerService $pointers,
+        private readonly StorefrontContext $storefront,
     ) {}
 
     /**
@@ -61,11 +65,7 @@ class CommerceExperienceController extends PublicApiController
         $manifest = $this->generations->forRuntime($request->header('X-Runtime-Version'));
         $limit = max(1, (int) config('app_builder.runtime_selection_scan_limit', self::DEFAULT_SCAN_LIMIT));
 
-        $candidates = BuilderPublishedExperienceVersion::query()
-            ->orderByDesc('published_at')
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->get();
+        $candidates = $this->candidates($limit);
 
         $version = $candidates->first(function (BuilderPublishedExperienceVersion $candidate) use ($manifest): bool {
             $schema = $candidate->schema;
@@ -85,11 +85,69 @@ class CommerceExperienceController extends PublicApiController
             abort(404, 'لا توجد تجربة منشورة لهذا المستأجر.');
         }
 
+        // AD-06 / S05c: ETag = (النسخة المختارة، جيل Runtime) — يتغيّر بنشر/ترقية/تراجع أو بجيل جهاز آخر. `no-cache` يُلزم
+        // الوسيط الخاص بإعادة التحقق في كل مرة (فنشر جديد يصل فوراً) بينما يُجيب `If-None-Match` المطابق بـ304 بلا حمولة.
+        $etag = '"'.$version->id.'-'.$manifest->runtimeVersion.'"';
+        $headers = ['ETag' => $etag, 'Cache-Control' => 'private, no-cache', 'Vary' => 'X-Runtime-Version'];
+
+        if ($this->etagMatches($request->header('If-None-Match'), $etag)) {
+            return response()->json(null, 304)->withHeaders($headers);
+        }
+
         return PublicApiResponse::success($request, [
             'version' => $version->version,
             'schema_version' => $version->schema_version,
             'published_at' => $version->published_at?->toIso8601String(),
             'schema' => $version->schema,
-        ])->header('Vary', 'X-Runtime-Version');
+        ])->withHeaders($headers);
+    }
+
+    /**
+     * المرشحون بترتيب الأولوية. مع المؤشر الحي (بوابة مفتوحة + مؤشر للقناة): نسخ **تطبيق المؤشر** حتى رقم النسخة الحيّة
+     * (سقف، لا أعلى منها) — فالتراجع يعني أن ما بعد النسخة الحيّة لا يُخدَم أبداً، ويبقى انتقاء الأعلى المتوافق مع جيل الجهاز
+     * ضمن هذا السقف (AD-02). بدونه: السلوك المؤقت القديم حرفياً (أحدث نشر عبر تطبيقات المستأجر).
+     *
+     * @return \Illuminate\Support\Collection<int, BuilderPublishedExperienceVersion>
+     */
+    private function candidates(int $limit)
+    {
+        $query = BuilderPublishedExperienceVersion::query();
+
+        if (BuilderLivePointerService::enabled() && $this->storefront->isEstablished()) {
+            $pointer = $this->pointers->current($this->storefront->salesChannelId());
+            $live = $pointer === null ? null : BuilderPublishedExperienceVersion::query()->whereKey($pointer->live_version_id)->first();
+            if ($live !== null) {
+                return $query
+                    ->where('builder_app_id', $live->builder_app_id)
+                    ->where('version', '<=', $live->version)
+                    ->orderByDesc('version')
+                    ->limit($limit)
+                    ->get();
+            }
+        }
+
+        return $query->orderByDesc('published_at')->orderByDesc('created_at')->limit($limit)->get();
+    }
+
+    /** مقارنة `If-None-Match` (قائمة، `*`، وبادئة ضعيفة `W/`) بقيمتنا القوية. */
+    private function etagMatches(?string $header, string $etag): bool
+    {
+        if ($header === null || trim($header) === '') {
+            return false;
+        }
+        if (trim($header) === '*') {
+            return true;
+        }
+        foreach (explode(',', $header) as $candidate) {
+            $candidate = trim($candidate);
+            if (str_starts_with($candidate, 'W/')) {
+                $candidate = substr($candidate, 2);
+            }
+            if ($candidate === $etag) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

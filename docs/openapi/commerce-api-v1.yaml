@@ -167,15 +167,30 @@ paths:
         (`Vary: X-Runtime-Version`). 404 when the tenant has never published, or
         when no published version is renderable by the declared generation (the
         runtime then uses its bundled Default Experience).
+
+
+        AD-06 (S05c): when the deployment enables the live-version pointer and the
+        tenant's mobile channel has one, the pointed version is the **ceiling**: the
+        highest renderable version of the pointed app at or below it is returned,
+        never a newer publish and never another app's. Without a pointer the
+        behaviour above is unchanged. The response carries a strong `ETag`
+        (selected version id + runtime generation) and `Cache-Control: private,
+        no-cache`; a matching `If-None-Match` answers `304` with no body.
       x-auth-tier: read
       responses:
         '200':
           description: The published experience.
           headers:
             X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            ETag: { schema: { type: string }, description: Strong validator for the selected version and runtime generation. }
+            Cache-Control: { schema: { type: string }, description: '`private, no-cache` (revalidate every time).' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ExperienceResponse' }
+        '304':
+          description: The caller's `If-None-Match` matches the current selection; no body.
+          headers:
+            ETag: { schema: { type: string } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
