@@ -63,6 +63,28 @@ trait AuthorizesFuelStationScope
         return $stations === null ? $query : $query->whereIn($stationColumn, $stations);
     }
 
+    /** معرّفات المحطات المتاحة للمستخدم، أو null إن كان غير مقيَّد (لتمريرها لخدمات التقارير). */
+    protected function accessibleStationIds(): ?array
+    {
+        $stations = $this->accessibleStationsQuery();
+
+        return $stations === null ? null : $stations->pluck('id')->all();
+    }
+
+    /** يصفّي سجلاً لا يرتبط بمحطة (كتنبيه مالي) إلى فروع المستخدم المسموحة؛ الفرع الفارغ يبقى مرئياً (عقد whereBranchIn). */
+    protected function restrictToAllowedBranches(Builder $query): Builder
+    {
+        $allowed = request()->user()?->allowedBranchIds();
+        if ($allowed === null) {
+            return $query;
+        }
+        $table = $query->getModel()->getTable();
+
+        return $query->where(function (Builder $q) use ($table, $allowed) {
+            $q->whereIn($table . '.branch_id', $allowed)->orWhereNull($table . '.branch_id');
+        });
+    }
+
     /** قيد قراءة للسجلات المرتبطة بمحطة (بلا عمود مخزن): تُخفى سجلات محطات مخزنها خارج نطاق المستخدم. */
     protected function restrictToAccessibleWarehouseStations(Builder $query, string $stationColumn = 'fuel_station_id'): Builder
     {

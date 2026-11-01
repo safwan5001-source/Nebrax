@@ -45,10 +45,10 @@ class FuelStationReportService
             'sales_today_minor' => (int) $totals->revenue_minor,
             'liters_today_milliliters' => (int) $totals->liters_ml,
             'gross_margin_minor' => (int) $totals->revenue_minor - (int) $totals->cogs_minor,
-            'open_shifts' => FuelShift::query()->where('status', FuelShift::STATUS_OPEN)->count(),
-            'open_work_orders' => FuelStationWorkOrder::query()->whereNotIn('status', [FuelStationWorkOrder::STATUS_CLOSED])->count(),
-            'active_alerts' => FinancialControlAlert::query()->where('rule', 'like', 'fuel.%')->whereIn('status', ['active', 'acknowledged'])->count(),
-            'degraded_devices' => FuelStationDevice::query()->where(fn (Builder $query) => $query->where('health', FuelStationDevice::HEALTH_DEGRADED)->orWhere('sync_status', FuelStationDevice::SYNC_FAILED))->count(),
+            'open_shifts' => $this->scopedToStations(FuelShift::query(), $filters)->where('status', FuelShift::STATUS_OPEN)->count(),
+            'open_work_orders' => $this->scopedToStations(FuelStationWorkOrder::query(), $filters)->whereNotIn('status', [FuelStationWorkOrder::STATUS_CLOSED])->count(),
+            'active_alerts' => $this->scopedToBranches(FinancialControlAlert::query(), $filters)->where('rule', 'like', 'fuel.%')->whereIn('status', ['active', 'acknowledged'])->count(),
+            'degraded_devices' => $this->scopedToStations(FuelStationDevice::query(), $filters)->where(fn (Builder $query) => $query->where('health', FuelStationDevice::HEALTH_DEGRADED)->orWhere('sync_status', FuelStationDevice::SYNC_FAILED))->count(),
             // لا نقدّر "أيام المخزون" من دون سياسة استهلاك/وحدة حرارية موثوقة؛ يعاد null بوضوح.
             'tank_days_remaining' => null,
             'data_boundary' => 'finalized_sales_and_operational_evidence_only',
@@ -121,7 +121,7 @@ class FuelStationReportService
     public function devices(array $filters = []): array
     {
         $this->requireTenant();
-        $query = FuelStationDevice::query();
+        $query = $this->scopedToStations(FuelStationDevice::query(), $filters);
         if (! empty($filters['station_id'])) $query->where('fuel_station_id', $filters['station_id']);
         return [
             'family' => 'devices',
@@ -137,7 +137,7 @@ class FuelStationReportService
     public function maintenance(array $filters = []): array
     {
         $this->requireTenant();
-        $query = FuelStationWorkOrder::query();
+        $query = $this->scopedToStations(FuelStationWorkOrder::query(), $filters);
         if (! empty($filters['station_id'])) $query->where('fuel_station_id', $filters['station_id']);
         $rows = $query->selectRaw('status, COUNT(*) as count, COALESCE(SUM(cost_minor), 0) as cost_minor, COALESCE(SUM(downtime_minutes), 0) as downtime_minutes')
             ->groupBy('status')->orderBy('status')->get()->map(fn ($row) => [
@@ -150,9 +150,12 @@ class FuelStationReportService
     public function safety(array $filters = []): array
     {
         $this->requireTenant();
-        $inspectionQuery = FuelStationSafetyInspection::query();
-        $permitQuery = FuelStationSafetyPermit::query();
+        $inspectionQuery = $this->scopedToStations(FuelStationSafetyInspection::query(), $filters);
+        $permitQuery = $this->scopedToStations(FuelStationSafetyPermit::query(), $filters);
         $actionQuery = FuelStationSafetyCorrectiveAction::query();
+        if (array_key_exists('station_ids', $filters)) {
+            $actionQuery->whereHas('finding.inspection', fn (Builder $query) => $query->whereIn('fuel_station_id', $filters['station_ids']));
+        }
         if (! empty($filters['station_id'])) {
             $inspectionQuery->where('fuel_station_id', $filters['station_id']);
             $permitQuery->where('fuel_station_id', $filters['station_id']);
@@ -180,6 +183,39 @@ class FuelStationReportService
         if (! empty($filters['from'])) $query->whereDate($dateColumn, '>=', $filters['from']);
         if (! empty($filters['to'])) $query->whereDate($dateColumn, '<=', $filters['to']);
         if (! empty($filters['station_id'])) $query->where('fuel_station_id', $filters['station_id']);
+        $this->scopedToStations($query, $filters);
+    }
+
+    /**
+     * FS-05: مستخدم مقيَّد بفرع/مخزن يمرّر المتحكم `station_ids` (محطاته المتاحة) فتُقصر التقارير عليها.
+     * غيابه = بلا تقييد (السلوك السابق)؛ مصفوفة فارغة = لا محطات متاحة ⇒ لا صفوف.
+     *
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  array<string,mixed>  $filters
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
+    private function scopedToStations(Builder $query, array $filters): Builder
+    {
+        if (array_key_exists('station_ids', $filters)) {
+            $query->whereIn('fuel_station_id', $filters['station_ids']);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  array<string,mixed>  $filters
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
+    private function scopedToBranches(Builder $query, array $filters): Builder
+    {
+        if (isset($filters['branch_ids']) && is_array($filters['branch_ids'])) {
+            $table = $query->getModel()->getTable();
+            $query->where(fn (Builder $q) => $q->whereIn($table . '.branch_id', $filters['branch_ids'])->orWhereNull($table . '.branch_id'));
+        }
+
+        return $query;
     }
 
     /** @return array<string,mixed> */
