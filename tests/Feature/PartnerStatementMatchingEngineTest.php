@@ -200,6 +200,27 @@ class PartnerStatementMatchingEngineTest extends TestCase
         $this->assertNotContains('matched', array_column($r1['ledger'], 'outcome'));
     }
 
+    /**
+     * Codex #1908 P2: وحدات مرشّحة لمرجع غامض (مفتاح يصيب أكثر من وثيقة) لا تُعرَض على R3 لسطر آخر — وإلا طُوبق سطر بلا مرجع تلقائياً بوحدة ما زالت مطلوبة من سطر غامض.
+     *
+     * @test
+     */
+    public function units_in_a_key_ambiguity_are_not_offered_to_r3_for_other_lines(): void
+    {
+        // رقم واحد INV-1 لوثيقتين (فرعان): مبلغ ١٠٠ ومبلغ ٢٠٠.
+        $units = [$this->unit('a', 'invoice', 'INV-1', '2026-09-01', 'debit', 10000), $this->unit('b', 'invoice', 'INV-1', '2026-09-01', 'debit', 20000)];
+        $result = $this->go([
+            $this->line(2, '2026-09-01', credit: 10000, our: 'inv-1'),   // يصيب الوثيقتين ⇒ ambiguous
+            $this->line(3, '2026-09-01', credit: 10000),                 // بلا مرجع: يجب ألا يلتقط وحدة a
+        ], $units);
+        $rows = $this->byLine($result);
+
+        $this->assertSame(['ambiguous', 'ambiguous_multiple_documents_for_reference'], [$rows[2]['outcome'], $rows[2]['explanation']['code']]);
+        $this->assertSame('missing_in_books', $rows[3]['outcome'], 'لا تعيين تلقائي لوحدة مطلوبة من سطر غامض.');
+        $this->assertNotContains('matched', array_column($result['statement'], 'outcome'));
+        $this->assertSame(['needs_review', 'needs_review'], array_column($result['ledger'], 'outcome'));
+    }
+
     /** @test */
     public function a_unit_matched_by_a_key_is_not_reused_by_r3_for_another_line(): void
     {

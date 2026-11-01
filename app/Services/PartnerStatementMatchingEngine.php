@@ -101,7 +101,8 @@ final class PartnerStatementMatchingEngine
         }
 
         // ───────────── المرحلة B: R3 (المبلغ + التاريخ + الاتجاه، وحيد من الجهتين) ─────────────
-        $free = array_filter($units, fn (array $u): bool => $u['state'] === 'active' && ! isset($claims[$u['key']]) && ! isset($disputed[$u['key']]));
+        // وحدات مرشّحة لمرجع غامض (`$inReview`) ما زالت مطلوبة من سطر غامض: لا تُعرَض على R3 لأي سطر آخر (Codex #1908 P2).
+        $free = array_filter($units, fn (array $u): bool => $u['state'] === 'active' && ! isset($claims[$u['key']]) && ! isset($disputed[$u['key']]) && ! isset($inReview[$u['key']]));
         $candidatesOf = [];   // ordinal => [unit key,...]
         $reverse = [];        // unit key => [ordinal,...]
         foreach ($pendingB as $line) {
@@ -143,7 +144,7 @@ final class PartnerStatementMatchingEngine
         }
 
         // ───────────── اقتراحات many-to-one (للمراجعة اليدوية فقط) ─────────────
-        $usable = array_values(array_filter($units, fn (array $u): bool => $u['state'] === 'active' && ! isset($claims[$u['key']]) && ! isset($disputed[$u['key']])));
+        $usable = array_values(array_filter($units, fn (array $u): bool => $u['state'] === 'active' && ! isset($claims[$u['key']]) && ! isset($disputed[$u['key']]) && ! isset($inReview[$u['key']])));
         $suggested = 0;
         foreach ($lines as $line) {
             $ordinal = (int) $line['ordinal'];

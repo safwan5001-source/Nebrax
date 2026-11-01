@@ -100,15 +100,17 @@ final class PartnerStatementMatchService
     {
         $reconciliation = $this->authorize($actor, $reconciliationId, 'partner_statements.view');
 
+        // التشغيلة المخزَّنة تحمل لقطات دفتر بنطاق من أنشأها: لا تُعاد إلا لقارئ نطاقه يحتويها (Codex #1908 P1) — افتراضياً أحدث تشغيلة **مقروءة** له، وصراحةً (`run_id`) رفضٌ موحَّد.
         $runs = PartnerStatementMatchRun::query()->where('reconciliation_id', $reconciliation->id);
-        $run = ! empty($filters['run_id'])
-            ? (clone $runs)->whereKey($filters['run_id'])->first()
-            : (clone $runs)->orderByDesc('created_at')->orderByDesc('id')->first();
-        if ($run === null) {
-            if (! empty($filters['run_id'])) {
+        if (! empty($filters['run_id'])) {
+            $run = (clone $runs)->whereKey($filters['run_id'])->first();
+            if ($run === null || ! $this->readable($actor, $run)) {
                 throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
             }
-
+        } else {
+            $run = (clone $runs)->orderByDesc('created_at')->orderByDesc('id')->get()->first(fn (PartnerStatementMatchRun $r): bool => $this->readable($actor, $r));
+        }
+        if ($run === null) {
             return ['run' => null, 'ledger_changed' => null, 'page' => null];
         }
 
@@ -293,6 +295,24 @@ final class PartnerStatementMatchService
 
             return $unit;
         }, $units);
+    }
+
+    /**
+     * هل نطاق التشغيلة المخزَّنة داخل نطاق القارئ الحالي؟ غير المقيَّد يقرأ كل شيء؛ المقيَّد يقرأ فقط تشغيلة نطاقها فروع محددة كلها ضمن فروعه
+     * (تشغيلة «المؤسسة» أو بلا فروع محددة لا يقرؤها المقيَّد).
+     */
+    private function readable(User $actor, PartnerStatementMatchRun $run): bool
+    {
+        $allowed = $actor->allowedBranchIds();
+        if ($allowed === null) {
+            return true;
+        }
+        $branches = $run->scope['branch_ids'] ?? null;
+        if (($run->scope['kind'] ?? null) === 'organization' || ! is_array($branches) || $branches === []) {
+            return false;
+        }
+
+        return array_diff($branches, $allowed) === [];
     }
 
     private function lock(string $reconciliationId): void

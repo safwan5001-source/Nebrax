@@ -436,6 +436,45 @@ class PartnerStatementMatchApiTest extends TestCase
         $this->getMatches($token, $outsideRecon)->assertStatus(422);
     }
 
+    /**
+     * Codex #1908 P1: نتائج مخزَّنة بنطاق أوسع من نطاق القارئ لا تُعاد له — لا بالاختيار الافتراضي ولا بـrun_id صريح؛ ويُختار له أحدث تشغيلة **مقروءة** له.
+     *
+     * @test
+     */
+    public function a_stored_run_is_only_readable_inside_the_readers_branch_scope(): void
+    {
+        $inside = Branch::create(['code' => 'IN', 'name' => 'فرع داخل']);
+        $outside = Branch::create(['code' => 'OUT', 'name' => 'فرع خارج']);
+        $mine = $this->invoice('2026-09-01', 100000, $inside->id);            // ‎00001‎ في «داخل»
+        $this->invoice('2026-09-05', 1000, $outside->id);                     // ‎00001‎ في «خارج» (ترقيم الفواتير لكل فرع)
+        $other = $this->invoice('2026-09-02', 70000, $outside->id);           // ‎00002‎ في «خارج»: رقم لا يملكه فرعي
+        $restrictedToken = $this->role('ps-scope', ['partner_statements.view', 'partner_statements.reconcile', 'partners.view'], 'sc@ps-a2c.test');
+        User::query()->where('email', 'sc@ps-a2c.test')->firstOrFail()->branches()->sync([$inside->id]);
+
+        $id = $this->statement([['date' => '2026-09-01', 'credit' => 115000], ['date' => '2026-09-02', 'credit' => 80500]]);
+        $orgRun = $this->postMatch($this->auth['token'], $id)->assertCreated()->json('data');
+        $this->assertSame('organization', $orgRun['scope']['kind']);
+
+        // تشغيلة المؤسسة مخزَّنة ببيانات الفرعين؛ المقيَّد لا يقرؤها: لا افتراضياً ولا صراحةً.
+        $default = $this->getMatches($restrictedToken, $id)->assertOk();
+        $this->assertNull($default->json('run'));
+        $this->assertSame([], $default->json('data'));
+        $this->assertStringNotContainsString($other->number.'"', (string) $default->getContent());
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $this->getMatches($restrictedToken, $id, ['run_id' => $orgRun['id']])->assertStatus(422)->json('message'));
+
+        // يشغّل بنطاقه فيرى تشغيلته هو (الأحدث المقروءة)، دون وحدات الفرع الآخر.
+        $own = $this->postMatch($restrictedToken, $id)->assertCreated()->json('data');
+        $this->assertSame('branch', $own['scope']['kind']);
+        $page = $this->getMatches($restrictedToken, $id, ['per_page' => 50])->assertOk();
+        $this->assertSame($own['id'], $page->json('run.id'));
+        $this->assertStringNotContainsString($other->number.'"', (string) $page->getContent());
+        $this->assertStringContainsString($mine->number, (string) $page->getContent());
+
+        // غير المقيَّد يقرأ كل التشغيلات؛ والأحدث له تشغيلة المقيَّد (الأحدث زمنياً)، والمؤسسة بـrun_id.
+        $this->getMatches($this->auth['token'], $id, ['run_id' => $orgRun['id']])->assertOk();
+        $this->assertSame($own['id'], $this->getMatches($this->auth['token'], $id)->assertOk()->json('run.id'));
+    }
+
     // ═══════════════════════════════ الواجهة والحدود ═══════════════════════════════
 
     /** @test */
