@@ -214,6 +214,17 @@ class CommerceProductPopularityTest extends TestCase
     }
 
     /** @test */
+    public function the_aggregate_has_a_supporting_tenant_product_index(): void
+    {
+        // مراجعة Codex: المجمّع المرتبط يمسح سطور المستأجر لكل منتج مرشّح بلا فهرس (ثوانٍ مع آلاف السطور).
+        $indexes = collect(\Illuminate\Support\Facades\Schema::getIndexes('invoice_lines'));
+        $this->assertTrue(
+            $indexes->contains(fn ($i) => array_slice($i['columns'], 0, 2) === ['tenant_id', 'product_id']),
+            'invoice_lines needs an index starting with (tenant_id, product_id).',
+        );
+    }
+
+    /** @test */
     public function the_sales_setting_rejects_out_of_range_windows(): void
     {
         $token = $this->registerTenant('pop-settings', 'owner@pop.test')['token'];
