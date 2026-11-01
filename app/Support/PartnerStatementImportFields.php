@@ -88,10 +88,18 @@ final class PartnerStatementImportFields
         return self::all()[$key] ?? null;
     }
 
-    /** @return list<string> */
+    /**
+     * عناوين القالب: تخطيط «مدين/دائن» وحده، **بلا عمود «المبلغ»** — الجمع بينهما يرفضه التحقق (استعمال أحد التخطيطين لا كليهما)، فالقالب المنزَّل يجب أن يُرفع كما هو دون حذف عمود
+     * (Codex #1877 P2). ملف العمود الواحد يُبنى بحذف عمودَي مدين/دائن وإضافة «المبلغ» مع إعلان الاتجاه.
+     *
+     * @return list<string>
+     */
     public static function templateHeaders(): array
     {
-        return array_values(array_map(static fn (array $field): string => (string) $field['label_ar'], self::all()));
+        return array_values(array_map(
+            static fn (array $field): string => (string) $field['label_ar'],
+            array_diff_key(self::all(), ['amount' => true]),
+        ));
     }
 
     /** @param list<string> $headers @return array<int, string|null> */

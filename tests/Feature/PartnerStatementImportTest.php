@@ -176,7 +176,14 @@ class PartnerStatementImportTest extends TestCase
     {
         $keys = array_column($this->withToken($this->auth['token'])->getJson('/api/partner-statements/import/fields')->assertOk()->json('data.fields'), 'key');
         $this->assertSame(['line_date', 'reference', 'our_reference', 'description', 'debit', 'credit', 'amount', 'balance', 'currency', 'kind'], $keys);
-        $this->assertStringContainsString('مدين', $this->withToken($this->auth['token'])->get('/api/partner-statements/import/template')->assertOk()->streamedContent());
+        $template = $this->withToken($this->auth['token'])->get('/api/partner-statements/import/template')->assertOk()->streamedContent();
+        $this->assertStringContainsString('مدين', $template);
+        $this->assertStringNotContainsString('المبلغ', $template, 'تخطيط مدين/دائن وحده؛ عمود المبلغ البديل يرفضه التحقق مع مدين/دائن.');
+
+        // القالب المنزَّل يُرفع كما هو بالمطابقة التلقائية ويصير معاينة صالحة (Codex #1877 P2).
+        $round = $this->upload($this->auth['token'], '/api/partner-statements/import/preview', ['file' => UploadedFile::fake()->createWithContent('template.csv', $template)] + $this->hdr())->assertOk()->json('data');
+        $this->assertSame([2, 0], [$round['line_rows'], $round['error_rows']]);
+        $this->assertSame([115000, 50000], [$round['total_debit_minor'], $round['total_credit_minor']]);
 
         // الفحص بالملف وحده: لا طرف ولا فترة، فلا يُقرأ طرفٌ أصلاً.
         $inspect = $this->upload($this->auth['token'], '/api/partner-statements/import/inspect', ['file' => $this->file($this->rows())])->assertOk()->json('data');
