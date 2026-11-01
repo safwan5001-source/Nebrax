@@ -28,7 +28,7 @@ type Workspace = { stations: Station[] };
 type Dashboard = {
   sales_today_minor: number;
   liters_today_milliliters: number;
-  gross_margin_minor: number;
+  gross_margin_minor?: number;
   open_shifts: number;
   open_work_orders: number;
   active_alerts: number;
@@ -184,7 +184,8 @@ export default function FuelStationsWorkspacePage() {
   const metrics = summary.dashboard ? [
     { label: t('salesToday'), value: formatMinorRiyal(summary.dashboard.sales_today_minor) },
     { label: t('litersToday'), value: formatMillilitersAsLiters(summary.dashboard.liters_today_milliliters, locale, t('literUnit')) },
-    { label: t('grossMargin'), value: formatMinorRiyal(summary.dashboard.gross_margin_minor) },
+    // FS-23: الهامش لا يصل إلا لمن يملك صلاحية التكلفة؛ غيابه يُخفي البطاقة.
+    ...(summary.dashboard.gross_margin_minor === undefined ? [] : [{ label: t('grossMargin'), value: formatMinorRiyal(summary.dashboard.gross_margin_minor) }]),
     { label: t('openShifts'), value: String(summary.dashboard.open_shifts) },
     { label: t('openWorkOrders'), value: String(summary.dashboard.open_work_orders) },
     { label: t('activeAlerts'), value: String(summary.dashboard.active_alerts) },

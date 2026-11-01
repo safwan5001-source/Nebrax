@@ -15,6 +15,7 @@ use App\Services\FuelStationSafetyService;
 use App\Services\Reporting\FuelStationReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\FuelCostVisibility;
 
 /** Cycle 9 surface; writes delegate to audited domain services only. */
 class FuelStationReadinessController extends ApiController
@@ -211,12 +212,18 @@ class FuelStationReadinessController extends ApiController
 
     public function dashboard(Request $request): JsonResponse
     {
-        return response()->json(['data' => $this->reports->dashboard($this->reportFilters($request))]);
+        return response()->json(['data' => FuelCostVisibility::redactReport(
+            $this->reports->dashboard($this->reportFilters($request)),
+            FuelCostVisibility::canSeeCost($request->user()),
+        )]);
     }
 
     public function report(Request $request, string $family): JsonResponse
     {
         $filters = $this->reportFilters($request);
+        $canSeeCost = FuelCostVisibility::canSeeCost($request->user());
+        // FS-23: تقرير الربحية هامش وتكلفة بالكامل — لا يُعرض بلا صلاحية التكلفة.
+        abort_if($family === 'profitability' && ! $canSeeCost, 403, 'ليس لديك صلاحية عرض تكلفة وهامش الوقود.');
         $data = match ($family) {
             'sales' => $this->reports->sales((string) $request->query('dimension', 'station'), $filters),
             'inventory' => $this->reports->inventory($filters),
@@ -225,7 +232,7 @@ class FuelStationReadinessController extends ApiController
             'devices' => $this->reports->devices($filters), 'maintenance' => $this->reports->maintenance($filters),
             'safety' => $this->reports->safety($filters), default => abort(404),
         };
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => FuelCostVisibility::redactReport($data, $canSeeCost)]);
     }
 
     /** @return array<string,mixed> */
