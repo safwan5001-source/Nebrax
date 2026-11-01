@@ -70,6 +70,26 @@ final class CapabilityManifest
         );
     }
 
+    /**
+     * الجيل 1.2.0 (AD-02 / S11a): كل ما في 1.1.0 + التصنيفات (`CategoryList` + مورد `commerce.categories` + `openCategory`) والبحث (`openSearch`).
+     * الخادم يعلنه قبل Flutter (S11b) كما حدث مع 1.1.0: لا جهاز يرسل `X-Runtime-Version: 1.2.0` قبل بنائه فلا يتأثر أي جهاز قائم.
+     */
+    public static function v120(): self
+    {
+        $base = self::v110();
+
+        return new self(
+            runtimeVersion: new SchemaVersion(1, 2, 0),
+            minSupportedSchemaVersion: $base->minSupportedSchemaVersion,
+            maxSupportedSchemaVersion: $base->maxSupportedSchemaVersion,
+            components: $base->components + RuntimeCapabilities::COMPONENTS_V120,
+            actions: $base->actions + RuntimeCapabilities::ACTIONS_V120,
+            nativeCapabilities: $base->nativeCapabilities,
+            dataResources: $base->dataResources + RuntimeCapabilities::DATA_RESOURCES_V120,
+            schemaFeatures: $base->schemaFeatures,
+        );
+    }
+
     public function componentVersion(string $type): ?int
     {
         return $this->components[$type] ?? null;

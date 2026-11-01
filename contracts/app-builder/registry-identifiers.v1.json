@@ -33,5 +33,12 @@
     "updateCartQuantity",
     "removeCartItem",
     "refresh"
+  ],
+  "components_v120": [
+    "CategoryList"
+  ],
+  "actions_v120": [
+    "openCategory",
+    "openSearch"
   ]
 }

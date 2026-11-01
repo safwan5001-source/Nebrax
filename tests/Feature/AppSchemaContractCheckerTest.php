@@ -308,8 +308,9 @@ class AppSchemaContractCheckerTest extends TestCase
     {
         $fixture = json_decode((string) file_get_contents(base_path('contracts/app-builder/registry-identifiers.v1.json')), true);
 
-        $components = $fixture['components'];
-        $actions = $fixture['actions'];
+        // الأساس = الجيل 1.0.0 المجمَّد؛ إضافات 1.2.0 في أقسام `*_v120` (S11a) وتُدمج عند Dart/الويب في S11b/c.
+        $components = array_merge($fixture['components'], $fixture['components_v120'] ?? []);
+        $actions = array_merge($fixture['actions'], $fixture['actions_v120'] ?? []);
         sort($components);
         sort($actions);
         $serverComponents = array_keys(ComponentRegistry::definitions());

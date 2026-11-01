@@ -203,6 +203,23 @@ final class ComponentRegistry
                 label: new Label(ar: 'إضافة إلى السلة', en: 'Add to Cart'),
             ),
             new ComponentDefinition(
+                type: 'CategoryList',
+                version: 1,
+                category: self::CATEGORY_COMMERCE,
+                props: [
+                    // نفس اتفاق `ProductList` (S10a): خاصيتا عرض اختياريتان؛ غيابهما = أفقي.
+                    new PropDefinition('layout', PropType::STRING, required: false, label: new Label(ar: 'طريقة العرض', en: 'Layout'), default: 'horizontal', enumValues: ['horizontal', 'grid', 'vertical']),
+                    new PropDefinition('columns', PropType::INTEGER, required: false, label: new Label(ar: 'عدد الأعمدة (الشبكة)', en: 'Columns (grid)'), default: 2),
+                ],
+                childrenRule: ChildrenRule::unboundedAny(),
+                actionable: false,
+                injectedRuntimeActionParams: [],
+                notes: 'الجيل 1.2.0 (S11): يكرّر قالب العنصر لكل تصنيف من `commerce.categories` (`$item.id`/`$item.name`) — قالب العنصر عادةً `Button` بإجراء `openCategory` يفتح منتجات التصنيف. أجهزة أقدم لا ترندره (يمنع النشر لها لا إسقاطاً صامتاً).',
+                label: new Label(ar: 'قائمة التصنيفات', en: 'Category List'),
+                bindableResources: ['commerce.categories'],
+                listShape: true,
+            ),
+            new ComponentDefinition(
                 type: 'CartList',
                 version: 1,
                 category: self::CATEGORY_COMMERCE,

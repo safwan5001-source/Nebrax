@@ -29,14 +29,16 @@ class AppBuilderRegistryTest extends TestCase
 
         $response = $this->withToken($auth['token'])->getJson('/api/app-builder/registries')->assertOk();
 
-        $this->assertSame(
-            array_keys(RuntimeCapabilities::COMPONENTS),
-            array_keys($response->json('data.components'))
-        );
-        $this->assertSame(
-            array_keys(RuntimeCapabilities::ACTIONS),
-            array_keys($response->json('data.actions'))
-        );
+        $components = array_keys(RuntimeCapabilities::COMPONENTS + RuntimeCapabilities::COMPONENTS_V120);
+        $actions = array_keys(RuntimeCapabilities::ACTIONS + RuntimeCapabilities::ACTIONS_V120);
+        $gotComponents = array_keys($response->json('data.components'));
+        $gotActions = array_keys($response->json('data.actions'));
+        sort($components);
+        sort($actions);
+        sort($gotComponents);
+        sort($gotActions);
+        $this->assertSame($components, $gotComponents);
+        $this->assertSame($actions, $gotActions);
     }
 
     /** @test */
