@@ -120,26 +120,34 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  /// رقم تسلسلي: ردٌّ أقدم أو بعد التفكيك لا يستبدل الأحدث ولا يستدعي `setState` على شاشة مفكَّكة.
+  int _loadSeq = 0;
+
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() => _loading = true);
     try {
       final raw = await widget.client.fetchBindingResource('commerce.cart');
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _cart = raw is Map ? raw.cast<String, Object?>() : const {};
         _errorMessage = null;
         _loading = false;
       });
     } on CommerceApiException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } on CommerceProtocolException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;

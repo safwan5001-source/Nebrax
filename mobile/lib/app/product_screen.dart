@@ -58,6 +58,9 @@ class _ProductScreenState extends State<ProductScreen> {
   String? _errorMessage;
   bool _loading = true;
 
+  /// رقم تسلسلي: ردٌّ أقدم أو بعد التفكيك (زر الرجوع) لا يستبدل الأحدث ولا يستدعي `setState` على شاشة مفكَّكة.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -71,27 +74,32 @@ class _ProductScreenState extends State<ProductScreen> {
   }
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     try {
       final product = await widget.client.getProduct(widget.productId);
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _product = product;
         _loading = false;
       });
     } on CommerceApiException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } on CommerceProtocolException catch (e) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = e.message;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;
