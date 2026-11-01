@@ -19,7 +19,8 @@ class FuelFleetController extends ApiController
 
     public function vehicles(): JsonResponse
     {
-        return response()->json(['data' => FuelFleetVehicle::query()->with('allowedFuelProducts')->orderByDesc('created_at')->paginate(50)]);
+        // المقسَّم يُسلسَل بـ`data` مصفوفةً على مستوى الجذر (كبقية قوائم الوقود)؛ لفّه بـ{data: ...} كان يجعل `data.data` هي القائمة (FS-10).
+        return response()->json(FuelFleetVehicle::query()->with('allowedFuelProducts')->orderByDesc('created_at')->paginate(50));
     }
 
     public function storeVehicle(StoreFuelFleetVehicleRequest $request): JsonResponse
@@ -31,7 +32,7 @@ class FuelFleetController extends ApiController
 
     public function drivers(): JsonResponse
     {
-        return response()->json(['data' => FuelFleetDriver::query()->orderByDesc('created_at')->paginate(50)]);
+        return response()->json(FuelFleetDriver::query()->orderByDesc('created_at')->paginate(50));
     }
 
     public function storeDriver(StoreFuelFleetDriverRequest $request): JsonResponse
