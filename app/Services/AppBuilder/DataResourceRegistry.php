@@ -101,6 +101,7 @@ final class DataResourceRegistry
                     new ResourceQueryParamDefinition('name', ResourceQueryParamDefinition::KIND_SORT, 'يطابق `CommerceProductController::SORTS[\'name\']` حرفياً.'),
                     new ResourceQueryParamDefinition('sale_price', ResourceQueryParamDefinition::KIND_SORT, 'يطابق `CommerceProductController::SORTS[\'sale_price\']` حرفياً.'),
                     new ResourceQueryParamDefinition('created_at', ResourceQueryParamDefinition::KIND_SORT, 'يطابق `CommerceProductController::SORTS[\'created_at\']` حرفياً. الاتجاه العكسي عبر بادئة `-` (مثال: `-created_at`).'),
+                    new ResourceQueryParamDefinition('popularity', ResourceQueryParamDefinition::KIND_SORT, 'الأكثر مبيعاً: مجموع وحدات الأساس في فواتير مرحّلة ضمن نافذة قابلة للضبط (`ProductPopularity`). `-popularity` الأعلى أولاً. لا تُعرض أي أرقام مبيعات.'),
                 ],
                 paginated: true,
                 auth: ResourceDefinition::AUTH_STORE_BEARER,

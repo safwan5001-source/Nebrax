@@ -1309,7 +1309,10 @@ components:
         `sale_price` / `-sale_price` order by the price the listing displays for this channel (the channel's active
         price-list item for the product's unit, else the base unit price; variant-managed products display 0), with the
         product id as a deterministic tie-break. The parameter values are unchanged.
-      schema: { type: string, enum: [name, '-name', sale_price, '-sale_price', created_at, '-created_at'] }
+        `popularity` / `-popularity` (AD-09) order by base units sold in posted invoices within the tenant's configurable
+        window (default 90 days; `sales.popularity_window_days`), `-popularity` best-selling first; ties break by name then
+        id. Read-only, tenant-scoped; no sales figures are returned — only the order.
+      schema: { type: string, enum: [name, '-name', sale_price, '-sale_price', created_at, '-created_at', popularity, '-popularity'] }
     OrdersSort:
       name: sort
       in: query
