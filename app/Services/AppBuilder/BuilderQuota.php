@@ -34,7 +34,8 @@ final class BuilderQuota
         if ($limit === null) {
             return;
         }
-        $current = BuilderApp::query()->count();
+        // التطبيقات المؤرشفة لا تُحتسب ضمن الحدّ (S05d): الأرشفة بديل الحذف ويُفرَّغ بها الحيّز.
+        $current = BuilderApp::query()->whereNull('archived_at')->count();
         $this->guard(self::APPS, $limit, $current, "بلغتَ الحدّ الأقصى لعدد التطبيقات في خطتك ({$limit}). احذف تطبيقاً أو رقِّ خطتك.");
     }
 

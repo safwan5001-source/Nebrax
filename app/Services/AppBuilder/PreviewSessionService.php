@@ -41,6 +41,9 @@ class PreviewSessionService
         return DB::transaction(function () use ($app, $issuer, $channel, $deviceLabel): array {
             // DRF-07: حدّ الجلسات النشطة لكل تطبيق (PlanGate) على صفّ التطبيق المقفول.
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            if ($lockedApp->isArchived()) {
+                throw new \RuntimeException('التطبيق مؤرشف ولا تُصدر له جلسات معاينة.');
+            }
             $this->quota->assertCanIssuePreview($lockedApp);
 
             return $this->createSession($lockedApp, $issuer, $channel, $deviceLabel);

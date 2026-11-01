@@ -1472,6 +1472,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::patch('app-builder/apps/{id}', [BuilderAppController::class, 'update'])
             ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
 
+        // AD-06 / S05d: أرشفة (soft) بدل الحذف؛ لا يُؤرشف الحيّ.
+        Route::post('app-builder/apps/{id}/archive', [BuilderAppController::class, 'archive'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+        Route::post('app-builder/apps/{id}/unarchive', [BuilderAppController::class, 'unarchive'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+
         Route::get('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
         Route::put('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'update'])

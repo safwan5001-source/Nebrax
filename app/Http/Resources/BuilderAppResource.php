@@ -16,6 +16,7 @@ class BuilderAppResource extends JsonResource
             'name' => $this->name,
             'name_en' => $this->name_en,
             'creation_source' => $this->creation_source,
+            'archived_at' => $this->archived_at?->toIso8601String(),
             // يقرأ من المجموعة المحمَّلة مسبقاً مباشرة (لا `latestPublishedVersion()`،
             // التي تفتح استعلاماً جديداً في كل صفّ فتُبطل فائدة `->with()` أعلاه —
             // العلاقة معرَّفة بترتيب `orderByDesc('version')` فالعنصر الأول مضموناً الأحدث.

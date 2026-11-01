@@ -7,7 +7,9 @@ use App\Http\Requests\UpdateBuilderAppRequest;
 use App\Http\Resources\BuilderAppResource;
 use App\Models\BuilderApp;
 use App\Services\AppBuilder\BuilderAppService;
+use App\Services\AppBuilder\LivePointerConflictException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * APP-BUILDER-1 — إدارة هوية تطبيقات AWJ App Builder (App Manager الخلفي).
@@ -18,13 +20,13 @@ class BuilderAppController extends ApiController
 {
     public function __construct(private readonly BuilderAppService $service) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json([
-            'data' => BuilderAppResource::collection(
-                BuilderApp::query()->with('publishedVersions')->latest()->get()
-            ),
-        ]);
+        // S05d: المؤرشفة مخفية افتراضياً؛ `?archived=1` يعرضها وحدها.
+        $query = BuilderApp::query()->with('publishedVersions')->latest();
+        $request->boolean('archived') ? $query->whereNotNull('archived_at') : $query->whereNull('archived_at');
+
+        return response()->json(['data' => BuilderAppResource::collection($query->get())]);
     }
 
     public function store(StoreBuilderAppRequest $request): JsonResponse
@@ -57,5 +59,25 @@ class BuilderAppController extends ApiController
         $updated = $this->service->rename($app, $data['name'], $data['name_en'] ?? null);
 
         return response()->json(['data' => new BuilderAppResource($updated)]);
+    }
+
+    public function archive(string $id): JsonResponse
+    {
+        $app = BuilderApp::findOrFail($id);
+
+        try {
+            $archived = $this->domain(fn () => $this->service->archive($app));
+        } catch (LivePointerConflictException $e) {
+            return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], 409);
+        }
+
+        return response()->json(['data' => new BuilderAppResource($archived)]);
+    }
+
+    public function unarchive(string $id): JsonResponse
+    {
+        $app = BuilderApp::findOrFail($id);
+
+        return response()->json(['data' => new BuilderAppResource($this->domain(fn () => $this->service->unarchive($app)))]);
     }
 }

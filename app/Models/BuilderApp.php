@@ -35,6 +35,14 @@ class BuilderApp extends BaseModel implements CompanyWide
         'tenant_id', 'name', 'name_en', 'creation_source', 'created_by',
     ];
 
+    protected $casts = ['archived_at' => 'immutable_datetime'];
+
+    /** أرشفة (soft، AD-06 / S05d): لا تدخل `$fillable`؛ تُكتب عبر `BuilderAppService::archive/unarchive` وحدها. */
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

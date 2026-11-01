@@ -4,6 +4,7 @@ namespace App\Services\AppBuilder;
 
 use App\Models\BuilderApp;
 use App\Models\BuilderDraftExperience;
+use App\Models\BuilderLivePointer;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -72,5 +73,44 @@ final class BuilderAppService
         $app->update(['name' => $name, 'name_en' => $nameEn]);
 
         return $app->fresh();
+    }
+
+    /**
+     * أرشفة (soft، AD-06 / S05d): تحفظ التطبيق ونسخه وتُخرجه من التقديم والنشر والتحرير. **لا يُؤرشف التطبيق الحيّ**
+     * (يشير إليه مؤشر قناة) — يُنقل المؤشر أولاً. القفل على صفّ التطبيق، فترقيةٌ متزامنة لنسخة منه (تقفله أولاً) تسبق الأرشفة
+     * فتُرفض، أو تتأخر عنها فتُرفض على التطبيق المؤرشف. idempotent.
+     *
+     * @throws LivePointerConflictException `app_is_live`
+     */
+    public function archive(BuilderApp $app): BuilderApp
+    {
+        return DB::transaction(function () use ($app): BuilderApp {
+            $locked = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            if ($locked->isArchived()) {
+                return $locked;
+            }
+            if (BuilderLivePointer::query()->where('builder_app_id', $locked->id)->exists()) {
+                throw new LivePointerConflictException('app_is_live', 'هذا التطبيق هو الحيّ حالياً؛ انقل النسخة الحيّة إلى تطبيق آخر قبل أرشفته.');
+            }
+            $locked->forceFill(['archived_at' => now()])->save();
+
+            return $locked->fresh();
+        });
+    }
+
+    /** إعادة تفعيل مؤرشف: يخضع لحدّ عدد التطبيقات (يُعاد احتسابه) تحت قفل المستأجر. idempotent. */
+    public function unarchive(BuilderApp $app): BuilderApp
+    {
+        return DB::transaction(function () use ($app): BuilderApp {
+            $this->quota->lockTenantRow();
+            $locked = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            if (! $locked->isArchived()) {
+                return $locked;
+            }
+            $this->quota->assertCanCreateApp();
+            $locked->forceFill(['archived_at' => null])->save();
+
+            return $locked->fresh();
+        });
     }
 }
