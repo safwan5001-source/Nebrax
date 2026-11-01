@@ -139,6 +139,25 @@ class AppSchemaNavigationShellTest extends TestCase
         }
     }
 
+    /** @test */
+    public function generation_1_1_0_declares_exactly_what_the_shipped_dart_build_declares(): void
+    {
+        $fixture = json_decode(file_get_contents(base_path('contracts/app-builder/navigation-shell.v1.json')), true)['generation_1_1_0'];
+        $manifest = CapabilityManifest::v110();
+
+        $this->assertSame($fixture['runtime'], (string) $manifest->runtimeVersion);
+        $features = $manifest->schemaFeatures;
+        ksort($features);
+        $expected = $fixture['schemaFeatures'];
+        ksort($expected);
+        $this->assertSame($expected, $features);
+        $resources = $manifest->dataResources;
+        ksort($resources);
+        $expectedResources = $fixture['dataResources'];
+        ksort($expectedResources);
+        $this->assertSame($expectedResources, $resources);
+    }
+
     // ── مولّد العقد (checker) ─────────────────────────────────────────────
 
     /** @test */

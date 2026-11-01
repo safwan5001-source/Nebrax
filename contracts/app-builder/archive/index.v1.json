@@ -9,9 +9,79 @@
     "archived documents are frozen: add new files for new shapes, never edit an existing one"
   ],
   "versions": [
-    { "file": "v1-minimal.json", "note": "home page only, no components", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
-    { "file": "../integrated-proof-schema.v1.json", "note": "products list + cart page with binding.collect (LIVE-PREVIEW-7 proof)", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
-    { "file": "v1-legacy-theme.json", "note": "published before S04b: legacy primaryColor + derived --css tokens", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
-    { "file": "v1-optional-dropped.json", "note": "optional section bound to a resource this runtime does not enable (commerce.categories) — dropped, never fails", "expect": { "1.0.0": { "compatible": true, "fallbackIds": ["categories-strip"] } } }
+    {
+      "file": "v1-minimal.json",
+      "note": "home page only, no components",
+      "expect": {
+        "1.0.0": {
+          "compatible": true,
+          "fallbackIds": []
+        },
+        "1.1.0": {
+          "compatible": true,
+          "fallbackIds": []
+        }
+      }
+    },
+    {
+      "file": "../integrated-proof-schema.v1.json",
+      "note": "products list + cart page with binding.collect (LIVE-PREVIEW-7 proof)",
+      "expect": {
+        "1.0.0": {
+          "compatible": true,
+          "fallbackIds": []
+        },
+        "1.1.0": {
+          "compatible": true,
+          "fallbackIds": []
+        }
+      }
+    },
+    {
+      "file": "v1-legacy-theme.json",
+      "note": "published before S04b: legacy primaryColor + derived --css tokens",
+      "expect": {
+        "1.0.0": {
+          "compatible": true,
+          "fallbackIds": []
+        },
+        "1.1.0": {
+          "compatible": true,
+          "fallbackIds": []
+        }
+      }
+    },
+    {
+      "file": "v1-optional-dropped.json",
+      "note": "optional section bound to a resource this runtime does not enable (commerce.categories) — dropped, never fails",
+      "expect": {
+        "1.0.0": {
+          "compatible": true,
+          "fallbackIds": [
+            "categories-strip"
+          ]
+        },
+        "1.1.0": {
+          "compatible": true,
+          "fallbackIds": [
+            "categories-strip"
+          ]
+        }
+      }
+    },
+    {
+      "file": "v1-1-shell.json",
+      "note": "AD-04 / S09a: bottom tabs + app bar — needs the 1.1.0 shell features; 1.0.0 must refuse it (never drop the shell silently)",
+      "expect": {
+        "1.0.0": {
+          "compatible": false,
+          "fallbackIds": []
+        },
+        "1.1.0": {
+          "compatible": true,
+          "fallbackIds": []
+        }
+      }
+    }
   ]
 }
