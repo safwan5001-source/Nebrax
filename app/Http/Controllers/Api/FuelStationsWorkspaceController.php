@@ -14,9 +14,11 @@ use Illuminate\Http\JsonResponse;
  */
 class FuelStationsWorkspaceController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function index(FuelStationSettingsService $settings): JsonResponse
     {
-        $stations = FuelStation::query()
+        $stations = $this->restrictToAccessibleStations(FuelStation::query(), 'id')
             ->orderBy('code')
             ->get(['id', 'branch_id', 'code', 'name', 'status', 'timezone', 'operating_day_starts_at']);
 

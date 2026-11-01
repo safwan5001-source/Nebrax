@@ -18,6 +18,8 @@ use Illuminate\Http\Request;
 
 class FuelStationDeviceController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(
         private readonly FuelStationDeviceService $devices,
         private readonly FuelStationDeviceIngressService $ingress,
@@ -28,7 +30,7 @@ class FuelStationDeviceController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = FuelStationDevice::query()->with('station')->orderBy('name');
+        $query = $this->restrictToAccessibleStations(FuelStationDevice::query()->with('station'))->orderBy('name');
         foreach (['fuel_station_id', 'device_type', 'status', 'health', 'adapter_key'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->query($filter));
@@ -45,6 +47,7 @@ class FuelStationDeviceController extends ApiController
 
     public function store(StoreFuelStationDeviceRequest $request): JsonResponse
     {
+        $this->accessibleStation($request->validated()['fuel_station_id']);
         $device = $this->domain(fn () => $this->devices->create($request->validated(), $request->user()));
 
         return (new FuelStationDeviceResource($device))->response()->setStatusCode(201);
@@ -53,6 +56,7 @@ class FuelStationDeviceController extends ApiController
     public function update(UpdateFuelStationDeviceRequest $request, string $id): JsonResponse
     {
         $device = FuelStationDevice::findOrFail($id);
+        $this->accessibleStation($device->fuel_station_id);
         $updated = $this->domain(fn () => $this->devices->update($device, $request->validated(), $request->user()));
 
         return (new FuelStationDeviceResource($updated))->response();
@@ -61,6 +65,7 @@ class FuelStationDeviceController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $device = FuelStationDevice::findOrFail($id);
+        $this->accessibleStation($device->fuel_station_id);
         $this->domain(fn () => $this->devices->delete($device));
 
         return response()->json([], 204);
@@ -68,7 +73,7 @@ class FuelStationDeviceController extends ApiController
 
     public function indexEvents(Request $request): JsonResponse
     {
-        $query = FuelStationIntegrationEvent::query()->with(['device', 'attempts'])->orderByDesc('received_at');
+        $query = $this->restrictToAccessibleStations(FuelStationIntegrationEvent::query()->with(['device', 'attempts']))->orderByDesc('received_at');
         foreach (['fuel_station_id', 'fuel_station_device_id', 'status', 'event_type', 'source_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->query($filter));
@@ -81,6 +86,7 @@ class FuelStationDeviceController extends ApiController
     public function simulate(StoreFuelStationSimulatedEventRequest $request, string $id): JsonResponse
     {
         $device = FuelStationDevice::findOrFail($id);
+        $this->accessibleStation($device->fuel_station_id);
         $event = $this->domain(fn () => $this->ingress->simulate($device, $request->validated(), $request->user()));
 
         return (new FuelStationIntegrationEventResource($event->load(['device', 'attempts'])))->response()->setStatusCode(201);
@@ -89,6 +95,7 @@ class FuelStationDeviceController extends ApiController
     public function retry(Request $request, string $id): JsonResponse
     {
         $event = FuelStationIntegrationEvent::findOrFail($id);
+        $this->accessibleStation($event->fuel_station_id);
         $retried = $this->domain(fn () => $this->events->retry($event, $request->user()));
 
         return (new FuelStationIntegrationEventResource($retried->load(['device', 'attempts'])))->response();

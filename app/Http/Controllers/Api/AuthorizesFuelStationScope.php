@@ -27,6 +27,42 @@ trait AuthorizesFuelStationScope
         return $station;
     }
 
+    /**
+     * محطات المستخدم المتاحة (فرعاً ومخزناً) كاستعلام فرعي، أو null إن كان غير مقيَّد (لا تصفية).
+     * الفرع/المخزن الفارغان على المحطة يبقيانها مرئية (عقد whereBranchIn القائم لما قبل الفروع).
+     */
+    protected function accessibleStationsQuery(): ?Builder
+    {
+        $user = request()->user();
+        $branches = $user?->allowedBranchIds();
+        $warehouses = $user?->allowedWarehouseIds();
+        if ($branches === null && $warehouses === null) {
+            return null;
+        }
+
+        $stations = FuelStation::query()->select('id');
+        if ($branches !== null) {
+            $stations->where(function (Builder $q) use ($branches) {
+                $q->whereIn('branch_id', $branches)->orWhereNull('branch_id');
+            });
+        }
+        if ($warehouses !== null) {
+            $stations->where(function (Builder $q) use ($warehouses) {
+                $q->whereNull('warehouse_id')->orWhereIn('warehouse_id', $warehouses);
+            });
+        }
+
+        return $stations;
+    }
+
+    /** يصفّي سجلات مرتبطة بمحطة (أو المحطات نفسها بـ `$stationColumn = 'id'`) إلى ما يصله المستخدم. */
+    protected function restrictToAccessibleStations(Builder $query, string $stationColumn = 'fuel_station_id'): Builder
+    {
+        $stations = $this->accessibleStationsQuery();
+
+        return $stations === null ? $query : $query->whereIn($stationColumn, $stations);
+    }
+
     /** قيد قراءة للسجلات المرتبطة بمحطة (بلا عمود مخزن): تُخفى سجلات محطات مخزنها خارج نطاق المستخدم. */
     protected function restrictToAccessibleWarehouseStations(Builder $query, string $stationColumn = 'fuel_station_id'): Builder
     {
