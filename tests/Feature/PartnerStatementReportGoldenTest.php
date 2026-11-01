@@ -23,7 +23,7 @@ use Tests\TestCase;
 /**
  * IMP-PARTNER-STATEMENTS PS-A2b (D-PS-10) — لقطة ذهبية لكشف حساب الطرف (`ReportService::partnerStatement`).
  *
- * اللقطة (`tests/Fixtures/partner_statement_report_golden.json`) **وُلِّدت من الكود قبل أي تعديل** على الخدمة، على حالة تغطّي: رصيد افتتاحي، فاتورة، سند قبض بتخصيص،
+ * اللقطة (`tests/Feature/PartnerStatementReportGolden.php`) **وُلِّدت من الكود قبل أي تعديل** على الخدمة، على حالة تغطّي: رصيد افتتاحي، فاتورة، سند قبض بتخصيص،
  * مشتريات، سند صرف بتخصيص، قيد يدوي، وقراءات: بلا تصفية · بفترة (رصيد افتتاحي) · بدور العميل · بدور المورد · بفرع. الاختبار يقارن الناتج الحالي بها
  * **بعد حذف المفاتيح الإضافية الثلاثة وحدها** (`entry_id`، `entry_status`، `reversal_of`): كل مفتاح وقيمة وترتيب قائم يجب أن يبقى حرفياً.
  *
@@ -36,7 +36,8 @@ class PartnerStatementReportGoldenTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const FIXTURE = __DIR__.'/../Fixtures/partner_statement_report_golden.json';
+    // ملف PHP في tests/Feature (لا JSON في tests/Fixtures): تجميع تطبيق الاختبار في CI ينسخ tests/Feature/*.php فقط (Codex #1898 P1).
+    private const FIXTURE = __DIR__.'/PartnerStatementReportGolden.php';
 
     private const NEW_KEYS = ['entry_id', 'entry_status', 'reversal_of'];
 
@@ -149,11 +150,11 @@ class PartnerStatementReportGoldenTest extends TestCase
         $actual = $this->normalise($readings, stripNew: true);
 
         if (getenv('GOLDEN_WRITE') === '1') {
-            file_put_contents(self::FIXTURE, json_encode($actual, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
+            file_put_contents(self::FIXTURE, "<?php\n\n// لقطة ذهبية — راجع PartnerStatementReportGoldenTest.\n\nreturn ".var_export($actual, true).";\n");
             $this->markTestSkipped('اللقطة الذهبية كُتبت؛ شغّل الاختبار بدون GOLDEN_WRITE.');
         }
 
-        $expected = json_decode((string) file_get_contents(self::FIXTURE), true, 512, JSON_THROW_ON_ERROR);
+        $expected = require self::FIXTURE;
         $this->assertSame($expected, $actual, 'مفاتيح/قيم/ترتيب الكشف الحالية تغيّرت.');
     }
 
