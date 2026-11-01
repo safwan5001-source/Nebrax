@@ -1,0 +1,113 @@
+{
+  "key": "promo",
+  "version": 1,
+  "vertical": "general",
+  "name": {
+    "ar": "صفحة عرض وترويج",
+    "en": "Promo landing"
+  },
+  "description": {
+    "ar": "صفحة ترحيب بعرض وزر تسوّق وقائمة الأكثر مبيعاً.",
+    "en": "A welcome page with an offer, a shop button and a best-selling list."
+  },
+  "schema": {
+    "schemaVersion": "1.0.0",
+    "minRuntimeVersion": "1.0.0",
+    "navigation": {
+      "initialPageId": "home"
+    },
+    "theme": {
+      "tokens": {}
+    },
+    "pages": {
+      "home": {
+        "type": "Page",
+        "id": "home-root",
+        "children": [
+          {
+            "type": "Section",
+            "id": "sec-hero",
+            "props": {
+              "title": "عرض خاص"
+            },
+            "children": [
+              {
+                "type": "Text",
+                "id": "txt-hero",
+                "props": {
+                  "text": "اكتشف تشكيلتنا المختارة بعناية.",
+                  "style": "title"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "btn-shop",
+                "props": {
+                  "label": "تسوّق الآن",
+                  "style": "primary"
+                },
+                "action": {
+                  "type": "navigate",
+                  "params": {
+                    "pageId": "cart"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "Section",
+            "id": "sec-best",
+            "props": {
+              "title": "الأكثر مبيعاً"
+            },
+            "children": [
+              {
+                "type": "ProductList",
+                "id": "list-best",
+                "binding": {
+                  "resource": "commerce.products",
+                  "query": {
+                    "sort": "-popularity"
+                  }
+                },
+                "children": [
+                  {
+                    "type": "ProductCard",
+                    "id": "best-template",
+                    "props": {
+                      "title": "$item.name",
+                      "amountMinor": "$item.price.amount_minor"
+                    },
+                    "action": {
+                      "type": "openProduct",
+                      "params": {
+                        "productId": "$item.id"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cart": {
+        "type": "Page",
+        "id": "cart-root",
+        "children": [
+          {
+            "type": "CartList",
+            "id": "cart-list",
+            "children": [
+              {
+                "type": "CartSummary",
+                "id": "cart-summary"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

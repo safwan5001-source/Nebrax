@@ -1494,6 +1494,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('app-builder/registries', [AppBuilderRegistryController::class, 'index'])
             ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
 
+        // AD-11 / S22a: سجل قوالب البدء (بيانات وصفية فقط؛ التطبيق = نسخ إلى المسودة عبر `POST apps` بـ`template_key`).
+        Route::get('app-builder/templates', [\App\Http\Controllers\Api\BuilderTemplateController::class, 'index'])
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+
         // MOBILE-PREVIEW-6: إصدار/سرد/إبطال جلسات معاينة — `apps_builder.view`
         // لا `apps_builder.manage`: إصدار الجلسة ينسخ لقطة قراءة فقط ولا يكتب
         // في المسودة (انظر قرار RBAC الموثَّق في PreviewSessionController).

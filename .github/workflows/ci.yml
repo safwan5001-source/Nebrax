@@ -213,6 +213,9 @@ jobs:
           # أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
           mkdir -p contracts/app-builder/archive
           cp -r "$CORE/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
+          # سجل قوالب التطبيقات (AD-11 / S22a) — يقرؤه AppTemplateRegistry عبر resource_path()؛ نفس الملفات يقرؤها اختبار Dart.
+          mkdir -p resources/app-builder/templates
+          cp -r "$CORE/resources/app-builder/templates/"*.json resources/app-builder/templates/
           # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
           # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
           cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
