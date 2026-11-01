@@ -170,7 +170,7 @@ class FuelStationSafetyService
             $station = $this->station($action->finding->inspection->fuel_station_id);
             $this->audit($station, $action, 'safety.corrective_action.' . $nextStatus, $before, $this->snapshot($action), $actor, $data['reason'] ?? null);
 
-            return $action->fresh(['finding', 'assignee', 'verifier']);
+            return $action->fresh(['finding', 'assignee:id,name', 'verifier:id,name']);
         });
     }
 

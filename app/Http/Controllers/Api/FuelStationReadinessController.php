@@ -33,7 +33,7 @@ class FuelStationReadinessController extends ApiController
     {
         $request->validate(['fuel_station_id' => ['nullable', 'uuid'], 'status' => ['nullable', 'string', 'max:32']]);
         $schedules = $this->restrictToAccessibleStations(FuelStationMaintenanceSchedule::query())->with('station')->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->orderBy('next_due_at')->paginate(50);
-        $orders = $this->restrictToAccessibleStations(FuelStationWorkOrder::query())->with(['station', 'schedule', 'assignee'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
+        $orders = $this->restrictToAccessibleStations(FuelStationWorkOrder::query())->with(['station', 'schedule', 'assignee:id,name'])->when($request->fuel_station_id, fn ($q, $id) => $q->where('fuel_station_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->orderByDesc('opened_at')->paginate(50);
 
         return response()->json(['data' => ['schedules' => $schedules, 'work_orders' => $orders]]);
     }
@@ -65,7 +65,7 @@ class FuelStationReadinessController extends ApiController
         $this->accessibleStation($data['fuel_station_id']);
         $order = $this->domain(fn () => $this->maintenance->createWorkOrder($data, $request->user()));
 
-        return response()->json(['data' => $order->load(['station', 'schedule', 'assignee'])], 201);
+        return response()->json(['data' => $order->load(['station', 'schedule', 'assignee:id,name'])], 201);
     }
 
     public function transitionWorkOrder(Request $request, string $id): JsonResponse

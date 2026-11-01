@@ -172,7 +172,7 @@ class FuelStationMaintenanceService
                 }
             }
 
-            return $workOrder->fresh(['station', 'schedule', 'assignee', 'reporter', 'verifier']);
+            return $workOrder->fresh(['station', 'schedule', 'assignee:id,name', 'reporter:id,name', 'verifier:id,name']);
         });
     }
 
