@@ -101,23 +101,25 @@ final class StorefrontClientIdentity
         return $normalized === null ? null : substr(hash('sha256', $normalized), 0, 32);
     }
 
-    /** عنوان عام صالح فقط؛ IPv6 → بادئة /64. */
+    /** عنوان عام صالح فقط؛ IPv4 المُغلَّف بـIPv6 (`::ffff:a.b.c.d`) يُختزل إلى IPv4 أولاً؛ IPv6 → بادئة /64. */
     private static function normalize(string $ip): ?string
     {
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            return null;
-        }
-
-        $packed = @inet_pton($ip);
+        $packed = filter_var($ip, FILTER_VALIDATE_IP) === false ? false : @inet_pton($ip);
         if ($packed === false) {
             return null;
         }
 
-        if (strlen($packed) === 16) {
-            return 'v6:'.bin2hex(substr($packed, 0, 8));
+        // ::ffff:a.b.c.d — نفس المستخدم بصيغتين؛ يجب أن يقع في سلة IPv4 نفسها ويُفحص كـIPv4 (وإلا رفضه فلتر النطاق المحجوز).
+        if (strlen($packed) === 16 && str_starts_with($packed, str_repeat("\0", 10)."\xff\xff")) {
+            $packed = substr($packed, 12);
+            $ip = (string) inet_ntop($packed);
         }
 
-        return 'v4:'.$ip;
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return null;
+        }
+
+        return strlen($packed) === 16 ? 'v6:'.bin2hex(substr($packed, 0, 8)) : 'v4:'.$ip;
     }
 
     /** هل يجوز لهذا المضيف استعمال سلة الزائر؟ تجزئة مفتوحة وجملة مغلقة فقط (لا إضعاف للجملة). */

@@ -267,6 +267,34 @@ class StorefrontSignedClientIdentityTest extends TestCase
     }
 
     #[Test]
+    public function an_ipv4_mapped_address_is_the_same_visitor_as_its_ipv4_form_and_private_mapped_ones_are_refused(): void
+    {
+        // Public mapped form is accepted (not silently dropped to the shared bucket) and shares the plain IPv4 bucket.
+        for ($i = 0; $i < 10; $i++) {
+            $this->login($this->signed(self::RETAIL, '::ffff:34.120.5.5'))->assertStatus(422);
+        }
+        for ($i = 0; $i < 10; $i++) {
+            $this->login($this->signed(self::RETAIL, '34.120.5.5'))->assertStatus(422);
+        }
+        $this->login($this->signed(self::RETAIL, '::ffff:34.120.5.5'))->assertStatus(429); // 21st for ONE visitor
+        $this->login($this->signed(self::RETAIL, $this->visitor(9)))->assertStatus(422);     // another visitor is free
+
+        // A mapped PRIVATE address is a misconfigured source: legacy shared bucket, never a visitor bucket.
+        $this->assertNull($this->bucketFor('::ffff:10.0.0.1'));
+        $this->assertNull($this->bucketFor('::ffff:127.0.0.1'));
+        $this->assertSame($this->bucketFor('34.120.5.5'), $this->bucketFor('::ffff:34.120.5.5'));
+        $this->assertNotNull($this->bucketFor('34.120.5.5'));
+    }
+
+    private function bucketFor(string $ip): ?string
+    {
+        $request = \Illuminate\Http\Request::create('/store/v1/auth/login', 'POST', [], [], [], $this->transformHeadersToServerVars($this->signed(self::RETAIL, $ip)));
+        $request->attributes->set(\App\Http\Middleware\ResolveStorefrontDomain::GATEWAY_VERIFIED_ATTRIBUTE, true);
+
+        return StorefrontClientIdentity::bucket($request);
+    }
+
+    #[Test]
     public function the_same_visitor_gets_separate_buckets_on_different_stores(): void
     {
         $visitor = $this->visitor(5);
