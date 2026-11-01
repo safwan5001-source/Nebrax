@@ -80,7 +80,9 @@
 | مرشّح Commerce/Storefront/OnlinePayment/PaymentAttempt/Flowers/Retail/Wholesale/BranchIsolation (≈3,018 اختباراً بما فيها اختبارات تزامن الإلغاء/التحصيل/الالتقاط/الترحيل/الإتمام القائمة التي صارت تكتب أحداثاً) | كلها ✔ بعد إصلاح واحد (أدناه) | كلها ✔ عدا `StorefrontMediaApiTest::the_library_lists_newest_first…` (خطأ PDO `HY093` في بحث `LIKE … ESCAPE '\'` — كود وسائط لم يُلمس، أخضر على CI الرئيسي ⇒ بيئي محلي) |
 | `php artisan test` كاملاً (SQLite) | انظر وصف الـPR (يُحدَّث بالأرقام) | CI |
 
-**الإصلاح الوحيد أثناء الانحدار:** `CommerceOrderCancellationFactsTest::rollback_without_cancelled_orders_removes_the_guards_and_up_restores_them` فشل على SQLite لأن مُشغّل التحقق من الطلب (يذكر `commerce_orders`) كسر إعادة بناء SQLite للجدول. أُزيل ذلك المُشغّل على SQLite وحده (التحقق في الكاتب)، وبقي في PostgreSQL. **الاختبار القائم لم يُعدَّل.**
+**إصلاح ثانٍ (من الاختبار الكامل):** اختبارات الاتصالات (`InteractsWithCommunicationSchema::commTriggerNames`) تحصي مُشغّلات SQLite بنمط `LIKE 'comm_%'` و`_` حرف بدل، فالتقطت مُشغّلاتي المسمّاة `commerce_*` (7 اختبارات). أُعيدت تسمية مُشغّلاتي ودوالها بالبادئة `cofeed_` على المحرّكين؛ **اختبارات الاتصالات لم تُعدَّل** وعادت خضراء.
+
+**الإصلاح الأول أثناء الانحدار:** `CommerceOrderCancellationFactsTest::rollback_without_cancelled_orders_removes_the_guards_and_up_restores_them` فشل على SQLite لأن مُشغّل التحقق من الطلب (يذكر `commerce_orders`) كسر إعادة بناء SQLite للجدول. أُزيل ذلك المُشغّل على SQLite وحده (التحقق في الكاتب)، وبقي في PostgreSQL. **الاختبار القائم لم يُعدَّل.**
 
 ### 3.3 قياس التنازع (البوابة 6) — PostgreSQL 16 محلياً (`synchronous_commit=on`, `fsync=on`)
 كل معاملة: قفل صف الطلب (عمل سابق) ثم الحدث آخراً ثم الالتزام؛ القياس = زمن `append()` (انتظار القفل + الإدراج).

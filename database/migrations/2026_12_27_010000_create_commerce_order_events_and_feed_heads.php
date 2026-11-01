@@ -35,6 +35,8 @@ use Illuminate\Support\Facades\Schema;
  *  E6  الحدث يُشير إلى طلب موجود للمستأجر نفسه (PostgreSQL في القاعدة؛ SQLite في الكاتب — انظر sqliteGuards)؛ النوع والفاعل من قائمة
  *      مغلقة (`actor_id` إلزامي لـuser/customer وممنوع لـguest/system) في المحرّكين.
  *
+ * أسماء المُشغّلات والدوال بالبادئة `cofeed_` عمداً: اختبارات قائمة تحصي مُشغّلات بنمط `comm_%` (و`_` في LIKE حرف بدل).
+ *
  * ═══ التراجع ═══ `down()` يرفض متى وُجد أي حدث (لا علم تجاوز) — نمط سلسلة ZATCA.
  */
 return new class extends Migration
@@ -90,13 +92,13 @@ return new class extends Migration
         }
 
         if (DB::connection()->getDriverName() === 'pgsql') {
-            DB::statement('DROP TRIGGER IF EXISTS commerce_feed_head_on_tenant ON tenants');
+            DB::statement('DROP TRIGGER IF EXISTS cofeed_head_on_tenant ON tenants');
             Schema::dropIfExists(self::EVENTS);
             Schema::dropIfExists(self::HEADS);
             foreach ([
-                'commerce_order_events_guard_update', 'commerce_order_events_guard_delete', 'commerce_order_events_guard_insert',
-                'commerce_order_events_contiguous', 'commerce_feed_heads_guard_update',
-                'commerce_feed_heads_guard_delete', 'commerce_order_feed_guard_truncate', 'commerce_feed_head_create_for_tenant',
+                'cofeed_events_guard_update', 'cofeed_events_guard_delete', 'cofeed_events_guard_insert',
+                'cofeed_events_contiguous', 'cofeed_heads_guard_update',
+                'cofeed_heads_guard_delete', 'cofeed_guard_truncate', 'cofeed_head_create_for_tenant',
             ] as $function) {
                 DB::statement("DROP FUNCTION IF EXISTS {$function}()");
             }
@@ -104,7 +106,7 @@ return new class extends Migration
             return;
         }
 
-        DB::statement('DROP TRIGGER IF EXISTS commerce_feed_head_on_tenant');
+        DB::statement('DROP TRIGGER IF EXISTS cofeed_head_on_tenant');
         Schema::dropIfExists(self::EVENTS);
         Schema::dropIfExists(self::HEADS);
     }
@@ -133,16 +135,16 @@ return new class extends Migration
 
         // رسائل ثابتة النص (لا استيفاء لقيم الصف).
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_order_events_guard_update() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_events_guard_update() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 RAISE EXCEPTION 'commerce_order_events: order events are immutable';
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_event_no_update BEFORE UPDATE ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION commerce_order_events_guard_update()');
+        DB::unprepared('CREATE TRIGGER cofeed_event_no_update BEFORE UPDATE ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION cofeed_events_guard_update()');
 
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_order_events_guard_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_events_guard_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 IF EXISTS (SELECT 1 FROM tenants WHERE id = OLD.tenant_id) THEN
                     RAISE EXCEPTION 'commerce_order_events: order events cannot be deleted';
@@ -151,10 +153,10 @@ return new class extends Migration
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_event_no_delete BEFORE DELETE ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION commerce_order_events_guard_delete()');
+        DB::unprepared('CREATE TRIGGER cofeed_event_no_delete BEFORE DELETE ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION cofeed_events_guard_delete()');
 
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_feed_heads_guard_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_heads_guard_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 IF EXISTS (SELECT 1 FROM tenants WHERE id = OLD.tenant_id) THEN
                     RAISE EXCEPTION 'commerce_order_feed_heads: feed heads cannot be deleted';
@@ -163,21 +165,21 @@ return new class extends Migration
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_feed_head_no_delete BEFORE DELETE ON commerce_order_feed_heads FOR EACH ROW EXECUTE FUNCTION commerce_feed_heads_guard_delete()');
+        DB::unprepared('CREATE TRIGGER cofeed_head_no_delete BEFORE DELETE ON commerce_order_feed_heads FOR EACH ROW EXECUTE FUNCTION cofeed_heads_guard_delete()');
 
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_order_feed_guard_truncate() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_guard_truncate() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 RAISE EXCEPTION 'commerce order feed tables cannot be truncated';
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_event_no_truncate BEFORE TRUNCATE ON commerce_order_events FOR EACH STATEMENT EXECUTE FUNCTION commerce_order_feed_guard_truncate()');
-        DB::unprepared('CREATE TRIGGER commerce_feed_head_no_truncate BEFORE TRUNCATE ON commerce_order_feed_heads FOR EACH STATEMENT EXECUTE FUNCTION commerce_order_feed_guard_truncate()');
+        DB::unprepared('CREATE TRIGGER cofeed_event_no_truncate BEFORE TRUNCATE ON commerce_order_events FOR EACH STATEMENT EXECUTE FUNCTION cofeed_guard_truncate()');
+        DB::unprepared('CREATE TRIGGER cofeed_head_no_truncate BEFORE TRUNCATE ON commerce_order_feed_heads FOR EACH STATEMENT EXECUTE FUNCTION cofeed_guard_truncate()');
 
         // E6: الطلب موجود وللمستأجر نفسه (قراءة MVCC بلا قفل).
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_order_events_guard_insert() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_events_guard_insert() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 IF (SELECT tenant_id FROM commerce_orders WHERE id = NEW.commerce_order_id) IS DISTINCT FROM NEW.tenant_id THEN
                     RAISE EXCEPTION 'commerce_order_events: the order does not exist in the event tenant';
@@ -186,11 +188,11 @@ return new class extends Migration
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_event_order_tenant BEFORE INSERT ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION commerce_order_events_guard_insert()');
+        DB::unprepared('CREATE TRIGGER cofeed_event_order_tenant BEFORE INSERT ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION cofeed_events_guard_insert()');
 
         // E4: التسلسل متصل — max+1 فقط (التفرّد يمنع التكرار؛ قراءة الفهرس بلا قفل، والكاتب يمسك صف الرأس).
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_order_events_contiguous() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_events_contiguous() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 IF NEW.feed_seq <> COALESCE((SELECT max(feed_seq) FROM commerce_order_events WHERE tenant_id = NEW.tenant_id), 0) + 1 THEN
                     RAISE EXCEPTION 'commerce_order_events: the event sequence must be exactly the tenant maximum plus one';
@@ -199,21 +201,21 @@ return new class extends Migration
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_event_contiguous BEFORE INSERT ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION commerce_order_events_contiguous()');
+        DB::unprepared('CREATE TRIGGER cofeed_event_contiguous BEFORE INSERT ON commerce_order_events FOR EACH ROW EXECUTE FUNCTION cofeed_events_contiguous()');
 
         // E5: صف القفل لا يُحدَّث.
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_feed_heads_guard_update() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_heads_guard_update() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 RAISE EXCEPTION 'commerce_order_feed_heads: feed heads are immutable lock rows';
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_feed_head_guard BEFORE UPDATE ON commerce_order_feed_heads FOR EACH ROW EXECUTE FUNCTION commerce_feed_heads_guard_update()');
+        DB::unprepared('CREATE TRIGGER cofeed_head_guard BEFORE UPDATE ON commerce_order_feed_heads FOR EACH ROW EXECUTE FUNCTION cofeed_heads_guard_update()');
 
         // رأس لكل مستأجر من ولادته (ON CONFLICT: إدراج يدوي سابق للرأس لا يُفشل إنشاء المستأجر).
         DB::unprepared(<<<'SQL'
-            CREATE OR REPLACE FUNCTION commerce_feed_head_create_for_tenant() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            CREATE OR REPLACE FUNCTION cofeed_head_create_for_tenant() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN
                 INSERT INTO commerce_order_feed_heads (tenant_id, created_at)
                 VALUES (NEW.id, CURRENT_TIMESTAMP)
@@ -222,7 +224,7 @@ return new class extends Migration
             END
             $fn$
             SQL);
-        DB::unprepared('CREATE TRIGGER commerce_feed_head_on_tenant AFTER INSERT ON tenants FOR EACH ROW EXECUTE FUNCTION commerce_feed_head_create_for_tenant()');
+        DB::unprepared('CREATE TRIGGER cofeed_head_on_tenant AFTER INSERT ON tenants FOR EACH ROW EXECUTE FUNCTION cofeed_head_create_for_tenant()');
     }
 
     private function sqliteGuards(): void
@@ -231,14 +233,14 @@ return new class extends Migration
         $actors = $this->actorList();
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_event_no_update BEFORE UPDATE ON commerce_order_events
+            CREATE TRIGGER cofeed_event_no_update BEFORE UPDATE ON commerce_order_events
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_events: order events are immutable');
             END
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_event_no_delete BEFORE DELETE ON commerce_order_events
+            CREATE TRIGGER cofeed_event_no_delete BEFORE DELETE ON commerce_order_events
             WHEN EXISTS (SELECT 1 FROM tenants WHERE id = OLD.tenant_id)
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_events: order events cannot be deleted');
@@ -246,7 +248,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_feed_head_no_delete BEFORE DELETE ON commerce_order_feed_heads
+            CREATE TRIGGER cofeed_head_no_delete BEFORE DELETE ON commerce_order_feed_heads
             WHEN EXISTS (SELECT 1 FROM tenants WHERE id = OLD.tenant_id)
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_feed_heads: feed heads cannot be deleted');
@@ -255,7 +257,7 @@ return new class extends Migration
 
         // بديل CHECK الشكل (SQLite لا يضيف CHECK بعد الإنشاء). NULL يُعامَل فشلاً.
         DB::unprepared(<<<SQL
-            CREATE TRIGGER commerce_event_shape BEFORE INSERT ON commerce_order_events
+            CREATE TRIGGER cofeed_event_shape BEFORE INSERT ON commerce_order_events
             WHEN COALESCE(NOT (
                 NEW.feed_seq > 0
                 AND NEW.type IN ({$types})
@@ -272,7 +274,7 @@ return new class extends Migration
         // أجسام المُشغّلات عند إعادة التسمية. PostgreSQL (الإنتاج) يفرضه في القاعدة أعلاه ويعدّل الجداول في مكانها.
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_event_contiguous BEFORE INSERT ON commerce_order_events
+            CREATE TRIGGER cofeed_event_contiguous BEFORE INSERT ON commerce_order_events
             WHEN NEW.feed_seq IS NOT COALESCE((SELECT MAX(feed_seq) FROM commerce_order_events WHERE tenant_id = NEW.tenant_id), 0) + 1
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_events: the event sequence must be exactly the tenant maximum plus one');
@@ -280,14 +282,14 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_feed_head_guard BEFORE UPDATE ON commerce_order_feed_heads
+            CREATE TRIGGER cofeed_head_guard BEFORE UPDATE ON commerce_order_feed_heads
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_feed_heads: feed heads are immutable lock rows');
             END
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_feed_head_on_tenant AFTER INSERT ON tenants
+            CREATE TRIGGER cofeed_head_on_tenant AFTER INSERT ON tenants
             BEGIN
                 INSERT OR IGNORE INTO commerce_order_feed_heads (tenant_id, created_at)
                 VALUES (NEW.id, CURRENT_TIMESTAMP);
