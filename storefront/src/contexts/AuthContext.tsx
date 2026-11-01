@@ -140,7 +140,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const RESYNC_THROTTLE_MS = 30_000;
     const maybeResync = () => {
       if (document.visibilityState !== "visible") return;
-      if (!hasAccountHint()) return;
+      if (!hasAccountHint()) {
+        // The session (and its hint) is gone — signed out in another tab, or an expired persistent cookie. Drop any
+        // authenticated state this tab still holds, with no request (anonymous visitors still cost nothing).
+        setUser((current) => (current === null ? current : null));
+        return;
+      }
       if (Date.now() - lastSyncRef.current < RESYNC_THROTTLE_MS) return;
       lastSyncRef.current = Date.now();
       void refreshUser();

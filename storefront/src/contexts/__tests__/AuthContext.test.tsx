@@ -83,6 +83,18 @@ describe("AuthContext session sync", () => {
     expect(mockSyncSession).not.toHaveBeenCalled();
   });
 
+  it("drops the signed-in state, without any request, when the session hint disappears (signed out in another tab / cookie expired)", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    expect(mockSyncSession).toHaveBeenCalledTimes(1);
+
+    setHint(false); // another tab signed out / the persistent cookie expired
+    await returnToTab(1_000); // even inside the resync throttle window: clearing is local and free
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(false));
+    expect(result.current.user).toBeNull();
+    expect(mockSyncSession).toHaveBeenCalledTimes(1); // no extra server call
+  });
+
   it("learns whether the host has accounts only when an account screen asks", async () => {
     setHint(false);
     mockAvailable.mockResolvedValue(false);
