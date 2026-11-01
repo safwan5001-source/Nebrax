@@ -8919,6 +8919,12 @@
         "searchPlaceholder": "Leave empty to show all",
         "sortLabel": "Sort by",
         "sortNoneOption": "Default order",
+        "sortOption": {
+          "name": "Name",
+          "sale_price": "Price",
+          "created_at": "Date added",
+          "popularity": "Best-selling"
+        },
         "sortDirectionLabel": "Sort direction",
         "sortDirectionAscending": "Ascending",
         "sortDirectionDescending": "Descending",

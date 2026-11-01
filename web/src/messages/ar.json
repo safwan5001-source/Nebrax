@@ -8919,6 +8919,12 @@
         "searchPlaceholder": "اتركه فارغاً لعرض الكل",
         "sortLabel": "الترتيب حسب",
         "sortNoneOption": "الترتيب الافتراضي",
+        "sortOption": {
+          "name": "الاسم",
+          "sale_price": "السعر",
+          "created_at": "تاريخ الإضافة",
+          "popularity": "الأكثر مبيعاً"
+        },
         "sortDirectionLabel": "اتجاه الترتيب",
         "sortDirectionAscending": "تصاعدي",
         "sortDirectionDescending": "تنازلي",
