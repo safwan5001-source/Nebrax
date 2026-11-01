@@ -16,12 +16,14 @@ use Illuminate\Http\JsonResponse;
 
 class FuelReconciliationController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(private FuelReconciliationService $service) {}
 
     public function readings(ListFuelTankReadingsRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $readings = FuelTankReading::query()
+        $readings = $this->restrictToAccessibleWarehouseStations(FuelTankReading::query())
             ->with(['station', 'tank', 'recorder'])
             ->when($data['fuel_tank_id'] ?? null, fn ($query, $id) => $query->where('fuel_tank_id', $id))
             ->latest('measured_at')
@@ -33,6 +35,7 @@ class FuelReconciliationController extends ApiController
     public function storeReading(StoreFuelTankReadingRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->accessibleStation($data['fuel_station_id']);
         $data['recorded_by'] = $request->user()->id;
         $reading = $this->domain(fn () => $this->service->recordReading($data));
 
@@ -42,7 +45,7 @@ class FuelReconciliationController extends ApiController
     public function index(ListFuelReconciliationsRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $reconciliations = $this->scopeToActiveBranch(FuelReconciliation::query(), $request)
+        $reconciliations = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id'])
             ->with(['station', 'tank', 'fuelProduct', 'warehouse'])
             ->when($data['fuel_station_id'] ?? null, fn ($query, $id) => $query->where('fuel_station_id', $id))
             ->when($data['fuel_tank_id'] ?? null, fn ($query, $id) => $query->where('fuel_tank_id', $id))
@@ -56,6 +59,7 @@ class FuelReconciliationController extends ApiController
     public function store(StoreFuelReconciliationRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->accessibleStation($data['fuel_station_id']);
         $data['created_by'] = $request->user()->id;
         $reconciliation = $this->domain(fn () => $this->service->createDraft($data));
 
@@ -65,7 +69,8 @@ class FuelReconciliationController extends ApiController
     public function approve(ApproveFuelReconciliationRequest $request, string $id): JsonResponse
     {
         $data = $request->validated();
-        $reconciliation = $this->scopeToActiveBranch(FuelReconciliation::query(), $request)->findOrFail($id);
+        $reconciliation = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id'])->findOrFail($id);
+        $this->accessibleStation($reconciliation->fuel_station_id);
         $approved = $this->domain(fn () => $this->service->approve($reconciliation, $request->user()->id, $data['reason'] ?? null));
 
         return (new FuelReconciliationResource($approved->load(['station', 'tank', 'fuelProduct', 'warehouse'])))->response();
