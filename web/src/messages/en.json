@@ -9790,7 +9790,8 @@
     "pendingVarianceHint": "The cash variance is preserved pending review; the system created no automatic entry or settlement.",
     "auditEmpty": "No audit events yet.",
     "eventRecorded": "Operational event recorded",
-    "openedSuccess": "Operational shift opened."
+    "openedSuccess": "Operational shift opened.",
+    "openedStaffAssignmentFailed": "The shift was opened but assigning you to it failed. Add staff from the shift details. Reason: {reason}"
   },
   "fuelStationsSales": {
     "eyebrow": "Fuel stations · official sales",
@@ -9841,6 +9842,9 @@
     "createDraft": "Save draft",
     "draftCreated": "Fuel sale draft created.",
     "finalized": "Fuel sale finalized and official invoice created.",
+    "finalizeConfirmTitle": "Confirm fuel sale finalization",
+    "finalizeConfirmHint": "Sale {number} will now get an official invoice, a journal entry and a stock movement, and it can no longer be edited. Continue?",
+    "finalizeConfirm": "Confirm finalization",
     "paymentTitle": "Fuel sale receipt",
     "paymentHint": "Sale {number}: official balance due {amount}.",
     "paymentMethod": "Payment method",

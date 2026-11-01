@@ -9790,7 +9790,8 @@
     "pendingVarianceHint": "فرق النقد محفوظ بانتظار المراجعة؛ لم ينشئ النظام أي قيد أو تسوية تلقائية.",
     "auditEmpty": "لا توجد أحداث تدقيق بعد.",
     "eventRecorded": "حدث تشغيلي مسجل",
-    "openedSuccess": "تم فتح الشفت التشغيلي."
+    "openedSuccess": "تم فتح الشفت التشغيلي.",
+    "openedStaffAssignmentFailed": "فُتح الشفت لكن تعذّر تعيينك عليه كموظف. أضف الموظف من تفاصيل الشفت. السبب: {reason}"
   },
   "fuelStationsSales": {
     "eyebrow": "محطات الوقود · البيع الرسمي",
@@ -9841,6 +9842,9 @@
     "createDraft": "حفظ المسودة",
     "draftCreated": "تم إنشاء مسودة بيع الوقود.",
     "finalized": "تم إنهاء بيع الوقود وإنشاء الفاتورة الرسمية.",
+    "finalizeConfirmTitle": "تأكيد إنهاء بيع الوقود",
+    "finalizeConfirmHint": "سيُنشأ الآن للبيع {number} فاتورة رسمية وقيد محاسبي وحركة مخزون، ولا يمكن تعديل البيع بعد ذلك. هل تريد المتابعة؟",
+    "finalizeConfirm": "تأكيد الإنهاء",
     "paymentTitle": "سند قبض بيع الوقود",
     "paymentHint": "البيع {number}: المتبقي الرسمي {amount}.",
     "paymentMethod": "طريقة الدفع",

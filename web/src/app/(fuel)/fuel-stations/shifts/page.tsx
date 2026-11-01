@@ -17,6 +17,7 @@ import { currentUser } from '@/lib/auth';
 import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { DialogError } from '@/components/fuel-stations/dialog-error';
 
 interface Station { id: string; name: string; code: string; status: string }
 interface Nozzle { id: string; nozzle_number: string; fuel_station_id: string; status: string }
@@ -114,9 +115,15 @@ export default function FuelShiftsPage() {
         method: 'POST', body: { ...openBody, idempotency_key: openKeys.keyFor(openBody) },
       });
       openKeys.reset();
+      setOpenDialog(false); setStationId(''); setOpeningFloat('0');
       const user = currentUser();
-      if (user?.id) await api(`/fuel-stations/shifts/${created.data.id}/staff`, { method: 'POST', body: { user_id: user.id, role: 'attendant' } });
-      success(t('openedSuccess')); setOpenDialog(false); setStationId(''); setOpeningFloat('0'); await load();
+      let staffFailure: string | null = null;
+      if (user?.id) {
+        try { await api(`/fuel-stations/shifts/${created.data.id}/staff`, { method: 'POST', body: { user_id: user.id, role: 'attendant' } }); }
+        catch (e) { staffFailure = e instanceof ApiError ? e.message : tc('saveFailed'); }
+      }
+      await load(); // يمسح الخطأ، فتُعرض رسالة فشل التعيين بعده
+      if (staffFailure) setError(t('openedStaffAssignmentFailed', { reason: staffFailure })); else success(t('openedSuccess'));
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
 
@@ -192,6 +199,7 @@ export default function FuelShiftsPage() {
       {row.original.status === 'closed' && can('fuel.shift.approve') && <Button variant="outline" size="sm" onClick={() => { setApproveShift(row.original); setApprovalNote(''); setError(null); }}><ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('approve')}</Button>}
     </div> },
   ], [can, stationName, statusLabel, t]);
+  const dialogOpen = openDialog || !!readingShift || !!cashShift || !!closeShift || !!reviewShift || !!approveShift;
 
   if (loading && shifts.length === 0) return <div className="space-y-4"><Skeleton className="h-9 w-56" /><Skeleton className="h-64 w-full" /></div>;
 
@@ -206,14 +214,14 @@ export default function FuelShiftsPage() {
       <Summary icon={<WalletCards />} label={t('summaryPendingCash')} value={String(shifts.filter((shift) => shift.cash_variance?.status === 'pending_review').length)} />
       <Summary icon={<ReceiptText />} label={t('summaryLocked')} value={String(shifts.filter((shift) => shift.status === 'approved').length)} />
     </div>
-    {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
+    {error && !dialogOpen && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <DataTable columns={columns} data={shifts} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="fuel-shifts" />
 
     <Dialog open={openDialog} onClose={() => setOpenDialog(false)} title={t('openTitle')}>
       <form onSubmit={(event) => { event.preventDefault(); void submitOpen(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('openHint')}</p>
         <div className="space-y-1.5"><Label htmlFor="fuel-shift-station">{t('station')}</Label><select id="fuel-shift-station" value={stationId} onChange={(event) => setStationId(event.target.value)} required disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('selectStation')}</option>{stations.map((station) => <option key={station.id} value={station.id}>{station.name} · {station.code}</option>)}</select></div>
         <div className="space-y-1.5"><Label htmlFor="fuel-shift-opening-float">{t('openingFloat')}</Label><Input id="fuel-shift-opening-float" className="num text-end" inputMode="decimal" value={openingFloat} onChange={(event) => setOpeningFloat(event.target.value)} required /></div>
-        <p className="text-xs text-muted">{t('selfAssignmentHint')}</p><DialogActions busy={busy} disabled={!stationId || !isValidRiyal(openingFloat)} onCancel={() => setOpenDialog(false)} saveLabel={t('open')} />
+        <p className="text-xs text-muted">{t('selfAssignmentHint')}</p><DialogActions error={error} busy={busy} disabled={!stationId || !isValidRiyal(openingFloat)} onCancel={() => setOpenDialog(false)} saveLabel={t('open')} />
       </form>
     </Dialog>
 
@@ -222,27 +230,27 @@ export default function FuelShiftsPage() {
         <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="reading-kind">{t('readingKind')}</Label><select id="reading-kind" value={readingKind} onChange={(event) => { setReadingKind(event.target.value as ReadingKind); setAssetId(''); }} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="meter">{t('meter')}</option><option value="tank">{t('tank')}</option></select></div><div className="space-y-1.5"><Label htmlFor="reading-stage">{t('readingStage')}</Label><select id="reading-stage" value={readingStage} onChange={(event) => setReadingStage(event.target.value as 'opening' | 'closing')} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="opening">{t('opening')}</option><option value="closing">{t('closing')}</option></select></div></div>
         {readingKind === 'tank' && <div className="space-y-1.5"><Label htmlFor="reading-type">{t('readingType')}</Label><select id="reading-type" value={readingType} onChange={(event) => setReadingType(event.target.value as 'physical' | 'atg')} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="physical">{t('physical')}</option><option value="atg">{t('atg')}</option></select></div>}
         <div className="space-y-1.5"><Label htmlFor="reading-asset">{readingKind === 'meter' ? t('nozzle') : t('tank')}</Label><select id="reading-asset" value={assetId} onChange={(event) => setAssetId(event.target.value)} required disabled={busy || filteredAssets.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('selectAsset')}</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{'nozzle_number' in asset ? asset.nozzle_number : `${asset.name} · ${asset.code}`}</option>)}</select></div>
-        <div className="space-y-1.5"><Label htmlFor="reading-liters">{t('readingLiters')}</Label><Input id="reading-liters" className="num text-end" inputMode="decimal" value={readingLiters} onChange={(event) => setReadingLiters(event.target.value)} required /></div><DialogActions busy={busy} disabled={!assetId || !/^\d+(?:\.\d{1,3})?$/.test(readingLiters)} onCancel={() => setReadingShift(null)} saveLabel={t('saveReading')} />
+        <div className="space-y-1.5"><Label htmlFor="reading-liters">{t('readingLiters')}</Label><Input id="reading-liters" className="num text-end" inputMode="decimal" value={readingLiters} onChange={(event) => setReadingLiters(event.target.value)} required /></div><DialogActions error={error} busy={busy} disabled={!assetId || !/^\d+(?:\.\d{1,3})?$/.test(readingLiters)} onCancel={() => setReadingShift(null)} saveLabel={t('saveReading')} />
       </form>
     </Dialog>
 
     <Dialog open={!!cashShift} onClose={() => setCashShift(null)} title={t('cashTitle')}>
       <form onSubmit={(event) => { event.preventDefault(); void submitCash(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('cashHint')}</p>
         <div className="space-y-1.5"><Label htmlFor="cash-type">{t('cashType')}</Label><select id="cash-type" value={movementType} onChange={(event) => setMovementType(event.target.value as 'cash_in' | 'cash_out' | 'expense')} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="cash_in">{t('cashIn')}</option><option value="cash_out">{t('cashOut')}</option><option value="expense">{t('expense')}</option></select></div>
-        <div className="space-y-1.5"><Label htmlFor="cash-amount">{t('amount')}</Label><Input id="cash-amount" className="num text-end" inputMode="decimal" value={movementAmount} onChange={(event) => setMovementAmount(event.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="cash-reason">{t('reason')}</Label><Input id="cash-reason" value={movementReason} onChange={(event) => setMovementReason(event.target.value)} required /></div><DialogActions busy={busy} disabled={!isValidRiyal(movementAmount) || movementReason.trim().length < 3} onCancel={() => setCashShift(null)} saveLabel={t('saveMovement')} />
+        <div className="space-y-1.5"><Label htmlFor="cash-amount">{t('amount')}</Label><Input id="cash-amount" className="num text-end" inputMode="decimal" value={movementAmount} onChange={(event) => setMovementAmount(event.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="cash-reason">{t('reason')}</Label><Input id="cash-reason" value={movementReason} onChange={(event) => setMovementReason(event.target.value)} required /></div><DialogActions error={error} busy={busy} disabled={!isValidRiyal(movementAmount) || movementReason.trim().length < 3} onCancel={() => setCashShift(null)} saveLabel={t('saveMovement')} />
       </form>
     </Dialog>
 
     <Dialog open={!!closeShift} onClose={() => setCloseShift(null)} title={t('closeTitle')}>
-      <form onSubmit={(event) => { event.preventDefault(); void submitClose(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('closeHint')}</p><div className="space-y-1.5"><Label htmlFor="counted-cash">{t('countedCash')}</Label><Input id="counted-cash" className="num text-end" inputMode="decimal" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="closing-note">{t('closingNote')}</Label><textarea id="closing-note" value={closingNote} onChange={(event) => setClosingNote(event.target.value)} className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions busy={busy} disabled={!isValidRiyal(countedCash)} onCancel={() => setCloseShift(null)} saveLabel={t('close')} /></form>
+      <form onSubmit={(event) => { event.preventDefault(); void submitClose(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('closeHint')}</p><div className="space-y-1.5"><Label htmlFor="counted-cash">{t('countedCash')}</Label><Input id="counted-cash" className="num text-end" inputMode="decimal" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="closing-note">{t('closingNote')}</Label><textarea id="closing-note" value={closingNote} onChange={(event) => setClosingNote(event.target.value)} className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions error={error} busy={busy} disabled={!isValidRiyal(countedCash)} onCancel={() => setCloseShift(null)} saveLabel={t('close')} /></form>
     </Dialog>
 
     <Dialog open={!!reviewShift} onClose={() => setReviewShift(null)} title={t('reviewVarianceTitle')}>
-      <form onSubmit={(event) => { event.preventDefault(); void submitReviewVariance(); }} className="space-y-3"><p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-text">{t('reviewVarianceHint')}</p><div className="space-y-1.5"><Label htmlFor="variance-review-note">{t('reviewNote')}</Label><textarea id="variance-review-note" value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} required className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions busy={busy} disabled={reviewNote.trim().length < 3} onCancel={() => setReviewShift(null)} saveLabel={t('reviewVariance')} /></form>
+      <form onSubmit={(event) => { event.preventDefault(); void submitReviewVariance(); }} className="space-y-3"><p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-text">{t('reviewVarianceHint')}</p><div className="space-y-1.5"><Label htmlFor="variance-review-note">{t('reviewNote')}</Label><textarea id="variance-review-note" value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} required className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions error={error} busy={busy} disabled={reviewNote.trim().length < 3} onCancel={() => setReviewShift(null)} saveLabel={t('reviewVariance')} /></form>
     </Dialog>
 
     <Dialog open={!!approveShift} onClose={() => setApproveShift(null)} title={t('approveTitle')}>
-      <form onSubmit={(event) => { event.preventDefault(); void submitApprove(); }} className="space-y-3"><p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-text">{t('approveHint')}</p><div className="space-y-1.5"><Label htmlFor="approval-note">{t('approvalNote')}</Label><textarea id="approval-note" value={approvalNote} onChange={(event) => setApprovalNote(event.target.value)} className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions busy={busy} disabled={false} onCancel={() => setApproveShift(null)} saveLabel={t('approve')} /></form>
+      <form onSubmit={(event) => { event.preventDefault(); void submitApprove(); }} className="space-y-3"><p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-text">{t('approveHint')}</p><div className="space-y-1.5"><Label htmlFor="approval-note">{t('approvalNote')}</Label><textarea id="approval-note" value={approvalNote} onChange={(event) => setApprovalNote(event.target.value)} className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div><DialogActions error={error} busy={busy} disabled={false} onCancel={() => setApproveShift(null)} saveLabel={t('approve')} /></form>
     </Dialog>
 
     <Dialog open={!!auditShift} onClose={() => setAuditShift(null)} title={t('auditTitle')}><div className="space-y-3">{auditShift?.cash_variance?.status === 'pending_review' && <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-text">{t('pendingVarianceHint')}</p>}{!auditShift?.events?.length && <p className="text-sm text-muted">{t('auditEmpty')}</p>}<ol className="divide-y divide-border rounded-md border border-border">{auditShift?.events?.map((event) => <li key={event.id} className="flex items-start justify-between gap-3 px-3 py-2.5"><div><p className="text-sm text-text">{event.type}</p><p className="text-xs text-muted">{typeof event.payload?.reason === 'string' ? event.payload.reason : typeof event.payload?.note === 'string' ? event.payload.note : t('eventRecorded')}</p></div><span className="num shrink-0 text-xs text-muted">{(event.occurred_at ?? '').slice(0, 16).replace('T', ' ')}</span></li>)}</ol></div></Dialog>
@@ -253,7 +261,7 @@ function Summary({ icon, label, value }: { icon: ReactNode; label: string; value
   return <div className="rounded-md border border-border bg-surface p-3"><div className="flex items-center gap-2 text-sm text-muted"><span aria-hidden="true" className="text-primary">{icon}</span>{label}</div><p className="num mt-2 text-xl font-semibold text-text">{value}</p></div>;
 }
 
-function DialogActions({ busy, disabled, onCancel, saveLabel }: { busy: boolean; disabled: boolean; onCancel: () => void; saveLabel: string }) {
+function DialogActions({ error, busy, disabled, onCancel, saveLabel }: { error?: string | null; busy: boolean; disabled: boolean; onCancel: () => void; saveLabel: string }) {
   const tc = useTranslations('common');
-  return <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={onCancel}>{tc('cancel')}</Button><Button type="submit" disabled={busy || disabled}>{saveLabel}</Button></div>;
+  return <div className="space-y-2"><DialogError message={error} /><div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={onCancel}>{tc('cancel')}</Button><Button type="submit" disabled={busy || disabled}>{saveLabel}</Button></div></div>;
 }
