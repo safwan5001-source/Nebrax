@@ -613,6 +613,24 @@ class FuelSaleServiceTest extends TestCase
         $this->assertSame(1, FuelSale::count());
     }
 
+    /** @test */
+    public function replaying_a_draft_with_a_different_odometer_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(FuelSaleService::class);
+        $payload = [
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234, 'odometer' => 120000, 'idempotency_key' => 'draft-odometer-replay',
+        ];
+        $first = $service->createDraft($payload, $fixture['actor']);
+
+        $this->assertSame($first->id, $service->createDraft($payload, $fixture['actor'])->id);
+        $this->assertSame($first->id, $service->createDraft(array_diff_key($payload, ['odometer' => 1]), $fixture['actor'])->id);
+        $message = $this->thrown(fn () => $service->createDraft([...$payload, 'odometer' => 120500], $fixture['actor']), 'عداد مختلف بالمفتاح نفسه يجب أن يرفض.')->getMessage();
+        $this->assertStringContainsString('odometer', $message);
+        $this->assertSame(1, FuelSale::count());
+    }
+
     private function fixture(string $suffix = 'main'): array
     {
         $auth = $this->registerTenant('fuel-sale-' . $suffix, "fuel-sale-{$suffix}@example.test");

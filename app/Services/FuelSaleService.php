@@ -146,6 +146,11 @@ class FuelSaleService
                 $different[] = $key;
             }
         }
+        // قراءة العداد: كان `assertDraftUsable` يطابقها مع التفويض قبل نقل البحث بالمفتاح، فتبقى المقارنة هنا بالمخزَّن.
+        $odometer = $attributes['odometer'] ?? null;
+        if ($odometer !== null && $odometer !== '' && (string) $existing->odometer_snapshot !== (string) $odometer) {
+            $different[] = 'odometer';
+        }
         if ($different !== []) {
             throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لبيع وقود مختلف ('.implode('، ', $different).').');
         }
