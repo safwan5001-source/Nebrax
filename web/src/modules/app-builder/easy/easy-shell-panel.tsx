@@ -104,8 +104,10 @@ export function EasyShellPanel({
                     maxLength={NAV_LIMITS.maxTabTitle}
                     disabled={!canManage}
                     className="h-8 text-xs"
+                    aria-invalid={tab.title.trim() === '' ? true : undefined}
                     onChange={(e) => onEdit((current) => updateNavTab(current, tab.pageId, { title: e.target.value }))}
                   />
+                  {tab.title.trim() === '' ? <p className="text-[11px] text-negative" role="alert">{t('easy.shell.tabTitleRequired')}</p> : null}
                   <div className="flex items-center gap-2">
                     <Select
                       aria-label={t('easy.shell.tabIcon', { page: label })}

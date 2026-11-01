@@ -89,4 +89,11 @@ describe('navigation shell helpers (AD-04 / S09d)', () => {
     const last = removePage(addNavTab(schema(), 'about', 'x')!, 'about');
     expect('tabs' in last.navigation).toBe(false);
   });
+
+  it('setAppBar keeps the raw text while the merchant types (spaces inside and trailing) and drops a blank title', () => {
+    expect(setAppBar(schema(), { title: 'My ' }).navigation.appBar?.title).toBe('My ');
+    expect(setAppBar(schema(), { title: 'My Store' }).navigation.appBar?.title).toBe('My Store');
+    expect(setAppBar(schema(), { title: ' ' }).navigation.appBar).toBeUndefined();
+    expect(setAppBar(schema(), { title: '   ', showCart: true }).navigation.appBar).toEqual({ showCart: true });
+  });
 });

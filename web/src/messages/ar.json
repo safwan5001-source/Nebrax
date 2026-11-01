@@ -8767,6 +8767,7 @@
             "tabTitle": "عنوان تبويب {page}",
             "tabIcon": "أيقونة تبويب {page}",
             "tabHidden": "مخفي",
+            "tabTitleRequired": "لكل تبويب عنوان مطلوب.",
             "addTabPage": "الصفحة المراد إضافتها",
             "addTab": "إضافة تبويب",
             "limitReached": "الحد الأقصى {max} تبويبات ظاهرة. أخفِ أحدها لإضافة آخر.",

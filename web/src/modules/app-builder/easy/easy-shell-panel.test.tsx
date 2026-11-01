@@ -114,4 +114,13 @@ describe('EasyShellPanel (AD-04 / S09d)', () => {
     const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html.slice(0, 100)).join(' | ')}`)).toEqual([]);
   });
+
+  it('typing a multiword top bar title keeps the spaces as they are typed', () => {
+    renderPanel({ initial: base() });
+    const input = screen.getByLabelText('Top bar title') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'My ' } });
+    expect(input.value).toBe('My ');
+    fireEvent.change(input, { target: { value: 'My Store' } });
+    expect(input.value).toBe('My Store');
+  });
 });

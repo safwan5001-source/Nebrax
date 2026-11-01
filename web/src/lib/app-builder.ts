@@ -654,8 +654,9 @@ export function setAppBar(schema: AppSchema, appBar: AppSchemaAppBar | undefined
   const { appBar: _drop, ...rest } = schema.navigation;
   void _drop;
   const next: AppSchemaAppBar = {};
-  const title = appBar?.title?.trim();
-  if (title) next.title = clampChars(title, NAV_LIMITS.maxAppBarTitle);
+  // النص الخام يُحفظ كما كُتب (المسافات أثناء الكتابة لا تُقصّ — مراجعة Codex)؛ العنوان الفارغ/المسافات وحدها يُحذف.
+  const title = appBar?.title;
+  if (typeof title === 'string' && title.trim() !== '') next.title = clampChars(title, NAV_LIMITS.maxAppBarTitle);
   if (typeof appBar?.showCart === 'boolean') next.showCart = appBar.showCart;
   return { ...schema, navigation: Object.keys(next).length > 0 ? { ...rest, appBar: next } : rest };
 }

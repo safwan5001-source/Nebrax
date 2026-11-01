@@ -8767,6 +8767,7 @@
             "tabTitle": "Title of tab {page}",
             "tabIcon": "Icon of tab {page}",
             "tabHidden": "Hidden",
+            "tabTitleRequired": "Every tab needs a title.",
             "addTabPage": "Page to add",
             "addTab": "Add tab",
             "limitReached": "At most {max} visible tabs. Hide one to add another.",
