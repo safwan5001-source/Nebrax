@@ -528,8 +528,9 @@ class FuelSaleServiceTest extends TestCase
         $this->assertSame('contract_special_price', $sale->corporate_price_source);
         $this->assertSame($price->id, $sale->corporate_fuel_contract_price_id);
         $this->assertSame(30, $sale->contract_payment_terms_days);
-        $this->assertSame(now()->toDateString(), $invoice->invoice_date->toDateString());
-        $this->assertSame(now()->addDays(30)->toDateString(), $invoice->due_date->toDateString());
+        // FS-19: التواريخ بتقويم المحطة (Asia/Riyadh) لا منطقة التطبيق (UTC)؛ المقارنة بـ`now()` كانت تفشل يومياً بين 21:00 و24:00 UTC.
+        $this->assertSame(now('Asia/Riyadh')->toDateString(), $invoice->invoice_date->toDateString());
+        $this->assertSame(now('Asia/Riyadh')->addDays(30)->toDateString(), $invoice->due_date->toDateString());
         $this->assertSame(200, $invoice->total, 'السعر العقدي الشامل لا يضيف VAT مرة ثانية.');
         $this->assertSame(200, app(CorporateFuelAuthorizationService::class)->officialExposure($fixture['customer_id']));
         $this->assertSame(1, FuelCardUsage::where('fuel_card_id', $card->id)->count());
