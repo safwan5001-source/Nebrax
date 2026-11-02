@@ -87,7 +87,12 @@ export function FulfillmentSection({
     } catch (error) {
       const failed = classifyAcceptError(error);
       setFailure(failed);
-      if (failureMeansStale(failed)) onStale();
+      if (failureMeansStale(failed)) {
+        // الحالة قديمة/غير مؤكَّدة: أي تأكيد مفتوح يحمل قيماً أُدخلت على قراءة قديمة — يُغلق نهائياً ويُعاد فتحه على التفاصيل المحدَّثة
+        // (وإلا أعاد المستخدم إرسال القيم القديمة بنسخة جديدة فيكتب فوق تعديل موظف آخر رغم حارس النسخة).
+        setDialog(null);
+        onStale();
+      }
 
       return false;
     } finally {
@@ -213,7 +218,7 @@ export function FulfillmentSection({
       {dialog !== null && f !== null
         ? (
             <ActionDialog
-              key={dialog}
+              key={`${dialog}-${f.version}`}
               kind={dialog}
               f={f}
               orderNumber={order.number}

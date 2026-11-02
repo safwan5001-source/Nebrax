@@ -212,6 +212,32 @@ describe('fulfillment section (COPS-H2-3)', () => {
       expect(btn('جاهز')).toBeNull();
     });
 
+    it('a 409 while a dispatch dialog is open closes it for good: the stale values are never resubmitted against the new version (review P2)', async () => {
+      const ready = (over = {}) => detailFixture({ fulfillment: fulfillmentBlock({ status: 'ready', type: 'carrier', version: 2, carrier: { name: 'قديم', tracking_number: null, tracking_url: null }, ...over }), fulfillment_actions: [{ action: 'dispatch', available: true, blocked_reason: null }] });
+      fetchOrderMock.mockResolvedValueOnce(ready());
+      apiMock.mockRejectedValueOnce(apiError(409, { reason: 'fulfillment_version_conflict', current_version: 3, current_status: 'ready' }));
+      // الموظف الآخر غيّر الناقل فصارت النسخة 3
+      fetchOrderMock.mockResolvedValueOnce(ready({ version: 3, carrier: { name: 'جديد-من-موظف-آخر', tracking_number: null, tracking_url: null } }));
+      render(<OrderDetailView id="o1" />);
+      await screen.findByRole('heading', { name: 'CORD-100' });
+      fireEvent.click(btn('إرسال للتوصيل')!);
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByLabelText(/اسم الناقل/), { target: { value: 'قيمة-قديمة-أدخلها-المستخدم' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'إرسال' }));
+
+      // الحوار يُغلق نهائياً بعد 409 ويبقى الخطأ ظاهراً في القسم
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(await screen.findByText(/تغيّرت حالة التنفيذ منذ آخر قراءة/)).toBeTruthy();
+      await waitFor(() => expect(fetchOrderMock).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect((btn('إرسال للتوصيل') as HTMLButtonElement | null)?.disabled).toBe(false));
+      expect(apiMock).toHaveBeenCalledTimes(1); // لا إعادة إرسال تلقائي
+
+      // إعادة الفتح تعرض التفاصيل المحدَّثة لا القيم القديمة
+      fireEvent.click(btn('إرسال للتوصيل')!);
+      const reopened = await screen.findByRole('dialog');
+      expect((within(reopened).getByLabelText(/اسم الناقل/) as HTMLInputElement).value).toBe('جديد-من-موظف-آخر');
+    });
+
     it('a network failure treats the outcome as unconfirmed and refreshes', async () => {
       fetchOrderMock.mockResolvedValueOnce(preparingFixture()).mockResolvedValueOnce(preparingFixture());
       apiMock.mockRejectedValue(new Error('offline'));
