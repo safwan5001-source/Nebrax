@@ -61,6 +61,11 @@ export function OrderDetailView({ id }: { id: string }) {
   const [justAccepted, setJustAccepted] = useState(false);
   const [justRejected, setJustRejected] = useState(false);
   const acceptInFlight = useRef(false);
+  // قفل حالة قديمة على مستوى الأب (مراجعة Codex P2): بعد 409/404/شبكة تُعطَّل كل إجراءات الطلب (قبول/رفض/إلغاء) حتى يصل تفصيل جديد من الخادم،
+  // فلا يُعاد استعمال أهلية معروفة بأنها قديمة لا بإغلاق حوار وإعادة فتحه ولا بانتهاء طلب القبول. فشل التحديث يُبقي القفل ويعرض إعادة تحديث صريحة.
+  const [stale, setStale] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const refreshSeq = useRef(0);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -81,21 +86,41 @@ export function OrderDetailView({ id }: { id: string }) {
 
   useEffect(() => load(), [load]);
 
-  /** تحديث صامت من الخادم (بعد سباق 409/شبكة): لا يعيد شاشة التحميل ولا يمسح البيانات الحالية إن فشل. */
-  const refresh = useCallback(() => {
-    fetchOrder(id)
-      .then((result) => setOrder(result))
-      .catch((error) => {
-        if (classifyOrdersError(error) === 'not_found') {
-          setOrder(null);
-          setErrorKind('not_found');
-        }
-      });
+  /**
+   * تحديث من الخادم (بعد سباق 409/شبكة): لا يعيد شاشة التحميل ولا يمسح البيانات الحالية إن فشل. ينجح ⇒ يُرفع قفل الحالة القديمة؛ يفشل ⇒ يبقى القفل
+   * ويظهر زر إعادة التحديث. استجابة أقدم من أحدث طلب تُهمَل (لا تعيد بيانات أقدم).
+   */
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const seq = ++refreshSeq.current;
+    try {
+      const result = await fetchOrder(id);
+      if (seq !== refreshSeq.current) return false;
+      setOrder(result);
+      setStale(false);
+      setRefreshFailed(false);
+      return true;
+    } catch (error) {
+      if (seq !== refreshSeq.current) return false;
+      if (classifyOrdersError(error) === 'not_found') {
+        setOrder(null);
+        setErrorKind('not_found');
+      } else {
+        setRefreshFailed(true);
+      }
+      return false;
+    }
   }, [id]);
+
+  /** يُستدعى عند حالة قديمة/غير مؤكَّدة من أي إجراء (قبول أو حوار رفض/إلغاء): قفل فوري ثم تحديث. */
+  const markStale = useCallback(() => {
+    setStale(true);
+    setRefreshFailed(false);
+    void refresh();
+  }, [refresh]);
 
   const handleAccept = useCallback(async () => {
     // يقبل **الطلب المعروض** نفسه (كحواري الإلغاء والرفض: `order.id`)، لا معرّف المسار الخام.
-    if (acceptInFlight.current || order === null) return;
+    if (acceptInFlight.current || stale || order === null) return;
     acceptInFlight.current = true;
     setAccepting(true);
     setAcceptFailure(null);
@@ -107,12 +132,12 @@ export function OrderDetailView({ id }: { id: string }) {
       const failed = classifyAcceptError(error);
       setAcceptFailure(failed);
       // الحالة تغيّرت أو غير مؤكَّدة (409/404/شبكة): نحدّث من الخادم فيختفي الإجراء أو يظهر بحالته الجديدة، ولا نُعيد المحاولة على بيانات قديمة.
-      if (failureMeansStale(failed)) refresh();
+      if (failureMeansStale(failed)) markStale();
     } finally {
       acceptInFlight.current = false;
       setAccepting(false);
     }
-  }, [order, refresh]);
+  }, [order, stale, markStale]);
 
   const backHref = useMemo(() => {
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : savedListQuery());
@@ -392,17 +417,17 @@ export function OrderDetailView({ id }: { id: string }) {
         canAccept || canReject || showCancelButton ? (
           <div className="flex flex-wrap items-center gap-2">
             {canAccept ? (
-              <Button type="button" onClick={() => void handleAccept()} disabled={accepting} aria-disabled={accepting} aria-busy={accepting}>
+              <Button type="button" onClick={() => void handleAccept()} disabled={accepting || stale} aria-disabled={accepting || stale} aria-busy={accepting}>
                 {accepting ? t('acceptSubmitting') : t('acceptAction')}
               </Button>
             ) : null}
             {canReject ? (
-              <Button type="button" variant="danger" onClick={() => setRejectOpen(true)} disabled={accepting}>
+              <Button type="button" variant="danger" onClick={() => setRejectOpen(true)} disabled={accepting || stale}>
                 {t('rejectAction')}
               </Button>
             ) : null}
             {showCancelButton ? (
-              <Button type="button" variant="danger" onClick={() => setCancelOpen(true)}>
+              <Button type="button" variant="danger" onClick={() => setCancelOpen(true)} disabled={stale}>
                 {t('cancelAction')}
               </Button>
             ) : null}
@@ -414,6 +439,18 @@ export function OrderDetailView({ id }: { id: string }) {
           {justCancelled ? (
             <div role="status">
               <FormAlert tone="info">{t('cancelSuccess')}</FormAlert>
+            </div>
+          ) : null}
+          {stale ? (
+            <div role="status">
+              <FormAlert tone="warning">
+                <p>{refreshFailed ? t('staleRefreshFailed') : t('staleSyncing')}</p>
+                {refreshFailed ? (
+                  <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => void refresh()}>
+                    {t('staleRetry')}
+                  </Button>
+                ) : null}
+              </FormAlert>
             </div>
           ) : null}
           {justAccepted ? (
@@ -483,7 +520,7 @@ export function OrderDetailView({ id }: { id: string }) {
             setRejectOpen(false);
             setJustRejected(true);
           }}
-          onStale={refresh}
+          onStale={markStale}
         />
       ) : null}
       {cancelOpen ? (
@@ -497,7 +534,7 @@ export function OrderDetailView({ id }: { id: string }) {
             setCancelOpen(false);
             setJustCancelled(true);
           }}
-          onStale={refresh}
+          onStale={markStale}
         />
       ) : null}
     </DetailPage>

@@ -363,6 +363,97 @@ describe('merchant acceptance UI (COPS-H1-5)', () => {
     });
   });
 
+  describe('stale-state lock (Codex P2: no actions on known-stale eligibility until a refresh succeeds)', () => {
+    it('keeps every action disabled while the refresh is slow, then restores the fresh state', async () => {
+      let resolveRefresh!: (order: unknown) => void;
+      fetchOrderMock.mockResolvedValueOnce(awaitingFixture()).mockReturnValueOnce(new Promise((resolve) => { resolveRefresh = resolve; }));
+      apiMock.mockRejectedValue(apiError(409, { message: 'x', reason: 'already_accepted' }));
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(acceptButton()!);
+
+      expect(await screen.findByText(/نحدّث الحالة الآن/)).toBeTruthy();
+      expect((acceptButton() as HTMLButtonElement).disabled).toBe(true);
+      expect((rejectButton() as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(acceptButton()!); // نقرة على حالة معروفة بأنها قديمة: لا طلب ثانٍ
+      expect(apiMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => resolveRefresh(acceptedFixture()));
+      await waitFor(() => expect(acceptButton()).toBeNull());
+      expect(screen.queryByText(/نحدّث الحالة الآن/)).toBeNull();
+      expect(cancelButton()).toBeTruthy();
+      expect((cancelButton() as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('a failed refresh keeps the actions locked and offers an explicit retry that unlocks only on success', async () => {
+      fetchOrderMock.mockResolvedValueOnce(awaitingFixture()).mockRejectedValueOnce(Object.assign(new Error('offline'), {})).mockResolvedValueOnce(acceptedFixture());
+      apiMock.mockRejectedValue(Object.assign(new Error('offline'), {})); // شبكة: النتيجة غير مؤكَّدة
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(acceptButton()!);
+
+      expect(await screen.findByText(/تعذّر تحديث حالة الطلب/)).toBeTruthy();
+      expect((acceptButton() as HTMLButtonElement).disabled).toBe(true);
+      expect((rejectButton() as HTMLButtonElement).disabled).toBe(true);
+
+      fireEvent.click(screen.getByRole('button', { name: 'إعادة تحديث الحالة' }));
+      await waitFor(() => expect(acceptButton()).toBeNull()); // الحالة الحقيقية: قُبل فعلاً
+      expect(screen.queryByText(/تعذّر تحديث حالة الطلب/)).toBeNull();
+      expect(apiMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('closing and reopening the reject dialog before a successful refresh cannot bypass the lock', async () => {
+      let resolveRefresh!: (order: unknown) => void;
+      fetchOrderMock.mockResolvedValueOnce(awaitingFixture()).mockReturnValueOnce(new Promise((resolve) => { resolveRefresh = resolve; }));
+      apiMock.mockRejectedValue(apiError(409, { message: 'x', reason: 'payment_collected' }));
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(rejectButton()!);
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'تأكيد الرفض' }));
+      await within(dialog).findByText(/حُصِّل مبلغ الطلب/);
+      fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+      expect((rejectButton() as HTMLButtonElement).disabled).toBe(true); // لا إعادة فتح على أهلية قديمة
+      fireEvent.click(rejectButton()!);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(apiMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => resolveRefresh(awaitingFixture({ reject_action: { available: false, blocked_reason: 'payment_collected' } })));
+      await waitFor(() => expect(rejectButton()).toBeNull());
+    });
+
+    it('a not-found refresh shows the not-found state instead of a stale order', async () => {
+      fetchOrderMock.mockResolvedValueOnce(awaitingFixture()).mockRejectedValueOnce(apiError(404));
+      apiMock.mockRejectedValue(apiError(404));
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(acceptButton()!);
+      expect(await screen.findByText('الطلب غير موجود')).toBeTruthy();
+      expect(acceptButton()).toBeNull();
+    });
+
+    it('the stale lock also covers the regular cancel dialog (same race, same protection)', async () => {
+      let resolveRefresh!: (order: unknown) => void;
+      fetchOrderMock.mockResolvedValueOnce(acceptedFixture()).mockReturnValueOnce(new Promise((resolve) => { resolveRefresh = resolve; }));
+      apiMock.mockRejectedValue(apiError(409, { message: 'x', reason: 'payment_collected' }));
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(cancelButton()!);
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByLabelText('سبب الإلغاء'), { target: { value: 'customer_request' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'تأكيد الإلغاء' }));
+      await within(dialog).findByText(/حُصِّل مبلغ الطلب/);
+      fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect((cancelButton() as HTMLButtonElement).disabled).toBe(true);
+
+      await act(async () => resolveRefresh(acceptedFixture({ cancel_action: { available: false, blocked_reason: 'payment_collected' } })));
+      await waitFor(() => expect(cancelButton()).toBeNull());
+    });
+  });
+
   describe('localization', () => {
     it('renders the English LTR experience with the same eligibility rules', async () => {
       locale.current = 'en';

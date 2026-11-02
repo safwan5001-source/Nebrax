@@ -154,7 +154,7 @@ const ar = {
   'cancelError.forbidden': 'لا تملك صلاحية إلغاء الطلبات، أو أن الميزة غير متاحة لحسابك.',
   'cancelError.session': 'انتهت الجلسة. سجّل الدخول ثم أعد المحاولة.',
   'cancelError.not_found': 'الطلب غير موجود أو لا يخص هذه المؤسسة.',
-  'cancelError.conflict': 'تغيّرت حالة الطلب ولم يعد قابلاً للإلغاء. حدّثنا الصفحة بآخر حالة.',
+  'cancelError.conflict': 'تغيّرت حالة الطلب ولم يعد قابلاً للإلغاء.',
   'cancelError.validation': 'الخادم رفض البيانات المدخلة. راجع السبب والملاحظة ثم أعد المحاولة.',
   'cancelError.network': 'تعذّر الاتصال بالخادم؛ لم يُؤكَّد الإلغاء. تحقق من الشبكة وحدّث الصفحة قبل إعادة المحاولة.',
   'cancelError.unknown': 'تعذّر إلغاء الطلب. حدّث الصفحة ثم أعد المحاولة.',
@@ -227,12 +227,15 @@ const ar = {
   'acceptError.forbidden': 'لا تملك صلاحية إدارة الطلبات، أو أن الميزة غير متاحة لحسابك.',
   'acceptError.session': 'انتهت الجلسة. سجّل الدخول ثم أعد المحاولة.',
   'acceptError.not_found': 'الطلب غير موجود أو لا يخص هذه المؤسسة، أو أن الميزة غير متاحة.',
-  'acceptError.conflict': 'تغيّرت حالة الطلب ولم يعد هذا الإجراء متاحاً. حُدِّثت الصفحة بآخر حالة.',
+  'acceptError.conflict': 'تغيّرت حالة الطلب ولم يعد هذا الإجراء متاحاً.',
   'acceptError.validation': 'الخادم رفض البيانات المدخلة. راجع الملاحظة ثم أعد المحاولة.',
-  'acceptError.network': 'تعذّر الاتصال بالخادم؛ لم يُؤكَّد الإجراء. حُدِّثت الصفحة — تحقق من الحالة قبل إعادة المحاولة.',
+  'acceptError.network': 'تعذّر الاتصال بالخادم؛ لم يُؤكَّد الإجراء. تحقق من الحالة قبل إعادة المحاولة.',
   'acceptError.unknown': 'تعذّر تنفيذ الإجراء. حدّث الصفحة ثم أعد المحاولة.',
   'reason.merchant_rejected': 'رفض التاجر',
   actionsNote: 'تُنفَّذ الإجراءات المتاحة للطلب من هذه الشاشة؛ لا تحصيل ولا شحن منها.',
+  staleSyncing: 'تغيّرت حالة الطلب أو لم تُؤكَّد. نحدّث الحالة الآن — الإجراءات معطّلة حتى تصل آخر حالة.',
+  staleRefreshFailed: 'تعذّر تحديث حالة الطلب. الإجراءات معطّلة حتى يصل تحديث ناجح.',
+  staleRetry: 'إعادة تحديث الحالة',
 } as const;
 
 const en: Record<keyof typeof ar, string> = {
@@ -384,7 +387,7 @@ const en: Record<keyof typeof ar, string> = {
   'cancelError.forbidden': 'You do not have permission to cancel orders, or the feature is not available for your account.',
   'cancelError.session': 'Your session expired. Sign in and try again.',
   'cancelError.not_found': 'The order was not found or does not belong to this organization.',
-  'cancelError.conflict': 'The order state changed and it can no longer be cancelled. The page was refreshed with the latest state.',
+  'cancelError.conflict': 'The order state changed and it can no longer be cancelled.',
   'cancelError.validation': 'The server rejected the input. Review the reason and note, then try again.',
   'cancelError.network': 'Could not reach the server; the cancellation was not confirmed. Check the network and refresh before retrying.',
   'cancelError.unknown': 'The order could not be cancelled. Refresh the page and try again.',
@@ -457,12 +460,15 @@ const en: Record<keyof typeof ar, string> = {
   'acceptError.forbidden': 'You do not have permission to manage orders, or the feature is not available for your account.',
   'acceptError.session': 'Your session expired. Sign in and try again.',
   'acceptError.not_found': 'The order was not found, does not belong to this organization, or the feature is not available.',
-  'acceptError.conflict': 'The order state changed and this action is no longer available. The page was refreshed with the latest state.',
+  'acceptError.conflict': 'The order state changed and this action is no longer available.',
   'acceptError.validation': 'The server rejected the input. Review the note and try again.',
-  'acceptError.network': 'Could not reach the server; the action was not confirmed. The page was refreshed — check the state before retrying.',
+  'acceptError.network': 'Could not reach the server; the action was not confirmed. Check the state before retrying.',
   'acceptError.unknown': 'The action could not be completed. Refresh the page and try again.',
   'reason.merchant_rejected': 'Merchant rejected',
   actionsNote: 'The actions available for this order can be performed here; no collection or shipping from this screen.',
+  staleSyncing: 'The order state changed or could not be confirmed. Refreshing now — actions stay disabled until the latest state arrives.',
+  staleRefreshFailed: 'Could not refresh the order state. Actions stay disabled until a refresh succeeds.',
+  staleRetry: 'Retry refresh',
 };
 
 export const COMMERCE_ORDERS_MESSAGES = { ar, en } as const;
