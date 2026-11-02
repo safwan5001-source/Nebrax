@@ -59,6 +59,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/channels/{id}/pricing-settings',
         // COMMERCE-ORDERS-O1a — طلبات المتجر للموظف (قراءة فقط، commerce.orders.view).
         'api/commerce/orders',
+        'api/commerce/orders/attention', // COPS-H1-2: مصالحة الانتباه بالحالة (قراءة فقط، commerce.orders.view)
+        'api/commerce/orders/feed', // COPS-H1-2: تغذية أحداث الطلبات بالمؤشّر (قراءة فقط، commerce.orders.view)
         'api/commerce/orders/{id}',
         // COMMERCE-ORDERS-O3a-2b — إلغاء طلب بواسطة موظف مخوّل (ADR-28، commerce.orders.cancel، بوابة مغلقة افتراضياً).
         'api/commerce/orders/{id}/cancel',
