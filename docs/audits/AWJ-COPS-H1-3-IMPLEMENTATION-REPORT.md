@@ -4,9 +4,9 @@
 |---|---|
 | Slice | COPS-H1-3 — `commerce_channel_operation_settings` (مفاتيح القبول فقط) + `GET|PUT commerce/channels/{id}/operations-settings` |
 | Branch | `claude/cops-h1-3-operations-settings` |
-| Base SHA | `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe` (`origin/main` بعد دمج H1-2) |
-| PR / Head SHA / Merge SHA | تُسجَّل في وصف الـPR وفي `AWJ_COPS_HORIZON_HANDOFF.md` (الملف لا يضمّن هاشه) |
-| الحالة | Implemented → Merged عند اجتياز البوابات · Not deployed · Not activated · Not env-verified |
+| Base SHA | `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe` (الفرع فُرِّع منه؛ Base الـPR الفعلي عند الدمج `ce081f8cae9791f068e8bbbe55d3d42e9ee4ce86`) |
+| PR / Head SHA / Merge SHA | #1926 · Head `3dfcb1dc2cf0a681fe24002a3bf3f6411b993610` (الرأس الأول `cb530730ffe1b9eb24cd79cd99d120ebd8d0035c`) · Merge `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200` |
+| الحالة | **Merged** (2026-11-02) · Not deployed · Not activated · Not env-verified |
 | العقد | `ADR-29` §2.5 + §2.5.1 · Revision 1 §1 (فصل أساس H1-3 عن امتداد H4-3) |
 | قرارات المالك | تفويض COPS-H1-2/H1-3 الذاتي (2026-11-02): "reuse existing channel-settings and audit patterns · tenant and channel isolation · strict RBAC and safe defaults · versioning and concurrent-update protection · backward compatibility · لا مفاتيح H4" |
 
@@ -73,6 +73,13 @@
 | مفاتيح H4 (إيقاف/ساعات/حد أدنى/جهات) | خارج النطاق؛ H4-3 يضيفها بهجرة إضافية على الجدول نفسه |
 | قيود CHECK غير موجودة على SQLite | الخدمة تتحقق على المحرّكين؛ SQLite للاختبار فقط |
 | `expected_version` إلزامي يغيّر شكل أول استدعاء لأي عميل مستقبلي | لا عميل قائم (جدول وواجهة جديدان)؛ الواجهة (H1-5) تقرأ `version` ثم ترسله |
+
+## 5.1 أدلة CI والمراجعة (#1926)
+
+- الرأس الأول `cb53073`: لم يكتمل (أُلغي بدفع الإصلاح). ملاحظة Codex P2: `history()` كان يقتطع 50 حدثاً من الجدول المشترك قبل التصفية بمفتاح `operations.` فتختفي التغييرات عند وجود أحداث أحدث لإعدادات أخرى ⇒ **أُصلحت في `3dfcb1d`** (تمرير بصفحات 100 مع التصفية حتى 10 نتائج أو سقف مسح 2000) + اختبار انحدار (حدث تشغيل + 120 حدثاً أحدث لإعدادات أخرى) ⇒ 19/19.
+- الرأس `3dfcb1d`: SQLite وPostgreSQL ووظيفة الأداء المخصصة (`pg-perf`، نجحت دون تغيير الحد أو الحمل) وCI Gate خضراء؛ Codex بلا ملاحظات مفتوحة.
+- **`main` بعد دمج H1-2 (`790eff709`):** فشلت وظيفة PostgreSQL مرة واحدة في `AiActionHistoryListTest::an_executed_action_carries_its_latest_execution_and_row_counts_without_n_plus_one` (عدّ الاستعلامات 23 مقابل 24؛ اختبار AI Actions يتأثر بدفء الذاكرات المؤقتة ولا صلة له بـCOPS)، ونجح في كل رؤوس الـPR وعلى `main` (`ce081f8ca`). أُعيد تشغيل الوظيفة الفاشلة مرة واحدة ⇒ **نجحت (المحاولة 2)**؛ وتشغيل `main` لدمج H1-3 (`f4ae9fc99`) نجح كاملاً من المحاولة الأولى (sqlite وpgsql والأداء).
+- **بوابة الأداء على PR السجلات #1930 (وثائق فقط، الرأس `95103a0`):** فشلت مرة واحدة في الجولة 3 (added p95 = 73.8ms؛ الجولتان 1 و2: 10.8 و11.2ms). التحقيق: تجمّع انتظار واحد متصل (14 انتظاراً متتالياً من 135ms إلى 56ms خلال ~15ms ⇒ التزام واحد بطيء تراكم خلفه الكتّاب)، بلا checkpoint أو autovacuum، steal=0، iowait 1.7%؛ الفرق وثائقي بحت ولا يمس أي PHP، ونفس الكود نجح في تشغيل `main` السابق. مطابق للخطر المعلن (توقف تخزين نادر ≈ 1 من 21–24 جولة). **لم يُغيَّر الحد (50ms) ولا الحمل ولا المنهجية**؛ أُجريت إعادة تشغيل **واحدة** فقط للتأكد ونجحت. يبقى اقتراح انتظار هدوء (quiescence) قراراً للمالك ولم يُنفَّذ.
 
 ## 6. الخطوة التالية
 دمج H1-3 بعد اجتياز البوابات، تسجيل الـSHA في Handoff والمتتبّع، **ثم التوقف**: H1-4 (القبول/الرفض) يبدأ بأمر صريح جديد من المالك بنموذج Opus.
