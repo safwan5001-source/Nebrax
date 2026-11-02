@@ -122,6 +122,37 @@ describe("buyer order mappers", () => {
     }
   });
 
+  it("reads the public fulfilment block of a buyer order (COPS-H2-4), null when absent or unreadable", () => {
+    const base = {
+      id: "o1",
+      number: "CORD-1",
+      status: "confirmed",
+      total: { amount_minor: 1000, currency: "SAR" },
+      created_at: "2026-11-02T09:00:00+03:00",
+      items: [],
+    };
+    expect(buyerOrderDetailFromApi(base)?.fulfillment).toBeNull();
+    expect(
+      buyerOrderDetailFromApi({
+        ...base,
+        fulfillment: { type: "drone", stage: "x", stages: [] },
+      })?.fulfillment,
+    ).toBeNull();
+    const detail = buyerOrderDetailFromApi({
+      ...base,
+      fulfillment: {
+        type: "pickup",
+        stage: "ready",
+        stages: [{ key: "placed", at: null }],
+        tracking: null,
+        pickup: { ready_at: "2026-11-02T13:00:00+03:00" },
+        courier: { name: "Khalid" },
+      },
+    });
+    expect(detail?.fulfillment?.stage).toBe("ready");
+    expect(JSON.stringify(detail)).not.toContain("Khalid");
+  });
+
   it("formats minor units in the visitor's locale and never as a float input", () => {
     expect(formatBuyerMoney(1600, "SAR", "en")).toMatch(/16\.00/);
     expect(formatBuyerMoney(50, "SAR", "en")).toMatch(/0\.50/);

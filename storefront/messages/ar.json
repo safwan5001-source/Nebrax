@@ -616,7 +616,16 @@
       "onTheWay": "في الطريق",
       "delivered": "تم التسليم",
       "notTracked": "غير متتبَّع",
-      "caption": "هذا المتجر لا ينشر تتبّع الشحن بعد. الطلب المؤكَّد يُعلَّم أنه تم طلبه فقط."
+      "caption": "هذا المتجر لا ينشر تتبّع الشحن بعد. الطلب المؤكَّد يُعلَّم أنه تم طلبه فقط.",
+      "readyForPickup": "جاهز للاستلام",
+      "pickedUp": "تم الاستلام",
+      "attemptFailedTitle": "لم تكتمل محاولة التسليم الأخيرة",
+      "attemptFailedBody": "يُرجى التواصل مع المتجر للاتفاق على الخطوة التالية.",
+      "trackingTitle": "تتبّع الشحنة",
+      "trackingCarrier": "شركة الشحن",
+      "trackingNumber": "رقم التتبع",
+      "trackingOpen": "فتح صفحة التتبع",
+      "pickupReady": "جاهز للاستلام منذ {date}"
     },
     "contact": "التواصل",
     "statusCancelled": "ملغى",

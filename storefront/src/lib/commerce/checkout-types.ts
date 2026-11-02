@@ -159,6 +159,22 @@ export interface AwjOrderSchedule {
   timezone: string;
 }
 
+/**
+ * COPS-H2-4 (D-H2-13) — the buyer-facing fulfilment block. Whitelisted by the API: no courier, staff, warehouse, notes,
+ * failure reason or attempt count. A failed attempt / return to the store is only ever `delivery_attempt_failed`.
+ */
+export interface AwjOrderFulfillment {
+  type: string;
+  stage: string;
+  stages: Array<{ key: string; at: string | null }>;
+  tracking: {
+    carrier: string | null;
+    number: string | null;
+    url: string | null;
+  } | null;
+  pickup: { ready_at: string | null } | null;
+}
+
 /** Raw `POST /checkout/complete` success payload — the `order` field, per `StorefrontCheckoutController::serializeOrder()`. */
 export interface AwjOrder {
   id: string;
@@ -189,6 +205,8 @@ export interface AwjOrder {
   gift?: AwjGift | null;
   /** ADR-19 — present only when a date/window was chosen. */
   schedule?: AwjOrderSchedule;
+  /** COPS-H2-4 — public fulfilment progress; absent when there is no fulfilment yet and for a cancelled order. */
+  fulfillment?: AwjOrderFulfillment;
   payment: {
     method: string | null;
     status: string | null;
@@ -253,6 +271,34 @@ export interface StorefrontCheckout {
   cart: StorefrontCart;
 }
 
+export const FULFILLMENT_TYPES = [
+  "local_delivery",
+  "carrier",
+  "pickup",
+] as const;
+export const FULFILLMENT_STAGES = [
+  "preparing",
+  "ready",
+  "out_for_delivery",
+  "delivery_attempt_failed",
+  "delivered",
+  "picked_up",
+] as const;
+const STAGE_KEYS = ["placed", "accepted", ...FULFILLMENT_STAGES] as const;
+
+export interface StorefrontFulfillment {
+  type: (typeof FULFILLMENT_TYPES)[number];
+  stage: (typeof FULFILLMENT_STAGES)[number];
+  stages: Array<{ key: (typeof STAGE_KEYS)[number]; at: string | null }>;
+  /** Carrier shipments after dispatch only; the link is https and nothing else. */
+  tracking: {
+    carrier: string | null;
+    number: string | null;
+    url: string | null;
+  } | null;
+  pickup: { readyAt: string | null } | null;
+}
+
 export interface StorefrontOrder {
   id: string;
   number: string;
@@ -268,6 +314,8 @@ export interface StorefrontOrder {
   gift: StorefrontGift | null;
   /** The requested date/window snapshot, or `null` when none was chosen. */
   schedule: StorefrontOrderSchedule | null;
+  /** COPS-H2-4 — `null` when the API sent no (or an unreadable) fulfilment block: the order is then only "placed". */
+  fulfillment?: StorefrontFulfillment | null;
   items: Array<{
     productId: string | null;
     productName: string;
@@ -303,6 +351,54 @@ export function mapAwjCheckoutToViewModel(
   };
 }
 
+const str = (v: unknown): string | null =>
+  typeof v === "string" && v !== "" ? v : null;
+const oneOf = <T extends string>(list: readonly T[], v: unknown): T | null =>
+  typeof v === "string" && (list as readonly string[]).includes(v)
+    ? (v as T)
+    : null;
+
+/**
+ * Defensive: an unknown type/stage (a newer API) or a malformed block yields `null`, so the UI falls back to the
+ * authoritative "placed" only — it never invents progress from something it cannot read.
+ */
+export function mapOrderFulfillment(
+  raw: AwjOrderFulfillment | null | undefined,
+): StorefrontFulfillment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const type = oneOf(FULFILLMENT_TYPES, raw.type);
+  const stage = oneOf(FULFILLMENT_STAGES, raw.stage);
+  if (!type || !stage || !Array.isArray(raw.stages)) return null;
+
+  const stages = raw.stages.flatMap((entry) => {
+    const key = oneOf(STAGE_KEYS, entry?.key);
+    return key ? [{ key, at: str(entry?.at) }] : [];
+  });
+
+  const tracking =
+    raw.tracking && typeof raw.tracking === "object"
+      ? {
+          carrier: str(raw.tracking.carrier),
+          number: str(raw.tracking.number),
+          // https only — a tracking link is a navigation target, never trust other schemes.
+          url: str(raw.tracking.url)?.toLowerCase().startsWith("https://")
+            ? str(raw.tracking.url)
+            : null,
+        }
+      : null;
+
+  return {
+    type,
+    stage,
+    stages,
+    tracking,
+    pickup:
+      raw.pickup && typeof raw.pickup === "object"
+        ? { readyAt: str(raw.pickup.ready_at) }
+        : null,
+  };
+}
+
 export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
   return {
     id: order.id,
@@ -318,6 +414,7 @@ export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
     payment: order.payment,
     gift: mapGift(order.gift),
     schedule: mapOrderSchedule(order.schedule),
+    fulfillment: mapOrderFulfillment(order.fulfillment),
     items: groupOrderItems(
       order.items.map((item) => ({
         productId: item.product_id,

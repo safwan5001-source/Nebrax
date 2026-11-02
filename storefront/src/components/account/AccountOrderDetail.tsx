@@ -99,6 +99,7 @@ export function AccountOrderDetail({
         <AccountOrderStatus
           status={order.status}
           cancelledDate={formatOrderDate(order.cancelledAt ?? null, locale)}
+          fulfillment={order.fulfillment}
         />
       </div>
 

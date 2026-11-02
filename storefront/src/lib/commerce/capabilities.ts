@@ -233,17 +233,18 @@ export const ACCOUNT_ORDER_LOOKUP_CAPABILITY = "live" as CapabilityState;
 /**
  * Fulfilment / tracking timeline on an order.
  *
- * `design_only`: `CommerceOrder.status` is `draft | confirmed`. Payment and
- * fulfilment dimensions have not been built — the model says so. A timeline
- * that marks a real order as shipped / out for delivery / delivered would be
- * a commercial claim with no source. The designed timeline may mark
- * **placed** when the authoritative status is `confirmed`; later steps stay
- * visibly untracked.
- *
- * Missing backend contract: a fulfilment lifecycle on the order (and a
- * storefront serializer for it) before any step past "placed" may light up.
+ * `gated` (COPS-H2-4): the backend now publishes a buyer-facing `fulfillment`
+ * block on the order (type, public stage, reached stages, carrier tracking,
+ * pickup readiness) — but only when staff actually use order fulfilment, and
+ * the staff-side gate (`COMMERCE_ORDER_FULFILLMENT_ENABLED`) is closed by
+ * default. So the timeline is driven **solely** by that block: with it, steps
+ * past "placed" light up from its stage; without it (no block, cancelled order,
+ * unreadable block) nothing past "placed" ever lights up and the order is
+ * exactly as before — `CommerceOrder.status` itself stays `draft | confirmed`
+ * and is never used to infer shipping. A failed delivery attempt is reported
+ * neutrally (no reason, no attempt count).
  */
-export const ACCOUNT_ORDER_STATUS_CAPABILITY = "design_only" as CapabilityState;
+export const ACCOUNT_ORDER_STATUS_CAPABILITY = "gated" as CapabilityState;
 
 /**
  * Saved customer addresses / address book.

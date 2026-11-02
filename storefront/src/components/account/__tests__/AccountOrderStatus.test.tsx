@@ -4,13 +4,14 @@ import { ACCOUNT_ORDER_STATUS_CAPABILITY } from "@/lib/commerce/capabilities";
 import { AccountOrderStatus } from "../AccountOrderStatus";
 
 vi.mock("next-intl", () => ({
+  useLocale: () => "en",
   useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
     vars ? `${key}:${JSON.stringify(vars)}` : key,
 }));
 
-describe("AccountOrderStatus — DESIGN_ONLY", () => {
-  it("is declared design_only", () => {
-    expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("design_only");
+describe("AccountOrderStatus — without a fulfillment block (legacy design)", () => {
+  it("is declared gated (COPS-H2-4: driven only by the server fulfillment block)", () => {
+    expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("gated");
   });
 
   it("marks placed for a confirmed order and states tracking once, quietly", () => {

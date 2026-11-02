@@ -616,7 +616,16 @@
       "onTheWay": "En route",
       "delivered": "Livrée",
       "notTracked": "Non suivi",
-      "caption": "Cette boutique ne publie pas encore de suivi d’expédition. Seule une commande confirmée est marquée comme passée."
+      "caption": "Cette boutique ne publie pas encore de suivi d’expédition. Seule une commande confirmée est marquée comme passée.",
+      "readyForPickup": "Prête au retrait",
+      "pickedUp": "Retirée",
+      "attemptFailedTitle": "La dernière tentative de livraison n’a pas abouti",
+      "attemptFailedBody": "Veuillez contacter la boutique pour convenir de la suite.",
+      "trackingTitle": "Suivi de l’expédition",
+      "trackingCarrier": "Transporteur",
+      "trackingNumber": "Numéro de suivi",
+      "trackingOpen": "Ouvrir la page de suivi",
+      "pickupReady": "Prête au retrait depuis le {date}"
     },
     "contact": "Contact",
     "statusCancelled": "Annulée",

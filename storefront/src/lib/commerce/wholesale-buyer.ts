@@ -11,6 +11,12 @@
  * The storefront holds no group name, no hard-coded minimum and no price rule.
  */
 
+import {
+  type AwjOrderFulfillment,
+  mapOrderFulfillment,
+  type StorefrontFulfillment,
+} from "@/lib/commerce/checkout-types";
+
 export const MEMBERSHIP_STATUSES = [
   "pending",
   "approved",
@@ -204,6 +210,8 @@ export type BuyerOrderLine = {
 };
 
 export type BuyerOrderDetail = BuyerOrderSummary & {
+  /** COPS-H2-4 — the public fulfilment block, `null` when absent/unreadable/cancelled. */
+  fulfillment?: StorefrontFulfillment | null;
   lines: BuyerOrderLine[];
   deliveryAmountMinor: number | null;
   deliveryAddress: string | null;
@@ -292,6 +300,11 @@ export function buyerOrderDetailFromApi(raw: unknown): BuyerOrderDetail | null {
 
   return {
     ...summary,
+    fulfillment: mapOrderFulfillment(
+      isObject(raw.fulfillment)
+        ? (raw.fulfillment as unknown as AwjOrderFulfillment)
+        : null,
+    ),
     lines,
     deliveryAmountMinor: delivery ? minor(delivery.amount) : null,
     deliveryAddress: address === "" ? null : address,

@@ -616,7 +616,16 @@
       "onTheWay": "On the way",
       "delivered": "Delivered",
       "notTracked": "Not tracked",
-      "caption": "This store does not publish shipment tracking yet. Only a confirmed order is marked as placed."
+      "caption": "This store does not publish shipment tracking yet. Only a confirmed order is marked as placed.",
+      "readyForPickup": "Ready for pickup",
+      "pickedUp": "Picked up",
+      "attemptFailedTitle": "The last delivery attempt was not completed",
+      "attemptFailedBody": "Please contact the store to arrange the next step.",
+      "trackingTitle": "Shipment tracking",
+      "trackingCarrier": "Carrier",
+      "trackingNumber": "Tracking number",
+      "trackingOpen": "Open tracking page",
+      "pickupReady": "Ready for pickup since {date}"
     },
     "contact": "Contact",
     "statusCancelled": "Cancelled",

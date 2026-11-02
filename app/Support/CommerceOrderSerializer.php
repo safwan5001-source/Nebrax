@@ -113,6 +113,8 @@ final class CommerceOrderSerializer
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
             'items' => self::serializeLines($order->lines, $currency),
+            // COPS-H2-4 / D-H2-13: كتلة التنفيذ العامة — غائبة لطلب بلا صف تنفيذ أو ملغى (الشكل حرفياً كما كان).
+            ...CommerceOrderPublicFulfillment::block($order),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }

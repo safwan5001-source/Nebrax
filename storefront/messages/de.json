@@ -616,7 +616,16 @@
       "onTheWay": "Unterwegs",
       "delivered": "Zugestellt",
       "notTracked": "Nicht verfolgt",
-      "caption": "Dieser Shop veröffentlicht noch keine Sendungsverfolgung. Nur eine bestätigte Bestellung gilt als aufgegeben."
+      "caption": "Dieser Shop veröffentlicht noch keine Sendungsverfolgung. Nur eine bestätigte Bestellung gilt als aufgegeben.",
+      "readyForPickup": "Abholbereit",
+      "pickedUp": "Abgeholt",
+      "attemptFailedTitle": "Der letzte Zustellversuch wurde nicht abgeschlossen",
+      "attemptFailedBody": "Bitte kontaktieren Sie den Shop, um das weitere Vorgehen zu klären.",
+      "trackingTitle": "Sendungsverfolgung",
+      "trackingCarrier": "Versanddienstleister",
+      "trackingNumber": "Sendungsnummer",
+      "trackingOpen": "Sendungsverfolgung öffnen",
+      "pickupReady": "Abholbereit seit {date}"
     },
     "contact": "Kontakt",
     "statusCancelled": "Storniert",

@@ -67,8 +67,8 @@ describe("AWJ account — architecture boundaries", () => {
     expect(ACCOUNT_ORDER_HISTORY_CAPABILITY).toBe("live");
     expect(ACCOUNT_ORDER_LOOKUP_CAPABILITY).toBe("live");
     expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("live");
-    // there is still no fulfilment lifecycle on the order, so tracking stays visibly untracked
-    expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("design_only");
+    // COPS-H2-4: tracking is driven only by the server fulfilment block (gated); without it the order stays "placed" only
+    expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("gated");
     expect(ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY).toBe("design_only");
     expect(WISHLIST_CAPABILITY).toBe("design_only");
   });
