@@ -850,6 +850,8 @@
     "backPlatform": "العودة إلى لوحة المنصة"
   },
   "common": {
+    "listTruncated": "تعرض الصفحة {loaded} من أصل {total} سجلاً؛ الملخصات أعلاه محسوبة من المعروض فقط.",
+    "loadMore": "تحميل المزيد",
     "refresh": "تحديث",
     "active": "نشط",
     "inactive": "غير نشط",

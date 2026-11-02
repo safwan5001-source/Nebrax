@@ -18,6 +18,7 @@ import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { DialogError } from '@/components/fuel-stations/dialog-error';
+import { TruncationNotice, mergeById, type PageMeta } from '@/components/fuel-stations/truncation-notice';
 
 interface Station { id: string; name: string; code: string; status: string }
 interface Nozzle { id: string; nozzle_number: string; fuel_station_id: string; status: string }
@@ -49,6 +50,8 @@ export default function FuelShiftsPage() {
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shiftsMeta, setShiftsMeta] = useState<PageMeta>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -81,18 +84,25 @@ export default function FuelShiftsPage() {
     setLoading(true); setError(null);
     try {
       const [shiftResult, stationResult, nozzleResult, tankResult] = await Promise.all([
-        api<{ data: Shift[] }>('/fuel-stations/shifts'),
+        api<{ data: Shift[]; meta?: PageMeta }>('/fuel-stations/shifts'),
         api<{ data: Station[] }>('/fuel-stations/stations'),
         api<{ data: Nozzle[] }>('/fuel-stations/nozzles'),
         api<{ data: Tank[] }>('/fuel-stations/tanks'),
       ]);
-      setShifts(shiftResult.data); setStations(stationResult.data.filter((station) => station.status === 'active'));
+      setShifts(shiftResult.data); setShiftsMeta(shiftResult.meta); setStations(stationResult.data.filter((station) => station.status === 'active'));
       setNozzles(nozzleResult.data.filter((nozzle) => nozzle.status === 'active'));
       setTanks(tankResult.data.filter((tank) => tank.status === 'active'));
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('loadFailed')); } finally { setLoading(false); }
   }, [tc]);
 
   useEffect(() => { void load(); }, [load]);
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true); setError(null);
+    try {
+      const next = await api<{ data: Shift[]; meta?: PageMeta }>(`/fuel-stations/shifts?page=${(shiftsMeta?.current_page ?? 1) + 1}`);
+      setShifts((current) => mergeById(current, next.data)); setShiftsMeta(next.meta);
+    } catch (e) { setError(e instanceof ApiError ? e.message : tc('loadFailed')); } finally { setLoadingMore(false); }
+  }, [shiftsMeta, tc]);
   useEffect(() => {
     const user = currentUser();
     if (user?.permissions) { setPermissions(user.permissions); return; }
@@ -214,6 +224,7 @@ export default function FuelShiftsPage() {
       <Summary icon={<WalletCards />} label={t('summaryPendingCash')} value={String(shifts.filter((shift) => shift.cash_variance?.status === 'pending_review').length)} />
       <Summary icon={<ReceiptText />} label={t('summaryLocked')} value={String(shifts.filter((shift) => shift.status === 'approved').length)} />
     </div>
+    <TruncationNotice loaded={shifts.length} meta={shiftsMeta} loading={loadingMore} onLoadMore={() => void loadMore()} onRefresh={() => void load()} />
     {error && !dialogOpen && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <DataTable columns={columns} data={shifts} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="fuel-shifts" />
 

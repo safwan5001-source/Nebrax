@@ -97,3 +97,52 @@ describe('FuelShiftsPage open flow (UX-07, FS-29)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+describe('FuelShiftsPage pagination (FS-31)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('React', React);
+    currentUser.mockReturnValue({ id: 'u1', permissions: ['*'] });
+  });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it('announces a truncated list and loads the next page instead of silently stopping at the first 50', async () => {
+    api.mockReset();
+    api.mockImplementation((path: string) => {
+      if (path === '/fuel-stations/shifts') return Promise.resolve({ data: [{ id: 'a', status: 'open' }], meta: { total: 3, current_page: 1, last_page: 2 } });
+      if (path === '/fuel-stations/shifts?page=2') return Promise.resolve({ data: [{ id: 'a', status: 'open' }, { id: 'b', status: 'closed' }], meta: { total: 3, current_page: 2, last_page: 2 } });
+      return Promise.resolve({ data: lists[path] ?? [] });
+    });
+    render(<FuelShiftsPage />);
+
+    expect(await screen.findByText('listTruncated:1,3')).toBeTruthy();
+    fireEvent.click(screen.getByText('loadMore'));
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/fuel-stations/shifts?page=2'));
+    // الصف المكرر (a) لا يُضاف مرتين: المحمَّل صار 2 من 3.
+    expect(await screen.findByText('listTruncated:2,3')).toBeTruthy();
+  });
+
+  it('at the last page with a remaining gap it offers a refresh instead of requesting empty pages', async () => {
+    api.mockReset();
+    api.mockImplementation((path: string) => Promise.resolve(path === '/fuel-stations/shifts'
+      ? { data: [{ id: 'a', status: 'open' }], meta: { total: 2, current_page: 1, last_page: 1 } }
+      : { data: lists[path] ?? [] }));
+    render(<FuelShiftsPage />);
+
+    expect(await screen.findByText('listTruncated:1,2')).toBeTruthy();
+    expect(screen.queryByText('loadMore')).toBeNull();
+    fireEvent.click(screen.getByText('refresh'));
+    await waitFor(() => expect(api.mock.calls.filter(([path]) => path === '/fuel-stations/shifts').length).toBe(2));
+    expect(api).not.toHaveBeenCalledWith('/fuel-stations/shifts?page=2');
+  });
+
+  it('shows no notice when everything fits in one page', async () => {
+    api.mockReset();
+    api.mockImplementation((path: string) => Promise.resolve(path === '/fuel-stations/shifts'
+      ? { data: [{ id: 'a', status: 'open' }], meta: { total: 1, current_page: 1, last_page: 1 } }
+      : { data: lists[path] ?? [] }));
+    render(<FuelShiftsPage />);
+    await screen.findByText('open');
+    expect(screen.queryByText('loadMore')).toBeNull();
+  });
+});
