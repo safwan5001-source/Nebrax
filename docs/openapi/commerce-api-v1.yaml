@@ -2267,7 +2267,49 @@ components:
                 description: Present only on an add-on line; the `line_id` of its parent line.
                 type: string
                 format: uuid
+        fulfillment: { $ref: '#/components/schemas/OrderFulfillment' }
         created_at: { type: [string, 'null'], format: date-time }
+
+    OrderFulfillment:
+      description: >
+        COPS-H2-4 (additive). The buyer-facing fulfillment progress. **Absent** (no key) when the order has no fulfillment
+        yet, and for a cancelled order (cancellation wins). Detail responses only - never in list rows. A failed delivery
+        attempt or a return to the store is reported only as the stage `delivery_attempt_failed`, with no reason and no
+        attempt count. Courier, staff, warehouse and internal notes are never exposed.
+      type: object
+      additionalProperties: false
+      required: [type, stage, stages, tracking, pickup]
+      properties:
+        type: { type: string, enum: [local_delivery, carrier, pickup] }
+        stage:
+          type: string
+          enum: [preparing, ready, out_for_delivery, delivery_attempt_failed, delivered, picked_up]
+        stages:
+          description: Stages reached so far, in order. `accepted` appears only for orders that needed manual acceptance.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, at]
+            properties:
+              key: { type: string, enum: [placed, accepted, preparing, ready, out_for_delivery, delivery_attempt_failed, delivered, picked_up] }
+              at: { type: [string, 'null'], format: date-time }
+        tracking:
+          description: Carrier shipments only, and only after dispatch; otherwise null. `url` is an https link.
+          type: [object, 'null']
+          additionalProperties: false
+          required: [carrier, number, url]
+          properties:
+            carrier: { type: [string, 'null'] }
+            number: { type: [string, 'null'] }
+            url: { type: [string, 'null'], format: uri }
+        pickup:
+          description: Store pickup only, and only once ready; otherwise null.
+          type: [object, 'null']
+          additionalProperties: false
+          required: [ready_at]
+          properties:
+            ready_at: { type: [string, 'null'], format: date-time }
 
     GuestOrderResponse:
       type: object

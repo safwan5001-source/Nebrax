@@ -292,6 +292,7 @@ export function AccountOrderDetailView({
         <AccountOrderStatus
           status={order.status}
           cancelledDate={when(order.cancelledAt, locale, true)}
+          fulfillment={order.fulfillment}
         />
       </div>
 

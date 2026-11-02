@@ -616,7 +616,16 @@
       "onTheWay": "En camino",
       "delivered": "Entregado",
       "notTracked": "Sin seguimiento",
-      "caption": "Esta tienda aún no publica seguimiento de envío. Solo un pedido confirmado se marca como realizado."
+      "caption": "Esta tienda aún no publica seguimiento de envío. Solo un pedido confirmado se marca como realizado.",
+      "readyForPickup": "Listo para recoger",
+      "pickedUp": "Recogido",
+      "attemptFailedTitle": "El último intento de entrega no se completó",
+      "attemptFailedBody": "Contacta con la tienda para acordar el siguiente paso.",
+      "trackingTitle": "Seguimiento del envío",
+      "trackingCarrier": "Transportista",
+      "trackingNumber": "Número de seguimiento",
+      "trackingOpen": "Abrir la página de seguimiento",
+      "pickupReady": "Listo para recoger desde {date}"
     },
     "contact": "Contacto",
     "statusCancelled": "Cancelado",

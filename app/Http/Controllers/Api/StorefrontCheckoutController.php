@@ -384,6 +384,8 @@ final class StorefrontCheckoutController extends PublicApiController
                     : []),
             ],
             'items' => CommerceOrderSerializer::serializeLines($order->lines, $currency),
+            // COPS-H2-4 / D-H2-13: كتلة التنفيذ العامة — غائبة لطلب بلا صف تنفيذ أو ملغى.
+            ...\App\Support\CommerceOrderPublicFulfillment::block($order),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }

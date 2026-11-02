@@ -616,7 +616,16 @@
       "onTheWay": "W drodze",
       "delivered": "Dostarczone",
       "notTracked": "Bez śledzenia",
-      "caption": "Ten sklep nie publikuje jeszcze śledzenia przesyłki. Tylko potwierdzone zamówienie jest oznaczone jako złożone."
+      "caption": "Ten sklep nie publikuje jeszcze śledzenia przesyłki. Tylko potwierdzone zamówienie jest oznaczone jako złożone.",
+      "readyForPickup": "Gotowe do odbioru",
+      "pickedUp": "Odebrane",
+      "attemptFailedTitle": "Ostatnia próba doręczenia nie została zakończona",
+      "attemptFailedBody": "Skontaktuj się ze sklepem, aby ustalić dalsze kroki.",
+      "trackingTitle": "Śledzenie przesyłki",
+      "trackingCarrier": "Przewoźnik",
+      "trackingNumber": "Numer śledzenia",
+      "trackingOpen": "Otwórz stronę śledzenia",
+      "pickupReady": "Gotowe do odbioru od {date}"
     },
     "contact": "Kontakt",
     "statusCancelled": "Anulowane",
