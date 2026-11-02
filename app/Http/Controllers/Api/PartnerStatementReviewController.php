@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * مراجعة نتائج مطابقة كشوف الأطراف (IMP-PS-A3a): تأكيد · تجاوز · سحب، وقراءة القرارات. **لا أثر مالي**. الكتابة `partner_statements.reconcile`، والقراءة `.view`
+ * مراجعة نتائج مطابقة كشوف الأطراف (IMP-PS-A3a/A3b): تأكيد · تجاوز · سحب · ربط زوج معكوس مثبت، وقراءة القرارات والأزواج. **لا أثر مالي**. الكتابة `partner_statements.reconcile`، والقراءة `.view`
  * (على المسار) + نطاق الطرف والفرع والتشغيلة داخل الخدمة. أخطاء المراجعة (`PartnerStatementReviewException`) تُرسل `{message, reason}` بحالتها الصريحة.
  */
 class PartnerStatementReviewController extends ApiController
@@ -19,7 +19,7 @@ class PartnerStatementReviewController extends ApiController
 
     public function decide(Request $request, string $id): JsonResponse
     {
-        $this->rejectUnknown($request, ['run_id', 'line_id', 'action', 'unit_keys', 'reason', 'accept_difference']);
+        $this->rejectUnknown($request, ['run_id', 'line_id', 'action', 'unit_keys', 'reason', 'accept_difference', 'pair_member']);
         $data = $request->validate([
             'run_id' => ['required', 'uuid'],
             'line_id' => ['required', 'uuid'],
@@ -28,6 +28,7 @@ class PartnerStatementReviewController extends ApiController
             'unit_keys.*' => ['required', 'string', 'max:100'],
             'reason' => ['nullable', 'string', 'max:500'],
             'accept_difference' => ['nullable', 'boolean'],
+            'pair_member' => ['nullable', Rule::in(PartnerStatementReviewDecision::MEMBERS)],
         ]);
         $result = $this->domain(fn () => $this->review->decide($request->user(), $id, $data));
 
@@ -49,6 +50,13 @@ class PartnerStatementReviewController extends ApiController
             'data' => $page->items(),
             'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'per_page' => $page->perPage(), 'total' => $page->total()],
         ]);
+    }
+
+    public function reversedPairs(Request $request, string $id): JsonResponse
+    {
+        $this->rejectUnknown($request, []);
+
+        return response()->json(['data' => $this->domain(fn () => $this->review->reversedPairs($request->user(), $id))]);
     }
 
     /** @param list<string> $allowed */

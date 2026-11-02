@@ -188,6 +188,11 @@ final class PartnerLedgerCandidates
                 'kind' => $source['kind'] ?? 'journal', 'source_id' => $source['id'] ?? null, 'label' => $source['label'] ?? null,
                 'numbers' => array_map(fn (array $m) => $m['number'], $members),
                 'entry_ids' => array_map(fn (array $m): string => $m['entry_id'], $members),
+                // PS-A3b (إضافة فقط، خارج البصمة): تفاصيل كل قيد في الوحدة — يلزمها إثبات زوج الأصل/العكس عبر `reversal_of` بلا استنتاج من المبلغ أو التاريخ أو الرقم.
+                'entries' => array_map(fn (array $m): array => [
+                    'entry_id' => $m['entry_id'], 'number' => $m['number'], 'date' => $m['date'], 'status' => $m['status'], 'reversal_of' => $m['reversal_of'],
+                    'debit_minor' => (int) $m['debit'], 'credit_minor' => (int) $m['credit'],
+                ], $members),
                 'date' => $date, 'last_date' => end($members)['date'], 'in_period' => $date >= $periodFrom && $date <= $periodTo,
                 'debit_minor' => $matchable ? max($net, 0) : $debit, 'credit_minor' => $matchable ? max(-$net, 0) : $credit,
                 'net_minor' => $net, 'direction' => $net > 0 ? 'debit' : ($net < 0 ? 'credit' : 'none'),

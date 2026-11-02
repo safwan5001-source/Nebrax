@@ -166,8 +166,8 @@ Integration, using the existing architecture only:
 | **PS-A2b** | `PartnerLedgerCandidates` + golden-snapshot/characterisation tests of the report (incl. the reversal/role-filter observation) + the three additive keys (D-PS-10) | none |
 | **PS-A2c** | Matching engine R1–R3, outcomes, reversed-pair netting, match tables/run (with `ledger_scope`), `match`/`matches`/`verify-set` API; counterparty orientation only (D-PS-11); no UI | A2a, A2b |
 | PS-A3 | Review actions, close/replace/void, events, scope-aware constraints (§5.3–5.4), overlap acknowledgement + unit claims (§5.5), concurrency tests — **split into the five slices below (2026-11-02)** | A2c |
-| ↳ **PS-A3a** | Review decisions confirm/override/clear (append-only log, mandatory reasons for overrides, stale-run guard, double-use guard, `active` units only) — report `reports/IMP-PS-A3a-REPORT.md` | A2c |
-| ↳ PS-A3b | Manual review of a *proven* reversed pair (D-PS-15 approved: no automatic R-REV; manual only with a complete, `reversal_of`-proven chain) | A3a |
+| ↳ PS-A3a (merged #1915) | Review decisions confirm/override/clear (append-only log, mandatory reasons for overrides, stale-run guard, double-use guard, `active` units only) — report `reports/IMP-PS-A3a-REPORT.md` | A2c |
+| ↳ **PS-A3b** | Manual review of a *proven* reversed pair (D-PS-15 approved: no automatic R-REV; manual only with a complete, `reversal_of`-proven chain) — `link_pair` + `GET …/reversed-pairs`; report `reports/IMP-PS-A3b-REPORT.md`; D-PS-16 (reason always required) applied | A3a (merged) |
 | ↳ PS-A3c | `draft → reviewed → closed`, events table, single-scope close (§5.3–5.4), "dismiss — absent from our books" action, statement digest check | A3a |
 | ↳ PS-A3d | Unit claims, overlap warning + acknowledgement, `unit_conflict` (§5.5; D-PS-12/14) | A3c |
 | ↳ PS-A3e | Void and explicit replace, claim release, PostgreSQL race matrix | A3c, A3d |
