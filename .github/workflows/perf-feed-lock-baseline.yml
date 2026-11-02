@@ -1,0 +1,384 @@
+name: Perf Feed-Lock Baseline (diagnostic)
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  COPS-PERF الخطوة 0 — قياس تشخيصي **غير مانع** لبوابة أداء قفل التغذية (COPS-H1-1)
+# ═══════════════════════════════════════════════════════════════════════════
+#  الغرض: تحويل «ثلاث حوادث» تذبذب (#1935، #1943، #1945) إلى **معدل فشل مقاس** على ubuntu-latest، بجمع بيانات كل تشغيل:
+#  p95 الإضافي لكل جولة، نتيجة pg_test_fsync على قرص قاعدة البيانات (قبل الاختبار وبعده)، وبصمة المشغّل. لا غرض غير ذلك.
+#
+#  ما لا يفعله (قرار المالك):
+#   • لا يمسّ `ci.yml` ولا `CI Gate` ولا `required-checks.json`: هذا الملف غير مشغَّل بـpull_request فلا تراه البوابة، وليس فحصاً مطلوباً.
+#   • يقيس **الحمل نفسه والحدّ نفسه (p95 إضافي < 50ms)**: الخطوات التالية نسخة حرفية من وظيفة `pg-perf` في ci.yml، والاختبار نفسه
+#     (`vendor/bin/phpunit --group cops-h1-1-perf --fail-on-skipped --fail-on-risky`) هو الذي يحكم؛ لا عتبة هنا ولا تخفيف.
+#   • لا إعادة محاولة ولا `continue-on-error` ولا `|| true` على القياس: فشل الاختبار يُفشل التشغيل ويبقى ظاهراً في تبويب Actions.
+#     الجولات الفاشلة تُحفظ كاملةً في الـartifact (`if: always()`)، فلا يُخفى أي فشل ولا يُكرَّر تشغيل بغرض الحصول على أخضر.
+#   • لا يُشغَّل على PR أبداً (جدولة + تشغيل يدوي فقط).
+#
+#  الكلفة والجدولة (للمراجعة قبل الدمج):
+#   • عينة واحدة ≈ 1.5 دقيقة تنفيذ فعلية (92 ثانية قيست على #1945) ⇒ تُحتسب دقيقتين (تقريب الدقيقة لكل وظيفة) + وظيفة `plan` دقيقة واحدة.
+#   • الجدولة الافتراضية: عينة واحدة كل ليلة 02:23 UTC ⇒ ≈ 3 دقائق/ليلة ≈ 90 دقيقة شهرياً (مشغّل ubuntu-latest، مضاعف 1×).
+#   • تنبيه تحيّز: الحوادث الثلاث وقعت نهاراً/مساءً UTC (≈16:18 و21:06)، فالقياس الليلي وحده قد **يُقلّل** تقدير معدل الفشل.
+#     نوافذ إضافية مقترحة (معطَّلة بالتعليق أدناه، تُفعَّل بقرار المراجعة): 14:23 و20:23 UTC ⇒ +6 دقائق/يوم ≈ +180 دقيقة/شهر.
+#   • التشغيل اليدوي: مدخل `samples` من 1 إلى 5، متتابعة (`max-parallel: 1`) كي لا يضرب بعضها بعضاً إن تشاركت المضيف.
+#   • سقف المدة: 15 دقيقة للوظيفة، و`concurrency` بلا إلغاء كي لا تتداخل عينتان.
+#   • الاحتفاظ بالـartifacts 30 يوماً (≈ 10–30KB لكل عينة).
+#
+#  القراءة: تبويب Actions ⇒ كل تشغيل أحمر = اختبار الأداء فشل فعلاً؛ والتفاصيل في الـartifact `feed-perf-baseline-<run>-<attempt>-<sample>`:
+#  `baseline-report.json` (النتيجة + p95 لكل جولة + fsync + المشغّل) و`runner-info.json` و`fsync-pre.txt` و`fsync-post.txt` وملفات المقاييس الأصلية.
+# ═══════════════════════════════════════════════════════════════════════════
+
+on:
+  schedule:
+    - cron: '23 2 * * *'      # كل ليلة 02:23 UTC (≈ 05:23 الرياض) — دقيقة غير مستديرة لتخفيف ازدحام الجدولة
+    # نوافذ إضافية لتغطية ساعات الحوادث المرصودة — معطَّلة افتراضياً (انظر الكلفة أعلاه):
+    # - cron: '23 14 * * *'
+    # - cron: '23 20 * * *'
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: 'عدد العينات المتتابعة (1–5)'
+        type: choice
+        options: ['1', '2', '3', '4', '5']
+        default: '1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-feed-lock-baseline
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan samples
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          SAMPLES_INPUT: ${{ inputs.samples }}
+        run: |
+          n="${SAMPLES_INPUT:-1}"
+          case "$n" in 1|2|3|4|5) ;; *) n=1 ;; esac
+          list=$(seq -s, 1 "$n")
+          echo "matrix={\"sample\":[${list}]}" >> "$GITHUB_OUTPUT"
+
+  baseline:
+    name: Feed-lock baseline (sample ${{ matrix.sample }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    env:
+      COMPOSER_NO_INTERACTION: '1'
+      APP_DIR: /tmp/nibras-app
+      REPORT_DIR: /tmp/baseline-report
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nibras
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: nibras
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nibras"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+
+    steps:
+      # ── تشخيص: بصمة المشغّل وقياس fsync على قرص قاعدة البيانات **قبل** تجميع التطبيق (لا يلوّث نافذة القياس). لا تفشل الخطوة
+      #    بسبب أداة تشخيص: فشل المسبار يُسجَّل صراحةً في الملف (PROBE_FAILED) ولا يُخفى.
+      - name: بصمة المشغّل وfsync (قبل)
+        shell: bash
+        env:
+          SAMPLE: ${{ matrix.sample }}
+        run: |
+          set -uo pipefail
+          mkdir -p "$REPORT_DIR"
+          python3 - <<'PY' > "$REPORT_DIR/runner-info.json"
+          import datetime, json, os, platform, subprocess
+          def sh(cmd):
+              try:
+                  return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=25).stdout.strip()
+              except Exception as exc:  # التشخيص لا يوقف الاختبار ويُسجَّل خطؤه
+                  return f"PROBE_FAILED: {exc}"
+          now = datetime.datetime.now(datetime.timezone.utc)
+          info = {
+              "captured_at_utc": now.isoformat(timespec="seconds"),
+              "utc_hour": now.hour,
+              "runner_name": os.environ.get("RUNNER_NAME"),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
+              "runner_environment": os.environ.get("RUNNER_ENVIRONMENT"),
+              "image_os": os.environ.get("ImageOS"),
+              "image_version": os.environ.get("ImageVersion"),
+              "event": os.environ.get("GITHUB_EVENT_NAME"),
+              "ref": os.environ.get("GITHUB_REF"),
+              "sha": os.environ.get("GITHUB_SHA"),
+              "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+              "sample": os.environ.get("SAMPLE"),
+              "nproc": sh("nproc"),
+              "cpu_model": sh("lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -1"),
+              "mem_total_kb": sh("awk '/MemTotal/ {print $2}' /proc/meminfo"),
+              "kernel": platform.release(),
+              "virtualization": sh("systemd-detect-virt 2>/dev/null || echo unknown"),
+              "loadavg": sh("cut -d' ' -f1-3 /proc/loadavg"),
+              "docker_root_dir": sh("docker info -f '{{.DockerRootDir}}' 2>/dev/null"),
+              "docker_root_fs": sh("df -h \"$(docker info -f '{{.DockerRootDir}}' 2>/dev/null)\" 2>/dev/null | tail -1"),
+              "block_devices": sh("lsblk -d -o NAME,ROTA,SIZE,MODEL 2>/dev/null"),
+          }
+          print(json.dumps(info, ensure_ascii=False, indent=2))
+          PY
+          cat "$REPORT_DIR/runner-info.json"
+          probe_fsync() {  # $1 = وسم الملف
+            local out="$REPORT_DIR/fsync-$1.txt" cid
+            cid="$(docker ps -q --filter "ancestor=postgres:16" | head -1)"
+            if [ -z "$cid" ]; then echo "PROBE_FAILED: لا حاوية postgres:16" | tee "$out"; return 0; fi
+            docker exec "$cid" pg_test_fsync -s 1 -f /var/lib/postgresql/data/pg_test_fsync.tmp 2>&1 | tee "$out" \
+              || echo "PROBE_FAILED: pg_test_fsync exit ${PIPESTATUS[0]}" | tee -a "$out"
+          }
+          probe_fsync pre
+
+      - name: Checkout core (النواة)
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip, dom, gd
+          coverage: none
+
+      # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
+      # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
+      - name: السماح بتثبيت Laravel 11 (بيئة CI مؤقتة)
+        run: composer config --global policy.advisories.block false
+
+      - name: إنشاء مشروع Laravel 11
+        run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
+
+      - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          # يقرأ «حارس قائمة النسخ» هذا السطر (laravel/sanctum أولاً، سطرٌ واحد) ليطابق حزم setup.sh.
+          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --quiet
+          php "$GITHUB_WORKSPACE/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
+          php artisan install:api --no-interaction --quiet || true
+          rm -f database/migrations/*_create_personal_access_tokens_table.php
+
+      - name: دمج ملفات النواة وطبقة الـ API
+        run: |
+          CORE="$GITHUB_WORKSPACE"
+          cd "$APP_DIR"
+          mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
+                   app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
+                   app/Http/Requests app/Http/Resources app/Console/Commands \
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+          cp -r "$CORE/app/Models/"*.php                  app/Models/
+          cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
+          cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
+          cp -r "$CORE/app/Listeners/"*.php  app/Listeners/ 2>/dev/null || true
+          cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
+          cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
+          cp -r "$CORE/app/Jobs/Accounting/"*.php          app/Jobs/Accounting/
+          # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
+          cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
+          cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
+          cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
+          cp -r "$CORE/app/Services/Commerce/"*.php       app/Services/Commerce/
+          cp -r "$CORE/app/Services/Commerce/Edge/"*.php  app/Services/Commerce/Edge/
+          cp -r "$CORE/app/Services/Commerce/Otp/"*.php   app/Services/Commerce/Otp/
+          cp -r "$CORE/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
+          cp -r "$CORE/app/Services/AppBuilder/"*.php     app/Services/AppBuilder/
+          cp -r "$CORE/app/Services/DeliveryHub/"*.php    app/Services/DeliveryHub/
+          cp -r "$CORE/app/Services/Pos/"*.php            app/Services/Pos/
+          cp -r "$CORE/app/Services/Pos/Hardware/"*.php   app/Services/Pos/Hardware/
+          cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
+          cp -r "$CORE/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
+          cp -r "$CORE/app/Support/"*.php                 app/Support/
+          cp -r "$CORE/app/Support/Inventory/"*.php       app/Support/Inventory/
+          cp -r "$CORE/app/Support/Dns/"*.php             app/Support/Dns/
+          cp -r "$CORE/app/Support/Commerce/"*.php        app/Support/Commerce/
+          cp -r "$CORE/app/Services/Communications/"*.php app/Services/Communications/
+          cp -r "$CORE/app/Support/Communications/"*.php  app/Support/Communications/
+          cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
+          cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/
+          cp -r "$CORE/app/Http/Controllers/Api/"*.php    app/Http/Controllers/Api/
+          cp -r "$CORE/app/Http/Requests/"*.php           app/Http/Requests/
+          cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
+          cp -r "$CORE/app/Providers/"*.php               app/Providers/
+          cp -r "$CORE/config/"*.php                      config/
+          # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
+          cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
+          cp -r "$CORE/database/migrations/"*.php         database/migrations/
+          cp -r "$CORE/routes/api.php"                    routes/api.php
+          cp -r "$CORE/routes/api_public.php"          routes/api_public.php
+          cp -r "$CORE/routes/api_storefront.php"      routes/api_storefront.php
+          cp -r "$CORE/routes/api_commerce.php"        routes/api_commerce.php
+          cp -r "$CORE/routes/api_preview.php"         routes/api_preview.php
+          cp -r "$CORE/routes/console.php"                routes/console.php
+          cp -r "$CORE/resources/views/"*                 resources/views/ 2>/dev/null || true
+          cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
+          cp -r "$CORE/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
+          # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
+          cp -r "$CORE/docs/openapi/"*.yaml               docs/openapi/
+          # حدود PHP الإنتاجية (AWJ-UPLOAD-PHP-LIMITS-1) — يقرؤها PhpUploadLimitsContractTest وPhpUploadRuntimeTest
+          mkdir -p deploy/php
+          cp "$CORE/deploy/php/awj-uploads.ini"            deploy/php/
+          # عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
+          # base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
+          cp -r "$CORE/contracts/app-builder/"*.json      contracts/app-builder/
+          # أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
+          mkdir -p contracts/app-builder/archive
+          cp -r "$CORE/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
+          # سجل قوالب التطبيقات (AD-11 / S22a) — يقرؤه AppTemplateRegistry عبر resource_path()؛ نفس الملفات يقرؤها اختبار Dart.
+          mkdir -p resources/app-builder/templates
+          cp -r "$CORE/resources/app-builder/templates/"*.json resources/app-builder/templates/
+          # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
+          # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
+          cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
+          # عقد رحلة التاجر الإدارية (FLOWERS-H2-15): الطلبات تولّدها الواجهة، والاستجابات يلتقطها الخادم؛ يقارنهما FlowersMerchantAdminJourneyTest.
+          cp -r "$CORE/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
+          cp -r "$CORE/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/
+
+      - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          grep -q "TenancyServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+          grep -q "DocumentCenterServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
+          grep -q "PublicApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "StorefrontApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\StorefrontApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "CommerceApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\CommerceApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "PreviewApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\PreviewApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "WebhookServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+          grep -q "MailServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
+          rm -f database/migrations/0001_01_01_000000_create_users_table.php
+
+      - name: تهيئة قاعدة بيانات القياس (pgsql)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          sed -i "/^DB_HOST=/d;/^DB_PORT=/d;/^DB_DATABASE=/d;/^DB_USERNAME=/d;/^DB_PASSWORD=/d" .env
+          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" .env
+          printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
+          php artisan migrate:fresh --force
+
+      - name: اختبارات مُلخِّص المقاييس
+        run: python3 -m unittest discover -s scripts/ci-perf -v
+
+      # تشغيل المجموعة وحدها، تسلسلياً (لا --parallel). vendor/bin/phpunit مباشرةً. --fail-on-skipped يفشل إن تخطّى أيٌّ من الاختبارين.
+      # الفشل هنا لا يمنع الخطوة التالية من تلخيص ما سُجِّل (المقاييس تُسجَّل قبل أي تأكيد).
+      - name: قياسات أداء تغذية الأحداث — تسلسلية على مشغّل خاص
+        id: perf
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS="-c lock_timeout=60s"
+          WD_DIR="$PWD/pgsql-watchdog"; mkdir -p "$WD_DIR"
+          rm -f "$WD_DIR"/cops-h1-1-*.json
+          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg)" | tee "$WD_DIR/perf-environment.txt"
+          vendor/bin/phpunit --group cops-h1-1-perf --fail-on-skipped --fail-on-risky 2>&1 | tee test-output-pgsql-perf.txt
+
+      - name: fsync (بعد)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          out="$REPORT_DIR/fsync-post.txt"
+          cid="$(docker ps -q --filter "ancestor=postgres:16" | head -1)"
+          if [ -z "$cid" ]; then echo "PROBE_FAILED: لا حاوية postgres:16" | tee "$out"; exit 0; fi
+          docker exec "$cid" pg_test_fsync -s 1 -f /var/lib/postgresql/data/pg_test_fsync.tmp 2>&1 | tee "$out" \
+            || echo "PROBE_FAILED: pg_test_fsync exit ${PIPESTATUS[0]}" | tee -a "$out"
+
+      # يلخّص المقاييس المسجَّلة (ويفشل إن غابت أو نقصت) حتى بعد فشل الخطوة السابقة.
+      - name: ملخّص مقاييس الأداء
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 "$GITHUB_WORKSPACE/scripts/ci-perf/summarize_feed_perf.py" "$APP_DIR/pgsql-watchdog"
+
+      # تقرير آلي موحَّد لكل عينة: يضمّ نتيجة خطوة الاختبار كما هي (success/failure) وp95 كل جولة، ولا يحكم بشيء ولا يُغيّر نتيجة الوظيفة.
+      - name: تقرير العينة
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          PERF_OUTCOME: ${{ steps.perf.outcome }}
+          SAMPLE: ${{ matrix.sample }}
+        run: |
+          set -uo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          rd = Path(os.environ["REPORT_DIR"]); wd = Path(os.environ["APP_DIR"]) / "pgsql-watchdog"
+          def jload(p):
+              try:
+                  return json.loads(Path(p).read_text(encoding="utf-8"))
+              except Exception as exc:
+                  return {"__unreadable__": str(exc)}
+          gate_p = wd / "cops-h1-1-realistic_load_gate.json"; burst_p = wd / "cops-h1-1-saturated_burst_diagnostic.json"
+          gate = jload(gate_p) if gate_p.is_file() else None
+          burst = jload(burst_p) if burst_p.is_file() else None
+          rep = {
+              "sample": os.environ.get("SAMPLE"),
+              "perf_step_outcome": os.environ.get("PERF_OUTCOME"),   # الحاكم الوحيد: اختبار CI نفسه
+              "evidence_missing": gate is None or (isinstance(gate, dict) and "__unreadable__" in gate),
+              "runner": jload(rd / "runner-info.json"),
+          }
+          if isinstance(gate, dict) and "rounds" in gate:
+              rep["budget_ms"] = gate.get("p95_budget_ms")
+              rep["baseline_p50_ms"] = gate.get("baseline_p50_ms")
+              rep["warmup_added_p95_ms"] = (gate.get("warmup") or {}).get("added_p95_ms")
+              rep["rounds"] = [
+                  {k: r.get(k) for k in ("round", "added_p95_ms", "contended_p50_ms", "contended_p95_ms", "contended_max_ms",
+                                         "active_window_events_per_second", "events_per_second", "cpu_busy_pct",
+                                         "cpu_iowait_pct", "cpu_steal_pct", "loadavg_1m_before")}
+                  | {"over_budget": (r.get("checks") or {}).get("added_p95_under_budget") is False,
+                     "slow_waits_count": len(r.get("slow_waits") or [])}
+                  for r in gate["rounds"]
+              ]
+              rep["variance_added_p95_ms"] = (gate.get("variance") or {}).get("added_p95_ms")
+          if isinstance(burst, dict) and "burst" in burst:
+              rep["saturated_burst_added_p95_ms"] = (burst["burst"] or {}).get("added_p95_ms")
+          for tag in ("pre", "post"):
+              f = rd / f"fsync-{tag}.txt"
+              rep[f"fsync_{tag}"] = f.read_text(encoding="utf-8", errors="replace") if f.is_file() else "PROBE_FAILED: الملف غير موجود"
+          (rd / "baseline-report.json").write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")
+          rows = ["### Feed-lock baseline — sample " + str(rep["sample"]),
+                  f"- نتيجة اختبار الأداء (الحاكم): **{rep['perf_step_outcome']}** · أدلة ناقصة: {rep['evidence_missing']}",
+                  f"- المشغّل: {rep['runner'].get('runner_name')} · {rep['runner'].get('cpu_model')} · {rep['runner'].get('image_version')}"]
+          for r in rep.get("rounds", []):
+              rows.append(f"- جولة {r['round']}: p95 إضافي **{r['added_p95_ms']}ms**" + (" ⚠ فوق الحد" if r["over_budget"] else ""))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write("\n".join(rows) + "\n")
+          PY
+
+      - name: حفظ تقارير القياس
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-perf-baseline-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.sample }}
+          path: |
+            ${{ env.REPORT_DIR }}/
+            ${{ env.APP_DIR }}/test-output-pgsql-perf.txt
+            ${{ env.APP_DIR }}/pgsql-watchdog/
+          if-no-files-found: warn
+          retention-days: 30
