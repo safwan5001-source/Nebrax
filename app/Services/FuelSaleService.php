@@ -84,7 +84,7 @@ class FuelSaleService
 
                 $sale = FuelSale::create([
                     'branch_id' => $station->branch_id,
-                    'number' => FuelSale::nextDocumentNumber('FSL', now()->toDateString(), $station->branch_id),
+                    'number' => FuelSale::nextDocumentNumber('FSL', $this->settings->businessDate($station), $station->branch_id),
                     'status' => FuelSale::STATUS_DRAFT,
                     'fuel_station_id' => $station->id,
                     'warehouse_id' => $warehouse->id,
@@ -193,6 +193,8 @@ class FuelSaleService
             }
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
             $finalizationAt = now();
+            // FS-19: تاريخ الفاتورة والاستحقاق والقيد بتقويم المحطة لا بمنطقة التطبيق.
+            $businessMoment = $this->settings->businessMoment($station, $finalizationAt);
             $authorization = $this->corporateAuthorizations->resolve($sale, $station, $fuelProduct, $finalizationAt);
             if ($authorization !== null && $authorization['price_source'] === 'contract_special_price') {
                 $pricePerLiter = $authorization['price_per_liter_minor'];
@@ -215,10 +217,10 @@ class FuelSaleService
                 'warehouse_id' => $warehouse->id,
                 'payment_type' => 'credit',
                 'is_paid' => false,
-                'invoice_date' => $finalizationAt->toDateString(),
+                'invoice_date' => $businessMoment->toDateString(),
                 'due_date' => $authorization === null
-                    ? $finalizationAt->toDateString()
-                    : $finalizationAt->copy()->addDays((int) $authorization['contract']->payment_terms_days)->toDateString(),
+                    ? $businessMoment->toDateString()
+                    : $businessMoment->addDays((int) $authorization['contract']->payment_terms_days)->toDateString(),
                 'tax_inclusive' => $taxMode === 'tax_inclusive',
                 'notes' => "بيع وقود {$sale->number}",
                 'created_by' => $actor->id,

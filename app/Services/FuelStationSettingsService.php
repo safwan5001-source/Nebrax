@@ -87,6 +87,40 @@ class FuelStationSettingsService
         return $mode;
     }
 
+    public const FALLBACK_TIMEZONE = 'Asia/Riyadh';
+
+    /**
+     * FS-19: منطقة تشغيل المحطة. عمود `fuel_stations.timezone` (بيانات المحطة الرئيسية) يتقدّم إن كان
+     * معرّفاً صالحاً، ثم إعداد `operating_timezone` (محطة ← مستأجر ← افتراضي النظام). قيمة غير صالحة
+     * لا تُخمَّن ولا توقف البيع: تسقط إلى منطقة المملكة المعتمدة.
+     */
+    public function operatingTimezone(FuelStation $station): string
+    {
+        foreach ([$station->timezone, $this->get($station, 'operating_timezone')] as $candidate) {
+            if (is_string($candidate) && in_array($candidate, \DateTimeZone::listIdentifiers(), true)) {
+                return $candidate;
+            }
+        }
+
+        return self::FALLBACK_TIMEZONE;
+    }
+
+    /**
+     * تاريخ التقويم بتوقيت المحطة للحظة معطاة (الآن افتراضياً) — مصدر تواريخ القيد والفاتورة والاستلام
+     * بدل `now()->toDateString()` الذي يتبع `APP_TIMEZONE` (الافتراضي UTC) فيُنسب بيع 00:00–03:00 بتوقيت
+     * المملكة ليومٍ سابق. لا يطبّق `operating_day_starts_at` (حدّ يوم التشغيل سياسة منفصلة لم تُعتمد بعد).
+     */
+    public function businessDate(FuelStation $station, ?\DateTimeInterface $at = null): string
+    {
+        return \Carbon\CarbonImmutable::instance($at ?? now())->setTimezone($this->operatingTimezone($station))->toDateString();
+    }
+
+    /** نفس اللحظة معروضة بمنطقة المحطة (لحساب due_date وما يشبهه). */
+    public function businessMoment(FuelStation $station, ?\DateTimeInterface $at = null): \Carbon\CarbonImmutable
+    {
+        return \Carbon\CarbonImmutable::instance($at ?? now())->setTimezone($this->operatingTimezone($station));
+    }
+
     /** @param array<string, mixed> $values @return array<string, mixed> */
     public function putTenant(array $values, ?User $actor = null, ?string $reason = null): array
     {

@@ -105,11 +105,28 @@ class FuelSupplyReceivingService
                 'received_unit_cost_minor' => $unitCompatibilityCost,
                 'received_total_cost_minor' => $totalCost,
                 'idempotency_key' => $key,
-                'received_at' => $data['received_at'] ?? now(),
+                'received_at' => $this->receivedAt($data['received_at'] ?? null),
                 'created_by' => $data['created_by'] ?? null,
                 'notes' => $this->nullableString($data['notes'] ?? null, 1000),
             ]);
         });
+    }
+
+    /**
+     * FS-19: الطابع المُرسَل بإزاحة صريحة (`+03:00`/`Z`) يُحوَّل إلى لحظته بمنطقة التطبيق قبل التخزين؛ إسناده مباشرةً
+     * لعمود datetime كان يحفظ الساعة المكتوبة ويُسقط الإزاحة، فيُقرأ لاحقاً لحظةً مختلفة وتتحول إلى تقويم المحطة خطأً.
+     * الطابع بلا إزاحة يبقى كما كان (منطقة التطبيق).
+     */
+    private function receivedAt(mixed $value): \Carbon\CarbonInterface
+    {
+        if ($value === null || $value === '') {
+            return now();
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return \Carbon\Carbon::instance($value)->setTimezone(config('app.timezone'));
+        }
+
+        return \Carbon\Carbon::parse((string) $value)->setTimezone(config('app.timezone'));
     }
 
     public function approveDelivery(FuelDelivery $delivery, string $actorId): FuelDelivery
@@ -144,7 +161,7 @@ class FuelSupplyReceivingService
                     'branch_id' => $station->branch_id,
                     'source_type' => FuelDelivery::class,
                     'source_id' => $delivery->id,
-                    'date' => $delivery->received_at->toDateString(),
+                    'date' => $this->settings->businessDate($station, $delivery->received_at),
                     'notes' => "استلام وقود {$delivery->delivery_note_number}",
                     InventoryService::FUEL_POOL_META => true,
                 ],
@@ -155,7 +172,7 @@ class FuelSupplyReceivingService
                 ['account_id' => $this->inventoryAccountId(), 'debit' => $value, 'branch_id' => $station->branch_id],
                 ['account_id' => $grni->id, 'credit' => $value, 'branch_id' => $station->branch_id],
             ], [
-                'entry_date' => $delivery->received_at->toDateString(),
+                'entry_date' => $this->settings->businessDate($station, $delivery->received_at),
                 'description' => "استلام وقود معتمد {$delivery->delivery_note_number}",
                 'source_type' => FuelDelivery::class,
                 'source_id' => $delivery->id,
@@ -460,7 +477,7 @@ class FuelSupplyReceivingService
             ['account_id' => $grni->id, 'debit' => $value, 'branch_id' => $delivery->branch_id],
             ['account_id' => $payable->id, 'credit' => $value, 'branch_id' => $delivery->branch_id, 'partner_type' => Partner::class, 'partner_id' => $delivery->supplier_id],
         ], [
-            'entry_date' => now()->toDateString(),
+            'entry_date' => $delivery->station !== null ? $this->settings->businessDate($delivery->station) : now()->toDateString(),
             'description' => "تسوية GRNI لاستلام الوقود {$delivery->delivery_note_number}",
             'source_type' => FuelSupplierInvoice::class,
             'source_id' => $invoice->id,

@@ -10,6 +10,7 @@ use App\Models\FuelProduct;
 use App\Models\FuelStation;
 use App\Models\FuelSupplierInvoiceMatch;
 use App\Models\FuelTank;
+use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
@@ -336,6 +337,30 @@ class FuelSupplyReceivingTest extends TestCase
     }
 
     /** @param array<string, mixed> $fixture @return array<string, mixed> */
+    /** @test */
+    public function fs19_dates_the_receipt_by_the_station_calendar_and_honours_an_explicit_offset(): void
+    {
+        $previous = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+        config(['app.timezone' => 'UTC']);
+        try {
+            $fixture = $this->fixture();
+            // 23:30 بتوقيت المملكة (+03:00) في 10 مارس = 20:30 UTC: يبقى تاريخ المحطة 10 مارس.
+            $first = $fixture['service']->createDelivery([...$this->deliveryData($fixture, 'fs19-offset', 2345), 'received_at' => '2026-03-10T23:30:00+03:00']);
+            $this->assertSame('2026-03-10 20:30:00', $first->received_at->utc()->format('Y-m-d H:i:s'));
+            $approved = $fixture['service']->approveDelivery($first, $fixture['owner_id']);
+            $this->assertSame('2026-03-10', JournalEntry::findOrFail($approved->journal_entry_id)->entry_date->toDateString());
+            $this->assertSame('2026-03-10', StockMovement::findOrFail($approved->stock_movement_id)->movement_date->toDateString());
+
+            // 21:30 UTC في 10 مارس = 00:30 بتوقيت المملكة في 11 مارس (UTC خام كان يؤرِّخه 10).
+            $second = $fixture['service']->createDelivery([...$this->deliveryData($fixture, 'fs19-utc', 2345), 'received_at' => '2026-03-10T21:30:00Z']);
+            $approvedSecond = $fixture['service']->approveDelivery($second, $fixture['owner_id']);
+            $this->assertSame('2026-03-11', JournalEntry::findOrFail($approvedSecond->journal_entry_id)->entry_date->toDateString());
+        } finally {
+            date_default_timezone_set($previous);
+        }
+    }
+
     private function deliveryData(array $fixture, string $idempotencyKey, int $totalCost): array
     {
         return [
