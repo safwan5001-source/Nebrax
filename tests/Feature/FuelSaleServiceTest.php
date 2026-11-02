@@ -36,6 +36,8 @@ use App\Services\FuelStationSettingsService;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -461,10 +463,26 @@ class FuelSaleServiceTest extends TestCase
         $prices->effective($other['station'], $other['fuelProduct'], now());
     }
 
-    /** @test */
-    public function it_uses_audited_contract_pricing_and_blocks_credit_and_card_limit_before_official_effects(): void
-    {
+    /**
+     * تواريخ الفاتورة والاستحقاق تتبع تقويم المحطة المعتمد (FS-19: `fuel_stations.timezone` ثم إعداد التشغيل ثم
+     * `Asia/Riyadh`)، لا UTC ولا ساعة الجهاز. اللحظة مثبَّتة ومقارنتها بتواريخ حرفية مستقلة عن الخدمة، فلا يتغيّر
+     * الناتج بتغيّر وقت تشغيل CI (كان يفشل بين 21:00 و24:00 UTC لأن الاختبار قارن بـ`now()` بتوقيت UTC).
+     *
+     * @param  string|null  $stationTimezone  null = لا عمود محفوظ للمحطة (الافتراضي المعتمد Asia/Riyadh)
+     */
+    #[Test]
+    #[DataProvider('contractSaleClocks')]
+    public function it_uses_audited_contract_pricing_and_blocks_credit_and_card_limit_before_official_effects(
+        string $nowUtc,
+        ?string $stationTimezone,
+        string $expectedInvoiceDate,
+        string $expectedDueDate,
+    ): void {
+        $this->travelTo(\Illuminate\Support\Carbon::parse($nowUtc, 'UTC'));
         $fixture = $this->fixture('corporate');
+        if ($stationTimezone !== null) {
+            $fixture['station']->forceFill(['timezone' => $stationTimezone])->save();
+        }
         $settings = app(FuelStationSettingsService::class);
         $settings->putStationValues($fixture['station'], [
             'corporate_credit_enabled' => true,
@@ -528,8 +546,8 @@ class FuelSaleServiceTest extends TestCase
         $this->assertSame('contract_special_price', $sale->corporate_price_source);
         $this->assertSame($price->id, $sale->corporate_fuel_contract_price_id);
         $this->assertSame(30, $sale->contract_payment_terms_days);
-        $this->assertSame(now()->toDateString(), $invoice->invoice_date->toDateString());
-        $this->assertSame(now()->addDays(30)->toDateString(), $invoice->due_date->toDateString());
+        $this->assertSame($expectedInvoiceDate, $invoice->invoice_date->toDateString());
+        $this->assertSame($expectedDueDate, $invoice->due_date->toDateString());
         $this->assertSame(200, $invoice->total, 'السعر العقدي الشامل لا يضيف VAT مرة ثانية.');
         $this->assertSame(200, app(CorporateFuelAuthorizationService::class)->officialExposure($fixture['customer_id']));
         $this->assertSame(1, FuelCardUsage::where('fuel_card_id', $card->id)->count());
@@ -670,6 +688,24 @@ class FuelSaleServiceTest extends TestCase
     }
 
     /** @return array<string,mixed> */
+    /**
+     * @return array<string, array{0: string, 1: string|null, 2: string, 3: string}>
+     *
+     * الرياض = UTC+3 بلا توقيت صيفي: 20:59 UTC = 23:59 محلياً (نفس اليوم)، و21:00 UTC = 00:00 (اليوم التالي).
+     * المنطقة المحفوظة للمحطة تتقدّم على الافتراضي (UTC = لا انزياح، Asia/Dubai = UTC+4).
+     */
+    public static function contractSaleClocks(): array
+    {
+        return [
+            'ordinary midday, default Riyadh' => ['2026-11-02 12:00:00', null, '2026-11-02', '2026-12-02'],
+            '20:59 UTC is 23:59 Riyadh (same day)' => ['2026-11-02 20:59:00', null, '2026-11-02', '2026-12-02'],
+            '21:00 UTC is 00:00 Riyadh (next day)' => ['2026-11-02 21:00:00', null, '2026-11-03', '2026-12-03'],
+            '21:30 UTC is 00:30 Riyadh (next day)' => ['2026-11-02 21:30:00', null, '2026-11-03', '2026-12-03'],
+            'saved station timezone UTC keeps the UTC day' => ['2026-11-02 21:30:00', 'UTC', '2026-11-02', '2026-12-02'],
+            'saved station timezone Asia/Dubai (UTC+4) rolls at 20:00 UTC' => ['2026-11-02 20:59:00', 'Asia/Dubai', '2026-11-03', '2026-12-03'],
+        ];
+    }
+
     private function fixture(string $suffix = 'main'): array
     {
         $auth = $this->registerTenant('fuel-sale-' . $suffix, "fuel-sale-{$suffix}@example.test");
