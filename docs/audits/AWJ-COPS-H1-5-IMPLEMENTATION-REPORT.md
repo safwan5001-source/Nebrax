@@ -5,8 +5,8 @@
 | Slice | COPS-H1-5 — واجهة قبول/رفض الطلب في `web/` + مرشّح `acceptance_status` (إضافة خلفية وحيدة) |
 | Branch | `claude/cops-h1-5-merchant-ui` |
 | Base SHA | `1946d3567552e827941b1b5bd0ba38e0aae71214` (`origin/main` بعد إغلاق H1-4، #1933) |
-| PR / Head SHA / Merge SHA | تُسجَّل في وصف الـPR وفي `AWJ_COPS_HORIZON_HANDOFF.md` وتقرير الإغلاق |
-| الحالة | Implemented → Merged عند اجتياز البوابات · Not deployed · Not activated · Not env-verified |
+| PR / Head SHA / Merge SHA | #1934 · `d9dc6381bfe57220d4cfa26a02418af0af46f74a` · `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` |
+| الحالة | **Merged** (2026-11-02) · Not deployed · Not activated · Not env-verified |
 | العقد | `ADR-29` §2.2 + §2.2.1 + §2.2.2 · قرارات المالك لـH1-5 (الخمسة) |
 
 ---
@@ -55,7 +55,7 @@
 | جناح الخلفية المجاور على PostgreSQL (قبول، موظف، إلغاء، تغذية، أحداث، حدود الوحدة) | ✅ 184 ناجحاً، منها السباقات السبعة |
 | `tsc` لوحدة الطلبات | ✅ بلا أخطاء (أخطاء قائمة في اختبارات غير مرتبطة — لا علاقة لها بالتغيير) |
 
-أرقام CI (sqlite، pgsql، بوابة الأداء المخصصة، CI Gate، web build) تُسجَّل في وصف الـPR وتقرير الإغلاق.
+**CI على الرأس `d9dc638` (كلها نجاح):** `php artisan test (L11, sqlite)` · `(L11, pgsql)` · `PostgreSQL feed-lock performance (COPS-H1-1)` · `CI Gate` · `web build (Next.js)` ×2. ملاحظة Codex P2 واحدة (قفل الإجراءات القديمة حتى نجاح التحديث) أُصلحت في `d9dc638` بخمسة اختبارات انحدار (إزالة القفل تُفشل ثلاثة منها) ثم أُغلق الخيط وأعاد Codex المراجعة بلا ملاحظات. بوابة الأداء بلا تغيير في الحد أو الحمل.
 
 ## 4. الأمان والعزل
 
@@ -75,4 +75,4 @@
 
 ## 6. الخطوة التالية
 
-دمج H1-5 بعد اجتياز البوابات، ثم سجلات الإغلاق وتقرير `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`، **ثم التوقف** (لا H2).
+H1-5 مدموج. سجلات الإغلاق وتقرير `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md` في PR وثائق مستقل، **ثم التوقف** (لا H2).
