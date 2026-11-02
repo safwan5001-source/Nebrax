@@ -20,6 +20,10 @@ use Illuminate\Support\Facades\Schema;
  *     — دفاع ضد الكتابة المباشرة؛ التسلسل الصحيح بين معاملتين يضمنه قفل الطلب والتنفيذ في الخدمة (المُشغّلات قراءات MVCC بلا أقفال).
  *  5. أنواع أحداث `fulfillment.*` تُضاف إلى قيد شكل الحدث (يُعاد إنشاؤه بالقائمة الموسَّعة؛ `down()` يعيد الأصلية).
  *
+ * **SQLite (اختبار فقط):** الفحوص العابرة للجداول (طلب/مخزن المستأجر نفسه، مطابقة النوع لطريقة التسليم، تجميد تنفيذ طلب ملغى) تبقى في **الكاتب** لا في مُشغّلات
+ * التنفيذ — مُشغّل على جدول يقرأ `commerce_orders` يكسر إعادة بناء ذلك الجدول (`no such table` أثناء `RENAME`) كما في تراجع هجرة الإلغاء؛ وهو السابقة نفسها
+ * لحراس `commerce_order_events`. في PostgreSQL كلها في القاعدة. حارس إلغاء الطلب (`cmo_fulfillment_cancel_block`) على `commerce_orders` نفسه فلا أثر له.
+ *
  * `down()` يرفض متى وُجد أي صف تنفيذ أو حدث `fulfillment.*` (إصلاح إلى الأمام فقط).
  */
 return new class extends Migration
@@ -125,7 +129,7 @@ return new class extends Migration
 
             return;
         } else {
-            foreach (['cof_insert', 'cof_frozen_ids', 'cof_order_cancelled', 'cof_terminal', 'cof_version', 'cof_edges', 'cof_type_switch', 'cof_once_stamps', 'cof_attempts', 'cof_transition_stamps', 'cof_value_domain', 'cof_no_delete', 'cmo_fulfillment_cancel_block'] as $trigger) {
+            foreach (['cof_insert', 'cof_frozen_ids', 'cof_terminal', 'cof_version', 'cof_edges', 'cof_type_switch', 'cof_once_stamps', 'cof_attempts', 'cof_transition_stamps', 'cof_value_domain', 'cof_no_delete', 'cmo_fulfillment_cancel_block'] as $trigger) {
                 DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
             }
             $this->sqliteEventShape(self::BASE_EVENT_TYPES);
@@ -362,14 +366,10 @@ return new class extends Migration
         $reasons = $this->quoted(self::FAILURE_REASONS);
         $edges = $this->quoted(self::EDGES);
         $notPure = 'NOT ('.$this->pureNullification(false).')';
-        $order = 'SELECT 1 FROM commerce_orders o WHERE o.id = NEW.commerce_order_id';
 
         DB::unprepared(<<<SQL
             CREATE TRIGGER cof_insert BEFORE INSERT ON {$t}
-            WHEN NOT EXISTS ({$order} AND o.tenant_id = NEW.tenant_id AND o.status = 'confirmed' AND o.cancelled_at IS NULL
-                             AND ((NEW.type = 'pickup') = (o.delivery_method = 'pickup')))
-              OR NOT EXISTS (SELECT 1 FROM warehouses w WHERE w.id = NEW.warehouse_id AND w.tenant_id = NEW.tenant_id)
-              OR NEW.type NOT IN ({$types})
+            WHEN NEW.type NOT IN ({$types})
               OR NEW.status NOT IN ('preparing','ready') OR NEW.version IS NOT 1 OR NEW.delivery_attempts IS NOT 0
               OR (NEW.status = 'preparing' AND NEW.preparing_at IS NULL) OR (NEW.status = 'ready' AND NEW.ready_at IS NULL)
               OR NEW.first_dispatched_at IS NOT NULL OR NEW.last_dispatched_at IS NOT NULL OR NEW.last_failed_at IS NOT NULL
@@ -377,7 +377,7 @@ return new class extends Migration
               OR NEW.last_failure_reason IS NOT NULL OR NEW.last_failure_note IS NOT NULL
               OR (NEW.tracking_url IS NOT NULL AND NEW.tracking_url NOT LIKE 'https://%')
             BEGIN
-                SELECT RAISE(ABORT, 'commerce_order_fulfillments: invalid creation (same-tenant confirmed non-cancelled order and warehouse, matching type, initial status, version 1)');
+                SELECT RAISE(ABORT, 'commerce_order_fulfillments: invalid creation (type, initial status, version 1, no later-stage facts)');
             END
             SQL);
 
@@ -387,14 +387,6 @@ return new class extends Migration
                  OR NEW.warehouse_id IS NOT OLD.warehouse_id OR NEW.created_at IS NOT OLD.created_at)
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_order_fulfillments: identity, order, warehouse and creation time are immutable');
-            END
-            SQL);
-
-        DB::unprepared(<<<SQL
-            CREATE TRIGGER cof_order_cancelled BEFORE UPDATE ON {$t}
-            WHEN {$notPure} AND EXISTS (SELECT 1 FROM commerce_orders o WHERE o.id = OLD.commerce_order_id AND o.cancelled_at IS NOT NULL)
-            BEGIN
-                SELECT RAISE(ABORT, 'commerce_order_fulfillments: a cancelled order fulfillment is frozen');
             END
             SQL);
 

@@ -826,9 +826,11 @@ class CommerceOrderFulfillmentTest extends TestCase
             'type' => 'local_delivery', 'status' => 'preparing', 'version' => 1, 'delivery_attempts' => 0, 'preparing_at' => $now, 'created_at' => $now, 'updated_at' => $now,
         ];
         foreach ([
-            ['status' => 'delivered'], ['status' => 'out_for_delivery'], ['version' => 2], ['type' => 'pickup'], ['type' => 'rocket'],
+            ['status' => 'delivered'], ['status' => 'out_for_delivery'], ['version' => 2], ['type' => 'rocket'],
             ['status' => 'preparing', 'preparing_at' => null], ['delivery_attempts' => 1], ['last_failure_reason' => 'address_issue'], ['tracking_url' => 'http://x.test'],
-            ['tenant_id' => (string) Str::uuid()], ['warehouse_id' => (string) Str::uuid()], ['delivered_at' => $now],
+            ['delivered_at' => $now],
+            // الفحوص العابرة للجداول في القاعدة على PostgreSQL فقط (SQLite: في الكاتب — انظر الهجرة).
+            ...(DB::connection()->getDriverName() === 'pgsql' ? [['type' => 'pickup'], ['tenant_id' => (string) Str::uuid()], ['warehouse_id' => (string) Str::uuid()]] : []),
         ] as $i => $bad) {
             $this->assertGuard(fn () => DB::table('commerce_order_fulfillments')->insert(array_merge($base, ['id' => (string) Str::uuid()], $bad)), 'insert '.json_encode(array_keys($bad)));
         }
@@ -876,7 +878,11 @@ class CommerceOrderFulfillmentTest extends TestCase
         $ready = $this->order();
         $this->drive($ready->id, 'ready');
         $this->withToken($this->ownerToken)->postJson("/api/commerce/orders/{$ready->id}/cancel", ['reason' => 'customer_request'])->assertOk();
-        $this->assertGuard(fn () => DB::table('commerce_order_fulfillments')->where('commerce_order_id', $ready->id)->update(['status' => 'out_for_delivery', 'version' => 3, 'last_dispatched_at' => now('UTC'), 'first_dispatched_at' => now('UTC')]), 'تنفيذ طلب ملغى مجمَّد');
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->assertGuard(fn () => DB::table('commerce_order_fulfillments')->where('commerce_order_id', $ready->id)->update(['status' => 'out_for_delivery', 'version' => 3, 'last_dispatched_at' => now('UTC'), 'first_dispatched_at' => now('UTC')]), 'تنفيذ طلب ملغى مجمَّد');
+        }
+        // الخدمة ترفض على المحرّكين (الحارس في الكاتب لـSQLite).
+        $this->assertRefused($this->act($ready->id, 'dispatch', ['expected_version' => 2, 'carrier_name' => 'x']), 'already_cancelled');
     }
 
     #[Test]
