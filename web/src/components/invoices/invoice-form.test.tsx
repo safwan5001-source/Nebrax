@@ -502,6 +502,163 @@ describe('InvoiceForm — line behaviour', () => {
   });
 });
 
+/**
+ * وصف السطر نصٌّ مخصَّص للمستند، لا قرارٌ بفكّ الربط عن المنتج. كان معالج الوصف
+ * يمسح `productId` مع كل ضغطة مفتاح فيعود المنتج «إدخالاً يدوياً»، ويُحفَظ السطر
+ * بلا `product_id` فيفلت من المخزون والتكلفة. فكّ الربط صريحٌ عبر منتقي المنتج.
+ */
+describe('InvoiceForm — editing the description keeps the product link', () => {
+  afterEach(cleanup);
+  beforeEach(() => { api.mockClear(); push.mockClear(); replace.mockClear(); });
+  const CUSTOM = 'A4 paper carton — bundled with delivery';
+  const itemSelect = () => screen.getAllByLabelText('Item')[0] as HTMLSelectElement;
+  /** يقرأ سطر الحمولة الأول من آخر استدعاءٍ بالمسار والطريقة المعنيَّين. */
+  const sentItem = (path: string, method: string) => {
+    const call = api.mock.calls.find((c) => c[0] === path && (c[1] as { method?: string } | undefined)?.method === method);
+    expect(call).toBeTruthy();
+    return (call![1] as { body: { items: Record<string, unknown>[] } }).body.items[0];
+  };
+  async function customize() {
+    respond({ '/invoices': { data: { id: 'inv-9' } } });
+    render(<InvoiceForm />);
+    await firstQty();
+    await userEvent.selectOptions(itemSelect(), 'pr1');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '3');
+    const description = lineField('Description');
+    await userEvent.clear(description);
+    await userEvent.type(description, CUSTOM);
+  }
+  it('keeps the product selected and shows the customized description', async () => {
+    await customize();
+    expect(lineField('Description').value).toBe(CUSTOM);
+    expect(itemSelect().value).toBe('pr1');
+  });
+  it('touches neither price, quantity, tax, discount nor unit while the description changes', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+    await userEvent.selectOptions(itemSelect(), 'pr2');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    await userEvent.type(await firstQty(), '2');
+    await userEvent.clear(lineField('Unit price'));
+    await userEvent.type(lineField('Unit price'), '110');
+    await userEvent.type(lineField('Discount'), '5');
+    await userEvent.clear(lineField('Tax %'));
+    await userEvent.type(lineField('Tax %'), '5');
+    await userEvent.selectOptions(screen.getByLabelText('Unit'), 'packet');
+    await userEvent.type(lineField('Description'), ' — special');
+    expect(itemSelect().value).toBe('pr2');
+    expect(lineField('Description').value).toBe('Tissue carton — special');
+    expect(lineField('Unit price').value).toBe('110');
+    expect((await firstQty()).value).toBe('2');
+    expect(lineField('Discount').value).toBe('5');
+    expect(lineField('Tax %').value).toBe('5');
+    expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('packet');
+  });
+  it('sends both product_id and the customized description when saving a draft', async () => {
+    await customize();
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices', expect.objectContaining({ method: 'POST' })));
+    expect(sentItem('/invoices', 'POST')).toMatchObject({
+      product_id: 'pr1', description: CUSTOM, quantity: 3, unit_price: 9500, tax_rate: 15,
+    });
+    expect(api.mock.calls.some((c) => String(c[0]).endsWith('/post'))).toBe(false);
+  });
+  it('sends both values when saving and posting, then posts the saved invoice', async () => {
+    await customize();
+    await userEvent.click(screen.getByRole('button', { name: 'Save and post' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-9/post', expect.objectContaining({ method: 'POST' })));
+    expect(sentItem('/invoices', 'POST')).toMatchObject({ product_id: 'pr1', description: CUSTOM });
+  });
+  describe('on an existing draft', () => {
+    const saved = {
+      status: 'draft', partner_id: 'c1', warehouse_id: null, price_list_id: null, payment_type: 'credit',
+      invoice_date: '2026-06-20', due_date: '2026-07-20', cost_center_id: null, salesperson_id: null,
+      discount: '0', shipping: '0', adjustment: '0', tax_inclusive: false, zatca_document_type: 'standard', notes: null,
+      is_paid: false, payment_method: null, payment_reference: null, cash_account_id: null,
+      print_template_override_revision_id: null, pdf_template_override_revision_id: null,
+      lines: [{
+        product_id: 'pr1', description: 'Saved custom text', quantity: 7, unit_name: null,
+        unit_price: '95.00', tax_rate: 15, line_discount: '0',
+      }],
+    };
+    async function openSaved(lines = saved.lines) {
+      api.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/invoices/inv-1' && options?.method === 'PUT') return Promise.resolve({ data: { id: 'inv-1' } });
+        if (path === '/invoices/inv-1') return Promise.resolve({ data: { ...saved, lines } });
+        if (path.startsWith('/partners')) return Promise.resolve({ data: [customer] });
+        if (path.startsWith('/products')) return Promise.resolve({ data: [product] });
+        return Promise.resolve({ data: [] });
+      });
+      render(<InvoiceForm editId="inv-1" />);
+      await waitFor(async () => expect((await firstQty()).value).toBe('7'));
+    }
+    it('reloads the product and the saved description together', async () => {
+      await openSaved();
+      expect(itemSelect().value).toBe('pr1');
+      expect(lineField('Description').value).toBe('Saved custom text');
+    });
+    it('keeps the link when the description is edited and sends both on PUT', async () => {
+      await openSaved();
+      await userEvent.type(lineField('Description'), ' v2');
+      expect(itemSelect().value).toBe('pr1');
+      const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+      await waitFor(() => expect(save.disabled).toBe(false));
+      await userEvent.click(save);
+      await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-1', expect.objectContaining({ method: 'PUT' })));
+      expect(sentItem('/invoices/inv-1', 'PUT')).toMatchObject({
+        product_id: 'pr1', description: 'Saved custom text v2', quantity: 7, unit_price: 9500, tax_rate: 15,
+      });
+    });
+    it('leaves a historical manual line manual — no product is invented by editing its text', async () => {
+      await openSaved([{ ...saved.lines[0], product_id: null as unknown as string, description: 'Consulting' }]);
+      expect(itemSelect().value).toBe('');
+      await userEvent.type(lineField('Description'), ' hours');
+      expect(itemSelect().value).toBe('');
+      const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+      await waitFor(() => expect(save.disabled).toBe(false));
+      await userEvent.click(save);
+      await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-1', expect.objectContaining({ method: 'PUT' })));
+      expect(sentItem('/invoices/inv-1', 'PUT')).toMatchObject({ product_id: null, description: 'Consulting hours' });
+    });
+  });
+  it('preserves explicit manual entry: choosing it unlinks the product and keeps the typed values', async () => {
+    await customize();
+    await userEvent.selectOptions(itemSelect(), '');
+    expect(itemSelect().value).toBe('');
+    expect(lineField('Description').value).toBe(CUSTOM);
+    expect(lineField('Unit price').value).toBe('95.00');
+    await userEvent.type(lineField('Description'), '!');
+    expect(itemSelect().value).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices', expect.objectContaining({ method: 'POST' })));
+    expect(sentItem('/invoices', 'POST')).toMatchObject({ product_id: null, description: `${CUSTOM}!`, unit_price: 9500 });
+  });
+  it('preserves product clearing: an unknown product value unlinks the line without touching its text', async () => {
+    await customize();
+    // نفس مسار «مسح المنتج» في المنتقي الحقيقي: `onChange('')` → `pickProduct` لا يجد منتجاً.
+    await userEvent.selectOptions(itemSelect(), '');
+    expect(itemSelect().value).toBe('');
+    expect(lineField('Description').value).toBe(CUSTOM);
+  });
+  it('keeps default filling when another product is chosen after a customized description', async () => {
+    await customize();
+    await userEvent.selectOptions(itemSelect(), 'pr2');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    expect(itemSelect().value).toBe('pr2');
+    expect(lineField('Description').value).toBe('Tissue carton');
+    expect(lineField('Tax %').value).toBe('15');
+  });
+  it('keeps the product when the description is emptied, so the server falls back to the product name', async () => {
+    await customize();
+    await userEvent.clear(lineField('Description'));
+    expect(itemSelect().value).toBe('pr1');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices', expect.objectContaining({ method: 'POST' })));
+    expect(sentItem('/invoices', 'POST')).toMatchObject({ product_id: 'pr1', description: null });
+  });
+});
 describe('InvoiceForm — totals, saving and errors', () => {
   afterEach(cleanup);
   // `mockClear` لا `mockReset`: الأخيرة تمسح التنفيذ نفسه، فوعدٌ متأخّر من اختبارٍ
