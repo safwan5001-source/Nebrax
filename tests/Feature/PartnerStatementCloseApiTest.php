@@ -886,6 +886,9 @@ class PartnerStatementCloseApiTest extends TestCase
         $this->withToken($this->closer)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id'], 'force' => true])->assertStatus(422);
         $this->withToken($this->closer)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id'], 'acknowledge_overlap' => ['nope']])->assertStatus(422);
         $this->withToken($this->closer)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id'], 'note' => str_repeat('x', 501)])->assertStatus(422);
+        // لا سقف على قائمة الإقرار (Codex #1941): الإقرار يطابق قائمة الخادم كاملةً مهما طالت؛ 250 معرّفاً تجتاز التحقق وتُرفض لعدم المطابقة (لا 422).
+        $many = array_map(fn () => (string) Str::uuid(), range(1, 250));
+        $this->assertSame('overlap_ack_stale', $this->close($this->closer, $id, $run['id'], $many)->assertStatus(409)->json('reason'));
         $this->close($this->closer, 'not-a-uuid', $run['id'])->assertNotFound();
 
         // معلَّقة ⇒ قراءة فقط: الإغلاق 403.

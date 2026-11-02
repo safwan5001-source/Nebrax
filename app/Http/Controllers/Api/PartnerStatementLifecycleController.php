@@ -42,8 +42,9 @@ class PartnerStatementLifecycleController extends ApiController
     public function close(Request $request, string $id): JsonResponse
     {
         $this->rejectUnknown($request, ['run_id', 'acknowledge_overlap', 'note']);
+        // قائمة الإقرار بلا سقف عدد: يجب أن تطابق قائمة الخادم كاملةً (D-PS-14)؛ يحدّها حجم الطلب وحده.
         $data = $request->validate([
-            'run_id' => ['required', 'uuid'], 'acknowledge_overlap' => ['nullable', 'array', 'max:200'], 'acknowledge_overlap.*' => ['uuid'], 'note' => ['nullable', 'string', 'max:500'],
+            'run_id' => ['required', 'uuid'], 'acknowledge_overlap' => ['nullable', 'array'], 'acknowledge_overlap.*' => ['uuid'], 'note' => ['nullable', 'string', 'max:500'],
         ]);
         $result = $this->domain(fn () => $this->lifecycle->close($request->user(), $id, $data));
 
