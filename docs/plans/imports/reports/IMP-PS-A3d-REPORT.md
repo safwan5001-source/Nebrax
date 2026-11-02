@@ -4,6 +4,30 @@
 
 Owner decisions applied: **D-PS-15** (no automatic R-REV) · **D-PS-16** (reason mandatory to accept a financial difference — unchanged) · **D-PS-17** (independent permission `partner_statements.close`; closer ≠ reviewer) · **D-PS-18** (bulk approval deferred to PS-A4).
 
+## Revision 2 (owner review of #1941, 2026-11-02) — claims policy corrected
+
+**Why.** The first version claimed **every entry dated inside the period** plus the entries decisions used. The owner's approved policy is narrower: a closed reconciliation must claim **only the entries its decisions actually used** — an entry that merely falls in the date range (and is absent from the statement) must not be locked, because it can legitimately be reconciled by another period's statement.
+
+**Data-contract check first (A3a/A3b).** The decision log stores the reviewer's explicit `unit_keys` (confirm = the engine's proposed unit the reviewer accepted; override = the reviewer-chosen units; link_pair = one unit **plus the two pair entry ids and the chosen member**), each decision carries the ledger fingerprint it was made on, and the fingerprint covers every unit's entry ids. At close the run must equal the current ledger fingerprint, so unit → entries is bound by evidence, not inferred from amount/date. No gap was found, so this is **not BLOCKED**; no new linkage was invented.
+
+**New policy (implemented in `PartnerStatementClaimService::claimSet`):**
+
+| Decision | Claims |
+|---|---|
+| `confirm` | the entries of the confirmed unit |
+| `override` | the entries of each reviewer-chosen unit |
+| `link_pair` | **only** the explicitly chosen member's entry (`original` or `reversal`); never the other member |
+| `dismiss` | nothing (no linked entry) |
+| entry in the period absent from the statement (`missing_in_statement`) | **not claimed**; listed as `unclaimed_in_period` (count + sample) in the close-event summary and in `GET …/status` → `final`; usable by another period |
+
+**Fail-closed identity checks at close** (`claim_identity_unproven`, 409): a decision whose unit is missing from the current ledger, not `active`/matchable, or has no entries; a `link_pair` whose unit is not a `neutralised` two-entry pair, whose stored original/reversal ids are not exactly the unit's entries, whose reversal does not point to the original through `reversal_of`, or whose member is invalid; a line decided twice on one entry (`claim_entry_used_twice`). Identity is never taken from amount, date or number similarity.
+
+**Database follow-up (migration edited in place — unreleased).** Claims are `basis = 'decision'` with a mandatory `line_id`; the insert trigger now requires that line's **latest** decision to be `confirm`/`override`/`link_pair` (so `dismiss` and cleared lines can never be claimed, even by raw SQL) and, for `link_pair`, that the claimed entry **is the chosen member's entry**. (The database cannot map a unit key to its entries without reading the ledger, so unit→entries for confirm/override stays a service guarantee under the anchor lock — stated limit.)
+
+**Unchanged (verified by the suites):** one active claim per entry across finals/periods/branches, tenant-anchor locking against ledger posting/reversal, D-PS-14 acknowledgement, D-PS-15 (no automatic reversal), D-PS-16, D-PS-17, fingerprint/digest/run freshness, scope rules, atomic close. No ledger/ZATCA/balance change.
+
+**Files changed in this revision:** `app/Services/PartnerStatementClaimService.php` (claimSet rewrite, identity proofs, `unclaimedInPeriod`) · `app/Services/PartnerStatementLifecycleService.php` (call site, `unclaimed_in_period` in the event summary and `final`) · `app/Models/PartnerStatementUnitClaim.php` · `database/migrations/2027_01_02_010000_add_partner_statement_final_claims.php` · `tests/Feature/PartnerStatementCloseApiTest.php` · `tests/Feature/PartnerStatementCloseConcurrencyPostgresTest.php` · plan §5.5 amendment · tracker · this report.
+
 ## 0. The ledger-race question (owner caveat) — resolved **without** touching `LedgerService`
 
 The owner asked: if stopping a new ledger posting during a close would need a change in `LedgerService` or the ledger database, **do not do it automatically** — document the gap and keep `closed` disabled. **That condition did not arise.**
@@ -40,13 +64,13 @@ The owner asked: if stopping a new ledger posting during a close would need a ch
 | 7 | **no real conflict:** none of the claimed entries has an active claim from another reconciliation of the same partner/role (any period, any branch) | `409 unit_conflict` + ids + bounded sample |
 | 8 | overlapping finals (period overlap **and** intersecting scope) must be acknowledged: `acknowledge_overlap` = the server's list exactly | `409 overlap_ack_required` / `overlap_ack_stale` (+ the list) |
 
-Then, in the same transaction: claims insert → close event (`from reviewed to closed`, run, ledger fingerprint, statement digest, summary incl. `scope_key`, claims counts, **the acknowledged overlap ids**, accepted-difference total, `reviewer_id`, `claims_count`) → reconciliation `status = closed`, `closed_at/by`, `scope_key`. Replay of the same request on a closed reconciliation → `200 replayed`, no new event or claims. `closed` is **terminal** in A3d (no decisions, review, reopen or second close; void/replace = A3e).
+Then, in the same transaction: claims insert → close event (`from reviewed to closed`, run, ledger fingerprint, statement digest, summary incl. `scope_key`, claims counts, `unclaimed_in_period`, **the acknowledged overlap ids**, accepted-difference total, `reviewer_id`, `claims_count`) → reconciliation `status = closed`, `closed_at/by`, `scope_key`. Replay of the same request on a closed reconciliation → `200 replayed`, no new event or claims. `closed` is **terminal** in A3d (no decisions, review, reopen or second close; void/replace = A3e).
 
-**The claimed set (D-PS-14 / plan §5.5) — not the search candidates.** Claimed = (a) every entry dated **inside** the statement period (any unit state: active/neutralised/incomplete), plus (b) every entry the **decisions actually used** (`confirm`/`override`: all entries of the unit; **`link_pair`: only the chosen member's entry** — the other member is claimed only if it falls inside the period; `dismiss`: nothing). Unused tolerance-window candidates are **not** claimed, so adjacent periods close without conflict; a window entry that a decision used **is** claimed and conflicts with an earlier final. A reversed pair can therefore be split across two finals, each member claimed once, never twice; **no R-REV entry is ever created** (D-PS-15). Date overlap alone is never a conflict (negative test): it needs an exact acknowledgement; only a shared entry is refused.
+**The claimed set (revised, see Revision 2).** Claimed = the entries **used by the effective decisions** (confirm/override: the units' entries; `link_pair`: the chosen member only; `dismiss`: none). Entries inside the period that the statement lacks are **not** claimed and are reported as `unclaimed_in_period`. A reversed pair can be split across two finals, each member claimed once, never twice; **no R-REV entry is ever created** (D-PS-15). Date overlap alone is never a conflict: it needs an exact acknowledgement; only a shared *used* entry is refused.
 
 ## 3. Database guarantees (PostgreSQL **and** SQLite — raw SQL cannot bypass them)
 
-- `partner_statement_unit_claims`: **partial unique index** `(tenant, partner, role, journal_entry_id) WHERE released_at IS NULL` (no second active claim, across periods/branches, even by raw SQL); shape (`role`, `released_at` null in A3d, `period` ⇒ no line / `decision` ⇒ line); inserts only for a **`reviewed`** reconciliation of the **same partner and role**, for an entry **of this tenant that carries a line of that partner**, and a statement line of the same reconciliation; **no UPDATE/DELETE/TRUNCATE** (release arrives with A3e).
+- `partner_statement_unit_claims`: **claims only for a line's effective confirm/override/link_pair decision (link_pair: the chosen member's entry only; dismiss/cleared lines claim nothing)**; **partial unique index** `(tenant, partner, role, journal_entry_id) WHERE released_at IS NULL` (no second active claim, across periods/branches, even by raw SQL); shape (`role`, `released_at` null in A3d, `basis = decision` with a line); inserts only for a **`reviewed`** reconciliation of the **same partner and role**, for an entry **of this tenant that carries a line of that partner**, and a statement line of the same reconciliation; **no UPDATE/DELETE/TRUNCATE** (release arrives with A3e).
 - `partner_statement_reconciliations`: `closed` only with `closed_at/by` + `scope_key` set and **`closed_by ≠ reviewed_by`** (CHECK/trigger); **never inserted as closed**; a `closed` row is immutable; review/close fields change only through a status transition; the transition to `closed` requires the **latest event to be a `close` event** whose actor = `closed_by`, `reviewer_id` = `reviewed_by`, run = `reviewed_run_id`, and **`claims_count` = the actual number of claims**; partial unique index `(tenant, partner, role, period_from, period_to, scope_key) WHERE status = 'closed'`; trigger: an `org` final and any other final of the **identical** period cannot coexist; a reconciliation with claims cannot be reopened.
 - `partner_statement_reconciliation_events`: `close` shape (run + fingerprints + `reviewer_id` + `claims_count`, `created_by ≠ reviewer_id`); insert guard: the reviewer must be the reconciliation's recorded reviewer **and** the actor of the latest `mark_reviewed` event, and `claims_count` must equal the recorded claims; other actions must not carry those columns.
 - Every nullable column in a CHECK/trigger is paired with an explicit `IS NOT NULL`. `down()` refuses if any claim, close event or `closed` row exists, then restores the A3c guard bodies; verified up → down → up on both engines.
@@ -56,12 +80,14 @@ Then, in the same transaction: claims insert → close event (`from reviewed to 
 
 | Suite | Result |
 |---|---|
-| `PartnerStatementCloseApiTest` (new, 20) | SQLite ✔ · PostgreSQL ✔ |
-| `PartnerStatementCloseConcurrencyPostgresTest` (new, 6, `pcntl_fork`) | PostgreSQL ✔ (skipped on SQLite by design; absence of pcntl on PG = failure) |
+| `PartnerStatementCloseApiTest` (new, 25) | SQLite ✔ · PostgreSQL ✔ |
+| `PartnerStatementCloseConcurrencyPostgresTest` (new, 7, `pcntl_fork`) | PostgreSQL ✔ (skipped on SQLite by design; absence of pcntl on PG = failure) |
 | `PartnerStatementLifecycleApiTest` (updated: close now needs review, SoD, `not_reviewed` state; wall allows the 3rd update) | SQLite ✔ · PostgreSQL ✔ |
 | Related set on SQLite (Rbac · Permission · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 419 passed, 23 skipped (PostgreSQL-only), 4 failed — `Fuel*` tests, `bcmath` extension missing in this sandbox (`Call to undefined function bcmul()`), unrelated; they pass in CI |
 | Same family on PostgreSQL (PartnerStatement* · PartnerLedger* · BranchIsolationGuard · ApplicationCatalog, incl. all earlier race suites) | **199 passed (3853 assertions)** |
 | Full `php artisan test` | not run locally; CI runs it on SQLite and PostgreSQL (see PR #1941) |
+
+Revision 2 additions: an entry in September's period but absent from its statement is **not claimed**, appears as `unclaimed_in_period` (event + status) and is then **claimed by October** without conflict · `dismiss` creates no claim and similarity of amount/date claims nothing · identity-proof matrix (missing/inactive/empty unit, malformed or unproven `link_pair`, double use) refuses with `claim_identity_unproven` · raw SQL cannot claim for a dismissed/cleared line or the unchosen pair member · a failure after the claims are written (temporary DB trigger on the close event) rolls **everything** back with no residue · PG race: a final that leaves an entry unclaimed never blocks a concurrent final that uses it.
 
 Coverage highlights: atomic success with claims/event/status and **no financial effect** (row counts of journal/accounts/invoices/payments/stock unchanged) · replay safety · permissions matrix (view-only, reconcile-only, close-without-view, no `partners.view`, viewer, reviewer holding close) · stale ledger / wrong run / changed statement / draft · real conflict across different periods with ids + sample and **no trace** · overlap without shared movement (required / stale-narrow / stale-wide / exact / stale-when-none) · adjacent periods + tolerance window (no conflict) and the counter-case (used outside-period entry conflicts) · `link_pair` member split and same-member conflict (no automatic reversal entry created) · branch finals coexist, organisation/identical-tuple refusal, several-branch restriction · tenant isolation, gate, strict input · raw-SQL attempts (self-close, missing reviewer, wrong count, wrong reviewer/run, closing without/with defective event, claims on closed rows, immutability, identical-period cross-scope and same-scope) with positive controls · migration refusal/reversibility · static wall (no financial writer referenced; writes only events/claims).
 
@@ -75,7 +101,10 @@ Coverage highlights: atomic success with claims/event/status and **no financial 
 | remove only the partner/role advisory lock | **survives by design** — the tenant anchor already serialises every close; the partner lock is defence in depth. Removing **both** → caught (two-finals race + posting race) |
 | skip the claims pre-check | caught (4 tests) |
 | skip acknowledgement equality / the acknowledgement requirement | caught / caught |
-| claim the whole candidate set instead of period + used | caught (3 tests) |
+| **(Revision 2)** claim every in-period entry again (old policy) | caught (5 tests) |
+| **(Revision 2)** `dismiss` claims entries | caught (3) |
+| **(Revision 2)** drop the unit identity/state checks | caught (identity-proof test) |
+| **(Revision 2)** drop the database decision guard on claims (SQLite trigger) | caught (2) |
 | `link_pair` claims the whole unit instead of the chosen member | caught |
 | remove closer ≠ reviewer (service) | caught (2) |
 | skip the identical-tuple refusal | caught (2) |
@@ -88,7 +117,7 @@ Coverage highlights: atomic success with claims/event/status and **no financial 
 
 1. **Tenant-wide pause during close** (§0): correctness over latency; short and bounded. If measured contention matters, the partner/role lock + claim check could run before the anchor and only the final read-and-write hold the anchor — not needed now.
 2. **Claim granularity is per entry, not per line** (plan limit 3). Two branch-scoped finals over different branches that share one multi-branch entry conflict (conservative: refuses rather than double-claims).
-3. **Every in-period entry is claimed**, including ledger units the statement lacks (`missing_in_statement`) — closing says "this period's movements were reviewed". Stated and tested; relaxing it is a policy decision (CLAUDE.md #6), not assumed.
+3. ~~Every in-period entry is claimed~~ — **resolved by Revision 2**: only decision-used entries are claimed; unclaimed in-period entries are surfaced as exceptions. Residual: an entry missing from a closed statement is not protected from being claimed by a later final (by design).
 4. **No release path** until PS-A3e: a mistaken close cannot be undone (terminal). That is why A3e (void/replace + claim release, with the PG race matrix) should follow before any UI exposes `close` (PS-A4).
 5. The overlap acknowledgement and run freshness are service-level guarantees under the anchor lock (§3 last bullet), not database-level.
 6. **Not run locally:** the entire repository suite (see the table) — CI runs it on both engines.

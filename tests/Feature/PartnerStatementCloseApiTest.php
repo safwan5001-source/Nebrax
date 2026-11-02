@@ -14,7 +14,11 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\LedgerService;
+use App\Models\PartnerStatementReviewDecision;
+use App\Services\PartnerStatementClaimService;
 use App\Services\PartnerStatementImportService;
+use App\Services\PartnerStatementLifecycleService;
+use App\Support\PartnerStatementReviewException;
 use App\Services\TenantApplicationService;
 use App\Support\Rbac;
 use App\Support\SpreadsheetWriter;
@@ -392,12 +396,12 @@ class PartnerStatementCloseApiTest extends TestCase
         $entry = $this->entryOf($a);
         $row = fn (string $entryId): array => [
             'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $two, 'partner_id' => $this->both->id, 'role' => 'customer',
-            'journal_entry_id' => $entryId, 'basis' => 'period', 'line_id' => null, 'claimed_at' => now(), 'released_at' => null,
+            'journal_entry_id' => $entryId, 'basis' => 'decision', 'line_id' => $this->lineId($two, 2), 'claimed_at' => now(), 'released_at' => null,
         ];
         $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($entry->id)), 'مطالبة فعّالة مزدوجة');
         $free = $this->entryOf($this->invoice('2026-12-01', 1000));
         DB::beginTransaction();
-        DB::table('partner_statement_unit_claims')->insert($row($free->id));
+        DB::table('partner_statement_unit_claims')->insert($row($free->id));   // ضابط إيجابي: الفهرس لا يحجب كاذباً
         $this->assertSame(1, DB::table('partner_statement_unit_claims')->where('reconciliation_id', $two)->count());
         DB::rollBack();
     }
@@ -497,6 +501,122 @@ class PartnerStatementCloseApiTest extends TestCase
         [$oct, $runOct] = $this->ready([['date' => '2026-10-02', 'credit' => 115000, 'act' => 'link_pair', 'units' => [$unit], 'member' => 'original']], ['period_from' => '2026-10-01', 'period_to' => '2026-10-31']);
         $this->assertSame('unit_conflict', $this->close($this->closer, $oct, $runOct['id'])->assertStatus(409)->json('reason'));
         $this->assertSame($count, $entries());
+    }
+
+    // ═══════════════════════════════ سياسة المطالبة: ما استُعمل بقرار فقط ═══════════════════════════════
+
+    /** @test */
+    public function an_entry_missing_from_the_statement_is_not_claimed_stays_visible_as_an_exception_and_is_usable_by_the_next_period(): void
+    {
+        $a = $this->invoice('2026-09-05', 100000);
+        $m = $this->invoice('2026-09-29', 40000);   // داخل أيلول، غائب عن كشف سبتمبر، داخل نافذة تسامح أكتوبر
+        [$sep, $runSep] = $this->ready([['date' => '2026-09-05', 'our' => $a->number, 'credit' => 115000]]);
+        $this->close($this->closer, $sep, $runSep['id'])->assertCreated();
+
+        // لا يُحجز؛ يظهر استثناءً بالعدد والعيّنة في حدث الإغلاق وفي حالة المقارنة.
+        $this->assertSame([$this->entryOf($a)->id], $this->claimed($sep));
+        $summary = collect($this->events($this->closer, $sep)->json('data'))->firstWhere('action', 'close')['summary'];
+        $this->assertSame([1, $this->entryOf($m)->id, '2026-09-29'], [$summary['unclaimed_in_period']['count'], $summary['unclaimed_in_period']['sample'][0]['entry_id'], $summary['unclaimed_in_period']['sample'][0]['date']]);
+        $this->assertSame(1, $this->lcStatus($this->closer, $sep)->json('data.final.unclaimed_in_period.count'));
+        $this->assertSame(1, $summary['ledger_units_missing_in_statement'], 'والمحرّك يعدّه «غائباً عن الكشف» كما كان.');
+
+        // مطابقة أكتوبر تستعمله بقرار صريح فتحجزه بلا تعارض ولا إقرار تداخل (الفترتان متجاورتان).
+        [$oct, $runOct] = $this->ready([['date' => '2026-10-01', 'our' => $m->number, 'credit' => 46000]], ['period_from' => '2026-10-01', 'period_to' => '2026-10-31']);
+        $this->close($this->closer, $oct, $runOct['id'])->assertCreated();
+        $this->assertSame([$this->entryOf($m)->id], $this->claimed($oct));
+        $this->assertSame(0, (int) collect($this->events($this->closer, $oct)->json('data'))->firstWhere('action', 'close')['summary']['unclaimed_in_period']['count']);
+    }
+
+    /** @test */
+    public function dismiss_creates_no_claim_and_an_entry_is_never_claimed_by_similarity_of_amount_or_date(): void
+    {
+        $d = $this->invoice('2026-09-10', 30000);   // قيد في الفترة؛ سطر الكشف المستبعد بمبلغ وتاريخ مختلفين
+        $e = $this->invoice('2026-09-28', 86870);   // 99900.50 ≈ إجمالي e قريب تاريخاً من سطر الاستبعاد: لا تشابه يُحجز به شيء
+        [$id, $run] = $this->ready([['date' => '2026-09-28', 'credit' => 99900, 'act' => 'dismiss']]);
+
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+        $this->assertSame([], $this->claimed($id), 'dismiss لا قيد مرتبط ⇒ لا مطالبة.');
+        $this->assertSame(0, $this->claimCount());
+        $summary = collect($this->events($this->closer, $id)->json('data'))->firstWhere('action', 'close')['summary'];
+        $this->assertSame([0, 2], [$summary['claims']['total'], $summary['unclaimed_in_period']['count']], 'قيدا الفترة استثناءان ظاهران لا محجوزان.');
+        $this->assertEqualsCanonicalizing([$this->entryOf($d)->id, $this->entryOf($e)->id], array_column($summary['unclaimed_in_period']['sample'], 'entry_id'));
+        $this->assertSame(['closed', 0], [$this->reconciliation($id)->status, DB::table('partner_statement_unit_claims')->where('reconciliation_id', $id)->count()]);
+    }
+
+    /** @test */
+    public function the_claimed_set_needs_a_proven_entry_identity_or_the_close_is_refused(): void
+    {
+        $service = app(PartnerStatementClaimService::class);
+        $entry = fn (string $id, ?string $reversalOf = null, string $status = 'posted') => ['entry_id' => $id, 'number' => 'JE-'.$id, 'date' => '2026-09-05', 'status' => $status, 'reversal_of' => $reversalOf, 'debit_minor' => 100, 'credit_minor' => 0];
+        $unit = fn (string $key, array $entries, string $state = 'active') => ['key' => $key, 'state' => $state, 'matchable' => $state === 'active', 'entries' => $entries, 'entry_ids' => array_column($entries, 'entry_id')];
+        $decision = fn (string $action, array $units, array $extra = []) => new PartnerStatementReviewDecision(['line_id' => (string) Str::uuid(), 'action' => $action, 'unit_keys' => $units] + $extra);
+        $reason = function (array $units, array $decisions) use ($service): ?string {
+            try {
+                $service->claimSet($units, $decisions);
+
+                return null;
+            } catch (PartnerStatementReviewException $e) {
+                return $e->reason;
+            }
+        };
+
+        $active = $unit('invoice#1', [$entry('e1'), $entry('e2')]);
+        $pair = $unit('invoice#2', [$entry('o', null, 'reversed'), $entry('r', 'o')], 'neutralised');
+        $link = fn (string $member, array $extra = []) => $decision('link_pair', ['invoice#2'], $extra + ['pair_member' => $member, 'pair_original_entry_id' => 'o', 'pair_reversal_entry_id' => 'r']);
+
+        // مطالبات صحيحة.
+        $this->assertSame(['e1', 'e2'], array_keys($service->claimSet([$active], ['L1' => $decision('confirm', ['invoice#1'])])));
+        $this->assertSame(['e1'], array_keys($service->claimSet([$unit('invoice#1', [$entry('e1')])], ['L1' => $decision('override', ['invoice#1'])])));
+        $this->assertSame(['o'], array_keys($service->claimSet([$pair], ['L1' => $link('original')])));
+        $this->assertSame(['r'], array_keys($service->claimSet([$pair], ['L1' => $link('reversal')])), 'العضو المختار فقط.');
+        $this->assertSame([], $service->claimSet([$active, $pair], ['L1' => $decision('dismiss', [])]), 'dismiss لا يطالب بشيء.');
+        $this->assertSame([], $service->claimSet([$active], []));
+
+        // هوية غير محددة/غير مثبتة ⇒ رفض (لا تخمين).
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('confirm', ['invoice#404'])]), 'وحدة غائبة عن الدفتر الحاضر');
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('override', [])]), 'قرار بلا وحدات');
+        $this->assertSame('claim_identity_unproven', $reason([$unit('invoice#1', [])], ['L1' => $decision('confirm', ['invoice#1'])]), 'وحدة بلا قيود');
+        $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $decision('confirm', ['invoice#2'])]), 'وحدة معكوسة لا تُطالَب بقرار عادي');
+        $this->assertSame('claim_identity_unproven', $reason([$unit('invoice#1', [$entry('e1')], 'incomplete')], ['L1' => $decision('override', ['invoice#1'])]), 'وحدة ناقصة السلسلة');
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $link('original')]), 'link_pair على وحدة نشطة');
+        $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $link('original', ['pair_original_entry_id' => 'zzz'])]), 'معرّف أصل لا يطابق قيود الوحدة');
+        $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $link('original', ['pair_reversal_entry_id' => null])]), 'معرّف عكس مفقود');
+        $this->assertSame('claim_identity_unproven', $reason([$unit('invoice#2', [$entry('o', null, 'reversed'), $entry('r', 'other')], 'neutralised')], ['L1' => $link('reversal')]), 'العكس لا يشير إلى الأصل');
+        $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $link('both')]), 'عضو غير محدد');
+        $this->assertSame('claim_entry_used_twice', $reason([$active], ['L1' => $decision('confirm', ['invoice#1']), 'L2' => $decision('override', ['invoice#1'])]), 'قيد لسطرين');
+    }
+
+    /** @test */
+    public function a_failure_after_the_claims_are_written_rolls_the_whole_close_back_and_leaves_no_residue(): void
+    {
+        $a = $this->invoice('2026-09-01', 100000);
+        [$id, $run] = $this->ready([['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000]]);
+        $closer = User::query()->findOrFail($this->closerId);
+        $this->actingAs($closer);
+        app(TenantContext::class)->set($this->auth['tenant_id']);
+
+        // المطالبات تُكتب قبل الحدث: فشل إدراج حدث الإغلاق (مُشغّل قاعدة بيانات مؤقت) يجب أن يُلغي المطالبات أيضاً.
+        $pg = DB::connection()->getDriverName() === 'pgsql';
+        if ($pg) {
+            DB::unprepared("CREATE OR REPLACE FUNCTION tmp_ps_a3d_boom() RETURNS trigger LANGUAGE plpgsql AS \$fn\$ BEGIN IF NEW.action = 'close' THEN RAISE EXCEPTION 'boom'; END IF; RETURN NEW; END \$fn\$");
+            DB::unprepared('CREATE TRIGGER tmp_ps_a3d_boom AFTER INSERT ON partner_statement_reconciliation_events FOR EACH ROW EXECUTE FUNCTION tmp_ps_a3d_boom()');
+        } else {
+            DB::unprepared("CREATE TRIGGER tmp_ps_a3d_boom AFTER INSERT ON partner_statement_reconciliation_events WHEN NEW.action = 'close' BEGIN SELECT RAISE(ABORT, 'boom'); END");
+        }
+        try {
+            app(PartnerStatementLifecycleService::class)->close($closer, $id, ['run_id' => $run['id']]);
+            $this->fail('كان يجب أن يفشل الإغلاق.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('boom', $e->getMessage());
+        } finally {
+            DB::unprepared($pg ? 'DROP TRIGGER tmp_ps_a3d_boom ON partner_statement_reconciliation_events' : 'DROP TRIGGER tmp_ps_a3d_boom');
+        }
+        $this->assertSame(['reviewed', 0, 1], [$this->reconciliation($id)->status, $this->claimCount(), $this->eventCount($id)]);
+        $this->assertNull($this->reconciliation($id)->closed_at);
+
+        // لا بقايا: الإغلاق السليم ينجح بعدها بلا تعارض مع مطالبات يتيمة.
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+        $this->assertSame([1, 2], [$this->claimCount(), $this->eventCount($id)]);
     }
 
     // ═══════════════════════════════ النطاق: مؤسسة / فرع ═══════════════════════════════
@@ -623,7 +743,7 @@ class PartnerStatementCloseApiTest extends TestCase
     }
 
     /** @test */
-    public function claims_are_immutable_and_only_shaped_for_a_reviewed_reconciliation_of_the_same_partner_with_a_real_entry(): void
+    public function claims_are_immutable_and_only_written_for_the_effective_decision_of_a_line_of_a_reviewed_reconciliation(): void
     {
         $a = $this->invoice('2026-09-01', 100000);
         [$id, $run] = $this->ready([['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000]]);
@@ -631,35 +751,78 @@ class PartnerStatementCloseApiTest extends TestCase
         $claim = DB::table('partner_statement_unit_claims')->where('reconciliation_id', $id)->first();
 
         $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->where('id', $claim->id)->update(['released_at' => now()]), 'إفراج (A3e)');
-        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->where('id', $claim->id)->update(['basis' => 'period']), 'تعديل');
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->where('id', $claim->id)->update(['line_id' => $claim->line_id]), 'تعديل');
         $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->where('id', $claim->id)->delete(), 'حذف');
         $this->assertSame(1, $this->claimCount());
         try {
-            PartnerStatementUnitClaim::query()->firstOrFail()->update(['basis' => 'period']);
+            PartnerStatementUnitClaim::query()->firstOrFail()->update(['basis' => 'changed']);
             $this->fail('النموذج يمنع التعديل');
         } catch (LogicException) {
             $this->addToAssertionCount(1);
         }
 
-        // إدراجات معيبة على مقارنة reviewed أخرى: قيد من مستأجر آخر/غير موجود، طرف آخر، دور آخر، سطر من مقارنة أخرى، basis/line_id متناقضان، released_at معبّأ.
+        // مقارنة reviewed أخرى بسطرين: ٢ مؤكَّد على b، ٣ مستبعد (dismiss).
         $b = $this->invoice('2026-09-02', 20000);
-        [$other, $runOther] = $this->ready([['date' => '2026-09-02', 'our' => $b->number, 'credit' => 23000]], ['period_from' => '2026-09-02', 'period_to' => '2026-09-02']);
+        [$other, $runOther] = $this->ready([
+            ['date' => '2026-09-02', 'our' => $b->number, 'credit' => 23000],
+            ['date' => '2026-09-25', 'credit' => 99900, 'act' => 'dismiss'],
+        ]);
+        $confirmed = $this->lineId($other, 2);
+        $dismissed = $this->lineId($other, 3);
         $base = fn (array $over = []) => $over + [
             'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $other, 'partner_id' => $this->both->id, 'role' => 'customer',
-            'journal_entry_id' => $this->entryOf($b)->id, 'basis' => 'period', 'line_id' => null, 'claimed_at' => now(), 'released_at' => null,
+            'journal_entry_id' => $this->entryOf($b)->id, 'basis' => 'decision', 'line_id' => $confirmed, 'claimed_at' => now(), 'released_at' => null,
         ];
         $insert = fn (array $over) => DB::table('partner_statement_unit_claims')->insert($base($over));
         $this->assertRejected(fn () => $insert(['journal_entry_id' => (string) Str::uuid()]), 'قيد غير موجود');
         $this->assertRejected(fn () => $insert(['partner_id' => (string) Str::uuid()]), 'طرف لا يطابق المقارنة');
         $this->assertRejected(fn () => $insert(['role' => 'supplier']), 'دور لا يطابق المقارنة');
         $this->assertRejected(fn () => $insert(['role' => 'other']), 'دور مجهول');
-        $this->assertRejected(fn () => $insert(['basis' => 'decision']), 'decision بلا سطر');
-        $this->assertRejected(fn () => $insert(['line_id' => $this->lineId($id, 2)]), 'period بسطر');
-        $this->assertRejected(fn () => $insert(['basis' => 'decision', 'line_id' => $this->lineId($id, 2)]), 'سطر من مقارنة أخرى');
+        $this->assertRejected(fn () => $insert(['basis' => 'period']), 'مطالبة بالفترة (لا مطالبة إلا بقرار)');
+        $this->assertRejected(fn () => $insert(['line_id' => null]), 'بلا سطر');
+        $this->assertRejected(fn () => $insert(['line_id' => $this->lineId($id, 2)]), 'سطر من مقارنة أخرى');
+        $this->assertRejected(fn () => $insert(['line_id' => $dismissed]), 'سطر مستبعد (dismiss) لا يطالب بشيء');
         $this->assertRejected(fn () => $insert(['released_at' => now()]), 'إفراج عند الإدراج');
         $this->assertRejected(fn () => $insert(['tenant_id' => (string) Str::uuid()]), 'مستأجر آخر');
         $this->assertRejected(fn () => $insert(['basis' => 'weird']), 'basis مجهول');
         $this->assertSame(1, $this->claimCount());
+
+        // ضابط إيجابي: المطالبة المشروعة (سطر مؤكَّد، قيده) تُقبل على مقارنة reviewed.
+        DB::beginTransaction();
+        $insert([]);
+        $this->assertSame(1, DB::table('partner_statement_unit_claims')->where('reconciliation_id', $other)->count());
+        DB::rollBack();
+    }
+
+    /** @test */
+    public function a_cleared_line_and_the_unchosen_pair_member_can_never_be_claimed_even_by_raw_sql(): void
+    {
+        $p = $this->invoice('2026-09-29', 100000);
+        $original = $this->entryOf($p);
+        app(LedgerService::class)->reverse($original, '2026-10-02', 'إلغاء');
+        $reversal = JournalEntry::query()->where('reversal_of', $original->id)->firstOrFail();
+        $unit = 'invoice#'.$p->id;
+        $id = $this->statement([['date' => '2026-09-29', 'credit' => 115000], ['date' => '2026-09-30', 'credit' => 7]]);
+        $run = $this->match($this->auth['token'], $id);
+        $token = $this->auth['token'];
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'original', 'reason' => 'ربط الأصل'])->assertCreated();
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 3), 'action' => 'dismiss', 'reason' => 'غير موجود'])->assertCreated();
+        $this->review($token, $id, $run['id'])->assertCreated();
+
+        $row = fn (string $entryId, string $line) => [
+            'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $id, 'partner_id' => $this->both->id, 'role' => 'customer',
+            'journal_entry_id' => $entryId, 'basis' => 'decision', 'line_id' => $line, 'claimed_at' => now(), 'released_at' => null,
+        ];
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($reversal->id, $this->lineId($id, 2))), 'العضو غير المختار (العكس)');
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($original->id, $this->lineId($id, 3))), 'سطر مستبعد');
+        DB::beginTransaction();
+        DB::table('partner_statement_unit_claims')->insert($row($original->id, $this->lineId($id, 2)));   // العضو المختار يُقبل
+        DB::rollBack();
+
+        // قرار مسحوب (clear) لا يترك مطالبة ممكنة: أعد الفتح، اسحب قرار السطر ٢، ثم راجع من جديد بقرار آخر لسطر ٣ فقط.
+        $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/reopen", ['reason' => 'اختبار السحب'])->assertOk();
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'clear'])->assertCreated();
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($original->id, $this->lineId($id, 2))), 'قرار مسحوب');
     }
 
     /** @test */

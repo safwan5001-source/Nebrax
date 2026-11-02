@@ -99,9 +99,9 @@ class PartnerStatementCloseConcurrencyPostgresTest extends TestCase
      * @param  list<Invoice>  $invoices
      * @return array{0: string, 1: string} [reconciliationId, runId]
      */
-    private function reviewed(array $invoices, string $from, string $to): array
+    private function reviewed(array $invoices, string $from, string $to, ?string $lineDate = null): array
     {
-        $rows = array_map(fn (Invoice $i): array => [$i->invoice_date->toDateString(), '', '', '', number_format(((int) $i->total) / 100, 2, '.', '')], $invoices);
+        $rows = array_map(fn (Invoice $i): array => [$lineDate ?? $i->invoice_date->toDateString(), '', '', '', number_format(((int) $i->total) / 100, 2, '.', '')], $invoices);
         $path = $this->dir.'/stmt_'.uniqid().'.csv';
         file_put_contents($path, SpreadsheetWriter::csv(['التاريخ', 'رقم المستند', 'مرجعنا', 'مدين', 'دائن'], $rows));
         $id = app(PartnerStatementImportService::class)->apply(
@@ -239,6 +239,22 @@ class PartnerStatementCloseConcurrencyPostgresTest extends TestCase
 
         $this->assertCount(2, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
         $this->assertSame(['closed', 'closed', 1, 1], [$this->rowStatus($sep), $this->rowStatus($oct), $this->claimsOf($sep), $this->claimsOf($oct)]);
+    }
+
+    /** @test */
+    public function a_final_that_leaves_an_entry_unclaimed_never_blocks_a_concurrent_final_that_uses_it(): void
+    {
+        $a = $this->invoice('2026-09-05', 100000);
+        $m = $this->invoice('2026-09-29', 40000);   // في أيلول وغائب عن كشفه؛ كشف أكتوبر يستعمله
+        [$sep, $runSep] = $this->reviewed([$a], '2026-09-01', '2026-09-30');
+        [$oct, $runOct] = $this->reviewed([$m], '2026-10-01', '2026-10-31', '2026-10-01');
+
+        $results = $this->runConcurrently([$this->closeJob(0, $sep, $runSep), $this->closeJob(1, $oct, $runOct), $this->closeJob(2, $oct, $runOct)]);
+
+        $this->assertCount(3, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(['closed', 'closed', 1, 1], [$this->rowStatus($sep), $this->rowStatus($oct), $this->claimsOf($sep), $this->claimsOf($oct)]);
+        app(TenantContext::class)->set($this->tenantId);
+        $this->assertSame(2, PartnerStatementUnitClaim::query()->distinct()->count('journal_entry_id'), 'كل قيد بمطالبة واحدة؛ m لأكتوبر وحده.');
     }
 
     /** @test */

@@ -6,14 +6,12 @@ use App\Tenancy\CompanyWide;
 use LogicException;
 
 /**
- * مطالبة نهائية بحركة (قيد يومية) من مقارنة كشف طرف مُغلقة (IMP-PS-A3d، `CompanyWide`). تُكتب حصراً عبر `PartnerStatementClaimService` داخل معاملة الإغلاق،
+ * مطالبة نهائية بحركة (قيد يومية) استعملها قرار مراجعة فعّال في مقارنة كشف طرف مُغلقة (`basis = decision` دائماً، ومعها سطر الكشف) (IMP-PS-A3d، `CompanyWide`). تُكتب حصراً عبر `PartnerStatementClaimService` داخل معاملة الإغلاق،
  * و**لا تُعدَّل ولا تُحذف** (النموذج والقاعدة؛ إفراج A3e يفتح `released_at`). فهرس فريد جزئي في القاعدة يمنع مطالبتين فعّالتين على الحركة نفسها. **لا أثر مالي.**
  */
 class PartnerStatementUnitClaim extends BaseModel implements CompanyWide
 {
     public const UPDATED_AT = null;
-
-    public const BASIS_PERIOD = 'period';
 
     public const BASIS_DECISION = 'decision';
 

@@ -15,8 +15,10 @@ use Illuminate\Support\Str;
 /**
  * مطالبات المقارنة النهائية بالحركات — IMP-PS-A3d (D-PS-12/14، خطة PS-A2 §5.2–5.5). **لا أثر مالي**: يقرأ وحدات الدفتر المُمرَّرة له (من `PartnerLedgerCandidates` عبر خدمة المطابقة) ويكتب جدول المطالبات وحده.
  *
- *  - **المجموعة المُطالَب بها ليست مجموعة البحث:** (أ) كل قيد تاريخه **داخل** فترة الكشف (أي حالة وحدته: نشطة/معكوسة/ناقصة)، و(ب) كل قيد استعملته **قرارات المراجعة** الفعّالة
- *    (confirm/override = كل قيود الوحدة، link_pair = قيد العضو المختار وحده، dismiss/clear = لا شيء). مرشّحو نافذة التسامح غير المستعملة لا يُطالَب بهم، فتتجاور فترتان بلا تعارض.
+ *  - **المطالَب به = ما استعملته قرارات المراجعة فعلاً (قرار المالك، 2026-11-02) — لا كل قيود الفترة:** confirm/override ⇒ قيود الوحدات التي اعتمدها المراجع صراحةً · link_pair ⇒ قيد العضو المحدَّد صراحةً
+ *    فقط (لا العضو الآخر) · dismiss ⇒ لا مطالبة (لا قيد مرتبط). قيد داخل الفترة **غائب عن الكشف** (`missing_in_statement`) **لا يُحجز**: يبقى مستثنىً ظاهراً في ملخص حدث الإغلاق ويصلح لمطابقة فترة أخرى.
+ *    **هوية القيد لا تُستنتج من مبلغ أو تاريخ:** مصدرها وحدة اختارها المراجع (مفتاح مستند) مربوطة بقيودها ببصمة الدفتر المقيَّدة بالقرار والمُعاد فحصها عند الإغلاق، أو معرّفا قيدَي الزوج المخزَّنان في قرار link_pair
+ *    ومثبتان بـ`reversal_of`. أي قرار لا تتحدد هويته أو لا يثبت (وحدة غائبة/غير نشطة/بلا قيود، زوج لا يطابق الأستاذ) ⇒ يُرفض الإغلاق (`claim_identity_unproven`) ولا يُخمَّن.
  *  - **التعارض الحقيقي** = قيد له مطالبة فعّالة (`released_at IS NULL`) من مقارنة أخرى لنفس الطرف والدور، **مهما اختلفت الفترة أو الفرع**؛ يمنعه الفحص تحت القفل ثم الفهرس الفريد الجزئي (حتى بـSQL خام).
  *  - **تداخل الفترات وحده تحذير** (D-PS-14): قائمة النهائيات المتداخلة فترةً والمتقاطعة نطاقاً (مؤسسة تتقاطع مع الكل؛ فرع مع نفسه ومع المؤسسة) يجب أن يُقرّ بها المُغلِق بمطابقة تامة.
  *  - **التسلسل:** قفل استشاري واسع على (مستأجر، طرف، دور) يسلسل كل إغلاق لهذا الطرف، ثم **قفل صف المستأجر** — المِرساة نفسها التي يقفلها `LedgerService` قبل أي ترحيل/عكس (عبر حارس التاريخ)
@@ -96,56 +98,116 @@ final class PartnerStatementClaimService
     // ═══════════════════════════════ مجموعة المطالبات ═══════════════════════════════
 
     /**
-     * @param  list<array<string, mixed>>  $units  وحدات الدفتر الحاضرة (بـ`entries`)
+     * المجموعة المُطالَب بها: قيود القرارات الفعّالة وحدها (انظر وصف الصنف). **فشل مغلق** عند أي هوية غير محددة أو غير مثبتة.
+     *
+     * @param  list<array<string, mixed>>  $units  وحدات الدفتر الحاضرة (بـ`entries`) — المطابقة لبصمة التشغيلة (فحصتها الخدمة المنادية)
      * @param  array<string, PartnerStatementReviewDecision>  $effective  القرارات الفعّالة `line_id ⇒ قرار`
-     * @return array<string, array{basis: string, line_id: ?string, number: string}>  `entry_id ⇒ مطالبة`
+     * @return array<string, array{basis: string, line_id: string, number: string}>  `entry_id ⇒ مطالبة`
      */
-    public function claimSet(array $units, string $periodFrom, string $periodTo, array $effective): array
+    public function claimSet(array $units, array $effective): array
     {
-        $set = [];
         $byKey = [];
         foreach ($units as $unit) {
             $byKey[$unit['key']] = $unit;
-            foreach ($unit['entries'] as $entry) {
-                if ($entry['date'] >= $periodFrom && $entry['date'] <= $periodTo) {
-                    $set[(string) $entry['entry_id']] = ['basis' => PartnerStatementUnitClaim::BASIS_PERIOD, 'line_id' => null, 'number' => (string) $entry['number']];
-                }
-            }
         }
 
+        $set = [];
         foreach ($effective as $lineId => $decision) {
-            $entries = [];
-            if (in_array($decision->action, [PartnerStatementReviewDecision::ACTION_CONFIRM, PartnerStatementReviewDecision::ACTION_OVERRIDE], true)) {
-                foreach ($decision->unit_keys as $key) {
-                    $unit = $byKey[$key] ?? null;
-                    if ($unit === null) {
-                        throw new PartnerStatementReviewException('claim_unit_missing', 'وحدة قرار فعّال لم تعد ضمن مرشحي الدفتر؛ أعد المطابقة والمراجعة.', 409, ['unit_key' => $key]);
-                    }
-                    array_push($entries, ...$unit['entries']);
-                }
-            } elseif ($decision->action === PartnerStatementReviewDecision::ACTION_LINK_PAIR) {
-                // قيد العضو المختار وحده — العضو الآخر لا يُطالَب به إلا إن وقع داخل الفترة (يُغطّى أعلاه).
-                $entryId = $decision->pair_member === PartnerStatementReviewDecision::MEMBER_ORIGINAL ? $decision->pair_original_entry_id : $decision->pair_reversal_entry_id;
-                $unit = $byKey[$decision->unit_keys[0] ?? ''] ?? null;
-                $found = $unit === null ? [] : array_values(array_filter($unit['entries'], fn (array $e): bool => $e['entry_id'] === $entryId));
-                if ($found === []) {
-                    throw new PartnerStatementReviewException('claim_unit_missing', 'زوج معكوس مرتبط لم يعد ضمن مرشحي الدفتر؛ أعد المطابقة والمراجعة.', 409, ['unit_key' => $decision->unit_keys[0] ?? null]);
-                }
-                $entries = $found;
-            }
+            $entries = match ($decision->action) {
+                PartnerStatementReviewDecision::ACTION_CONFIRM, PartnerStatementReviewDecision::ACTION_OVERRIDE => $this->decidedEntries($decision, $byKey),
+                PartnerStatementReviewDecision::ACTION_LINK_PAIR => [$this->chosenPairEntry($decision, $byKey)],
+                default => [],   // dismiss: لا قيد مرتبط ⇒ لا مطالبة
+            };
             foreach ($entries as $entry) {
                 $id = (string) $entry['entry_id'];
-                if (($set[$id]['basis'] ?? null) === PartnerStatementUnitClaim::BASIS_DECISION && $set[$id]['line_id'] !== $lineId) {
+                if (isset($set[$id])) {
                     // مستحيل بحراسة الاستعمال المزدوج؛ فحص دفاعي يفشل مغلقاً بدل مطالبة غامضة.
                     throw new PartnerStatementReviewException('claim_entry_used_twice', 'قيد مُسند لسطرَي كشف بقرارين فعّالين.', 409, ['entry_id' => $id]);
                 }
-                $set[$id] = ['basis' => PartnerStatementUnitClaim::BASIS_DECISION, 'line_id' => $lineId, 'number' => (string) $entry['number']];
+                $set[$id] = ['basis' => PartnerStatementUnitClaim::BASIS_DECISION, 'line_id' => (string) $lineId, 'number' => (string) $entry['number']];
             }
         }
-
         ksort($set);
 
         return $set;
+    }
+
+    /**
+     * قيود داخل الفترة لم يُطالَب بها (لا قرار استعملها): استثناء يُعرض في ملخص الإغلاق لا يُحجز. عدد + عيّنة محدودة.
+     *
+     * @param  list<array<string, mixed>>  $units
+     * @param  array<string, mixed>  $set
+     * @return array{count: int, sample: list<array<string, string>>}
+     */
+    public function unclaimedInPeriod(array $units, string $periodFrom, string $periodTo, array $set): array
+    {
+        $found = [];
+        foreach ($units as $unit) {
+            foreach ($unit['entries'] as $entry) {
+                if ($entry['date'] >= $periodFrom && $entry['date'] <= $periodTo && ! isset($set[(string) $entry['entry_id']])) {
+                    $found[(string) $entry['entry_id']] = ['entry_id' => (string) $entry['entry_id'], 'number' => (string) $entry['number'], 'date' => (string) $entry['date'], 'unit_key' => (string) $unit['key'], 'state' => (string) $unit['state']];
+                }
+            }
+        }
+        ksort($found);
+
+        return ['count' => count($found), 'sample' => array_slice(array_values($found), 0, self::SAMPLE)];
+    }
+
+    /**
+     * confirm/override: قيود الوحدات التي اعتمدها المراجع. كل وحدة يجب أن تكون حاضرة، **نشطة وقابلة للمطابقة**، ولها قيود (فلا هوية مخمَّنة).
+     *
+     * @param  array<string, array<string, mixed>>  $byKey
+     * @return list<array<string, mixed>>
+     */
+    private function decidedEntries(PartnerStatementReviewDecision $decision, array $byKey): array
+    {
+        $keys = array_values(array_unique(array_map('strval', $decision->unit_keys ?? [])));
+        if ($keys === []) {
+            throw $this->unproven('قرار بلا وحدات محددة.', $decision);
+        }
+        $entries = [];
+        foreach ($keys as $key) {
+            $unit = $byKey[$key] ?? null;
+            if ($unit === null || ($unit['state'] ?? null) !== 'active' || ! ($unit['matchable'] ?? false) || ($unit['entries'] ?? []) === []) {
+                throw $this->unproven('وحدة قرار فعّال غائبة أو غير نشطة أو بلا قيود مثبتة في الدفتر الحاضر.', $decision, ['unit_key' => $key, 'state' => $unit['state'] ?? null]);
+            }
+            array_push($entries, ...$unit['entries']);
+        }
+
+        return $entries;
+    }
+
+    /**
+     * link_pair: قيد العضو المحدَّد صراحةً فقط. يُثبَّت من الأستاذ الحاضر: الوحدة زوج معكوس (`neutralised`) من قيدين، معرّفا القيدين المخزَّنان في القرار هما قيداها، والعكس يشير بـ`reversal_of` إلى الأصل.
+     *
+     * @param  array<string, array<string, mixed>>  $byKey
+     * @return array<string, mixed>
+     */
+    private function chosenPairEntry(PartnerStatementReviewDecision $decision, array $byKey): array
+    {
+        $unit = $byKey[$decision->unit_keys[0] ?? ''] ?? null;
+        $original = (string) $decision->pair_original_entry_id;
+        $reversal = (string) $decision->pair_reversal_entry_id;
+        $member = $decision->pair_member;
+        if ($unit === null || ($unit['state'] ?? null) !== 'neutralised' || ! in_array($member, PartnerStatementReviewDecision::MEMBERS, true) || $original === '' || $reversal === '') {
+            throw $this->unproven('زوج معكوس مرتبط لم يعد مثبتاً في الدفتر الحاضر.', $decision, ['unit_key' => $decision->unit_keys[0] ?? null]);
+        }
+        $byId = [];
+        foreach ($unit['entries'] ?? [] as $entry) {
+            $byId[(string) $entry['entry_id']] = $entry;
+        }
+        if (count($byId) !== 2 || ! isset($byId[$original], $byId[$reversal]) || ($byId[$reversal]['reversal_of'] ?? null) !== $original || ($byId[$original]['reversal_of'] ?? null) !== null) {
+            throw $this->unproven('قيدا الزوج المخزَّنان في القرار لا يطابقان قيود الوحدة ورابط العكس في الأستاذ.', $decision, ['unit_key' => $decision->unit_keys[0] ?? null]);
+        }
+
+        return $byId[$member === PartnerStatementReviewDecision::MEMBER_ORIGINAL ? $original : $reversal];
+    }
+
+    /** @param array<string, mixed> $details */
+    private function unproven(string $message, PartnerStatementReviewDecision $decision, array $details = []): PartnerStatementReviewException
+    {
+        return new PartnerStatementReviewException('claim_identity_unproven', $message.' لا يُغلق نهائياً قرارٌ تتطلب مطالبته قيداً غير محدد الهوية؛ أعد المطابقة والمراجعة.', 409, ['line_id' => $decision->line_id, 'action' => $decision->action] + $details);
     }
 
     /**
@@ -174,16 +236,14 @@ final class PartnerStatementClaimService
     /**
      * يكتب المطالبات (داخل معاملة الإغلاق). الفهرس الفريد الجزئي شبكة أمان؛ الفحص السابق تحت القفل يجعل مخالفته غير قابلة للبلوغ في المسار العادي.
      *
-     * @param  array<string, array{basis: string, line_id: ?string, number: string}>  $set
-     * @return array{period: int, decision: int, total: int}
+     * @param  array<string, array{basis: string, line_id: string, number: string}>  $set
+     * @return array{decision: int, total: int}
      */
     public function write(PartnerStatementReconciliation $reconciliation, array $set): array
     {
         $now = now();
-        $counts = [PartnerStatementUnitClaim::BASIS_PERIOD => 0, PartnerStatementUnitClaim::BASIS_DECISION => 0];
         $rows = [];
         foreach ($set as $entryId => $claim) {
-            $counts[$claim['basis']]++;
             $rows[] = [
                 'id' => (string) Str::uuid(), 'tenant_id' => (string) $this->tenant->id(), 'reconciliation_id' => $reconciliation->id, 'partner_id' => $reconciliation->partner_id,
                 'role' => $reconciliation->role, 'journal_entry_id' => $entryId, 'basis' => $claim['basis'], 'line_id' => $claim['line_id'], 'claimed_at' => $now, 'released_at' => null,
@@ -193,7 +253,7 @@ final class PartnerStatementClaimService
             PartnerStatementUnitClaim::insert($chunk);
         }
 
-        return ['period' => $counts[PartnerStatementUnitClaim::BASIS_PERIOD], 'decision' => $counts[PartnerStatementUnitClaim::BASIS_DECISION], 'total' => count($rows)];
+        return ['decision' => count($rows), 'total' => count($rows)];
     }
 
     /** عدد مطالبات مقارنة (للعرض والتحقق). */

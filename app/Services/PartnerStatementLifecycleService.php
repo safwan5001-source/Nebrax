@@ -91,6 +91,9 @@ final class PartnerStatementLifecycleService
             'final' => $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED ? [
                 'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
                 'claims_count' => $this->claims->countFor((string) $reconciliation->id),
+                // قيود الفترة غير المُطالَب بها (غائبة عن الكشف): استثناء ظاهر لا حجز (قرار المالك، 2026-11-02).
+                'unclaimed_in_period' => PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
+                    ->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first()?->summary['unclaimed_in_period'] ?? null,
             ] : null,
         ];
     }
@@ -260,7 +263,8 @@ final class PartnerStatementLifecycleService
                 ]);
             }
 
-            $set = $this->claims->claimSet($source['units'], $fresh->period_from->toDateString(), $fresh->period_to->toDateString(), $this->review->effectiveDecisions((string) $fresh->id));
+            $set = $this->claims->claimSet($source['units'], $this->review->effectiveDecisions((string) $fresh->id));
+            $exceptions = $this->claims->unclaimedInPeriod($source['units'], $fresh->period_from->toDateString(), $fresh->period_to->toDateString(), $set);
             $conflicts = $this->claims->conflicts($fresh, $set);
             if ($conflicts !== []) {
                 throw new PartnerStatementReviewException('unit_conflict', 'حركة (قيد) مُطالَب بها فعلاً من مقارنة نهائية أخرى لهذا الطرف: لا مطالبة مزدوجة (الاستبدال شريحة PS-A3e).', 409, [
@@ -287,7 +291,7 @@ final class PartnerStatementLifecycleService
                 'reconciliation_id' => $fresh->id, 'seq' => ((int) $last) + 1, 'action' => PartnerStatementReconciliationEvent::ACTION_CLOSE,
                 'from_status' => PartnerStatementReconciliation::STATUS_REVIEWED, 'to_status' => PartnerStatementReconciliation::STATUS_CLOSED, 'run_id' => $run->id,
                 'ledger_fingerprint' => $source['fingerprint'], 'statement_digest' => $digest,
-                'summary' => $evaluation['summary'] + ['scope_key' => $scopeKey, 'claims' => $written, 'overlap_acknowledged' => $acknowledged],
+                'summary' => $evaluation['summary'] + ['scope_key' => $scopeKey, 'claims' => $written, 'unclaimed_in_period' => $exceptions, 'overlap_acknowledged' => $acknowledged],
                 'reason' => $note, 'created_by' => $actor->getKey(), 'reviewer_id' => $fresh->reviewed_by, 'claims_count' => $written['total'], 'created_at' => now(),
             ]);
             $fresh->update(['status' => PartnerStatementReconciliation::STATUS_CLOSED, 'closed_at' => now(), 'closed_by' => $actor->getKey(), 'scope_key' => $scopeKey]);

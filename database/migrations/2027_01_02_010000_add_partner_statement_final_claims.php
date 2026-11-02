@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Schema;
 /**
  * IMP-PS-A3d — المطالبات النهائية بالحركات + الإغلاق الفعلي `reviewed → closed` لمقارنة كشف الطرف. **إضافي: لا مساس بالأستاذ ولا بأي مستند، ولا مفتاح أجنبي إلى جداول الأستاذ.**
  *
- *  - `partner_statement_unit_claims`: مطالبة واحدة لكل **قيد يومية** (`journal_entry_id`) تغطيه مقارنة مُغلقة: قيود الفترة نفسها (`basis = period`) وقيود خارج الفترة استعملتها قرارات المراجعة
- *    (`basis = decision` + سطر الكشف). فهرس فريد جزئي `(tenant, partner, role, journal_entry_id) WHERE released_at IS NULL` يمنع مطالبتين فعّالتين على الحركة نفسها **حتى عبر فترات أو فروع
- *    مختلفة وحتى بـSQL خام**. الجدول append-only في A3d (لا UPDATE ولا DELETE ولا TRUNCATE)؛ `released_at` موجود لإفراج A3e (الإبطال/الاستبدال) ويبقى فارغاً هنا.
+ *  - `partner_statement_unit_claims`: مطالبة واحدة لكل **قيد يومية** (`journal_entry_id`) **استعمله قرار مراجعة فعّال** (`basis = decision` + سطر الكشف) — لا قيود الفترة لمجرد تاريخها (قرار المالك 2026-11-02).
+ *    فهرس فريد جزئي `(tenant, partner, role, journal_entry_id) WHERE released_at IS NULL` يمنع مطالبتين فعّالتين على الحركة نفسها **حتى عبر فترات أو فروع مختلفة وحتى بـSQL خام**. مُشغّل الإدراج يشترط أن يكون
+ *    للسطر قرارٌ فعّال (أحدث نسخة) من نوع confirm/override/link_pair — فلا مطالبة لسطر dismiss/مسحوب — وأن يكون القيد في link_pair هو **العضو المحدَّد صراحةً** فقط. الجدول append-only في A3d (لا UPDATE ولا DELETE
+ *    ولا TRUNCATE)؛ `released_at` موجود لإفراج A3e ويبقى فارغاً هنا.
  *  - `partner_statement_reconciliations`: `closed_at/closed_by/scope_key` (`org` أو معرّف الفرع)، وحالة `closed` الطرفية. حراس القاعدة: الإدراج لا يكون `closed` أبداً؛ لا تحديث لصف `closed`؛ الانتقال
  *    إلى `closed` يتطلب **حدث `close` مطابقاً** (الفاعل = المُغلِق، المراجِع = `reviewed_by` المسجَّل بحدث المراجعة، التشغيلة نفسها، وعدد المطالبات = المسجَّل بالحدث)، **المُغلِق ≠ المراجِع** (D-PS-17)،
  *    وفهرس فريد جزئي لنفس النطاق/الفترة (`WHERE status='closed'`) + قاعدة التطابق التام للفترة (مؤسسة ⇄ فرع) — خطة PS-A2 §5.3–5.4. لا تُدرج مطالبات إلا لمقارنة `reviewed` بالطرف/الدور نفسيهما
@@ -46,8 +47,8 @@ return new class extends Migration
             $table->uuid('partner_id');
             $table->string('role', 16);
             $table->uuid('journal_entry_id');             // قيد اليومية المُطالَب به (بلا مفتاح أجنبي للأستاذ عمداً؛ يتحقق المُشغّل من وجوده وارتباطه بالطرف)
-            $table->string('basis', 16);                  // period | decision
-            $table->uuid('line_id')->nullable();          // سطر الكشف الذي استعمل القيد (basis = decision)
+            $table->string('basis', 16);                  // decision دائماً (A3d)
+            $table->uuid('line_id');                      // سطر الكشف الذي استعمل القيد
             $table->timestamp('claimed_at')->nullable();
             $table->timestamp('released_at')->nullable(); // A3e فقط؛ يبقى فارغاً في A3d
 
@@ -277,7 +278,7 @@ return new class extends Migration
                 ADD CONSTRAINT partner_stmt_claim_shape_chk CHECK (
                     role IN ('customer', 'supplier')
                     AND released_at IS NULL
-                    AND ((basis = 'period' AND line_id IS NULL) OR (basis = 'decision' AND line_id IS NOT NULL))
+                    AND basis = 'decision' AND line_id IS NOT NULL
                 )
             SQL);
         DB::unprepared(<<<'SQL'
@@ -292,9 +293,16 @@ return new class extends Migration
                                 WHERE je.id = NEW.journal_entry_id AND je.tenant_id = NEW.tenant_id AND jl.partner_id = NEW.partner_id) THEN
                     RAISE EXCEPTION 'partner_statement_unit_claims: the claimed entry must belong to this tenant and carry a line for the partner';
                 END IF;
-                IF NEW.line_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM partner_statement_lines l
-                                                             WHERE l.tenant_id = NEW.tenant_id AND l.id = NEW.line_id AND l.reconciliation_id = NEW.reconciliation_id) THEN
+                IF NOT EXISTS (SELECT 1 FROM partner_statement_lines l
+                                WHERE l.tenant_id = NEW.tenant_id AND l.id = NEW.line_id AND l.reconciliation_id = NEW.reconciliation_id) THEN
                     RAISE EXCEPTION 'partner_statement_unit_claims: the statement line must belong to the same reconciliation';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM partner_statement_review_decisions d
+                                WHERE d.tenant_id = NEW.tenant_id AND d.reconciliation_id = NEW.reconciliation_id AND d.line_id = NEW.line_id
+                                  AND d.action IN ('confirm', 'override', 'link_pair')
+                                  AND d.revision = (SELECT MAX(x.revision) FROM partner_statement_review_decisions x WHERE x.tenant_id = d.tenant_id AND x.line_id = d.line_id)
+                                  AND (d.action <> 'link_pair' OR NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END)) THEN
+                    RAISE EXCEPTION 'partner_statement_unit_claims: a claim needs the line''s effective confirm/override/link_pair decision (link_pair: the chosen member only); dismiss and cleared lines claim nothing';
                 END IF;
                 RETURN NEW;
             END
@@ -465,7 +473,7 @@ return new class extends Migration
             WHEN NOT (
                 NEW.role IN ('customer', 'supplier')
                 AND NEW.released_at IS NULL
-                AND ((NEW.basis = 'period' AND NEW.line_id IS NULL) OR (NEW.basis = 'decision' AND NEW.line_id IS NOT NULL))
+                AND NEW.basis = 'decision' AND NEW.line_id IS NOT NULL
             )
             BEGIN
                 SELECT RAISE(ABORT, 'partner_statement_unit_claims: invalid claim shape');
@@ -478,10 +486,15 @@ return new class extends Migration
                                 AND r.partner_id = NEW.partner_id AND r.role = NEW.role)
               OR NOT EXISTS (SELECT 1 FROM journal_entries je JOIN journal_lines jl ON jl.journal_entry_id = je.id AND jl.tenant_id = je.tenant_id
                               WHERE je.id = NEW.journal_entry_id AND je.tenant_id = NEW.tenant_id AND jl.partner_id = NEW.partner_id)
-              OR (NEW.line_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM partner_statement_lines l
-                                                           WHERE l.tenant_id = NEW.tenant_id AND l.id = NEW.line_id AND l.reconciliation_id = NEW.reconciliation_id))
+              OR NOT EXISTS (SELECT 1 FROM partner_statement_lines l
+                              WHERE l.tenant_id = NEW.tenant_id AND l.id = NEW.line_id AND l.reconciliation_id = NEW.reconciliation_id)
+              OR NOT EXISTS (SELECT 1 FROM partner_statement_review_decisions d
+                              WHERE d.tenant_id = NEW.tenant_id AND d.reconciliation_id = NEW.reconciliation_id AND d.line_id = NEW.line_id
+                                AND d.action IN ('confirm', 'override', 'link_pair')
+                                AND d.revision = (SELECT MAX(x.revision) FROM partner_statement_review_decisions x WHERE x.tenant_id = d.tenant_id AND x.line_id = d.line_id)
+                                AND (d.action <> 'link_pair' OR NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END))
             BEGIN
-                SELECT RAISE(ABORT, 'partner_statement_unit_claims: claims need a reviewed reconciliation of the same partner and role, a ledger entry of this tenant for the partner, and a line of the same reconciliation');
+                SELECT RAISE(ABORT, 'partner_statement_unit_claims: claims need a reviewed reconciliation of the same partner and role, a ledger entry of this tenant for the partner, a line of the same reconciliation and that line''s effective confirm/override/link_pair decision (link_pair: the chosen member only)');
             END
             SQL);
         DB::unprepared(<<<'SQL'
