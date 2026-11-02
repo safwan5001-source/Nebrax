@@ -59,8 +59,9 @@ Then, in the same transaction: claims insert → close event (`from reviewed to 
 | `PartnerStatementCloseApiTest` (new, 20) | SQLite ✔ · PostgreSQL ✔ |
 | `PartnerStatementCloseConcurrencyPostgresTest` (new, 6, `pcntl_fork`) | PostgreSQL ✔ (skipped on SQLite by design; absence of pcntl on PG = failure) |
 | `PartnerStatementLifecycleApiTest` (updated: close now needs review, SoD, `not_reviewed` state; wall allows the 3rd update) | SQLite ✔ · PostgreSQL ✔ |
-| Related set (Rbac · Permission · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | __RELATED_SQLITE__ |
-| Full `php artisan test` | __FULL__ |
+| Related set on SQLite (Rbac · Permission · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 419 passed, 23 skipped (PostgreSQL-only), 4 failed — `Fuel*` tests, `bcmath` extension missing in this sandbox (`Call to undefined function bcmul()`), unrelated; they pass in CI |
+| Same family on PostgreSQL (PartnerStatement* · PartnerLedger* · BranchIsolationGuard · ApplicationCatalog, incl. all earlier race suites) | **199 passed (3853 assertions)** |
+| Full `php artisan test` | not run locally; CI runs it on SQLite and PostgreSQL (see PR #1941) |
 
 Coverage highlights: atomic success with claims/event/status and **no financial effect** (row counts of journal/accounts/invoices/payments/stock unchanged) · replay safety · permissions matrix (view-only, reconcile-only, close-without-view, no `partners.view`, viewer, reviewer holding close) · stale ledger / wrong run / changed statement / draft · real conflict across different periods with ids + sample and **no trace** · overlap without shared movement (required / stale-narrow / stale-wide / exact / stale-when-none) · adjacent periods + tolerance window (no conflict) and the counter-case (used outside-period entry conflicts) · `link_pair` member split and same-member conflict (no automatic reversal entry created) · branch finals coexist, organisation/identical-tuple refusal, several-branch restriction · tenant isolation, gate, strict input · raw-SQL attempts (self-close, missing reviewer, wrong count, wrong reviewer/run, closing without/with defective event, claims on closed rows, immutability, identical-period cross-scope and same-scope) with positive controls · migration refusal/reversibility · static wall (no financial writer referenced; writes only events/claims).
 
@@ -94,4 +95,4 @@ Coverage highlights: atomic success with claims/event/status and **no financial 
 
 ## 6. Delivery
 
-Branch / PR / Base SHA / Head SHA / CI / Codex: __DELIVERY__
+Branch `claude/imp-ps-a3d` · PR #1941 · Base `2c0a4148be7402d56fe67daba7e93fa3d6d5c3d8` (main after #1939) · first Head `da984b6ec86899d44e9d918d971da7543cc43a28` · CI and Codex: pending at the time of writing — see the PR. Status: **READY_TO_MERGE after green CI and Codex review** (no merge, deploy or Railway change made).
