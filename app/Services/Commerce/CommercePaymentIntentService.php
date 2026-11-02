@@ -3,9 +3,11 @@
 namespace App\Services\Commerce;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentMethod;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\PaymentMethodChannelAvailabilityService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -107,9 +109,9 @@ final class CommercePaymentIntentService
      *
      * @throws RuntimeException الحالة الحالية ليست قابلة للتحصيل.
      */
-    public function markCollected(CommercePaymentIntent $intent, ?string $note = null): CommercePaymentIntent
+    public function markCollected(CommercePaymentIntent $intent, ?string $note = null, ?User $actor = null): CommercePaymentIntent
     {
-        return DB::transaction(function () use ($intent, $note): CommercePaymentIntent {
+        return DB::transaction(function () use ($intent, $note, $actor): CommercePaymentIntent {
             $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== CommercePaymentIntent::STATUS_AWAITING_COLLECTION || $locked->isOnline()) {
@@ -121,6 +123,17 @@ final class CommercePaymentIntentService
                 'collected_at' => now(),
                 'collection_note' => $note,
             ]);
+
+            // COPS-H1-1: آخر كتابة في المعاملة (بعد قفل النية) ⇒ رأس التغذية آخر قفل. الملاحظة لا تدخل الحدث (قائمة بيضاء بلا نص حر).
+            $order = CommerceOrder::query()->find($locked->commerce_order_id);
+            if ($order !== null) {
+                app(CommerceOrderEventRecorder::class)->append(
+                    $order,
+                    CommerceOrderEvent::PAYMENT_COLLECTED,
+                    $actor !== null ? CommerceOrderEvent::ACTOR_USER : CommerceOrderEvent::ACTOR_SYSTEM,
+                    $actor?->id,
+                );
+            }
 
             return $locked->fresh();
         });

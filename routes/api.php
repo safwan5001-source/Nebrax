@@ -91,6 +91,7 @@ use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelAviController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
+use App\Http\Controllers\Api\FuelStationAuditController;
 use App\Http\Controllers\Api\FuelStationDeviceController;
 use App\Http\Controllers\Api\FuelStationReadinessController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
@@ -1576,6 +1577,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'destroyNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // Cycle 2: حدود التسوية وتعيينات حسابات الفروق إعدادات مدققة: tenant ثم station.
+        Route::get('fuel-stations/audit-events', [FuelStationAuditController::class, 'index'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/settings', [FuelStationSettingsController::class, 'showTenant'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/settings', [FuelStationSettingsController::class, 'updateTenant'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);

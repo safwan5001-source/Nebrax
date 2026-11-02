@@ -26,26 +26,32 @@ use RuntimeException;
  */
 class FuelStationMasterDataService
 {
+    public function __construct(private readonly FuelStationAuditTrail $audit) {}
+
     /** @param array<string, mixed> $data */
-    public function createStation(array $data): FuelStation
+    public function createStation(array $data, ?User $actor = null): FuelStation
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actor) {
             $branch = $this->branch($data['branch_id']);
             $this->assertStationReferences($data, $branch->id);
             $this->assertStationCodeAvailable($data['code']);
 
-            return FuelStation::create([
+            $station = FuelStation::create([
                 ...$this->stationAttributes($data),
                 'branch_id' => $branch->id,
             ]);
+            $this->audit->record('station.created', $station, null, $this->audit->snapshot($station), $actor);
+
+            return $station;
         });
     }
 
     /** @param array<string, mixed> $data */
-    public function updateStation(FuelStation $station, array $data): FuelStation
+    public function updateStation(FuelStation $station, array $data, ?User $actor = null): FuelStation
     {
-        return DB::transaction(function () use ($station, $data) {
+        return DB::transaction(function () use ($station, $data, $actor) {
             $station = FuelStation::lockForUpdate()->findOrFail($station->id);
+            $before = $this->audit->snapshot($station);
             $next = $this->merged($station, $data, [...array_keys($this->stationAttributes($data)), 'branch_id']);
             $branch = $this->branch($next['branch_id']);
             $this->assertStationReferences($next, $branch->id);
@@ -60,28 +66,32 @@ class FuelStationMasterDataService
             }
 
             $station->update([...$this->stationAttributes($next), 'branch_id' => $branch->id]);
+            $this->audit->record('station.updated', $station, $before, $this->audit->snapshot($station->fresh()), $actor);
 
             return $station->fresh($this->stationRelations());
         });
     }
 
-    public function deleteStation(FuelStation $station): void
+    public function deleteStation(FuelStation $station, ?User $actor = null): void
     {
         if ($station->tanks()->exists() || $station->pumps()->exists() || $station->integrationEvents()->exists()) {
             throw new RuntimeException('لا يمكن حذف محطة لها بنية ساحة أو سجل تكامل. عطّلها للاحتفاظ بالأثر التشغيلي.');
         }
 
-        $station->delete();
+        DB::transaction(function () use ($station, $actor) {
+            $this->audit->record('station.deleted', $station, $this->audit->snapshot($station), null, $actor);
+            $station->delete();
+        });
     }
 
     /** @param array<string, mixed> $data */
-    public function createFuelProduct(array $data): FuelProduct
+    public function createFuelProduct(array $data, ?User $actor = null): FuelProduct
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actor) {
             $product = $this->product($data['product_id']);
             $this->assertFuelProductCodeAvailable($data['code']);
 
-            return FuelProduct::create([
+            $fuelProduct = FuelProduct::create([
                 'product_id' => $product->id,
                 'code' => trim($data['code']),
                 'name' => trim($data['name']),
@@ -89,14 +99,18 @@ class FuelStationMasterDataService
                 'tax_category' => $this->nullableTrim($data['tax_category'] ?? null),
                 'is_active' => $data['is_active'] ?? true,
             ]);
+            $this->audit->record('fuel_product.created', $fuelProduct, null, $this->audit->snapshot($fuelProduct), $actor);
+
+            return $fuelProduct;
         });
     }
 
     /** @param array<string, mixed> $data */
-    public function updateFuelProduct(FuelProduct $fuelProduct, array $data): FuelProduct
+    public function updateFuelProduct(FuelProduct $fuelProduct, array $data, ?User $actor = null): FuelProduct
     {
-        return DB::transaction(function () use ($fuelProduct, $data) {
+        return DB::transaction(function () use ($fuelProduct, $data, $actor) {
             $fuelProduct = FuelProduct::lockForUpdate()->findOrFail($fuelProduct->id);
+            $before = $this->audit->snapshot($fuelProduct);
             $nextProductId = array_key_exists('product_id', $data) ? $data['product_id'] : $fuelProduct->product_id;
             $nextCode = array_key_exists('code', $data) ? trim($data['code']) : $fuelProduct->code;
             $this->product($nextProductId);
@@ -115,23 +129,28 @@ class FuelStationMasterDataService
                 'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : $fuelProduct->is_active,
             ]);
 
+            $this->audit->record('fuel_product.updated', $fuelProduct, $before, $this->audit->snapshot($fuelProduct->fresh()), $actor);
+
             return $fuelProduct->fresh('product');
         });
     }
 
-    public function deleteFuelProduct(FuelProduct $fuelProduct): void
+    public function deleteFuelProduct(FuelProduct $fuelProduct, ?User $actor = null): void
     {
         if ($fuelProduct->tanks()->exists() || $fuelProduct->nozzles()->exists()) {
             throw new RuntimeException('لا يمكن حذف منتج وقود مرتبط بخزان أو فوهة. عطّله للحفاظ على الخرائط.');
         }
 
-        $fuelProduct->delete();
+        DB::transaction(function () use ($fuelProduct, $actor) {
+            $this->audit->record('fuel_product.deleted', $fuelProduct, $this->audit->snapshot($fuelProduct), null, $actor);
+            $fuelProduct->delete();
+        });
     }
 
     /** @param array<string, mixed> $data */
-    public function createTank(array $data): FuelTank
+    public function createTank(array $data, ?User $actor = null): FuelTank
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actor) {
             $station = $this->station($data['fuel_station_id']);
             $fuelProduct = $this->fuelProduct($data['fuel_product_id']);
             $attributes = $this->tankAttributes($data, $station, $fuelProduct);
@@ -140,16 +159,18 @@ class FuelStationMasterDataService
 
             $tank = FuelTank::create($attributes);
             $this->syncCalibration($tank, $data['calibration_points'] ?? []);
+            $this->audit->record('tank.created', $tank, null, $this->tankSnapshot($tank->fresh('calibrationPoints')), $actor);
 
             return $tank->fresh('calibrationPoints');
         });
     }
 
     /** @param array<string, mixed> $data */
-    public function updateTank(FuelTank $tank, array $data): FuelTank
+    public function updateTank(FuelTank $tank, array $data, ?User $actor = null): FuelTank
     {
-        return DB::transaction(function () use ($tank, $data) {
+        return DB::transaction(function () use ($tank, $data, $actor) {
             $tank = FuelTank::lockForUpdate()->findOrFail($tank->id);
+            $before = $this->tankSnapshot($tank->loadMissing('calibrationPoints'));
             $next = $this->merged($tank, $data, [
                 'fuel_station_id', 'fuel_product_id', 'code', 'name', 'capacity_milliliters',
                 'safe_capacity_milliliters', 'minimum_level_milliliters', 'dead_stock_milliliters',
@@ -169,38 +190,46 @@ class FuelStationMasterDataService
             if (array_key_exists('calibration_points', $data)) {
                 $this->syncCalibration($tank, $data['calibration_points'] ?? []);
             }
+            $this->audit->record('tank.updated', $tank, $before, $this->tankSnapshot($tank->fresh('calibrationPoints')), $actor);
 
             return $tank->fresh('calibrationPoints');
         });
     }
 
-    public function deleteTank(FuelTank $tank): void
+    public function deleteTank(FuelTank $tank, ?User $actor = null): void
     {
         if ($tank->nozzles()->exists()) {
             throw new RuntimeException('لا يمكن حذف خزان مرتبط بفوهة. أزل خريطة الفوهة أولاً.');
         }
 
-        $tank->delete();
+        DB::transaction(function () use ($tank, $actor) {
+            $this->audit->record('tank.deleted', $tank, $this->tankSnapshot($tank->loadMissing('calibrationPoints')), null, $actor);
+            $tank->delete();
+        });
     }
 
     /** @param array<string, mixed> $data */
-    public function createPump(array $data): FuelPump
+    public function createPump(array $data, ?User $actor = null): FuelPump
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actor) {
             $station = $this->station($data['fuel_station_id']);
             $attributes = $this->pumpAttributes($data, $station);
             $this->assertPumpNumberAvailable($station, $attributes['pump_number']);
             $this->assertControllerKeyAvailable(FuelPump::class, $attributes['controller_key']);
 
-            return FuelPump::create($attributes);
+            $pump = FuelPump::create($attributes);
+            $this->audit->record('pump.created', $pump, null, $this->audit->snapshot($pump), $actor);
+
+            return $pump;
         });
     }
 
     /** @param array<string, mixed> $data */
-    public function updatePump(FuelPump $pump, array $data): FuelPump
+    public function updatePump(FuelPump $pump, array $data, ?User $actor = null): FuelPump
     {
-        return DB::transaction(function () use ($pump, $data) {
+        return DB::transaction(function () use ($pump, $data, $actor) {
             $pump = FuelPump::lockForUpdate()->findOrFail($pump->id);
+            $before = $this->audit->snapshot($pump);
             $next = $this->merged($pump, $data, ['fuel_station_id', 'pump_number', 'name', 'controller_key', 'status']);
             $station = $this->station($next['fuel_station_id']);
             $attributes = $this->pumpAttributes($next, $station);
@@ -212,37 +241,45 @@ class FuelStationMasterDataService
             }
 
             $pump->update($attributes);
+            $this->audit->record('pump.updated', $pump, $before, $this->audit->snapshot($pump->fresh()), $actor);
 
             return $pump->fresh('nozzles');
         });
     }
 
-    public function deletePump(FuelPump $pump): void
+    public function deletePump(FuelPump $pump, ?User $actor = null): void
     {
         if ($pump->nozzles()->exists()) {
             throw new RuntimeException('لا يمكن حذف مضخة لها فوهات. احذف الفوهات أولاً.');
         }
 
-        $pump->delete();
-    }
-
-    /** @param array<string, mixed> $data */
-    public function createNozzle(array $data): FuelNozzle
-    {
-        return DB::transaction(function () use ($data) {
-            $attributes = $this->nozzleAttributes($data);
-            $this->assertNozzleNumberAvailable($attributes['fuel_pump_id'], $attributes['nozzle_number']);
-            $this->assertControllerKeyAvailable(FuelNozzle::class, $attributes['controller_key']);
-
-            return FuelNozzle::create($attributes);
+        DB::transaction(function () use ($pump, $actor) {
+            $this->audit->record('pump.deleted', $pump, $this->audit->snapshot($pump), null, $actor);
+            $pump->delete();
         });
     }
 
     /** @param array<string, mixed> $data */
-    public function updateNozzle(FuelNozzle $nozzle, array $data): FuelNozzle
+    public function createNozzle(array $data, ?User $actor = null): FuelNozzle
     {
-        return DB::transaction(function () use ($nozzle, $data) {
+        return DB::transaction(function () use ($data, $actor) {
+            $attributes = $this->nozzleAttributes($data);
+            $this->assertNozzleNumberAvailable($attributes['fuel_pump_id'], $attributes['nozzle_number']);
+            $this->assertControllerKeyAvailable(FuelNozzle::class, $attributes['controller_key']);
+
+            $nozzle = FuelNozzle::create($attributes);
+            $this->audit->record('nozzle.created', $nozzle, null, $this->audit->snapshot($nozzle), $actor);
+
+            return $nozzle;
+        });
+    }
+
+    /** @param array<string, mixed> $data */
+    public function updateNozzle(FuelNozzle $nozzle, array $data, ?User $actor = null): FuelNozzle
+    {
+        return DB::transaction(function () use ($nozzle, $data, $actor) {
             $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzle->id);
+            $before = $this->audit->snapshot($nozzle);
             $next = $this->merged($nozzle, $data, [
                 'fuel_pump_id', 'fuel_tank_id', 'fuel_product_id', 'nozzle_number', 'controller_key',
                 'meter_opening_milliliters', 'status',
@@ -251,14 +288,28 @@ class FuelStationMasterDataService
             $this->assertNozzleNumberAvailable($attributes['fuel_pump_id'], $attributes['nozzle_number'], $nozzle->id);
             $this->assertControllerKeyAvailable(FuelNozzle::class, $attributes['controller_key'], $nozzle->id);
             $nozzle->update($attributes);
+            $this->audit->record('nozzle.updated', $nozzle, $before, $this->audit->snapshot($nozzle->fresh()), $actor);
 
             return $nozzle->fresh(['pump', 'tank', 'fuelProduct']);
         });
     }
 
-    public function deleteNozzle(FuelNozzle $nozzle): void
+    public function deleteNozzle(FuelNozzle $nozzle, ?User $actor = null): void
     {
-        $nozzle->delete();
+        DB::transaction(function () use ($nozzle, $actor) {
+            $this->audit->record('nozzle.deleted', $nozzle, $this->audit->snapshot($nozzle), null, $actor);
+            $nozzle->delete();
+        });
+    }
+
+    /** @return array<string,mixed> لقطة الخزان مع نقاط المعايرة (ارتفاع/حجم فقط). */
+    private function tankSnapshot(FuelTank $tank): array
+    {
+        return $this->audit->snapshot($tank) + [
+            'calibration_points' => $tank->calibrationPoints
+                ->map(fn ($point) => ['level_millimeters' => (int) $point->level_millimeters, 'volume_milliliters' => (int) $point->volume_milliliters])
+                ->sortBy('level_millimeters')->values()->all(),
+        ];
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */

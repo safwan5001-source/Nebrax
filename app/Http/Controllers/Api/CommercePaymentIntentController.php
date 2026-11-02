@@ -53,7 +53,7 @@ class CommercePaymentIntentController extends ApiController
         $data = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:1000']]);
         $intent = CommercePaymentIntent::findOrFail($id);
 
-        $intent = $this->domain(fn () => $intents->markCollected($intent, $data['note'] ?? null));
+        $intent = $this->domain(fn () => $intents->markCollected($intent, $data['note'] ?? null, $request->user()));
 
         return response()->json(['data' => $this->serialize($intent)]);
     }

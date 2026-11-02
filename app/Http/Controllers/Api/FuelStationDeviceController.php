@@ -62,11 +62,11 @@ class FuelStationDeviceController extends ApiController
         return (new FuelStationDeviceResource($updated))->response();
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $device = FuelStationDevice::findOrFail($id);
         $this->accessibleStation($device->fuel_station_id);
-        $this->domain(fn () => $this->devices->delete($device));
+        $this->domain(fn () => $this->devices->delete($device, $request->user()));
 
         return response()->json([], 204);
     }
