@@ -6,14 +6,19 @@
  * Pure and dependency-free so the same code runs in the browser and Node inits and can be unit-tested without the SDK.
  * It rewrites only the single path segment after `/track/`; everything else in the payload is left untouched.
  */
-const TRACK_SEGMENT = /(\/track\/)[^/?#\s"'\\]+/gi;
+// The page path (`/track/{token}`) and the backend API path the storefront server calls (`/store/v1/order-tracking/{token}`).
+const TRACK_SEGMENT = /(\/(?:track|order-tracking)\/)[^/?#\s"'\\]+/gi;
+// The bare token shape, wherever it appears (headers, bodies, messages) even without a path around it.
+const BARE_TOKEN = /trk1\.[0-9a-f-]{36}\.\d+\.[0-9a-f]{16,}/gi;
 const REDACTED = "[redacted]";
 const MAX_DEPTH = 10;
 
 export function redactTrackingPath(value: string): string {
-  return value.includes("/track/")
-    ? value.replace(TRACK_SEGMENT, `$1${REDACTED}`)
-    : value;
+  let out = value;
+  if (out.includes("/track/") || out.includes("/order-tracking/")) {
+    out = out.replace(TRACK_SEGMENT, `$1${REDACTED}`);
+  }
+  return out.includes("trk1.") ? out.replace(BARE_TOKEN, REDACTED) : out;
 }
 
 function walk(value: unknown, depth: number, seen: WeakSet<object>): unknown {

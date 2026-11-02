@@ -78,4 +78,22 @@ describe("guest tracking token scrubbing (COPS-H2-5 review)", () => {
       }).url,
     ).toBe("https://shop.example/sa/en/track/[redacted]");
   });
+
+  it("also redacts the backend API path and a bare token anywhere (review P2)", () => {
+    expect(
+      redactTrackingPath(
+        `https://api.example/api/store/v1/order-tracking/${TOKEN}`,
+      ),
+    ).toBe("https://api.example/api/store/v1/order-tracking/[redacted]");
+    const span = {
+      data: {
+        "http.url": `https://api.example/store/v1/order-tracking/${TOKEN}`,
+      },
+      description: `GET https://api.example/store/v1/order-tracking/${TOKEN}`,
+      extra: `token=${TOKEN} end`,
+    };
+    const scrubbed = JSON.stringify(scrubTrackingCredentials(span));
+    expect(scrubbed).not.toContain(TOKEN);
+    expect(scrubbed).not.toContain("trk1.");
+  });
 });

@@ -32,19 +32,30 @@ describe("TrackingRouteTelemetryGate (COPS-H2-5 review)", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("fails closed in the shell: every third-party telemetry script sits behind the gate and Vercel events are redacted", () => {
+  it("fails closed in the shell: every third-party telemetry script sits behind the gate", () => {
     const source = readFileSync(
       join(__dirname, "../DocumentShell.tsx"),
       "utf8",
     );
     // Each tag must be inside a TrackingRouteTelemetryGate element, never bare.
-    for (const tag of ["<GoogleTagManager", "<Analytics", "<SpeedInsights"]) {
+    for (const tag of ["<GoogleTagManager", "<VercelTelemetry"]) {
       const at = source.indexOf(tag);
       expect(at, tag).toBeGreaterThan(-1);
       const gateOpen = source.lastIndexOf("<TrackingRouteTelemetryGate>", at);
       const gateClose = source.lastIndexOf("</TrackingRouteTelemetryGate>", at);
       expect(gateOpen, `${tag} is not wrapped`).toBeGreaterThan(gateClose);
     }
+    // The Vercel packages must not be rendered (or given function props) from this Server Component.
+    expect(source).not.toMatch(/<(Analytics|SpeedInsights)\b/);
+    expect(source).not.toContain("beforeSend");
+  });
+
+  it("attaches the Vercel beforeSend callbacks inside a Client Component (functions cannot cross the server boundary)", () => {
+    const source = readFileSync(
+      join(__dirname, "../VercelTelemetry.tsx"),
+      "utf8",
+    );
+    expect(source.trimStart().startsWith('"use client"')).toBe(true);
     expect(source.match(/beforeSend=\{redactTrackingEventUrl\}/g)).toHaveLength(
       2,
     );

@@ -1,6 +1,4 @@
 import { GoogleTagManager } from "@next/third-parties/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import {
   Alexandria,
   Almarai,
@@ -21,8 +19,8 @@ import {
 import localFont from "next/font/local";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
-import { redactTrackingEventUrl } from "@/lib/telemetry/scrub-tracking";
 import { TrackingRouteTelemetryGate } from "./TrackingRouteTelemetryGate";
+import { VercelTelemetry } from "./VercelTelemetry";
 
 const gtmId = process.env.GTM_ID;
 
@@ -337,8 +335,7 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
         {process.env.VERCEL ? (
           <Suspense fallback={null}>
             <TrackingRouteTelemetryGate>
-              <Analytics beforeSend={redactTrackingEventUrl} />
-              <SpeedInsights beforeSend={redactTrackingEventUrl} />
+              <VercelTelemetry />
             </TrackingRouteTelemetryGate>
           </Suspense>
         ) : null}
