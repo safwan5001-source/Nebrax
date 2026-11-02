@@ -56,6 +56,7 @@ class CommerceModuleBoundaryTest extends TestCase
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
         // H6 Batch F — إعدادات تسعير قناة الويب (commerce.channel_settings.manage؛ إعداد فقط، لا تفعيل للجملة).
+        'api/commerce/channels/{id}/operations-settings', // COPS-H1-3: إعدادات تشغيل القناة (القبول فقط، commerce.channel_settings.manage)
         'api/commerce/channels/{id}/pricing-settings',
         // COMMERCE-ORDERS-O1a — طلبات المتجر للموظف (قراءة فقط، commerce.orders.view).
         'api/commerce/orders',
