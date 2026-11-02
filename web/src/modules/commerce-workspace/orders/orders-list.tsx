@@ -15,6 +15,8 @@ import { formatDateTime } from '@/lib/formatting';
 import { ACTIVE_STORE_QUERY_PARAM, withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
+  ACCEPTANCE_STATUSES,
+  acceptanceBadgeOf,
   DELIVERY_METHODS,
   ORDERS_PER_PAGE_OPTIONS,
   ORDERS_Q_MIN,
@@ -31,7 +33,7 @@ import {
   type OrdersMeta,
 } from './contract';
 import { ordersMessages } from './messages';
-import { OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
+import { AcceptanceBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrders } from './orders-api';
 
 /** يحفظ استعلام القائمة لهذا التبويب فتعود صفحة التفاصيل إلى الصفحة/التصفية نفسها. */
@@ -168,7 +170,7 @@ export function OrdersList() {
   }, [stores]);
 
   const hasFilters = Boolean(
-    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.from || state.to,
+    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.acceptanceStatus || state.from || state.to,
   );
 
   const detailHref = useCallback((id: string) => withStoreParam(`/commerce/orders/${id}`, activeStoreId), [activeStoreId]);
@@ -227,6 +229,13 @@ export function OrdersList() {
         cell: ({ row }) => <PaymentStatusBadge status={row.original.payment.status} locale={locale} />,
       },
       {
+        id: 'acceptance',
+        header: t('acceptanceColumn'),
+        enableSorting: false,
+        accessorFn: (o) => o.operational_status ?? '',
+        cell: ({ row }) => (acceptanceBadgeOf(row.original) === null ? <span className="text-muted">—</span> : <AcceptanceBadge order={row.original} locale={locale} />),
+      },
+      {
         id: 'status',
         header: t('orderStatus'),
         enableSorting: false,
@@ -257,6 +266,18 @@ export function OrdersList() {
 
   return (
     <div className="space-y-4">
+      {/* اختصار للتاجر (جوال أولاً): يفعّل مرشّح الخادم نفسه `acceptance_status=awaiting_acceptance`؛ لا حالة محلية ولا عدّاد مخترع. */}
+      <div>
+        <Button
+          type="button"
+          size="sm"
+          variant={state.acceptanceStatus === 'awaiting_acceptance' ? 'primary' : 'outline'}
+          aria-pressed={state.acceptanceStatus === 'awaiting_acceptance'}
+          onClick={() => update({ acceptanceStatus: state.acceptanceStatus === 'awaiting_acceptance' ? '' : 'awaiting_acceptance' })}
+        >
+          {t('quickAwaiting')}
+        </Button>
+      </div>
       <section aria-label={t('filtersLabel')} className="rounded border border-border bg-surface p-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label={t('search')} className="sm:col-span-2">
@@ -335,6 +356,16 @@ export function OrdersList() {
               ))}
             </Select>
           </Field>
+          <Field label={t('acceptanceStatus')}>
+            <Select value={state.acceptanceStatus} aria-label={t('acceptanceStatus')} onChange={(event) => update({ acceptanceStatus: event.target.value })}>
+              <option value="">{t('allAcceptanceStatuses')}</option>
+              {ACCEPTANCE_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {label('acceptanceFilter', value)}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label={t('dateFrom')}>
             <Input type="date" value={state.from} max={state.to || undefined} aria-label={t('dateFrom')} onChange={(event) => update({ from: event.target.value })} />
           </Field>
@@ -351,7 +382,7 @@ export function OrdersList() {
           </Field>
           {hasFilters ? (
             <div className="flex items-end">
-              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', from: '', to: '' }); }}>
+              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', acceptanceStatus: '', from: '', to: '' }); }}>
                 {t('clearFilters')}
               </Button>
             </div>
@@ -388,6 +419,7 @@ export function OrdersList() {
                 <span className="flex flex-wrap items-center gap-1.5">
                   <OrderStatusBadge status={lifecycleOf(order)} locale={locale} />
                   <PaymentStatusBadge status={order.payment.status} locale={locale} />
+                  <AcceptanceBadge order={order} locale={locale} />
                 </span>
               ),
               meta: formatDateTime(order.created_at, locale),

@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { formatMinorRiyal, minorToRiyal } from '@/lib/money';
-import type { Money } from './contract';
+import { acceptanceBadgeOf, type AcceptanceBadgeKind, type Money, type OrderSummary } from './contract';
 import { ordersMessages } from './messages';
 
 type Tone = 'neutral' | 'muted' | 'positive' | 'warning' | 'negative';
@@ -36,4 +36,15 @@ export function PaymentStatusBadge({ status, locale }: { status: string | null; 
   if (!status) return <Badge tone="muted">{t('payment.none')}</Badge>;
 
   return <Badge tone={PAYMENT_TONE[status] ?? 'muted'}>{label('payment', status)}</Badge>;
+}
+
+const ACCEPTANCE_TONE: Record<AcceptanceBadgeKind, Tone> = { rejected: 'negative', accepted: 'positive', awaiting: 'warning', auto: 'muted' };
+
+/** شارة القبول (H1-5): بُعد مستقل عن شارتي الطلب والدفع. تغيب (null) حين لا بيانات قبول أو حالة لا تخصّه. */
+export function AcceptanceBadge({ order, locale }: { order: Pick<OrderSummary, 'acceptance' | 'operational_status' | 'cancellation'>; locale: string }) {
+  const kind = acceptanceBadgeOf(order);
+  if (kind === null) return null;
+  const { label } = ordersMessages(locale);
+
+  return <Badge tone={ACCEPTANCE_TONE[kind]}>{label('acceptanceBadge', kind)}</Badge>;
 }
