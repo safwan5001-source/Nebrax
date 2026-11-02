@@ -850,6 +850,8 @@
     "backPlatform": "Back to the platform console"
   },
   "common": {
+    "listTruncated": "Showing {loaded} of {total} records; the summaries above are calculated from the loaded rows only.",
+    "loadMore": "Load more",
     "refresh": "Refresh",
     "active": "Active",
     "inactive": "Inactive",
