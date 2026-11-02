@@ -3,6 +3,7 @@
 namespace App\Services\Commerce;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
@@ -244,6 +245,13 @@ final class CommerceOnlinePaymentService
             ])->save();
             // H4-02: طلب مدفوع ⇒ حجزه لا ينتهي بالموعد (يبقى حتى الإصدار المحاسبي).
             app(CommerceOrderReservationService::class)->makePermanent((string) $intent->commerce_order_id);
+
+            // COPS-H1-1: فرع الانتقال الفعلي وحده (النية المدفوعة سابقاً تعود أعلاه بلا حدث)؛ آخر كتابة ⇒ رأس التغذية آخر قفل. كل مستدعي
+            // هذه الدالة (المستمع بعد الالتزام، المكنسة، runPending، start/status من المتحكّم) يفتحها معاملة عليا بلا معاملة خارجية.
+            $order = CommerceOrder::query()->find($intent->commerce_order_id);
+            if ($order !== null) {
+                app(CommerceOrderEventRecorder::class)->append($order, CommerceOrderEvent::PAYMENT_PAID, CommerceOrderEvent::ACTOR_SYSTEM);
+            }
 
             return 'paid';
         });

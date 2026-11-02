@@ -15,6 +15,8 @@ use RuntimeException;
  */
 class FuelStationDeviceService
 {
+    public function __construct(private readonly FuelStationAuditTrail $audit) {}
+
     /** @var list<string> */
     private const TYPES = [
         FuelStationDevice::TYPE_FORECOURT_CONTROLLER,
@@ -39,25 +41,30 @@ class FuelStationDeviceService
         $adapterKey = $this->key($data['adapter_key'], 'معرف المحول');
         $this->assertDeviceKeyAvailable($deviceKey);
 
-        return FuelStationDevice::create([
-            'tenant_id' => $station->tenant_id,
-            'branch_id' => $station->branch_id,
-            'fuel_station_id' => $station->id,
-            'device_key' => $deviceKey,
-            'name' => $this->requiredText($data['name'], 'اسم الجهاز', 160),
-            'device_type' => $type,
-            'status' => $this->status($data['status'] ?? FuelStationDevice::STATUS_ACTIVE),
-            'adapter_key' => $adapterKey,
-            'manufacturer' => $this->nullableText($data['manufacturer'] ?? null, 120),
-            'model' => $this->nullableText($data['model'] ?? null, 120),
-            'serial_number' => $this->nullableText($data['serial_number'] ?? null, 160),
-            'firmware_version' => $this->nullableText($data['firmware_version'] ?? null, 120),
-            'protocol' => $this->nullableText($data['protocol'] ?? null, 64),
-            'external_identifier' => $this->nullableText($data['external_identifier'] ?? null, 160),
-            'endpoint_metadata' => $this->safeMetadata($data['endpoint_metadata'] ?? null),
-            'credential_reference' => $this->credentialReference($data['credential_reference'] ?? null),
-            'created_by' => $actor->id,
-        ]);
+        return DB::transaction(function () use ($station, $deviceKey, $type, $adapterKey, $data, $actor) {
+            $device = FuelStationDevice::create([
+                'tenant_id' => $station->tenant_id,
+                'branch_id' => $station->branch_id,
+                'fuel_station_id' => $station->id,
+                'device_key' => $deviceKey,
+                'name' => $this->requiredText($data['name'], 'اسم الجهاز', 160),
+                'device_type' => $type,
+                'status' => $this->status($data['status'] ?? FuelStationDevice::STATUS_ACTIVE),
+                'adapter_key' => $adapterKey,
+                'manufacturer' => $this->nullableText($data['manufacturer'] ?? null, 120),
+                'model' => $this->nullableText($data['model'] ?? null, 120),
+                'serial_number' => $this->nullableText($data['serial_number'] ?? null, 160),
+                'firmware_version' => $this->nullableText($data['firmware_version'] ?? null, 120),
+                'protocol' => $this->nullableText($data['protocol'] ?? null, 64),
+                'external_identifier' => $this->nullableText($data['external_identifier'] ?? null, 160),
+                'endpoint_metadata' => $this->safeMetadata($data['endpoint_metadata'] ?? null),
+                'credential_reference' => $this->credentialReference($data['credential_reference'] ?? null),
+                'created_by' => $actor->id,
+            ]);
+            $this->audit->record('device.created', $device, null, $this->audit->snapshot($device), $actor);
+
+            return $device;
+        });
     }
 
     public function update(FuelStationDevice $device, array $data, User $actor): FuelStationDevice
@@ -70,6 +77,7 @@ class FuelStationDeviceService
             $nextStatus = array_key_exists('status', $data) ? $this->status($data['status']) : $device->status;
             $nextKey = array_key_exists('device_key', $data) ? $this->key($data['device_key'], 'معرف الجهاز') : $device->device_key;
             $this->assertDeviceKeyAvailable($nextKey, $device->id);
+            $before = $this->audit->snapshot($device);
 
             if ($device->events()->exists() && $nextKey !== $device->device_key) {
                 throw new RuntimeException('لا يمكن تغيير معرف مصدر جهاز له أحداث تكامل مسجلة؛ عطّل الجهاز أو سجّل جهازاً جديداً.');
@@ -94,14 +102,19 @@ class FuelStationDeviceService
                 'credential_reference' => array_key_exists('credential_reference', $data) ? $this->credentialReference($data['credential_reference']) : $device->credential_reference,
             ]);
 
+            $this->audit->record('device.updated', $device, $before, $this->audit->snapshot($device->fresh()), $actor);
+
             return $device->fresh(['station', 'createdBy']);
         });
     }
 
-    public function delete(FuelStationDevice $device): void
+    public function delete(FuelStationDevice $device, ?User $actor = null): void
     {
         $this->assertDeviceTenant($device);
-        $device->delete();
+        DB::transaction(function () use ($device, $actor) {
+            $this->audit->record('device.deleted', $device, $this->audit->snapshot($device), null, $actor);
+            $device->delete();
+        });
     }
 
     public function activeSource(string $stationId, string $deviceKey, string $adapterKey): FuelStationDevice

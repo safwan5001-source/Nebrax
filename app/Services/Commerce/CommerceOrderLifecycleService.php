@@ -3,6 +3,7 @@
 namespace App\Services\Commerce;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Models\CommerceOrderPosting;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
@@ -32,6 +33,7 @@ final class CommerceOrderLifecycleService
         private readonly CommerceOnlinePaymentService $online,
         private readonly CommerceOrderReservationService $reservations,
         private readonly OrderCancellationCleanup $cleanup,
+        private readonly CommerceOrderEventRecorder $events,
     ) {}
 
     /**
@@ -90,6 +92,9 @@ final class CommerceOrderLifecycleService
                 'cancellation_reason' => $reason,
                 'cancellation_note' => $note,
             ])->save();
+
+            // COPS-H1-1: آخر كتابة في المعاملة (بعد النية والطلب والحجز) — رأس التغذية آخر قفل. الفرع idempotent أعلاه لا يصل هنا.
+            $this->events->append($locked, CommerceOrderEvent::ORDER_CANCELLED, CommerceOrderEvent::ACTOR_USER, (string) $actor->id, ['reason' => $reason]);
 
             return $locked->fresh();
         });

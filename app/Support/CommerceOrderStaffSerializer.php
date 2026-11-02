@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
 use App\Models\CommerceOrderPosting;
 use App\Models\PaymentAttempt;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
@@ -55,7 +56,11 @@ final class CommerceOrderStaffSerializer
      * @param  Collection<int, PaymentAttempt>  $attempts  محاولات النية الإلكترونية (الأحدث أولاً)
      * @return array<string, mixed>
      */
-    public static function detail(CommerceOrder $order, string $currency, Collection $attempts, ?CommerceOrderPosting $posting): array
+    /**
+     * @param  Collection<int, CommerceOrderEvent>|null  $events  أحداث الطلب مرتبةً بـ`feed_seq` (COPS-H1-1)؛ null ⇒ خط زمني فارغ
+     * @param  array<string, string>  $userNames  أسماء الموظفين الفاعلين (معرّف ⇒ اسم)، محمَّلة باستعلام واحد
+     */
+    public static function detail(CommerceOrder $order, string $currency, Collection $attempts, ?CommerceOrderPosting $posting, ?Collection $events = null, array $userNames = []): array
     {
         $snapshot = $order->snapshot;
         $intent = $order->paymentIntent;
@@ -130,6 +135,17 @@ final class CommerceOrderStaffSerializer
                     'accounting_date' => $posting->accounting_date?->toDateString(),
                     'amount' => self::money((int) $posting->amount_minor, $currency),
                 ],
+            // COPS-H1-1: خط زمني تدقيقي إضافي (قراءة فقط). الفاعل: موظف باسمه، أو عميل/ضيف/نظام بلا هوية. `data` قائمة بيضاء محفوظة عند الكتابة.
+            'timeline' => ($events ?? collect())->map(fn (CommerceOrderEvent $e) => [
+                'seq' => $e->feed_seq,
+                'type' => $e->type,
+                'at' => $e->occurred_at?->toIso8601String(),
+                'actor' => [
+                    'type' => $e->actor_type,
+                    'name' => $e->actor_type === CommerceOrderEvent::ACTOR_USER ? ($userNames[(string) $e->actor_id] ?? null) : null,
+                ],
+                'data' => (object) array_intersect_key($e->data ?? [], array_flip(CommerceOrderEvent::DATA_KEYS[$e->type] ?? [])),
+            ])->values()->all(),
         ];
     }
 
