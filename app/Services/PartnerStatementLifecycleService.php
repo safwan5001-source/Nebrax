@@ -92,9 +92,9 @@ final class PartnerStatementLifecycleService
             'final' => $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED ? [
                 'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
                 'claims_count' => $this->claims->countFor((string) $reconciliation->id),
-                // قيود الفترة غير المُطالَب بها (غائبة عن الكشف): استثناء ظاهر لا حجز (قرار المالك، 2026-11-02).
-                'unclaimed_in_period' => PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
-                    ->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first()?->summary['unclaimed_in_period'] ?? null,
+                // قيود الفترة غير المُطالَب بها (غائبة عن الكشف): استثناء ظاهر لا حجز (قرار المالك، 2026-11-02). تحمل معرّفات قيود وأرقامها وتواريخها من **نطاق تشغيلة الإغلاق**
+                // فلا تُعرض إلا لمن يقرأ تلك التشغيلة (كما يرشّح `events()`): مستخدم مقيَّد بفرع لا يرى قيود فروع أخرى (Codex #1941).
+                'unclaimed_in_period' => $this->unclaimedExceptions($actor, $reconciliation),
             ] : null,
         ];
     }
@@ -301,6 +301,23 @@ final class PartnerStatementLifecycleService
         }, 3);
 
         return ['replayed' => $replayed, 'status' => $this->status($actor, $reconciliationId, $run->id)];
+    }
+
+    /**
+     * استثناءات الإغلاق (`unclaimed_in_period`) من حدث الإغلاق الأخير — **لقارئ تشغيلة الإغلاق وحده**؛ غيره `null` (لا عدد ولا عيّنة).
+     *
+     * @return ?array<string, mixed>
+     */
+    private function unclaimedExceptions(User $actor, PartnerStatementReconciliation $reconciliation): ?array
+    {
+        $event = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
+            ->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first();
+        $run = $event === null || $event->run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($event->run_id)->first();
+        if ($event === null || $run === null || ! $this->matching->readable($actor, $run)) {
+            return null;
+        }
+
+        return $event->summary['unclaimed_in_period'] ?? null;
     }
 
     /**

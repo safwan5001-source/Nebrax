@@ -531,6 +531,31 @@ class PartnerStatementCloseApiTest extends TestCase
     }
 
     /** @test */
+    public function the_status_never_shows_unclaimed_entries_of_a_close_run_the_caller_cannot_read(): void
+    {
+        $inside = Branch::create(['code' => 'VIS', 'name' => 'فرع ظاهر']);
+        $other = Branch::create(['code' => 'HID', 'name' => 'فرع آخر']);
+        $a = $this->invoice('2026-09-01', 100000, $inside->id);
+        $hidden = $this->invoice('2026-09-12', 50000, $other->id);   // قيد فرع آخر غائب عن الكشف ⇒ استثناء بنطاق المؤسسة
+        [$id, $run] = $this->ready([['date' => '2026-09-01', 'credit' => 115000, 'act' => 'override', 'units' => ['invoice#'.$a->id]]]);
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+
+        $restricted = $this->role('ps-vis', ['partner_statements.view', 'partners.view'], 'vis@ps-a3d.test');
+        User::query()->where('email', 'vis@ps-a3d.test')->firstOrFail()->branches()->sync([$inside->id]);
+
+        // القارئ المطلق (مؤسسة) يرى الاستثناء بعيّنته؛ المقيَّد بفرع لا تُقرأ له تشغيلة المؤسسة فلا عدد ولا عيّنة ولا معرّفات قيود.
+        $full = $this->lcStatus($this->closer, $id)->assertOk();
+        $this->assertSame(1, $full->json('data.final.unclaimed_in_period.count'));
+        $this->assertSame($this->entryOf($hidden)->id, $full->json('data.final.unclaimed_in_period.sample.0.entry_id'));
+        $seen = $this->lcStatus($restricted, $id)->assertOk();
+        $this->assertSame('closed', $seen->json('data.reconciliation.status'));
+        $this->assertNull($seen->json('data.final.unclaimed_in_period'));
+        $this->assertStringNotContainsString($this->entryOf($hidden)->id, (string) $seen->getContent());
+        $this->assertStringNotContainsString($this->entryOf($hidden)->number, (string) $seen->getContent());
+        $this->assertSame([], $this->events($restricted, $id)->assertOk()->json('data') === [] ? [] : array_filter($this->events($restricted, $id)->json('data'), fn ($e) => $e['action'] === 'close'));
+    }
+
+    /** @test */
     public function dismiss_creates_no_claim_and_an_entry_is_never_claimed_by_similarity_of_amount_or_date(): void
     {
         $d = $this->invoice('2026-09-10', 30000);   // قيد في الفترة؛ سطر الكشف المستبعد بمبلغ وتاريخ مختلفين
