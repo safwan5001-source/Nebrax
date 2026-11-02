@@ -105,7 +105,7 @@ class CommerceStaffOrderController extends ApiController
         $order = CommerceOrder::query()
             ->with([
                 'salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'gift', 'schedule',
-                'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name',
+                'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name', 'acceptedBy:id,name',
             ])
             ->withCount('lines')
             ->find($id);
@@ -126,6 +126,16 @@ class CommerceStaffOrderController extends ApiController
         $action = $actor === null ? null : app(CommerceOrderLifecycleService::class)->cancelAction($order, $actor);
         if ($action !== null) {
             $data['cancel_action'] = $action;
+        }
+        // COPS-H1-4: إجراءا القبول والرفض بالعقد نفسه — يغيبان (لا مفتاح) حين البوابة/البوابتان مغلقة أو تنقص الصلاحية؛ استرشاديان.
+        if ($actor !== null) {
+            $lifecycle = app(CommerceOrderLifecycleService::class);
+            if (($accept = $lifecycle->acceptAction($order, $actor)) !== null) {
+                $data['accept_action'] = $accept;
+            }
+            if (($reject = $lifecycle->rejectAction($order, $actor)) !== null) {
+                $data['reject_action'] = $reject;
+            }
         }
 
         return $data;

@@ -41,8 +41,8 @@ final class CommerceOrderLifecycleService
      */
     public function cancel(CommerceOrder $order, User $actor, string $reason, ?string $note): CommerceOrder
     {
-        $note = $note === null ? null : trim($note);
-        $note = $note === '' ? null : $note;
+        $note = $this->normalizeNote($note);
+        // `merchant_rejected` ليس من أسباب الموظف هنا: الرفض له مساره وصلاحيته وبوابته ({@see self::reject}).
         if (! in_array($reason, CommerceOrder::CANCELLATION_REASONS, true)) {
             throw new CommerceOrderCancellationException(CommerceOrderCancellationException::INVALID_REASON, 'سبب الإلغاء غير معتمد.', 422);
         }
@@ -50,9 +50,62 @@ final class CommerceOrderLifecycleService
             throw new CommerceOrderCancellationException(CommerceOrderCancellationException::NOTE_REQUIRED, 'الملاحظة مطلوبة عند اختيار سبب «أخرى».', 422);
         }
 
+        return $this->performCancellation($order, $actor, $reason, $note, false);
+    }
+
+    /**
+     * COPS-H1-4 (ADR-29 §2.2 R-3): **رفض التاجر = الإلغاء نفسه** بسبب `merchant_rejected` — الأقفال والمصفوفة (ADR-28 §3) والتحرير والتنظيف بعد
+     * الالتزام والحدث (`order.cancelled` بـ`reason: merchant_rejected`) كلها مسار الإلغاء حرفياً؛ لا انتقال ثانٍ.
+     *
+     * إضافاته تحت الأقفال نفسها: لا رفض إلا لطلب لقطته `manual` لم يُقبل بعد (بعد القبول = إلغاء عادي بأسبابه؛ والقاعدة تحرس ذلك أيضاً).
+     * idempotent: طلب مرفوض أصلاً ⇒ يُعاد كما هو؛ طلب ملغى بسبب آخر ⇒ 409 `already_cancelled` (لا يُعرض إلغاءٌ عادي كأنه رفض).
+     * البوابتان (القبول والإلغاء) يفحصهما المتحكّم قبل الوصول هنا.
+     *
+     * @throws CommerceOrderCancellationException
+     */
+    public function reject(CommerceOrder $order, User $actor, ?string $note): CommerceOrder
+    {
+        return $this->performCancellation($order, $actor, CommerceOrder::REJECTION_REASON, $this->normalizeNote($note), true);
+    }
+
+    /**
+     * COPS-H1-4 (ADR-29 §2.2): قبول التاجر اليدوي. **المعاملة:** قفل النية ← قفل الطلب (ترتيب المحور القائم ADR-28 §1.3 نفسه — لا يعكس الالتقاط
+     * أو الترحيل أو الإلغاء أو المكنسة)، ثم الفحوص تحت الأقفال، ثم كتابة حقيقتي القبول، ثم الحدث `order.accepted` **آخر كتابة** (رأس التغذية آخر قفل).
+     * لا أثر مالي أو مخزني إطلاقاً (لا حجز يتغيّر ولا قيد ولا فاتورة).
+     *
+     * idempotent بالحالة: طلب مقبول ⇒ يُعاد كما هو بلا حدث ولا تغيير للفاعل/الوقت.
+     * الأهلية: مؤكَّد · غير ملغى · لقطته `manual` · **الدفع جاهز (R-5)**: نية COD/استلام (`awaiting_collection`/`collected`) أو إلكترونية `paid`.
+     * البوابة (`commerce.order_acceptance_enabled`) يفحصها المتحكّم.
+     *
+     * @throws CommerceOrderAcceptanceException
+     */
+    public function accept(CommerceOrder $order, User $actor): CommerceOrder
+    {
+        return DB::transaction(function () use ($order, $actor): CommerceOrder {
+            $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->lockForUpdate()->first();
+            $locked = CommerceOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->isAccepted()) {
+                return $locked;
+            }
+            $this->assertAcceptable($locked, $intent);
+
+            // حقيقتا القبول ليستا في $fillable؛ تكتبهما هذه الخدمة وحدها وتحرسهما مُشغّلات القاعدة (يدوي/مؤكَّد/غير ملغى/بفاعل/جمود).
+            $locked->forceFill(['accepted_at' => now('UTC'), 'accepted_by_user_id' => $actor->id])->save();
+
+            // COPS-H1-1: آخر كتابة في المعاملة — رأس التغذية آخر قفل. الفرع idempotent أعلاه لا يصل هنا.
+            $this->events->append($locked, CommerceOrderEvent::ORDER_ACCEPTED, CommerceOrderEvent::ACTOR_USER, (string) $actor->id);
+
+            return $locked->fresh();
+        });
+    }
+
+    /** المسار المشترك للإلغاء والرفض (انظر {@see self::cancel()} و{@see self::reject()}). */
+    private function performCancellation(CommerceOrder $order, User $actor, string $reason, ?string $note, bool $rejection): CommerceOrder
+    {
         $cleanupIntent = null;
 
-        $cancelled = DB::transaction(function () use ($order, $actor, $reason, $note, &$cleanupIntent): CommerceOrder {
+        $cancelled = DB::transaction(function () use ($order, $actor, $reason, $note, $rejection, &$cleanupIntent): CommerceOrder {
             // 1) النية أولاً (المحور الذي يسلسل الالتقاط/الإلغاء/الترحيل) — نطاق المستأجر مطبَّق على الاستعلامين.
             $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->lockForUpdate()->first();
             // 2) ثم الطلب.
@@ -60,10 +113,17 @@ final class CommerceOrderLifecycleService
 
             // idempotent: لا أثر ولا تنظيف جديد ولا تغيير لحقائق الإلغاء الأصلية.
             if ($locked->isCancelled()) {
+                if ($rejection && $locked->cancellation_reason !== CommerceOrder::REJECTION_REASON) {
+                    throw new CommerceOrderCancellationException(CommerceOrderCancellationException::ALREADY_CANCELLED, 'أُلغي هذا الطلب مسبقاً.');
+                }
+
                 return $locked;
             }
             if (! $locked->isConfirmed()) {
                 throw new CommerceOrderCancellationException(CommerceOrderCancellationException::NOT_CONFIRMED, 'لا يمكن إلغاء طلب غير مؤكَّد.', 422);
+            }
+            if ($rejection) {
+                $this->assertRejectable($locked);
             }
 
             $this->assertCancellable($locked, $intent);
@@ -85,7 +145,7 @@ final class CommerceOrderLifecycleService
             // 3) ثم صفوف الحجز (قاعدة بيانات فقط، idempotent: لا حجز نشط ⇒ لا شيء، فلا تحرير مزدوج).
             $this->reservations->releaseActive((string) $locked->id);
 
-            // حقائق الإلغاء ليست في $fillable عمداً؛ تكتبها هذه الخدمة وحدها وتحرسها مُشغّلات القاعدة (سبب معتمد/جمود/لا مسودة).
+            // حقائق الإلغاء ليست في $fillable عمداً؛ تكتبها هذه الخدمة وحدها وتحرسها مُشغّلات القاعدة (سبب معتمد/جمود/لا مسودة/رفض قبل القبول).
             $locked->forceFill([
                 'cancelled_at' => now('UTC'),
                 'cancelled_by_user_id' => $actor->id,
@@ -105,6 +165,13 @@ final class CommerceOrderLifecycleService
         }
 
         return $cancelled;
+    }
+
+    private function normalizeNote(?string $note): ?string
+    {
+        $note = $note === null ? null : trim($note);
+
+        return $note === '' ? null : $note;
     }
 
     /**
@@ -143,6 +210,104 @@ final class CommerceOrderLifecycleService
         }
 
         return null;
+    }
+
+    /**
+     * COPS-H1-4 — عقد قراءة إجراء «قبول الطلب» (مثل {@see self::cancelAction()}): `null` ⇒ غير معروض (البوابة مغلقة أو لا `commerce.orders.manage`،
+     * فلا يتسرّب وجود البوابة). وإلا `{available, blocked_reason}` برمز آمن من {@see CommerceOrderAcceptanceException}. استرشادي؛ القرار لـ`accept()`.
+     *
+     * @return array{available: bool, blocked_reason: ?string}|null
+     */
+    public function acceptAction(CommerceOrder $order, User $actor): ?array
+    {
+        if (! (bool) config('commerce.order_acceptance_enabled') || ! $actor->hasPermission('commerce.orders.manage')) {
+            return null;
+        }
+        $blocker = $this->acceptanceBlocker($order);
+
+        return ['available' => $blocker === null, 'blocked_reason' => $blocker];
+    }
+
+    /**
+     * COPS-H1-4 — عقد قراءة إجراء «رفض الطلب»: يُعرض فقط حين **البوابتان** (القبول والإلغاء) مفتوحتان **و**للمستخدم `commerce.orders.manage`
+     * **و**`commerce.orders.cancel` (R-6)، وإلا `null`.
+     *
+     * @return array{available: bool, blocked_reason: ?string}|null
+     */
+    public function rejectAction(CommerceOrder $order, User $actor): ?array
+    {
+        if (! (bool) config('commerce.order_acceptance_enabled') || ! (bool) config('commerce.order_cancellation_enabled')
+            || ! $actor->hasPermission('commerce.orders.manage') || ! $actor->hasPermission('commerce.orders.cancel')) {
+            return null;
+        }
+        $blocker = $this->rejectionBlocker($order);
+
+        return ['available' => $blocker === null, 'blocked_reason' => $blocker];
+    }
+
+    /** رمز المانع الأول للقبول أو `null` (قراءة بلا أقفال تعيد استعمال `assertAcceptable`). */
+    public function acceptanceBlocker(CommerceOrder $order): ?string
+    {
+        if ($order->isAccepted()) {
+            return CommerceOrderAcceptanceException::ALREADY_ACCEPTED;
+        }
+        $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->first();
+        try {
+            $this->assertAcceptable($order, $intent);
+        } catch (CommerceOrderAcceptanceException $e) {
+            return $e->reason;
+        }
+
+        return null;
+    }
+
+    /** رمز المانع الأول للرفض أو `null` (قراءة بلا أقفال: قواعد الرفض ثم مصفوفة الإلغاء نفسها). */
+    public function rejectionBlocker(CommerceOrder $order): ?string
+    {
+        if ($order->isCancelled()) {
+            return CommerceOrderCancellationException::ALREADY_CANCELLED;
+        }
+        if (! $order->isConfirmed()) {
+            return CommerceOrderCancellationException::NOT_CONFIRMED;
+        }
+        try {
+            $this->assertRejectable($order);
+        } catch (CommerceOrderCancellationException $e) {
+            return $e->reason;
+        }
+
+        return $this->cancellationBlocker($order);
+    }
+
+    /** أهلية القبول (ADR-29 §2.2 + R-5). تُستدعى تحت قفل النية والطلب في `accept()`. */
+    private function assertAcceptable(CommerceOrder $order, ?CommercePaymentIntent $intent): void
+    {
+        if ($order->isCancelled()) {
+            throw new CommerceOrderAcceptanceException(CommerceOrderAcceptanceException::ALREADY_CANCELLED, 'أُلغي هذا الطلب؛ لا يمكن قبوله.');
+        }
+        if (! $order->isConfirmed()) {
+            throw new CommerceOrderAcceptanceException(CommerceOrderAcceptanceException::NOT_CONFIRMED, 'لا يمكن قبول طلب غير مؤكَّد.', 422);
+        }
+        if ($order->effectiveAcceptanceMode() !== CommerceOrder::ACCEPTANCE_MANUAL) {
+            throw new CommerceOrderAcceptanceException(CommerceOrderAcceptanceException::NOT_MANUAL, 'هذا الطلب مقبول تلقائياً؛ لا يحتاج قبولاً يدوياً.');
+        }
+        if ($intent === null || $intent->isCancelled()) {
+            throw new CommerceOrderAcceptanceException(CommerceOrderAcceptanceException::PAYMENT_NOT_READY, 'لا توجد طريقة دفع قائمة لهذا الطلب؛ لا يمكن قبوله.');
+        }
+        if (! in_array($intent->status, CommerceOrderAttentionQuery::PAYMENT_READY, true)) {
+            throw new CommerceOrderAcceptanceException(CommerceOrderAcceptanceException::PAYMENT_PENDING, 'لم يكتمل الدفع الإلكتروني لهذا الطلب بعد؛ يُقبل بعد تأكيد الدفع.');
+        }
+    }
+
+    /** قواعد الرفض الخاصة (R-3): لقطة يدوية ولم يُقبل. تُستدعى تحت قفل الطلب في المسار المشترك. */
+    private function assertRejectable(CommerceOrder $order): void
+    {
+        if (! $order->isManualAcceptance()) {
+            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::NOT_MANUAL, 'هذا الطلب مقبول تلقائياً؛ يُلغى بمسار الإلغاء لا بالرفض.');
+        }
+        if ($order->isAccepted()) {
+            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::ALREADY_ACCEPTED, 'قُبل هذا الطلب؛ يُلغى بمسار الإلغاء لا بالرفض.');
+        }
     }
 
     /** مصفوفة ADR-28 §3 (الصفوف 2 و5–8). تُستدعى تحت قفل النية والطلب. */

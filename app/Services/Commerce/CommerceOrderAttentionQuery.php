@@ -17,14 +17,18 @@ use Illuminate\Support\Collection;
  *   • دفعه **جاهز**: نية COD/استلام (`awaiting_collection`/`collected`) أو نية إلكترونية `paid` — الإلكتروني `pending` (غير المدفوع) لا يدخل ولا يولّد تنبيهاً؛
  *   • ضمن نافذة حداثة (`commerce.attention_window_hours`، الافتراضي 48 ساعة ≥ ضعف أقصى مهلة حجز دفع إلكتروني 24 ساعة، فطلب دُفع قرب نهاية مهلته يظهر).
  *
- * الأسباب (`reasons`) قائمة قابلة للتوسعة، وما يُفعَّل منها يتبع وجود قدرته: في H1-2 لا قبول يدوي ولا تنفيذ ولا إقرار فيُرجَع السبب الأساسي `new_order`
- * وحده؛ H1-4 يضيف `awaiting_acceptance`، وH2 يضيف `fulfillment_not_started`، وH3-4 يزيل المُقَرّ لكل طلب. لا يُخترع هنا سلوك لقدرة لم تُبنَ.
+ * الأسباب (`reasons`) قائمة قابلة للتوسعة، وما يُفعَّل منها يتبع وجود قدرته. `new_order` (H1-2، للتوافق): كل طلب بالشرط الأساسي ضمن النافذة.
+ * **`awaiting_acceptance` (COPS-H1-4):** طلب وضعه الفعّال يدوي (لقطة `manual` + بوابة القبول مفتوحة) لم يُقبل — **من الحالة لا من النافذة**: يبقى
+ * حتى يُقبل أو يُرفض/يُلغى مهما طال، لأن الانتظار نفسه هو ما يحتاج انتباهاً. البوابة مغلقة ⇒ الاستعلام والأسباب كما في H1-2 حرفياً.
+ * H2 يضيف `fulfillment_not_started`، وH3-4 يزيل المُقَرّ لكل طلب. لا يُخترع هنا سلوك لقدرة لم تُبنَ.
  *
  * الاستعلام يمرّ بـ`TenantScope`؛ الترتيب الأقدم أولاً (الأطول انتظاراً) وبسقف صريح مع علم `truncated`. الفهرس `(tenant_id, status, created_at)`.
  */
 final class CommerceOrderAttentionQuery
 {
     public const REASON_NEW_ORDER = 'new_order';
+
+    public const REASON_AWAITING_ACCEPTANCE = 'awaiting_acceptance';
 
     public const MAX_LIMIT = 100;
 
@@ -45,12 +49,21 @@ final class CommerceOrderAttentionQuery
         $limit = max(1, min(self::MAX_LIMIT, $limit));
         $hours = self::windowHours();
 
+        $since = now('UTC')->subHours($hours);
+        $acceptanceOpen = (bool) config('commerce.order_acceptance_enabled');
+
         $rows = CommerceOrder::query()
-            ->select(['id', 'number', 'storefront_id', 'sales_channel_id', 'delivery_method', 'status', 'cancelled_at', 'created_at'])
+            ->select(['id', 'number', 'storefront_id', 'sales_channel_id', 'delivery_method', 'status', 'cancelled_at', 'created_at', 'acceptance_mode', 'accepted_at'])
             ->with('paymentIntent:id,commerce_order_id,method,status')
             ->where('status', CommerceOrder::STATUS_CONFIRMED)
             ->whereNull('cancelled_at')
-            ->where('created_at', '>=', now('UTC')->subHours($hours))
+            ->when(
+                $acceptanceOpen,
+                // نافذة الحداثة (new_order) **أو** بانتظار قبول يدوي مهما كان عمره.
+                fn ($q) => $q->where(fn ($w) => $w->where('created_at', '>=', $since)
+                    ->orWhere(fn ($m) => $m->where('acceptance_mode', CommerceOrder::ACCEPTANCE_MANUAL)->whereNull('accepted_at'))),
+                fn ($q) => $q->where('created_at', '>=', $since),
+            )
             ->whereHas('paymentIntent', fn ($q) => $q->whereIn('status', self::PAYMENT_READY))
             ->when($storefrontId !== null, fn ($q) => $q->where('storefront_id', $storefrontId))
             ->orderBy('created_at')->orderBy('id')
@@ -77,6 +90,15 @@ final class CommerceOrderAttentionQuery
      */
     public function reasonsFor(CommerceOrder $order): array
     {
-        return [self::REASON_NEW_ORDER];
+        $reasons = [];
+        if ($order->created_at !== null && $order->created_at->greaterThanOrEqualTo(now('UTC')->subHours(self::windowHours()))) {
+            $reasons[] = self::REASON_NEW_ORDER;
+        }
+        if ($order->awaitsManualAcceptance()) {
+            $reasons[] = self::REASON_AWAITING_ACCEPTANCE;
+        }
+
+        // كل صف من `run()` يطابق أحد الفرعين؛ حدّ النافذة قد يُعبَر بين الاستعلام والحساب ⇒ لا يُعاد طلب بلا سبب.
+        return $reasons === [] ? [self::REASON_NEW_ORDER] : $reasons;
     }
 }

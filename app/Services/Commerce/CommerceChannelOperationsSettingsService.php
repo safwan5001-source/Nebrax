@@ -134,6 +134,23 @@ class CommerceChannelOperationsSettingsService
         });
     }
 
+    /**
+     * COPS-H1-4 (ADR-29 §2.2) — **المستهلك الوحيد** لهذا الجدول خارج هذه الخدمة: لقطة وضع القبول لطلب ينشأ الآن، يستدعيها
+     * `CommerceOrderService::createFromCheckout` داخل معاملة الإنشاء. قراءة عادية بلا قفل (لقطة لحظة؛ الكاتب يقفل القناة ولا سباق صحة).
+     *
+     * البوابة مغلقة ⇒ `null` **بلا أي استعلام** (مسار الإنشاء حرفياً كما قبل H1-4). مفتوحة ⇒ `manual` فقط حين المخزَّن للقناة `manual`؛ غياب
+     * الصف أو `auto` ⇒ `null` (تلقائي). لا تمسّ إعدادات H4.
+     */
+    public function acceptanceModeForNewOrder(string $channelId): ?string
+    {
+        if (! (bool) config('commerce.order_acceptance_enabled')) {
+            return null;
+        }
+        $mode = CommerceChannelOperationSetting::query()->where('sales_channel_id', $channelId)->value('acceptance_mode');
+
+        return $mode === CommerceChannelOperationSetting::MODE_MANUAL ? $mode : null;
+    }
+
     /** @return array{acceptance_mode: string, acceptance_reminder_minutes: ?int, acceptance_escalation_minutes: ?int} */
     private function values(?CommerceChannelOperationSetting $row): array
     {

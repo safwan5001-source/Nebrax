@@ -72,6 +72,7 @@ class CommerceOrder extends BaseModel implements CompanyWide
         'delivery_amount_minor' => 'integer',
         'confirmed_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'accepted_at' => 'datetime',
     ];
 
     /**
@@ -80,8 +81,19 @@ class CommerceOrder extends BaseModel implements CompanyWide
      */
     public const LIFECYCLE_CANCELLED = 'cancelled';
 
-    /** @var list<string> */
+    /** @var list<string> أسباب الإلغاء التي يختارها الموظف في مسار الإلغاء (ADR-28 §5.1). لا تشمل `merchant_rejected`. */
     public const CANCELLATION_REASONS = ['customer_request', 'out_of_stock', 'payment_issue', 'duplicate_order', 'fraud_suspected', 'other'];
+
+    /**
+     * COPS-H1-4 (ADR-29 §2.2 R-3): رفض التاجر إلغاءٌ بهذا السبب، يكتبه مسار الرفض وحده (لا يُقبل من مسار الإلغاء العام) وتحرسه القاعدة:
+     * مسموح فقط لطلب `manual` غير مقبول.
+     */
+    public const REJECTION_REASON = 'merchant_rejected';
+
+    /** COPS-H1-4: لقطة وضع القبول اليدوي عند الإنشاء؛ `NULL` = تلقائي (التاريخي وكل طلب أُنشئ والبوابة مغلقة). */
+    public const ACCEPTANCE_MANUAL = 'manual';
+
+    public const ACCEPTANCE_AUTO = 'auto';
 
     /** Order id currently being attached to its owner by the ownership-claim service (guards the immutability rule). */
     private static ?string $ownershipClaimOrderId = null;
@@ -230,6 +242,47 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function isCancelled(): bool
     {
         return $this->cancelled_at !== null;
+    }
+
+    /**
+     * COPS-H1-4: فاعل القبول اليدوي — بالقواعد نفسها لـ{@see self::cancelledBy()} (يشمل المحذوف ناعماً، ومستخدم المستأجر الحالي فقط).
+     * حقائق القبول (`acceptance_mode`, `accepted_at`, `accepted_by_user_id`) **ليست** في `$fillable`: تكتبها خدمة دورة الحياة وحدها
+     * وتحرسها القاعدة (migration 2026_12_30_010000).
+     */
+    public function acceptedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'accepted_by_user_id')
+            ->withTrashed()
+            ->where('users.tenant_id', app(TenantContext::class)->id());
+    }
+
+    /** لقطة الإنشاء: هل وُضع الطلب في وضع القبول اليدوي؟ (لا تعني أن القبول اليدوي فعّال الآن — انظر {@see self::awaitsManualAcceptance()}). */
+    public function isManualAcceptance(): bool
+    {
+        return $this->acceptance_mode === self::ACCEPTANCE_MANUAL;
+    }
+
+    public function isAccepted(): bool
+    {
+        return $this->accepted_at !== null;
+    }
+
+    /**
+     * الوضع الفعّال لهذا الطلب الآن: `manual` فقط حين لقطته يدوية **و**بوابة النشر `commerce.order_acceptance_enabled` مفتوحة؛ وإلا `auto`
+     * (البوابة المغلقة تعني التلقائي مهما كانت اللقطة — لا يعلق طلب بانتظار قبول لا مسار له).
+     */
+    public function effectiveAcceptanceMode(): string
+    {
+        return $this->isManualAcceptance() && (bool) config('commerce.order_acceptance_enabled')
+            ? self::ACCEPTANCE_MANUAL
+            : self::ACCEPTANCE_AUTO;
+    }
+
+    /** طلب مؤكَّد غير ملغى، وضعه الفعّال يدوي ولم يُقبل بعد (بلا فحص الدفع — انظر R-5 في المُسقِط/الخدمة). */
+    public function awaitsManualAcceptance(): bool
+    {
+        return $this->isConfirmed() && ! $this->isCancelled() && ! $this->isAccepted()
+            && $this->effectiveAcceptanceMode() === self::ACCEPTANCE_MANUAL;
     }
 
     /** `cancelled` | `confirmed` | `draft` — مشتقة، لا تُخزَّن. */

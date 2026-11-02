@@ -2,6 +2,7 @@
 
 namespace App\Services\Commerce;
 
+use App\Events\CommerceOrderAccepted;
 use App\Events\CommerceOrderCancelled;
 use App\Events\CommerceOrderDomainEvent;
 use App\Events\CommerceOrderPaymentCollected;
@@ -52,6 +53,7 @@ final class CommerceOrderEventRecorder
         CommerceOrderEvent::ORDER_CANCELLED => CommerceOrderCancelled::class,
         CommerceOrderEvent::PAYMENT_PAID => CommerceOrderPaymentPaid::class,
         CommerceOrderEvent::PAYMENT_COLLECTED => CommerceOrderPaymentCollected::class,
+        CommerceOrderEvent::ORDER_ACCEPTED => CommerceOrderAccepted::class,
     ];
 
     public function __construct(private readonly TenantContext $tenant) {}
