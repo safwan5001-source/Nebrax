@@ -30,6 +30,7 @@ use Tests\TestCase;
  */
 class FuelShiftServiceTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
     use InteractsWithApi;
 
@@ -127,9 +128,10 @@ class FuelShiftServiceTest extends TestCase
             'opening_float_minor' => 1000,
             'idempotency_key' => 'open-guards-1',
         ], $fixture['actor']);
+        // FS-16: الإعادة بمفتاح مستعمل تُرجع الوردية الأولى بالحمولة نفسها؛ عهدة مختلفة تضارب (تغطيه اختبار الإعادة المخصص).
         $same = $service->open([
             'fuel_station_id' => $fixture['station']->id,
-            'opening_float_minor' => 999999,
+            'opening_float_minor' => 1000,
             'idempotency_key' => 'open-guards-1',
         ], $fixture['actor']);
         $this->assertSame($shift->id, $same->id);
@@ -259,6 +261,20 @@ class FuelShiftServiceTest extends TestCase
     }
 
     /** @return array{tenant_id:string,actor:User,supervisor:User,branch:Branch,station:\App\Models\FuelStation,tank:FuelTank,nozzle:FuelNozzle} */
+    /** @test */
+    public function replaying_open_with_the_same_key_returns_the_first_shift_but_a_different_float_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(FuelShiftService::class);
+        $payload = ['fuel_station_id' => $fixture['station']->id, 'opening_float_minor' => 10000, 'idempotency_key' => 'open-replay'];
+        $first = $service->open($payload, $fixture['actor']);
+
+        $this->assertSame($first->id, $service->open($payload, $fixture['actor'])->id);
+        $message = $this->thrown(fn () => $service->open([...$payload, 'opening_float_minor' => 5], $fixture['actor']), 'عهدة افتتاحية مختلفة بالمفتاح نفسه يجب أن ترفض.')->getMessage();
+        $this->assertStringContainsString('عهدة', $message);
+        $this->assertSame(1, FuelShift::count());
+    }
+
     private function fixture(string $suffix = 'main'): array
     {
         $n = ++$this->sequence;
