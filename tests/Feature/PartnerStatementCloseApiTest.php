@@ -550,6 +550,9 @@ class PartnerStatementCloseApiTest extends TestCase
         $seen = $this->lcStatus($restricted, $id)->assertOk();
         $this->assertSame('closed', $seen->json('data.reconciliation.status'));
         $this->assertNull($seen->json('data.final.unclaimed_in_period'));
+        $this->assertNull($seen->json('data.final.claims_count'), 'عدد المطالبات يخصّ نطاق تشغيلة الإغلاق أيضاً (Codex).');
+        $this->assertSame([1, $this->closerId, 'org'], [$full->json('data.final.claims_count'), $full->json('data.final.closed_by'), $full->json('data.final.scope_key')]);
+        $this->assertSame([$this->closerId, 'org'], [$seen->json('data.final.closed_by'), $seen->json('data.final.scope_key')], 'هوية المُغلِق ونطاقه تبقى ظاهرة لمن يرى المقارنة.');
         $this->assertStringNotContainsString($this->entryOf($hidden)->id, (string) $seen->getContent());
         $this->assertStringNotContainsString($this->entryOf($hidden)->number, (string) $seen->getContent());
         $this->assertSame([], $this->events($restricted, $id)->assertOk()->json('data') === [] ? [] : array_filter($this->events($restricted, $id)->json('data'), fn ($e) => $e['action'] === 'close'));

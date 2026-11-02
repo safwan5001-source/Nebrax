@@ -89,13 +89,8 @@ final class PartnerStatementLifecycleService
             'blockers' => $evaluation['blockers'],
             'reviewed_state' => $reviewedState,
             'close' => $this->closeState($actor, $reconciliation, $reviewedState),
-            'final' => $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED ? [
-                'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
-                'claims_count' => $this->claims->countFor((string) $reconciliation->id),
-                // قيود الفترة غير المُطالَب بها (غائبة عن الكشف): استثناء ظاهر لا حجز (قرار المالك، 2026-11-02). تحمل معرّفات قيود وأرقامها وتواريخها من **نطاق تشغيلة الإغلاق**
-                // فلا تُعرض إلا لمن يقرأ تلك التشغيلة (كما يرشّح `events()`): مستخدم مقيَّد بفرع لا يرى قيود فروع أخرى (Codex #1941).
-                'unclaimed_in_period' => $this->unclaimedExceptions($actor, $reconciliation),
-            ] : null,
+            // بيانات الإغلاق التي تعدّ/تصف **قيوداً** (عدد المطالبات، استثناءات الفترة) تخصّ نطاق تشغيلة الإغلاق: لا تُعرض إلا لقارئها (كما يرشّح `events()`)؛ غيرُه `null` لا عدد ولا عيّنة (Codex #1941).
+            'final' => $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED ? $this->finalBlock($actor, $reconciliation) : null,
         ];
     }
 
@@ -304,20 +299,23 @@ final class PartnerStatementLifecycleService
     }
 
     /**
-     * استثناءات الإغلاق (`unclaimed_in_period`) من حدث الإغلاق الأخير — **لقارئ تشغيلة الإغلاق وحده**؛ غيره `null` (لا عدد ولا عيّنة).
+     * كتلة الإغلاق النهائي للعرض. الهوية والتوقيت والنطاق (`closed_at/by`, `scope_key`) متاحة لمن يرى المقارنة؛ أما **عدد المطالبات واستثناءات الفترة** (معرّفات قيود وأرقام وتواريخ) فمن نطاق تشغيلة
+     * الإغلاق وتُعرض لقارئ تلك التشغيلة وحده، وإلا `null`.
      *
-     * @return ?array<string, mixed>
+     * @return array<string, mixed>
      */
-    private function unclaimedExceptions(User $actor, PartnerStatementReconciliation $reconciliation): ?array
+    private function finalBlock(User $actor, PartnerStatementReconciliation $reconciliation): array
     {
         $event = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
             ->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first();
         $run = $event === null || $event->run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($event->run_id)->first();
-        if ($event === null || $run === null || ! $this->matching->readable($actor, $run)) {
-            return null;
-        }
+        $readable = $event !== null && $run !== null && $this->matching->readable($actor, $run);
 
-        return $event->summary['unclaimed_in_period'] ?? null;
+        return [
+            'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
+            'claims_count' => $readable ? $this->claims->countFor((string) $reconciliation->id) : null,
+            'unclaimed_in_period' => $readable ? ($event->summary['unclaimed_in_period'] ?? null) : null,
+        ];
     }
 
     /**
