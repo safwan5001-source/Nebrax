@@ -378,6 +378,47 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function a_long_lead_order_is_a_preparation_candidate_far_beyond_the_three_day_window(): void
+    {
+        // Codex P1: أطول تحضير مدعوم 30 يوماً؛ طلب يُسلَّم بعد 10 أيام بتحضير 10 أيام يدخل prepare_now اليوم.
+        $this->channelSettings();
+        app(TenantContext::class)->set($this->tenant->id);
+        $slow = Product::create(['name' => 'تركيب', 'sku' => 'PQ-'.Str::random(6), 'unit' => 'piece', 'sale_price' => 5000, 'is_active' => true]);
+        CommerceProductPreparation::create(['product_id' => $slow->id, 'preparation_minutes' => 14400]);
+        app(TenantContext::class)->forget();
+        $far = $this->scheduled('2026-11-12', '12:00', '14:00', 'Asia/Riyadh', CommercePaymentIntent::STATUS_AWAITING_COLLECTION, null, $slow->id);
+        // أبعد من أفق أطول تحضير مدعوم (30 يوماً) لا يدخل حتى لو كان مقبولاً.
+        $beyond = $this->scheduled('2026-12-20', '12:00', '14:00');
+
+        $items = $this->queue('prepare_now');
+
+        $this->assertArrayHasKey($far->id, $items);
+        $this->assertSame(['prepare_now'], $items[$far->id]['buckets']);
+        $this->assertArrayNotHasKey($beyond->id, $items);
+        $this->assertArrayHasKey($far->id, $this->queue(), 'الطابور غير المصفّى يضمّه أيضاً');
+    }
+
+    #[Test]
+    public function candidates_are_narrowed_by_bucket_before_the_shared_cap(): void
+    {
+        // Codex P2: طلبات دلو آخر لا تُحمَّل أصلاً (فلا تستنزف سقف المرشّحين).
+        $this->channelSettings();
+        foreach (range(1, 3) as $i) {
+            $this->scheduled('2026-10-20', '10:00', '12:00'); // متأخرة بوضوح
+        }
+        $tomorrow = $this->scheduled('2026-11-03', '10:00', '12:00');
+
+        $loaded = 0;
+        CommerceOrder::retrieved(function () use (&$loaded): void {
+            $loaded++;
+        });
+        $items = $this->queue('tomorrow');
+
+        $this->assertSame([$tomorrow->id], array_keys($items));
+        $this->assertSame(1, $loaded, 'دلو «غداً» يحمّل مرشّحيه وحدهم لا المتأخرات');
+    }
+
+    #[Test]
     public function the_queue_reads_only_and_runs_a_bounded_number_of_queries(): void
     {
         $this->channelSettings();

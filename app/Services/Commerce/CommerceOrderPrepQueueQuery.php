@@ -2,9 +2,11 @@
 
 namespace App\Services\Commerce;
 
+use App\Models\CommerceDeliveryScheduleSetting;
 use App\Models\CommerceOrder;
 use App\Models\CommerceOrderFulfillment;
 use App\Models\CommerceOrderSchedule;
+use App\Models\CommerceProductPreparation;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -19,7 +21,7 @@ use Illuminate\Support\Collection;
  *   - `prepare_now` («ابدأ التحضير»): مقبول فعلياً، **لا صف تنفيذ**، و`prepare_from ≤ الآن + 60 دقيقة` — بلا نافذة حداثة (D-H2-20).
  *  الدلاء غير حصرية بين `overdue` و`prepare_now` وغيرهما (طلب متأخر لم يبدأ يظهر في الاثنين). طلب غير مجدول خارج الطابور تماماً.
  *
- *  **التقييد:** مرشّح SQL أولي على `delivery_date` بهامش يوم (يغطي ±14/−12) ثم حساب دقيق بـ`CommerceOrderPreparationClock` في PHP؛ سقف مرشّحين صريح
+ *  **التقييد:** مرشّح SQL أولي **لكل دلو** على `delivery_date` بهامش يوم (يغطي ±14/−12؛ وأفق `prepare_now` يغطي أطول تحضير مدعوم 30 يوماً) ثم حساب دقيق بـ`CommerceOrderPreparationClock` في PHP؛ سقف مرشّحين صريح
  *  (`MAX_CANDIDATES`) مع علم `truncated`. يمرّ بـ`TenantScope` وبنطاق مخازن المستخدم (`CommerceOrderWarehouseScope`). لا كتابة ولا حدث.
  */
 final class CommerceOrderPrepQueueQuery
@@ -31,6 +33,7 @@ final class CommerceOrderPrepQueueQuery
     /** أقدم موعد ما زال يُعدّ «متأخراً» في الطابور (أيام). */
     private const LOOKBACK_DAYS = 30;
 
+    /** أفق الدلاء الزمنية (`today`/`tomorrow`) بالأيام، بهامش يوم للمنطقة الزمنية. */
     private const LOOKAHEAD_DAYS = 3;
 
     public function __construct(private readonly CommerceDeliveryScheduleService $schedules, private readonly ProductPreparationService $preparation) {}
@@ -42,15 +45,19 @@ final class CommerceOrderPrepQueueQuery
     public function run(?string $storefrontId = null, ?string $bucket = null, ?array $allowedWarehouseIds = null, ?CarbonImmutable $now = null): array
     {
         $now ??= CarbonImmutable::now('UTC');
-        $from = $now->subDays(self::LOOKBACK_DAYS + 1)->toDateString();
-        $to = $now->addDays(self::LOOKAHEAD_DAYS + 1)->toDateString();
 
         /** @var Collection<int, CommerceOrder> $orders */
         $orders = CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $allowedWarehouseIds)
             ->where('status', CommerceOrder::STATUS_CONFIRMED)
             ->whereNull('cancelled_at')
             ->whereHas('paymentIntent', fn (Builder $q) => $q->whereIn('status', CommerceOrderAttentionQuery::PAYMENT_READY))
-            ->whereHas('schedule', fn (Builder $q) => $q->whereBetween('delivery_date', [$from, $to]))
+            ->where(function (Builder $q) use ($bucket, $now): void {
+                // مرشّح أولي لكل دلو على حدة قبل السقف: طلبات دلو آخر لا تستنزف ميزانية المرشّحين (Codex P2)،
+                // وأفق `prepare_now` يغطي أطول مدة تحضير مدعومة (30 يوماً) لا نافذة ثابتة (Codex P1).
+                foreach ($bucket === null ? self::BUCKETS : [$bucket] as $b) {
+                    $q->orWhere(fn (Builder $w) => $this->coarse($w, $b, $now));
+                }
+            })
             ->whereDoesntHave('fulfillment', fn (Builder $q) => $q->whereIn('status', CommerceOrderFulfillment::COMPLETED))
             ->when($storefrontId !== null, fn (Builder $q) => $q->where('storefront_id', $storefrontId))
             ->with(['schedule', 'fulfillment:id,commerce_order_id,status', 'lines:id,commerce_order_id,product_id'])
@@ -74,6 +81,34 @@ final class CommerceOrderPrepQueueQuery
         }
 
         return ['items' => $items->sortBy([['window_start', 'asc'], ['order_id', 'asc']])->values(), 'truncated' => $truncated];
+    }
+
+    /**
+     * مرشّح SQL أولي (واسع بهامش يوم للمنطقة الزمنية) لدلو واحد؛ الحساب الدقيق في `classify()`.
+     * `overdue`: نهاية النافذة قبل الآن ⇒ تاريخ التسليم ≤ غداً. `today`/`tomorrow`: حول اليوم.
+     * `prepare_now`: بلا صف تنفيذ، وتاريخ التسليم حتى (أطول تحضير مدعوم + نافذة الاستباق) من الآن.
+     */
+    private function coarse(Builder $q, string $bucket, CarbonImmutable $now): void
+    {
+        $from = $now->subDays(self::LOOKBACK_DAYS + 1)->toDateString();
+        [$low, $high] = match ($bucket) {
+            'overdue' => [$from, $now->addDay()->toDateString()],
+            'today' => [$now->subDay()->toDateString(), $now->addDay()->toDateString()],
+            'tomorrow' => [$now->toDateString(), $now->addDays(self::LOOKAHEAD_DAYS)->toDateString()],
+            default => [$from, $now->addDays(self::prepareHorizonDays())->toDateString()],
+        };
+        $q->whereHas('schedule', fn (Builder $s) => $s->whereBetween('delivery_date', [$low, $high]));
+        if ($bucket === 'prepare_now') {
+            $q->whereDoesntHave('fulfillment');
+        }
+    }
+
+    /** أيام أفق `prepare_now`: أكبر تحضير مدعوم (منتج/قناة) + الاستباق + يومان هامش منطقة زمنية. */
+    private static function prepareHorizonDays(): int
+    {
+        $maxMinutes = max(CommerceProductPreparation::MAX_MINUTES, CommerceDeliveryScheduleSetting::MAX_LEAD_TIME_MINUTES);
+
+        return intdiv($maxMinutes + CommerceOrderPreparationClock::PREPARE_LOOKAHEAD_MINUTES, 1440) + 2;
     }
 
     /**
