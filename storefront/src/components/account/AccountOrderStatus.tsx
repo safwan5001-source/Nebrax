@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
 import { ACCOUNT_ORDER_STATUS_CAPABILITY } from "@/lib/commerce/capabilities";
 import type { StorefrontFulfillment } from "@/lib/commerce/checkout-types";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,10 @@ export function AccountOrderStatus({
 }) {
   const t = useTranslations("orders");
   const locale = useLocale();
+  // Times are formatted in the buyer's own time zone, which the server cannot know: render them only after hydration so the
+  // server markup and the first client render are identical (no hydration mismatch when the server zone differs).
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const live = ACCOUNT_ORDER_STATUS_CAPABILITY === "live";
 
   // O3c: a cancelled order is terminal. It must never read as placed / being
@@ -145,7 +150,9 @@ export function AccountOrderStatus({
     const showTracking =
       tracking !== null &&
       (tracking.carrier || tracking.number || tracking.url);
-    const readyAt = formatAt(fulfillment.pickup?.readyAt, locale);
+    const readyAt = hydrated
+      ? formatAt(fulfillment.pickup?.readyAt, locale)
+      : null;
 
     return (
       <section
@@ -167,7 +174,8 @@ export function AccountOrderStatus({
             {steps.map((step, index) => {
               const lit = index <= reached;
               const current = index === reached && !failed;
-              const at = lit ? stepTime(fulfillment, step, locale) : null;
+              const at =
+                hydrated && lit ? stepTime(fulfillment, step, locale) : null;
               return (
                 <li
                   key={step}

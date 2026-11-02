@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   type AwjOrderFulfillment,
@@ -230,5 +231,26 @@ describe("AccountOrderStatus with a fulfillment block (COPS-H2-4)", () => {
       }
       expect(messages.pickupReady).toContain("{date}");
     });
+  });
+
+  it("renders no time-zone-dependent text on the server (no hydration mismatch); times appear after hydration", () => {
+    const fulfillment = mapOrderFulfillment(
+      raw({
+        stages: [
+          { key: "placed", at: "2026-11-02T09:00:00+03:00" },
+          { key: "preparing", at: "2026-11-02T10:00:00+03:00" },
+        ],
+      }),
+    );
+    const html = renderToString(
+      <NextIntlClientProvider locale="en" messages={LOCALES.en}>
+        <AccountOrderStatus status="confirmed" fulfillment={fulfillment} />
+      </NextIntlClientProvider>,
+    );
+    expect(html).toContain("Preparing");
+    expect(html).not.toMatch(/\d{1,2}:\d{2}/);
+
+    const { container } = view("en", raw());
+    expect(container.textContent).toMatch(/\d{1,2}:\d{2}/);
   });
 });
