@@ -315,9 +315,17 @@ class PartnerStatementReviewApiTest extends TestCase
         $token = $this->auth['token'];
         $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'confirm'])->assertCreated();
 
-        DB::table('partner_statement_reconciliations')->where('id', $id)->update(['status' => 'reviewed']);
+        // الانتقال المشروع عبر دورة الحالات (A3c): كل البنود لها قرارات صريحة ثم `review` — القاعدة ترفض تغيير الحالة بلا حدث مطابق.
+        foreach ([3, 4] as $ordinal) {
+            $line = $this->lineId($id, $ordinal);
+            $row = $ordinal === 3
+                ? ['action' => 'override', 'unit_keys' => ['invoice#'.$b->id], 'reason' => 'سبب كاف']
+                : ['action' => 'confirm', 'reason' => 'اتفاق على خصم', 'accept_difference' => true];
+            $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line] + $row)->assertCreated();
+        }
+        $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/review", ['run_id' => $run['id']])->assertStatus(201);
         $this->assertSame('reconciliation_not_editable', $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'clear'])->assertStatus(409)->json('reason'));
-        $this->assertSame(1, $this->decisionCount());
+        $this->assertSame(3, $this->decisionCount());
         $this->listDecisions($token, $id)->assertOk();
     }
 

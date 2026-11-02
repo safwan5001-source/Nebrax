@@ -50,7 +50,7 @@ class PartnerStatementImportService
 
     public const PARTNER_UNAVAILABLE = 'الطرف غير متاح لك في هذا الدور.';
 
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(private readonly TenantContext $tenantContext, private readonly PartnerStatementDigest $digest) {}
 
     // ═══════════════════════════════════════════════════════════════
     //  العقد والقالب والفحص (لا يقرأ بيانات أطراف)
@@ -181,6 +181,9 @@ class PartnerStatementImportService
                     'balance_minor' => $row['balance_minor'], 'kind' => $row['kind'], 'created_at' => $now, 'updated_at' => $now,
                 ], $chunk));
             }
+
+            // IMP-PS-A3c: بصمة السطور عند الاستيراد (مرة واحدة) — نقطة الثقة لاكتشاف أي تغيير لاحق خارج التطبيق.
+            $reconciliation->update(['lines_digest' => $this->digest->for((string) $reconciliation->id)]);
 
             return $this->result($reconciliation, $parsed, created: 1, replayed: false);
         });
