@@ -67,3 +67,34 @@ export function FulfillmentBadge({ fulfillment, locale }: { fulfillment: { statu
 
   return <Badge tone={FULFILLMENT_TONE[fulfillment.status] ?? 'muted'}>{text}</Badge>;
 }
+
+/**
+ * خلية موعد التسليم في الطابور (COPS-H2-6). التوقيتات تأتي من الخادم UTC، وتُعرض **بمنطقة لقطة الطلب** (`queue.timezone`) لا بمنطقة المتصفح:
+ * موظف مسافر يرى الموعد نفسه الذي التقطه الطلب. لا حساب استحقاق في المتصفح.
+ */
+export function DueCell({ queue, locale }: { queue: { window_start: string; window_end: string; prepare_from: string; timezone: string; buckets: string[] }; locale: string }) {
+  const { t } = ordersMessages(locale);
+  const fmt = (iso: string, withDate: boolean): string => {
+    try {
+      return new Intl.DateTimeFormat(locale === 'en' ? 'en' : 'ar', {
+        timeZone: queue.timezone,
+        ...(withDate ? { month: 'short', day: 'numeric' } : {}),
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(iso));
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <div className="space-y-0.5 text-xs">
+      <div className="num">
+        {fmt(queue.window_start, true)} – {fmt(queue.window_end, false)}
+      </div>
+      <div className="text-muted">
+        {t('duePrepareFrom')} <span className="num">{fmt(queue.prepare_from, true)}</span>
+      </div>
+    </div>
+  );
+}

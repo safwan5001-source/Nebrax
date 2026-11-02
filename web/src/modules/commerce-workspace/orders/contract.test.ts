@@ -44,6 +44,19 @@ describe('orders list state', () => {
     expect(serializeOrdersState(DEFAULT_ORDERS_STATE).has('fulfillment_status')).toBe(false);
   });
 
+  it('round-trips the queue bucket (COPS-H2-6) and drops unknown values', () => {
+    for (const v of ['overdue', 'today', 'tomorrow', 'prepare_now']) {
+      const state = parseOrdersState(params(`due=${v}`));
+      expect(state.due).toBe(v);
+      expect(serializeOrdersState(state).get('due')).toBe(v);
+      expect(buildOrdersQuery(state, null).get('due')).toBe(v);
+    }
+    const bad = parseOrdersState(params('due=whenever'));
+    expect(bad.due).toBe('');
+    expect(buildOrdersQuery(bad, null).has('due')).toBe(false);
+    expect(serializeOrdersState(DEFAULT_ORDERS_STATE).has('due')).toBe(false);
+  });
+
   it('never serializes the store (owned by the store context)', () => {
     expect(serializeOrdersState({ ...DEFAULT_ORDERS_STATE, scopeAll: false }).has('store')).toBe(false);
   });

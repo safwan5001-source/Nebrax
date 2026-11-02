@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Commerce\CommerceOrderAttentionQuery;
 use App\Services\Commerce\CommerceOrderFulfillmentService;
 use App\Services\Commerce\CommerceOrderLifecycleService;
+use App\Services\Commerce\CommerceOrderPrepQueueQuery;
 use App\Services\Commerce\CommerceOrderStatusProjector;
 use App\Services\Commerce\CommerceOrderWarehouseScope;
 use App\Support\CommerceOrderStaffSerializer;
@@ -57,6 +58,8 @@ class CommerceStaffOrderController extends ApiController
             'acceptance_status' => ['sometimes', Rule::in(self::ACCEPTANCE_STATUSES)],
             // COPS-H2-1: مرشّح حالة التنفيذ من الحقائق المخزَّنة (قائمة بيضاء؛ `not_started` = لا صف). يعمل دائماً أياً كان وضع بوابة التنفيذ (AR-3).
             'fulfillment_status' => ['sometimes', Rule::in([...CommerceOrderFulfillment::STATUSES, 'not_started'])],
+            // COPS-H2-6 (D-H2-18/19): طابور التحضير المجدول — مستحق اليوم/غداً (بمنطقة القناة) · متأخر · ابدأ التحضير. قراءة من لقطة الموعد؛ يعمل أياً كان وضع بوابة التنفيذ.
+            'due' => ['sometimes', Rule::in(CommerceOrderPrepQueueQuery::BUCKETS)],
             'payment_status' => ['sometimes', Rule::in([
                 CommercePaymentIntent::STATUS_PENDING,
                 CommercePaymentIntent::STATUS_AWAITING_COLLECTION,
@@ -80,6 +83,16 @@ class CommerceStaffOrderController extends ApiController
 
         $this->applyFilters($query, $data);
 
+        // COPS-H2-6: مرشّح الطابور يحسب الاستحقاق بمنطقة لقطة كل طلب وحدود اليوم بمنطقة القناة (لا المتصفح) ثم يقيّد القائمة بمعرّفاتها؛ الصفوف تحمل `queue`.
+        $queue = null;
+        $queueTruncated = false;
+        if (isset($data['due'])) {
+            $result = app(CommerceOrderPrepQueueQuery::class)->run($data['storefront_id'] ?? null, $data['due'], $request->user()?->allowedWarehouseIds());
+            $queue = $result['items']->keyBy('order_id');
+            $queueTruncated = $result['truncated'];
+            $queue->isEmpty() ? $query->whereRaw('1 = 0') : $query->whereIn('id', $queue->keys()->all());
+        }
+
         $sort = $data['sort'] ?? 'created_at';
         $direction = $data['direction'] ?? 'desc';
         $page = $query->orderBy($sort, $direction)->orderBy('id', $direction)
@@ -89,14 +102,25 @@ class CommerceStaffOrderController extends ApiController
 
         return response()->json([
             'data' => $page->getCollection()
-                ->map(fn (CommerceOrder $o) => CommerceOrderStaffSerializer::summary($o, $currency))
+                ->map(function (CommerceOrder $o) use ($currency, $queue): array {
+                    $row = CommerceOrderStaffSerializer::summary($o, $currency);
+                    $item = $queue?->get((string) $o->id);
+
+                    return $item === null ? $row : $row + ['queue' => [
+                        'window_start' => $item['window_start'],
+                        'window_end' => $item['window_end'],
+                        'prepare_from' => $item['prepare_from'],
+                        'timezone' => $item['timezone'],
+                        'buckets' => $item['buckets'],
+                    ]];
+                })
                 ->values()->all(),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'per_page' => $page->perPage(),
                 'total' => $page->total(),
                 'last_page' => $page->lastPage(),
-            ],
+            ] + ($queue === null ? [] : ['queue_truncated' => $queueTruncated]),
         ]);
     }
 

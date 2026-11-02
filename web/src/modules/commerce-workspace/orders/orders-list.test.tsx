@@ -269,6 +269,65 @@ describe('OrdersList', () => {
     expect(within(channel).getAllByRole('option').map((o) => o.textContent)).toEqual(['كل القنوات', 'زهور طيبة', 'زهور الرشد']);
   });
 
+  describe('scheduled preparation queue (COPS-H2-6)', () => {
+    const queued = () =>
+      summaryFixture({
+        id: '77777777-7777-4777-8777-777777777777', number: 'CORD-700',
+        queue: { window_start: '2026-11-02T14:00:00+00:00', window_end: '2026-11-02T17:00:00+00:00', prepare_from: '2026-11-02T12:00:00+00:00', timezone: 'Asia/Riyadh', buckets: ['today'] },
+      });
+
+    it('offers the four server buckets as chips with aria-pressed and sends the chosen one as a separate param', async () => {
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      for (const name of ['متأخر', 'مستحق اليوم', 'مستحق غداً', 'ابدأ التحضير']) {
+        expect(screen.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('false');
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'مستحق اليوم' }));
+      const url = lastUrl();
+      expect(url.searchParams.get('due')).toBe('today');
+      expect(url.searchParams.has('page')).toBe(false);
+    });
+
+    it('reads the bucket from the URL, forwards it, shows the due column only then, and ignores an unknown value', async () => {
+      nav.search = 'due=prepare_now&page=2';
+      fetchOrdersMock.mockResolvedValue(page([queued()]));
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(Object.fromEntries(lastQuery())).toMatchObject({ due: 'prepare_now', page: '2', storefront_id: 's1' });
+      expect(screen.getByRole('button', { name: 'ابدأ التحضير' }).getAttribute('aria-pressed')).toBe('true');
+      await waitFor(() => screen.getAllByText('CORD-700'));
+      expect(screen.getAllByText('موعد التسليم').length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/ابدأ التحضير قبل/).length).toBeGreaterThan(0);
+
+      cleanup();
+      fetchOrdersMock.mockClear();
+      nav.search = 'due=whenever';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().has('due')).toBe(false);
+      expect(screen.queryByText('موعد التسليم')).toBeNull();
+    });
+
+    it('renders the due time in the order timezone from the server, never the browser zone', async () => {
+      nav.search = 'due=today';
+      fetchOrdersMock.mockResolvedValue(page([queued()]));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-700'));
+      // 14:00Z في الرياض = 05:00 م — يظهر الرقم 5 (بالأرقام اللاتينية أو العربية-الهندية حسب اللغة) وليس 02:00 م.
+      const text = document.body.textContent ?? '';
+      expect(text).toMatch(/0?5:00|٠?٥:٠٠/);
+      expect(text).not.toMatch(/02:00|٠٢:٠٠/);
+    });
+
+    it('clear filters resets the bucket', async () => {
+      nav.search = 'due=overdue';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.click(screen.getByRole('button', { name: /مسح التصفية/ }));
+      expect(String(nav.replace.mock.calls.at(-1)![0])).not.toContain('due=');
+    });
+  });
+
   describe('fulfillment status (COPS-H2-3)', () => {
     const preparingRow = () => summaryFixture({ id: '55555555-5555-4555-8555-555555555555', number: 'CORD-500', fulfillment: { status: 'preparing', type: 'local_delivery' } });
     const readyPickupRow = () => summaryFixture({ id: '66666666-6666-4666-8666-666666666666', number: 'CORD-600', fulfillment: { status: 'ready', type: 'pickup' } });
