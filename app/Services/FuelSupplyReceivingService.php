@@ -94,11 +94,28 @@ class FuelSupplyReceivingService
                 'received_unit_cost_minor' => $unitCompatibilityCost,
                 'received_total_cost_minor' => $totalCost,
                 'idempotency_key' => $key,
-                'received_at' => $data['received_at'] ?? now(),
+                'received_at' => $this->receivedAt($data['received_at'] ?? null),
                 'created_by' => $data['created_by'] ?? null,
                 'notes' => $this->nullableString($data['notes'] ?? null, 1000),
             ]);
         });
+    }
+
+    /**
+     * FS-19: الطابع المُرسَل بإزاحة صريحة (`+03:00`/`Z`) يُحوَّل إلى لحظته بمنطقة التطبيق قبل التخزين؛ إسناده مباشرةً
+     * لعمود datetime كان يحفظ الساعة المكتوبة ويُسقط الإزاحة، فيُقرأ لاحقاً لحظةً مختلفة وتتحول إلى تقويم المحطة خطأً.
+     * الطابع بلا إزاحة يبقى كما كان (منطقة التطبيق).
+     */
+    private function receivedAt(mixed $value): \Carbon\CarbonInterface
+    {
+        if ($value === null || $value === '') {
+            return now();
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return \Carbon\Carbon::instance($value)->setTimezone(config('app.timezone'));
+        }
+
+        return \Carbon\Carbon::parse((string) $value)->setTimezone(config('app.timezone'));
     }
 
     public function approveDelivery(FuelDelivery $delivery, string $actorId): FuelDelivery
