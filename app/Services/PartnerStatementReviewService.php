@@ -138,7 +138,7 @@ final class PartnerStatementReviewService
                 }
                 foreach ($plan['claims'] as $claim) {
                     foreach ($effective as $otherLine => $decision) {
-                        if ($otherLine !== $line->id && in_array($claim, $this->claimsOf($decision), true)) {
+                        if ($otherLine !== $line->id && $this->conflictsWithAny($claim, $this->claimsOf($decision))) {
                             throw new PartnerStatementReviewException('unit_already_decided', 'وحدة دفترية (أو طرف زوج معكوس) مُسندة بقرار فعّال إلى سطر كشف آخر.', 409, [
                                 'unit_key' => $claim, 'line_id' => $otherLine,
                             ]);
@@ -236,9 +236,10 @@ final class PartnerStatementReviewService
                 $row += ['reviewable' => true, 'blocked_reason' => null];
                 foreach (['original', 'reversal'] as $member) {
                     $entry = $proof[$member];
+                    // طرف الزوج محجوز بادعائه أو بادعاء الوحدة كاملةً (قرار عادي سابق للعكس).
                     $row[$member] = [
                         'entry_id' => $entry['entry_id'], 'number' => $entry['number'], 'date' => $entry['date'], 'net_minor' => $entry['debit_minor'] - $entry['credit_minor'],
-                    ] + ($claimed[$unit['key'].'@'.$member] ?? $free);
+                    ] + ($claimed[$unit['key'].'@'.$member] ?? $claimed[$unit['key']] ?? $free);
                 }
             } catch (PartnerStatementReviewException $e) {
                 $row += ['reviewable' => false, 'blocked_reason' => $e->reason];
@@ -537,6 +538,28 @@ final class PartnerStatementReviewService
         }
 
         return $decision->unit_keys;
+    }
+
+    /**
+     * هل يتعارض ادعاء مع أي من ادعاءات قرار آخر؟ المتطابقان يتعارضان؛ وادعاء الوحدة كاملةً (`وحدة`) يتعارض مع ادعاء أي من طرفيها (`وحدة@عضو`) وبالعكس
+     * (Codex #1929): قرار عادي سبق عكس القيد يبقى فعّالاً حتى يُسحب فلا يُعاد إسناد الأصل لسطر آخر. طرفا الزوج المختلفان لا يتعارضان.
+     *
+     * @param  list<string>  $existing
+     */
+    private function conflictsWithAny(string $claim, array $existing): bool
+    {
+        foreach ($existing as $other) {
+            if ($claim === $other) {
+                return true;
+            }
+            $claimIsMember = str_contains($claim, '@');
+            $otherIsMember = str_contains($other, '@');
+            if ($claimIsMember !== $otherIsMember && explode('@', $claim)[0] === explode('@', $other)[0]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function lock(string $reconciliationId): void

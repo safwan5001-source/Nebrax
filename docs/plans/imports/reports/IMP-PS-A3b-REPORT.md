@@ -48,7 +48,7 @@ The widened shape guard (PostgreSQL `CHECK`, SQLite trigger): `link_pair` ⇒ ex
 
 | Suite | Result |
 |---|---|
-| `PartnerStatementPairReviewApiTest` (11, real ledger) | pass on both (167 assertions) |
+| `PartnerStatementPairReviewApiTest` (12, real ledger) | pass on both |
 | `PartnerStatementReviewConcurrencyPostgresTest` (7: 5 from A3a + 2 pair races, `pcntl_fork`) | pass on PostgreSQL |
 | `PartnerStatementReviewApiTest` (A3a, 14) | pass on both with the D-PS-16 rule |
 | Wider filter | see PR description |
@@ -65,6 +65,9 @@ Covered: member-by-member linking with the engine rows asserted identical before
 - hidden holder's line identity exposed in `reversed-pairs` → fails 1
 - replay ignoring the member → **survived the first run** (the changed-member request also changed the reason, so it was never a replay candidate); the test now sends the identical reason, and the mutation fails it. Recorded because a surviving mutant is a weak test, not a pass.
 - (PostgreSQL) the A3a lock-removal controls still apply: the review path and its locks are unchanged.
+
+### Codex review of this PR
+- **P2 — an ordinary claim made before the reversal must still block the pair.** An invoice confirmed/overridden onto line A and *then* reversed keeps A's decision effective (claim `invoice#x`), while `link_pair` claims `invoice#x@original`; plain string equality missed the duplicate and `reversed-pairs` showed the original as free. Conflict is now evaluated by `conflictsWithAny`: equal tokens conflict, and a whole-unit claim conflicts with either member (and vice versa); the two *members* of a pair still do not conflict with each other. `reversed-pairs` shows both members held when the whole unit is. Reproduced first (the new test fails on the previous code), fixed, and the old decision must be cleared before the original can go to another line. Test `an_ordinary_claim_made_before_the_reversal_still_blocks_linking_the_same_original_to_another_line`.
 
 ## 6. Risks and disclosures
 1. **No netting check.** Linking only the invoice line (or only the cancellation) is allowed and shown as such; the system does not verify that a statement "nets to zero" — that would be R-REV, forbidden by D-PS-15. `reversed-pairs` shows which members are held.

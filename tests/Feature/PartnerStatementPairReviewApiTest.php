@@ -334,6 +334,45 @@ class PartnerStatementPairReviewApiTest extends TestCase
         $this->assertSame(6, $this->decisionCount());
     }
 
+    /**
+     * Codex #1929 P2: فاتورة سبق تأكيدها/إسنادها لسطر (ادعاء الوحدة العادي) ثم عُكست؛ ربط الأصل لسطر آخر يجب ألا يمرّ — الوحدة محجوزة بقرار فعّال حتى يُسحب. وتعرضه
+     * `reversed-pairs` محجوزاً لا حراً.
+     *
+     * @test
+     */
+    public function an_ordinary_claim_made_before_the_reversal_still_blocks_linking_the_same_original_to_another_line(): void
+    {
+        $invoice = $this->invoice('2026-09-03', 100000);
+        $unit = 'invoice#'.$invoice->id;
+        $id = $this->statement([
+            ['date' => '2026-09-03', 'our' => $invoice->number, 'credit' => 115000],   // ٢ ⇒ matched R1
+            ['date' => '2026-09-06', 'credit' => 115000],                              // ٣
+        ]);
+        $token = $this->auth['token'];
+        $early = $this->match($token, $id);
+        $this->decide($token, $id, ['run_id' => $early['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'confirm'])->assertCreated();
+
+        app(LedgerService::class)->reverse($this->entryOf($invoice), '2026-09-06', 'إلغاء بعد المراجعة');
+        $run = $this->match($token, $id);   // الدفتر تغيّر ⇒ تشغيلة جديدة، والوحدة صارت زوجاً معكوساً
+        $link = fn (int $ordinal, string $member) => $this->decide($token, $id, [
+            'run_id' => $run['id'], 'line_id' => $this->lineId($id, $ordinal), 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => $member, 'reason' => 'سبب كاف', 'accept_difference' => true,
+        ]);
+
+        $shown = $this->pairs($token, $id)->assertOk()->json('data.pairs.0');
+        $this->assertSame([true, true, $this->lineId($id, 2)], [$shown['original']['claimed'], $shown['reversal']['claimed'], $shown['original']['line_id']]);
+        $clash = $link(3, 'original')->assertStatus(409);
+        $this->assertSame(['unit_already_decided', $this->lineId($id, 2)], [$clash->json('reason'), $clash->json('details.line_id')]);
+        $this->assertSame('unit_already_decided', $link(3, 'reversal')->assertStatus(409)->json('reason'));
+        $this->assertSame(1, $this->decisionCount());
+
+        // بعد سحب القرار القديم تتحرر الوحدة بطرفيها ويصحّ الربط.
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'clear'])->assertCreated();
+        $this->assertFalse($this->pairs($token, $id)->json('data.pairs.0.original.claimed'));
+        $link(3, 'original')->assertCreated();
+        $this->assertTrue($this->pairs($token, $id)->json('data.pairs.0.original.claimed'));
+        $this->assertFalse($this->pairs($token, $id)->json('data.pairs.0.reversal.claimed'));
+    }
+
     // ═══════════════════════════════ حداثة التشغيل ═══════════════════════════════
 
     /** @test */
