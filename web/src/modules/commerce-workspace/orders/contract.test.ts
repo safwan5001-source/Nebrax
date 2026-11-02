@@ -31,6 +31,19 @@ describe('orders list state', () => {
     expect(state.scopeAll).toBe(true);
   });
 
+  it('round-trips the fulfillment filter, including not_started, and drops unknown values (COPS-H2-3)', () => {
+    for (const v of ['not_started', 'preparing', 'delivery_failed', 'picked_up']) {
+      const state = parseOrdersState(params(`fulfillment_status=${v}`));
+      expect(state.fulfillmentStatus).toBe(v);
+      expect(serializeOrdersState(state).get('fulfillment_status')).toBe(v);
+      expect(buildOrdersQuery(state, null).get('fulfillment_status')).toBe(v);
+    }
+    const bad = parseOrdersState(params('fulfillment_status=cancelled'));
+    expect(bad.fulfillmentStatus).toBe('');
+    expect(buildOrdersQuery(bad, null).has('fulfillment_status')).toBe(false);
+    expect(serializeOrdersState(DEFAULT_ORDERS_STATE).has('fulfillment_status')).toBe(false);
+  });
+
   it('never serializes the store (owned by the store context)', () => {
     expect(serializeOrdersState({ ...DEFAULT_ORDERS_STATE, scopeAll: false }).has('store')).toBe(false);
   });
