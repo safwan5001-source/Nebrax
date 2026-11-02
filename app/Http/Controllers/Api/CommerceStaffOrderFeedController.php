@@ -55,14 +55,15 @@ class CommerceStaffOrderFeedController extends ApiController
 
     public function attention(Request $request, CommerceOrderAttentionQuery $query): JsonResponse
     {
-        $this->guard($request);
+        // COPS-H2-2 (D-H2-11): الانتباه يُصفّى بنطاق مخازن المستخدم بدل الرفض 403؛ التغذية (`feed`) تبقى 403 للمقيَّد حتى H3 (تصفية تسلسل متصل بمخزن متغيّر
+        // تكسر ضمان الاكتمال).
 
         $data = $request->validate([
             'storefront_id' => ['sometimes', 'uuid'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:'.CommerceOrderAttentionQuery::MAX_LIMIT],
         ]);
 
-        $result = $query->run($data['storefront_id'] ?? null, (int) ($data['limit'] ?? CommerceOrderAttentionQuery::DEFAULT_LIMIT));
+        $result = $query->run($data['storefront_id'] ?? null, (int) ($data['limit'] ?? CommerceOrderAttentionQuery::DEFAULT_LIMIT), $request->user()?->allowedWarehouseIds());
 
         return response()->json([
             'data' => $result['orders']->map(fn ($o) => CommerceOrderFeedSerializer::attention($o, $query))->values()->all(),

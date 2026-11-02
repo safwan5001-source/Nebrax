@@ -162,7 +162,7 @@ class CommerceStaffOrderApiTest extends TestCase
     // ── المقيَّد بمخازن ──────────────────────────────────────────────────
 
     /** @test */
-    public function a_warehouse_restricted_user_is_rejected_even_with_the_permission(): void
+    public function a_warehouse_restricted_user_never_sees_an_order_outside_their_warehouses(): void
     {
         [$tenantId] = $this->owner();
         $order = $this->seedOrder($tenantId);
@@ -172,8 +172,9 @@ class CommerceStaffOrderApiTest extends TestCase
         User::where('email', 'restricted@acme.test')->firstOrFail()->warehouses()->attach($warehouse->id);
         app(TenantContext::class)->forget();
 
-        $this->withToken($token)->getJson('/api/commerce/orders')->assertForbidden();
-        $this->withToken($token)->getJson("/api/commerce/orders/{$order->id}")->assertForbidden();
+        // COPS-H2-2 (D-H2-11): لم يعد 403 — يرى طلبات مخازنه فقط. طلب بلا حجز ولا سياسة قناة ⇒ بلا مخزن فعّال ⇒ غير مرئي (فشل مغلق): قائمة فارغة و404 للتفاصيل.
+        $this->withToken($token)->getJson('/api/commerce/orders')->assertOk()->assertJsonPath('meta.total', 0)->assertJsonPath('data', []);
+        $this->withToken($token)->getJson("/api/commerce/orders/{$order->id}")->assertNotFound();
     }
 
     // ── البحث والفلاتر والفرز والترقيم ───────────────────────────────────

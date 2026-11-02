@@ -668,10 +668,12 @@ class CommerceOrderFulfillmentTest extends TestCase
 
         $restricted = $this->tokenFor($this->tenant, 'admin', 'restricted-fulfil@fulfil.test');
         app(TenantContext::class)->set($this->tenant->id);
-        User::where('email', 'restricted-fulfil@fulfil.test')->firstOrFail()->warehouses()->attach($this->warehouse->id);
+        // COPS-H2-2 (D-H2-11): المقيَّد برؤية مخازنه فقط — مخزن غير مخزن الطلب ⇒ 404 موحَّد (لا 403)؛ ضمن نطاقه ⇒ يعمل (اختبار الرؤية المخصص).
+        $elsewhere = Warehouse::create(['name' => 'مخزن آخر', 'code' => 'FUL-W3']);
+        User::where('email', 'restricted-fulfil@fulfil.test')->firstOrFail()->warehouses()->attach($elsewhere->id);
         app(TenantContext::class)->forget();
-        $this->act($order->id, 'mark_ready', ['expected_version' => 1], $restricted)->assertForbidden();
-        $this->patchDetails($order->id, ['expected_version' => 1, 'carrier_name' => 'x'], $restricted)->assertForbidden();
+        $this->act($order->id, 'mark_ready', ['expected_version' => 1], $restricted)->assertNotFound();
+        $this->patchDetails($order->id, ['expected_version' => 1, 'carrier_name' => 'x'], $restricted)->assertNotFound();
         $this->assertSame('preparing', $this->row($order->id)->status);
 
         // مستأجر آخر: 404 موحَّد قبل أي 428/422، ولا أثر.

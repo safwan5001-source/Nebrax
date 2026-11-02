@@ -487,11 +487,14 @@ class CommerceOrderAcceptanceTest extends TestCase
         $order = $this->order();
         $token = $this->tokenFor($this->tenant, 'admin', 'restricted-accept@accept.test');
         app(TenantContext::class)->set($this->tenant->id);
-        User::where('email', 'restricted-accept@accept.test')->firstOrFail()->warehouses()->attach($this->warehouse->id);
+        // COPS-H2-2 (D-H2-11): المقيَّد يرى طلبات مخازنه فقط — مخزن غير مخزن القناة ⇒ الطلب خارج نطاقه ⇒ 404 موحَّد (لا 403).
+        $elsewhere = Warehouse::create(['name' => 'مخزن آخر', 'code' => 'ACC-W2']);
+        User::where('email', 'restricted-accept@accept.test')->firstOrFail()->warehouses()->attach($elsewhere->id);
         app(TenantContext::class)->forget();
 
-        $this->accept($order->id, $token)->assertForbidden();
-        $this->reject($order->id, [], $token)->assertForbidden();
+        $this->accept($order->id, $token)->assertNotFound();
+        $this->reject($order->id, [], $token)->assertNotFound();
+        $this->assertNull($this->fresh($order->id)->accepted_at);
 
         app(TenantContext::class)->set($this->tenant->id);
         app(TenantApplicationService::class)->disable('commerce.storefront', null);
@@ -836,9 +839,11 @@ class CommerceOrderAcceptanceTest extends TestCase
 
         $restricted = $this->tokenFor($this->tenant, 'admin', 'restricted-filter@accept.test');
         app(TenantContext::class)->set($this->tenant->id);
-        User::where('email', 'restricted-filter@accept.test')->firstOrFail()->warehouses()->attach($this->warehouse->id);
+        $elsewhere = Warehouse::create(['name' => 'مخزن آخر', 'code' => 'ACC-W3']);
+        User::where('email', 'restricted-filter@accept.test')->firstOrFail()->warehouses()->attach($elsewhere->id);
         app(TenantContext::class)->forget();
-        $this->withToken($restricted)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertForbidden();
+        // COPS-H2-2: المقيَّد لا يُرفض؛ المرشّح يعمل ضمن نطاق مخازنه (هنا لا طلب فيه ⇒ فارغ).
+        $this->assertSame([], $this->listIds('&acceptance_status=awaiting_acceptance', $restricted));
         $this->assertNotEmpty($w);
     }
 

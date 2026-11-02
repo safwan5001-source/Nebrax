@@ -31,7 +31,7 @@ class CommerceStaffOrderFulfillmentController extends ApiController
         $read->guard($request);
         $input = $this->input($request, self::ACTION_KEYS);
 
-        $order = CommerceOrder::query()->find($id);
+        $order = CommerceStaffOrderController::scopedOrders($request->user())->find($id);
         abort_if($order === null, 404, 'الطلب غير موجود.');
 
         try {
@@ -49,7 +49,7 @@ class CommerceStaffOrderFulfillmentController extends ApiController
         $read->guard($request);
         $input = $this->input($request, self::DETAIL_KEYS);
 
-        $order = CommerceOrder::query()->find($id);
+        $order = CommerceStaffOrderController::scopedOrders($request->user())->find($id);
         abort_if($order === null, 404, 'الطلب غير موجود.');
 
         try {

@@ -376,7 +376,7 @@ final class CommerceOrderFulfillmentService
     {
         $reserved = InventoryReservation::query()
             ->where('source_type', CommerceOrder::class)->where('source_id', $order->id)
-            ->orderBy('created_at')->value('warehouse_id');
+            ->orderBy('created_at')->orderBy('id')->value('warehouse_id');
         if (is_string($reserved) && $reserved !== '') {
             return $reserved;
         }

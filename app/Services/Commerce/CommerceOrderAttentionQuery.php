@@ -42,9 +42,10 @@ final class CommerceOrderAttentionQuery
     ];
 
     /**
+     * @param  ?list<string>  $allowedWarehouseIds  null = غير مقيَّد
      * @return array{orders: Collection<int, CommerceOrder>, truncated: bool, window_hours: int, limit: int}
      */
-    public function run(?string $storefrontId = null, int $limit = self::DEFAULT_LIMIT): array
+    public function run(?string $storefrontId = null, int $limit = self::DEFAULT_LIMIT, ?array $allowedWarehouseIds = null): array
     {
         $limit = max(1, min(self::MAX_LIMIT, $limit));
         $hours = self::windowHours();
@@ -52,7 +53,8 @@ final class CommerceOrderAttentionQuery
         $since = now('UTC')->subHours($hours);
         $acceptanceOpen = (bool) config('commerce.order_acceptance_enabled');
 
-        $rows = CommerceOrder::query()
+        // COPS-H2-2: المقيَّد بمخازن يرى انتباه طلبات مخازنه فقط (المخزن الفعّال)؛ غير المقيَّد (`null`) كما كان.
+        $rows = CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $allowedWarehouseIds)
             ->select(['id', 'number', 'storefront_id', 'sales_channel_id', 'delivery_method', 'status', 'cancelled_at', 'created_at', 'acceptance_mode', 'accepted_at'])
             ->with('paymentIntent:id,commerce_order_id,method,status')
             ->where('status', CommerceOrder::STATUS_CONFIRMED)

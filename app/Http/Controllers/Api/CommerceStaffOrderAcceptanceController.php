@@ -28,7 +28,7 @@ class CommerceStaffOrderAcceptanceController extends ApiController
         $read->guard($request);
         $request->validate(['tenant_id' => ['prohibited']]);
 
-        $order = CommerceOrder::query()->find($id);
+        $order = CommerceStaffOrderController::scopedOrders($request->user())->find($id);
         abort_if($order === null, 404, 'الطلب غير موجود.');
 
         try {
@@ -50,7 +50,7 @@ class CommerceStaffOrderAcceptanceController extends ApiController
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
-        $order = CommerceOrder::query()->find($id);
+        $order = CommerceStaffOrderController::scopedOrders($request->user())->find($id);
         abort_if($order === null, 404, 'الطلب غير موجود.');
 
         try {

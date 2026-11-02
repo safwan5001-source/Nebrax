@@ -35,7 +35,7 @@ class CommerceStaffOrderCancellationController extends ApiController
             'note' => ['sometimes', 'nullable', 'string', 'max:500', 'required_if:reason,other'],
         ]);
 
-        $order = CommerceOrder::query()->find($id);
+        $order = CommerceStaffOrderController::scopedOrders($request->user())->find($id);
         abort_if($order === null, 404, 'الطلب غير موجود.');
 
         try {
