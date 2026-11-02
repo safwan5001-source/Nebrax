@@ -34,7 +34,11 @@ final class CommerceOrderStatusProjector
 
     public const ACCEPTED = 'accepted';
 
-    public const VALUES = [self::CANCELLED, self::DRAFT, self::AWAITING_PAYMENT, self::PAYMENT_CANCELLED, self::AWAITING_ACCEPTANCE, self::ACCEPTED];
+    /** COPS-H2-1: بعد `accepted` تُسقَط حالة التنفيذ المخزَّنة (قراءة فقط؛ لا تحكم انتقالاً). */
+    public const VALUES = [
+        self::CANCELLED, self::DRAFT, self::AWAITING_PAYMENT, self::PAYMENT_CANCELLED, self::AWAITING_ACCEPTANCE, self::ACCEPTED,
+        'preparing', 'ready', 'out_for_delivery', 'delivery_failed', 'returned_to_store', 'delivered', 'picked_up',
+    ];
 
     public static function project(CommerceOrder $order): string
     {
@@ -53,6 +57,10 @@ final class CommerceOrderStatusProjector
         }
         if ($order->awaitsManualAcceptance()) {
             return self::AWAITING_ACCEPTANCE;
+        }
+        // التنفيذ يُسقَط من الحقائق المخزَّنة دائماً (AR-3: لا تُخفيه البوابة). يتطلب تحميل العلاقة مسبقاً (القوائم/التفاصيل تفعل) فلا N+1.
+        if ($order->relationLoaded('fulfillment') && $order->fulfillment !== null) {
+            return (string) $order->fulfillment->status;
         }
 
         return self::ACCEPTED;

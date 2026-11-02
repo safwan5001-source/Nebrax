@@ -66,6 +66,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/orders/{id}/accept', // COPS-H1-4: قبول التاجر اليدوي (commerce.orders.manage، بوابة القبول)
         // COMMERCE-ORDERS-O3a-2b — إلغاء طلب بواسطة موظف مخوّل (ADR-28، commerce.orders.cancel، بوابة مغلقة افتراضياً).
         'api/commerce/orders/{id}/cancel',
+        'api/commerce/orders/{id}/fulfillment', // COPS-H2-1: تحديث تفاصيل التنفيذ (PATCH، commerce.orders.manage، بوابة التنفيذ)
+        'api/commerce/orders/{id}/fulfillment/{action}', // COPS-H2-1: إجراءات تنفيذ الطلب (POST، commerce.orders.manage، بوابة التنفيذ)
         'api/commerce/orders/{id}/reject', // COPS-H1-4: رفض التاجر = إلغاء بسبب merchant_rejected (manage + cancel، البوابتان)
         // COM-MOBILE-PAYMENTS-1 — إدارة داخلية لالتزامات دفع Commerce (ADR-09).
         'api/commerce/payment-intents',

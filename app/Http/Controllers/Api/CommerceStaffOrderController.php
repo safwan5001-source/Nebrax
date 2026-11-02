@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderFulfillment;
 use App\Models\CommerceOrderEvent;
 use App\Models\CommerceOrderPosting;
 use App\Models\CommercePaymentIntent;
@@ -10,6 +11,7 @@ use App\Models\PaymentAttempt;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Commerce\CommerceOrderAttentionQuery;
+use App\Services\Commerce\CommerceOrderFulfillmentService;
 use App\Services\Commerce\CommerceOrderLifecycleService;
 use App\Services\Commerce\CommerceOrderStatusProjector;
 use App\Support\CommerceOrderStaffSerializer;
@@ -52,6 +54,8 @@ class CommerceStaffOrderController extends ApiController
             'lifecycle_status' => ['sometimes', Rule::in([CommerceOrder::STATUS_DRAFT, CommerceOrder::STATUS_CONFIRMED, CommerceOrder::LIFECYCLE_CANCELLED])],
             // COPS-H1-5: مرشّح حالة القبول التشغيلية (بُعد مستقل عن الدورة والدفع والتنفيذ). انظر {@see self::applyAcceptanceFilter()}.
             'acceptance_status' => ['sometimes', Rule::in(self::ACCEPTANCE_STATUSES)],
+            // COPS-H2-1: مرشّح حالة التنفيذ من الحقائق المخزَّنة (قائمة بيضاء؛ `not_started` = لا صف). يعمل دائماً أياً كان وضع بوابة التنفيذ (AR-3).
+            'fulfillment_status' => ['sometimes', Rule::in([...CommerceOrderFulfillment::STATUSES, 'not_started'])],
             'payment_status' => ['sometimes', Rule::in([
                 CommercePaymentIntent::STATUS_PENDING,
                 CommercePaymentIntent::STATUS_AWAITING_COLLECTION,
@@ -70,7 +74,7 @@ class CommerceStaffOrderController extends ApiController
         ]);
 
         $query = CommerceOrder::query()
-            ->with(['salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'paymentIntent'])
+            ->with(['salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'paymentIntent', 'fulfillment'])
             ->withCount('lines');
 
         $this->applyFilters($query, $data);
@@ -112,7 +116,7 @@ class CommerceStaffOrderController extends ApiController
         $order = CommerceOrder::query()
             ->with([
                 'salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'gift', 'schedule',
-                'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name', 'acceptedBy:id,name',
+                'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name', 'acceptedBy:id,name', 'fulfillment.warehouse:id,name',
             ])
             ->withCount('lines')
             ->find($id);
@@ -145,6 +149,12 @@ class CommerceStaffOrderController extends ApiController
             }
         }
 
+        // COPS-H2-1: إجراءات التنفيذ التالية بالعقد نفسه — تغيب (لا مفتاح) حين بوابة التنفيذ مغلقة أو تنقص `commerce.orders.manage`؛ استرشادية.
+        // الحقائق المخزَّنة (كتلة `fulfillment`) لا تتأثر بالبوابة أبداً (AR-3).
+        if ($actor !== null && (bool) config('commerce.order_fulfillment_enabled') && $actor->hasPermission('commerce.orders.manage')) {
+            $data['fulfillment_actions'] = app(CommerceOrderFulfillmentService::class)->actions($order);
+        }
+
         return $data;
     }
 
@@ -166,6 +176,11 @@ class CommerceStaffOrderController extends ApiController
         }
         if (isset($f['acceptance_status'])) {
             $this->applyAcceptanceFilter($query, $f['acceptance_status']);
+        }
+        if (isset($f['fulfillment_status'])) {
+            $f['fulfillment_status'] === 'not_started'
+                ? $query->whereDoesntHave('fulfillment')
+                : $query->whereHas('fulfillment', fn (Builder $q) => $q->where('status', $f['fulfillment_status']));
         }
         if (isset($f['payment_status']) || isset($f['payment_method'])) {
             $query->whereHas('paymentIntent', function (Builder $q) use ($f): void {

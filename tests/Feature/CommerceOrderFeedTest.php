@@ -274,7 +274,13 @@ class CommerceOrderFeedTest extends TestCase
     #[Test]
     public function the_domain_events_carry_ids_only_and_cover_every_recorded_type(): void
     {
-        $classes = [CommerceOrderPlaced::class, CommerceOrderCancelled::class, CommerceOrderPaymentPaid::class, CommerceOrderPaymentCollected::class, CommerceOrderAccepted::class];
+        $classes = [
+            CommerceOrderPlaced::class, CommerceOrderCancelled::class, CommerceOrderPaymentPaid::class, CommerceOrderPaymentCollected::class, CommerceOrderAccepted::class,
+            // COPS-H2-1: لكل نوع تنفيذ حدث نطاق مقابل.
+            \App\Events\CommerceOrderFulfillmentStarted::class, \App\Events\CommerceOrderFulfillmentReady::class, \App\Events\CommerceOrderFulfillmentDispatched::class,
+            \App\Events\CommerceOrderFulfillmentDeliveryFailed::class, \App\Events\CommerceOrderFulfillmentReturned::class, \App\Events\CommerceOrderFulfillmentDelivered::class,
+            \App\Events\CommerceOrderFulfillmentPickedUp::class, \App\Events\CommerceOrderFulfillmentDetailsUpdated::class,
+        ];
         foreach ($classes as $class) {
             $props = array_map(fn (ReflectionProperty $p) => $p->getName(), (new ReflectionClass($class))->getProperties(ReflectionProperty::IS_PUBLIC));
             sort($props);

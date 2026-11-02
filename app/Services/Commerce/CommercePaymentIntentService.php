@@ -196,6 +196,9 @@ final class CommercePaymentIntentService
             if ($locked->isOnline() && $this->online->hasCapture($locked)) {
                 throw new RuntimeException('سبق التقاط دفعة لهذا الطلب؛ لا يُلغى التزام الدفع.');
             }
+            // COPS-H2-1 (AR-2): الكاتب الوحيد لحالة `cancelled` على النية ⇒ الحارس هنا يغطي كل المسارات (القديم بوابة مغلقة/مفتوحة، المكنسة، cancel() المباشر).
+            // قراءة بلا قفل كافية: كل انتقال تنفيذي يقفل النية أولاً (ونحن نحمل قفلها)، فلا يتحرك صف التنفيذ بين القراءة والالتزام. لا يتعلق بأي بوابة (AR-3).
+            $this->assertFulfillmentAllowsCancellation($locked);
 
             $locked->update([
                 'status' => CommercePaymentIntent::STATUS_CANCELLED,
@@ -204,6 +207,21 @@ final class CommercePaymentIntentService
 
             return $locked->fresh();
         });
+    }
+
+    /** @throws CommerceOrderFulfillmentLockedException */
+    private function assertFulfillmentAllowsCancellation(CommercePaymentIntent $intent): void
+    {
+        if ($intent->commerce_order_id === null) {
+            return;
+        }
+        $status = \App\Models\CommerceOrderFulfillment::query()->where('commerce_order_id', $intent->commerce_order_id)->value('status');
+        if (in_array($status, \App\Models\CommerceOrderFulfillment::IN_TRANSIT, true)) {
+            throw new CommerceOrderFulfillmentLockedException(CommerceOrderFulfillmentLockedException::IN_TRANSIT, 'تنفيذ هذا الطلب في النقل؛ لا يُلغى التزام الدفع.');
+        }
+        if (in_array($status, \App\Models\CommerceOrderFulfillment::COMPLETED, true)) {
+            throw new CommerceOrderFulfillmentLockedException(CommerceOrderFulfillmentLockedException::COMPLETED, 'اكتمل تنفيذ هذا الطلب؛ لا يُلغى التزام الدفع.');
+        }
     }
 
     /**

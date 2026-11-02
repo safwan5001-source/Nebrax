@@ -30,6 +30,12 @@ final class CommerceOrderCancellationException extends RuntimeException
     /** COPS-H1-4 (رفض التاجر): قُبل الطلب ⇒ لا رفض بعد القبول؛ يُلغى بمسار الإلغاء العادي بأسبابه. */
     public const ALREADY_ACCEPTED = 'already_accepted';
 
+    /** COPS-H2-1 (ADR-28 §3 الصف 14): تنفيذ الطلب في النقل (`out_for_delivery`/`delivery_failed`) ⇒ لا إلغاء. */
+    public const FULFILLMENT_IN_TRANSIT = 'fulfillment_in_transit';
+
+    /** COPS-H2-1 (الصف 14): اكتمل التنفيذ (`delivered`/`picked_up`) ⇒ لا إلغاء؛ يُعالَج بمسار المرتجع/الاسترداد (H6). */
+    public const FULFILLMENT_COMPLETED = 'fulfillment_completed';
+
     public const INVALID_REASON = 'invalid_reason';
 
     public const NOTE_REQUIRED = 'note_required';

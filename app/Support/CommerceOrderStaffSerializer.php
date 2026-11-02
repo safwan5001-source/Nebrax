@@ -38,6 +38,7 @@ final class CommerceOrderStaffSerializer
             // COPS-H1-4: حالة تشغيلية مشتقة للعرض فقط (لا تُخزَّن ولا تحكم انتقالاً) + كتلة القبول.
             'operational_status' => CommerceOrderStatusProjector::project($order),
             'acceptance' => CommerceOrderStatusProjector::acceptanceBlock($order),
+            ...self::fulfillmentSummary($order),
             'cancellation' => self::cancellation($order, false),
             'created_at' => $order->created_at?->toIso8601String(),
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
@@ -75,6 +76,7 @@ final class CommerceOrderStaffSerializer
             'acceptance' => CommerceOrderStatusProjector::acceptanceBlock($order) + [
                 'by' => $order->accepted_by_user_id === null ? null : ['id' => $order->accepted_by_user_id, 'name' => $order->acceptedBy?->name],
             ],
+            ...self::fulfillmentDetail($order),
             'cancellation' => self::cancellation($order, true),
             'delivery_amount' => self::money($order->delivery_amount_minor, $currency),
             'contact' => [
@@ -161,6 +163,54 @@ final class CommerceOrderStaffSerializer
      *
      * @return array{cancelled: bool, at: ?string, reason: ?string, by?: ?array{id: string, name: ?string}, note?: ?string}
      */
+    /**
+     * COPS-H2-1: موجز التنفيذ في صف القائمة — **يغيب المفتاح كلياً** حين لا صف (استجابات الطلبات القائمة حرفياً كما كانت). تُقرأ الحقائق المخزَّنة دائماً
+     * (AR-3: إغلاق بوابة التنفيذ لا يُخفيها). يتطلب تحميل علاقة `fulfillment`.
+     *
+     * @return array<string, mixed>
+     */
+    private static function fulfillmentSummary(CommerceOrder $order): array
+    {
+        $f = $order->relationLoaded('fulfillment') ? $order->fulfillment : null;
+
+        return $f === null ? [] : ['fulfillment' => ['status' => $f->status, 'type' => $f->type]];
+    }
+
+    /**
+     * كتلة تنفيذ الموظف الكاملة (داخلية: الناقل/التتبع/الساعي/سبب الفشل). تغيب حين لا صف. بيانات الساعي داخلية فقط (D-H2-09).
+     *
+     * @return array<string, mixed>
+     */
+    private static function fulfillmentDetail(CommerceOrder $order): array
+    {
+        $f = $order->relationLoaded('fulfillment') ? $order->fulfillment : null;
+        if ($f === null) {
+            return [];
+        }
+        $iso = fn ($t) => $t?->toIso8601String();
+
+        return ['fulfillment' => [
+            'status' => $f->status,
+            'type' => $f->type,
+            'version' => (int) $f->version,
+            'warehouse' => $f->relationLoaded('warehouse') && $f->warehouse !== null ? ['id' => $f->warehouse->id, 'name' => $f->warehouse->name] : ['id' => $f->warehouse_id, 'name' => null],
+            'carrier' => ['name' => $f->carrier_name, 'tracking_number' => $f->tracking_number, 'tracking_url' => $f->tracking_url],
+            'courier' => ['name' => $f->courier_name, 'phone' => $f->courier_phone],
+            'delivery_attempts' => (int) $f->delivery_attempts,
+            'last_failure' => $f->last_failure_reason === null ? null : ['reason' => $f->last_failure_reason, 'note' => $f->last_failure_note, 'at' => $iso($f->last_failed_at)],
+            'timestamps' => [
+                'preparing_at' => $iso($f->preparing_at),
+                'ready_at' => $iso($f->ready_at),
+                'first_dispatched_at' => $iso($f->first_dispatched_at),
+                'last_dispatched_at' => $iso($f->last_dispatched_at),
+                'last_failed_at' => $iso($f->last_failed_at),
+                'last_returned_at' => $iso($f->last_returned_at),
+                'delivered_at' => $iso($f->delivered_at),
+                'picked_up_at' => $iso($f->picked_up_at),
+            ],
+        ]];
+    }
+
     private static function cancellation(CommerceOrder $order, bool $detailed): array
     {
         $block = [
