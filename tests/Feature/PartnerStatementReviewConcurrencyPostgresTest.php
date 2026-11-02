@@ -245,6 +245,65 @@ class PartnerStatementReviewConcurrencyPostgresTest extends TestCase
         $this->assertSame(0, PartnerStatementReviewDecision::query()->count(), 'لا قرار على وحدة معكوسة.');
     }
 
+    /** @return array{0: string, 1: string, 2: string, 3: list<string>} [reconciliationId, runId, unitKey, lineIds] — زوج معكوس مثبت وثلاثة أسطر كشف (دائن، دائن، مدين). */
+    private function preparePair(): array
+    {
+        $invoices = app(InvoiceService::class);
+        $invoice = $invoices->post($invoices->create(['partner_id' => $this->partnerId, 'payment_type' => 'credit', 'invoice_date' => '2026-09-03'], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]));
+        auth()->setUser(User::query()->findOrFail($this->userId));
+        $entry = JournalEntry::query()->where('source_type', Invoice::class)->where('source_id', $invoice->id)->firstOrFail();
+        app(LedgerService::class)->reverse($entry, '2026-09-06', 'إلغاء');
+        $path = $this->dir.'/pair.csv';
+        file_put_contents($path, SpreadsheetWriter::csv(['التاريخ', 'رقم المستند', 'مدين', 'دائن'], [
+            ['2026-09-03', '', '', '1150.00'], ['2026-09-04', '', '', '1150.00'], ['2026-09-06', '', '1150.00', ''],
+        ]));
+        $id = app(PartnerStatementImportService::class)->apply(
+            new UploadedFile($path, 'pair.csv', 'text/csv', null, true),
+            ['partner_id' => $this->partnerId, 'role' => 'customer', 'period_from' => '2026-09-01', 'period_to' => '2026-09-30'],
+            $this->userId,
+        )['reconciliation_id'];
+        $run = app(PartnerStatementMatchService::class)->run(User::query()->findOrFail($this->userId), $id);
+
+        return [$id, $run['id'], 'invoice#'.$invoice->id, PartnerStatementLine::query()->where('reconciliation_id', $id)->orderBy('ordinal')->pluck('id')->all()];
+    }
+
+    /** @test */
+    public function two_lines_racing_for_the_same_pair_member_yield_one_winner(): void
+    {
+        [$id, $runId, $unit, $lines] = $this->preparePair();
+
+        $jobs = [];
+        foreach (range(0, 5) as $i) {
+            $jobs[] = $this->decideJob($id, ['run_id' => $runId, 'line_id' => $lines[$i % 2], 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'original', 'reason' => 'سباق الطرف', 'accept_difference' => true]);
+        }
+        $results = $this->runConcurrently($jobs);
+
+        app(TenantContext::class)->set($this->tenantId);
+        $this->assertSame(1, PartnerStatementReviewDecision::query()->count(), json_encode($results, JSON_UNESCAPED_UNICODE));
+        foreach ($this->failures($results) as $failure) {
+            $this->assertSame(PartnerStatementReviewException::class, $failure['error_class'] ?? null, json_encode($failure, JSON_UNESCAPED_UNICODE));
+        }
+        $this->assertCount(1, array_filter($this->successes($results), fn ($v) => $v['replayed'] === false));
+    }
+
+    /** @test */
+    public function the_two_members_of_a_pair_are_linked_concurrently_without_false_blocking_and_identical_requests_replay(): void
+    {
+        [$id, $runId, $unit, $lines] = $this->preparePair();
+
+        $results = $this->runConcurrently([
+            $this->decideJob($id, ['run_id' => $runId, 'line_id' => $lines[0], 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'original', 'reason' => 'الأصل']),
+            $this->decideJob($id, ['run_id' => $runId, 'line_id' => $lines[2], 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'reversal', 'reason' => 'العكس']),
+            $this->decideJob($id, ['run_id' => $runId, 'line_id' => $lines[2], 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'reversal', 'reason' => 'العكس']),
+            $this->decideJob($id, ['run_id' => $runId, 'line_id' => $lines[0], 'action' => 'link_pair', 'unit_keys' => [$unit], 'pair_member' => 'original', 'reason' => 'الأصل']),
+        ]);
+
+        app(TenantContext::class)->set($this->tenantId);
+        $this->assertCount(4, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(2, PartnerStatementReviewDecision::query()->count());
+        $this->assertCount(2, array_filter($this->successes($results), fn ($v) => $v['replayed'] === false));
+    }
+
     /** @param list<callable> $jobs @return array<int, array<string, mixed>> */
     private function runConcurrently(array $jobs): array
     {
