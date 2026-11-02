@@ -43,7 +43,7 @@ const rejected = {
   accept_action: { available: false, blocked_reason: 'already_cancelled' }, reject_action: { available: false, blocked_reason: 'already_cancelled' }, cancel_action: { available: false, blocked_reason: 'already_cancelled' },
 };
 
-async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; theme?: 'light' | 'dark'; permissions?: string[]; detail?: unknown; accept?: (route: Route) => Promise<void> | void; reject?: (route: Route) => Promise<void> | void } = {}) {
+async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; theme?: 'light' | 'dark'; permissions?: string[]; detail?: unknown; accept?: (route: Route) => Promise<void> | void; detailFn?: () => unknown; reject?: (route: Route) => Promise<void> | void } = {}) {
   const locale = opts.locale ?? 'ar';
   await page.context().addCookies([{ name: 'locale', value: locale, url: baseUrl }]);
   const requests: string[] = [];
@@ -67,7 +67,7 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     }
     if (p === `/commerce/orders/${ORDER_ID}/accept` && method === 'POST') return opts.accept ? opts.accept(route) : json(route, { data: accepted });
     if (p === `/commerce/orders/${ORDER_ID}/reject` && method === 'POST') return opts.reject ? opts.reject(route) : json(route, { data: rejected });
-    if (p === `/commerce/orders/${ORDER_ID}`) return json(route, { data: opts.detail ?? detailBase });
+    if (p === `/commerce/orders/${ORDER_ID}`) return json(route, { data: opts.detailFn ? opts.detailFn() : opts.detail ?? detailBase });
     if (p === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
@@ -152,9 +152,11 @@ test.describe('H1-5 merchant acceptance UI', () => {
       },
     });
     await expect(page.getByRole('button', { name: 'قبول الطلب' })).toBeVisible();
-    const button = page.getByRole('button', { name: 'قبول الطلب' });
-    await button.click();
-    await button.click({ force: true, noWaitAfter: true }).catch(() => undefined);
+    // نقرتان متزامنتان في الإطار نفسه على DOM حقيقي (أقوى من نقرتين متتاليتين): الثانية يجب أن تُهمَل.
+    await page.getByRole('button', { name: 'قبول الطلب' }).evaluate((el) => {
+      (el as HTMLButtonElement).click();
+      (el as HTMLButtonElement).click();
+    });
     await expect(page.getByRole('status').filter({ hasText: 'تم قبول الطلب.' })).toBeVisible();
     expect(hits).toBe(1);
     expect(writes(requests)).toHaveLength(1);
@@ -178,25 +180,26 @@ test.describe('H1-5 merchant acceptance UI', () => {
     await expect(page.getByRole('status').filter({ hasText: 'تم رفض الطلب.' })).toBeVisible();
     expect(body).toEqual({ note: 'خارج نطاق التوصيل' });
     expect(writes(requests)).toEqual([`POST /commerce/orders/${ORDER_ID}/reject`]);
-    await expect(page.getByText('رفض التاجر').locator('visible=true').first()).toBeVisible();
+    await expect(shown(page, 'مرفوض')).toBeVisible();
+    // سبب الرفض في قسم الإلغاء: ظاهر على سطح المكتب؛ على الجوال الأقسام خلف تنقّل فنكتفي بشارة «مرفوض» في الترويسة.
+    if (info.project.name === 'desktop') await expect(shown(page, 'رفض التاجر')).toBeVisible();
     await shot(page, `detail-rejected-ar-${info.project.name}`);
   });
 
   test('a 409 race refreshes to the real state and removes the stale action', async ({ page }) => {
-    let served = 0;
+    let raced = false;
     const requests = await open(page, `/commerce/orders/${ORDER_ID}`, {
-      accept: (route) => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ message: 'x', reason: 'already_cancelled' }) }),
+      detailFn: () => (raced ? rejected : detailBase), // بعد السباق يعيد الخادم الحالة الحقيقية (React StrictMode يكرّر الجلب في التطوير فلا نعدّ GET)
+      accept: (route) => {
+        raced = true;
+        return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ message: 'x', reason: 'already_cancelled' }) });
+      },
     });
-    await page.route(`**/api/commerce/orders/${ORDER_ID}`, (route) => {
-      served += 1;
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: served === 1 ? detailBase : rejected }) });
-    });
-    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('button', { name: 'قبول الطلب' })).toBeVisible();
     await page.getByRole('button', { name: 'قبول الطلب' }).click();
     await expect(page.getByText(/تغيّرت حالة الطلب ولم يعد هذا الإجراء متاحاً/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'قبول الطلب' })).toHaveCount(0);
-    expect(writes(requests).length).toBeGreaterThanOrEqual(1);
+    expect(writes(requests)).toEqual([`POST /commerce/orders/${ORDER_ID}/accept`]);
   });
 
   test('without the manage permission no acceptance action is rendered', async ({ page }) => {
