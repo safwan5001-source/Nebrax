@@ -182,7 +182,7 @@ class FuelReconciliationService
                 $quote = $this->costBasis->quoteGain($fuelProduct, $warehouse, $difference);
                 $value = $quote['posted_cost_minor'];
                 $unitCost = intdiv($value, $difference);
-                $stockMovement = $this->inventory->applyReceipt($product, $difference, $unitCost, $this->movementMeta($reconciliation, $warehouse), $value);
+                $stockMovement = $this->inventory->applyReceipt($product, $difference, $unitCost, $this->movementMeta($reconciliation, $warehouse, $station), $value);
                 $entry = $this->postEntry($reconciliation, $station, $value, true, $approverId);
                 $this->costBasis->recordGain($fuelProduct, $warehouse, $stockMovement, $difference, $value, $entry);
             } elseif ($difference < 0) {
@@ -192,7 +192,7 @@ class FuelReconciliationService
                 $lossValue = $quote['posted_cost_minor'];
                 $value = -$lossValue;
                 $unitCost = intdiv($lossValue, $lossQuantity);
-                $stockMovement = $this->inventory->applyIssue($product, $lossQuantity, $unitCost, $this->movementMeta($reconciliation, $warehouse) + ['enforce_stock' => true], $lossValue);
+                $stockMovement = $this->inventory->applyIssue($product, $lossQuantity, $unitCost, $this->movementMeta($reconciliation, $warehouse, $station) + ['enforce_stock' => true], $lossValue);
                 $entry = $this->postEntry($reconciliation, $station, $lossValue, false, $approverId);
                 $this->costBasis->recordIssue($fuelProduct, $warehouse, $stockMovement, $lossQuantity, $lossValue, $entry);
             }
@@ -342,9 +342,9 @@ class FuelReconciliationService
     }
 
     /** @return array<string,mixed> */
-    private function movementMeta(FuelReconciliation $r, Warehouse $warehouse): array
+    private function movementMeta(FuelReconciliation $r, Warehouse $warehouse, FuelStation $station): array
     {
-        return ['warehouse_id' => $warehouse->id, 'date' => now()->toDateString(), 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'notes' => 'تسوية وقود معتمدة', InventoryService::FUEL_POOL_META => true];
+        return ['warehouse_id' => $warehouse->id, 'date' => $this->settings->businessDate($station), 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'notes' => 'تسوية وقود معتمدة', InventoryService::FUEL_POOL_META => true];
     }
 
     private function postEntry(FuelReconciliation $r, FuelStation $station, int $amount, bool $gain, string $approverId): ?\App\Models\JournalEntry
@@ -362,7 +362,7 @@ class FuelReconciliationService
         $lines = $gain
             ? [['account_id' => $inventory->id, 'debit' => $amount, 'branch_id' => $branchId], ['account_id' => $variance->id, 'credit' => $amount, 'branch_id' => $branchId]]
             : [['account_id' => $variance->id, 'debit' => $amount, 'branch_id' => $branchId], ['account_id' => $inventory->id, 'credit' => $amount, 'branch_id' => $branchId]];
-        return $this->ledger->post($lines, ['entry_date' => now()->toDateString(), 'description' => $gain ? 'زيادة تسوية وقود' : 'فقد تسوية وقود', 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'created_by' => $approverId]);
+        return $this->ledger->post($lines, ['entry_date' => $this->settings->businessDate($station), 'description' => $gain ? 'زيادة تسوية وقود' : 'فقد تسوية وقود', 'source_type' => FuelReconciliation::class, 'source_id' => $r->id, 'created_by' => $approverId]);
     }
 
     /** @param array<int, string> $allowedTypes */
