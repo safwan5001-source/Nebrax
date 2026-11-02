@@ -1,7 +1,7 @@
 # COPS Horizon — Handoff (التسليم الحيّ)
 
 **البرنامج:** AWJ Commerce Operations Horizon (COPS) — امتداد لـ `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1` (المتتبّع §9).
-**آخر تحديث:** 2026-11-02 — **H1-4 مدموج:** #1932 ⇒ `5cca769d34e89cb6ee378e891e0b32c83fe3b8af` (قبول التاجر ورفضه). H1-3 مدموج #1926 ⇒ `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200`؛ H1-2 #1924 ⇒ `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe`؛ H1-1 مغلق (#1910/#1920/#1917). **توقّف التنفيذ بعد H1-4 كما فوَّض المالك — H1-5 لم يبدأ** (بأمر صريح جديد).
+**آخر تحديث:** 2026-11-02 — **H1-5 مدموج وبه يكتمل COPS-H1:** #1934 ⇒ `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` (واجهة التاجر للقبول والرفض + مرشّح حالة القبول). H1-4 #1932 ⇒ `5cca769d34e89cb6ee378e891e0b32c83fe3b8af`؛ H1-3 #1926 ⇒ `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200`؛ H1-2 #1924 ⇒ `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe`؛ H1-1 مغلق (#1910/#1920/#1917). **توقّف التنفيذ بعد H1-5 كما فوَّض المالك — H2 لم يبدأ** (بأمر صريح جديد). تقرير الإغلاق: `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`.
 **القاعدة:** يُحدَّث هذا الملف في نهاية كل شريحة (Slice) قبل التوقف. هو نقطة الاستئناف الوحيدة؛ لا يُعاد الاستكشاف.
 
 ---
@@ -23,7 +23,7 @@
 | H1-1 | Claude Opus | **STOP** ✅ (هذه النقطة — مغلق بالكامل) |
 | H1-2 ثم H1-3 | Claude Sonnet | **STOP** ✅ (هذه النقطة — مفوَّضتان ذاتياً 2026-11-02؛ H1-2 ✅ وH1-3 ✅ مدموجتان) |
 | H1-4 | Claude Opus | **STOP** ✅ (هذه النقطة — مفوَّض ذاتياً 2026-11-02؛ مدموج) |
-| H1-5 + تقرير إغلاق H1 (`AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`) | Claude Sonnet | STOP |
+| H1-5 + تقرير إغلاق H1 (`AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`) | Claude Sonnet | **STOP** ✅ (هذه النقطة — مفوَّض ذاتياً 2026-11-02؛ مدموج) |
 
 لا تبدأ المجموعة التالية إلا بأمر استمرار صريح جديد من المالك. نقطة التوقف لا تلغي تفويض H1.
 
@@ -41,15 +41,23 @@
 | H1-2 closing records | **Merged** (وثائق فقط، 2026-11-02) | #1925 | `e05c8e0f3ca125d27af76fda0b174baa66607174` | SHA الدمج لـ#1917/#1924 وأدلة CI/الأداء |
 | H1-3 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL ووظيفة الأداء المخصصة وCI Gate خضراء على الرأس `3dfcb1dc2cf0a681fe24002a3bf3f6411b993610`؛ Codex بلا ملاحظات مفتوحة؛ لم يُنشر ولم يُفعَّل شيء | #1926 | `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200` | `AWJ-COPS-H1-3-IMPLEMENTATION-REPORT.md`؛ Base الفعلي `ce081f8ca`؛ ملاحظة Codex P2 واحدة (التاريخ يُقتطع قبل التصفية) أُصلحت في `3dfcb1d` باختبار انحدار؛ جدول جديد `commerce_channel_operation_settings` (إضافي)، بلا إنفاذ، بوابة R-6b مغلقة |
 | H1-4 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL ووظيفة الأداء المخصصة وCI Gate وweb build خضراء على الرأس `4f3c07480b2f3ba1eb7fd119e56f1292460d33ce` من المحاولة الأولى؛ Codex بلا ملاحظات؛ لم يُنشر ولم يُفعَّل شيء | #1932 | `5cca769d34e89cb6ee378e891e0b32c83fe3b8af` | `AWJ-COPS-H1-4-IMPLEMENTATION-REPORT.md`؛ Base `d5e1be954`؛ هجرتان (أعمدة القبول + حراسها؛ مُشغِّلات فقط لـ`merchant_rejected` و`order.accepted`)؛ صلاحية `commerce.orders.manage`؛ البوابتان مغلقتان |
-| H1-5 | Planned — **غير مفوَّض** | — | — | — |
+| H1-5 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL ووظيفة الأداء المخصصة وCI Gate وweb build (×2) خضراء على الرأس `d9dc6381bfe57220d4cfa26a02418af0af46f74a`؛ لم يُنشر ولم يُفعَّل شيء | #1934 | `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` | `AWJ-COPS-H1-5-IMPLEMENTATION-REPORT.md`؛ Base `1946d3567`؛ بلا هجرة؛ مرشّح `acceptance_status` وحيد في الخلفية؛ ملاحظة Codex P2 واحدة (قفل الإجراءات القديمة حتى نجاح التحديث) أُصلحت في `d9dc638` بـ5 اختبارات؛ البوابتان مغلقتان |
+| H1-4 closing records | **Merged** (وثائق فقط، 2026-11-02) | #1933 | `1946d3567552e827941b1b5bd0ba38e0aae71214` | SHA الدمج وأدلة CI + نقطة استئناف H1-5 |
+| H1 closing records | هذا الـPR (وثائق فقط) — تقرير `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md` | يُسجَّل بعد الدمج | — | Implemented/Tested/Merged/Deployed/Activated/Env-verified مفصولة في التقرير |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 
 ---
 
-## 3.A نقطة الاستئناف الحالية — H1-5 (بأمر صريح من المالك)
+## 3.A نقطة الاستئناف الحالية — H2 (بأمر صريح جديد من المالك فقط)
 
-**الحالة:** H1-1..H1-4 مدموجة (`46774c5c2` · `790eff709` · `f4ae9fc99` · `5cca769d3`). **التنفيذ متوقف بتفويض المالك.** لا H1-5 قبل أمر استمرار صريح جديد؛ ولا نشر ولا تفعيل (البوابتان `COMMERCE_ORDER_ACCEPTANCE_ENABLED` و`COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقتان).
+**الحالة:** H1-1..H1-5 مدموجة (`46774c5c2` · `790eff709` · `f4ae9fc99` · `5cca769d3` · `76bf5293d`). **COPS-H1 مكتمل تنفيذاً ودمجاً، ولا شيء منه منشور أو مُفعَّل.** **التنفيذ متوقف بتفويض المالك:** لا H2 قبل أمر استمرار صريح جديد؛ ولا نشر ولا تفعيل (البوابتان `COMMERCE_ORDER_ACCEPTANCE_ENABLED` و`COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقتان). الملخص الكامل ومتطلبات التفعيل: `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`.
+
+**ما أنتجه H1-5:** مرشّح `GET commerce/orders?acceptance_status=awaiting_acceptance|accepted|auto` (مشتقّ من الحقائق، يطابق المُسقِط، مغلق بالبوابة)؛ واجهة تفاصيل الطلب تعرض «قبول/رفض» من `accept_action`/`reject_action` + الصلاحية فقط (الرفض يتطلب `manage` و`cancel`)، بقفل إرسال مكرر وقفل حالة قديمة على مستوى الصفحة حتى نجاح التحديث؛ شارة قبول ومرشّح واختصار «بانتظار القبول» في القائمة. كتابات الويب الجديدة معزولة في `accept-order.ts` (POSTان فقط، يحرسهما `orders-readonly.test.ts`). **لا قبول/رفض من صفوف القائمة** (الملخّص بلا عقد إجراء)، و**لا واجهة attention/feed** (H3).
+
+**قرار H1-5 المفتوح سابقاً (مرشّح `operational_status`) حُسم:** اكتُفي بمرشّح `acceptance_status` المشتقّ من الحقائق الأصلية، لا ترجمة الإسقاط إلى SQL.
+
+**قرارات مفتوحة للمالك:** (1) تأكيد تفسير `attention` (`new_order` + نافذة 48 ساعة للتلقائي، و`awaiting_acceptance` بلا نافذة) — الواجهة لا تستهلكه بعد؛ (2) قرار تفعيل منسَّق للبوابتين (القبول والإلغاء) قبل أي مستأجر حي؛ (3) أمر بدء H2.
 
 **ما أنتجه H1-2:** أحداث النطاق بعد الالتزام (معرّفات فقط؛ **كل نوع سجل جديد يتطلب حدث نطاق** وإلا فشل `CommerceOrderFeedTest`؛ المستمعون لا يرمون) · `GET commerce/orders/feed` و`attention` · أي مسار Commerce جديد يلزمه سطر في `CommerceModuleBoundaryTest`.
 
@@ -64,7 +72,7 @@
 
 **ثوابت لا تُكسر:** الرأس صف قفل ثابت لا يُحدَّث؛ `max+1` بعبارة واحدة؛ الكاتب لا يلمس `tenants`؛ الرأس آخر قفل؛ القراءة بلا أقفال؛ القبول/الرفض على محور النية ← الطلب؛ حقائق القبول والإلغاء تكتبها `CommerceOrderLifecycleService` وحدها؛ بوابة الأداء المخصصة (§3.B). **SQLite:** لا تضف مفتاحاً أجنبياً على `commerce_orders` عبر Schema Builder (يعيد بناء الجدول ويُسقط مُشغِّلات الحراس بصمت) — استعمل `ADD COLUMN … REFERENCES` الأصلية.
 
-**الفرع:** `claude/cops-h1-5-...` من أحدث `origin/main` (يُنشأ عند البدء).
+**الفرع:** `claude/cops-h2-...` من أحدث `origin/main` (يُنشأ عند البدء، بأمر صريح فقط).
 
 ## 3.B قاعدة بوابة الأداء في CI (تسري على كل شريحة COPS قادمة)
 
