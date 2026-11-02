@@ -26,6 +26,10 @@ use RuntimeException;
  *  - **confirm:** يقبل اقتراح المحرّك لسطر واحد (`matched | amount_difference | date_difference`) بوحدته؛ السبب إلزامي إن لم يكن `matched`.
  *  - **override:** يُسند وحدات (1..50) يختارها المراجع؛ **سبب إلزامي (≥ 3 محارف)**؛ إن خرج الفرق عن P-2 فلا بد من `accept_difference = true` صريح.
  *  - **clear:** يسحب القرار الفعّال للسطر (لا قرار فعّال بعده)؛ idempotent إن لم يكن هناك قرار.
+ *  - **link_pair (PS-A3b، D-PS-15):** ربط يدوي صريح لسطر كشف بأحد طرفي زوج أصل/عكس **مثبت بـ`reversal_of` في الأستاذ**: الوحدة `neutralised` ببساطة قيدين بالضبط
+ *    (الأصل `reversed` والعكس `posted` يشير إليه) وصافيهما صفر؛ العضو (`original`|`reversal`) يختاره المراجع ولا يُستنتج من مبلغ أو تاريخ أو رقم؛ سبب إلزامي. السلسلة الناقصة
+ *    أو الأطول من قيدين أو غير المثبتة تُرفض؛ ولا يتغيّر ناتج المحرّك (`reversed_in_books`/`missing_in_books` تبقى ظاهرة)، والاستعمال المزدوج يُحرس لكل عضو (`وحدة@عضو`).
+ *  - **السبب (D-PS-16، قرار المالك):** أي قبول لفرق مالي (غير صفر) يتطلب سبباً دائماً — ثابت لا يُعطَّل بإعداد مستأجر.
  *  - **الوحدات القابلة للمراجعة:** `active` فقط. المعكوسة (`neutralised`) والناقصة (`incomplete`) و`zero_net` مرفوضة (D-PS-15: لا ربط تلقائي أو مخمَّن؛ الربط اليدوي لزوج معكوس مثبت شريحة مستقلة).
  *  - **لا استعمال مزدوج:** وحدة لها قرار فعّال على سطر لا تُسند لسطر آخر (409 `unit_already_decided`).
  *  - **المسودة فقط:** مقارنة ليست `draft` ⇒ 409 `reconciliation_not_editable` (لا مراجعة بعد الاعتماد).
@@ -64,8 +68,23 @@ final class PartnerStatementReviewService
             throw new PartnerStatementReviewException('reason_too_long', 'سبب المراجعة أطول من 500 حرف.');
         }
         $requested = array_values(array_unique(array_map('strval', (array) ($input['unit_keys'] ?? []))));
-        if ($action !== PartnerStatementReviewDecision::ACTION_OVERRIDE && $requested !== []) {
-            throw new PartnerStatementReviewException('unit_keys_not_allowed', 'الوحدات تُحدَّد في التجاوز (override) وحده؛ التأكيد يقبل اقتراح المحرّك والسحب بلا وحدات.');
+        $withUnits = [PartnerStatementReviewDecision::ACTION_OVERRIDE, PartnerStatementReviewDecision::ACTION_LINK_PAIR];
+        if (! in_array($action, $withUnits, true) && $requested !== []) {
+            throw new PartnerStatementReviewException('unit_keys_not_allowed', 'الوحدات تُحدَّد في التجاوز (override) أو ربط الزوج (link_pair) وحدهما؛ التأكيد يقبل اقتراح المحرّك والسحب بلا وحدات.');
+        }
+        $member = isset($input['pair_member']) ? (string) $input['pair_member'] : null;
+        if ($action === PartnerStatementReviewDecision::ACTION_LINK_PAIR) {
+            if (! in_array($member, PartnerStatementReviewDecision::MEMBERS, true)) {
+                throw new PartnerStatementReviewException('pair_member_required', 'حدّد طرف الزوج الذي يقابله السطر: original أو reversal.');
+            }
+            if (count($requested) !== 1) {
+                throw new PartnerStatementReviewException('unit_keys_invalid', 'ربط الزوج يتطلب وحدة دفترية واحدة بالضبط.');
+            }
+            if ($reason === null || mb_strlen($reason) < 3) {
+                throw new PartnerStatementReviewException('reason_required', 'سبب ربط الزوج المعكوس إلزامي (3 محارف على الأقل).');
+            }
+        } elseif ($member !== null) {
+            throw new PartnerStatementReviewException('pair_member_not_allowed', 'طرف الزوج يخصّ ربط الزوج (link_pair) وحده.');
         }
         if ($action === PartnerStatementReviewDecision::ACTION_OVERRIDE) {
             if ($requested === [] || count($requested) > PartnerStatementMatchService::MAX_SET) {
@@ -83,7 +102,7 @@ final class PartnerStatementReviewService
             throw new PartnerStatementReviewException('line_not_in_run', 'سطر الكشف غير موجود ضمن هذه التشغيلة.');
         }
 
-        return DB::transaction(function () use ($actor, $reconciliation, $run, $line, $row, $action, $reason, $requested, $input): array {
+        return DB::transaction(function () use ($actor, $reconciliation, $run, $line, $row, $action, $reason, $requested, $member, $input): array {
             $this->lock($reconciliation->id);
             // حالة المقارنة تُعاد قراءتها داخل المعاملة بعد القفل: لا مراجعة إلا على مسودة.
             $fresh = PartnerStatementReconciliation::query()->whereKey($reconciliation->id)->lockForUpdate()->first();
@@ -96,8 +115,9 @@ final class PartnerStatementReviewService
             $source = $this->matching->source($actor, $reconciliation);
             $this->assertFresh($run, $reconciliation, $source);
             $plan = match ($action) {
-                PartnerStatementReviewDecision::ACTION_CLEAR => ['units' => [], 'net' => null],
+                PartnerStatementReviewDecision::ACTION_CLEAR => ['units' => [], 'claims' => [], 'net' => null],
                 PartnerStatementReviewDecision::ACTION_CONFIRM => $this->planConfirm($row, $reason, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
+                PartnerStatementReviewDecision::ACTION_LINK_PAIR => $this->planPair((string) $requested[0], (string) $member, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
                 default => $this->planOverride($requested, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
             };
             $warnings = $action === PartnerStatementReviewDecision::ACTION_CLEAR ? [] : $this->warnings($run, $line, $plan['units']);
@@ -113,14 +133,14 @@ final class PartnerStatementReviewService
                     return ['decision' => null, 'replayed' => true, 'warnings' => []];
                 }
             } else {
-                if ($current !== null && $this->sameDecision($current, $run->id, $action, $plan['units'], $reason, $source['fingerprint'])) {
+                if ($current !== null && $this->sameDecision($current, $run->id, $action, $plan['units'], $member, $reason, $source['fingerprint'])) {
                     return ['decision' => $this->present($current), 'replayed' => true, 'warnings' => $warnings];
                 }
-                foreach ($plan['units'] as $unitKey) {
+                foreach ($plan['claims'] as $claim) {
                     foreach ($effective as $otherLine => $decision) {
-                        if ($otherLine !== $line->id && in_array($unitKey, $decision->unit_keys, true)) {
-                            throw new PartnerStatementReviewException('unit_already_decided', 'وحدة دفترية مُسندة بقرار فعّال إلى سطر كشف آخر.', 409, [
-                                'unit_key' => $unitKey, 'line_id' => $otherLine,
+                        if ($otherLine !== $line->id && in_array($claim, $this->claimsOf($decision), true)) {
+                            throw new PartnerStatementReviewException('unit_already_decided', 'وحدة دفترية (أو طرف زوج معكوس) مُسندة بقرار فعّال إلى سطر كشف آخر.', 409, [
+                                'unit_key' => $claim, 'line_id' => $otherLine,
                             ]);
                         }
                     }
@@ -129,7 +149,8 @@ final class PartnerStatementReviewService
 
             $decision = PartnerStatementReviewDecision::create([
                 'reconciliation_id' => $reconciliation->id, 'run_id' => $run->id, 'line_id' => $line->id, 'revision' => $nextRevision, 'action' => $action,
-                'unit_keys' => $plan['units'], 'engine_outcome' => $row->outcome,
+                'unit_keys' => $plan['units'], 'engine_outcome' => $row->outcome, 'engine_code' => $row->explanation['code'] ?? null,
+                'pair_member' => $plan['pair']['member'] ?? null, 'pair_original_entry_id' => $plan['pair']['original'] ?? null, 'pair_reversal_entry_id' => $plan['pair']['reversal'] ?? null,
                 'expected_net_minor' => $plan['net']['expected'] ?? null, 'set_net_minor' => $plan['net']['set'] ?? null, 'difference_minor' => $plan['net']['difference'] ?? null,
                 'accepted_difference' => (bool) ($plan['net']['accepted'] ?? false), 'reason' => $reason,
                 'ledger_fingerprint' => $source['fingerprint'], 'created_by' => $actor->getKey(), 'created_at' => now(),
@@ -179,6 +200,56 @@ final class PartnerStatementReviewService
             array_map(fn (PartnerStatementReviewDecision $d): array => $this->present($d) + ['ordinal' => $ordinals[$d->line_id] ?? null], $slice),
             count($effective), $perPage, $page,
         );
+    }
+
+    /**
+     * الأزواج المعكوسة المرئية للمراجع في الدفتر الحالي (قراءة فقط، بنطاق الفاعل): المثبتة القابلة للربط اليدوي (`reviewable`) وغيرها بسببها، مع ما أُسند لكل طرف.
+     * لا تغيّر نتائج المحرّك ولا تخفي فروقها؛ هي أداة اختيار للمراجع قبل `link_pair`. حدّ العرض 200 زوج (`truncated`).
+     *
+     * @return array{pairs: list<array<string, mixed>>, truncated: bool, scope: array<string, mixed>, ledger_fingerprint: string}
+     */
+    public function reversedPairs(User $actor, string $reconciliationId): array
+    {
+        $reconciliation = $this->matching->authorize($actor, $reconciliationId, 'partner_statements.view');
+        $source = $this->matching->source($actor, $reconciliation);
+
+        $readable = [];
+        foreach (PartnerStatementMatchRun::query()->where('reconciliation_id', $reconciliation->id)->get() as $run) {
+            $readable[$run->id] = $this->matching->readable($actor, $run);
+        }
+        $claimed = [];
+        foreach ($this->effective($this->decisionsOf($reconciliation->id)) as $lineId => $decision) {
+            foreach ($this->claimsOf($decision) as $claim) {
+                $claimed[$claim] = ['claimed' => true, 'line_id' => ($readable[$decision->run_id] ?? false) ? $lineId : null];
+            }
+        }
+        $free = ['claimed' => false, 'line_id' => null];
+
+        $pairs = [];
+        foreach ($source['units'] as $unit) {
+            if (! in_array($unit['state'], ['neutralised', 'incomplete'], true)) {
+                continue;
+            }
+            $row = ['unit_key' => $unit['key'], 'kind' => $unit['kind'], 'state' => $unit['state'], 'reasons' => $unit['reasons'], 'entry_numbers' => $unit['numbers']];
+            try {
+                $proof = $this->provePair($unit);
+                $row += ['reviewable' => true, 'blocked_reason' => null];
+                foreach (['original', 'reversal'] as $member) {
+                    $entry = $proof[$member];
+                    $row[$member] = [
+                        'entry_id' => $entry['entry_id'], 'number' => $entry['number'], 'date' => $entry['date'], 'net_minor' => $entry['debit_minor'] - $entry['credit_minor'],
+                    ] + ($claimed[$unit['key'].'@'.$member] ?? $free);
+                }
+            } catch (PartnerStatementReviewException $e) {
+                $row += ['reviewable' => false, 'blocked_reason' => $e->reason];
+            }
+            $pairs[] = $row;
+        }
+
+        return [
+            'pairs' => array_slice($pairs, 0, 200), 'truncated' => count($pairs) > 200,
+            'scope' => $source['scope'], 'ledger_fingerprint' => $source['fingerprint'],
+        ];
     }
 
     // ═══════════════════════════════ الداخل ═══════════════════════════════
@@ -245,7 +316,13 @@ final class PartnerStatementReviewService
             throw new PartnerStatementReviewException('reason_required', 'تأكيد مطابقة بفرق (مبلغ أو تاريخ) يتطلب سبباً (3 محارف على الأقل).');
         }
 
-        return ['units' => [(string) $row->unit_key], 'net' => $this->net($source, [(string) $row->unit_key], $line, $reconciliation, $accept)];
+        $net = $this->net($source, [(string) $row->unit_key], $line, $reconciliation, $accept);
+        // D-PS-16 (قرار المالك): قبول فرق مالي (غير صفر) يتطلب سبباً دائماً، حتى لو كان داخل التسامح — ثابت، لا إعداد مستأجر.
+        if ($net['difference'] !== 0 && ($reason === null || mb_strlen($reason) < 3)) {
+            throw new PartnerStatementReviewException('reason_required', 'تأكيد مطابقة بفرق مالي يتطلب سبباً (3 محارف على الأقل).');
+        }
+
+        return ['units' => [(string) $row->unit_key], 'claims' => [(string) $row->unit_key], 'net' => $net];
     }
 
     /**
@@ -256,7 +333,76 @@ final class PartnerStatementReviewService
     {
         sort($requested);
 
-        return ['units' => $requested, 'net' => $this->net($source, $requested, $line, $reconciliation, $accept)];
+        return ['units' => $requested, 'claims' => $requested, 'net' => $this->net($source, $requested, $line, $reconciliation, $accept)];
+    }
+
+    /**
+     * PS-A3b: ربط سطر كشف بطرف (`original`|`reversal`) من زوج معكوس **مثبت**. الإثبات من الأستاذ نفسه (`reversal_of`) لا من تشابه مبلغ أو تاريخ أو رقم؛ العضو قرار المراجع.
+     *
+     * @param  array{units: list<array<string, mixed>>}  $source
+     * @return array{units: list<string>, claims: list<string>, net: array<string, mixed>, pair: array<string, string>}
+     */
+    private function planPair(string $unitKey, string $member, array $source, PartnerStatementLine $line, PartnerStatementReconciliation $reconciliation, bool $accept): array
+    {
+        $unit = null;
+        foreach ($source['units'] as $candidate) {
+            if ($candidate['key'] === $unitKey) {
+                $unit = $candidate;
+                break;
+            }
+        }
+        if ($unit === null) {
+            throw new PartnerStatementReviewException('unit_not_in_ledger', 'وحدة دفترية غير موجودة ضمن مرشحي هذا الطرف والفترة.', 422, ['unit_key' => $unitKey]);
+        }
+        $proof = $this->provePair($unit);
+        $entry = $proof[$member];
+
+        return [
+            'units' => [$unitKey], 'claims' => [$unitKey.'@'.$member],
+            'net' => $this->settle($entry['debit_minor'] - $entry['credit_minor'], $line, $reconciliation, $accept),
+            'pair' => ['member' => $member, 'original' => $proof['original']['entry_id'], 'reversal' => $proof['reversal']['entry_id']],
+        ];
+    }
+
+    /**
+     * إثبات زوج أصل/عكس بسيط من تفاصيل القيود في الأستاذ: قيدان بالضبط، العكس `posted` ويشير بـ`reversal_of` إلى الأصل `reversed`، والأصل لا يشير لشيء، وصافياهما متعاكسان ومجموعهما صفر.
+     * أي حالة أخرى لا تُخمَّن: ناقصة ⇒ `pair_incomplete`، سلسلة أطول أو غير مطابقة ⇒ `pair_not_simple`/`pair_not_proven`، وحدة نشطة ⇒ `unit_not_a_reversed_pair`.
+     *
+     * @param  array<string, mixed>  $unit
+     * @return array{original: array<string, mixed>, reversal: array<string, mixed>}
+     */
+    private function provePair(array $unit): array
+    {
+        $key = $unit['key'];
+        if (($unit['state'] ?? null) === 'incomplete') {
+            throw new PartnerStatementReviewException('pair_incomplete', 'سلسلة العكس ناقصة داخل نافذة الكشف: لا يُربط زوج غير مكتمل.', 422, ['unit_key' => $key, 'reasons' => $unit['reasons'] ?? []]);
+        }
+        if (($unit['state'] ?? null) !== 'neutralised') {
+            throw new PartnerStatementReviewException('unit_not_a_reversed_pair', 'الوحدة ليست زوجاً معكوساً؛ استعمل التجاوز (override) للوحدات النشطة.', 422, ['unit_key' => $key, 'state' => $unit['state'] ?? null]);
+        }
+        $entries = $unit['entries'] ?? [];
+        if (count($entries) !== 2) {
+            throw new PartnerStatementReviewException('pair_not_simple', 'الربط اليدوي لزوج أصل/عكس من قيدين فقط؛ السلاسل الأطول لا تُربط هنا.', 422, ['unit_key' => $key, 'entries' => count($entries)]);
+        }
+        $reversals = array_values(array_filter($entries, fn (array $e): bool => $e['reversal_of'] !== null));
+        if (count($reversals) !== 1) {
+            throw new PartnerStatementReviewException('pair_not_proven', 'لا رابط عكس مثبت (reversal_of) بين قيدي الوحدة.', 422, ['unit_key' => $key]);
+        }
+        $reversal = $reversals[0];
+        $original = null;
+        foreach ($entries as $entry) {
+            if ($entry['entry_id'] === $reversal['reversal_of']) {
+                $original = $entry;
+            }
+        }
+        $originalNet = $original === null ? 0 : $original['debit_minor'] - $original['credit_minor'];
+        $reversalNet = $reversal['debit_minor'] - $reversal['credit_minor'];
+        if ($original === null || $original['reversal_of'] !== null || $original['status'] !== 'reversed' || $reversal['status'] !== 'posted'
+            || $originalNet === 0 || $originalNet + $reversalNet !== 0) {
+            throw new PartnerStatementReviewException('pair_not_proven', 'قيد العكس لا يشير إلى أصل مكتمل الحالة (reversed) بصافٍ معاكس؛ لا ربط بلا إثبات.', 422, ['unit_key' => $key]);
+        }
+
+        return ['original' => $original, 'reversal' => $reversal];
     }
 
     /**
@@ -285,9 +431,18 @@ final class PartnerStatementReviewService
             $selected[] = $unit;
         }
 
+        return $this->settle((int) array_sum(array_map(fn (array $u): int => (int) $u['net_minor'], $selected)), $line, $reconciliation, $accept);
+    }
+
+    /**
+     * يقارن صافي ما أُسند بسطر الكشف (±P-2 المجمَّد) ويشترط الإقرار الصريح خارج التسامح. سطر الكشف الدائن = مدين عندنا (+)، والمدين = دائن عندنا (−).
+     *
+     * @return array{expected: int, set: int, difference: int, accepted: bool}
+     */
+    private function settle(int $setNet, PartnerStatementLine $line, PartnerStatementReconciliation $reconciliation, bool $accept): array
+    {
         $amount = (int) $line->debit_minor > 0 ? (int) $line->debit_minor : (int) $line->credit_minor;
         $expected = (int) $line->debit_minor > 0 ? -$amount : $amount;
-        $setNet = (int) array_sum(array_map(fn (array $u): int => (int) $u['net_minor'], $selected));
         $difference = $expected - $setNet;
         $tolerance = (int) $this->matching->policy($reconciliation)['amount_tolerance_minor'];
         $outside = abs($difference) > $tolerance;
@@ -325,7 +480,7 @@ final class PartnerStatementReviewService
     /**
      * @param  list<string>  $units
      */
-    private function sameDecision(PartnerStatementReviewDecision $current, string $runId, string $action, array $units, ?string $reason, string $fingerprint): bool
+    private function sameDecision(PartnerStatementReviewDecision $current, string $runId, string $action, array $units, ?string $member, ?string $reason, string $fingerprint): bool
     {
         $existing = $current->unit_keys;
         sort($existing);
@@ -333,7 +488,7 @@ final class PartnerStatementReviewService
         sort($new);
 
         // الإعادة مرتبطة بالتشغيلة المطلوبة نفسها (Codex #1915): تشغيلتان بنطاقين مختلفين قد تشتركان في البصمة، ولا يُعاد لقارئ قرارٌ بُني على تشغيلة لا يقرؤها.
-        return $current->run_id === $runId && $current->action === $action && $existing === $new && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint;
+        return $current->run_id === $runId && $current->action === $action && $existing === $new && ($current->pair_member ?? null) === $member && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint;
     }
 
     /**
@@ -370,6 +525,20 @@ final class PartnerStatementReviewService
         return $effective;
     }
 
+    /**
+     * رموز الاستعمال المزدوج للقرار: الوحدات نفسها، أو `وحدة@عضو` لربط الزوج (فكل طرف من الزوج يحمله سطر واحد على الأكثر).
+     *
+     * @return list<string>
+     */
+    private function claimsOf(PartnerStatementReviewDecision $decision): array
+    {
+        if ($decision->action === PartnerStatementReviewDecision::ACTION_LINK_PAIR && $decision->pair_member !== null) {
+            return array_map(fn (string $unit): string => $unit.'@'.$decision->pair_member, $decision->unit_keys);
+        }
+
+        return $decision->unit_keys;
+    }
+
     private function lock(string $reconciliationId): void
     {
         if (DB::connection()->getDriverName() === 'pgsql') {
@@ -382,7 +551,8 @@ final class PartnerStatementReviewService
     {
         return [
             'id' => $d->id, 'reconciliation_id' => $d->reconciliation_id, 'run_id' => $d->run_id, 'line_id' => $d->line_id, 'revision' => $d->revision, 'action' => $d->action,
-            'unit_keys' => $d->unit_keys, 'engine_outcome' => $d->engine_outcome, 'expected_net_minor' => $d->expected_net_minor, 'set_net_minor' => $d->set_net_minor,
+            'unit_keys' => $d->unit_keys, 'engine_outcome' => $d->engine_outcome, 'engine_code' => $d->engine_code,
+            'pair' => $d->pair_member === null ? null : ['member' => $d->pair_member, 'original_entry_id' => $d->pair_original_entry_id, 'reversal_entry_id' => $d->pair_reversal_entry_id], 'expected_net_minor' => $d->expected_net_minor, 'set_net_minor' => $d->set_net_minor,
             'difference_minor' => $d->difference_minor, 'accepted_difference' => (bool) $d->accepted_difference, 'reason' => $d->reason,
             'created_by' => $d->created_by, 'created_at' => optional($d->created_at)->toIso8601String(),
         ];
