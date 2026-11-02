@@ -5,8 +5,8 @@
 | Slice | COPS-H1-4 — حقائق القبول + `accept`/`reject` + حراس القاعدة + `operational_status` المشتق + `commerce.orders.manage` + دمج القبول في `attention` |
 | Branch | `claude/cops-h1-4-acceptance` |
 | Base SHA | `d5e1be954cb1360c7a5f4bd5c37fa6258949d908` (`origin/main` بعد إغلاق H1-3، #1930) |
-| PR / Head SHA / Merge SHA | تُسجَّل في وصف الـPR وفي `AWJ_COPS_HORIZON_HANDOFF.md` (الملف لا يضمّن هاشه) |
-| الحالة | Implemented → Merged عند اجتياز البوابات · Not deployed · Not activated · Not env-verified |
+| PR / Head SHA / Merge SHA | #1932 · Head `4f3c07480b2f3ba1eb7fd119e56f1292460d33ce` · Merge `5cca769d34e89cb6ee378e891e0b32c83fe3b8af` |
+| الحالة | **Merged** (2026-11-02) · Not deployed · Not activated · Not env-verified |
 | العقد | `ADR-29` §2.1، §2.2 (+ §2.2.1 الجديد)، §2.4 · Revision 1 صف H1-4 · ADR-28 §3 (مصفوفة الإلغاء) |
 | قرارات المالك | R-3 · R-5 · R-6 · R-6b (معتمدة في ADR-29 §0) · تفويض COPS-H1-4 الذاتي (2026-11-02) |
 
@@ -65,7 +65,10 @@
 | اختبارات الطفرة | ✅ إزالة فحص جاهزية الدفع ⇒ يفشل سباق قبول×التقاط واختبار الدفع الإلكتروني؛ إزالة قاعدة الرفض قبل القبول ⇒ يفشل سباق قبول×رفض واختبار المصفوفة (والقاعدة ترفض) |
 | الأجنحة المجاورة (الإلغاء، الأحداث، التغذية، إعدادات التشغيل، حدود الوحدة، طلبات الموظف) SQLite | ✅ 140 ناجح، 26 متخطٍّ (PostgreSQL فقط) |
 
-أرقام الأجنحة الموسَّعة على PostgreSQL وCI (sqlite، pgsql، الأداء المخصص، CI Gate) تُسجَّل في وصف الـPR وHandoff.
+| الجناح الموسَّع على PostgreSQL (Commerce/Checkout/Payments/Cancellation/Events بما فيها اختبارات الأداء/PaymentAttemptPosting/BranchIsolation/Rbac) | ✅ 488 passed |
+| الجناح الموسَّع على SQLite (Rbac/Route/ApplicationCatalog/Enforcement/Navigation/BranchIsolation/Commerce/Migration/Storefront/Flowers) | ✅ 3174 passed، 83 skipped (PostgreSQL فقط) |
+
+**CI على الرأس `4f3c074` (#1932):** sqlite ✅ · pgsql ✅ · PostgreSQL feed-lock performance ✅ · web build ✅ · CI Gate ✅ — كلها من المحاولة الأولى بلا إعادة تشغيل. Codex: لا ملاحظات.
 
 ## 4. الأمان والعزل
 
