@@ -267,9 +267,8 @@ final class PartnerStatementLifecycleService
                 continue;
             }
             $byAction[$decision->action] = ($byAction[$decision->action] ?? 0) + 1;
-            if ($decision->accepted_difference) {
-                $acceptedDifferenceMinor += (int) $decision->difference_minor;
-            }
+            // كل فرق مالي قُبل بقرار (داخل التسامح بسبب أو خارجه بإقرار) يدخل المجموع المطلق — لا يُستثنى ما كان ضمن التسامح (Codex #1939، D-PS-16).
+            $acceptedDifferenceMinor += abs((int) $decision->difference_minor);
         }
 
         if ($run === null) {

@@ -361,7 +361,8 @@ final class PartnerStatementReviewService
             throw new PartnerStatementReviewException('dismiss_requires_missing_in_books', 'الاستبعاد لسطر حكم المحرّك عليه «غير موجود في الدفاتر» (missing_in_books) وحده؛ غيره يُؤكَّد أو يُسند.', 422, ['engine_outcome' => $row->outcome]);
         }
 
-        return ['units' => [], 'claims' => [], 'net' => $this->settle(0, $line, $reconciliation, true)];
+        // الاستبعاد يقبل مبلغ السطر كله صراحةً مهما كان التسامح (Codex #1939): العلم يُفرض لا يُستنتج من التسامح العادي.
+        return ['units' => [], 'claims' => [], 'net' => ['accepted' => true] + $this->settle(0, $line, $reconciliation, true)];
     }
 
     /**

@@ -70,8 +70,8 @@ class PartnerStatementLifecycleApiTest extends TestCase
         }
     }
 
-    /** @param list<array{date: string, ref?: string, our?: string, debit?: int, credit?: int}> $rows */
-    private function statement(array $rows): string
+    /** @param list<array{date: string, ref?: string, our?: string, debit?: int, credit?: int}> $rows @param array<string, mixed> $over */
+    private function statement(array $rows, array $over = []): string
     {
         $money = fn (?int $minor): string => $minor === null ? '' : number_format($minor / 100, 2, '.', '');
         $csv = SpreadsheetWriter::csv(['التاريخ', 'رقم المستند', 'مرجعنا', 'مدين', 'دائن'], array_map(fn (array $r): array => [
@@ -81,7 +81,7 @@ class PartnerStatementLifecycleApiTest extends TestCase
         app(TenantContext::class)->set($this->auth['tenant_id']);
         $this->actingAs($this->owner);
 
-        return app(PartnerStatementImportService::class)->apply($file, [
+        return app(PartnerStatementImportService::class)->apply($file, $over + [
             'partner_id' => $this->both->id, 'role' => 'customer', 'period_from' => '2026-09-01', 'period_to' => '2026-09-30',
         ], (string) $this->owner->id)['reconciliation_id'];
     }
@@ -403,6 +403,32 @@ class PartnerStatementLifecycleApiTest extends TestCase
         $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line4, 'action' => 'clear'])->assertCreated();
         $this->assertSame(1, $this->lcStatus($token, $id)->assertOk()->json('data.readiness.resolved'));
         $this->assertSame($before, $this->counts());
+    }
+
+    /**
+     * Codex #1939 P2: الاستبعاد يقبل مبلغ السطر كله صراحةً حتى لو كان داخل التسامح؛ والمجموع المسجَّل في حدث المراجعة يشمل كل فرق مالي قُبل (مطلقاً) لا ما تجاوز التسامح وحده.
+     *
+     * @test
+     */
+    public function dismissing_a_line_inside_the_tolerance_still_records_the_full_accepted_difference_in_the_decision_and_the_audit_summary(): void
+    {
+        $a = $this->invoice('2026-09-01', 100000);
+        $id = $this->statement([
+            ['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000],   // ٢ ⇒ matched
+            ['date' => '2026-09-20', 'credit' => 50],                            // ٣ ⇒ ٠٫٥٠ ر.س، داخل التسامح (١٫٠٠) ومفقود في الدفاتر
+        ], ['amount_tolerance_minor' => 100]);
+        $run = $this->match($this->auth['token'], $id);
+        $token = $this->auth['token'];
+
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'confirm'])->assertCreated();
+        $row = collect($this->withToken($token)->getJson("/api/partner-statement-reconciliations/{$id}/matches?per_page=50&side=statement")->json('data'))->firstWhere('ordinal', 3);
+        $this->assertSame('missing_in_books', $row['outcome']);
+
+        $d = $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 3), 'action' => 'dismiss', 'reason' => 'مبلغ زهيد غير موجود'])->assertCreated();
+        $this->assertSame([50, true], [$d->json('data.difference_minor'), $d->json('data.accepted_difference')]);
+
+        $this->review($token, $id, $run['id'])->assertCreated();
+        $this->assertSame(50, $this->events($token, $id)->json('data.0.summary.accepted_difference_minor'));
     }
 
     /** @test */

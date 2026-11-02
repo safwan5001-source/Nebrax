@@ -69,7 +69,7 @@ Unknown/foreign reconciliation or run ⇒ the single identical refusal (no exist
 
 | Suite | Result |
 |---|---|
-| `PartnerStatementLifecycleApiTest` (16) | pass on both |
+| `PartnerStatementLifecycleApiTest` (17) | pass on both |
 | `PartnerStatementLifecycleConcurrencyPostgresTest` (5, `pcntl_fork`) | pass on PostgreSQL |
 | A1/A2c/A3a/A3b suites after the additive changes | pass on both (one A3a test now reaches `reviewed` legitimately through the lifecycle instead of a raw status update, which the new guard rightly rejects) |
 | Wider filter | see the PR description |
@@ -86,6 +86,9 @@ Covered: the full cycle with audit rows and counts; early review refused with ze
 - digest gate removed from the match run → fails 1; removed from `review` → fails 1
 - freshness check skipped in `markReviewed` alone → **survives, as an equivalent mutant**: `evaluate()` re-applies the same check and refuses with the same `run_stale` reason and causes (two independent layers). Removing **both** layers fails 2 tests.
 - (PostgreSQL) advisory lock **and** row lock removed from `review`/`reopen` → fails 3 of the 5 race tests; the other two (invariants on the event log and final status) still pass because the database guards (gapless `seq` trigger, `from_status` check, edge-matching status guard) hold even without the locks — the guards are a genuine second net, not decoration.
+
+### Codex review of this PR
+- **P2 — a dismissal inside the tolerance must still record the full accepted difference.** `dismiss` accepts the whole line amount explicitly, but the `accepted_difference` flag followed the ordinary tolerance rule (a 50-minor line with a 100 tolerance recorded `accepted_difference = false`), so the audit summary excluded it. The flag is now forced for `dismiss`, and the event summary's `accepted_difference_minor` is the **absolute total of every non-zero accepted difference** (inside the tolerance with a reason, or outside it with an explicit acceptance) — the same root cause would otherwise have under-reported within-tolerance confirmations (D-PS-16). Reproduced first (the new test fails on the previous code). Test `dismissing_a_line_inside_the_tolerance_still_records_the_full_accepted_difference_in_the_decision_and_the_audit_summary`.
 
 ## 7. Risks and disclosures
 1. **No `closed` yet — by decision (§0).** Reviewed reconciliations are not "final": nothing prevents two reviewed reconciliations of overlapping periods from both existing (they are drafts-with-a-reviewed-flag, not effective finals). That is exactly what PS-A3d adds.
