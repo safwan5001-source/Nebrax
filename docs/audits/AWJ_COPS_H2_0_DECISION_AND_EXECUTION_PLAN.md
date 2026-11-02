@@ -104,7 +104,8 @@ returned_to_store ─dispatch▶ out_for_delivery            (إعادة توص�
 
 ### 2.3 الأهلية (D-H2-02) — تُفحص تحت الأقفال
 
-بدء التنفيذ (أول إجراء) يتطلب: طلب `confirmed` غير ملغى · نية موجودة غير ملغاة و`status ∈ PAYMENT_READY` · قبول فعّال (`effectiveAcceptanceMode() = auto` أو `accepted_at` موجود) · بوابة التنفيذ مفتوحة · مخزن قابل للحسم. الرموز (409): `already_cancelled` · `payment_not_ready` · `payment_pending` · `payment_cancelled` · `awaiting_acceptance` · `fulfillment_policy_missing`؛ و422 `not_confirmed`. الانتقالات اللاحقة تتطلب طلباً غير ملغى فقط (الدفع لا يرتدّ).
+بدء التنفيذ (أول إجراء) يتطلب: طلب `confirmed` غير ملغى · نية موجودة غير ملغاة و`status ∈ PAYMENT_READY` · قبول فعّال (`effectiveAcceptanceMode() = auto` أو `accepted_at` موجود) · بوابة التنفيذ مفتوحة · مخزن قابل للحسم. الرموز (409): `already_cancelled` · `payment_not_ready` · `payment_pending` · `payment_cancelled` · `awaiting_acceptance` · `fulfillment_policy_missing`؛ و422 `not_confirmed`. **كل انتقال لاحق** (`mark_ready`، `dispatch` بما فيه إعادة المحاولة وإعادة الإرسال بعد العودة، `deliver`، `fail`، `return`، `pickup`) يعيد فحص **الشرطين تحت قفل النية والطلب**: طلب غير ملغى **و**نية قائمة غير ملغاة بحالة `PAYMENT_READY`. السبب: «الدفع لا يرتدّ» صحيح لـ`collected/paid` فقط؛ أما نية COD/الاستلام `awaiting_collection` فيمكن إلغاؤها **وحدها** (المسار القديم والبوابة مغلقة، أو `cancel()` المباشر) بينما الطلب لا يزال غير ملغى والتنفيذ في `preparing/ready/returned_to_store` — حالة يسمح بها حدّ الإلغاء المعتمد (D-H2-03) فيصير الإلغاء-أولاً ممكناً. الرفض بـ409 `payment_cancelled` (أو `payment_not_ready`). المخرج من هذه الحالة: إلغاء الطلب بمساره القائم (الصف 9 «إقفال إداري» يسمح لنية ملغاة) — لا آلية جديدة.
+`updateDetails` (الناقل/التتبع/الساعي/الملاحظة) مستثنى من فحص الدفع ليبقى التوثيق ممكناً (لا يغيّر الحالة).
 
 ### 2.4 الأقفال والمعاملة (ثابت غير قابل للتفاوض)
 
@@ -286,7 +287,7 @@ H2-1 ─┬─▶ H2-2 ─▶ H2-3 ─┬─▶ H2-6
 **H2-1**
 1. البوابة مغلقة ⇒ كل استجابات الموظف والجمهور والإتمام والقبول والإلغاء والدفع حرفياً كما هي (لقطات اختبارات قائمة بلا تعديل).
 2. كل ضلع مسموح ينجح، وكل ضلع محظور ⇒ 409 برمز ثابت (مصفوفة شاملة: 7 حالات × 8 إجراءات + «لا صف»).
-3. الأهلية (D-H2-02) بكل رموزها؛ R-5 محفوظ.
+3. الأهلية (D-H2-02) بكل رموزها؛ R-5 محفوظ؛ **وإعادة فحص نية غير ملغاة بحالة جاهزة على كل انتقال لاحق** (§2.3): نية COD `awaiting_collection` تُلغى وحدها (المسار القديم والبوابة مغلقة؛ `cancel()` المباشر) والتنفيذ في `ready` ⇒ `dispatch`/`pickup`/`mark_ready` تُرفض `payment_cancelled`؛ والمخرج إلغاء الطلب (الصف 9) ينجح.
 4. الإلغاء: المصفوفة الكاملة بما فيها الصف 14؛ الرفض (قبل القبول) غير متأثر لأن التنفيذ لا يبدأ قبل القبول.
 5. idempotency/النسخة/428 وفق §2.5.
 6. حراس القاعدة على المحرّكين (إدراج/ضلع/نسخة/ثبات/حذف/طلب ملغى/`cancelled_at` المحجوب) + `down()` الرافض.
@@ -319,6 +320,7 @@ H2-1 ─┬─▶ H2-2 ─▶ H2-3 ─┬─▶ H2-6
 | PG: بدء × المكنسة (نية إلكترونية تنتهي) — لا «يُحضَّر ∧ نية ملغاة» | ✔ | | | | | |
 | PG: بدء × التقاط / بدء × تحصيل COD / بدء × قبول | ✔ | | | | | |
 | PG: إرسال × مسار إلغاء النية القديم (D-H2-06) | ✔ | | | | | |
+| PG: **إلغاء النية أولاً** (قديم/مباشر) ثم انتقال لاحق (`dispatch`/`pickup`/`mark_ready`) ⇒ رفض `payment_cancelled`؛ والسباق المتزامن بالاتجاهين | ✔ | | | | | |
 | لا `40P01`، التغذية متصلة، الرأس آخر قفل | ✔ | | | | | |
 | جاهزية الدفع والقبول (البوابتان مفتوحة/مغلقة) | ✔ | | | | | ✔ |
 | عزل المستأجر + IDOR (404 موحَّد) | ✔ | ✔ | | ✔ | ✔ | ✔ |
@@ -419,6 +421,10 @@ Build (names are binding — CommerceFulfillmentController/FulfillmentPolicy alr
   in-transit/completed fulfillment; event types fulfillment.* (§2.7) via triggers/constraints-only
   migration; down() refuses when facts exist. Never add an FK to commerce_orders via Schema Builder
   on SQLite.
+- Every transition after the first re-checks, under the Intent+Order locks, that the order is not
+  cancelled AND the intent exists, is not cancelled and is PAYMENT_READY (§2.3): a COD intent can be
+  cancelled alone while fulfillment is preparing/ready/returned_to_store; reject with 409
+  payment_cancelled/payment_not_ready; updateDetails is exempt. Test cancel-first ordering (§4.1-3).
 - Cancellation: assertCancellable locks the fulfillment row after Order and adds matrix row 14
   (fulfillment_in_transit / fulfillment_completed); cancel never writes the fulfillment row.
   AR-2: the SAME restriction is enforced inside CommercePaymentIntentService::cancelWithinTransaction
