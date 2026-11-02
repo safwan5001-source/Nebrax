@@ -137,48 +137,84 @@ class CommerceOrderFeedPostgresTest extends TestCase
     {
         $tenant = $this->tenantId;
         [$o1, $o2] = [$this->order(), $this->order()];
+        $dir = $this->dir;
 
-        $slow = function () use ($tenant, $o1) {
-            DB::transaction(function () use ($tenant, $o1) {
-                self::append($tenant, $o1);
-                usleep(1_500_000); // يمسك الرأس 1.5ث قبل الالتزام
-            });
-
-            return ['committed_at' => microtime(true)];
-        };
-        $fast = function () use ($tenant, $o2) {
-            usleep(300_000); // يبدأ بعد أن يمسك البطيء الرأس
-            $t0 = microtime(true);
-            DB::transaction(fn () => self::append($tenant, $o2));
-
-            return ['started_at' => $t0, 'committed_at' => microtime(true)];
-        };
-        $poller = function () use ($tenant) {
-            $cursor = 0;
-            $observed = [];
-            $violations = [];
-            $deadline = microtime(true) + 2.6;
-            while (microtime(true) < $deadline) {
-                [$seqs, $cursor, $v] = self::readPage($tenant, $cursor, 100);
-                $violations = array_merge($violations, $v);
-                foreach ($seqs as $s) {
-                    $observed[] = ['seq' => $s, 'at' => microtime(true)];
-                }
-                usleep(20_000);
+        // تزامن صريح بالملفات بدل الاعتماد على أزمنة: البطيء يكتب ثم يبقى مفتوحاً حتى يتحقق المستطلِع (والتحقق نفسه يتطلب أن يكون كاتب آخر
+        // محجوباً على قفل). لا مقارنة بين لحظة التزام «مُسجَّلة» ولحظة رؤية — فلحظة التسجيل تقع بعد عودة المعاملة (وبعد استدعاء ما بعد الالتزام).
+        $waitFor = function (string $marker, float $seconds) use ($dir): bool {
+            $deadline = microtime(true) + $seconds;
+            while (! file_exists("{$dir}/{$marker}") && microtime(true) < $deadline) {
+                usleep(2_000);
             }
 
-            return ['observed' => $observed, 'violations' => $violations];
+            return file_exists("{$dir}/{$marker}");
+        };
+
+        $slow = function () use ($tenant, $o1, $dir, $waitFor) {
+            DB::transaction(function () use ($tenant, $o1, $dir, $waitFor) {
+                self::append($tenant, $o1);   // يمسك رأس التغذية دون التزام
+                touch("{$dir}/slow_appended");
+                $released = $waitFor('poller_checked', 8.0);   // ينتظر تحقق المستطلِع (حدّ أمان فقط)
+                if (! $released) {
+                    throw new RuntimeException('لم يتحقق المستطلِع في المهلة');
+                }
+            });
+
+            return ['done' => true];
+        };
+        $fast = function () use ($tenant, $o2, $waitFor) {
+            if (! $waitFor('slow_appended', 8.0)) {
+                throw new RuntimeException('لم يبدأ الكاتب البطيء');
+            }
+            DB::transaction(fn () => self::append($tenant, $o2));   // ينتظر الرأس حتى يلتزم البطيء
+
+            return ['done' => true];
+        };
+        $poller = function () use ($tenant, $dir, $waitFor) {
+            if (! $waitFor('slow_appended', 8.0)) {
+                throw new RuntimeException('لم يبدأ الكاتب البطيء');
+            }
+            // (1) والمعاملة مفتوحة: لا حدث مرئي، ويجب أن نرى كاتباً محجوباً على قفل (الكاتب اللاحق ينتظر الرأس).
+            $duringOpen = [];
+            $blockedSeen = false;
+            $violations = [];
+            $deadline = microtime(true) + 6.0;
+            $cursor = 0;
+            while (microtime(true) < $deadline && (! $blockedSeen || count($duringOpen) < 5)) {
+                [$seqs, $cursor, $v] = self::readPage($tenant, $cursor, 100);
+                $violations = array_merge($violations, $v);
+                $duringOpen[] = $seqs;
+                $blockedSeen = $blockedSeen || (int) DB::selectOne("select count(*) c from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")->c >= 1;
+                usleep(20_000);
+            }
+            touch("{$dir}/poller_checked"); // الإذن بالالتزام
+
+            // (2) بعد الإذن: نجمع بالمؤشّر حتى نرى الحدثين.
+            $observed = [];
+            $deadline = microtime(true) + 8.0;
+            while (count($observed) < 2 && microtime(true) < $deadline) {
+                [$seqs, $cursor, $v] = self::readPage($tenant, $cursor, 100);
+                $violations = array_merge($violations, $v);
+                $observed = array_merge($observed, $seqs);
+                usleep(10_000);
+            }
+
+            return ['during_open' => $duringOpen, 'blocked_seen' => $blockedSeen, 'observed' => $observed, 'violations' => $violations];
         };
 
         $results = $this->runConcurrently([$slow, $fast, $poller]);
         $this->assertNoFailure($results);
-        [$slowR, $fastR, $pollR] = array_column($results, 'value');
+        $pollR = $results[2]['value'];
 
         $this->assertSame([], $pollR['violations']);
-        $this->assertSame([1, 2], array_column($pollR['observed'], 'seq'), 'كل حدث مرة واحدة بالترتيب');
-        $this->assertGreaterThanOrEqual($slowR['committed_at'], $pollR['observed'][0]['at'], 'لا يُرى حدث قبل التزامه');
-        $this->assertGreaterThan(1.0, $fastR['committed_at'] - $fastR['started_at'], 'الكاتب اللاحق انتظر الرأس حتى التزام السابق');
+        $this->assertGreaterThanOrEqual(1, count($pollR['during_open']), 'قرأ المستطلِع أثناء فتح المعاملة');
+        foreach ($pollR['during_open'] as $page) {
+            $this->assertSame([], $page, 'لا حدث غير ملتزم يظهر للقارئ أبداً');
+        }
+        $this->assertTrue($pollR['blocked_seen'], 'الكاتب اللاحق كان محجوباً على قفل الرأس أثناء بقاء السابق مفتوحاً');
+        $this->assertSame([1, 2], $pollR['observed'], 'كل حدث مرة واحدة بالترتيب بعد الالتزام');
         $this->assertSame([1, 2], $this->seqs());
+        $this->assertSame($o1, DB::table('commerce_order_events')->where('tenant_id', $tenant)->where('feed_seq', 1)->value('commerce_order_id'), 'التسلسل بترتيب الالتزام: البطيء أولاً');
     }
 
     // ───────────────────────── 2) الاكتمال تحت كتّاب متوازين ─────────────────────────
