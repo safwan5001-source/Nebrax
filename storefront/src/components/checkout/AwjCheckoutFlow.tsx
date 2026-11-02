@@ -658,11 +658,13 @@ export function AwjCheckoutFlow() {
   }
 
   if (flowState === "done" && order) {
-    return <AwjOrderConfirmation
+    return (
+      <AwjOrderConfirmation
         order={order}
         basePath={basePath}
         orderReference={orderReference}
-      />;
+      />
+    );
   }
 
   if (!checkout) {

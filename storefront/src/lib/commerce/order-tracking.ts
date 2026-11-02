@@ -15,10 +15,7 @@ import {
   mapOrderFulfillment,
   type StorefrontFulfillment,
 } from "./checkout-types";
-import {
-  storefrontCartRequest,
-  storefrontFetch,
-} from "./config";
+import { storefrontCartRequest, storefrontFetch } from "./config";
 import { ORDER_REFERENCE_HEADER } from "./online-payment";
 import type { AwjResourceResponse } from "./types";
 
@@ -32,7 +29,12 @@ export interface AwjOrderTracking {
   schedule?: {
     method?: string;
     date?: string;
-    slot?: { label?: string | null; label_en?: string | null; start_time?: string; end_time?: string };
+    slot?: {
+      label?: string | null;
+      label_en?: string | null;
+      start_time?: string;
+      end_time?: string;
+    };
     timezone?: string;
   };
   fulfillment?: AwjOrderFulfillment;
@@ -45,12 +47,19 @@ export interface StorefrontOrderTracking {
   deliveryMethod: string | null;
   placedAt: string | null;
   cancelledAt: string | null;
-  schedule: { date: string; label: string | null; labelEn: string | null; start: string | null; end: string | null } | null;
+  schedule: {
+    date: string;
+    label: string | null;
+    labelEn: string | null;
+    start: string | null;
+    end: string | null;
+  } | null;
   fulfillment: StorefrontFulfillment | null;
   expiresAt: string | null;
 }
 
-const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+const str = (v: unknown): string | null =>
+  typeof v === "string" && v !== "" ? v : null;
 
 export function mapOrderTracking(raw: unknown): StorefrontOrderTracking | null {
   if (!raw || typeof raw !== "object") return null;
@@ -67,7 +76,8 @@ export function mapOrderTracking(raw: unknown): StorefrontOrderTracking | null {
     status,
     deliveryMethod: str(t.delivery_method),
     placedAt: str(t.placed_at),
-    cancelledAt: status === "cancelled" ? str(t.cancellation?.cancelled_at) : null,
+    cancelledAt:
+      status === "cancelled" ? str(t.cancellation?.cancelled_at) : null,
     schedule: date
       ? {
           date,
@@ -78,18 +88,21 @@ export function mapOrderTracking(raw: unknown): StorefrontOrderTracking | null {
         }
       : null,
     // A cancelled order never shows progress (the API omits the block; this also guards a stale payload).
-    fulfillment: status === "cancelled" ? null : mapOrderFulfillment(t.fulfillment),
+    fulfillment:
+      status === "cancelled" ? null : mapOrderFulfillment(t.fulfillment),
     expiresAt: str(t.expires_at),
   };
 }
 
 /** `GET store/v1/order-tracking/{token}` — never cached (a tracking page is per-visitor and live). */
-export async function fetchAwjOrderTracking(token: string): Promise<StorefrontOrderTracking> {
-  const response = await storefrontFetch<AwjResourceResponse<{ tracking: unknown }>>(
-    `order-tracking/${encodeURIComponent(token)}`,
-    undefined,
-    { cache: "no-store" },
-  );
+export async function fetchAwjOrderTracking(
+  token: string,
+): Promise<StorefrontOrderTracking> {
+  const response = await storefrontFetch<
+    AwjResourceResponse<{ tracking: unknown }>
+  >(`order-tracking/${encodeURIComponent(token)}`, undefined, {
+    cache: "no-store",
+  });
   const mapped = mapOrderTracking(response.data.tracking);
   if (!mapped) throw new Error("Malformed tracking response");
   return mapped;
@@ -102,12 +115,9 @@ export async function issueAwjTrackingLink(
 ): Promise<{ token: string; expiresAt: string | null }> {
   const response = await storefrontCartRequest<
     AwjResourceResponse<{ token: string; expires_at: string | null }>
-  >(
-    "POST",
-    `orders/${encodeURIComponent(orderId)}/tracking-link`,
-    undefined,
-    { [ORDER_REFERENCE_HEADER]: orderReference },
-  );
+  >("POST", `orders/${encodeURIComponent(orderId)}/tracking-link`, undefined, {
+    [ORDER_REFERENCE_HEADER]: orderReference,
+  });
   const token = response.data.token;
   if (typeof token !== "string" || !token.startsWith("trk1.")) {
     throw new Error("Malformed tracking-link response");

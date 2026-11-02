@@ -21,12 +21,15 @@ export type TrackingLinkResult =
   | { success: true; token: string; expiresAt: string | null }
   | { success: false };
 
-export async function getOrderTrackingAction(token: string): Promise<TrackingResult> {
+export async function getOrderTrackingAction(
+  token: string,
+): Promise<TrackingResult> {
   try {
     return { success: true, tracking: await fetchAwjOrderTracking(token) };
   } catch (error) {
     if (error instanceof StorefrontApiError) {
-      if (error.status === 429) return { success: false, reason: "rate_limited" };
+      if (error.status === 429)
+        return { success: false, reason: "rate_limited" };
       if (error.status === 404) return { success: false, reason: "not_found" };
     }
     return { success: false, reason: "error" };

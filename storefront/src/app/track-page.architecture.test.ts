@@ -10,8 +10,12 @@ const root = join(__dirname, "..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 describe("guest tracking page — architecture", () => {
-  const layout = read("app/[country]/[locale]/(store-checkout)/track/[token]/layout.tsx");
-  const page = read("app/[country]/[locale]/(store-checkout)/track/[token]/page.tsx");
+  const layout = read(
+    "app/[country]/[locale]/(store-checkout)/track/[token]/layout.tsx",
+  );
+  const page = read(
+    "app/[country]/[locale]/(store-checkout)/track/[token]/page.tsx",
+  );
   const view = read("components/orders/OrderTrackingView.tsx");
   const client = read("lib/commerce/order-tracking.ts");
   const actions = read("lib/data/awj-order-tracking.ts");
@@ -25,13 +29,17 @@ describe("guest tracking page — architecture", () => {
   it("reads the token from the path only (no query string, no storage)", () => {
     expect(page).toContain("useParams");
     for (const source of [page, view]) {
-      expect(source).not.toMatch(/useSearchParams|location\.search|localStorage|sessionStorage|document\.cookie/);
+      expect(source).not.toMatch(
+        /useSearchParams|location\.search|localStorage|sessionStorage|document\.cookie/,
+      );
     }
   });
 
   it("never touches the order reference or any payment surface", () => {
     for (const source of [page, view]) {
-      expect(source).not.toMatch(/orderReference|X-Order-Reference|payment-intent|payment-status|startOnlinePayment/);
+      expect(source).not.toMatch(
+        /orderReference|X-Order-Reference|payment-intent|payment-status|startOnlinePayment/,
+      );
     }
   });
 

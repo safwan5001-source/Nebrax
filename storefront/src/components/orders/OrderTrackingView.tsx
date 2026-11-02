@@ -17,7 +17,11 @@ import {
  * uniform "not found" for anything wrong with it, and this page says no more than that. It shows the narrow projection
  * only — never names, addresses, items or prices — because the link may be shared with the recipient of a gift.
  */
-function formatDate(value: string | null, locale: string, withTime = false): string | null {
+function formatDate(
+  value: string | null,
+  locale: string,
+  withTime = false,
+): string | null {
   if (!value) return null;
   try {
     return new Intl.DateTimeFormat(locale, {
@@ -78,12 +82,23 @@ export function OrderTrackingView({
     const limited = state.reason === "rate_limited";
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col items-center px-4 py-16 text-center">
-        <SearchX className="size-8 text-store-muted-foreground" aria-hidden="true" />
+        <SearchX
+          className="size-8 text-store-muted-foreground"
+          aria-hidden="true"
+        />
         <h1 className="mt-3 text-lg font-bold text-store-foreground">
-          {notFound ? t("notFoundTitle") : limited ? t("rateLimitedTitle") : t("errorTitle")}
+          {notFound
+            ? t("notFoundTitle")
+            : limited
+              ? t("rateLimitedTitle")
+              : t("errorTitle")}
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-store-muted-foreground">
-          {notFound ? t("notFoundBody") : limited ? t("rateLimitedBody") : t("errorBody")}
+          {notFound
+            ? t("notFoundBody")
+            : limited
+              ? t("rateLimitedBody")
+              : t("errorBody")}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {!notFound && (
@@ -102,13 +117,18 @@ export function OrderTrackingView({
   const { tracking } = state;
   const placed = formatDate(tracking.placedAt, locale);
   const expires = formatDate(tracking.expiresAt, locale);
-  const scheduleDate = tracking.schedule ? formatDate(tracking.schedule.date, locale) : null;
-  const methodKey = tracking.deliveryMethod === "pickup" ? "pickup" : "standard";
+  const scheduleDate = tracking.schedule
+    ? formatDate(tracking.schedule.date, locale)
+    : null;
+  const methodKey =
+    tracking.deliveryMethod === "pickup" ? "pickup" : "standard";
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-10 sm:px-6">
       <header>
-        <p className="text-xs font-medium text-store-muted-foreground">{t("title")}</p>
+        <p className="text-xs font-medium text-store-muted-foreground">
+          {t("title")}
+        </p>
         <h1 className="mt-1 text-xl font-bold text-store-foreground">
           <span className="text-sm font-normal text-store-muted-foreground">
             {t("orderNumber")}{" "}
@@ -122,7 +142,9 @@ export function OrderTrackingView({
         {scheduleDate && (
           <p className="mt-1 text-sm text-store-foreground">
             {t("scheduled", {
-              date: [scheduleDate, tracking.schedule?.label].filter(Boolean).join(" · "),
+              date: [scheduleDate, tracking.schedule?.label]
+                .filter(Boolean)
+                .join(" · "),
             })}
           </p>
         )}
