@@ -221,7 +221,7 @@ export function ProcurementForm({ type }: { type: ProcurementType }) {
                   <option value="">{tf('manual')}</option>
                   {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                 </Select>
-                <Input aria-label={tf('description')} className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
+                <Input aria-label={tf('description')} className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value })} />
                 <Input aria-label={tf('qty')} className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
                 <Input aria-label={t('unit_cost')} className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('optional_price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
                 <Input aria-label={tf('tax')} className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
