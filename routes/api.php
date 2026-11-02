@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
+use App\Http\Controllers\Api\CommerceStaffChannelOperationsSettingsController;
 use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
 use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
@@ -1209,6 +1210,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('commerce/channels/{id}/pricing-settings', [CommerceStaffChannelSettingsController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
         Route::put('commerce/channels/{id}/pricing-settings', [CommerceStaffChannelSettingsController::class, 'update'])
+            ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
+        // COPS-H1-3: إعدادات تشغيل القناة (القبول فقط، ADR-29 §2.5) — الصلاحية نفسها commerce.channel_settings.manage. إعداد بلا إنفاذ؛ PUT يتطلب expected_version.
+        Route::get('commerce/channels/{id}/operations-settings', [CommerceStaffChannelOperationsSettingsController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
+        Route::put('commerce/channels/{id}/operations-settings', [CommerceStaffChannelOperationsSettingsController::class, 'update'])
             ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
 
         // H6 Batch E: مراجعة طلبات عضوية مشتري الجملة (قائمة + اعتماد/رفض/إيقاف/إعادة تفعيل) — صلاحية مستقلة
