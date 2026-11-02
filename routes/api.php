@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
+use App\Http\Controllers\Api\CommerceStaffOrderAcceptanceController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
 use App\Http\Controllers\Api\CommerceStaffChannelOperationsSettingsController;
 use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
@@ -1204,6 +1205,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // وبوابة نشر commerce.order_cancellation_enabled مغلقة افتراضياً (404). لا تغيير في عقد المشتري.
         Route::post('commerce/orders/{id}/cancel', [CommerceStaffOrderCancellationController::class, 'cancel'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.cancel'), $app('commerce.storefront')]);
+        // COPS-H1-4 (ADR-29 §2.2): قبول/رفض التاجر — commerce.orders.manage (owner/admin عبر `*` فقط)؛ الرفض يتطلب أيضاً commerce.orders.cancel
+        // (في المتحكّم) والبوابتين معاً. بوابة القبول مغلقة ⇒ 404.
+        Route::post('commerce/orders/{id}/accept', [CommerceStaffOrderAcceptanceController::class, 'accept'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
+        Route::post('commerce/orders/{id}/reject', [CommerceStaffOrderAcceptanceController::class, 'reject'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
 
         // H6 Batch F: إعدادات تسعير قناة الويب (إسناد/إلغاء قائمة أسعار القناة + وسم عضوية الجملة) — صلاحية مستقلة
         // commerce.channel_settings.manage (owner/admin عبر `*` فقط) + حارس القدرة commerce.storefront. إعداد فقط:

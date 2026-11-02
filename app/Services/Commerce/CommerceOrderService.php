@@ -215,7 +215,11 @@ class CommerceOrderService
         return DB::transaction(function () use ($header, $lines, $customerIdentityId) {
             $this->assertWholesaleBuyerStillApproved($header['sales_channel_id'], $customerIdentityId);
 
-            $order = CommerceOrder::create([
+            // COPS-H1-4 (ADR-29 §2.2): لقطة وضع القبول عند الإنشاء — `manual` فقط حين بوابة القبول مفتوحة ووضع القناة يدوي؛ وإلا لا يُكتب
+            // العمود إطلاقاً (البوابة المغلقة: لا استعلام ولا عمود جديد — مسار الإنشاء حرفياً كما كان). حقيقة غير قابلة للتعيين الجماعي.
+            $acceptanceMode = app(CommerceChannelOperationsSettingsService::class)->acceptanceModeForNewOrder($header['sales_channel_id']);
+
+            $order = new CommerceOrder([
                 'sales_channel_id' => $header['sales_channel_id'],
                 'storefront_id' => $header['storefront_id'],
                 'commerce_checkout_id' => $header['commerce_checkout_id'],
@@ -225,6 +229,10 @@ class CommerceOrderService
                 'delivery_method' => $header['delivery_method'],
                 'delivery_amount_minor' => $header['delivery_amount_minor'] ?? 0,
             ]);
+            if ($acceptanceMode !== null) {
+                $order->forceFill(['acceptance_mode' => $acceptanceMode]);
+            }
+            $order->save();
 
             $total = $order->delivery_amount_minor;
             $createdByCartItem = [];

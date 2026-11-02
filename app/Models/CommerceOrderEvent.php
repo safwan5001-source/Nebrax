@@ -29,8 +29,11 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
 
     public const PAYMENT_COLLECTED = 'payment.collected';
 
+    /** COPS-H1-4: قبول التاجر اليدوي لطلب (`data` فارغة؛ الفاعل موظف). رفض التاجر ليس نوعاً جديداً: `order.cancelled` بسبب `merchant_rejected`. */
+    public const ORDER_ACCEPTED = 'order.accepted';
+
     /** القائمة المغلقة (تطابق CHECK/مُشغّل القاعدة حرفياً؛ يحرسها اختبار). الإضافة بهجرة صريحة في شريحتها. */
-    public const TYPES = [self::ORDER_PLACED, self::ORDER_CANCELLED, self::PAYMENT_PAID, self::PAYMENT_COLLECTED];
+    public const TYPES = [self::ORDER_PLACED, self::ORDER_CANCELLED, self::PAYMENT_PAID, self::PAYMENT_COLLECTED, self::ORDER_ACCEPTED];
 
     public const ACTOR_USER = 'user';
 
@@ -48,6 +51,7 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
         self::ORDER_CANCELLED => ['reason'],
         self::PAYMENT_PAID => [],
         self::PAYMENT_COLLECTED => [],
+        self::ORDER_ACCEPTED => [],
     ];
 
     protected $fillable = ['commerce_order_id', 'feed_seq', 'type', 'actor_type', 'actor_id', 'data', 'occurred_at'];

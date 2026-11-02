@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Events\CommerceOrderAccepted;
 use App\Events\CommerceOrderCancelled;
 use App\Events\CommerceOrderDomainEvent;
 use App\Events\CommerceOrderPaymentCollected;
@@ -273,7 +274,7 @@ class CommerceOrderFeedTest extends TestCase
     #[Test]
     public function the_domain_events_carry_ids_only_and_cover_every_recorded_type(): void
     {
-        $classes = [CommerceOrderPlaced::class, CommerceOrderCancelled::class, CommerceOrderPaymentPaid::class, CommerceOrderPaymentCollected::class];
+        $classes = [CommerceOrderPlaced::class, CommerceOrderCancelled::class, CommerceOrderPaymentPaid::class, CommerceOrderPaymentCollected::class, CommerceOrderAccepted::class];
         foreach ($classes as $class) {
             $props = array_map(fn (ReflectionProperty $p) => $p->getName(), (new ReflectionClass($class))->getProperties(ReflectionProperty::IS_PUBLIC));
             sort($props);

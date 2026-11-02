@@ -7,6 +7,7 @@ use App\Models\CommerceOrderEvent;
 use App\Models\CommerceOrderPosting;
 use App\Models\PaymentAttempt;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
+use App\Services\Commerce\CommerceOrderStatusProjector;
 use Illuminate\Support\Collection;
 
 /**
@@ -34,6 +35,9 @@ final class CommerceOrderStaffSerializer
             'status' => $order->status,
             // ADR-28 (O3a-1): حالة دورة الحياة المشتقّة + كتلة الإلغاء؛ `status` الخام يبقى كما كان.
             'lifecycle_status' => $order->lifecycleStatus(),
+            // COPS-H1-4: حالة تشغيلية مشتقة للعرض فقط (لا تُخزَّن ولا تحكم انتقالاً) + كتلة القبول.
+            'operational_status' => CommerceOrderStatusProjector::project($order),
+            'acceptance' => CommerceOrderStatusProjector::acceptanceBlock($order),
             'cancellation' => self::cancellation($order, false),
             'created_at' => $order->created_at?->toIso8601String(),
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
@@ -68,6 +72,9 @@ final class CommerceOrderStaffSerializer
         return [
             ...self::summary($order, $currency),
             'partner_id' => $order->partner_id,
+            'acceptance' => CommerceOrderStatusProjector::acceptanceBlock($order) + [
+                'by' => $order->accepted_by_user_id === null ? null : ['id' => $order->accepted_by_user_id, 'name' => $order->acceptedBy?->name],
+            ],
             'cancellation' => self::cancellation($order, true),
             'delivery_amount' => self::money($order->delivery_amount_minor, $currency),
             'contact' => [

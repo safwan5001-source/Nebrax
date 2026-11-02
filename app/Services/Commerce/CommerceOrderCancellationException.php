@@ -24,6 +24,12 @@ final class CommerceOrderCancellationException extends RuntimeException
     /** رمز للمعاينة الاسترشادية فقط (`cancelAction`)؛ الإلغاء المتكرر الفعلي idempotent ولا يرمي به. */
     public const ALREADY_CANCELLED = 'already_cancelled';
 
+    /** COPS-H1-4 (رفض التاجر): الطلب ليس بانتظار قبول يدوي (لقطة تلقائية) ⇒ لا رفض؛ يُلغى بمسار الإلغاء العادي. */
+    public const NOT_MANUAL = 'not_manual';
+
+    /** COPS-H1-4 (رفض التاجر): قُبل الطلب ⇒ لا رفض بعد القبول؛ يُلغى بمسار الإلغاء العادي بأسبابه. */
+    public const ALREADY_ACCEPTED = 'already_accepted';
+
     public const INVALID_REASON = 'invalid_reason';
 
     public const NOTE_REQUIRED = 'note_required';

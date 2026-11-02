@@ -384,8 +384,10 @@ class CommerceChannelOperationsSettingsTest extends TestCase
     // ═════════════════════════ 8) التوافق الرجعي وعدم الإنفاذ ═════════════════════════
 
     #[Test]
-    public function a_configured_manual_mode_changes_nothing_in_checkout_or_the_order_events(): void
+    public function a_configured_manual_mode_only_snapshots_the_mode_on_new_orders_and_changes_nothing_else_in_checkout(): void
     {
+        // COPS-H1-4 (المستهلك الأول المقصود): البوابة مفتوحة + `manual` ⇒ لقطة `acceptance_mode = manual` على الطلب الجديد فقط؛ يبقى مؤكَّداً
+        // بحدث `order.placed` وحده (القبول فعل لاحق للموظف)، ولا أثر آخر على الإتمام.
         config(['commerce.order_acceptance_enabled' => true]);
         $this->save(['expected_version' => 0, 'acceptance_mode' => 'manual', 'acceptance_reminder_minutes' => 5, 'acceptance_escalation_minutes' => 10])->assertOk();
 
@@ -393,7 +395,9 @@ class CommerceChannelOperationsSettingsTest extends TestCase
         $orderId = (string) $this->complete($token, 'idem-ops-compat')->assertCreated()->json('data.order.id');
 
         $order = \App\Models\CommerceOrder::query()->findOrFail($orderId);
-        $this->assertSame(\App\Models\CommerceOrder::STATUS_CONFIRMED, $order->status, 'يبقى مؤكَّداً آلياً (لا قبول في H1-3)');
+        $this->assertSame(\App\Models\CommerceOrder::STATUS_CONFIRMED, $order->status, 'يبقى مؤكَّداً (القبول اليدوي فعل لاحق، لا حالة جديدة)');
+        $this->assertSame(\App\Models\CommerceOrder::ACCEPTANCE_MANUAL, $order->acceptance_mode);
+        $this->assertNull($order->accepted_at);
         $this->assertNull($order->cancelled_at);
         $this->assertSame(['order.placed'], CommerceOrderEvent::query()->where('commerce_order_id', $orderId)->pluck('type')->all());
         $this->assertSame(['pickup' => 'pickup'][$order->delivery_method] ?? $order->delivery_method, $order->delivery_method);
@@ -422,7 +426,17 @@ class CommerceChannelOperationsSettingsTest extends TestCase
             }
         }
 
-        $this->assertSame([], $offenders, 'لا إنفاذ في H1-3: القبول والرفض والمهل في H1-4 وما بعده فقط، ولا مسار قائم يقرأ هذا الجدول');
+        $this->assertSame([], $offenders, 'لا يقرأ هذا الجدول إلا نموذجه وخدمته');
+
+        // COPS-H1-4: المستهلك الوحيد خارج الخدمة هو لقطة وضع القبول عند إنشاء طلب الإتمام — لا Checkout/دفع/إلغاء/مكنسة يقرأ الإعداد.
+        $callers = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() === 'php' && str_contains((string) file_get_contents($file->getPathname()), 'acceptanceModeForNewOrder(')) {
+                $callers[] = str_replace(base_path().'/', '', $file->getPathname());
+            }
+        }
+        sort($callers);
+        $this->assertSame(['app/Services/Commerce/CommerceChannelOperationsSettingsService.php', 'app/Services/Commerce/CommerceOrderService.php'], $callers);
     }
 
     #[Test]
