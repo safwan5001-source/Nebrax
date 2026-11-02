@@ -57,6 +57,10 @@ class FuelShiftService
                     if ($existing->fuel_station_id !== $station->id) {
                         throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لوردية محطة أخرى.');
                     }
+                    // FS-16: الإعادة تُرجع الوردية الأولى فقط إن طابقت الحمولة (عهدة الافتتاح)؛ وإلا تضارب صريح.
+                    if ((int) $existing->opening_float_minor !== $openingFloat) {
+                        throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لفتح وردية بعهدة افتتاحية مختلفة؛ استعمل مفتاحاً جديداً.');
+                    }
 
                     return $existing;
                 }

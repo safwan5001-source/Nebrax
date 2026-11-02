@@ -670,6 +670,63 @@ class FuelSaleServiceTest extends TestCase
     }
 
     /** @return array<string,mixed> */
+    /** @test */
+    public function replaying_a_draft_with_the_same_key_returns_it_but_a_different_nozzle_shift_or_customer_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(FuelSaleService::class);
+        $payload = [
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234, 'idempotency_key' => 'draft-replay',
+        ];
+        $first = $service->createDraft($payload, $fixture['actor']);
+
+        $this->assertSame($first->id, $service->createDraft($payload, $fixture['actor'])->id);
+        $this->assertSame($first->id, $service->createDraft(array_diff_key($payload, ['partner_id' => 1]), $fixture['actor'])->id, 'مرجع غائب من الإعادة لا يُقارَن');
+
+        $otherCustomer = \App\Models\Partner::create(['type' => 'customer', 'name' => 'عميل آخر', 'is_active' => true]);
+        $customer = $this->thrown(fn () => $service->createDraft([...$payload, 'partner_id' => $otherCustomer->id], $fixture['actor']), 'عميل مختلف بالمفتاح نفسه يجب أن يرفض.');
+        $this->assertStringContainsString('partner_id', $customer->getMessage());
+        $quantity = $this->thrown(fn () => $service->createDraft([...$payload, 'quantity_milliliters' => 999], $fixture['actor']), 'كمية مختلفة بالمفتاح نفسه يجب أن ترفض.');
+        $this->assertStringContainsString('quantity_milliliters', $quantity->getMessage());
+        $this->assertSame(1, FuelSale::count());
+    }
+
+    /** @test */
+    public function replaying_a_draft_with_a_different_odometer_is_a_conflict(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(FuelSaleService::class);
+        $payload = [
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234, 'odometer' => 120000, 'idempotency_key' => 'draft-odometer-replay',
+        ];
+        $first = $service->createDraft($payload, $fixture['actor']);
+
+        $this->assertSame($first->id, $service->createDraft($payload, $fixture['actor'])->id);
+        $this->assertSame($first->id, $service->createDraft(array_diff_key($payload, ['odometer' => 1]), $fixture['actor'])->id);
+        $message = $this->thrown(fn () => $service->createDraft([...$payload, 'odometer' => 120500], $fixture['actor']), 'عداد مختلف بالمفتاح نفسه يجب أن يرفض.')->getMessage();
+        $this->assertStringContainsString('odometer', $message);
+        $this->assertSame(1, FuelSale::count());
+    }
+
+    /** @test */
+    public function replaying_the_identical_request_after_finalization_returns_the_sale_even_though_finalize_rewrites_the_odometer_snapshot(): void
+    {
+        $fixture = $this->fixture('odometer-final');
+        $service = app(FuelSaleService::class);
+        $payload = [
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234, 'odometer' => 120000, 'idempotency_key' => 'draft-odometer-final',
+        ];
+        $first = $service->createDraft($payload, $fixture['actor']);
+        // `finalize()` يكتب `odometer_snapshot` من التفويض (null لبيع غير مؤسسي) ويغيّر الحالة.
+        \Illuminate\Support\Facades\DB::table('fuel_sales')->where('id', $first->id)->update(['status' => FuelSale::STATUS_FINALIZED, 'odometer_snapshot' => null]);
+
+        $this->assertSame($first->id, $service->createDraft($payload, $fixture['actor'])->id);
+        $this->assertSame(1, FuelSale::count());
+    }
+
     private function fixture(string $suffix = 'main'): array
     {
         $auth = $this->registerTenant('fuel-sale-' . $suffix, "fuel-sale-{$suffix}@example.test");
