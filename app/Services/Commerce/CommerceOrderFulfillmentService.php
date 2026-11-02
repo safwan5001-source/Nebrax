@@ -109,6 +109,22 @@ final class CommerceOrderFulfillmentService
             $row = CommerceOrderFulfillment::query()->where('commerce_order_id', $locked->id)->lockForUpdate()->first();
             $target = self::TARGETS[$action];
 
+            // COPS-H2-2 (Codex): نطاق المخازن يُعاد التحقق منه هنا تحت الأقفال. صف قائم ⇒ مخزنه ثابت (يُفحص بـSQL الرؤية)؛ لا صف ⇒ المخزن المحلول الذي سيُكتب هو نفسه
+            // الذي يُفحص، فلا يُكتب تنفيذ خارج نطاق الفاعل حتى لو تغيّرت السياسة بعد البحث المقيَّد. غير المقيَّد لا يتأثر.
+            $newWarehouseId = null;
+            if ($actor->allowedWarehouseIds() !== null) {
+                if ($row === null) {
+                    try {
+                        $newWarehouseId = $this->resolveWarehouseId($locked);
+                    } catch (CommerceOrderFulfillmentException) {
+                        $newWarehouseId = null; // بلا مخزن فعّال ⇒ الطلب غير مرئي للمقيَّد أصلاً
+                    }
+                    CommerceOrderWarehouseScope::assertWarehouseAllowed($newWarehouseId, $actor);
+                } else {
+                    CommerceOrderWarehouseScope::assertVisible($locked, $actor);
+                }
+            }
+
             // الهدف متحقق أصلاً ⇒ idempotent: لا أثر ولا حدث ولا تغيير للفاعل/الوقت.
             if ($row !== null && $row->status === $target) {
                 return $row;
@@ -135,7 +151,7 @@ final class CommerceOrderFulfillmentService
                 $row->forceFill($changes + [
                     'tenant_id' => $locked->tenant_id,
                     'commerce_order_id' => $locked->id,
-                    'warehouse_id' => $this->resolveWarehouseId($locked),
+                    'warehouse_id' => $newWarehouseId ?? $this->resolveWarehouseId($locked),
                     'type' => $locked->delivery_method === 'pickup' ? CommerceOrderFulfillment::TYPE_PICKUP : CommerceOrderFulfillment::TYPE_LOCAL_DELIVERY,
                     'status' => $target,
                     'version' => 1,
@@ -189,6 +205,7 @@ final class CommerceOrderFulfillmentService
             CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->lockForUpdate()->first();
             $locked = CommerceOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
             $row = CommerceOrderFulfillment::query()->where('commerce_order_id', $locked->id)->lockForUpdate()->first();
+            CommerceOrderWarehouseScope::assertVisible($locked, $actor); // COPS-H2-2 (Codex): نطاق المخازن تحت الأقفال
 
             if ($row === null) {
                 throw new CommerceOrderFulfillmentException(CommerceOrderFulfillmentException::NOT_STARTED, 'لم يبدأ تنفيذ هذا الطلب بعد.');
@@ -376,7 +393,7 @@ final class CommerceOrderFulfillmentService
     {
         $reserved = InventoryReservation::query()
             ->where('source_type', CommerceOrder::class)->where('source_id', $order->id)
-            ->orderBy('created_at')->value('warehouse_id');
+            ->orderBy('created_at')->orderBy('id')->value('warehouse_id');
         if (is_string($reserved) && $reserved !== '') {
             return $reserved;
         }

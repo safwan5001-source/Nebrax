@@ -409,6 +409,10 @@ php artisan serve
 - **SQLite:** لا مفتاح أجنبي جديد على `commerce_orders` عبر Schema Builder (يُسقط المُشغّلات)؛ الجدول الجديد مستقل. `down()` يرفض متى وُجد صف تنفيذ أو حدث `fulfillment.*`.
 - المرجع: `docs/audits/AWJ_COPS_H2_0_DECISION_AND_EXECUTION_PLAN.md` و`docs/audits/AWJ-COPS-H2-1-IMPLEMENTATION-REPORT.md`.
 
+## رؤية المقيَّد بمخازن لطلبات المتجر — COPS-H2-2 (D-H2-11)
+
+المستخدم المقيَّد بمخازن لم يعد يُرفض 403 على `GET commerce/orders[/{id}]` و`attention` وإجراءات الطلب (قبول/رفض/إلغاء/تنفيذ): يرى طلبات مخازنه فقط عبر **المخزن الفعّال** = `COALESCE(صف التنفيذ, حجز الطلب الأقدم, سياسة القناة الحالية)` — لا شيء ⇒ **غير مرئي** (فشل مغلق) — وطلب خارج نطاقه ⇒ **404 موحَّد** (قبل أي 428/422). المصدر الوحيد `CommerceOrderWarehouseScope::apply()` (SQL واحد بلا استعلام لكل صف، فرعية مقيَّدة بالمستأجر)، وكل بحث بمعرّف في متحكّمات الموظف يمرّ بـ`CommerceStaffOrderController::scopedOrders()`. **التغذية `orders/feed` تبقى 403 للمقيَّد حتى H3** (تصفية تسلسل متصل بمخزن متغيّر تكسر ضمان الاكتمال)، ومسار `payment-intents/{id}/cancel` القديم يبقى 403. لا صلاحيات جديدة ولا هجرة. المرجع: `docs/audits/AWJ-COPS-H2-2-IMPLEMENTATION-REPORT.md`.
+
 ## العقد العام للطلب الملغى — COMMERCE-ORDERS-O3c (ADR-28 D-9-P1 الخيار B)
 
 الطلب الملغى يقرؤه المشتري `status: "cancelled"` + `cancellation: {cancelled_at}` في **كل** مسارات القراءة العامة (`/commerce/v1` ضيف/عميل قائمة وتفاصيل، و`/store/v1` الإتمام/الإعادة) عبر `CommerceOrderSerializer::publicStatus()`/`cancellationBlock()`؛ عمود `commerce_orders.status` يبقى `confirmed` (مصدر الحقيقة `cancelled_at`). غير الملغى **حرفياً كما كان** (لا مفتاح `cancellation`). السبب والملاحظة والفاعل للموظف وحده (`CommerceOrderStaffSerializer`). إضافة قيمة `cancelled` إلى enum العميل **تغيير مقصود** يخص العملاء الصارمين (موثَّق في OpenAPI والتقرير). الواجهة: `AccountOrderStatus` يستبدل الرحلة بإشعار الإلغاء (لا ادّعاء استرداد)، وتُخفى ملاحظة «لم يُدفع» للملغى. لا تفعيل للإلغاء (`COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقة). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3c-IMPLEMENTATION-REPORT.md`.

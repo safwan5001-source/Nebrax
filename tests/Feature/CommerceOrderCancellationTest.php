@@ -637,15 +637,17 @@ class CommerceOrderCancellationTest extends TestCase
     }
 
     #[Test]
-    public function a_warehouse_restricted_user_is_rejected_even_when_owner_or_admin(): void
+    public function a_warehouse_restricted_user_cannot_cancel_an_order_outside_their_warehouses(): void
     {
         $order = $this->cod();
         $token = $this->tokenFor($this->tenant, 'admin', 'restricted-cancel@cancel.test');
         app(TenantContext::class)->set($this->tenant->id);
-        User::where('email', 'restricted-cancel@cancel.test')->firstOrFail()->warehouses()->attach($this->warehouse->id);
+        // COPS-H2-2 (D-H2-11): خارج نطاق المخزن ⇒ 404 موحَّد (لا 403).
+        $elsewhere = \App\Models\Warehouse::create(['name' => 'مخزن آخر', 'code' => 'CAN-W2']);
+        User::where('email', 'restricted-cancel@cancel.test')->firstOrFail()->warehouses()->attach($elsewhere->id);
         app(TenantContext::class)->forget();
 
-        $this->cancel($order->id, ['reason' => 'customer_request'], $token)->assertForbidden();
+        $this->cancel($order->id, ['reason' => 'customer_request'], $token)->assertNotFound();
 
         $this->assertNull($this->order($order->id)->cancelled_at);
     }

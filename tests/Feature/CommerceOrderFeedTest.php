@@ -427,7 +427,7 @@ class CommerceOrderFeedTest extends TestCase
         $this->getJson('/api/commerce/orders/feed')->assertStatus($anon);
         $this->getJson('/api/commerce/orders/attention')->assertStatus($anon);
 
-        // مستخدم admin مقيَّد بمخزن ⇒ 403 رغم الصلاحية (الطلب CompanyWide بلا مخزن).
+        // مستخدم admin مقيَّد بمخزن: التغذية تبقى 403 (H2-2 يفتح الانتباه فقط بتصفية المخزن الفعّال).
         $restricted = $this->tokenFor($this->tenant, 'admin');
         app(TenantContext::class)->set($this->tenant->id);
         $warehouse = Warehouse::create(['name' => 'مخزن', 'code' => 'WH-FEED', 'is_default' => false]);
@@ -435,7 +435,7 @@ class CommerceOrderFeedTest extends TestCase
         $user->warehouses()->attach($warehouse->id);
         app(TenantContext::class)->forget();
         $this->feed('', $restricted)->assertForbidden();
-        $this->attention('', $restricted)->assertForbidden();
+        $this->attention('', $restricted)->assertOk()->assertJsonPath('data', []);
 
         // قدرة المتجر معطَّلة ⇒ 403 على المسارين.
         app(TenantContext::class)->set($this->tenant->id);

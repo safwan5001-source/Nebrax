@@ -14,6 +14,7 @@ use App\Services\Commerce\CommerceOrderAttentionQuery;
 use App\Services\Commerce\CommerceOrderFulfillmentService;
 use App\Services\Commerce\CommerceOrderLifecycleService;
 use App\Services\Commerce\CommerceOrderStatusProjector;
+use App\Services\Commerce\CommerceOrderWarehouseScope;
 use App\Support\CommerceOrderStaffSerializer;
 use App\Tenancy\TenantContext;
 use Carbon\Carbon;
@@ -28,8 +29,8 @@ use Illuminate\Validation\Rule;
  * - لا تغيير حالة طلب/دفع/تنفيذ، لا حجز ولا حركة مخزون ولا قيد ولا إشعار. لا يستدعي أي خدمة كتابة.
  * - الصلاحية `commerce.orders.view` (owner/admin عبر `*` فقط) + `EnsureApplicationActive:commerce.storefront`
  *   على المسار. استعلامات `CommerceOrder` تمرّ بـ`TenantScope`؛ طلب مستأجر آخر ⇒ 404 مطابق لغير الموجود (IDOR).
- * - **المستخدم المقيَّد بمخازن يُرفض (403 fail-closed):** الطلب `CompanyWide` ولا يحمل مخزناً، فلا نطاق رؤية صحيح
- *   يمكن إثباته له. يُرفع القيد في مرحلة التنفيذ (F1) حين تحمل الشحنة المخزن.
+ * - **المستخدم المقيَّد بمخازن (COPS-H2-2، D-H2-11):** يرى طلبات مخازنه فقط عبر **المخزن الفعّال** (تنفيذ ← حجز ← سياسة القناة الحالية ← لا شيء=غير
+ *   مرئي، فشل مغلق) — {@see CommerceOrderWarehouseScope}؛ طلب خارج نطاقه ⇒ 404 موحَّد. (كان 403 قبل H2-2.) التغذية تبقى 403 له.
  * - البحث والفلاتر والفرز بقائمة بيضاء حصراً؛ الترقيم محدود (≤ 50). لا يستقبل معرّف مستأجر من العميل.
  * - لا يغيّر العقد العام (`CommerceOrderSerializer`)؛ مسلسل الموظف منفصل (`CommerceOrderStaffSerializer`).
  */
@@ -73,7 +74,7 @@ class CommerceStaffOrderController extends ApiController
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
         ]);
 
-        $query = CommerceOrder::query()
+        $query = self::scopedOrders($request->user())
             ->with(['salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'paymentIntent', 'fulfillment'])
             ->withCount('lines');
 
@@ -113,7 +114,7 @@ class CommerceStaffOrderController extends ApiController
      */
     public function detailData(string $id, ?User $actor = null): array
     {
-        $order = CommerceOrder::query()
+        $order = self::scopedOrders($actor)
             ->with([
                 'salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'gift', 'schedule',
                 'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name', 'acceptedBy:id,name', 'fulfillment.warehouse:id,name',
@@ -241,11 +242,23 @@ class CommerceStaffOrderController extends ApiController
         };
     }
 
+    /**
+     * COPS-H2-2 (D-H2-11): المستخدم المقيَّد بمخازن لم يعد يُرفض 403 — يرى طلبات مخازنه فقط (المخزن الفعّال، {@see CommerceOrderWarehouseScope}) وطلب خارج
+     * نطاقه ⇒ 404 موحَّد. تُبقي هذه الدالة اسمها للمستدعين (متحكّمات الإجراءات) لكنها لا ترفض؛ التصفية في {@see self::scopedOrders()}.
+     */
     public function guard(Request $request): void
     {
-        if ($request->user()?->allowedWarehouseIds() !== null) {
-            abort(403, 'عرض طلبات المتجر غير متاح للمستخدم المقيَّد بمخازن محددة.');
-        }
+        // مقصود: لا رفض. الرؤية بالنطاق لا بالمنع (H2-2).
+    }
+
+    /**
+     * استعلام الطلبات مقيَّداً بنطاق مخازن المستخدم (غير المقيَّد: بلا تصفية). نقطة الدخول الوحيدة لأي بحث عن طلب بمعرّفه من متحكّمات الموظف.
+     *
+     * @return Builder<CommerceOrder>
+     */
+    public static function scopedOrders(?User $user): Builder
+    {
+        return CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $user?->allowedWarehouseIds());
     }
 
     private function currency(): string
