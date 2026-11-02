@@ -5,7 +5,7 @@
 | الشريحة | **COPS-H2-0** — تخطيط ومعمار وقرارات فقط |
 | Base | `main@21b59852c54522c7a441000eb5296c8be02e3834` (بعد #1936، إغلاق COPS-H1) |
 | الطبيعة | وثيقة فقط. **لا** هجرة، **لا** مسار، **لا** واجهة، **لا** انتقال حالة تنفيذ، **لا** دمج/نشر/تفعيل |
-| حالة H2 | **لم يبدأ التنفيذ.** H2-1 محجوب حتى يعتمد المالك القرارات في §3 ويصدر أمراً صريحاً |
+| حالة H2 | **لم يبدأ التنفيذ.** القرارات الثلاثة عشر الإلزامية **معتمدة** (§3.0، 2026-11-02) بثلاثة اشتراطات إضافية AR-1..AR-3؛ H2-1 محجوب حتى أمر صريح منفصل |
 | العقود الحاكمة | ADR-29 (§2.1، §2.3، §2.4، §2.7) · ADR-28 (§1.3، §3 الصف 14، §4، §5.2) · H0 §C.3/§C.7/§C.9 · Revision 1 §6–§7 |
 
 > **قاعدة القراءة:** كل ما في §2 «تصميم موصى به» **مشروط** باعتماد القرارات المقابلة في §3. لا شيء هنا معتمد ضمنياً.
@@ -138,11 +138,63 @@ returned_to_store ─dispatch▶ out_for_delivery            (إعادة توص�
 
 `assertCancellable` يقفل صف التنفيذ بعد الطلب ويضيف صف المصفوفة 14: `out_for_delivery|delivery_failed` ⇒ 409 `fulfillment_in_transit`؛ `delivered|picked_up` ⇒ 409 `fulfillment_completed`. مسموح: لا صف، `preparing`، `ready`، `returned_to_store`. الإلغاء **لا يكتب** صف التنفيذ؛ «ملغى» مشتق من `cancelled_at` في المُسقِط والمسلسلات، والحارس (§2.6-2) يجمّد الصف.
 
+### 2.8.1 التحقق من كل مسارات إلغاء التزام الدفع القديمة (AR-2) — نتيجة فحص الكود
+
+الكاتب الوحيد لحالة `cancelled` على `commerce_payment_intents` هو `CommercePaymentIntentService::cancelWithinTransaction` (السطر 201)؛ لا `DB::table` ولا `update` آخر عليها (فحص `app/`). مستدعوه ومسارات الوصول إليه:
+
+| # | المسار | يصل إلى الكاتب عبر | يلزم له حارس التنفيذ؟ | أين الحارس |
+|---|---|---|---|---|
+| 1 | `POST commerce/payment-intents/{id}/cancel` والبوابة **مغلقة** (الافتراضي) | `CommercePaymentIntentService::cancel()` ← `cancelWithinTransaction` | **نعم — الثغرة الفعلية**: `payments.manage` وحدها تكفي اليوم | الكاتب الوحيد (أدناه) |
+| 2 | المسار نفسه والبوابة **مفتوحة** وللنية طلب | `CommerceOrderLifecycleService::cancel` ← `assertCancellable` ثم `cancelWithinTransaction` | نعم | الصف 14 في `assertCancellable` + الكاتب (دفاع مزدوج) |
+| 3 | المسار نفسه ونية بلا طلب (`commerce_order_id` فارغ) | `cancel()` | لا تنفيذ لطلب غير موجود | الكاتب يقرأ تنفيذ الطلب إن وُجد فقط |
+| 4 | `POST commerce/orders/{id}/cancel` / `…/reject` (O3a-2b/H1-4) | `CommerceOrderLifecycleService::performCancellation` | نعم | الصف 14 + الكاتب |
+| 5 | المكنسة `commerce:expire-unpaid-orders` | `CommerceUnpaidOrderSweeper` ← `cancel()` | نظرياً لا (تلغي إلكترونياً `pending` فقط، والتنفيذ يشترط دفعاً جاهزاً) لكنها تمرّ بالكاتب | الكاتب (دفاع عميق) |
+| 6 | `OrderCancellationCleanup` / `commerce:close-cancelled-order-attempts` | **لا تلغي نية** (تغلق محاولات نية ملغاة أصلاً) | لا | — |
+| 7 | الإتمام/الدفع/الالتقاط/التحصيل/الترحيل | لا مسار إلى الكاتب | لا | — |
+
+**القرار الهندسي (إلزامي في H2-1):**
+1. **الحارس في الكاتب الوحيد** `cancelWithinTransaction` بعد قفل النية: يقرأ حالة صف التنفيذ للطلب (`commerce_order_fulfillments` بالمستأجر الحالي) **دون قفل**، ويرفض بالحالات المحجوبة (`out_for_delivery|delivery_failed` ⇒ `fulfillment_in_transit`؛ `delivered|picked_up` ⇒ `fulfillment_completed`) **أياً كان وضع أي بوابة**. وبذلك تُغطّى المسارات 1–5 معاً ولا يبقى مسار «يتذكّره» أحد.
+2. **لماذا القراءة بلا قفل كافية:** كل انتقال تنفيذي يقفل **النية أولاً** (§2.4)، والكاتب يحمل قفل النية؛ فلا ينتقل صف التنفيذ بين قراءة الحارس والتزام الإلغاء. يحرسه اختبار ساكن (كل انتقال يبدأ بقفل النية) واختبار سباق PG.
+3. **الاستثناء المخصَّص:** يرمي الحارس `CommerceOrderFulfillmentLockedException` (يرث `RuntimeException` ليحوّله `ApiController::domain()` إلى 422 برسالة وبـ`reason`)، **ويجب** تعديل `catch (RuntimeException)` في `performCancellation` (السطر 137-141) كي **لا يُعاد تصنيفه `payment_captured`** — يُمرَّر كما هو إلى `CommerceOrderCancellationException` برمز `fulfillment_in_transit|fulfillment_completed` (409). دون هذا التعديل يصير خطأ التنفيذ رسالة دفع مضلِّلة.
+4. **المسار 1 يرفض بـ422 (لا 409)** لأن `domain()` يحوّل `RuntimeException`؛ وهو سلوك المسار القديم لكل رفض (مبلغ مُحصَّل/مُلغى) فلا تغيير في عقده؛ الجسم يحمل `reason` الجديد إضافياً.
+5. لا تغيير في أي سلوك لا يوجد فيه صف تنفيذ (جميع البيانات القائمة اليوم)، فلا خطر انحدار على `CommerceIntentCancelSeparationTest` ولا `CommerceOrderCancellationTest`.
+
 ### 2.9 عقد قراءة الموظف (H2-1 خلفية) والبوابة
 
 - كتلة `fulfillment` في تفاصيل الموظف (كل الحقول الداخلية) + `fulfillment_actions: [{action, available, blocked_reason}]` **فقط** والبوابة مفتوحة وللمستخدم `commerce.orders.manage` (غيابها = لا إجراء، نمط `accept_action`).
 - `operational_status` يمتد بعد `accepted`: `preparing|ready|out_for_delivery|delivery_failed|returned_to_store|delivered|picked_up` (عرض فقط).
-- **البوابة** `commerce.order_fulfillment_enabled` (env `COMMERCE_ORDER_FULFILLMENT_ENABLED`، مغلقة): مغلقة ⇒ مسارات الكتابة 404، لا `fulfillment_actions`، والإلغاء والقبول حرفياً كما هما (لا صفوف ⇒ الصف 14 بلا أثر). الحقائق المخزَّنة سابقاً تُقرأ دائماً (D-H2-21).
+- **البوابة** `commerce.order_fulfillment_enabled` (env `COMMERCE_ORDER_FULFILLMENT_ENABLED`، **مغلقة افتراضياً**، لا قيمة في أي ملف بيئة مُتتبَّع): تحكم **الكتابة وعقد الإجراءات فقط**.
+
+**عقد الظهور بعد إغلاق البوابة (AR-3 — إلزامي):** إغلاق البوابة أو تعطيلها بعد نشاط تنفيذ تاريخي **لا يُخفي ولا يُعطّل** أياً مما يلي، لأنها كلها تُقرأ من **حقائق مخزَّنة** لا من البوابة:
+
+| يبقى فعّالاً والبوابة مغلقة | يتوقف والبوابة مغلقة |
+|---|---|
+| كتلة `fulfillment` وخطها الزمني في تفاصيل الموظف | مسارات `POST …/fulfillment/{action}` و`PATCH` ⇒ 404 |
+| `operational_status` الممتد ومرشّح `fulfillment_status` في القائمة | `fulfillment_actions` (غيابها = لا إجراء) |
+| قيد الإلغاء (الصف 14 + حارس الكاتب الوحيد §2.8.1) وحارس `cancelled_at` في القاعدة وجمود الصف | أسباب `attention` الجديدة التي تُنتجها البوابة (H2-6) تعود لسلوك H1 |
+| كتلة `fulfillment` العامة للعميل (H2-4) وصفحة الحساب | — (وبوابة تتبّع الضيف H2-5 **مستقلة** ولا تمسّ هذه الكتلة) |
+| أحداث `fulfillment.*` في السجل والتغذية | — |
+
+وعكسه: بوابة مغلقة **ولا صفوف** ⇒ كل الاستجابات حرفياً كاليوم (لا كتلة، لا مفتاح، لا أثر على الإلغاء). تُختبر الحالتان (§4.1 H2-1 بند 11).
+
+### 2.10 فشل التوصيل وتعذّر العودة للمتجر — التوثيق الملزم (AR-1)
+
+**ما يفعله V1 (بالاتفاق D-H2-03 + D-H2-05):**
+
+| الحالة الواقعية | الحالة المخزَّنة | ما يمكن للتاجر فعله في V1 | ما **لا** يمكنه |
+|---|---|---|---|
+| لم يُسلَّم (العميل غائب/العنوان خاطئ/رفض) والبضاعة مع الساعي | `delivery_failed` (+ سبب من القائمة المغلقة وملاحظة داخلية، `delivery_attempts` + 1) | **إعادة المحاولة** (`dispatch`) بلا حد؛ أو **تسجيل العودة** (`return`) متى عادت البضاعة فعلاً؛ أو تحديث التفاصيل/الملاحظة الداخلية | إلغاء الطلب، استرداد، إغلاق إداري |
+| عادت البضاعة للمتجر | `returned_to_store` | إعادة الإرسال (`dispatch`)، أو **إلغاء الطلب** بمساره القائم (مسموح لهذه الحالة) — بمصفوفة ADR-28 كاملة (المدفوع/المحصَّل يبقى ممنوعاً ⇒ مسار الاسترداد H6) | — |
+| **يستحيل الرجوع للمتجر** (فُقدت/تلفت/استُهلكت البضاعة، منتج قابل للتلف كالزهور، رفض العميل ولم تُسترجع، الساعي غير متاح) | تبقى `delivery_failed` — **لا حالة خاصة** | توثيق الواقعة في الملاحظة الداخلية عبر تحديث التفاصيل؛ استمرار الظهور في الطابور (سبب `delivery_failed` في `attention` من H2-6 بلا نافذة) إلى أن يتحدد الإجراء | لا يُسجَّل `returned_to_store` كذباً ليتحرر الإلغاء؛ لا يُلغى الطلب أثناء `delivery_failed`؛ لا استرداد ولا رصيد ولا مخزون |
+
+**الحقيقة المعلنة للتاجر والمالك:** في V1 قد يبقى طلب «عالقاً» في `delivery_failed` إلى أجل غير مسمى حين يستحيل الرجوع. هذا **قصور متعمَّد** وليس خللاً: الحلول المحتملة (إغلاق إداري كـ«تعذّر التسليم»، إلغاء بسبب خاص، استرداد/رصيد، شطب مخزون) **كلها تتطلب قرارات غير معتمدة** (D-OPS-4c / H6-2، D-11 للاسترداد، D-8/D-10 للأثر المحاسبي والمخزني) ولا يجوز استحداثها ضمنياً في H2. لا يُضاف مفتاح `abandon`/`write_off`/`cancel_failed` ولا حالة جديدة ولا تعديل لمصفوفة الإلغاء.
+
+**ما يلزم تنفيذه في H2 لتقليل الضرر دون آلية جديدة:**
+1. الواجهة (H2-3): نص ثابت عند `delivery_failed`: «تعذّر التسليم. أعد المحاولة أو سجّل عودة البضاعة عند وصولها. لا يتوفر في هذه النسخة إغلاق/إلغاء/استرداد لهذه الحالة — راجع المسؤول». وملاحظة داخلية قابلة للتحديث توثّق الواقعة.
+2. الأحداث: كل محاولة فاشلة تُسجَّل (`fulfillment.delivery_failed` بالسبب والمحاولة) فيبقى التدقيق كاملاً.
+3. الظهور: لا يُخفى الطلب العالق من القائمة ولا من التغذية؛ سبب `delivery_failed` في `attention` بلا نافذة حداثة (D-H2-20) كي لا يضيع.
+4. ربطه بقرار مالك لاحق: **توصية** — ضمّ بند «إغلاق إداري لطلب لا يمكن إرجاعه» إلى نطاق قرار H6-2 (D-OPS-4c) قبل أي تفعيل إنتاجي لتنفيذ التوصيل؛ إدراج صريح كشرط BOR في تقرير الإغلاق.
+
 
 ---
 
@@ -150,7 +202,19 @@ returned_to_store ─dispatch▶ out_for_delivery            (إعادة توص�
 
 **المفتاح:** «إلزامي» = لا يبدأ تنفيذ الشريحة المتأثرة قبل اعتماد صريح. الاعتماد الجزئي مسموح بالرقم.
 
-### 3.1 القرارات الإلزامية قبل H2-1 (13)
+### 3.0 سجل اعتماد المالك — 2026-11-02 (المرجع الحاكم)
+
+**اعتمد المالك القرارات الثلاثة عشر الإلزامية D-H2-01 … D-H2-10 وD-H2-12 وD-H2-21 وD-H2-22 كما هي موصى بها في §3.1**، بثلاثة اشتراطات إضافية ملزمة (تعدّل/توضّح القرارات المعنية وتسري على H2-1 وما بعده):
+
+| # | الاشتراط | القرار المتأثر | أين نُفِّذ في هذه الوثيقة |
+|---|---|---|---|
+| **AR-1** | توثيق معالجة فشل التوصيل بوضوح، **بما فيها الحالات التي يستحيل فيها الرجوع للمتجر**؛ ولا استحداث آلية إلغاء أو استرداد غير معتمدة | D-H2-03 (مع D-H2-05) | §2.10 + مخاطر R-H2-11 + معايير القبول §4.1 (H2-1، H2-3) |
+| **AR-2** | التحقق من أن **كل** مسار إلغاء قديم لالتزام الدفع يحترم قيود التنفيذ، بما فيها الطلبات المُرسَلة أو المكتملة | D-H2-06 | §2.8.1 (نتيجة التحقق من الكود) + §4.1 + §5 + §8 |
+| **AR-3** | كل بوابات التفعيل **مغلقة افتراضياً**؛ وإغلاق بوابة بعد نشاط تنفيذ تاريخي **لا يُخفي** حقائق التنفيذ القائمة | D-H2-21 | §2.9 (عقد الظهور) + §4.1 + §5 + §8 |
+
+حالة القرارات: D-H2-01 ✔ · 02 ✔ · 03 ✔ (+AR-1) · 04 ✔ · 05 ✔ (+AR-1) · 06 ✔ (+AR-2) · 07 ✔ · 08 ✔ · 09 ✔ · 10 ✔ · 12 ✔ · 21 ✔ (+AR-3) · 22 ✔ — **كلها «معتمدة»**. القرارات التسعة في §3.2 **غير معتمدة بعد** وتُعتمد قبل شرائحها (لا يُفترض شيء منها). لا يغيّر الاعتماد أياً من: تفويض التنفيذ (H2-1 غير مفوَّض)، الدمج/النشر/التفعيل (غير ممنوحة)، أو أي أثر محاسبي/مخزني (ممنوع في H2).
+
+### 3.1 القرارات الإلزامية قبل H2-1 (13) — ✔ معتمدة 2026-11-02 (مع AR-1..AR-3)
 
 | # | القرار | القاعدة المعتمدة الحالية | السؤال المفتوح | التوصية | البدائل والمخاطر | الشريحة | إلزامي |
 |---|---|---|---|---|---|---|---|
@@ -168,7 +232,7 @@ returned_to_store ─dispatch▶ out_for_delivery            (إعادة توص�
 | **D-H2-21** | البوابات والتفعيل | كل سلوك جديد خلف بوابة مغلقة | ما البوابات؟ | `COMMERCE_ORDER_FULFILLMENT_ENABLED` (مغلقة) للكتابة وعقد الإجراءات؛ `COMMERCE_GUEST_ORDER_TRACKING_ENABLED` (مغلقة) لـH2-5. كتلة التتبع العامة تظهر **فقط** حين يوجد صف (ولا صف بلا فتح البوابة). إغلاق البوابة بعد فتحها: الحقائق تُقرأ والكتابة 404 | بوابة لكل شيء بما فيها القراءة: يُخفي حقائق قائمة عن العميل عند الإغلاق المؤقت — أسوأ | H2-1، H2-5 | **نعم** |
 | **D-H2-22** | حماية التكرار/الحالة القديمة | H1-3 (`expected_version` إلزامي)؛ H1-5 (409 ⇒ تحديث وقفل) | ما عقد الكتابة؟ | §2.5: `expected_version` إلزامي (428)، هدف متحقق ⇒ 200 بلا أثر، نسخة قديمة ⇒ 409 + الحالة الحالية | الحالة فقط بلا نسخة: تعديل تفاصيل متزامن يضيع بصمت | H2-1 | **نعم** |
 
-### 3.2 القرارات الإلزامية قبل شرائح لاحقة (9)
+### 3.2 القرارات الإلزامية قبل شرائح لاحقة (9) — ✘ غير معتمدة بعد
 
 | # | القرار | القاعدة الحالية | السؤال | التوصية | البدائل والمخاطر | الشريحة | إلزامي |
 |---|---|---|---|---|---|---|---|
@@ -230,10 +294,13 @@ H2-1 ─┬─▶ H2-2 ─▶ H2-3 ─┬─▶ H2-6
 8. **ساكن:** الخدمة لا تذكر `LedgerService|InventoryService|InvoiceService|PaymentService|StockMovement|InventoryReservationService|PaymentOrchestrator`؛ كاتب وحيد للجدول؛ الرأس آخر قفل (يمتد اختبار «الرأس آخراً» للكاتب الجديد).
 9. `BranchIsolationGuardTest`: النموذج مصنَّف `CompanyWide`.
 10. `CommerceModuleBoundaryTest`: سطر لكل مسار جديد.
+11. **AR-3:** (أ) افتراضي البوابة `false` (اختبار قيمة الإعداد الافتراضية دون env)؛ (ب) فتح البوابة ← إنشاء تنفيذ وتقدّمه إلى `out_for_delivery` ← **إغلاق البوابة** ⇒ تفاصيل الموظف تعرض الكتلة والـ`operational_status`، والقائمة تُرشَّح بـ`fulfillment_status`، والإلغاء مرفوض (`fulfillment_in_transit`) من **كل** المسارات، والحراس في القاعدة قائمة، ومسارات الكتابة 404 ولا `fulfillment_actions`.
+12. **AR-2:** اختبار لكل مسار في جدول §2.8.1 (المسارات 1–5) على حالتي التنفيذ المحجوبتين `out_for_delivery` و`delivered` (وعلى `delivery_failed` و`picked_up`): البوابة مغلقة ومفتوحة؛ الخدمة مباشرة `cancel()`؛ المكنسة؛ `reject`؛ والتأكد أن الرمز **ليس** `payment_captured`. + اختبار ساكن: `cancelWithinTransaction` هو الكاتب الوحيد لـ`status = cancelled` على النية؛ + اختبار ساكن: كل انتقال تنفيذي يقفل النية أولاً.
+13. **AR-1:** الحالات الثلاث في §2.10 (فشل ← إعادة محاولة؛ فشل ← عودة ← إلغاء؛ فشل مع تعذّر العودة يبقى `delivery_failed` والإلغاء 409 والتفاصيل تُحدَّث)؛ **لا** إجراء/مسار/حالة `abandon|write_off|cancel_failed|refund` (اختبار ساكن على قائمة الإجراءات والأحداث).
 
 **H2-2** — مصفوفة رؤية (غير مقيَّد/مقيَّد بمخزن A/مقيَّد بـB) × (لا صف/صف A/صف B/حجز A مع سياسة B/لا سياسة) × (قائمة/تفاصيل/إجراء/`attention`)؛ 404 موحَّد؛ التغذية 403؛ عدد استعلامات ثابت.
 
-**H2-3** — الإجراءات من العقد فقط؛ نقرتان متزامنتان ⇒ POST واحد؛ 409 ⇒ تحديث وقفل حتى نجاح التحديث؛ ar/en RTL/LTR؛ 390px بلا تمرير أفقي؛ `orders-readonly.test.ts` يُعدَّل عمداً للسماح بكتابات `fulfill-order.ts` وحدها؛ Playwright.
+**H2-3** — الإجراءات من العقد فقط؛ نص `delivery_failed` الثابت (AR-1) وعدم وجود أي زر إغلاق/إلغاء/استرداد لتلك الحالة؛ نقرتان متزامنتان ⇒ POST واحد؛ 409 ⇒ تحديث وقفل حتى نجاح التحديث؛ ar/en RTL/LTR؛ 390px بلا تمرير أفقي؛ `orders-readonly.test.ts` يُعدَّل عمداً للسماح بكتابات `fulfill-order.ts` وحدها؛ Playwright.
 
 **H2-4** — لا صف ⇒ JSON مطابق بايتاً لما قبل (FlowersEndToEndJourneyTest/CommerceOrderStatusApiTest/CommerceCustomerOrderTest بلا تعديل)؛ ملغى ⇒ لا كتلة؛ قائمة بيضاء للحقول (اختبار يفشل عند أي مفتاح إضافي)؛ لا ساعي/موظف/مخزن/سبب؛ OpenAPI؛ storefront vitest للغات الست.
 
@@ -261,6 +328,9 @@ H2-1 ─┬─▶ H2-2 ─▶ H2-3 ─┬─▶ H2-6
 | عبث بالرمز، تعداد، تقنين، فصل الغرض | | | | | ✔ | |
 | حدود المنطقة الزمنية | | | | | | ✔ |
 | حراس SQLite محفوظة (مُشغّلات الإلغاء/القبول لم تُسقَط) | ✔ | | | | | ✔ (إن وُجد فهرس) |
+| AR-2: كل مسارات إلغاء النية القديمة × حالات التنفيذ المحجوبة (البوابتان مغلقة/مفتوحة) | ✔ | | | | | |
+| AR-3: بوابة مغلقة بعد نشاط تاريخي لا تُخفي الحقائق (موظف/عام/إلغاء/حراس) | ✔ | | | ✔ | | |
+| AR-1: فشل التوصيل وتعذّر العودة (لا آلية إلغاء/استرداد جديدة) | ✔ | | ✔ | | | |
 | انحدار الإتمام/الدفع/المحاسبة/المخزون (`php artisan test` كاملاً) | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | ساكن: لا خدمات محاسبية/مخزنية/حجز | ✔ | | | ✔ | ✔ | ✔ |
 | web build + vitest + Playwright | | | ✔ | | | ✔ |
@@ -309,6 +379,8 @@ H2-1 ─┬─▶ H2-2 ─▶ H2-3 ─┬─▶ H2-6
 | R-H2-08 | توقف تخزين نادر في `pg-perf` | §5؛ بلا تغيير للمنهجية |
 | R-H2-09 | سلسلة `merchant_rejected` والقبول تفترض أن التنفيذ يلي القبول | الأهلية (D-H2-02) تفرضه؛ اختبار «لا تنفيذ قبل القبول» |
 | R-H2-10 | لا تنبيه للعميل بتغيّر الحالة (H7 محجوبة) | التتبع سحب لا دفع؛ معلن في الواجهة |
+| R-H2-11 | طلب عالق في `delivery_failed` بلا مخرج حين يستحيل الرجوع للمتجر (AR-1) | قصور متعمَّد معلن (§2.10)؛ يظهر في الطابور؛ التوصية: ضمّ إغلاق إداري لقرار H6-2 كشرط BOR؛ لا آلية غير معتمدة في H2 |
+| R-H2-12 | تعديل `catch (RuntimeException)` في `performCancellation` لتفادي إعادة تسمية خطأ التنفيذ `payment_captured` | إلزامي في H2-1 (§2.8.1-3) + اختبار صريح |
 
 ---
 
@@ -323,9 +395,14 @@ Model: Claude Sonnet. Owner authorization: implement, test, review and merge COP
 (plus its docs-only closing records). STOP after merge (checkpoint CP-1). No H2-2, no deploy,
 no activation, no gate opened, no financial/inventory policy change.
 
-Approved decisions: D-H2-01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 12, 21, 22
-(exactly as recommended in docs/audits/AWJ_COPS_H2_0_DECISION_AND_EXECUTION_PLAN.md §3.1,
-unless amended here: <owner amendments or "none">).
+Approved decisions (owner, 2026-11-02): D-H2-01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 12, 21, 22
+(exactly as recommended in docs/audits/AWJ_COPS_H2_0_DECISION_AND_EXECUTION_PLAN.md §3.1) PLUS the
+binding requirements AR-1 (§2.10 delivery-failure handling incl. impossible return — NO new
+cancellation/refund/close mechanism), AR-2 (§2.8.1 — the guard lives in the sole writer
+CommercePaymentIntentService::cancelWithinTransaction with a dedicated exception that
+performCancellation must NOT relabel payment_captured; every legacy path tested), AR-3 (§2.9 gates
+closed by default; closing a gate never hides historical fulfillment facts). D-H2-11 and
+D-H2-13..20 are NOT approved: do not build anything that depends on them.
 
 Start: fresh branch from latest verified origin/main. Read ONLY: the H2-0 plan §1–§2, §3.1,
 §4 (H2-1 row + §4.1 H2-1), §5; ADR-29 §2.4; ADR-28 §3–§4; and as code patterns:
@@ -344,7 +421,14 @@ Build (names are binding — CommerceFulfillmentController/FulfillmentPolicy alr
   on SQLite.
 - Cancellation: assertCancellable locks the fulfillment row after Order and adds matrix row 14
   (fulfillment_in_transit / fulfillment_completed); cancel never writes the fulfillment row.
-  Legacy payment-intents/{id}/cancel rejects the same states when a fulfillment row exists.
+  AR-2: the SAME restriction is enforced inside CommercePaymentIntentService::cancelWithinTransaction
+  (sole writer of intent status=cancelled; unlocked read of the fulfillment status under the intent
+  lock, independent of any gate) so the legacy route (gate closed or open), the sweeper and direct
+  cancel() are all covered; throw CommerceOrderFulfillmentLockedException and fix the
+  performCancellation catch so it is never reported as payment_captured.
+- AR-1: implement exactly the §2.10 table; add NO abandon/write_off/cancel-on-failure/refund action,
+  state, route or event. Staff UI text for delivery_failed is H2-3.
+- AR-3: gate default false; reads of stored fulfillment facts are never gated (§2.9 table).
 - Gate config('commerce.order_fulfillment_enabled') (env COMMERCE_ORDER_FULFILLMENT_ENABLED,
   default false): closed ⇒ write routes 404 and no fulfillment_actions; all existing responses
   byte-identical.
@@ -357,7 +441,7 @@ Build (names are binding — CommerceFulfillmentController/FulfillmentPolicy alr
 - One domain event per new type (CommerceOrderFeedTest); CommerceModuleBoundaryTest lines;
   BranchIsolationGuardTest classification.
 
-Mandatory tests: §4.1 H2-1 criteria 1–10 and every H2-1 row of §5, including PostgreSQL races
+Mandatory tests: §4.1 H2-1 criteria 1–13 and every H2-1 row of §5, including PostgreSQL races
 (transition×transition, start×cancel, dispatch×cancel, start×sweeper, start×capture,
 start×COD collection, dispatch×legacy intent cancel) with no 40P01 and a gap-free feed; static
 guards (no Ledger/Inventory/Invoice/Payment/Reservation/Orchestrator references; sole writer;
@@ -380,4 +464,4 @@ paragraph, Handoff + Tracker updates, then STOP at CP-1.
 
 ## 9. التوقف
 
-H2-0 مكتمل كتخطيط. **لم يبدأ أي تنفيذ لـH2**: لا هجرة ولا مسار ولا واجهة ولا انتقال حالة، ولا دمج ولا نشر ولا تفعيل. ينتظر التنفيذ: (1) اعتماد المالك للقرارات §3.1 (وما يلزم من §3.2 قبل شرائحه)، (2) أمر صريح ببدء H2-1 وتبديل النموذج.
+H2-0 مكتمل كتخطيط. **لم يبدأ أي تنفيذ لـH2**: لا هجرة ولا مسار ولا واجهة ولا انتقال حالة، ولا دمج ولا نشر ولا تفعيل. اعتُمدت القرارات الإلزامية §3.1 (+AR-1..AR-3) في 2026-11-02. ينتظر التنفيذ: **أمر صريح منفصل** ببدء H2-1. القرارات §3.2 تُعتمد قبل شرائحها.
