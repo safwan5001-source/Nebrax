@@ -85,7 +85,7 @@ Then, in the same transaction: claims insert → close event (`from reviewed to 
 | `PartnerStatementLifecycleApiTest` (updated: close now needs review, SoD, `not_reviewed` state; wall allows the 3rd update) | SQLite ✔ · PostgreSQL ✔ |
 | Related set on SQLite after Revision 2 (Rbac · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 225 passed, 23 skipped (PostgreSQL-only), 1 failed → **fixed** (see below) and re-run green (`PartnerStatementPairReviewApiTest` 12 ✔) |
 | Same family on PostgreSQL after Revision 2 (incl. all earlier race suites) | **249 passed (4232 assertions)**; the pair-review suite re-run after the test fix: 12 ✔ |
-| Full `php artisan test` | not run locally; CI runs it on SQLite and PostgreSQL (see PR #1941) |
+| Full `php artisan test` | not run locally; **CI on head `4a17030`: `php artisan test` SQLite ✔ · PostgreSQL ✔ · PostgreSQL feed-lock performance ✔ · web build ✔ · CI Gate ✔** |
 
 **Regression found and fixed in Revision 2:** the new claims trigger (SQLite) reads the decisions' pair columns, so the **A3b** migration test (`…rolls_back_and_forward_cleanly_when_no_pair_link_exists`) could no longer drop those columns in isolation. Real rollbacks run in reverse order (A3d first), so the test now rolls A3d back before A3b and re-applies it after — no production behaviour changed.
 
@@ -126,4 +126,8 @@ Coverage highlights: atomic success with claims/event/status and **no financial 
 
 ## 6. Delivery
 
-Branch `claude/imp-ps-a3d` · PR #1941 · Base `2c0a4148be7402d56fe67daba7e93fa3d6d5c3d8` (main after #1939) · first Head `da984b6ec86899d44e9d918d971da7543cc43a28` · CI and Codex: pending at the time of writing — see the PR. Status: **READY_TO_MERGE after green CI and Codex review** (no merge, deploy or Railway change made).
+- Branch `claude/imp-ps-a3d` · PR #1941 · **Base `2c0a4148be7402d56fe67daba7e93fa3d6d5c3d8`** (main after #1939).
+- Heads: first `da984b6` → report `a99c875` (CI ✔, Codex: no findings) → **Revision 2** `431d3ad` (claims policy) → `4a17030` (migration-order test fix; **all CI checks green**) → final report-only commit (this file; no code change).
+- **Codex on Revision 2 (`431d3ad`):** one P2 — the claims trigger does not verify that a `confirm`/`override` claim's entry belongs to the approved unit (PostgreSQL and SQLite). Verified; a documented limit (§3, Revision 2). Not changed in this slice (needs the proven entry ids persisted on the decision — an A3a/A3b contract change). Replied on the thread, **left open for the owner's decision**.
+- **Residual risks:** (1) that Codex finding (raw-SQL reservation of an unrelated entry; bounded, no ledger effect, remedy via A3e release or the follow-up slice); (2) tenant-wide pause during close; (3) per-entry (not per-line) claim granularity; (4) no undo until A3e; (5) overlap acknowledgement/run freshness are service-level guarantees. 
+- Status: **READY_TO_MERGE** pending the owner's decision on the open Codex thread. No merge, deploy or Railway change was made; PS-A3e, PS-A4 and Track B were not started.
