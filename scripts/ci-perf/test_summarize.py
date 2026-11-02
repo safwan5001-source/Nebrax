@@ -52,6 +52,19 @@ class Summarize(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("**170.0**", summary)
 
+    def test_background_diagnostics_are_rendered_when_present_and_optional_when_absent(self):
+        bg = {"checkpoints_timed": 0, "checkpoints_req": 1, "autovac_autoanalyze_cycles": 3, "autovacuum_workers_now": 1, "wal_syncs": 40}
+        slow = [{"t_s": 0.5, "wait_ms": 88.1}, {"t_s": 0.52, "wait_ms": 61.0}]
+        g = gate(rounds=[{**rnd(1, 88.0), "pg_background": bg, "slow_waits": slow}, rnd(2), rnd(3)])
+        rc, _, summary = self.run_in({"cops-h1-1-realistic_load_gate.json": g, "cops-h1-1-saturated_burst_diagnostic.json": BURST})
+        self.assertEqual(rc, 0)
+        self.assertIn("نقاط تفتيش", summary)
+        self.assertIn("autovacuum", summary)
+        self.assertIn("88.1ms", summary)
+        rc, _, plain = self.run_in({"cops-h1-1-realistic_load_gate.json": gate(), "cops-h1-1-saturated_burst_diagnostic.json": BURST})
+        self.assertEqual(rc, 0)
+        self.assertNotIn("نقاط تفتيش", plain)
+
     def test_missing_gate_file_fails(self):
         rc, out, _ = self.run_in({"cops-h1-1-saturated_burst_diagnostic.json": BURST})
         self.assertEqual(rc, 2)

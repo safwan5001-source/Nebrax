@@ -77,6 +77,20 @@ def render(gate: dict, burst: dict, environment: str = "") -> str:
         f"التباين (3 جولات محتسبة): p95 إضافي min {a['min']} / mean {a['mean']} / max {a['max']} / stdev {a['stdev']} ms · "
         f"نافذة النشاط min {w['min']} / max {w['max']} أحداث/ث · إجمالي الجولة min {t['min']} / max {t['max']} أحداث/ث",
     ]
+    # تشخيص فقط (لا يدخل أي معيار): نشاط PostgreSQL الخلفي وشكل أي توقف. حقول اختيارية — غيابها (مرفقات أقدم) لا يفشل شيئاً.
+    for r in [warm, *rounds]:
+        bg, slow = r.get("pg_background"), r.get("slow_waits") or []
+        if bg is None and not slow:
+            continue
+        label = "إحماء" if r is warm else f"جولة {r.get('round')}"
+        parts = []
+        if bg is not None:
+            parts.append("نقاط تفتيش Δ زمنية/مطلوبة {}/{}".format(bg.get("checkpoints_timed"), bg.get("checkpoints_req"))
+                         + f" · دورات autovacuum+analyze Δ {bg.get('autovac_autoanalyze_cycles')} · عمّال autovacuum الآن {bg.get('autovacuum_workers_now')}"
+                         + f" · مزامنات WAL Δ {bg.get('wal_syncs')}")
+        if slow:
+            parts.append(f"انتظارات ≥ الحد: {len(slow)} بين t={slow[0]['t_s']}s وt={slow[-1]['t_s']}s (أطولها {max(x['wait_ms'] for x in slow)}ms)")
+        lines.append(f"- {label}: " + " · ".join(parts))
     s = need(burst, "burst", "burst")
     lines += [
         "",

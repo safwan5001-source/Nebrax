@@ -399,6 +399,75 @@ class CommerceOrderEventsPostgresTest extends TestCase
         return ['min' => round((float) min($values), 3), 'max' => round((float) max($values), 3), 'mean' => round($mean, 3), 'stdev' => round(sqrt($var), 3)];
     }
 
+    /**
+     * لقطة نشاط الخلفية في PostgreSQL (تسجيل تشخيصي فقط — لا يدخل أي معيار): نقاط التفتيش (زمنية/مطلوبة)، عدد دورات autovacuum/autoanalyze التراكمي،
+     * عدد عمّال autovacuum النشطين الآن، ومزامنات WAL. تفشل بصمت (null) إن غابت الصلاحية/الإصدار ولا تمسّ القياس. تُؤخذ خارج القسم المقيس.
+     *
+     * @return array<string, int>|null
+     */
+    private static function pgActivity(): ?array
+    {
+        try {
+            $out = [];
+            $out['autovacuum_workers_now'] = (int) DB::selectOne("select count(*) c from pg_stat_activity where backend_type = 'autovacuum worker'")->c;
+            $out['autovac_autoanalyze_cycles'] = (int) DB::selectOne('select coalesce(sum(autovacuum_count + autoanalyze_count), 0) c from pg_stat_all_tables')->c;
+            try {
+                $bg = DB::selectOne('select checkpoints_timed t, checkpoints_req r, buffers_backend_fsync f from pg_stat_bgwriter');
+                $out += ['checkpoints_timed' => (int) $bg->t, 'checkpoints_req' => (int) $bg->r, 'backend_fsyncs' => (int) $bg->f];
+            } catch (\Throwable) {
+                $cp = DB::selectOne('select num_timed t, num_requested r from pg_stat_checkpointer'); // PostgreSQL 17+
+                $out += ['checkpoints_timed' => (int) $cp->t, 'checkpoints_req' => (int) $cp->r];
+            }
+            $out['wal_syncs'] = (int) DB::selectOne('select wal_sync c from pg_stat_wal')->c;
+
+            return $out;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * فرق لقطتَي نشاط الخلفية خلال الجولة. إحصاءات PostgreSQL تُدفع بتأخر قصير فهذه أدلة تقريبية لا حسابات دقيقة.
+     *
+     * @param  array<string, int>|null  $a
+     * @param  array<string, int>|null  $b
+     * @return array<string, int>|null
+     */
+    private static function pgActivityDelta(?array $a, ?array $b): ?array
+    {
+        if ($a === null || $b === null) {
+            return null;
+        }
+        $d = [];
+        foreach ($b as $k => $v) {
+            $d[$k] = $k === 'autovacuum_workers_now' ? $v : $v - ($a[$k] ?? 0);
+        }
+
+        return $d;
+    }
+
+    /**
+     * شكل أي توقف: كل انتظار فوق ميزانية p95 مع زمن وقوعه نسبةً لبدء الجولة (حتى 40). توقف واحد طويل يظهر كعناقيد متتالية متقاربة الزمن
+     * (ممسك الرأس تعطّل ⇒ كل من خلفه تأخر)، وضجيج موزَّع يظهر متفرقاً. للتشخيص فقط.
+     *
+     * @param  list<array<string, mixed>>  $values
+     * @return list<array{t_s: float, wait_ms: float}>
+     */
+    private static function slowWaits(array $values, float $started): array
+    {
+        $rows = [];
+        foreach ($values as $v) {
+            foreach ($v['timed'] ?? [] as [$at, $wait]) {
+                if ($wait >= self::P95_BUDGET_MS) {
+                    $rows[] = ['t_s' => round($at - $started, 3), 'wait_ms' => round($wait, 1)];
+                }
+            }
+        }
+        usort($rows, fn (array $x, array $y) => $x['t_s'] <=> $y['t_s']);
+
+        return array_slice($rows, 0, 40);
+    }
+
     /** p50 زمن الكتابة بلا تنافس: كاتب واحد متسلسل، 30 معاملة (قفل صف الطلب ثم الحدث آخراً). */
     private function baselineP50(): float
     {
@@ -443,6 +512,7 @@ class CommerceOrderEventsPostgresTest extends TestCase
                 mt_srand($seed + $i);
                 $waits = [];
                 $ends = [];
+                $slow = [];
                 $loopStart = microtime(true);
                 for ($j = 0; $j < $perWriter; $j++) {
                     if ($thinkMaxMs > 0) {
@@ -455,17 +525,20 @@ class CommerceOrderEventsPostgresTest extends TestCase
                         $waits[] = (hrtime(true) - $t0) / 1e6;
                     });
                     $ends[] = microtime(true);
+                    $slow[] = [end($ends), end($waits)];
                 }
 
-                return ['waits' => $waits, 'ends' => $ends, 'start' => $loopStart, 'end' => microtime(true)];
+                return ['waits' => $waits, 'ends' => $ends, 'start' => $loopStart, 'end' => microtime(true), 'timed' => $slow];
             };
         }
         $loadBefore = (sys_getloadavg() ?: [0.0])[0];
         $cpuBefore = self::cpuSnapshot();
+        $pgBefore = self::pgActivity();
         $started = microtime(true);
         $results = $this->runConcurrently($jobs);
         $elapsed = microtime(true) - $started;
         $cpu = self::cpuWindow($cpuBefore, self::cpuSnapshot(), $loadBefore);
+        $pgDelta = self::pgActivityDelta($pgBefore, self::pgActivity());
 
         // النزاهة: تُحسب هنا وتُؤكَّد لاحقاً (بعد التسجيل). نفس الفحوص السابقة حرفياً.
         $errors = [];
@@ -512,6 +585,8 @@ class CommerceOrderEventsPostgresTest extends TestCase
             'span_events_per_second' => round(count($waits) / $spanLen, 1), 'startup_overhead_s' => round($elapsed - $spanLen, 3),
             'contended_p50_ms' => $pct(50), 'contended_p95_ms' => $pct(95), 'contended_p99_ms' => $pct(99), 'contended_max_ms' => $waits ? round(max($waits), 3) : 0.0,
             ...$cpu,
+            'pg_background' => $pgDelta,
+            'slow_waits' => self::slowWaits($values, $started),
             'integrity' => ['errors' => $errors, 'sequence_complete' => $sequenceComplete, 'per_writer_complete' => $perWriterComplete],
         ];
     }
