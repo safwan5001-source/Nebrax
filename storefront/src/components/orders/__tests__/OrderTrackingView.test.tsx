@@ -152,6 +152,32 @@ describe("OrderTrackingView (COPS-H2-5)", () => {
     expect(container.textContent).not.toMatch(/@|\+?\d{9,}/);
   });
 
+  it("shows the scheduled delivery date unshifted for visitors west of UTC (review P2)", async () => {
+    const previous = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      action.mockResolvedValue({
+        success: true,
+        tracking: tracking({
+          schedule: {
+            date: "2026-11-05",
+            label: null,
+            labelEn: null,
+            start: "17:00",
+            end: "20:00",
+          },
+        }),
+      });
+      const { container } = view("en");
+      await screen.findByText("CORD-77");
+      expect(container.textContent).toContain("November 5, 2026");
+      expect(container.textContent).not.toContain("November 4, 2026");
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
+  });
+
   describe.each(
     Object.keys(LOCALES) as Array<keyof typeof LOCALES>,
   )("%s", (locale) => {

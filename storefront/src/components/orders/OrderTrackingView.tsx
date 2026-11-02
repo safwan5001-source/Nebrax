@@ -23,12 +23,16 @@ function formatDate(
   withTime = false,
 ): string | null {
   if (!value) return null;
+  // تاريخ تقويمي بلا وقت (مثل موعد التسليم `2026-11-05`): يُحلَّل منتصف ليل UTC، فيُنسَّق بـUTC وإلا ظهر قبل يوم
+  // لمن هم غرب UTC. الطوابع الزمنية الحقيقية تبقى بتوقيت المتصفح.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   try {
     return new Intl.DateTimeFormat(locale, {
       year: "numeric",
       month: "long",
       day: "numeric",
       ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+      ...(dateOnly ? { timeZone: "UTC" } : {}),
     }).format(new Date(value));
   } catch {
     return null;

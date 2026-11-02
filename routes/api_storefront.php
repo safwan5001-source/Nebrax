@@ -234,7 +234,7 @@ Route::middleware([
             ->middleware('throttle:10,1')->name('checkout.payment_intent.store');
         // COPS-H2-5 / D-H2-15 — إصدار رابط التتبع (يلزم مرجع الطلب `v1`)؛ حتمي لكل طلب.
         Route::post('orders/{order}/tracking-link', [StorefrontOrderTrackingController::class, 'issue'])
-            ->whereUuid('order')->middleware('throttle:10,1')->name('orders.tracking_link.store');
+            ->whereUuid('order')->middleware('throttle:storefront-tracking-link')->name('orders.tracking_link.store');
         Route::middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->group(function () {
             Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
             Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');

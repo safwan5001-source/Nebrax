@@ -222,6 +222,22 @@ class CommerceOrderGuestTrackingTest extends TestCase
     }
 
     #[Test]
+    public function issuing_links_has_its_own_budget_and_never_consumes_the_payment_start_budget(): void
+    {
+        $order = $this->order();
+
+        // 10 إصدارات تستنفد سلة الإصدار لهذا الطلب، والحادي عشر 429.
+        for ($i = 0; $i < 10; $i++) {
+            $this->issue($order)->assertOk();
+        }
+        $this->issue($order)->assertStatus(429);
+
+        // ولا أثر على سلة `checkout/payment-intent` المشتركة بعنوان خادم المتجر (مراجعة Codex P1):
+        // بدء الدفع لا يُقابَل بـ429 بسبب إصدارات التتبع.
+        $this->assertNotSame(429, $this->startPayment($order, $order['reference'])->getStatusCode());
+    }
+
+    #[Test]
     public function failed_attempts_are_limited_to_twenty_per_minute_but_a_valid_token_is_never_locked_out(): void
     {
         $order = $this->order();
