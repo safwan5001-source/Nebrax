@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  isTrackingPath,
+  redactTrackingEventUrl,
   redactTrackingPath,
   scrubTrackingCredentials,
 } from "../scrub-tracking";
@@ -62,5 +64,18 @@ describe("guest tracking token scrubbing (COPS-H2-5 review)", () => {
         expect(source, `${file} ${hook}`).toContain(hook);
       }
     }
+  });
+
+  it("recognises tracking pages only, and redacts analytics event URLs", () => {
+    expect(isTrackingPath(`/sa/en/track/${TOKEN}`)).toBe(true);
+    expect(isTrackingPath("/sa/en/products/track-suit")).toBe(false);
+    expect(isTrackingPath("/sa/en/track")).toBe(false);
+    expect(isTrackingPath(null)).toBe(false);
+    expect(
+      redactTrackingEventUrl({
+        type: "pageview",
+        url: `https://shop.example/sa/en/track/${TOKEN}`,
+      }).url,
+    ).toBe("https://shop.example/sa/en/track/[redacted]");
   });
 });

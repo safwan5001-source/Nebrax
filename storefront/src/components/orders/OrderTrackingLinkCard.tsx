@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, Copy, MapPin } from "lucide-react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -66,7 +65,8 @@ export function OrderTrackingLinkCard({
       </p>
       <div className="mt-3 flex flex-wrap gap-3">
         <Button asChild variant="outline">
-          <Link href={path}>{t("linkOpen")}</Link>
+          {/* Full page load on purpose: a client-side navigation would let an already-loaded tag manager observe the token URL. */}
+          <a href={path}>{t("linkOpen")}</a>
         </Button>
         <Button type="button" variant="ghost" onClick={() => void copy()}>
           {copied ? (

@@ -46,3 +46,13 @@ export function scrubTrackingCredentials<T>(payload: T): T {
     return null as T;
   }
 }
+
+/** Whether a pathname is a guest tracking page (`/{country}/{locale}/track/{token}`): such pages load no third-party telemetry at all. */
+export function isTrackingPath(pathname: string | null | undefined): boolean {
+  return !!pathname && /(^|\/)track\/[^/]+/.test(pathname);
+}
+
+/** Vercel Analytics / Speed Insights `beforeSend`: keeps the event but strips the token from its URL. */
+export function redactTrackingEventUrl<T extends { url: string }>(event: T): T {
+  return { ...event, url: redactTrackingPath(event.url) };
+}
