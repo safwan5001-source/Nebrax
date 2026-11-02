@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
 use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
+use App\Http\Controllers\Api\CommerceStaffOrderFeedController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -1189,6 +1190,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // COMMERCE-ORDERS-O1a: طلبات المتجر للموظف — قراءة فقط (قائمة + تفاصيل). صلاحية مستقلة commerce.orders.view
         // (owner/admin عبر `*`)، وحارس القدرة commerce.storefront. المقيَّد بمخازن مرفوض داخل المتحكّم (fail-closed).
         Route::get('commerce/orders', [CommerceStaffOrderController::class, 'index'])
+            ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COPS-H1-2: تغذية الأحداث بالمؤشّر + مصالحة الانتباه بالحالة (ADR-29 §2.4) — قراءة فقط، الصلاحية نفسها commerce.orders.view. تُسجَّل قبل {id} (UUID فقط) فلا تلتبس.
+        Route::get('commerce/orders/feed', [CommerceStaffOrderFeedController::class, 'feed'])
+            ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        Route::get('commerce/orders/attention', [CommerceStaffOrderFeedController::class, 'attention'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);

@@ -2,13 +2,20 @@
 
 namespace App\Services\Commerce;
 
+use App\Events\CommerceOrderCancelled;
+use App\Events\CommerceOrderDomainEvent;
+use App\Events\CommerceOrderPaymentCollected;
+use App\Events\CommerceOrderPaymentPaid;
+use App\Events\CommerceOrderPlaced;
 use App\Models\CommerceOrder;
 use App\Models\CommerceOrderEvent;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
+use Throwable;
 
 /**
  * الكاتب الوحيد لسجل أحداث طلب المتجر وتسلسل التغذية (COPS-H1-1، ADR-29 §2.4).
@@ -24,6 +31,12 @@ use LogicException;
  *  • لا شبكة ولا مزوّد ولا قيد ولا مخزون. `data` قائمة بيضاء لكل نوع (`CommerceOrderEvent::DATA_KEYS`) بقيم نصية قصيرة فقط.
  *
  * Idempotency حالة-مبنية: يكتب المستدعي الحدث على فرع الانتقال الفعلي وحده (إعادة الإتمام/الإلغاء/الالتقاط/التحصيل لا تصل إليه).
+ *
+ * ═══ أحداث النطاق بعد الالتزام (COPS-H1-2) ═══
+ *  بعد الإدراج يسجّل `DB::afterCommit` إطلاقَ حدث Laravel المقابل (`CommerceOrderPlaced`…): لا يُطلق إن تراجعت المعاملة (أو معاملتها الخارجية)،
+ *  ويُطلق مرة واحدة لكل انتقال فعلي (الإعادات لا تصل إلى `append`). لا عبارة قاعدة بيانات إضافية داخل المعاملة (زمن إمساك قفل الرأس لم يتغيّر).
+ *  الإطلاق **محميّ**: أي استثناء من مستمع يُسجَّل بالمعرّفات فقط ولا يُعاد رميه — لا يُفشل الطلب ولا الاستجابة ولا الانتقال الملتزم؛ التغذية والمصالحة
+ *  هما شبكة الأمان للفقد.
  */
 final class CommerceOrderEventRecorder
 {
@@ -32,6 +45,14 @@ final class CommerceOrderEventRecorder
     private const EVENTS = 'commerce_order_events';
 
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+
+    /** @var array<string, class-string<CommerceOrderDomainEvent>> */
+    private const DOMAIN_EVENTS = [
+        CommerceOrderEvent::ORDER_PLACED => CommerceOrderPlaced::class,
+        CommerceOrderEvent::ORDER_CANCELLED => CommerceOrderCancelled::class,
+        CommerceOrderEvent::PAYMENT_PAID => CommerceOrderPaymentPaid::class,
+        CommerceOrderEvent::PAYMENT_COLLECTED => CommerceOrderPaymentCollected::class,
+    ];
 
     public function __construct(private readonly TenantContext $tenant) {}
 
@@ -70,8 +91,9 @@ final class CommerceOrderEventRecorder
         // بعد نيل القفل، عبارة واحدة: لقطتها الجديدة تُظهر آخر حدث ملتزم، و`max + 1` يُحسب ويُدرَج معاً (جولة واحدة أثناء إمساك القفل؛
         // الفهرس الفريد `(tenant_id, feed_seq)` يجعل `max` قراءة فهرس واحدة). المعرّف مُتحقَّق منه بصيغة UUID قبل إدراجه حرفياً في الاستعلام الفرعي.
         $now = now('UTC');
+        $eventId = (string) Str::uuid();
         DB::table(self::EVENTS)->insert([
-            'id' => (string) Str::uuid(),
+            'id' => $eventId,
             'tenant_id' => $tenantId,
             'commerce_order_id' => (string) $order->getKey(),
             'feed_seq' => DB::raw('(SELECT COALESCE(MAX(e.feed_seq), 0) + 1 FROM '.self::EVENTS." e WHERE e.tenant_id = '{$tenantId}')"),
@@ -82,6 +104,27 @@ final class CommerceOrderEventRecorder
             'occurred_at' => $now,
             'created_at' => $now,
         ]);
+
+        $orderId = (string) $order->getKey();
+        DB::afterCommit(fn () => $this->publish($type, $tenantId, $orderId, $eventId));
+    }
+
+    /**
+     * يُطلق حدث النطاق بعد الالتزام. محميّ: استثناء المستمع لا يتجاوز هذه الدالة (الانتقال ملتزم أصلاً؛ الفشل يُسجَّل بالمعرّفات فقط، بلا PII).
+     */
+    private function publish(string $type, string $tenantId, string $orderId, string $eventId): void
+    {
+        $class = self::DOMAIN_EVENTS[$type] ?? null;
+        if ($class === null) {
+            return;
+        }
+        try {
+            event(new $class($tenantId, $orderId, $eventId));
+        } catch (Throwable $e) {
+            Log::warning('commerce.order_event.listener_failed', [
+                'type' => $type, 'tenant_id' => $tenantId, 'order_id' => $orderId, 'event_id' => $eventId, 'exception' => $e::class,
+            ]);
+        }
     }
 
     /**
