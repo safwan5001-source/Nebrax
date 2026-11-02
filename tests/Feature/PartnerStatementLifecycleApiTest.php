@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * IMP-PARTNER-STATEMENTS PS-A3c — دورة حالات المطابقة `draft ⇄ reviewed` (الإغلاق محجوب حتى PS-A3d)، إجراء `dismiss`، بصمة سطور الكشف، حراس القاعدة، سجل الأحداث append-only،
+ * IMP-PARTNER-STATEMENTS PS-A3c — دورة حالات المطابقة `draft ⇄ reviewed` (الإغلاق النهائي في A3d: PartnerStatementCloseApiTest)، إجراء `dismiss`، بصمة سطور الكشف، حراس القاعدة، سجل الأحداث append-only،
  * RBAC/عزل/فروع/بوابة القدرة، التشغيلات القديمة، وعدم الأثر المالي. تشغيل: php artisan test --filter=PartnerStatementLifecycleApiTest
  */
 class PartnerStatementLifecycleApiTest extends TestCase
@@ -201,7 +201,7 @@ class PartnerStatementLifecycleApiTest extends TestCase
         $this->assertEquals([true, 3, 0, ['confirm' => 1, 'dismiss' => 1, 'override' => 1]], [
             $ready['readiness']['can_mark_reviewed'], $ready['readiness']['resolved'], $ready['readiness']['unresolved'], $ready['readiness']['decisions_by_action'],
         ]);
-        $this->assertSame(['available' => false, 'blocked_reason' => 'close_blocked_pending_claims'], $ready['close']);
+        $this->assertSame(['available' => false, 'blocked_reason' => 'not_reviewed'], $ready['close'], 'A3d: الإغلاق لا يُعرض متاحاً إلا لمقارنة reviewed.');
 
         // draft → reviewed
         $reviewed = $this->review($token, $id, $run['id'])->assertCreated();
@@ -259,21 +259,21 @@ class PartnerStatementLifecycleApiTest extends TestCase
     }
 
     /** @test */
-    public function closing_is_blocked_by_the_service_the_api_and_the_database(): void
+    public function closing_needs_a_reviewed_reconciliation_a_different_closer_and_the_database_refuses_raw_closing(): void
     {
         [$a, $b, $id, $run] = $this->scenario();
         $token = $this->auth['token'];
         $this->resolveAll($id, $run, $b);
 
-        // draft وreviewed كلاهما: 409 برمز ثابت وبلا أثر.
-        $r = $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close")->assertStatus(409);
-        $this->assertSame('close_blocked_pending_claims', $r->json('reason'));
+        // مسودة: لا إغلاق (409 برمز ثابت وبلا أثر). الباقي (المُغلِق ≠ المراجِع، المطالبات، التداخل) في PartnerStatementCloseApiTest.
+        $this->assertSame('reconciliation_not_reviewed', $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id']])->assertStatus(409)->json('reason'));
         $this->review($token, $id, $run['id'])->assertCreated();
-        $this->assertSame('close_blocked_pending_claims', $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close")->assertStatus(409)->json('reason'));
+        $this->assertSame('closer_must_differ_from_reviewer', $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id']])->assertStatus(403)->json('reason'));
         $this->assertSame('reviewed', $this->reconciliation($id)->status);
-        $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['force' => true])->assertStatus(422);
+        $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close", ['run_id' => $run['id'], 'force' => true])->assertStatus(422);
+        $this->withToken($token)->postJson("/api/partner-statement-reconciliations/{$id}/close")->assertStatus(422);
 
-        // القاعدة نفسها لا تقبل `closed` (ولا غيرها) حتى لو تجاوزنا الخدمة: لا بتحديث ولا بإدراج.
+        // القاعدة نفسها لا تقبل `closed` بلا حدث إغلاق مطابق (ولا حالات مجهولة) حتى لو تجاوزنا الخدمة: لا بتحديث ولا بإدراج.
         foreach (['closed', 'voided', 'superseded', 'anything'] as $status) {
             $this->assertRejected(fn () => DB::table('partner_statement_reconciliations')->where('id', $id)->update(['status' => $status]), "تحديث إلى {$status}");
         }
@@ -692,7 +692,7 @@ class PartnerStatementLifecycleApiTest extends TestCase
         }
         // الكاتب الوحيد لحقول حالة المقارنة هو خدمة الدورة (`->update(` على صف المقارنة المقفول).
         $source = (string) file_get_contents(base_path('app/Services/PartnerStatementLifecycleService.php'));
-        $this->assertSame(2, substr_count($source, '$fresh->update('), 'تحديثان فقط: reviewed و draft.');
+        $this->assertSame(3, substr_count($source, '$fresh->update('), 'ثلاثة تحديثات فقط: reviewed و draft و closed (A3d).');
     }
 
     /** @test */

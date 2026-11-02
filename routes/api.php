@@ -1787,7 +1787,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('partner-statement-reconciliations/{id}/events', [PartnerStatementLifecycleController::class, 'events'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
         Route::post('partner-statement-reconciliations/{id}/review', [PartnerStatementLifecycleController::class, 'review'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::post('partner-statement-reconciliations/{id}/reopen', [PartnerStatementLifecycleController::class, 'reopen'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
-        Route::post('partner-statement-reconciliations/{id}/close', [PartnerStatementLifecycleController::class, 'close'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
+        Route::post('partner-statement-reconciliations/{id}/close', [PartnerStatementLifecycleController::class, 'close'])->middleware([$perm('partner_statements.close'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

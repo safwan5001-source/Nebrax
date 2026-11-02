@@ -7,8 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * دورة حالات مقارنة كشف الطرف (IMP-PS-A3c): حالة وجاهزية · `review` (draft → reviewed) · `reopen` (reviewed → draft) · `close` (محجوب حتى PS-A3d) · سجل الأحداث. **لا أثر مالي.**
- * الكتابة `partner_statements.reconcile`، والقراءة `.view` (على المسار) + نطاق الطرف والفرع والتشغيلة داخل الخدمة. أخطاء الدورة (`PartnerStatementReviewException`) تُرسل `{message, reason}`.
+ * دورة حالات مقارنة كشف الطرف (IMP-PS-A3c): حالة وجاهزية · `review` (draft → reviewed) · `reopen` (reviewed → draft) · `close` (PS-A3d: إغلاق نهائي بمطالبات وفصل مهام، `partner_statements.close`) · سجل الأحداث. **لا أثر مالي.**
+ * الكتابة `partner_statements.reconcile` (والإغلاق `partner_statements.close`)، والقراءة `.view` (على المسار) + نطاق الطرف والفرع والتشغيلة داخل الخدمة. أخطاء الدورة (`PartnerStatementReviewException`) تُرسل `{message, reason}`.
  */
 class PartnerStatementLifecycleController extends ApiController
 {
@@ -41,10 +41,13 @@ class PartnerStatementLifecycleController extends ApiController
 
     public function close(Request $request, string $id): JsonResponse
     {
-        $this->rejectUnknown($request, []);
-        $this->domain(fn () => $this->lifecycle->close($request->user(), $id));
+        $this->rejectUnknown($request, ['run_id', 'acknowledge_overlap', 'note']);
+        $data = $request->validate([
+            'run_id' => ['required', 'uuid'], 'acknowledge_overlap' => ['nullable', 'array', 'max:200'], 'acknowledge_overlap.*' => ['uuid'], 'note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $result = $this->domain(fn () => $this->lifecycle->close($request->user(), $id, $data));
 
-        return response()->json([], 409);   // لا يُبلَغ: الخدمة ترمي دائماً
+        return response()->json(['data' => $result['status'], 'replayed' => $result['replayed']], $result['replayed'] ? 200 : 201);
     }
 
     public function events(Request $request, string $id): JsonResponse
