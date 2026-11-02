@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontOnlinePaymentController;
+use App\Http\Controllers\Api\StorefrontOrderTrackingController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontDeliveryScheduleController;
 use App\Http\Controllers\Api\StorefrontCustomizerMediaController;
@@ -224,10 +225,16 @@ Route::middleware([
     // PAY-H4-04a — حالة الدفع الإلكتروني لطلب (حقيقة الخادم، لا عودة المتصفح). الملكية بمرجع الطلب الموقَّع؛ مغلق (404) خلف البوابة المنصّية.
     Route::get('orders/{order}/payment-status', [StorefrontOnlinePaymentController::class, 'status'])
         ->whereUuid('order')->middleware('throttle:30,1')->name('orders.payment_status');
+    // COPS-H2-5 / D-H2-15 — تتبّع الضيف الموقَّع: رمز `trk1` في المسار (منفصل الغرض عن مرجع الطلب)، 404 موحَّد، مغلق افتراضياً. حدوده داخل المتحكّم (D-H2-17).
+    Route::get('order-tracking/{token}', [StorefrontOrderTrackingController::class, 'show'])
+        ->where('token', '[^/]+')->name('order_tracking.show');
     Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
         // PAY-H4-04a — بدء/استئناف محاولة دفع إلكتروني للطلب (يعيد `checkout_url` لصفحة المزوّد المستضافة).
         Route::post('checkout/payment-intent', [StorefrontOnlinePaymentController::class, 'start'])
             ->middleware('throttle:10,1')->name('checkout.payment_intent.store');
+        // COPS-H2-5 / D-H2-15 — إصدار رابط التتبع (يلزم مرجع الطلب `v1`)؛ حتمي لكل طلب.
+        Route::post('orders/{order}/tracking-link', [StorefrontOrderTrackingController::class, 'issue'])
+            ->whereUuid('order')->middleware('throttle:10,1')->name('orders.tracking_link.store');
         Route::middleware([EstablishRetailCustomerIfPresent::class, EnsureWholesalePriceAccess::class])->group(function () {
             Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
             Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');

@@ -1307,5 +1307,30 @@
     "verifyThenSignIn": "After you verify your email you can sign in.",
     "verifying": "Verifying your email…",
     "verifyingTitle": "Verifying"
+  },
+  "orderTracking": {
+    "title": "Seguimiento del pedido",
+    "orderNumber": "Número de pedido",
+    "placedOn": "Realizado el {date}",
+    "expiresNote": "Este enlace funciona hasta el {date}. Cualquiera que lo tenga puede seguir el avance del pedido, pero no ver su contenido.",
+    "method": {
+      "standard": "Entrega",
+      "pickup": "Recogida"
+    },
+    "scheduled": "Momento solicitado: {date}",
+    "loading": "Cargando tu pedido…",
+    "notFoundTitle": "No encontramos este pedido",
+    "notFoundBody": "Puede que el enlace de seguimiento sea incorrecto o haya caducado. Revisa el enlace que recibiste o contacta con la tienda.",
+    "rateLimitedTitle": "Demasiados intentos",
+    "rateLimitedBody": "Espera un minuto e inténtalo de nuevo.",
+    "errorTitle": "El seguimiento no está disponible ahora",
+    "errorBody": "Inténtalo de nuevo en un momento.",
+    "retry": "Reintentar",
+    "backToStore": "Volver a la tienda",
+    "linkTitle": "Sigue este pedido",
+    "linkBody": "Guarda este enlace para seguir el avance de tu pedido. Cualquiera que lo tenga verá el avance, pero no el contenido del pedido.",
+    "linkOpen": "Abrir la página de seguimiento",
+    "linkCopy": "Copiar enlace",
+    "linkCopied": "Enlace copiado"
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { awjOrderLineView, CartLine } from "@/components/cart/CartLine";
 import { OrderGiftingDetails } from "@/components/orders/OrderGiftingDetails";
+import { OrderTrackingLinkCard } from "@/components/orders/OrderTrackingLinkCard";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
@@ -24,17 +25,20 @@ import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
  * on this screen would be the single most damaging untruth this storefront
  * could tell, so the note is not optional chrome — it is the screen's subject.
  *
- * What it deliberately does not offer: an order-tracking link, a delivery date,
- * a shipment status, or a receipt/invoice download. `CommerceOrder != Invoice`
- * (ADR-01), there is no order-lookup route for a guest, and no fulfilment
- * status exists to track. Each would be a promise with nothing behind it.
+ * What it deliberately does not offer: a delivery date, a shipment status, or a receipt/invoice download.
+ * `CommerceOrder != Invoice` (ADR-01). Each would be a promise with nothing behind it. The one exception is the guest
+ * tracking link (COPS-H2-5): shown **only** when the API issues one (its gate is closed by default), and it leads to a page
+ * that believes nothing but the server's narrow projection.
  */
 export function AwjOrderConfirmation({
   order,
   basePath,
+  orderReference = null,
 }: {
   order: StorefrontOrder;
   basePath: string;
+  /** The signed order reference from the completion response — only used to ask for a guest tracking link (H2-5). */
+  orderReference?: string | null;
 }) {
   const t = useTranslations("awjCheckout");
   const to = useTranslations("orders");
@@ -113,6 +117,14 @@ export function AwjOrderConfirmation({
           />
           <span>{t("success.notPaidNote")}</span>
         </p>
+      )}
+
+      {!cancelled && (
+        <OrderTrackingLinkCard
+          orderId={order.id}
+          orderReference={orderReference}
+          basePath={basePath}
+        />
       )}
 
       <section

@@ -139,6 +139,7 @@ describe("robots.txt", () => {
           "/*/cart",
           "/*/checkout",
           "/*/checkout/*",
+          "/*/track/*",
           "/*?*sort=*",
           "/*?*page=*",
           "/*?*filter*=*",
