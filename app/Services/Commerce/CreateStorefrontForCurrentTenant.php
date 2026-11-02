@@ -24,7 +24,7 @@ final class CreateStorefrontForCurrentTenant
     /**
      * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: string, default_locale: string, created: bool}
      */
-    public function create(string $displayName, string $defaultLocale = 'ar'): array
+    public function create(string $displayName, string $defaultLocale = 'ar', ?bool $customerAccountsEnabled = null): array
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -39,7 +39,7 @@ final class CreateStorefrontForCurrentTenant
         }
         $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
 
-        return DB::transaction(function () use ($tenantId, $name, $defaultLocale, $baseDomain): array {
+        return DB::transaction(function () use ($tenantId, $name, $defaultLocale, $baseDomain, $customerAccountsEnabled): array {
             $tenant = Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
             if ($tenant === null) {
                 throw new RuntimeException('المستأجر غير موجود.');
@@ -70,13 +70,14 @@ final class CreateStorefrontForCurrentTenant
                 'store',
             );
 
-            $channel = SalesChannel::create([
+            // B2C-DEFAULT: a NEW retail store starts with customer accounts ON unless the creator said otherwise;
+            // the deployment gate stays authoritative (see NewRetailChannelDefaults).
+            $channel = NewRetailChannelDefaults::createWebChannel([
                 'tenant_id' => $tenantId,
                 'slug' => $channelSlug,
                 'name' => $name,
-                'type' => SalesChannel::TYPE_WEB,
                 'is_active' => true,
-            ]);
+            ], $customerAccountsEnabled);
             $storefront = Storefront::create([
                 'tenant_id' => $tenantId,
                 'sales_channel_id' => $channel->id,

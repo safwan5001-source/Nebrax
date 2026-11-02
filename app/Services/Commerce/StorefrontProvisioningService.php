@@ -51,7 +51,7 @@ final class StorefrontProvisioningService
     /**
      * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: string, default_locale: string, created: bool}
      */
-    public function provisionFirstStorefrontForCurrentTenant(?string $displayName = null, ?BusinessVertical $vertical = null): array
+    public function provisionFirstStorefrontForCurrentTenant(?string $displayName = null, ?BusinessVertical $vertical = null, ?bool $customerAccountsEnabled = null): array
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -62,7 +62,7 @@ final class StorefrontProvisioningService
         // معاملة ولا يقفل أي صفّ — فشلٌ مغلق مبكرٌ بلا أي أثر جزئي.
         $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
 
-        return DB::transaction(function () use ($tenantId, $baseDomain, $displayName, $vertical) {
+        return DB::transaction(function () use ($tenantId, $baseDomain, $displayName, $vertical, $customerAccountsEnabled) {
             // مرساة التسلسل: يقفل صفّ المستأجر نفسه، فطلبا تزويدٍ متزامنان
             // لنفس المستأجر يتسلسلان — الثاني يرى دوماً ما التزمه الأول.
             $tenant = Tenant::whereKey($tenantId)->lockForUpdate()->first();
@@ -72,7 +72,7 @@ final class StorefrontProvisioningService
 
             $hostname = ManagedStorefrontHostname::forSlug($tenant->slug, $baseDomain);
 
-            $channel = $this->ensureWebSalesChannel($tenant);
+            $channel = $this->ensureWebSalesChannel($tenant, $customerAccountsEnabled);
             $storefront = $this->ensureStorefront($channel, $tenant, $displayName);
             // FLOWERS-H1: ملف النشاط يُسنَد عند **إنشاء** المتجر فقط؛ إعادة
             // التزويد لمتجر قائم لا تغيّره (التغيير عبر PUT الهوية الصريح).
@@ -102,7 +102,7 @@ final class StorefrontProvisioningService
      * (المنطق عاش فقط داخل صنف الأمر) — فهذا أصغر امتداد ضروري، لا تكرارٌ
      * زائد عن حاجة.
      */
-    private function ensureWebSalesChannel(Tenant $tenant): SalesChannel
+    private function ensureWebSalesChannel(Tenant $tenant, ?bool $customerAccountsEnabled = null): SalesChannel
     {
         $activeWeb = SalesChannel::query()
             ->where('type', SalesChannel::TYPE_WEB)
@@ -140,13 +140,15 @@ final class StorefrontProvisioningService
             return $occupant;
         }
 
-        return SalesChannel::create([
+        // B2C-DEFAULT: only this branch INSERTS a channel — a converged/existing channel returned above is never
+        // modified. New retail channel ⇒ customer accounts ON unless explicitly declined; the deployment gate stays
+        // authoritative (see NewRetailChannelDefaults).
+        return NewRetailChannelDefaults::createWebChannel([
             'tenant_id' => $tenant->id,
             'slug' => self::CHANNEL_SLUG,
             'name' => 'المتجر الإلكتروني',
-            'type' => SalesChannel::TYPE_WEB,
             'is_active' => true,
-        ]);
+        ], $customerAccountsEnabled);
     }
 
     /**

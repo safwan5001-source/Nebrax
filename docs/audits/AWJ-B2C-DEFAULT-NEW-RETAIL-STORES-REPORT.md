@@ -1,0 +1,103 @@
+# AWJ ERP — تفعيل حسابات B2C افتراضياً للمتاجر التجزئة الجديدة (B2C-DEFAULT)
+
+**الحالة:** جاهز لمراجعة ChatGPT. **لا دمج، لا نشر، لا تغيير لمتغيرات Railway، لا تفعيل لأي متجر قائم.**
+
+## 1. ملخص التغيير
+
+القناة web **التي تُنشأ حديثاً** تبدأ بـ`customer_accounts_enabled = true` ما لم يُرسَل `false` صراحةً. لا هجرة، ولا تغيير لافتراض العمود (`false` يبقى لكل مسار إدخال آخر).
+
+**مسارا الإنشاء المعتمدان (وحدهما يُنشئان قناة web لمتجر تجزئة):**
+
+| المسار | الخدمة | السلوك الجديد |
+|---|---|---|
+| `POST /api/commerce/workspace/storefronts` (التزويد الأول) | `StorefrontProvisioningService::ensureWebSalesChannel` | يُدرج القناة بـ`true` افتراضياً **فقط في فرع الإدراج**؛ التقارب لقناة قائمة يعيدها دون أي تعديل |
+| `POST /api/commerce/workspace/storefronts/create` (متجر إضافي) | `CreateStorefrontForCurrentTenant::create` | يُدرج القناة بـ`true` افتراضياً |
+
+- حقل جديد **اختياري** `customer_accounts_enabled` (boolean، `nullable`) في `ProvisionStorefrontRequest` و`CreateStorefrontRequest`: غائب/`null` ⇒ مفعّل؛ `false` ⇒ يُحترم؛ `true` ⇒ مفعّل؛ غير منطقي ⇒ 422 بلا أي كتابة.
+- المصدر الوحيد للقرار: `App\Services\Commerce\NewRetailChannelDefaults` (`initialCustomerAccountsEnabled` + `createWebChannel`). العمود غير قابل للتعبئة الجماعية عمداً، فيُضبط صراحةً في هذا الملف وحده. اختبار ساكن يضمن أن مستخدميه هما الخدمتان أعلاه فقط.
+
+**قرارات صريحة**
+1. **المفتاح العام يبقى الحَكَم (البند 9):** لا تُلمس `RetailAccountGate` ولا `commerce.retail_accounts_enabled`. القناة المخزَّنة `true` مع المفتاح مغلقاً **بلا وصول فعلي** (`capabilities.customer_accounts=false` وكل مسارات `auth/*`/`account/*` تردّ 404) — مُثبَت باختبار. وحين يُفتح المفتاح لاحقاً تصير المتاجر المنشأة أثناء إغلاقه فعّالة تلقائياً (هذا هو معنى «افتراضي»؛ مذكور في المخاطر).
+2. **الجملة:** لا مسار ينشئ قناة جملة؛ القناة الجديدة دائماً `wholesale_membership_enabled=false`. القنوات الموسومة جملة القائمة لا تُمسّ (مُثبَت)، والقناة غير web تبقى بافتراض العمود وحارس النموذج يرفض `true` عليها (مُثبَت).
+3. **التدقيق:** لا يُكتب `SalesChannelSettingEvent` عند الإنشاء — الحالة الابتدائية ليست تغيير إعداد. أي تغيير لاحق عبر شاشة الإعدادات يُدقَّق كما كان (مُثبَت: حدث واحد بعد PUT).
+4. **أمر `sales-channel:ensure-web` (CLI تشغيلي)** و`DeliveryPlatformConfigService` وفئات الاختبار: بلا تغيير (افتراض العمود `false`).
+5. **الواجهة:** لا تعديل. حوار «إنشاء متجر» لا يرسل الحقل ⇒ الافتراضي مفعّل؛ شاشة «حسابات العملاء» (#1883) تقرأ القيمة المحفوظة وتحفظها كما كانت (مُثبَت بنقطة `pricing-settings` في الاختبار الجديد وباختبارات الواجهة القائمة). إضافة خيار «إلغاء التفعيل عند الإنشاء» في الحوار تحسين لاحق اختياري.
+
+## 2. الملفات
+
+| ملف | تغيير |
+|---|---|
+| `app/Services/Commerce/NewRetailChannelDefaults.php` | جديد — مصدر الافتراضي وإنشاء القناة |
+| `app/Services/Commerce/StorefrontProvisioningService.php` | معامل اختياري + استدعاء المصدر في فرع الإدراج فقط |
+| `app/Services/Commerce/CreateStorefrontForCurrentTenant.php` | معامل اختياري + استدعاء المصدر |
+| `app/Http/Requests/ProvisionStorefrontRequest.php`, `CreateStorefrontRequest.php` | حقل اختياري + مُستخرِج `customerAccountsEnabled()` |
+| `app/Http/Controllers/Api/CommerceWorkspaceStorefrontsController.php` | تمرير القيمة للخدمتين |
+| `tests/Feature/NewRetailStoreAccountsDefaultTest.php` | جديد — 14 اختباراً |
+| `CLAUDE.md` | بند توثيق B2C-DEFAULT |
+
+## 3. الاختبارات
+
+**جديد (14):** المتجر الأول افتراضيه مفعّل وفعّال فعلياً (التسجيل 202 والقدرة `true`) · `false` الصريح يُحترم (التسجيل 404) · `true` مقبول · إعادة التزويد/التقارب لا يعدّل قناة قائمة ولا ينشئ قناة · المتجر الإضافي مفعّل ولا يمسّ المتاجر القائمة (مقارنة حقول وقت التحديث) · `false` الصريح للإضافي · **المفتاح العام مغلق ⇒ لا وصول فعلي ثم يصير فعّالاً عند فتحه** · الجملة والخارجي لا يتأثران وحارس النموذج قائم · المصدر والمستخدمون الوحيدون · افتراض العمود للمسارات الأخرى `false` · tenant_id/sales_channel_id من العميل مُتجاهَلان وقناة مستأجر آخر لا تُمسّ · staff/self_service/ضيف مرفوضون بلا إنشاء شيء · قيمة غير منطقية 422 بلا رسم جزئي · نقطة إعدادات القناة تقرأ القيمة الحقيقية وتحفظ التغيير مع تدقيقه · الإنشاء لا يكتب قيوداً محاسبية.
+
+| الفحص | النتيجة |
+|---|---|
+| `NewRetailStoreAccountsDefaultTest` | 14/14 |
+| `php artisan test` **الكامل** (محلي، sqlite، قبل دمج `main`) | 10285 ناجحاً، 307 متخطّى، **45 إخفاقاً كلها بيئية لا علاقة لها بالتغيير** (انظر أدناه) |
+| إعادة تشغيل المتأثر بعد تثبيت bcmath ومزامنة `contracts/` ودمج `origin/main` (Fuel*، ApplicationCatalog، TenantApplication، PartnerStatement، الميزة الجديدة، MultiStore، CommerceWorkspaceStorefront*، StorefrontProvision*، RetailCustomerAccounts، StaffChannelPricingSettings، CommerceModuleBoundary، BranchIsolationGuard، InventoryReport/Service، ImportJob) | **533 ناجحاً، 7 متخطّى، 0 إخفاق** |
+| إعادة تشغيل `AppTemplateRegistry`/`BuilderLivePointer`/`AppSchemaNavigationShell` بعد مزامنة `contracts/` | 41/41 |
+| Vitest ذو الصلة (customer-accounts، create-store-dialog، stores) | 56/56 |
+| CI على GitHub (على `fbb6c8d`) | **أخضر بالكامل** — انظر القسم 8 |
+
+**تفصيل الإخفاقات البيئية في التشغيل الكامل الأول (حُلّت دون أي تغيير في الكود):**
+- 35 إخفاقاً في اختبارات الفيول: `Call to undefined function bcmul()` — امتداد bcmath غير مثبّت في بيئة الجلسة (تحذّر منه خطوة الإعداد، وهو مثبّت في CI). بعد تثبيته نجحت.
+- 10 إخفاقات (`AppTemplateRegistry`، `BuilderLivePointer`، `AppSchemaNavigationShell`): ملف `contracts/app-builder/archive/*.json` لم أنسخه إلى المشروع المولَّد. بعد المزامنة نجحت.
+- كلتاهما بعيدتان عن ملفات التغيير، ولا يمسّها فرق الـ PR.
+
+لم يُمسّ: الفوترة، القيود، المدفوعات، ZATCA، الدفع كضيف، سلوك الجملة (لا ملف في `Invoice*`/`Ledger*`/`Payment*`/`Zatca*`).
+
+## 4. التوافق الرجعي
+- لا هجرة ولا تغيير بيانات: أي صف قائم يبقى كما هو (مُثبَت بمقارنة الحقول والـ`updated_at`).
+- مستهلكو API القائمون الذين لا يرسلون الحقل: يحصلون على قناة جديدة مفعّلة (التغيير المقصود)، والرد لم يتغير شكلاً.
+- فتح كل شيء يعتمد على المفتاح العام كما قبل.
+
+## 5. المخاطر والمتبقي
+1. **تفعيل مؤجَّل ضمني:** أي متجر يُنشأ والمفتاح العام مغلق سيكون مفعّلاً تلقائياً لحظة فتح المفتاح لاحقاً. هذا مقصود لكنه يستحق علماً عند قرار فتح المفتاح في بيئة لها متاجر جديدة.
+2. **متاجر Beta القائمة** (مثل التي أُنشئت قبل هذا التغيير) تبقى `false` — لا تفعيل آلي (طلبك). تفعيلها يتم من شاشة «حسابات العملاء» لكل متجر.
+3. **حد IP المشترك وجاهزية التفعيل** (B2C-ACTIVATION-READINESS) ما زالا قيدين معلنين لحسابات التجزئة في الإنتاج؛ هذا التغيير لا يعالجهما.
+4. مستأجرون يُنشئون متجرهم الأول عبر مسارات أخرى (CLI/seed) لا يتأثرون — مقصود.
+5. خيار الإيقاف عند الإنشاء متاح عبر API فقط حالياً (لا حقل في حوار الإنشاء).
+
+## 6. Branch / PR / SHAs
+- **Branch:** `feat/b2c-accounts-default-new-retail-stores`
+- **PR:** #1901 — https://github.com/safwan5001-source/Nebrax/pull/1901
+- **Base (بعد التحديث):** `main` @ `511a19e3f384cae9a62c0fc81a6142080fe6a1db` (كان الفرع قد بدأ من `40b6e35`؛ دُمج `main` بلا تعارض، وفرق الـ PR أمامه ملفاتنا التسعة فقط)
+- **Head (كود):** `c044e2814debe4059bc36734a5025410e0e708e8`
+- **Head الذي اختُبر في CI:** `fbb6c8db86dcd977e6cf56cb79a8a2c22a3a0b39` (كود مطابق + تقرير). commit هذا التحديث التوثيقي يليه ولا يغيّر كوداً.
+
+## 7. الإجراء التالي المقترح
+1. مراجعة ChatGPT (التركيز: افتراض `true` مقابل البوابة العامة، وغياب حدث تدقيق عند الإنشاء).
+2. بعد الدمج: إنشاء متجر تجريبي جديد والتحقق أن `GET store/v1/storefront` يعلن `customer_accounts: true` وأن التسجيل يعمل؛ ثم تفعيل المتاجر القائمة (إن رُغب) يدوياً من الشاشة متجراً متجراً.
+3. لاحقاً (اختياري): خيار «تفعيل حسابات العملاء» في حوار إنشاء المتجر.
+
+## 8. نتائج CI الفعلية (PR #1901)
+
+**التشغيل الأول على `fbb6c8db86dcd977e6cf56cb79a8a2c22a3a0b39`:** sqlite ✅ · pgsql ✅ · CI Gate ✅ · Codex بلا ملاحظات.
+
+**التشغيل على `57c6ab679bc5a8fd677d713faa28ececfac9fe1b`** (يضيف commit تقرير فقط؛ الكود مطابق):
+
+| الفحص | المحاولة 1 | المحاولة 2 (إعادة واحدة) |
+|---|---|---|
+| `php artisan test (L11, sqlite)` | ✅ نجح (26 د) | — |
+| `php artisan test (L11, pgsql)` | ❌ فشل اختبار واحد من 10691 | ✅ نجح (26 د) |
+| `CI Gate` | ❌ (تبعاً لـpgsql) | ✅ نجح بعد إعادة التقييم |
+| Codex | ✅ بلا ملاحظات | — |
+| حالة الدمج | `mergeable_state: clean`، لا تعارض | — |
+
+**الفشل الوحيد في المحاولة 1 ليس من هذا الـ PR:** `ReportStatementsTest::account_ledger_lists_movements_with_a_running_balance` (`Failed asserting that -20000 is identical to 115000`). السبب الجذري: `ReportService::postedLines` يرتّب بـ`entry_date` ثم `created_at` (دقة الثانية) **بلا مفتاح فاصل**، والاختبار يُرحّل قيدين في الثانية نفسها فيتبادلان الترتيب أحياناً على Postgres. فرق الـ PR (9 ملفات) لا يمسّ `ReportService` ولا القيود، والكود نفسه اجتاز pgsql على `fbb6c8d` وعلى المحاولة 2، والترتيب موجود كما هو على `main`.
+**الإصلاح المقترح (PR منفصل، غير مضمَّن هنا):** إضافة `->orderBy('e.number')` بعد `e.created_at` في `postedLines` (رقم القيد تسلسلي `JE-YYYY-NNNNN`) مع اختبار بقيدين بالطابع الزمني نفسه. وُثّق في تعليق على الـ PR. **المخاطرة:** الخلل قائم على `main` وقد يصيب أي PR آخر بشكل متقطع.
+
+`web build` لم يُشغَّل لأن الفرق لا يمسّ `web/`. لا تعليقات مراجعة مفتوحة.
+
+**لم يُدمج، ولم يُنشر، ولم يُغيَّر Railway، ولم يُفعَّل أي متجر قائم.** بانتظار مراجعة ChatGPT.
+
+> ملاحظة: commit هذا التحديث التوثيقي (توثيق فقط، بلا كود) سيعيد تشغيل CI على رأسه؛ الكود المُختبَر مطابق لما اجتاز أعلاه.

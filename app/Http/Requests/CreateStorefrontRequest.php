@@ -17,6 +17,8 @@ class CreateStorefrontRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'default_locale' => ['sometimes', 'nullable', 'string', 'in:ar,en'],
+            // B2C-DEFAULT: غيابه/null = تُفعَّل حسابات العملاء للمتجر الجديد؛ false الصريح يُحترم.
+            'customer_accounts_enabled' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 
@@ -33,6 +35,14 @@ class CreateStorefrontRequest extends FormRequest
     public function normalizedName(): string
     {
         return trim((string) $this->validated('name'));
+    }
+
+    /** `null` = لم يُرسَل ⇒ الافتراضي (مفعَّلة)؛ قيمة منطقية صريحة تُحترم كما أُرسلت. */
+    public function customerAccountsEnabled(): ?bool
+    {
+        $value = $this->validated('customer_accounts_enabled');
+
+        return $value === null ? null : (bool) $value;
     }
 
     public function locale(): string

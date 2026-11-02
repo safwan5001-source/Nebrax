@@ -73,6 +73,7 @@ class CommerceWorkspaceStorefrontsController extends ApiController
             $result = $provisioning->provisionFirstStorefrontForCurrentTenant(
                 $request->validated('name'),
                 BusinessVertical::tryFrom((string) $request->validated('business_vertical')),
+                $request->customerAccountsEnabled(),
             );
         } catch (StorefrontBaseDomainMisconfiguredException $e) {
             abort(500, $e->getMessage());
@@ -101,7 +102,7 @@ class CommerceWorkspaceStorefrontsController extends ApiController
         }
 
         try {
-            $store = $creator->create($request->normalizedName(), $request->locale());
+            $store = $creator->create($request->normalizedName(), $request->locale(), $request->customerAccountsEnabled());
         } catch (StorefrontBaseDomainMisconfiguredException $e) {
             abort(500, $e->getMessage());
         } catch (StorefrontHostnameConflictException $e) {

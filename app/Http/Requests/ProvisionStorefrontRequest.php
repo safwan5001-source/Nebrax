@@ -27,6 +27,16 @@ class ProvisionStorefrontRequest extends FormRequest
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
             // FLOWERS-H1: ملف النشاط عند إنشاء متجر جديد فقط (لا يغيّر متجراً قائماً).
             'business_vertical' => ['sometimes', 'nullable', 'string', Rule::in(BusinessVertical::values())],
+            // B2C-DEFAULT: غيابه/null = تُفعَّل حسابات العملاء لقناة المتجر الجديدة؛ false الصريح يُحترم. لا أثر على قناة قائمة.
+            'customer_accounts_enabled' => ['sometimes', 'nullable', 'boolean'],
         ];
+    }
+
+    /** `null` = لم يُرسَل ⇒ الافتراضي (مفعَّلة)؛ قيمة منطقية صريحة تُحترم كما أُرسلت. */
+    public function customerAccountsEnabled(): ?bool
+    {
+        $value = $this->validated('customer_accounts_enabled');
+
+        return $value === null ? null : (bool) $value;
     }
 }
