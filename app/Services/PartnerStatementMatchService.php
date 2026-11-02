@@ -13,6 +13,7 @@ use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Models\User;
 use App\Services\Reporting\PartnerLedgerCandidates;
+use App\Support\PartnerStatementReviewException;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -46,6 +47,7 @@ final class PartnerStatementMatchService
         private readonly PartnerStatementMatchingEngine $engine,
         private readonly PartnerStatementImportService $access,
         private readonly TenantContext $tenant,
+        private readonly PartnerStatementDigest $digest,
     ) {}
 
     // ═══════════════════════════════ التشغيل ═══════════════════════════════
@@ -57,13 +59,18 @@ final class PartnerStatementMatchService
         $source = $this->source($actor, $reconciliation);
         $units = $this->enrich($source['units']);
         $policy = $this->policy($reconciliation);
+        // IMP-PS-A3c: سطور الكشف يجب أن تطابق بصمة الاستيراد (إن وُجدت): تغيير خارج التطبيق ⇒ لا تشغيلة. والبصمة جزء من مفتاح التشغيلة وتُخزَّن عليها.
+        $statementDigest = $this->digest->for((string) $reconciliation->id);
+        if ($reconciliation->lines_digest !== null && $reconciliation->lines_digest !== $statementDigest) {
+            throw new PartnerStatementReviewException('statement_changed', 'سطور الكشف تغيّرت عن بصمة الاستيراد (تعديل خارج التطبيق): لا تُشغَّل مطابقة على بيانات مشكوك فيها.', 409);
+        }
         $result = $this->engine->match($this->lines($reconciliation), $units, $policy, $reconciliation->role);
 
         $runKey = hash('sha256', json_encode([
-            'engine' => PartnerStatementMatchingEngine::VERSION, 'policy' => $policy, 'scope' => $source['scope'], 'fingerprint' => $source['fingerprint'],
+            'engine' => PartnerStatementMatchingEngine::VERSION, 'policy' => $policy, 'scope' => $source['scope'], 'fingerprint' => $source['fingerprint'], 'statement' => $statementDigest,
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
 
-        return DB::transaction(function () use ($actor, $reconciliation, $source, $policy, $result, $runKey): array {
+        return DB::transaction(function () use ($actor, $reconciliation, $source, $policy, $result, $runKey, $statementDigest): array {
             $this->lock($reconciliation->id);
             $existing = PartnerStatementMatchRun::query()->where('reconciliation_id', $reconciliation->id)->where('run_key', $runKey)->first();
             if ($existing !== null) {
@@ -73,6 +80,7 @@ final class PartnerStatementMatchService
             $run = PartnerStatementMatchRun::create([
                 'reconciliation_id' => $reconciliation->id, 'engine_version' => PartnerStatementMatchingEngine::VERSION, 'run_key' => $runKey, 'status' => 'completed',
                 'policy' => $policy, 'scope' => $source['scope'], 'ledger_fingerprint' => $source['fingerprint'], 'counts' => $result['counts'], 'created_by' => $actor->getKey(),
+                'statement_digest' => $statementDigest,
             ]);
 
             $tenantId = (string) $this->tenant->id();

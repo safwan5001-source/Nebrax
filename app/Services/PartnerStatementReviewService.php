@@ -47,6 +47,7 @@ final class PartnerStatementReviewService
     public function __construct(
         private readonly PartnerStatementMatchService $matching,
         private readonly TenantContext $tenant,
+        private readonly PartnerStatementDigest $digest,
     ) {}
 
     // ═══════════════════════════════ الإجراء ═══════════════════════════════
@@ -95,6 +96,10 @@ final class PartnerStatementReviewService
             }
         }
 
+        if ($action === PartnerStatementReviewDecision::ACTION_DISMISS && ($reason === null || mb_strlen($reason) < 3)) {
+            throw new PartnerStatementReviewException('reason_required', 'سبب استبعاد سطر الكشف («غير موجود في دفاترنا») إلزامي (3 محارف على الأقل).');
+        }
+
         $run = $this->run($actor, $reconciliation, (string) ($input['run_id'] ?? ''));
         $line = $this->line($reconciliation, (string) ($input['line_id'] ?? ''));
         $row = PartnerStatementMatch::query()->where('run_id', $run->id)->where('side', 'statement')->where('line_id', $line->id)->first();
@@ -113,9 +118,10 @@ final class PartnerStatementReviewService
             // الدفتر يُقرأ **بعد** أخذ القفل (Codex #1915): ترحيل/عكس يُثبَّت أثناء انتظار القفل لا يتسرّب بلقطة سابقة (`LedgerService` لا يأخذ هذا القفل).
             // يبقى حدّ READ COMMITTED المعلن: ترحيل يُثبَّت بين هذه القراءة والالتزام لا يمنعه قفل المراجعة؛ يظهر القِدَم عند أي قراءة/قرار لاحق.
             $source = $this->matching->source($actor, $reconciliation);
-            $this->assertFresh($run, $reconciliation, $source);
+            $this->assertFresh($run, $reconciliation, $source, $this->digest->for((string) $reconciliation->id));
             $plan = match ($action) {
                 PartnerStatementReviewDecision::ACTION_CLEAR => ['units' => [], 'claims' => [], 'net' => null],
+                PartnerStatementReviewDecision::ACTION_DISMISS => $this->planDismiss($row, $line, $reconciliation),
                 PartnerStatementReviewDecision::ACTION_CONFIRM => $this->planConfirm($row, $reason, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
                 PartnerStatementReviewDecision::ACTION_LINK_PAIR => $this->planPair((string) $requested[0], (string) $member, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
                 default => $this->planOverride($requested, $source, $line, $reconciliation, (bool) ($input['accept_difference'] ?? false)),
@@ -280,11 +286,11 @@ final class PartnerStatementReviewService
     }
 
     /**
-     * التشغيلة يجب أن تطابق الحاضر: لا اعتماد على نتائج قديمة (إصدار المحرّك · السياسة · نطاق الدفتر · بصمة الدفتر).
+     * التشغيلة يجب أن تطابق الحاضر: لا اعتماد على نتائج قديمة (إصدار المحرّك · السياسة · نطاق الدفتر · بصمة الدفتر · بصمة سطور الكشف).
      *
      * @param  array{scope: array<string, mixed>, fingerprint: string}  $source
      */
-    private function assertFresh(PartnerStatementMatchRun $run, PartnerStatementReconciliation $reconciliation, array $source): void
+    public function assertFresh(PartnerStatementMatchRun $run, PartnerStatementReconciliation $reconciliation, array $source, string $statementDigest): void
     {
         $causes = [];
         if ($run->engine_version !== PartnerStatementMatchingEngine::VERSION) {
@@ -299,8 +305,14 @@ final class PartnerStatementReviewService
         if ($run->ledger_fingerprint !== $source['fingerprint']) {
             $causes[] = 'ledger_fingerprint';
         }
+        // IMP-PS-A3c: سطور الكشف نفسها — تشغيلة بلا بصمة (قبل A3c) أو ببصمة مختلفة عن الحاضر ⇒ قديمة (تعديل/حذف/إدراج خارج التطبيق).
+        if ($run->statement_digest === null) {
+            $causes[] = 'statement_digest_missing';
+        } elseif ($run->statement_digest !== $statementDigest) {
+            $causes[] = 'statement_digest';
+        }
         if ($causes !== []) {
-            throw new PartnerStatementReviewException('run_stale', 'نتائج المطابقة قديمة: تغيّر الدفتر أو السياسة أو المحرّك منذ التشغيل. أعد المطابقة ثم راجع.', 409, ['causes' => $causes]);
+            throw new PartnerStatementReviewException('run_stale', 'نتائج المطابقة قديمة: تغيّر الدفتر أو السياسة أو المحرّك أو سطور الكشف منذ التشغيل. أعد المطابقة ثم راجع.', 409, ['causes' => $causes]);
         }
     }
 
@@ -335,6 +347,22 @@ final class PartnerStatementReviewService
         sort($requested);
 
         return ['units' => $requested, 'claims' => $requested, 'net' => $this->net($source, $requested, $line, $reconciliation, $accept)];
+    }
+
+    /**
+     * PS-A3c: «سطر الكشف غير موجود في دفاترنا» — يُقبل فقط حين حكم المحرّك على السطر في هذه التشغيلة `missing_in_books`. الفرق (مبلغ السطر كاملاً مقابل صافٍ صفري) **مقبول صراحةً**
+     * (D-PS-16: السبب إلزامي، يُتحقق منه قبل). لا وحدات ولا ادعاءات، ولا أثر مالي.
+     *
+     * @return array{units: list<string>, claims: list<string>, net: array<string, mixed>}
+     */
+    private function planDismiss(PartnerStatementMatch $row, PartnerStatementLine $line, PartnerStatementReconciliation $reconciliation): array
+    {
+        if ($row->outcome !== 'missing_in_books') {
+            throw new PartnerStatementReviewException('dismiss_requires_missing_in_books', 'الاستبعاد لسطر حكم المحرّك عليه «غير موجود في الدفاتر» (missing_in_books) وحده؛ غيره يُؤكَّد أو يُسند.', 422, ['engine_outcome' => $row->outcome]);
+        }
+
+        // الاستبعاد يقبل مبلغ السطر كله صراحةً مهما كان التسامح (Codex #1939): العلم يُفرض لا يُستنتج من التسامح العادي.
+        return ['units' => [], 'claims' => [], 'net' => ['accepted' => true] + $this->settle(0, $line, $reconciliation, true)];
     }
 
     /**
@@ -560,6 +588,22 @@ final class PartnerStatementReviewService
         }
 
         return false;
+    }
+
+    /**
+     * القرارات الفعّالة (أحدث نسخة غير clear) لكل سطر في المقارنة: `line_id ⇒ قرار`. قراءة لخدمة دورة الحالات (PS-A3c).
+     *
+     * @return array<string, PartnerStatementReviewDecision>
+     */
+    public function effectiveDecisions(string $reconciliationId): array
+    {
+        return $this->effective($this->decisionsOf($reconciliationId));
+    }
+
+    /** قفل المراجعة لكل مقارنة (نفسه للقرارات ودورة الحالات): التزامن بينهما متسلسل. يُستدعى داخل معاملة. */
+    public function lockReconciliation(string $reconciliationId): void
+    {
+        $this->lock($reconciliationId);
     }
 
     private function lock(string $reconciliationId): void

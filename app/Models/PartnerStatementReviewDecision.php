@@ -6,7 +6,7 @@ use App\Tenancy\CompanyWide;
 use LogicException;
 
 /**
- * قرار مراجعة واحد على سطر كشف (IMP-PS-A3a/A3b، `CompanyWide`): confirm | override | clear | link_pair. **سجل append-only**: لا تعديل ولا حذف (يحرسه النموذج والقاعدة)،
+ * قرار مراجعة واحد على سطر كشف (IMP-PS-A3a/A3b، `CompanyWide`): confirm | override | clear | link_pair | dismiss. **سجل append-only**: لا تعديل ولا حذف (يحرسه النموذج والقاعدة)،
  * والقرار الفعّال لسطر = أعلى نسخة له (clear = لا قرار). **لا أثر مالي**: لا قيد ولا مستند ولا رصيد ولا ZATCA — مراجعة لنتائج مشتقة فقط.
  */
 class PartnerStatementReviewDecision extends BaseModel implements CompanyWide
@@ -22,7 +22,10 @@ class PartnerStatementReviewDecision extends BaseModel implements CompanyWide
     /** PS-A3b: ربط يدوي صريح لسطر كشف بأحد طرفي زوج أصل/عكس مثبت بـ`reversal_of`. */
     public const ACTION_LINK_PAIR = 'link_pair';
 
-    public const ACTIONS = [self::ACTION_CONFIRM, self::ACTION_OVERRIDE, self::ACTION_CLEAR, self::ACTION_LINK_PAIR];
+    /** PS-A3c: «سطر الكشف غير موجود في دفاترنا» (محرّك `missing_in_books`) — تسجيل مراجعة بسبب إلزامي، لا أثر مالي. */
+    public const ACTION_DISMISS = 'dismiss';
+
+    public const ACTIONS = [self::ACTION_CONFIRM, self::ACTION_OVERRIDE, self::ACTION_CLEAR, self::ACTION_LINK_PAIR, self::ACTION_DISMISS];
 
     public const MEMBER_ORIGINAL = 'original';
 

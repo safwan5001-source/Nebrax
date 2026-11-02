@@ -20,9 +20,13 @@ class PartnerStatementReconciliation extends BaseModel implements CompanyWide
 
     public const STATUS_DRAFT = 'draft';
 
+    /** IMP-PS-A3c: كل بنود الكشف عولجت بقرارات صريحة على تشغيلة حديثة. `closed` محجوب حتى مطالبات PS-A3d (القاعدة تحصر الحالة بـ draft|reviewed). */
+    public const STATUS_REVIEWED = 'reviewed';
+
     protected $fillable = [
         'tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'status', 'original_filename', 'file_sha256', 'identity_sha256',
         'source_import_job_id', 'line_count', 'total_debit_minor', 'total_credit_minor', 'policy', 'checks', 'created_by',
+        'lines_digest', 'reviewed_at', 'reviewed_by', 'reviewed_run_id',
     ];
 
     protected $casts = [
@@ -33,6 +37,7 @@ class PartnerStatementReconciliation extends BaseModel implements CompanyWide
         'total_credit_minor' => 'integer',
         'policy' => 'array',
         'checks' => 'array',
+        'reviewed_at' => 'datetime',
     ];
 
     public function lines(): HasMany

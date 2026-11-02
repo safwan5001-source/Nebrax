@@ -13,7 +13,7 @@ use LogicException;
 class PartnerStatementMatchRun extends BaseModel implements CompanyWide
 {
     protected $fillable = [
-        'tenant_id', 'reconciliation_id', 'engine_version', 'run_key', 'status', 'policy', 'scope', 'ledger_fingerprint', 'counts', 'created_by',
+        'tenant_id', 'reconciliation_id', 'engine_version', 'run_key', 'status', 'policy', 'scope', 'ledger_fingerprint', 'counts', 'created_by', 'statement_digest',
     ];
 
     protected $casts = ['policy' => 'array', 'scope' => 'array', 'counts' => 'array'];
