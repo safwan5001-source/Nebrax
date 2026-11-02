@@ -46,12 +46,36 @@ export type OrderCancellation = {
  */
 export type CancelAction = { available: boolean; blocked_reason: string | null };
 
+/**
+ * COPS-H1-4/H1-5 — بُعد القبول (مستقل عن دورة الحياة والدفع والتنفيذ). `mode` لقطة الإنشاء (`auto`|`manual`)، و`effective_mode` ما يُنفَّذ الآن
+ * (بوابة القبول مغلقة ⇒ `auto` مهما كانت اللقطة). `accepted_at` يوجد للقبول اليدوي فقط. حقول اختيارية: خادم أقدم لا يرسلها ⇒ لا بيانات قبول تُعرض.
+ */
+export type OrderAcceptance = {
+  mode: string;
+  effective_mode: string;
+  accepted_at: string | null;
+  by?: { id: string; name: string | null } | null;
+};
+
+/** حالة تشغيلية **مشتقّة للعرض فقط** (`CommerceOrderStatusProjector`) — لا تُستعمل شرطاً لإجراء؛ الإجراءات من `accept_action`/`reject_action`/`cancel_action`. */
+export const OPERATIONAL_STATUSES = ['cancelled', 'draft', 'awaiting_payment', 'payment_cancelled', 'awaiting_acceptance', 'accepted'] as const;
+
+/** عقدا قراءة إجراءَي القبول والرفض (استرشاديان، كـ`CancelAction`): غيابهما ⇒ لا إجراء (بوابة مغلقة أو صلاحية ناقصة، ولا يُكشف أيّهما). */
+export type AcceptAction = { available: boolean; blocked_reason: string | null };
+export type RejectAction = { available: boolean; blocked_reason: string | null };
+
+/** سبب الرفض المخزَّن في كتلة الإلغاء (ADR-29 §2.2): إلغاء بسبب `merchant_rejected`. */
+export const REJECTION_REASON = 'merchant_rejected';
+export const REJECTION_NOTE_MAX = 500;
+
 export type OrderSummary = {
   id: string;
   number: string;
   status: string;
   /** `draft|confirmed|cancelled` مشتقّة (O3a-1). غائبة من خادم أقدم ⇒ يُستعمل `status`. */
   lifecycle_status?: string;
+  operational_status?: string;
+  acceptance?: OrderAcceptance;
   cancellation?: OrderCancellation;
   created_at: string | null;
   confirmed_at: string | null;
@@ -91,6 +115,8 @@ export type OrderAttempt = {
 
 export type OrderDetail = OrderSummary & {
   cancel_action?: CancelAction;
+  accept_action?: AcceptAction;
+  reject_action?: RejectAction;
   partner_id: string | null;
   delivery_amount: Money;
   contact: {
@@ -133,6 +159,9 @@ export const ORDERS_SORT_COLUMNS = ['created_at', 'total', 'number'] as const;
 export const ORDERS_Q_MIN = 2;
 export const ORDERS_Q_MAX = 100;
 
+/** مرشّح حالة القبول (H1-5) — يطابق `acceptance_status` في الخادم حرفياً؛ بُعد مستقل عن حالة الدفع والدورة. */
+export const ACCEPTANCE_STATUSES = ['awaiting_acceptance', 'accepted', 'auto'] as const;
+
 export const PAYMENT_STATUSES = ['pending', 'awaiting_collection', 'collected', 'paid', 'cancelled'] as const;
 export const PAYMENT_METHODS = ['cod', 'pay_on_pickup', 'online'] as const;
 export const DELIVERY_METHODS = ['standard', 'pickup'] as const;
@@ -145,6 +174,7 @@ export type OrdersListState = {
   paymentStatus: string;
   paymentMethod: string;
   deliveryMethod: string;
+  acceptanceStatus: string;
   from: string;
   to: string;
   /** `-created_at` | `created_at` | `-total` ... */
@@ -160,6 +190,7 @@ export const DEFAULT_ORDERS_STATE: OrdersListState = {
   paymentStatus: '',
   paymentMethod: '',
   deliveryMethod: '',
+  acceptanceStatus: '',
   from: '',
   to: '',
   sort: '-created_at',
@@ -191,6 +222,7 @@ export function parseOrdersState(params: URLSearchParams): OrdersListState {
     paymentStatus: oneOf(params.get('payment_status'), PAYMENT_STATUSES),
     paymentMethod: oneOf(params.get('payment_method'), PAYMENT_METHODS),
     deliveryMethod: oneOf(params.get('delivery_method'), DELIVERY_METHODS),
+    acceptanceStatus: oneOf(params.get('acceptance_status'), ACCEPTANCE_STATUSES),
     from: DATE.test(from) ? from : '',
     to: DATE.test(to) ? to : '',
     sort: (ORDERS_SORT_COLUMNS as readonly string[]).includes(sortKey) ? sortRaw : DEFAULT_ORDERS_STATE.sort,
@@ -208,6 +240,7 @@ export function serializeOrdersState(state: OrdersListState): URLSearchParams {
   if (state.paymentStatus) p.set('payment_status', state.paymentStatus);
   if (state.paymentMethod) p.set('payment_method', state.paymentMethod);
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
+  if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
   if (state.from) p.set('from', state.from);
   if (state.to) p.set('to', state.to);
   if (state.sort !== DEFAULT_ORDERS_STATE.sort) p.set('sort', state.sort);
@@ -229,6 +262,7 @@ export function buildOrdersQuery(state: OrdersListState, storefrontId: string | 
   if (state.paymentStatus) p.set('payment_status', state.paymentStatus);
   if (state.paymentMethod) p.set('payment_method', state.paymentMethod);
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
+  if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
   if (state.from) p.set('from', state.from);
   if (state.to && (!state.from || state.to >= state.from)) p.set('to', state.to);
   p.set('sort', state.sort.replace(/^-/, ''));
@@ -263,4 +297,21 @@ export function needsAccountingWarning(order: Pick<OrderDetail, 'accounting' | '
 /** حالة دورة الحياة المعروضة: المشتقّة من الخادم إن وُجدت وإلا `status` الخام. */
 export function lifecycleOf(order: Pick<OrderSummary, 'status' | 'lifecycle_status'>): string {
   return order.lifecycle_status ?? order.status;
+}
+
+/**
+ * شارة القبول للعرض: **مشتقّة من حقائق القبول** لا من الدفع. `null` ⇒ لا شارة (لا بيانات قبول من خادم أقدم، أو حالة لا تخص القبول مثل
+ * طلب بانتظار الدفع الإلكتروني أو ملغى بسبب غير الرفض). الترتيب: رفض التاجر ← قبول يدوي ← بانتظار القبول ← قبول تلقائي.
+ */
+export type AcceptanceBadgeKind = 'rejected' | 'accepted' | 'awaiting' | 'auto';
+
+export function acceptanceBadgeOf(order: Pick<OrderSummary, 'acceptance' | 'operational_status' | 'cancellation'>): AcceptanceBadgeKind | null {
+  if (order.cancellation?.cancelled && order.cancellation.reason === REJECTION_REASON) return 'rejected';
+  const acceptance = order.acceptance;
+  if (!acceptance) return null;
+  if (acceptance.accepted_at) return 'accepted';
+  if (order.operational_status === 'awaiting_acceptance') return 'awaiting';
+  if (order.operational_status === 'accepted' && acceptance.effective_mode === 'auto') return 'auto';
+
+  return null;
 }

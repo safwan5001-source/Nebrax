@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { ClipboardList, TriangleAlert } from 'lucide-react';
@@ -11,12 +11,14 @@ import { formatDateTime } from '@/lib/formatting';
 import { useCan } from '@/lib/use-can';
 import { ACTIVE_STORE_QUERY_PARAM, withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
+import { acceptOrder, classifyAcceptError, failureMeansStale, type AcceptFailure } from './accept-order';
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { classifyOrdersError, lifecycleOf, type OrderAddress, type OrderDetail } from './contract';
 import { ordersMessages, type OrdersMessageKey } from './messages';
-import { OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
+import { AcceptanceBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrder } from './orders-api';
 import { ORDERS_LIST_QUERY_KEY } from './orders-list';
+import { RejectOrderDialog } from './reject-order-dialog';
 
 function savedListQuery(): string {
   try {
@@ -52,6 +54,18 @@ export function OrderDetailView({ id }: { id: string }) {
   const { can } = useCan();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [justCancelled, setJustCancelled] = useState(false);
+  // COPS-H1-5: قبول التاجر ورفضه. القفل المتزامن بـ`useRef` يمنع إرسالاً مكرراً في الإطار نفسه (النقرتان قبل أن يُعاد الرسم).
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptFailure, setAcceptFailure] = useState<AcceptFailure | null>(null);
+  const [justAccepted, setJustAccepted] = useState(false);
+  const [justRejected, setJustRejected] = useState(false);
+  const acceptInFlight = useRef(false);
+  // قفل حالة قديمة على مستوى الأب (مراجعة Codex P2): بعد 409/404/شبكة تُعطَّل كل إجراءات الطلب (قبول/رفض/إلغاء) حتى يصل تفصيل جديد من الخادم،
+  // فلا يُعاد استعمال أهلية معروفة بأنها قديمة لا بإغلاق حوار وإعادة فتحه ولا بانتهاء طلب القبول. فشل التحديث يُبقي القفل ويعرض إعادة تحديث صريحة.
+  const [stale, setStale] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const refreshSeq = useRef(0);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -72,17 +86,58 @@ export function OrderDetailView({ id }: { id: string }) {
 
   useEffect(() => load(), [load]);
 
-  /** تحديث صامت من الخادم (بعد سباق 409/شبكة): لا يعيد شاشة التحميل ولا يمسح البيانات الحالية إن فشل. */
-  const refresh = useCallback(() => {
-    fetchOrder(id)
-      .then((result) => setOrder(result))
-      .catch((error) => {
-        if (classifyOrdersError(error) === 'not_found') {
-          setOrder(null);
-          setErrorKind('not_found');
-        }
-      });
+  /**
+   * تحديث من الخادم (بعد سباق 409/شبكة): لا يعيد شاشة التحميل ولا يمسح البيانات الحالية إن فشل. ينجح ⇒ يُرفع قفل الحالة القديمة؛ يفشل ⇒ يبقى القفل
+   * ويظهر زر إعادة التحديث. استجابة أقدم من أحدث طلب تُهمَل (لا تعيد بيانات أقدم).
+   */
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const seq = ++refreshSeq.current;
+    try {
+      const result = await fetchOrder(id);
+      if (seq !== refreshSeq.current) return false;
+      setOrder(result);
+      setStale(false);
+      setRefreshFailed(false);
+      return true;
+    } catch (error) {
+      if (seq !== refreshSeq.current) return false;
+      if (classifyOrdersError(error) === 'not_found') {
+        setOrder(null);
+        setErrorKind('not_found');
+      } else {
+        setRefreshFailed(true);
+      }
+      return false;
+    }
   }, [id]);
+
+  /** يُستدعى عند حالة قديمة/غير مؤكَّدة من أي إجراء (قبول أو حوار رفض/إلغاء): قفل فوري ثم تحديث. */
+  const markStale = useCallback(() => {
+    setStale(true);
+    setRefreshFailed(false);
+    void refresh();
+  }, [refresh]);
+
+  const handleAccept = useCallback(async () => {
+    // يقبل **الطلب المعروض** نفسه (كحواري الإلغاء والرفض: `order.id`)، لا معرّف المسار الخام.
+    if (acceptInFlight.current || stale || order === null) return;
+    acceptInFlight.current = true;
+    setAccepting(true);
+    setAcceptFailure(null);
+    try {
+      const updated = await acceptOrder(order.id);
+      setOrder(updated);
+      setJustAccepted(true);
+    } catch (error) {
+      const failed = classifyAcceptError(error);
+      setAcceptFailure(failed);
+      // الحالة تغيّرت أو غير مؤكَّدة (409/404/شبكة): نحدّث من الخادم فيختفي الإجراء أو يظهر بحالته الجديدة، ولا نُعيد المحاولة على بيانات قديمة.
+      if (failureMeansStale(failed)) markStale();
+    } finally {
+      acceptInFlight.current = false;
+      setAccepting(false);
+    }
+  }, [order, stale, markStale]);
 
   const backHref = useMemo(() => {
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : savedListQuery());
@@ -110,6 +165,18 @@ export function OrderDetailView({ id }: { id: string }) {
   const cancelAction = order.cancel_action;
   const canCancel = can('commerce.orders.cancel') && cancelAction?.available === true && !isCancelled;
   const cancelBlocked = !isCancelled && can('commerce.orders.cancel') && cancelAction?.available === false ? cancelAction.blocked_reason : undefined;
+  // COPS-H1-5: إجراءا القبول والرفض بالعقد نفسه (استرشاديان؛ الخادم يحكم). الرفض يستبدل «الإلغاء» أثناء انتظار القبول فلا يظهر الاثنان معاً.
+  const canManage = can('commerce.orders.manage');
+  const canAccept = canManage && order.accept_action?.available === true && !isCancelled;
+  const canReject = canManage && can('commerce.orders.cancel') && order.reject_action?.available === true && !isCancelled;
+  const awaitingManual = !isCancelled && order.acceptance?.effective_mode === 'manual' && !order.acceptance.accepted_at;
+  const ACCEPT_BLOCKERS = ['payment_pending', 'payment_not_ready', 'not_confirmed'];
+  const acceptBlocked =
+    awaitingManual && canManage && order.accept_action?.available === false && ACCEPT_BLOCKERS.includes(order.accept_action.blocked_reason ?? '')
+      ? order.accept_action.blocked_reason
+      : undefined;
+  const showCancelButton = canCancel && !canReject;
+  const hasAcceptContract = order.accept_action !== undefined || order.reject_action !== undefined;
   const isPickup = order.delivery_method === 'pickup';
   const money = formatOrderMoney;
 
@@ -289,6 +356,26 @@ export function OrderDetailView({ id }: { id: string }) {
         </div>
       ),
     },
+    ...(order.acceptance
+      ? [
+          {
+            id: 'acceptance',
+            title: t('sectionAcceptance'),
+            content: (
+              <DefinitionGrid
+                rows={[
+                  [t('acceptanceMode'), label('acceptanceModeValue', order.acceptance.mode)],
+                  ...(order.acceptance.effective_mode !== order.acceptance.mode
+                    ? ([[t('acceptanceEffective'), label('acceptanceModeValue', order.acceptance.effective_mode)]] as [string, string | null][])
+                    : []),
+                  [t('acceptanceAt'), order.acceptance.accepted_at ? formatDateTime(order.acceptance.accepted_at, locale) : null, true],
+                  [t('acceptanceBy'), order.acceptance.by?.name],
+                ]}
+              />
+            ),
+          } satisfies DetailSection,
+        ]
+      : []),
     ...(isCancelled
       ? [
           {
@@ -318,18 +405,33 @@ export function OrderDetailView({ id }: { id: string }) {
         <>
           <OrderStatusBadge status={lifecycle} locale={locale} />
           <PaymentStatusBadge status={order.payment.status} locale={locale} />
+          <AcceptanceBadge order={order} locale={locale} />
         </>
       }
       meta={
         <span>
-          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {cancelAction && !isCancelled ? t('cancelEnabledNote') : t('readOnlyNote')}
+          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {hasAcceptContract && !isCancelled ? t('actionsNote') : cancelAction && !isCancelled ? t('cancelEnabledNote') : t('readOnlyNote')}
         </span>
       }
       actionsSlot={
-        canCancel ? (
-          <Button type="button" variant="danger" onClick={() => setCancelOpen(true)}>
-            {t('cancelAction')}
-          </Button>
+        canAccept || canReject || showCancelButton ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {canAccept ? (
+              <Button type="button" onClick={() => void handleAccept()} disabled={accepting || stale} aria-disabled={accepting || stale} aria-busy={accepting}>
+                {accepting ? t('acceptSubmitting') : t('acceptAction')}
+              </Button>
+            ) : null}
+            {canReject ? (
+              <Button type="button" variant="danger" onClick={() => setRejectOpen(true)} disabled={accepting || stale}>
+                {t('rejectAction')}
+              </Button>
+            ) : null}
+            {showCancelButton ? (
+              <Button type="button" variant="danger" onClick={() => setCancelOpen(true)} disabled={stale}>
+                {t('cancelAction')}
+              </Button>
+            ) : null}
+          </div>
         ) : undefined
       }
       alert={
@@ -338,6 +440,43 @@ export function OrderDetailView({ id }: { id: string }) {
             <div role="status">
               <FormAlert tone="info">{t('cancelSuccess')}</FormAlert>
             </div>
+          ) : null}
+          {stale ? (
+            <div role="status">
+              <FormAlert tone="warning">
+                <p>{refreshFailed ? t('staleRefreshFailed') : t('staleSyncing')}</p>
+                {refreshFailed ? (
+                  <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => void refresh()}>
+                    {t('staleRetry')}
+                  </Button>
+                ) : null}
+              </FormAlert>
+            </div>
+          ) : null}
+          {justAccepted ? (
+            <div role="status">
+              <FormAlert tone="info">{t('acceptSuccess')}</FormAlert>
+            </div>
+          ) : null}
+          {justRejected ? (
+            <div role="status">
+              <FormAlert tone="info">{t('rejectSuccess')}</FormAlert>
+            </div>
+          ) : null}
+          {acceptFailure !== null ? (
+            <div role="alert">
+              <FormAlert tone="error">
+                {label('acceptError', acceptFailure.kind)}
+                {acceptFailure.reason && label('blocked', acceptFailure.reason) !== acceptFailure.reason ? ` ${label('blocked', acceptFailure.reason)}` : ''}
+              </FormAlert>
+            </div>
+          ) : null}
+          {canAccept && awaitingManual ? <FormAlert tone="info">{t('acceptAwaitingNote')}</FormAlert> : null}
+          {acceptBlocked !== undefined ? (
+            <FormAlert tone="warning">
+              <p className="font-medium text-text">{t('acceptBlockedTitle')}</p>
+              <p className="mt-1 text-muted">{label('blocked', acceptBlocked)}</p>
+            </FormAlert>
           ) : null}
           {isCancelled ? <FormAlert tone="info">{t('cancelledBanner')}</FormAlert> : null}
           {cancelBlocked !== undefined ? (
@@ -370,6 +509,20 @@ export function OrderDetailView({ id }: { id: string }) {
     >
       {/* يُركَّب عند كل فتح ويُفكّ عند الإغلاق: حالة الحوار (القفل، الأخطاء، الحقول) لا تعبر من محاولة قديمة إلى فتح جديد بعد تحديث الأهلية، ويبقى
           مركَّباً طوال فتحه حتى لو اختفى الإجراء بعد تحديث الحالة (سباق 409) فلا تضيع رسالة الرفض. */}
+      {rejectOpen ? (
+        <RejectOrderDialog
+          open={rejectOpen}
+          orderId={order.id}
+          orderNumber={order.number}
+          onClose={() => setRejectOpen(false)}
+          onRejected={(updated) => {
+            setOrder(updated);
+            setRejectOpen(false);
+            setJustRejected(true);
+          }}
+          onStale={markStale}
+        />
+      ) : null}
       {cancelOpen ? (
         <CancelOrderDialog
           open={cancelOpen}
@@ -381,7 +534,7 @@ export function OrderDetailView({ id }: { id: string }) {
             setCancelOpen(false);
             setJustCancelled(true);
           }}
-          onStale={refresh}
+          onStale={markStale}
         />
       ) : null}
     </DetailPage>

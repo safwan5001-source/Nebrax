@@ -728,6 +728,143 @@ class CommerceOrderAcceptanceTest extends TestCase
         $this->assertSame(['new_order'], $closed[$recent->id]['reasons']);
     }
 
+    // ═════════════════════════ 7) COPS-H1-5 — مرشّح acceptance_status ═════════════════════════
+
+    private function listIds(string $query = '', ?string $token = null): array
+    {
+        return collect($this->withToken($token ?? $this->ownerToken)->getJson('/api/commerce/orders?per_page=50'.$query)->assertOk()->json('data'))->pluck('id')->all();
+    }
+
+    /** يبني مجموعة طلبات تغطي كل المسارات: بانتظار القبول، مقبول، تلقائي، يدوي غير مدفوع، مرفوض، يدوي مدفوع إلكترونياً. */
+    private function acceptanceWorld(): array
+    {
+        $awaiting = $this->order();
+        $paidOnline = $this->order(CommercePaymentIntent::STATUS_PAID, method: CommercePaymentIntent::METHOD_ONLINE);
+        $accepted = $this->order();
+        $this->accept($accepted->id)->assertOk();
+        $auto = $this->order(mode: null);
+        $unpaid = $this->order(CommercePaymentIntent::STATUS_PENDING, method: CommercePaymentIntent::METHOD_ONLINE);
+        $rejected = $this->order();
+        $this->reject($rejected->id)->assertOk();
+
+        return compact('awaiting', 'paidOnline', 'accepted', 'auto', 'unpaid', 'rejected');
+    }
+
+    #[Test]
+    public function the_acceptance_filter_matches_the_projected_status_exactly_and_never_conflates_payment(): void
+    {
+        $w = $this->acceptanceWorld();
+
+        $awaiting = $this->listIds('&acceptance_status=awaiting_acceptance');
+        $this->assertEqualsCanonicalizing([$w['awaiting']->id, $w['paidOnline']->id], $awaiting);
+        $this->assertNotContains($w['unpaid']->id, $awaiting, 'يدوي غير مدفوع: awaiting_payment وليس awaiting_acceptance');
+        $this->assertNotContains($w['rejected']->id, $awaiting);
+
+        // توازٍ مع المُسقِط حرفياً: كل طلب في النتيجة مُسقَطه awaiting_acceptance، وكل طلب مُسقَطه awaiting_acceptance في النتيجة.
+        foreach ($w as $order) {
+            $projected = CommerceOrderStatusProjector::project($this->fresh($order->id));
+            $this->assertSame($projected === 'awaiting_acceptance', in_array($order->id, $awaiting, true), $order->id.' '.$projected);
+        }
+
+        $this->assertSame([$w['accepted']->id], $this->listIds('&acceptance_status=accepted'));
+        $auto = $this->listIds('&acceptance_status=auto');
+        $this->assertContains($w['auto']->id, $auto);
+        $this->assertNotContains($w['accepted']->id, $auto);
+        $this->assertNotContains($w['awaiting']->id, $auto, 'البوابة مفتوحة: اليدوي غير المقبول ليس تلقائياً');
+    }
+
+    #[Test]
+    public function the_acceptance_filter_follows_the_gate_and_never_returns_awaiting_when_closed(): void
+    {
+        $w = $this->acceptanceWorld();
+        config(['commerce.order_acceptance_enabled' => false]);
+
+        $this->assertSame([], $this->listIds('&acceptance_status=awaiting_acceptance'));
+        $auto = $this->listIds('&acceptance_status=auto');
+        $this->assertContains($w['awaiting']->id, $auto, 'البوابة مغلقة ⇒ اليدوي غير المقبول تلقائي فعّالاً (كالمُسقِط)');
+        $this->assertContains($w['auto']->id, $auto);
+        $this->assertNotContains($w['accepted']->id, $auto);
+        $this->assertSame([$w['accepted']->id], $this->listIds('&acceptance_status=accepted'), 'الحقيقة المخزَّنة لا تتأثر بالبوابة');
+        foreach ([$w['awaiting'], $w['auto']] as $order) {
+            $this->assertSame('accepted', CommerceOrderStatusProjector::project($this->fresh($order->id)));
+        }
+    }
+
+    #[Test]
+    public function the_acceptance_filter_is_validated_and_composes_with_existing_filters_and_pagination(): void
+    {
+        $w = $this->acceptanceWorld();
+        foreach (range(1, 4) as $i) {
+            $this->order();
+        }
+
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=rejected')->assertUnprocessable();
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status[]=accepted')->assertUnprocessable();
+
+        // مع مرشّح الدفع: COD فقط.
+        $cod = $this->listIds('&acceptance_status=awaiting_acceptance&payment_method=cod');
+        $this->assertNotContains($w['paidOnline']->id, $cod);
+        $this->assertContains($w['awaiting']->id, $cod);
+
+        // ترقيم: المجموع من الخادم يطابق عدد المطابِقين، والصفحات لا تكرّر.
+        $page1 = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance&per_page=2&page=1')->assertOk();
+        $page2 = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance&per_page=2&page=2')->assertOk();
+        $this->assertSame(6, $page1->json('meta.total'));
+        $this->assertSame(3, $page1->json('meta.last_page'));
+        $this->assertSame([], array_intersect(array_column($page1->json('data'), 'id'), array_column($page2->json('data'), 'id')));
+        foreach ($page1->json('data') as $row) {
+            $this->assertSame('awaiting_acceptance', $row['operational_status']);
+        }
+
+        // مرشّح الدورة المشتقّة يتركّب: المرفوض ملغى فلا يظهر بانتظار القبول أبداً.
+        $this->assertNotContains($w['rejected']->id, $this->listIds('&acceptance_status=awaiting_acceptance&lifecycle_status=cancelled'));
+    }
+
+    #[Test]
+    public function the_acceptance_filter_keeps_tenant_isolation_and_rbac(): void
+    {
+        $w = $this->acceptanceWorld();
+        ['tenant' => $other] = $this->makeStore('other-filter.test', 'other-filter');
+        $this->enableApplications($other);
+        $foreign = $this->tokenFor($other, 'owner');
+
+        $this->assertSame([], $this->listIds('&acceptance_status=awaiting_acceptance', $foreign), 'مستأجر آخر لا يرى طلباتنا');
+        $this->assertSame([], $this->listIds('&acceptance_status=accepted', $foreign));
+
+        $this->withToken($this->tokenFor($this->tenant, 'accountant'))->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertForbidden();
+        $this->flushHeaders()->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertUnauthorized();
+
+        $restricted = $this->tokenFor($this->tenant, 'admin', 'restricted-filter@accept.test');
+        app(TenantContext::class)->set($this->tenant->id);
+        User::where('email', 'restricted-filter@accept.test')->firstOrFail()->warehouses()->attach($this->warehouse->id);
+        app(TenantContext::class)->forget();
+        $this->withToken($restricted)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertForbidden();
+        $this->assertNotEmpty($w);
+    }
+
+    #[Test]
+    public function the_acceptance_filter_adds_no_query_per_row_and_is_read_only(): void
+    {
+        $this->acceptanceWorld();
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertOk(); // تسخين
+        DB::enableQueryLog();
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertOk();
+        $few = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        foreach (range(1, 5) as $i) {
+            $this->order();
+        }
+        $snapshot = [DB::table('commerce_orders')->count(), DB::table('commerce_order_events')->count(), $this->counts()];
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?acceptance_status=awaiting_acceptance')->assertOk();
+        $many = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame($few, $many, 'لا استعلام لكل صف');
+        $this->assertSame($snapshot, [DB::table('commerce_orders')->count(), DB::table('commerce_order_events')->count(), $this->counts()], 'قراءة فقط');
+    }
+
     #[Test]
     public function the_feed_carries_the_acceptance_event_in_commit_order(): void
     {

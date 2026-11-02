@@ -63,3 +63,40 @@ export function detailFixture(over: Partial<OrderDetail> = {}): OrderDetail {
     ...over,
   } as OrderDetail;
 }
+
+/** COPS-H1-5: طلب COD بانتظار القبول اليدوي مع عقدَي القبول والرفض (مالك: الاثنان متاحان). */
+export function awaitingFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'awaiting_acceptance',
+    acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: null },
+    accept_action: { available: true, blocked_reason: null },
+    reject_action: { available: true, blocked_reason: null },
+    cancel_action: { available: true, blocked_reason: null },
+    ...over,
+  });
+}
+
+export function acceptedFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'accepted',
+    acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: '2026-11-02T10:30:00+03:00', by: { id: 'u1', name: 'المشرف' } },
+    accept_action: { available: false, blocked_reason: 'already_accepted' },
+    reject_action: { available: false, blocked_reason: 'already_accepted' },
+    cancel_action: { available: true, blocked_reason: null },
+    ...over,
+  });
+}
+
+export function rejectedFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    lifecycle_status: 'cancelled',
+    operational_status: 'cancelled',
+    acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: null },
+    cancellation: { cancelled: true, at: '2026-11-02T10:40:00+03:00', reason: 'merchant_rejected', note: 'خارج نطاق التوصيل', by: { id: 'u1', name: 'المشرف' } },
+    payment: { ...detailFixture().payment, status: 'cancelled', cancelled_at: '2026-11-02T10:40:00+03:00' },
+    accept_action: { available: false, blocked_reason: 'already_cancelled' },
+    reject_action: { available: false, blocked_reason: 'already_cancelled' },
+    cancel_action: { available: false, blocked_reason: 'already_cancelled' },
+    ...over,
+  });
+}

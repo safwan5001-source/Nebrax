@@ -9,7 +9,9 @@ use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Commerce\CommerceOrderAttentionQuery;
 use App\Services\Commerce\CommerceOrderLifecycleService;
+use App\Services\Commerce\CommerceOrderStatusProjector;
 use App\Support\CommerceOrderStaffSerializer;
 use App\Tenancy\TenantContext;
 use Carbon\Carbon;
@@ -35,6 +37,9 @@ class CommerceStaffOrderController extends ApiController
 
     private const SORTS = ['created_at', 'total', 'number'];
 
+    /** COPS-H1-5: `awaiting_acceptance` بانتظار قبول يدوي · `accepted` قُبل يدوياً · `auto` قبوله تلقائي (ضمني). */
+    public const ACCEPTANCE_STATUSES = ['awaiting_acceptance', 'accepted', 'auto'];
+
     public function index(Request $request): JsonResponse
     {
         $this->guard($request);
@@ -45,6 +50,8 @@ class CommerceStaffOrderController extends ApiController
             'sales_channel_id' => ['sometimes', 'uuid'],
             'status' => ['sometimes', Rule::in([CommerceOrder::STATUS_DRAFT, CommerceOrder::STATUS_CONFIRMED])],
             'lifecycle_status' => ['sometimes', Rule::in([CommerceOrder::STATUS_DRAFT, CommerceOrder::STATUS_CONFIRMED, CommerceOrder::LIFECYCLE_CANCELLED])],
+            // COPS-H1-5: مرشّح حالة القبول التشغيلية (بُعد مستقل عن الدورة والدفع والتنفيذ). انظر {@see self::applyAcceptanceFilter()}.
+            'acceptance_status' => ['sometimes', Rule::in(self::ACCEPTANCE_STATUSES)],
             'payment_status' => ['sometimes', Rule::in([
                 CommercePaymentIntent::STATUS_PENDING,
                 CommercePaymentIntent::STATUS_AWAITING_COLLECTION,
@@ -157,6 +164,9 @@ class CommerceStaffOrderController extends ApiController
                 $query->where('status', $f['lifecycle_status'])->whereNull('cancelled_at');
             }
         }
+        if (isset($f['acceptance_status'])) {
+            $this->applyAcceptanceFilter($query, $f['acceptance_status']);
+        }
         if (isset($f['payment_status']) || isset($f['payment_method'])) {
             $query->whereHas('paymentIntent', function (Builder $q) use ($f): void {
                 if (isset($f['payment_status'])) {
@@ -184,6 +194,36 @@ class CommerceStaffOrderController extends ApiController
                         ->orWhere('email', 'like', $like));
             });
         }
+    }
+
+    /**
+     * COPS-H1-5 — مرشّح حالة القبول **من الحقائق الأصلية** (لا من عمود حالة): يطابق {@see CommerceOrderStatusProjector} حرفياً لـ`awaiting_acceptance`
+     * (مؤكَّد · غير ملغى · لقطة `manual` والبوابة مفتوحة · لم يُقبل · الدفع جاهز بقائمة R-5 الواحدة). لا يخلط الدفع بالقبول: الطلب اليدوي غير المدفوع
+     * إلكترونياً لا يظهر في أي من الثلاثة (حالته `awaiting_payment` في المُسقِط).
+     *
+     *  - `awaiting_acceptance`: كما سبق.
+     *  - `accepted`: قُبل يدوياً (`accepted_at` موجود) — حقيقة ثابتة لا تتأثر بالبوابة.
+     *  - `auto`: قبوله ضمني — لم يُقبل يدوياً ولا يحتاج قبولاً الآن: لقطة NULL (التاريخي وما أُنشئ والبوابة مغلقة) أو لقطة `manual` والبوابة مغلقة.
+     */
+    private function applyAcceptanceFilter(Builder $query, string $status): void
+    {
+        $gateOpen = (bool) config('commerce.order_acceptance_enabled');
+
+        match ($status) {
+            'awaiting_acceptance' => $gateOpen
+                ? $query->where('status', CommerceOrder::STATUS_CONFIRMED)
+                    ->whereNull('cancelled_at')
+                    ->where('acceptance_mode', CommerceOrder::ACCEPTANCE_MANUAL)
+                    ->whereNull('accepted_at')
+                    ->whereHas('paymentIntent', fn (Builder $q) => $q->whereIn('status', CommerceOrderAttentionQuery::PAYMENT_READY))
+                : $query->whereRaw('1 = 0'),
+            'accepted' => $query->whereNotNull('accepted_at'),
+            default => $query->whereNull('accepted_at')->where(
+                fn (Builder $q) => $gateOpen
+                    ? $q->whereNull('acceptance_mode')
+                    : $q->whereNull('acceptance_mode')->orWhere('acceptance_mode', CommerceOrder::ACCEPTANCE_MANUAL)
+            ),
+        };
     }
 
     public function guard(Request $request): void

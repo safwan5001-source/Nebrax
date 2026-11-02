@@ -224,13 +224,17 @@ describe('OrdersList', () => {
     expect(screen.queryByText('CORD-OLD')).toBeNull();
   });
 
-  it('exposes no write actions', async () => {
+  it('exposes no write actions (the awaiting-acceptance chip is a server filter toggle, not an action)', async () => {
     render(<OrdersList />);
     await waitFor(() => screen.getAllByText('CORD-100'));
-    const names = [...screen.getAllByRole('button'), ...screen.getAllByRole('link')].map((el) => (el.textContent ?? '') + (el.getAttribute('aria-label') ?? ''));
-    for (const word of ['قبول', 'إلغاء', 'تحصيل', 'شحن', 'تجهيز', 'فاتورة']) {
+    const interactive = [...screen.getAllByRole('button'), ...screen.getAllByRole('link')];
+    const names = interactive.map((el) => (el.textContent ?? '') + (el.getAttribute('aria-label') ?? ''));
+    // COPS-H1-5: القبول/الرفض على التفاصيل فقط؛ القائمة بلا أي إجراء كتابة.
+    for (const word of ['قبول الطلب', 'رفض', 'إلغاء', 'تحصيل', 'شحن', 'تجهيز', 'فاتورة']) {
       expect(names.some((n) => n.includes(word)), word).toBe(false);
     }
+    const chip = interactive.find((el) => el.textContent === 'بانتظار القبول');
+    expect(chip?.getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('form')).toBeNull();
   });
 
@@ -263,6 +267,114 @@ describe('OrdersList', () => {
     await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
     const channel = screen.getByLabelText('قناة البيع');
     expect(within(channel).getAllByRole('option').map((o) => o.textContent)).toEqual(['كل القنوات', 'زهور طيبة', 'زهور الرشد']);
+  });
+
+  describe('acceptance status (COPS-H1-5)', () => {
+    const awaitingRow = () =>
+      summaryFixture({
+        id: '22222222-2222-4222-8222-222222222222', number: 'CORD-200', operational_status: 'awaiting_acceptance',
+        acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: null },
+      });
+    const acceptedRow = () =>
+      summaryFixture({
+        id: '33333333-3333-4333-8333-333333333333', number: 'CORD-300', operational_status: 'accepted',
+        acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: '2026-11-02T10:00:00+03:00' },
+      });
+    const rejectedRow = () =>
+      summaryFixture({
+        id: '44444444-4444-4444-8444-444444444444', number: 'CORD-400', lifecycle_status: 'cancelled', operational_status: 'cancelled',
+        acceptance: { mode: 'manual', effective_mode: 'manual', accepted_at: null },
+        cancellation: { cancelled: true, at: '2026-11-02T10:00:00+03:00', reason: 'merchant_rejected' },
+      });
+
+    it('shows the acceptance badge as a separate dimension beside the order and payment badges (desktop and mobile)', async () => {
+      fetchOrdersMock.mockResolvedValue(page([awaitingRow(), acceptedRow(), rejectedRow(), summaryFixture({ number: 'CORD-100' })]));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-200'));
+      expect(screen.getAllByText('بانتظار القبول').length).toBeGreaterThanOrEqual(3); // chip + جدول + بطاقة جوال
+      expect(screen.getAllByText('مقبول').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText('مرفوض').length).toBeGreaterThanOrEqual(2);
+      // الدفع والطلب ما زالا شارتين مستقلتين؛ ولا شارة قبول لطلب بلا بيانات قبول.
+      expect(screen.getAllByText('بانتظار التحصيل').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('مؤكَّد').length).toBeGreaterThan(0);
+      const plain = screen.getAllByText('CORD-100')[0].closest('tr');
+      expect(plain?.textContent).not.toMatch(/بانتظار القبول|مقبول|مرفوض|قبول تلقائي/);
+    });
+
+    it('offers the three server-side values in the filter and sends the chosen one as a separate param', async () => {
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      const select = screen.getByLabelText('حالة القبول');
+      expect(within(select).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['', 'awaiting_acceptance', 'accepted', 'auto']);
+      fireEvent.change(select, { target: { value: 'accepted' } });
+      const url = lastUrl();
+      expect(url.searchParams.get('acceptance_status')).toBe('accepted');
+      expect(url.searchParams.has('payment_status')).toBe(false);
+      expect(url.searchParams.has('page')).toBe(false);
+    });
+
+    it('reads the filter from the URL, sends it to the API next to the other filters, and ignores an unknown value', async () => {
+      nav.search = 'acceptance_status=awaiting_acceptance&payment_status=awaiting_collection&page=2';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(Object.fromEntries(lastQuery())).toMatchObject({ acceptance_status: 'awaiting_acceptance', payment_status: 'awaiting_collection', page: '2', storefront_id: 's1' });
+      expect((screen.getByLabelText('حالة القبول') as HTMLSelectElement).value).toBe('awaiting_acceptance');
+
+      cleanup();
+      fetchOrdersMock.mockClear();
+      nav.search = 'acceptance_status=hacked';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().has('acceptance_status')).toBe(false);
+    });
+
+    it('the quick awaiting-acceptance chip toggles the same server filter and reflects it with aria-pressed', async () => {
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      const chip = () => screen.getByRole('button', { name: 'بانتظار القبول' });
+      expect(chip().getAttribute('aria-pressed')).toBe('false');
+      fireEvent.click(chip());
+      expect(lastUrl().searchParams.get('acceptance_status')).toBe('awaiting_acceptance');
+
+      cleanup();
+      nav.search = 'acceptance_status=awaiting_acceptance';
+      render(<OrdersList />);
+      await waitFor(() => screen.getByRole('button', { name: 'بانتظار القبول' }));
+      expect(chip().getAttribute('aria-pressed')).toBe('true');
+      fireEvent.click(chip());
+      expect(lastUrl().searchParams.has('acceptance_status')).toBe(false);
+    });
+
+    it('treats the filter as an active filter: empty-filtered state and clear action remove it', async () => {
+      nav.search = 'acceptance_status=awaiting_acceptance';
+      fetchOrdersMock.mockResolvedValue(page([]));
+      render(<OrdersList />);
+      expect(await screen.findByText('لا نتائج مطابقة')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'مسح التصفية' }));
+      expect(String(nav.replace.mock.calls.at(-1)![0])).not.toContain('acceptance_status');
+    });
+
+    it('keeps pagination server-driven with the filter and remembers it for returning from the detail page', async () => {
+      nav.search = 'acceptance_status=auto&page=2&per_page=50';
+      fetchOrdersMock.mockResolvedValue(page([awaitingRow()], { current_page: 2, per_page: 50, total: 120, last_page: 3 }));
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(Object.fromEntries(lastQuery())).toMatchObject({ acceptance_status: 'auto', page: '2', per_page: '50' });
+      expect(window.sessionStorage.getItem('awj-commerce-orders-list-query')).toBe('acceptance_status=auto&page=2&per_page=50');
+    });
+
+    it('renders the English LTR labels for the filter, chip and badges', async () => {
+      locale.current = 'en';
+      fetchOrdersMock.mockResolvedValue(page([awaitingRow()]));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-200'));
+      expect(screen.getByLabelText('Acceptance status')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Awaiting acceptance' })).toBeTruthy();
+      expect(screen.getAllByText('Awaiting acceptance').length).toBeGreaterThanOrEqual(3);
+      expect(within(screen.getByLabelText('Acceptance status')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+        'All acceptance statuses', 'Awaiting acceptance', 'Manually accepted', 'Automatic acceptance',
+      ]);
+    });
   });
 
   describe('store ↔ URL ↔ data consistency (review P2: stale store overwrote the new one)', () => {
