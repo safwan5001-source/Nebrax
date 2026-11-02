@@ -1,7 +1,7 @@
 # COPS Horizon — Handoff (التسليم الحيّ)
 
 **البرنامج:** AWJ Commerce Operations Horizon (COPS) — امتداد لـ `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1` (المتتبّع §9).
-**آخر تحديث:** 2026-11-02 — **H1-1 مغلق بالكامل (EC):** #1910 ⇒ `46774c5c2`، واستعادة بوابة الأداء #1920 ⇒ `125abcab7`، وسجلات الإغلاق #1917. بوابة الأداء في وظيفة CI مخصصة؛ 5 تشغيلات مستقلة ناجحة (15/15 جولة، p95 إضافي 12.5–26.9ms مقابل حد 50ms). **نقطة توقف لتبديل النموذج قبل H1-2.**
+**آخر تحديث:** 2026-11-02 — **H1-2 مدموج:** #1924 ⇒ `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe` (أحداث نطاق بعد الالتزام + `feed` + `attention`). H1-1 مغلق (#1910/#1920/#1917). **H1-3 قيد التنفيذ** (تفويض المالك الذاتي لـH1-2/H1-3 فقط؛ يتوقف بعد H1-3 — لا H1-4 ولا H1-5).
 **القاعدة:** يُحدَّث هذا الملف في نهاية كل شريحة (Slice) قبل التوقف. هو نقطة الاستئناف الوحيدة؛ لا يُعاد الاستكشاف.
 
 ---
@@ -21,7 +21,7 @@
 |---|---|---|
 | H1-0 | Claude Opus | STOP ✅ |
 | H1-1 | Claude Opus | **STOP** ✅ (هذه النقطة — مغلق بالكامل) |
-| H1-2 ثم H1-3 | Claude Sonnet | STOP |
+| H1-2 ثم H1-3 | Claude Sonnet | STOP (مفوَّضتان ذاتياً 2026-11-02؛ H1-2 ✅ مدموج، H1-3 قيد التنفيذ) |
 | H1-4 | Claude Opus | STOP |
 | H1-5 + تقرير إغلاق H1 (`AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`) | Claude Sonnet | STOP |
 
@@ -36,24 +36,27 @@
 | H1-0 | **Merged** (squash، 2026-11-01) — CI أخضر على رأس الـPR؛ لم يُنشر ولم يُفعَّل شيء | #1896 | `d729fc9be46e404ed58289f75802e7eadca5d560` | توثيق فقط. رأس الفرع `59e197726b4ecf11b81a71c562388ba126410355`؛ فُرع من `6d78858d2` ثم تقدّم `main` (أب الدمج `511a19e3f`) دون تعارض. تفاصيل الفحوص في تقرير التنفيذ §3 |
 | H1-1 | **Merged** (squash، 2026-11-01) — نجح CI على رأس الـPR `4da6f14`، **لكن بوابة الأداء فشلت لاحقاً على `main` (استقرار القياس لا الصحة)** وعولجت في #1920؛ لم يُنشر ولم يُفعَّل شيء | #1910 | `46774c5c2c2aadc8d173017990b206ef6d877d17` | قرار P-A؛ مقاييس CI وأدلة الوقود في التقرير §8 |
 | H1-1 CI recovery | **Merged** (squash، 2026-11-02) — وظيفة `pg-perf` مخصصة + قياس نافذة النشاط؛ 5 تشغيلات مستقلة ناجحة | #1920 | `125abcab70293f4e1b1677a9185ff6ab53575c61` | قرار المالك: Option B + تصحيحات القياس (D-H1-1-PERF-B)؛ `AWJ-COPS-H1-1-CI-PERF-ISOLATION-RECOVERY-REPORT.md` |
-| H1-1 closing records | **Merged** — راجع `AWJ-COPS-H1-1-CLOSURE-REPORT.md` | #1917 | يُسجَّل في المتتبّع | وثائق فقط |
-| H1-2 … H1-5 | Planned | — | — | — |
+| H1-1 closing records | **Merged** — راجع `AWJ-COPS-H1-1-CLOSURE-REPORT.md` | #1917 | `134244ba5fef7253fd043aa21d85b666bd3fedcb` | وثائق فقط |
+| H1-2 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL والوظيفة المخصصة للأداء وCI Gate خضراء على الرأس `66a2952`؛ لم يُنشر ولم يُفعَّل شيء | #1924 | `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe` | `AWJ-COPS-H1-2-IMPLEMENTATION-REPORT.md`؛ فشلت وظيفة الأداء مرة واحدة على الرأس الأول `b75bb99` (جولة واحدة 88.6ms من 3، توقف تخزين منعزل لا صلة له بالتغيير) ثم نجحت على الرأس التالي بلا تغيير في الحد أو الحمل؛ أُضيف تسجيل تشخيصي فقط |
+| H1-3 | **قيد التنفيذ** (تفويض المالك 2026-11-02) | — | (يُسجَّل بعد الدمج) | `commerce_channel_operation_settings` (القبول والتذكير والتصعيد فقط) |
+| H1-4 … H1-5 | Planned — **غير مفوَّضتين في هذه الجولة** | — | — | — |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 
 ---
 
-## 3.A نقطة الاستئناف الحالية — H1-2 (Claude Sonnet، بأمر استمرار صريح من المالك فقط)
+## 3.A نقطة الاستئناف الحالية — H1-3 (قيد التنفيذ ضمن تفويض 2026-11-02)
 
-**الحالة:** H1-1 مدموج ومغلق. **لا تبدأ H1-2 قبل أمر المالك وتبديل النموذج إلى Sonnet.**
+**الحالة:** H1-2 مدموج (`790eff709`). H1-3 يُنفَّذ في الجلسة نفسها على `claude/cops-h1-3-operations-settings`؛ بعد دمجه وتسجيل سجلات إغلاقه **يتوقف التنفيذ** (المالك يبدّل النموذج إلى Opus لـH1-4).
 
-**الهدف (ADR-29 §2.4 + Revision 1 §2):** تغذية الأحداث للموظف (قراءة بمؤشّر `feed_seq` لكل مستأجر) + كتلة/عدّاد «الانتباه» بمصالحة بالحالة، فوق الجداول المدموجة. لا كتابة أحداث جديدة إلا عبر `CommerceOrderEventRecorder::append()` وفي آخر المعاملة.
+**ما أنتجه H1-2 للشرائح القادمة:**
+- أحداث النطاق `CommerceOrderPlaced`/`Cancelled`/`PaymentPaid`/`PaymentCollected` (معرّفات فقط) تُطلق من `CommerceOrderEventRecorder::append()` بعد الالتزام؛ **نوع سجل جديد (مثل `order.accepted` في H1-4) يتطلب حدث نطاق مقابلاً** وإلا فشل `CommerceOrderFeedTest`. المستمعون (H3) **لا يرمون**.
+- `GET commerce/orders/feed` (مؤشّر `after_seq`) و`GET commerce/orders/attention` (الأسباب في `CommerceOrderAttentionQuery::reasonsFor()`؛ H1-4 يضيف `awaiting_acceptance`، H2 `fulfillment_not_started`، H3-4 الإقرار). السبب الأساسي `new_order` ونافذة 48 ساعة تفسير موثَّق في ADR-29 §2.4.2 **ينتظر تأكيد المالك**.
+- أي مسار Commerce جديد يلزمه سطر في `CommerceModuleBoundaryTest::ALLOWED_COMMERCE_API_ROUTES`.
 
-**ابدأ بقراءة:** ADR-29 §2.4–§2.4.1؛ `app/Services/Commerce/CommerceOrderEventRecorder.php`؛ هجرة `2026_12_27_010000_create_commerce_order_events_and_feed_heads.php`؛ تقرير H1-1 §1–§3 و§6 (المخاطر)؛ `CommerceStaffOrderController`/`CommerceOrderStaffSerializer` (كتلة `timeline`).
+**ثوابت لا تُكسر:** الرأس صف قفل ثابت لا يُحدَّث؛ `max+1` بعبارة واحدة؛ الكاتب لا يلمس `tenants`؛ الرأس آخر قفل؛ القراءة بلا أقفال؛ بوابة الأداء المخصصة (§3.B).
 
-**ثوابت من H1-1 لا تُكسر:** الرأس صف قفل ثابت لا يُحدَّث؛ التسلسل `max+1` بعبارة واحدة تحت القفل؛ الكاتب لا يلمس `tenants`؛ الرأس آخر قفل؛ القارئ لا يأخذ قفل الرأس (المؤشّر يعتمد ترتيب الالتزام: كل `feed_seq` مرئي ⇒ كل ما قبله ملتزم). الحد التشغيلي الموثَّق: ~130 حدثاً/ث/مستأجر (p95 إضافي < 50ms)، والتشبّع ~300+/ث.
-
-**الفرع المقترح:** `claude/cops-h1-2-order-feed` من أحدث `origin/main`.
+**الفرع:** `claude/cops-h1-3-operations-settings` من أحدث `origin/main`.
 
 ## 3.B قاعدة بوابة الأداء في CI (تسري على كل شريحة COPS قادمة)
 
