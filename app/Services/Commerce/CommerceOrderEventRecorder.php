@@ -54,6 +54,14 @@ final class CommerceOrderEventRecorder
         CommerceOrderEvent::PAYMENT_PAID => CommerceOrderPaymentPaid::class,
         CommerceOrderEvent::PAYMENT_COLLECTED => CommerceOrderPaymentCollected::class,
         CommerceOrderEvent::ORDER_ACCEPTED => CommerceOrderAccepted::class,
+        CommerceOrderEvent::FULFILLMENT_STARTED => \App\Events\CommerceOrderFulfillmentStarted::class,
+        CommerceOrderEvent::FULFILLMENT_READY => \App\Events\CommerceOrderFulfillmentReady::class,
+        CommerceOrderEvent::FULFILLMENT_DISPATCHED => \App\Events\CommerceOrderFulfillmentDispatched::class,
+        CommerceOrderEvent::FULFILLMENT_DELIVERY_FAILED => \App\Events\CommerceOrderFulfillmentDeliveryFailed::class,
+        CommerceOrderEvent::FULFILLMENT_RETURNED => \App\Events\CommerceOrderFulfillmentReturned::class,
+        CommerceOrderEvent::FULFILLMENT_DELIVERED => \App\Events\CommerceOrderFulfillmentDelivered::class,
+        CommerceOrderEvent::FULFILLMENT_PICKED_UP => \App\Events\CommerceOrderFulfillmentPickedUp::class,
+        CommerceOrderEvent::FULFILLMENT_DETAILS_UPDATED => \App\Events\CommerceOrderFulfillmentDetailsUpdated::class,
     ];
 
     public function __construct(private readonly TenantContext $tenant) {}

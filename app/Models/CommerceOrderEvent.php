@@ -33,7 +33,28 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
     public const ORDER_ACCEPTED = 'order.accepted';
 
     /** القائمة المغلقة (تطابق CHECK/مُشغّل القاعدة حرفياً؛ يحرسها اختبار). الإضافة بهجرة صريحة في شريحتها. */
-    public const TYPES = [self::ORDER_PLACED, self::ORDER_CANCELLED, self::PAYMENT_PAID, self::PAYMENT_COLLECTED, self::ORDER_ACCEPTED];
+    /** COPS-H2-1: أحداث تنفيذ الطلب (`data` قائمة بيضاء بلا ناقل/تتبع/ساعٍ/ملاحظة). */
+    public const FULFILLMENT_STARTED = 'fulfillment.started';
+
+    public const FULFILLMENT_READY = 'fulfillment.ready';
+
+    public const FULFILLMENT_DISPATCHED = 'fulfillment.dispatched';
+
+    public const FULFILLMENT_DELIVERY_FAILED = 'fulfillment.delivery_failed';
+
+    public const FULFILLMENT_RETURNED = 'fulfillment.returned';
+
+    public const FULFILLMENT_DELIVERED = 'fulfillment.delivered';
+
+    public const FULFILLMENT_PICKED_UP = 'fulfillment.picked_up';
+
+    public const FULFILLMENT_DETAILS_UPDATED = 'fulfillment.details_updated';
+
+    public const TYPES = [
+        self::ORDER_PLACED, self::ORDER_CANCELLED, self::PAYMENT_PAID, self::PAYMENT_COLLECTED, self::ORDER_ACCEPTED,
+        self::FULFILLMENT_STARTED, self::FULFILLMENT_READY, self::FULFILLMENT_DISPATCHED, self::FULFILLMENT_DELIVERY_FAILED,
+        self::FULFILLMENT_RETURNED, self::FULFILLMENT_DELIVERED, self::FULFILLMENT_PICKED_UP, self::FULFILLMENT_DETAILS_UPDATED,
+    ];
 
     public const ACTOR_USER = 'user';
 
@@ -52,6 +73,15 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
         self::PAYMENT_PAID => [],
         self::PAYMENT_COLLECTED => [],
         self::ORDER_ACCEPTED => [],
+        self::FULFILLMENT_STARTED => [],
+        self::FULFILLMENT_READY => [],
+        self::FULFILLMENT_DISPATCHED => ['type', 'attempt'],
+        self::FULFILLMENT_DELIVERY_FAILED => ['reason', 'attempt'],
+        self::FULFILLMENT_RETURNED => [],
+        self::FULFILLMENT_DELIVERED => [],
+        self::FULFILLMENT_PICKED_UP => [],
+        // أسماء الحقول المتغيّرة فقط (مفصولة بفاصلة) — لا قيم (ناقل/تتبع/ساعٍ/ملاحظة تبقى داخل صف التنفيذ).
+        self::FULFILLMENT_DETAILS_UPDATED => ['fields'],
     ];
 
     protected $fillable = ['commerce_order_id', 'feed_seq', 'type', 'actor_type', 'actor_id', 'data', 'occurred_at'];

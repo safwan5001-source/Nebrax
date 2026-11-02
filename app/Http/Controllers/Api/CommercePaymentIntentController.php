@@ -90,9 +90,20 @@ class CommercePaymentIntentController extends ApiController
             return response()->json(['data' => $this->serialize($intent->fresh())]);
         }
 
-        $intent = $this->domain(fn () => $intents->cancel($intent));
+        // COPS-H2-1 (AR-2): تنفيذ الطلب في النقل/مكتمل ⇒ 422 برمز ثابت (RuntimeException ⇒ 422 كرفض القديم). يُلتقط داخل `domain()` لأنه يحوّل
+        // كل RuntimeException إلى 422 برسالة فقط فيضيع الرمز.
+        $result = $this->domain(function () use ($intents, $intent) {
+            try {
+                return $intents->cancel($intent);
+            } catch (\App\Services\Commerce\CommerceOrderFulfillmentLockedException $e) {
+                return $e;
+            }
+        });
+        if ($result instanceof \App\Services\Commerce\CommerceOrderFulfillmentLockedException) {
+            return response()->json(['message' => $result->getMessage(), 'reason' => $result->reason], 422);
+        }
 
-        return response()->json(['data' => $this->serialize($intent)]);
+        return response()->json(['data' => $this->serialize($result)]);
     }
 
     /**

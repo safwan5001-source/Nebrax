@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderAcceptanceController;
+use App\Http\Controllers\Api\CommerceStaffOrderFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
 use App\Http\Controllers\Api\CommerceStaffChannelOperationsSettingsController;
 use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
@@ -1210,6 +1211,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/orders/{id}/accept', [CommerceStaffOrderAcceptanceController::class, 'accept'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
         Route::post('commerce/orders/{id}/reject', [CommerceStaffOrderAcceptanceController::class, 'reject'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
+        // COPS-H2-1 (خطة H2-0): إجراءات تنفيذ طلب المتجر — commerce.orders.manage (owner/admin عبر `*` فقط)، بوابة commerce.order_fulfillment_enabled مغلقة ⇒ 404.
+        // الكاتب الوحيد CommerceOrderFulfillmentService؛ لا أثر محاسبي ولا مخزني ولا حجز.
+        Route::post('commerce/orders/{id}/fulfillment/{action}', [CommerceStaffOrderFulfillmentController::class, 'act'])
+            ->whereUuid('id')->whereIn('action', array_keys(\App\Services\Commerce\CommerceOrderFulfillmentService::TARGETS))
+            ->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
+        Route::patch('commerce/orders/{id}/fulfillment', [CommerceStaffOrderFulfillmentController::class, 'update'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.manage'), $app('commerce.storefront')]);
 
         // H6 Batch F: إعدادات تسعير قناة الويب (إسناد/إلغاء قائمة أسعار القناة + وسم عضوية الجملة) — صلاحية مستقلة

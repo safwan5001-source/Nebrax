@@ -110,6 +110,8 @@ final class CommerceOrderLifecycleService
             $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->lockForUpdate()->first();
             // 2) ثم الطلب.
             $locked = CommerceOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            // COPS-H2-1 (ADR-28 صف 14): ثم صف التنفيذ إن وُجد (النية ← الطلب ← التنفيذ ← الحجز). الإلغاء لا يكتبه؛ القفل يسلسل مع انتقالات التنفيذ.
+            \App\Models\CommerceOrderFulfillment::query()->where('commerce_order_id', $locked->id)->lockForUpdate()->first();
 
             // idempotent: لا أثر ولا تنظيف جديد ولا تغيير لحقائق الإلغاء الأصلية.
             if ($locked->isCancelled()) {
@@ -135,6 +137,14 @@ final class CommerceOrderLifecycleService
                     $intent = $this->intents->cancelWithinTransaction($intent);
                 } catch (CommerceOrderCancellationException $e) {
                     throw $e;
+                } catch (CommerceOrderFulfillmentLockedException $e) {
+                    // AR-2: حارس الكاتب الوحيد (تنفيذ في النقل/مكتمل) — رمز مصفوفة الإلغاء الصحيح، لا `payment_captured`.
+                    throw new CommerceOrderCancellationException(
+                        $e->reason === CommerceOrderFulfillmentLockedException::COMPLETED
+                            ? CommerceOrderCancellationException::FULFILLMENT_COMPLETED
+                            : CommerceOrderCancellationException::FULFILLMENT_IN_TRANSIT,
+                        $e->getMessage(),
+                    );
                 } catch (RuntimeException $e) {
                     $this->assertCancellable($locked, $intent->fresh() ?? $intent);
                     throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_CAPTURED, $e->getMessage());
@@ -315,6 +325,15 @@ final class CommerceOrderLifecycleService
     {
         if (CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->exists()) {
             throw new CommerceOrderCancellationException(CommerceOrderCancellationException::ALREADY_POSTED, 'رُحِّل هذا الطلب محاسبياً؛ يُعالَج بمرتجع/إشعار دائن لا بإلغاء مباشر.');
+        }
+        // COPS-H2-1 — الصف 14 (ADR-28 §3): تنفيذ في النقل أو مكتمل ⇒ لا إلغاء، **أياً كان وضع بوابة التنفيذ** (AR-3: الحقائق المخزَّنة تحكم).
+        // المسموح: لا تنفيذ، `preparing`، `ready`، `returned_to_store`.
+        $fulfillmentStatus = \App\Models\CommerceOrderFulfillment::query()->where('commerce_order_id', $order->id)->value('status');
+        if (in_array($fulfillmentStatus, \App\Models\CommerceOrderFulfillment::IN_TRANSIT, true)) {
+            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::FULFILLMENT_IN_TRANSIT, 'تنفيذ هذا الطلب في النقل؛ لا يُلغى قبل عودته للمتجر أو تسليمه.');
+        }
+        if (in_array($fulfillmentStatus, \App\Models\CommerceOrderFulfillment::COMPLETED, true)) {
+            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::FULFILLMENT_COMPLETED, 'اكتمل تنفيذ هذا الطلب؛ يُعالَج بمرتجع/استرداد لا بإلغاء مباشر.');
         }
         if ($intent === null) {
             return; // طلب بلا نية: لا دفع يُفحص.

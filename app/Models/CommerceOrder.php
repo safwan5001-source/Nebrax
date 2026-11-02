@@ -217,6 +217,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->hasOne(CommerceOrderSchedule::class, 'commerce_order_id');
     }
 
+    /** تنفيذ الطلب (COPS-H2-1): صف واحد كسول؛ غيابه = «لم يبدأ». */
+    public function fulfillment(): HasOne
+    {
+        return $this->hasOne(CommerceOrderFulfillment::class, 'commerce_order_id');
+    }
+
     /** COM-MOBILE-PAYMENTS-1 — التزام الدفع (ADR-04) — واحدٌ لكل طلب في V1. */
     public function paymentIntent(): HasOne
     {
