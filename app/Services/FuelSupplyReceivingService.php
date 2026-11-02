@@ -133,7 +133,7 @@ class FuelSupplyReceivingService
                     'branch_id' => $station->branch_id,
                     'source_type' => FuelDelivery::class,
                     'source_id' => $delivery->id,
-                    'date' => $delivery->received_at->toDateString(),
+                    'date' => $this->settings->businessDate($station, $delivery->received_at),
                     'notes' => "استلام وقود {$delivery->delivery_note_number}",
                     InventoryService::FUEL_POOL_META => true,
                 ],
@@ -144,7 +144,7 @@ class FuelSupplyReceivingService
                 ['account_id' => $this->inventoryAccountId(), 'debit' => $value, 'branch_id' => $station->branch_id],
                 ['account_id' => $grni->id, 'credit' => $value, 'branch_id' => $station->branch_id],
             ], [
-                'entry_date' => $delivery->received_at->toDateString(),
+                'entry_date' => $this->settings->businessDate($station, $delivery->received_at),
                 'description' => "استلام وقود معتمد {$delivery->delivery_note_number}",
                 'source_type' => FuelDelivery::class,
                 'source_id' => $delivery->id,
@@ -426,7 +426,7 @@ class FuelSupplyReceivingService
             ['account_id' => $grni->id, 'debit' => $value, 'branch_id' => $delivery->branch_id],
             ['account_id' => $payable->id, 'credit' => $value, 'branch_id' => $delivery->branch_id, 'partner_type' => Partner::class, 'partner_id' => $delivery->supplier_id],
         ], [
-            'entry_date' => now()->toDateString(),
+            'entry_date' => $delivery->station !== null ? $this->settings->businessDate($delivery->station) : now()->toDateString(),
             'description' => "تسوية GRNI لاستلام الوقود {$delivery->delivery_note_number}",
             'source_type' => FuelSupplierInvoice::class,
             'source_id' => $invoice->id,

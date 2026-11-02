@@ -105,6 +105,85 @@ class FuelSaleServiceTest extends TestCase
     }
 
     /** @test */
+    public function fs19_dates_the_invoice_and_cogs_entry_by_the_station_calendar_not_the_app_timezone(): void
+    {
+        // 22:30 UTC في 10 مارس = 01:30 بتوقيت المملكة في 11 مارس.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-03-10 22:30:00', 'UTC'));
+        try {
+            $sale = $this->finalizedSaleAt('fs19-riyadh');
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
+
+        $invoice = $sale->invoice()->firstOrFail();
+        $this->assertSame('2026-03-11', $invoice->invoice_date->toDateString());
+        $this->assertSame('2026-03-11', $invoice->due_date->toDateString());
+        $dates = \App\Models\JournalEntry::query()
+            ->whereIn('source_type', [get_class($invoice), \App\Models\Invoice::class])
+            ->get()->map(fn ($entry) => $entry->entry_date->toDateString())->unique()->values()->all();
+        $this->assertSame(['2026-03-11'], $dates);
+    }
+
+    /** @test */
+    public function fs19_honours_an_explicit_station_timezone_and_falls_back_safely_when_invalid(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-03-10 22:30:00', 'UTC'));
+        try {
+            $fixture = $this->fixture('fs19-tz');
+            $settings = app(FuelStationSettingsService::class);
+            $station = $fixture['station'];
+
+            $this->assertSame('Asia/Riyadh', $settings->operatingTimezone($station));
+            $this->assertSame('2026-03-11', $settings->businessDate($station));
+
+            $station->forceFill(['timezone' => 'UTC'])->save();
+            $this->assertSame('UTC', $settings->operatingTimezone($station->fresh()));
+            $this->assertSame('2026-03-10', $settings->businessDate($station->fresh()));
+
+            // قيمة غير صالحة في عمود المحطة تسقط إلى إعداد التشغيل ثم الافتراضي، ولا تُخمَّن.
+            $station->forceFill(['timezone' => 'Not/AZone'])->save();
+            $this->assertSame('Asia/Riyadh', $settings->operatingTimezone($station->fresh()));
+
+            // إعداد المستأجر يُحترم حين لا يُحدَّد عمود المحطة.
+            $station->forceFill(['timezone' => null])->save();
+            $settings->putTenant(['operating_timezone' => 'UTC'], $fixture['actor'], 'اختبار FS-19');
+            $this->assertSame('2026-03-10', $settings->businessDate($station->fresh()));
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
+    }
+
+    private function finalizedSaleAt(string $key): FuelSale
+    {
+        $fixture = $this->fixture($key);
+        app(FuelStationProductPriceService::class)->create([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+            'reason' => 'سعر مضخة اختبار معتمد',
+        ], $fixture['actor']);
+        $shift = app(FuelShiftService::class)->open([
+            'fuel_station_id' => $fixture['station']->id,
+            'opening_float_minor' => 0,
+            'idempotency_key' => $key . '-shift',
+        ], $fixture['actor']);
+        $service = app(FuelSaleService::class);
+        $draft = $service->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234,
+            'meter_start_milliliters' => 100000,
+            'meter_end_milliliters' => 101234,
+            'idempotency_key' => $key . '-draft',
+        ], $fixture['actor']);
+
+        return $service->finalize($draft, $fixture['actor']);
+    }
+
+    /** @test */
     public function it_snapshots_the_station_tax_mode_and_uses_invoice_vat_without_reinterpreting_history(): void
     {
         $fixture = $this->fixture('vat');
