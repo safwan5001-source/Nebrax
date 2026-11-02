@@ -83,9 +83,11 @@ Then, in the same transaction: claims insert → close event (`from reviewed to 
 | `PartnerStatementCloseApiTest` (new, 25) | SQLite ✔ · PostgreSQL ✔ |
 | `PartnerStatementCloseConcurrencyPostgresTest` (new, 7, `pcntl_fork`) | PostgreSQL ✔ (skipped on SQLite by design; absence of pcntl on PG = failure) |
 | `PartnerStatementLifecycleApiTest` (updated: close now needs review, SoD, `not_reviewed` state; wall allows the 3rd update) | SQLite ✔ · PostgreSQL ✔ |
-| Related set on SQLite (Rbac · Permission · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 419 passed, 23 skipped (PostgreSQL-only), 4 failed — `Fuel*` tests, `bcmath` extension missing in this sandbox (`Call to undefined function bcmul()`), unrelated; they pass in CI |
-| Same family on PostgreSQL (PartnerStatement* · PartnerLedger* · BranchIsolationGuard · ApplicationCatalog, incl. all earlier race suites) | **199 passed (3853 assertions)** |
+| Related set on SQLite after Revision 2 (Rbac · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 225 passed, 23 skipped (PostgreSQL-only), 1 failed → **fixed** (see below) and re-run green (`PartnerStatementPairReviewApiTest` 12 ✔) |
+| Same family on PostgreSQL after Revision 2 (incl. all earlier race suites) | **249 passed (4232 assertions)**; the pair-review suite re-run after the test fix: 12 ✔ |
 | Full `php artisan test` | not run locally; CI runs it on SQLite and PostgreSQL (see PR #1941) |
+
+**Regression found and fixed in Revision 2:** the new claims trigger (SQLite) reads the decisions' pair columns, so the **A3b** migration test (`…rolls_back_and_forward_cleanly_when_no_pair_link_exists`) could no longer drop those columns in isolation. Real rollbacks run in reverse order (A3d first), so the test now rolls A3d back before A3b and re-applies it after — no production behaviour changed.
 
 Revision 2 additions: an entry in September's period but absent from its statement is **not claimed**, appears as `unclaimed_in_period` (event + status) and is then **claimed by October** without conflict · `dismiss` creates no claim and similarity of amount/date claims nothing · identity-proof matrix (missing/inactive/empty unit, malformed or unproven `link_pair`, double use) refuses with `claim_identity_unproven` · raw SQL cannot claim for a dismissed/cleared line or the unchosen pair member · a failure after the claims are written (temporary DB trigger on the close event) rolls **everything** back with no residue · PG race: a final that leaves an entry unclaimed never blocks a concurrent final that uses it.
 

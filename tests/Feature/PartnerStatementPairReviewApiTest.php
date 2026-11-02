@@ -537,10 +537,14 @@ class PartnerStatementPairReviewApiTest extends TestCase
     public function the_migration_rolls_back_and_forward_cleanly_when_no_pair_link_exists(): void
     {
         $migration = require base_path('database/migrations/2026_12_29_010000_add_pair_link_to_partner_statement_review_decisions.php');
+        // PS-A3d: مُشغّل المطالبات يقرأ أعمدة الربط (`pair_member`…)؛ فالتراجع يتبع ترتيب الاعتماد: A3d أولاً ثم هذه الهجرة، والصعود بالعكس.
+        $dependent = require base_path('database/migrations/2027_01_02_010000_add_partner_statement_final_claims.php');
+        $dependent->down();
         $migration->down();
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'pair_member'));
         $migration->up();
         $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'engine_code'));
+        $dependent->up();
 
         // بعد إعادة الصعود يعمل الربط كاملاً.
         [$invoice, $id, $run] = $this->pairScenario();
