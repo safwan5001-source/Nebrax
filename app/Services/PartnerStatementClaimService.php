@@ -155,7 +155,8 @@ final class PartnerStatementClaimService
     }
 
     /**
-     * confirm/override: قيود الوحدات التي اعتمدها المراجع. كل وحدة يجب أن تكون حاضرة، **نشطة وقابلة للمطابقة**، ولها قيود (فلا هوية مخمَّنة).
+     * confirm/override: قيود الوحدات التي اعتمدها المراجع. **الهوية مسجَّلة مع القرار** (`claim_entry_ids`، وقت القرار على الدفتر المقيَّد ببصمته): يجب أن تكون موجودة، وأن تساوي تماماً قيود الوحدات المعتمدة في الدفتر الحاضر
+     * (التشغيلة حديثة فالبصمة واحدة)، وكل وحدة نشطة وقابلة للمطابقة ولها قيود. القرار القديم بلا هوية لا يُطالَب بقيوده (يُعاد القرار). حارس القاعدة يطبّق الانتماء نفسه على كل مطالبة.
      *
      * @param  array<string, array<string, mixed>>  $byKey
      * @return list<array<string, mixed>>
@@ -166,16 +167,30 @@ final class PartnerStatementClaimService
         if ($keys === []) {
             throw $this->unproven('قرار بلا وحدات محددة.', $decision);
         }
-        $entries = [];
+        $current = [];
         foreach ($keys as $key) {
             $unit = $byKey[$key] ?? null;
             if ($unit === null || ($unit['state'] ?? null) !== 'active' || ! ($unit['matchable'] ?? false) || ($unit['entries'] ?? []) === []) {
                 throw $this->unproven('وحدة قرار فعّال غائبة أو غير نشطة أو بلا قيود مثبتة في الدفتر الحاضر.', $decision, ['unit_key' => $key, 'state' => $unit['state'] ?? null]);
             }
-            array_push($entries, ...$unit['entries']);
+            foreach ($unit['entries'] as $entry) {
+                $current[(string) $entry['entry_id']] = $entry;
+            }
         }
 
-        return $entries;
+        $recorded = $decision->claim_entry_ids;
+        if (! is_array($recorded) || $recorded === []) {
+            throw $this->unproven('القرار لا يحمل هوية القيود المعتمدة (قرار سابق لتسجيلها): أعد القرار نفسه ليُسجَّلها.', $decision, ['reason' => 'decision_entry_identity_missing']);
+        }
+        $recordedIds = array_values(array_unique(array_map('strval', $recorded)));
+        $currentIds = array_keys($current);
+        sort($recordedIds);
+        sort($currentIds);
+        if ($recordedIds !== $currentIds) {
+            throw $this->unproven('قيود الوحدات المعتمدة في الدفتر الحاضر لا تطابق الهوية المسجَّلة مع القرار.', $decision, ['reason' => 'decision_entry_identity_mismatch']);
+        }
+
+        return array_values($current);
     }
 
     /**

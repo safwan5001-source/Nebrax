@@ -394,15 +394,18 @@ class PartnerStatementCloseApiTest extends TestCase
 
         // الشبكة الأخيرة: إدراج مطالبة ثانية فعّالة لقيد مُطالَب به يُرفض في القاعدة (تجاوز الخدمة)، ومطالبة حرة تُقبل (ضابط إيجابي).
         $entry = $this->entryOf($a);
-        $row = fn (string $entryId): array => [
-            'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $two, 'partner_id' => $this->both->id, 'role' => 'customer',
-            'journal_entry_id' => $entryId, 'basis' => 'decision', 'line_id' => $this->lineId($two, 2), 'claimed_at' => now(), 'released_at' => null,
+        $row = fn (string $reconciliation, string $line, string $entryId): array => [
+            'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $reconciliation, 'partner_id' => $this->both->id, 'role' => 'customer',
+            'journal_entry_id' => $entryId, 'basis' => 'decision', 'line_id' => $line, 'claimed_at' => now(), 'released_at' => null,
         ];
-        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($entry->id)), 'مطالبة فعّالة مزدوجة');
-        $free = $this->entryOf($this->invoice('2026-12-01', 1000));
+        // المطالبة بقيد a (ضمن هوية قرار rec2 نفسها) لكنه مُطالَب به فعلاً من rec1 ⇒ الفهرس الفريد وحده يمنعه.
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($two, $this->lineId($two, 2), $entry->id)), 'مطالبة فعّالة مزدوجة');
+        // ضابط إيجابي: مقارنة ثالثة بقيد حرّ تقبل مطالبتها (الفهرس لا يحجب كاذباً).
+        $free = $this->invoice('2026-12-01', 1000);
+        [$three, $runThree] = $this->ready([['date' => '2026-12-01', 'our' => $free->number, 'credit' => 1150]], ['period_from' => '2026-12-01', 'period_to' => '2026-12-31']);
         DB::beginTransaction();
-        DB::table('partner_statement_unit_claims')->insert($row($free->id));   // ضابط إيجابي: الفهرس لا يحجب كاذباً
-        $this->assertSame(1, DB::table('partner_statement_unit_claims')->where('reconciliation_id', $two)->count());
+        DB::table('partner_statement_unit_claims')->insert($row($three, $this->lineId($three, 2), $this->entryOf($free)->id));
+        $this->assertSame(1, DB::table('partner_statement_unit_claims')->where('reconciliation_id', $three)->count());
         DB::rollBack();
     }
 
@@ -565,8 +568,8 @@ class PartnerStatementCloseApiTest extends TestCase
         $link = fn (string $member, array $extra = []) => $decision('link_pair', ['invoice#2'], $extra + ['pair_member' => $member, 'pair_original_entry_id' => 'o', 'pair_reversal_entry_id' => 'r']);
 
         // مطالبات صحيحة.
-        $this->assertSame(['e1', 'e2'], array_keys($service->claimSet([$active], ['L1' => $decision('confirm', ['invoice#1'])])));
-        $this->assertSame(['e1'], array_keys($service->claimSet([$unit('invoice#1', [$entry('e1')])], ['L1' => $decision('override', ['invoice#1'])])));
+        $this->assertSame(['e1', 'e2'], array_keys($service->claimSet([$active], ['L1' => $decision('confirm', ['invoice#1'], ['claim_entry_ids' => ['e2', 'e1']])])));
+        $this->assertSame(['e1'], array_keys($service->claimSet([$unit('invoice#1', [$entry('e1')])], ['L1' => $decision('override', ['invoice#1'], ['claim_entry_ids' => ['e1']])])));
         $this->assertSame(['o'], array_keys($service->claimSet([$pair], ['L1' => $link('original')])));
         $this->assertSame(['r'], array_keys($service->claimSet([$pair], ['L1' => $link('reversal')])), 'العضو المختار فقط.');
         $this->assertSame([], $service->claimSet([$active, $pair], ['L1' => $decision('dismiss', [])]), 'dismiss لا يطالب بشيء.');
@@ -583,7 +586,12 @@ class PartnerStatementCloseApiTest extends TestCase
         $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $link('original', ['pair_reversal_entry_id' => null])]), 'معرّف عكس مفقود');
         $this->assertSame('claim_identity_unproven', $reason([$unit('invoice#2', [$entry('o', null, 'reversed'), $entry('r', 'other')], 'neutralised')], ['L1' => $link('reversal')]), 'العكس لا يشير إلى الأصل');
         $this->assertSame('claim_identity_unproven', $reason([$pair], ['L1' => $link('both')]), 'عضو غير محدد');
-        $this->assertSame('claim_entry_used_twice', $reason([$active], ['L1' => $decision('confirm', ['invoice#1']), 'L2' => $decision('override', ['invoice#1'])]), 'قيد لسطرين');
+        // هوية القيود المسجَّلة مع القرار (Codex P2): مفقودة أو لا تطابق قيود الوحدة المعتمدة ⇒ رفض.
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('confirm', ['invoice#1'])]), 'قرار قديم بلا هوية مسجَّلة');
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('confirm', ['invoice#1'], ['claim_entry_ids' => ['e1']])]), 'هوية ناقصة');
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('confirm', ['invoice#1'], ['claim_entry_ids' => ['e1', 'e2', 'zzz']])]), 'هوية بقيد غريب');
+        $this->assertSame('claim_identity_unproven', $reason([$active], ['L1' => $decision('override', ['invoice#1'], ['claim_entry_ids' => []])]), 'هوية فارغة');
+        $this->assertSame('claim_entry_used_twice', $reason([$active], ['L1' => $decision('confirm', ['invoice#1'], ['claim_entry_ids' => ['e1', 'e2']]), 'L2' => $decision('override', ['invoice#1'], ['claim_entry_ids' => ['e1', 'e2']])]), 'قيد لسطرين');
     }
 
     /** @test */
@@ -617,6 +625,119 @@ class PartnerStatementCloseApiTest extends TestCase
         // لا بقايا: الإغلاق السليم ينجح بعدها بلا تعارض مع مطالبات يتيمة.
         $this->close($this->closer, $id, $run['id'])->assertCreated();
         $this->assertSame([1, 2], [$this->claimCount(), $this->eventCount($id)]);
+    }
+
+    // ═══════════════════════════════ هوية القيود في القرار (Codex P2) ═══════════════════════════════
+
+    /** @test */
+    public function decisions_record_the_approved_entry_identity_and_an_old_decision_without_it_must_be_redecided(): void
+    {
+        $a = $this->invoice('2026-09-01', 100000);
+        $b = $this->invoice('2026-09-05', 20000);
+        $token = $this->auth['token'];
+        $id = $this->statement([
+            ['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000],
+            ['date' => '2026-09-25', 'credit' => 23000],
+            ['date' => '2026-09-28', 'credit' => 99900],
+        ]);
+        $run = $this->match($token, $id);
+        $line = fn (int $n) => $this->lineId($id, $n);
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line(2), 'action' => 'confirm'])->assertCreated();
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line(3), 'action' => 'override', 'unit_keys' => ['invoice#'.$b->id], 'reason' => 'تحويل مؤرخ لاحقاً'])->assertCreated();
+        $this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line(4), 'action' => 'dismiss', 'reason' => 'غير موجودة'])->assertCreated();
+
+        // الهوية مسجَّلة لـconfirm/override وحدهما بمعرّفات قيود الوحدات المعتمدة؛ والإعادة المطابقة replay بلا نسخة جديدة.
+        $ids = fn (string $lineId) => json_decode((string) DB::table('partner_statement_review_decisions')->where('line_id', $lineId)->orderByDesc('revision')->value('claim_entry_ids'), true);
+        $this->assertSame([$this->entryOf($a)->id], $ids($line(2)));
+        $this->assertSame([$this->entryOf($b)->id], $ids($line(3)));
+        $this->assertNull(DB::table('partner_statement_review_decisions')->where('line_id', $line(4))->value('claim_entry_ids'));
+        $this->assertTrue($this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line(2), 'action' => 'confirm'])->assertOk()->json('replayed'));
+        $this->assertSame(3, DB::table('partner_statement_review_decisions')->count());
+
+        // قرار «قديم» بلا هوية (نسخة أحدث بلا claim_entry_ids، كما كان قبل تسجيلها): مانع صريح عند المراجعة، ولا يُطالَب بقيوده.
+        $row = (array) DB::table('partner_statement_review_decisions')->where('line_id', $line(2))->orderByDesc('revision')->first();
+        DB::table('partner_statement_review_decisions')->insert(['id' => (string) Str::uuid(), 'revision' => $row['revision'] + 1, 'claim_entry_ids' => null] + $row);
+        $state = $this->lcStatus($this->auth['token'], $id)->assertOk()->json('data');
+        $this->assertSame(['decisions_without_entry_identity', 1], [collect($state['blockers'])->firstWhere('code', 'decisions_without_entry_identity')['code'], collect($state['blockers'])->firstWhere('code', 'decisions_without_entry_identity')['count']]);
+        $this->assertSame('decisions_without_entry_identity', $this->review($token, $id, $run['id'])->assertStatus(409)->json('reason'));
+
+        // إعادة القرار نفسه تكتب نسخة جديدة بالهوية (لا replay لقرار بلا هوية) فيزول المانع ويمضي الإغلاق.
+        $this->assertFalse($this->decide($token, $id, ['run_id' => $run['id'], 'line_id' => $line(2), 'action' => 'confirm'])->assertCreated()->json('replayed'));
+        $this->assertSame([$this->entryOf($a)->id], $ids($line(2)));
+        $this->review($token, $id, $run['id'])->assertCreated();
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+        $this->assertEqualsCanonicalizing([$this->entryOf($a)->id, $this->entryOf($b)->id], $this->claimed($id));
+    }
+
+    /** @test */
+    public function the_database_refuses_a_claim_for_an_entry_that_does_not_belong_to_the_approved_unit_even_by_raw_sql(): void
+    {
+        $a = $this->invoice('2026-09-01', 100000);
+        $b = $this->invoice('2026-09-05', 20000);
+        $c = $this->invoice('2026-09-09', 30000);   // لعميل الطرف نفسه لكنه ليس ضمن ما اعتُمد
+        $x = $this->invoice('2026-09-12', 40000);
+        [$id, $run] = $this->ready([
+            ['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000],
+            ['date' => '2026-09-25', 'credit' => 69000, 'act' => 'override', 'units' => ['invoice#'.$b->id, 'invoice#'.$x->id]],
+        ]);
+        $confirmedLine = $this->lineId($id, 2);
+        $overrideLine = $this->lineId($id, 3);
+        $row = fn (string $entryId, string $line) => [
+            'id' => (string) Str::uuid(), 'tenant_id' => $this->auth['tenant_id'], 'reconciliation_id' => $id, 'partner_id' => $this->both->id, 'role' => 'customer',
+            'journal_entry_id' => $entryId, 'basis' => 'decision', 'line_id' => $line, 'claimed_at' => now(), 'released_at' => null,
+        ];
+
+        // سيناريو Codex: قرار يعتمد وحدة a؛ قيد c (لا صلة له بالقرار) يُرفض. وكذلك قيد a على سطر قرار آخر، وc على سطر override.
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($this->entryOf($c)->id, $confirmedLine)), 'قيد غير مرتبط بوحدة confirm');
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($this->entryOf($a)->id, $overrideLine)), 'قيد وحدة سطر آخر');
+        $this->assertRejected(fn () => DB::table('partner_statement_unit_claims')->insert($row($this->entryOf($c)->id, $overrideLine)), 'قيد غير مرتبط بوحدات override');
+        $this->assertSame(0, $this->claimCount());
+
+        // ضوابط إيجابية: كل قيد ضمن هوية القرار يُقبل (confirm: a؛ override: b وx).
+        foreach ([[$a, $confirmedLine], [$b, $overrideLine], [$x, $overrideLine]] as [$invoice, $line]) {
+            DB::beginTransaction();
+            DB::table('partner_statement_unit_claims')->insert($row($this->entryOf($invoice)->id, $line));
+            $this->assertSame(1, $this->claimCount());
+            DB::rollBack();
+        }
+
+        // والإغلاق الحقيقي يكتب مطالبات الهوية المعتمدة وحدها.
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+        $this->assertEqualsCanonicalizing([$this->entryOf($a)->id, $this->entryOf($b)->id, $this->entryOf($x)->id], $this->claimed($id));
+        $this->assertNotContains($this->entryOf($c)->id, $this->claimed($id));
+    }
+
+    /** @test */
+    public function the_entry_identity_migration_is_additive_refuses_rollback_with_identities_and_reverses_when_empty(): void
+    {
+        $identity = require base_path('database/migrations/2027_01_02_000100_add_claim_entry_ids_to_partner_statement_review_decisions.php');
+        $claims = require base_path('database/migrations/2027_01_02_010000_add_partner_statement_final_claims.php');
+        $a = $this->invoice('2026-09-01', 100000);
+
+        // فارغ: يتراجع بترتيب الاعتماد (المطالبات أولاً) ثم يصعد سليماً.
+        $claims->down();
+        $identity->down();
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'claim_entry_ids'));
+        $identity->up();
+        $claims->up();
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'claim_entry_ids'));
+
+        // الشكل: لا تحمل الهوية إلا confirm/override كمصفوفة غير فارغة.
+        [$id, $run] = $this->ready([['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000]]);
+        $base = (array) DB::table('partner_statement_review_decisions')->where('reconciliation_id', $id)->first();
+        $this->assertRejected(fn () => DB::table('partner_statement_review_decisions')->insert(['id' => (string) Str::uuid(), 'revision' => 9, 'claim_entry_ids' => '[]'] + $base), 'مصفوفة فارغة');
+        $this->assertRejected(fn () => DB::table('partner_statement_review_decisions')->insert(['id' => (string) Str::uuid(), 'revision' => 9, 'claim_entry_ids' => '{"a":1}'] + $base), 'ليست مصفوفة');
+        $this->assertRejected(fn () => DB::table('partner_statement_review_decisions')->insert(['id' => (string) Str::uuid(), 'revision' => 9, 'claim_entry_ids' => '["x"]', 'action' => 'clear', 'unit_keys' => '[]'] + $base), 'هوية على غير confirm/override');
+
+        // قرار يحمل هوية ⇒ لا تراجع (أثر تدقيق).
+        $claims->down();
+        try {
+            $identity->down();
+            $this->fail('لا تراجع بهوية مسجَّلة');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('لا يُتراجع', $e->getMessage());
+        }
+        $claims->up();
     }
 
     // ═══════════════════════════════ النطاق: مؤسسة / فرع ═══════════════════════════════

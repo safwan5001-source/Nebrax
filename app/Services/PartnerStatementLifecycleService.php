@@ -7,6 +7,7 @@ use App\Models\PartnerStatementMatch;
 use App\Models\PartnerStatementMatchRun;
 use App\Models\PartnerStatementReconciliation;
 use App\Models\PartnerStatementReconciliationEvent;
+use App\Models\PartnerStatementReviewDecision;
 use App\Models\User;
 use App\Support\PartnerStatementReviewException;
 use App\Support\Rbac;
@@ -381,6 +382,7 @@ final class PartnerStatementLifecycleService
         $byAction = [];
         $unresolved = [];
         $otherRun = 0;
+        $withoutIdentity = 0;
         $acceptedDifferenceMinor = 0;
         foreach ($lines as $line) {
             $decision = $effective[$line->id] ?? null;
@@ -394,6 +396,9 @@ final class PartnerStatementLifecycleService
                 $otherRun++;
 
                 continue;
+            }
+            if (in_array($decision->action, [PartnerStatementReviewDecision::ACTION_CONFIRM, PartnerStatementReviewDecision::ACTION_OVERRIDE], true) && empty($decision->claim_entry_ids)) {
+                $withoutIdentity++;   // قرار سابق لتسجيل هوية القيود (PS-A3d): يُعاد ليُسجَّلها قبل أن يُراجَع/يُغلق
             }
             $byAction[$decision->action] = ($byAction[$decision->action] ?? 0) + 1;
             // كل فرق مالي قُبل بقرار (داخل التسامح بسبب أو خارجه بإقرار) يدخل المجموع المطلق — لا يُستثنى ما كان ضمن التسامح (Codex #1939، D-PS-16).
@@ -414,6 +419,9 @@ final class PartnerStatementLifecycleService
                 'code' => 'unresolved_lines', 'message' => 'بنود كشف بلا قرار مراجعة صريح (confirm / override / link_pair / dismiss).',
                 'count' => count($unresolved), 'sample_ordinals' => array_slice($unresolved, 0, self::SAMPLE),
             ];
+        }
+        if ($withoutIdentity > 0) {
+            $blockers[] = ['code' => 'decisions_without_entry_identity', 'message' => 'قرارات confirm/override سابقة لتسجيل هوية القيود المعتمدة: أعد كلاً منها (القرار نفسه) ليُسجَّل بهويته.', 'count' => $withoutIdentity];
         }
         if ($otherRun > 0) {
             $blockers[] = ['code' => 'decisions_on_other_runs', 'message' => 'قرارات فعّالة بُنيت على تشغيلة أخرى أو ببصمة دفتر مختلفة: أعد القرار على هذه التشغيلة.', 'count' => $otherRun];

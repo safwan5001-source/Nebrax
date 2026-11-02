@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Schema;
  *
  *  - `partner_statement_unit_claims`: مطالبة واحدة لكل **قيد يومية** (`journal_entry_id`) **استعمله قرار مراجعة فعّال** (`basis = decision` + سطر الكشف) — لا قيود الفترة لمجرد تاريخها (قرار المالك 2026-11-02).
  *    فهرس فريد جزئي `(tenant, partner, role, journal_entry_id) WHERE released_at IS NULL` يمنع مطالبتين فعّالتين على الحركة نفسها **حتى عبر فترات أو فروع مختلفة وحتى بـSQL خام**. مُشغّل الإدراج يشترط أن يكون
- *    للسطر قرارٌ فعّال (أحدث نسخة) من نوع confirm/override/link_pair — فلا مطالبة لسطر dismiss/مسحوب — وأن يكون القيد في link_pair هو **العضو المحدَّد صراحةً** فقط. الجدول append-only في A3d (لا UPDATE ولا DELETE
+ *    للسطر قرارٌ فعّال (أحدث نسخة) من نوع confirm/override/link_pair — فلا مطالبة لسطر dismiss/مسحوب — وأن يكون القيد **منتمياً إلى القرار**: في link_pair العضو المحدَّد صراحةً فقط، وفي confirm/override ضمن `claim_entry_ids`
+ *    المسجَّلة مع القرار (هجرة `2027_01_02_000100`، تسبق هذه). الجدول append-only في A3d (لا UPDATE ولا DELETE
  *    ولا TRUNCATE)؛ `released_at` موجود لإفراج A3e ويبقى فارغاً هنا.
  *  - `partner_statement_reconciliations`: `closed_at/closed_by/scope_key` (`org` أو معرّف الفرع)، وحالة `closed` الطرفية. حراس القاعدة: الإدراج لا يكون `closed` أبداً؛ لا تحديث لصف `closed`؛ الانتقال
  *    إلى `closed` يتطلب **حدث `close` مطابقاً** (الفاعل = المُغلِق، المراجِع = `reviewed_by` المسجَّل بحدث المراجعة، التشغيلة نفسها، وعدد المطالبات = المسجَّل بالحدث)، **المُغلِق ≠ المراجِع** (D-PS-17)،
@@ -301,8 +302,9 @@ return new class extends Migration
                                 WHERE d.tenant_id = NEW.tenant_id AND d.reconciliation_id = NEW.reconciliation_id AND d.line_id = NEW.line_id
                                   AND d.action IN ('confirm', 'override', 'link_pair')
                                   AND d.revision = (SELECT MAX(x.revision) FROM partner_statement_review_decisions x WHERE x.tenant_id = d.tenant_id AND x.line_id = d.line_id)
-                                  AND (d.action <> 'link_pair' OR NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END)) THEN
-                    RAISE EXCEPTION 'partner_statement_unit_claims: a claim needs the line''s effective confirm/override/link_pair decision (link_pair: the chosen member only); dismiss and cleared lines claim nothing';
+                                  AND ((d.action = 'link_pair' AND NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END)
+                                       OR (d.action IN ('confirm', 'override') AND d.claim_entry_ids IS NOT NULL AND jsonb_exists(d.claim_entry_ids::jsonb, NEW.journal_entry_id::text)))) THEN
+                    RAISE EXCEPTION 'partner_statement_unit_claims: a claim needs the line''s effective decision and the entry must belong to it (link_pair: the chosen member; confirm/override: the entry ids recorded with the decision); dismiss and cleared lines claim nothing';
                 END IF;
                 RETURN NEW;
             END
@@ -492,9 +494,11 @@ return new class extends Migration
                               WHERE d.tenant_id = NEW.tenant_id AND d.reconciliation_id = NEW.reconciliation_id AND d.line_id = NEW.line_id
                                 AND d.action IN ('confirm', 'override', 'link_pair')
                                 AND d.revision = (SELECT MAX(x.revision) FROM partner_statement_review_decisions x WHERE x.tenant_id = d.tenant_id AND x.line_id = d.line_id)
-                                AND (d.action <> 'link_pair' OR NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END))
+                                AND ((d.action = 'link_pair' AND NEW.journal_entry_id = CASE d.pair_member WHEN 'original' THEN d.pair_original_entry_id ELSE d.pair_reversal_entry_id END)
+                                     OR (d.action IN ('confirm', 'override') AND d.claim_entry_ids IS NOT NULL
+                                         AND EXISTS (SELECT 1 FROM json_each(d.claim_entry_ids) j WHERE j.value = NEW.journal_entry_id))))
             BEGIN
-                SELECT RAISE(ABORT, 'partner_statement_unit_claims: claims need a reviewed reconciliation of the same partner and role, a ledger entry of this tenant for the partner, a line of the same reconciliation and that line''s effective confirm/override/link_pair decision (link_pair: the chosen member only)');
+                SELECT RAISE(ABORT, 'partner_statement_unit_claims: claims need a reviewed reconciliation of the same partner and role, a ledger entry of this tenant for the partner, a line of the same reconciliation and that line''s effective decision with the entry belonging to it (link_pair: the chosen member; confirm/override: the recorded entry ids)');
             END
             SQL);
         DB::unprepared(<<<'SQL'
