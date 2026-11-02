@@ -100,3 +100,66 @@ export function rejectedFixture(over: Partial<OrderDetail> = {}): OrderDetail {
     ...over,
   });
 }
+
+/** COPS-H2-3: كتلة تنفيذ بحالة معطاة (توصيل محلي افتراضياً). */
+export function fulfillmentBlock(over: Partial<NonNullable<OrderDetail['fulfillment']>> = {}): NonNullable<OrderDetail['fulfillment']> {
+  return {
+    status: 'preparing',
+    type: 'local_delivery',
+    version: 1,
+    warehouse: { id: 'w1', name: 'مخزن الدمام' },
+    carrier: { name: null, tracking_number: null, tracking_url: null },
+    courier: { name: null, phone: null },
+    delivery_attempts: 0,
+    last_failure: null,
+    timestamps: { preparing_at: '2026-11-02T09:00:00+03:00' },
+    ...over,
+  };
+}
+
+/** طلب COD مقبول تلقائياً بلا تنفيذ بعد، وعقد الإجراءات حاضر (بوابة مفتوحة + `manage`): البدء والجاهزية متاحان. */
+export function notStartedFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'accepted',
+    fulfillment_actions: [
+      { action: 'start', available: true, blocked_reason: null },
+      { action: 'mark_ready', available: true, blocked_reason: null },
+    ],
+    ...over,
+  });
+}
+
+export function preparingFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'preparing',
+    fulfillment: fulfillmentBlock(),
+    fulfillment_actions: [{ action: 'mark_ready', available: true, blocked_reason: null }],
+    ...over,
+  });
+}
+
+export function outForDeliveryFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'out_for_delivery',
+    fulfillment: fulfillmentBlock({ status: 'out_for_delivery', version: 3, carrier: { name: 'سمسا', tracking_number: 'T-1', tracking_url: 'https://track.example.test/T-1' }, courier: { name: 'خالد', phone: '0500000009' } }),
+    fulfillment_actions: [
+      { action: 'deliver', available: true, blocked_reason: null },
+      { action: 'fail', available: true, blocked_reason: null },
+    ],
+    cancel_action: { available: false, blocked_reason: 'fulfillment_in_transit' },
+    ...over,
+  });
+}
+
+export function failedFixture(over: Partial<OrderDetail> = {}): OrderDetail {
+  return detailFixture({
+    operational_status: 'delivery_failed',
+    fulfillment: fulfillmentBlock({ status: 'delivery_failed', version: 4, delivery_attempts: 1, last_failure: { reason: 'address_issue', note: 'العنوان غير صحيح', at: '2026-11-02T12:00:00+03:00' } }),
+    fulfillment_actions: [
+      { action: 'dispatch', available: true, blocked_reason: null },
+      { action: 'return', available: true, blocked_reason: null },
+    ],
+    cancel_action: { available: false, blocked_reason: 'fulfillment_in_transit' },
+    ...over,
+  });
+}

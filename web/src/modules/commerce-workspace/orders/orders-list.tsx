@@ -16,6 +16,7 @@ import { ACTIVE_STORE_QUERY_PARAM, withStoreParam } from '@/modules/commerce-wor
 import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
   ACCEPTANCE_STATUSES,
+  FULFILLMENT_STATUS_FILTERS,
   acceptanceBadgeOf,
   DELIVERY_METHODS,
   ORDERS_PER_PAGE_OPTIONS,
@@ -33,7 +34,7 @@ import {
   type OrdersMeta,
 } from './contract';
 import { ordersMessages } from './messages';
-import { AcceptanceBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
+import { AcceptanceBadge, FulfillmentBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrders } from './orders-api';
 
 /** يحفظ استعلام القائمة لهذا التبويب فتعود صفحة التفاصيل إلى الصفحة/التصفية نفسها. */
@@ -170,7 +171,7 @@ export function OrdersList() {
   }, [stores]);
 
   const hasFilters = Boolean(
-    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.acceptanceStatus || state.from || state.to,
+    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.acceptanceStatus || state.fulfillmentStatus || state.from || state.to,
   );
 
   const detailHref = useCallback((id: string) => withStoreParam(`/commerce/orders/${id}`, activeStoreId), [activeStoreId]);
@@ -234,6 +235,13 @@ export function OrdersList() {
         enableSorting: false,
         accessorFn: (o) => o.operational_status ?? '',
         cell: ({ row }) => (acceptanceBadgeOf(row.original) === null ? <span className="text-muted">—</span> : <AcceptanceBadge order={row.original} locale={locale} />),
+      },
+      {
+        id: 'fulfillment',
+        header: t('fulfillmentColumn'),
+        enableSorting: false,
+        accessorFn: (o) => o.fulfillment?.status ?? '',
+        cell: ({ row }) => (row.original.fulfillment ? <FulfillmentBadge fulfillment={row.original.fulfillment} locale={locale} /> : <span className="text-muted">—</span>),
       },
       {
         id: 'status',
@@ -366,6 +374,16 @@ export function OrdersList() {
               ))}
             </Select>
           </Field>
+          <Field label={t('fulfillmentStatus')}>
+            <Select value={state.fulfillmentStatus} aria-label={t('fulfillmentStatus')} onChange={(event) => update({ fulfillmentStatus: event.target.value })}>
+              <option value="">{t('allFulfillmentStatuses')}</option>
+              {FULFILLMENT_STATUS_FILTERS.map((value) => (
+                <option key={value} value={value}>
+                  {label('fulfillFilter', value)}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label={t('dateFrom')}>
             <Input type="date" value={state.from} max={state.to || undefined} aria-label={t('dateFrom')} onChange={(event) => update({ from: event.target.value })} />
           </Field>
@@ -382,7 +400,7 @@ export function OrdersList() {
           </Field>
           {hasFilters ? (
             <div className="flex items-end">
-              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', acceptanceStatus: '', from: '', to: '' }); }}>
+              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', acceptanceStatus: '', fulfillmentStatus: '', from: '', to: '' }); }}>
                 {t('clearFilters')}
               </Button>
             </div>
@@ -420,6 +438,7 @@ export function OrdersList() {
                   <OrderStatusBadge status={lifecycleOf(order)} locale={locale} />
                   <PaymentStatusBadge status={order.payment.status} locale={locale} />
                   <AcceptanceBadge order={order} locale={locale} />
+                  <FulfillmentBadge fulfillment={order.fulfillment} locale={locale} />
                 </span>
               ),
               meta: formatDateTime(order.created_at, locale),

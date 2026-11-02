@@ -48,3 +48,22 @@ export function AcceptanceBadge({ order, locale }: { order: Pick<OrderSummary, '
 
   return <Badge tone={ACCEPTANCE_TONE[kind]}>{label('acceptanceBadge', kind)}</Badge>;
 }
+
+const FULFILLMENT_TONE: Record<string, Tone> = {
+  preparing: 'warning',
+  ready: 'neutral',
+  out_for_delivery: 'neutral',
+  delivery_failed: 'negative',
+  returned_to_store: 'warning',
+  delivered: 'positive',
+  picked_up: 'positive',
+};
+
+/** شارة التنفيذ (H2-3): من حقائق التنفيذ المخزَّنة فقط، وتغيب (null) حين لا صف. `ready` لاستلام العميل تُسمّى «جاهز للاستلام». */
+export function FulfillmentBadge({ fulfillment, locale }: { fulfillment: { status: string; type: string } | undefined; locale: string }) {
+  if (!fulfillment) return null;
+  const { label, t } = ordersMessages(locale);
+  const text = fulfillment.status === 'ready' && fulfillment.type === 'pickup' ? t('fulfillment.ready_pickup') : label('fulfillment', fulfillment.status);
+
+  return <Badge tone={FULFILLMENT_TONE[fulfillment.status] ?? 'muted'}>{text}</Badge>;
+}

@@ -58,7 +58,39 @@ export type OrderAcceptance = {
 };
 
 /** حالة تشغيلية **مشتقّة للعرض فقط** (`CommerceOrderStatusProjector`) — لا تُستعمل شرطاً لإجراء؛ الإجراءات من `accept_action`/`reject_action`/`cancel_action`. */
-export const OPERATIONAL_STATUSES = ['cancelled', 'draft', 'awaiting_payment', 'payment_cancelled', 'awaiting_acceptance', 'accepted'] as const;
+export const OPERATIONAL_STATUSES = [
+  'cancelled', 'draft', 'awaiting_payment', 'payment_cancelled', 'awaiting_acceptance', 'accepted',
+  'preparing', 'ready', 'out_for_delivery', 'delivery_failed', 'returned_to_store', 'delivered', 'picked_up',
+] as const;
+
+/**
+ * COPS-H2-3 — تنفيذ الطلب. الحالات والأنواع وأسباب الفشل تطابق الخادم حرفياً (H2-1). الإجراءات تأتي **من عقد القراءة وحده** (`fulfillment_actions`)
+ * ولا يستنتجها المتصفح من الحالة؛ الخادم يحكم دائماً تحت الأقفال. التنفيذ تشغيلي: لا قيد ولا مخزون ولا تحصيل.
+ */
+export const FULFILLMENT_STATUSES = ['preparing', 'ready', 'out_for_delivery', 'delivery_failed', 'returned_to_store', 'delivered', 'picked_up'] as const;
+export type FulfillmentStatus = (typeof FULFILLMENT_STATUSES)[number];
+export const FULFILLMENT_STATUS_FILTERS = [...FULFILLMENT_STATUSES, 'not_started'] as const;
+export const FULFILLMENT_ACTIONS = ['start', 'mark_ready', 'dispatch', 'deliver', 'fail', 'return', 'pickup'] as const;
+export type FulfillmentActionName = (typeof FULFILLMENT_ACTIONS)[number];
+export const FAILURE_REASONS = ['customer_unreachable', 'address_issue', 'recipient_absent', 'customer_refused', 'other'] as const;
+export const FULFILLMENT_NOTE_MAX = 500;
+export const FULFILLMENT_FIELD_MAX = 100;
+export const FULFILLMENT_URL_MAX = 500;
+
+export type FulfillmentActionItem = { action: string; available: boolean; blocked_reason: string | null };
+
+/** كتلة تنفيذ الموظف (داخلية: الناقل/التتبع/الساعي/سبب الفشل) — تغيب حين لا صف. */
+export type OrderFulfillment = {
+  status: string;
+  type: string;
+  version: number;
+  warehouse: { id: string | null; name: string | null };
+  carrier: { name: string | null; tracking_number: string | null; tracking_url: string | null };
+  courier: { name: string | null; phone: string | null };
+  delivery_attempts: number;
+  last_failure: { reason: string; note: string | null; at: string | null } | null;
+  timestamps: Record<string, string | null>;
+};
 
 /** عقدا قراءة إجراءَي القبول والرفض (استرشاديان، كـ`CancelAction`): غيابهما ⇒ لا إجراء (بوابة مغلقة أو صلاحية ناقصة، ولا يُكشف أيّهما). */
 export type AcceptAction = { available: boolean; blocked_reason: string | null };
@@ -76,6 +108,8 @@ export type OrderSummary = {
   lifecycle_status?: string;
   operational_status?: string;
   acceptance?: OrderAcceptance;
+  /** موجز التنفيذ في القائمة — يغيب حين لا صف. */
+  fulfillment?: { status: string; type: string };
   cancellation?: OrderCancellation;
   created_at: string | null;
   confirmed_at: string | null;
@@ -113,7 +147,11 @@ export type OrderAttempt = {
   created_at: string | null;
 };
 
-export type OrderDetail = OrderSummary & {
+export type OrderDetail = Omit<OrderSummary, 'fulfillment'> & {
+  /** كتلة التنفيذ الكاملة — تغيب حين لا صف. حقائق مخزَّنة تُقرأ دائماً (مهما كان وضع بوابة التنفيذ). */
+  fulfillment?: OrderFulfillment;
+  /** الإجراءات التالية الصالحة (استرشادي): تغيب حين البوابة مغلقة أو تنقص `commerce.orders.manage`. فارغة ⇒ لا إجراء (مكتمل/ملغى). */
+  fulfillment_actions?: FulfillmentActionItem[];
   cancel_action?: CancelAction;
   accept_action?: AcceptAction;
   reject_action?: RejectAction;
@@ -175,6 +213,7 @@ export type OrdersListState = {
   paymentMethod: string;
   deliveryMethod: string;
   acceptanceStatus: string;
+  fulfillmentStatus: string;
   from: string;
   to: string;
   /** `-created_at` | `created_at` | `-total` ... */
@@ -191,6 +230,7 @@ export const DEFAULT_ORDERS_STATE: OrdersListState = {
   paymentMethod: '',
   deliveryMethod: '',
   acceptanceStatus: '',
+  fulfillmentStatus: '',
   from: '',
   to: '',
   sort: '-created_at',
@@ -223,6 +263,7 @@ export function parseOrdersState(params: URLSearchParams): OrdersListState {
     paymentMethod: oneOf(params.get('payment_method'), PAYMENT_METHODS),
     deliveryMethod: oneOf(params.get('delivery_method'), DELIVERY_METHODS),
     acceptanceStatus: oneOf(params.get('acceptance_status'), ACCEPTANCE_STATUSES),
+    fulfillmentStatus: oneOf(params.get('fulfillment_status'), FULFILLMENT_STATUS_FILTERS),
     from: DATE.test(from) ? from : '',
     to: DATE.test(to) ? to : '',
     sort: (ORDERS_SORT_COLUMNS as readonly string[]).includes(sortKey) ? sortRaw : DEFAULT_ORDERS_STATE.sort,
@@ -241,6 +282,7 @@ export function serializeOrdersState(state: OrdersListState): URLSearchParams {
   if (state.paymentMethod) p.set('payment_method', state.paymentMethod);
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
   if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
+  if (state.fulfillmentStatus) p.set('fulfillment_status', state.fulfillmentStatus);
   if (state.from) p.set('from', state.from);
   if (state.to) p.set('to', state.to);
   if (state.sort !== DEFAULT_ORDERS_STATE.sort) p.set('sort', state.sort);
@@ -263,6 +305,7 @@ export function buildOrdersQuery(state: OrdersListState, storefrontId: string | 
   if (state.paymentMethod) p.set('payment_method', state.paymentMethod);
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
   if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
+  if (state.fulfillmentStatus) p.set('fulfillment_status', state.fulfillmentStatus);
   if (state.from) p.set('from', state.from);
   if (state.to && (!state.from || state.to >= state.from)) p.set('to', state.to);
   p.set('sort', state.sort.replace(/^-/, ''));

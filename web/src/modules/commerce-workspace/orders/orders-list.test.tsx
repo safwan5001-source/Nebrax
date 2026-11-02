@@ -269,6 +269,59 @@ describe('OrdersList', () => {
     expect(within(channel).getAllByRole('option').map((o) => o.textContent)).toEqual(['كل القنوات', 'زهور طيبة', 'زهور الرشد']);
   });
 
+  describe('fulfillment status (COPS-H2-3)', () => {
+    const preparingRow = () => summaryFixture({ id: '55555555-5555-4555-8555-555555555555', number: 'CORD-500', fulfillment: { status: 'preparing', type: 'local_delivery' } });
+    const readyPickupRow = () => summaryFixture({ id: '66666666-6666-4666-8666-666666666666', number: 'CORD-600', fulfillment: { status: 'ready', type: 'pickup' } });
+
+    it('shows the fulfillment badge as its own dimension (desktop and mobile) and nothing for an order without a row', async () => {
+      fetchOrdersMock.mockResolvedValue(page([preparingRow(), readyPickupRow(), summaryFixture({ number: 'CORD-100' })]));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-500'));
+      expect(screen.getAllByText('قيد التحضير').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText('جاهز للاستلام').length).toBeGreaterThanOrEqual(2);
+      const plain = screen.getAllByText('CORD-100')[0].closest('tr');
+      expect(plain?.textContent).not.toMatch(/قيد التحضير|جاهز|خرج للتوصيل|سُلِّم/);
+    });
+
+    it('offers the server values (including not-started) and sends the chosen one as a separate param', async () => {
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      const select = screen.getByLabelText('حالة التنفيذ');
+      const values = within(select).getAllByRole('option').map((o) => (o as HTMLOptionElement).value);
+      expect(values[0]).toBe('');
+      expect(values).toContain('not_started');
+      expect(values).toContain('delivery_failed');
+      fireEvent.change(select, { target: { value: 'delivery_failed' } });
+      const url = lastUrl();
+      expect(url.searchParams.get('fulfillment_status')).toBe('delivery_failed');
+      expect(url.searchParams.has('acceptance_status')).toBe(false);
+      expect(url.searchParams.has('page')).toBe(false);
+    });
+
+    it('reads the filter from the URL, forwards it, and ignores an unknown value', async () => {
+      nav.search = 'fulfillment_status=not_started&payment_status=awaiting_collection&page=2';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(Object.fromEntries(lastQuery())).toMatchObject({ fulfillment_status: 'not_started', payment_status: 'awaiting_collection', page: '2', storefront_id: 's1' });
+      expect((screen.getByLabelText('حالة التنفيذ') as HTMLSelectElement).value).toBe('not_started');
+
+      cleanup();
+      fetchOrdersMock.mockClear();
+      nav.search = 'fulfillment_status=hacked';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().has('fulfillment_status')).toBe(false);
+    });
+
+    it('clear-filters resets the fulfillment filter', async () => {
+      nav.search = 'fulfillment_status=preparing';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.click(screen.getByRole('button', { name: /مسح|إعادة ضبط|إزالة/ }));
+      expect(String(nav.replace.mock.calls.at(-1)![0])).not.toContain('fulfillment_status');
+    });
+  });
+
   describe('acceptance status (COPS-H1-5)', () => {
     const awaitingRow = () =>
       summaryFixture({

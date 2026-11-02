@@ -15,7 +15,8 @@ import { acceptOrder, classifyAcceptError, failureMeansStale, type AcceptFailure
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { classifyOrdersError, lifecycleOf, type OrderAddress, type OrderDetail } from './contract';
 import { ordersMessages, type OrdersMessageKey } from './messages';
-import { AcceptanceBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
+import { FulfillmentSection } from './fulfillment-section';
+import { AcceptanceBadge, FulfillmentBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrder } from './orders-api';
 import { ORDERS_LIST_QUERY_KEY } from './orders-list';
 import { RejectOrderDialog } from './reject-order-dialog';
@@ -245,6 +246,16 @@ export function OrderDetailView({ id }: { id: string }) {
         </div>
       ),
     },
+    // COPS-H2-3: الحقائق المخزَّنة تُعرض دائماً؛ القسم يظهر مع وجود كتلة تنفيذ أو عقد إجراءات (بوابة مفتوحة + صلاحية).
+    ...(order.fulfillment !== undefined || order.fulfillment_actions !== undefined
+      ? [
+          {
+            id: 'fulfillment',
+            title: t('sectionFulfillment'),
+            content: <FulfillmentSection order={order} canManage={canManage} stale={stale} onUpdated={(updated) => setOrder(updated)} onStale={markStale} />,
+          } satisfies DetailSection,
+        ]
+      : []),
     {
       id: 'items',
       title: t('sectionItems'),
@@ -406,6 +417,7 @@ export function OrderDetailView({ id }: { id: string }) {
           <OrderStatusBadge status={lifecycle} locale={locale} />
           <PaymentStatusBadge status={order.payment.status} locale={locale} />
           <AcceptanceBadge order={order} locale={locale} />
+          <FulfillmentBadge fulfillment={order.fulfillment} locale={locale} />
         </>
       }
       meta={
