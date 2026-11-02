@@ -297,6 +297,7 @@ jobs:
           php artisan migrate:fresh --force
 
       - name: تشغيل الاختبارات
+        id: run-tests
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         run: |
@@ -326,6 +327,47 @@ jobs:
             php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
           fi
 
+      # COPS-H1-1 — عزل قياسات الأداء. اختبارا الأداء (المجموعة cops-h1-1-perf) يقيسان الكمون بمؤقّت جداري، فيتشوّهان حين يشاركان الجهاز مع
+      # عمّال ParaTest الأربعة (رُصد p95 إضافي 55–102ms بدل 18–26ms بلا أي تغيير في الكود). لذلك يتخطّيان نفسيهما داخل العمّال المتوازين
+      # (LARAVEL_PARALLEL_TESTING) ويعملان هنا وحدهما، تسلسلياً، بعد انتهاء المجموعة الكاملة — فلا يعمل أيٌّ منهما مرتين. حدّ 50ms ونموذج الحمل
+      # ≈130 حدثاً/ث لم يتغيّرا؛ كل اختبارات الصحة/الجمود/الاكتمال تبقى في الخطوة المتوازية الكاملة أعلاه (لا --group ولا --exclude-group فيها،
+      # فلا تلمس حارس CI Gate). ‎vendor/bin/phpunit مباشرةً (لا artisan test) كي لا تُعدّ خطوةً مضبوطةً. تفشل الخطوة إن لم تُنتج الاختبارات
+      # مقاييسها (حارس ضد التخطّي الصامت إن أُزيلت هذه الخطوة أو تغيّر شرط التخطّي).
+      - name: قياسات أداء PostgreSQL المعزولة — تسلسلية (pgsql فقط)
+        id: pg-perf
+        if: ${{ !cancelled() && matrix.db == 'pgsql' && steps.run-tests.conclusion != 'skipped' }}
+        timeout-minutes: 15
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS="-c lock_timeout=60s"
+          WD_DIR="$PWD/pgsql-watchdog"; mkdir -p "$WD_DIR"
+          rm -f "$WD_DIR"/cops-h1-1-*.json
+          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg)" | tee -a "$WD_DIR/perf-environment.txt"
+          # نخلي الجهاز من بقايا الخطوة السابقة قبل القياس (مراقب التعليق يتوقف مع خطوتها؛ هذا فحص لا إنهاء).
+          uptime | tee -a "$WD_DIR/perf-environment.txt"
+          vendor/bin/phpunit --group cops-h1-1-perf --fail-on-skipped --fail-on-risky 2>&1 | tee test-output-pgsql-perf.txt
+          for f in realistic_load_gate saturated_burst_diagnostic; do
+            test -s "$WD_DIR/cops-h1-1-$f.json" || { echo "::error::لم يُنتج اختبار الأداء المقاييس ($f) — تخطٍّ صامت أو فشل قبل التسجيل"; exit 1; }
+          done
+          python3 - "$WD_DIR" <<'PY'
+          import json, sys, os
+          d = sys.argv[1]
+          g = json.load(open(os.path.join(d, "cops-h1-1-realistic_load_gate.json")))
+          b = json.load(open(os.path.join(d, "cops-h1-1-saturated_burst_diagnostic.json")))
+          assert len(g["rounds"]) == 3, "بوابة الحمل الواقعي يجب أن تُسجَّل ثلاث جولات"
+          lines = ["### COPS-H1-1 — قياسات الأداء المعزولة (PostgreSQL، تسلسلية)", "",
+                   f"الحدّ المعتمد: p95 إضافي < {g['p95_budget_ms']}ms عند ≈{g['offered_rate_target_per_s']:.0f} حدثاً/ث/مستأجر · baseline p50 = {g['baseline_p50_ms']}ms · مدة الاختبار {g['test_duration_s']}s", "",
+                   "| الجولة | أحداث/ث (محقق) | % من الهدف | p50 | p95 | p95 إضافي | CPU busy% | iowait% | steal% | loadavg قبل |", "|---|---|---|---|---|---|---|---|---|---|"]
+          for r in g["rounds"]:
+              lines.append(f"| {r['round']} | {r['events_per_second']} | {r['achieved_vs_offered_target_pct']} | {r['contended_p50_ms']} | {r['contended_p95_ms']} | **{r['added_p95_ms']}** | {r['cpu_busy_pct']} | {r['cpu_iowait_pct']} | {r['cpu_steal_pct']} | {r['loadavg_1m_before']} |")
+          s = b["burst"]
+          lines += ["", f"تشخيص الاندفاع المشبَع (غير شرط): {s['events_per_second']} حدثاً/ث · p50 {s['contended_p50_ms']}ms · p95 {s['contended_p95_ms']}ms · p95 إضافي {s['added_p95_ms']}ms · CPU busy {s['cpu_busy_pct']}% · cores {s['cores']}"]
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8").write("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+
       - name: حفظ مخرجات الاختبارات للتشخيص
         if: always()
         uses: actions/upload-artifact@v4
@@ -335,5 +377,6 @@ jobs:
           # الاحتفاظ 7 أيام لا يوماً: تحليل حادثٍ متقطّع قد يتأخر عن يوم الفشل.
           path: |
             ${{ env.APP_DIR }}/test-output-${{ matrix.db }}.txt
+            ${{ env.APP_DIR }}/test-output-pgsql-perf.txt
             ${{ env.APP_DIR }}/pgsql-watchdog/
           retention-days: 7

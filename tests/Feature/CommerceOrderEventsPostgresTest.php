@@ -13,6 +13,7 @@ use App\Services\Commerce\CommercePaymentIntentService;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -27,6 +28,11 @@ use Tests\TestCase;
  *  4) لا جمود: الكاتب لا يلمس `tenants`، فممسك مِرساة المستأجر (`FOR UPDATE`) المنتظر لصف يمسكه الكاتب لا يكوّن حلقة — مع ضابط سلبي
  *     يُثبت أن قفلاً على `tenants` في الموضع نفسه كان سيُنتج 40P01 (حساسية الاختبار).
  *  5) المسارات الحقيقية (إلغاء الموظف ‖ تحصيل الاستلام ‖ ممسك مِرساة يكتب حدثاً آخراً) بلا جمود وبتسلسل متصل.
+ *
+ *  **عزل القياس (COPS-H1-1 CI Performance Isolation Recovery):** اختبارا الأداء (المجموعة `cops-h1-1-perf`) يقيسان كموناً مقابل مؤقّت جداري، فيتشوّه
+ *  القياس حين يشاركان الجهاز مع عمّال ParaTest الأربعة (رُصد p95 إضافي 55–102ms بدل 18–26ms بلا أي تغيير في الكود). لذلك يتخطّيان نفسيهما حين
+ *  يعملان داخل عامل متوازٍ (`LARAVEL_PARALLEL_TESTING`) ويعملان في خطوة CI تسلسلية معزولة لاحقة (`vendor/bin/phpunit --group cops-h1-1-perf`) تتحقق
+ *  من أنهما نُفِّذا فعلاً (ملفات المقاييس). حدّ 50ms ونموذج الحمل ≈130 حدثاً/ث وكل اختبارات الصحة/الجمود/الاكتمال بلا أي تغيير ولا تخفيف.
  *
  *  على PostgreSQL **لا يُتخطّى** إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط. بلا معاملة مُغلِّفة (الأطفال يحتاجون صفوفاً مثبَّتة).
  */
@@ -44,6 +50,14 @@ class CommerceOrderEventsPostgresTest extends TestCase
     private const REALISTIC_RATE_MIN = 90.0;
 
     private const REALISTIC_RATE_MAX = 170.0;
+
+    /** المعدل المعروض المعتمد (D-H1-1-P): يُسجَّل بجانب المعدل المحقق فعلاً كي لا يُنسب للقياس حمل لم يُولَّد. */
+    private const OFFERED_RATE_TARGET = 130.0;
+
+    /** مجموعة قياسات الأداء: تعمل في الخطوة التسلسلية المعزولة في CI، وتتخطّى نفسها داخل العمّال المتوازين. */
+    public const PERF_GROUP = 'cops-h1-1-perf';
+
+    private float $perfStartedAt = 0.0;
 
     private string $dir;
 
@@ -246,14 +260,17 @@ class CommerceOrderEventsPostgresTest extends TestCase
      * (ب) يُكمل التسلسل بلا فجوة ولا تكرار، (ج) يبقي p95 انتظار الرأس الإضافي (p95 المتنافس − p50 خط الأساس) دون 50ms.
      */
     #[Test]
+    #[Group(self::PERF_GROUP)]
     public function the_realistic_load_gate_keeps_the_added_p95_feed_lock_wait_under_budget_at_about_130_events_per_second(): void
     {
+        $this->isolateFromParallelWorkers();
         $baselineP50 = $this->baselineP50();
         $rounds = [];
         foreach ([1, 2, 3] as $round) {
             $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: self::REALISTIC_THINK_MAX_MS, seed: 1000 * $round);
             $m['round'] = $round;
             $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
+            $m['achieved_vs_offered_target_pct'] = round(100 * $m['events_per_second'] / self::OFFERED_RATE_TARGET, 1);
             $rounds[] = $m;
 
             $this->assertGreaterThanOrEqual(self::REALISTIC_RATE_MIN, $m['events_per_second'], 'نموذج الحمل: المعدل المحقق أدنى من المعتمد (لا يُقبل نجاح بحمل أخف) '.json_encode($m));
@@ -268,13 +285,61 @@ class CommerceOrderEventsPostgresTest extends TestCase
      * ولا يُخفى؛ الصحة (اكتمال بلا فجوة ولا تكرار، لا جمود) **مفروضة** هنا أيضاً، أما الكمون تحت التشبّع فحدّ تشغيلي موثَّق لا شرط قبول.
      */
     #[Test]
+    #[Group(self::PERF_GROUP)]
     public function the_saturated_burst_diagnostic_stays_complete_and_records_its_capacity_and_latency(): void
     {
+        $this->isolateFromParallelWorkers();
         $baselineP50 = $this->baselineP50();
         $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: 0, seed: 7);
         $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
         $this->recordMetrics('saturated_burst_diagnostic', ['baseline_p50_ms' => $baselineP50, 'burst' => $m]);
         $this->assertGreaterThan(0, $m['events_per_second']);
+    }
+
+    /**
+     * قياس الكمون مقابل مؤقّت جداري لا يصحّ على جهاز يشاركه أربعة عمّال اختبار متوازية (تنافس المعالج يؤخّر مُمسك القفل فيطول انتظار كل من خلفه
+     * — ضجيج بيئة لا خاصية في الكاتب). داخل عامل ParaTest نتخطّى بسبب صريح؛ الخطوة المعزولة في CI تشغّل المجموعة وحدها وتفشل إن لم تُنتج مقاييس.
+     */
+    private function isolateFromParallelWorkers(): void
+    {
+        if (! empty($_SERVER['LARAVEL_PARALLEL_TESTING']) || ! empty(getenv('LARAVEL_PARALLEL_TESTING'))) {
+            $this->markTestSkipped('قياس الأداء يعمل في خطوة CI تسلسلية معزولة: vendor/bin/phpunit --group '.self::PERF_GROUP.' (لا داخل عمّال متوازين).');
+        }
+        $this->perfStartedAt = microtime(true);
+    }
+
+    /** @return array{busy:int,idle:int,iowait:int,steal:int,total:int}|null لقطة عدّادات المعالج التراكمية من /proc/stat (لينكس)؛ null إن تعذّرت. */
+    private static function cpuSnapshot(): ?array
+    {
+        $line = @file('/proc/stat', FILE_IGNORE_NEW_LINES)[0] ?? null;
+        if ($line === null || ! str_starts_with($line, 'cpu ')) {
+            return null;
+        }
+        $f = array_map('intval', preg_split('/\s+/', trim(substr($line, 4))) ?: []);
+        $f += array_fill(0, 8, 0);
+        // user nice system idle iowait irq softirq steal
+        $idle = $f[3] + $f[4];
+        $total = array_sum(array_slice($f, 0, 8));
+
+        return ['busy' => $total - $idle, 'idle' => $f[3], 'iowait' => $f[4], 'steal' => $f[7], 'total' => $total];
+    }
+
+    /**
+     * نسب المعالج خلال نافذة القياس (فرق لقطتين). تعكس تنافس الجهاز كله لا العملية: busy مرتفع مع أنوية محدودة = المقيس يتنافس على المعالج.
+     *
+     * @return array<string, float|int|null>
+     */
+    private static function cpuWindow(?array $a, ?array $b, float $loadBefore): array
+    {
+        $cores = max(1, (int) trim((string) @shell_exec('nproc 2>/dev/null')));
+        if ($a === null || $b === null || ($b['total'] - $a['total']) <= 0) {
+            return ['cores' => $cores, 'loadavg_1m_before' => round($loadBefore, 2), 'cpu_busy_pct' => null, 'cpu_iowait_pct' => null, 'cpu_steal_pct' => null];
+        }
+        $d = $b['total'] - $a['total'];
+        $pct = fn (int $x): float => round(100 * $x / $d, 1);
+
+        return ['cores' => $cores, 'loadavg_1m_before' => round($loadBefore, 2),
+            'cpu_busy_pct' => $pct($b['busy'] - $a['busy']), 'cpu_iowait_pct' => $pct($b['iowait'] - $a['iowait']), 'cpu_steal_pct' => $pct($b['steal'] - $a['steal'])];
     }
 
     /** p50 زمن الكتابة بلا تنافس: كاتب واحد متسلسل، 30 معاملة (قفل صف الطلب ثم الحدث آخراً). */
@@ -331,9 +396,12 @@ class CommerceOrderEventsPostgresTest extends TestCase
                 return $waits;
             };
         }
+        $loadBefore = (sys_getloadavg() ?: [0.0])[0];
+        $cpuBefore = self::cpuSnapshot();
         $started = microtime(true);
         $results = $this->runConcurrently($jobs);
         $elapsed = microtime(true) - $started;
+        $cpu = self::cpuWindow($cpuBefore, self::cpuSnapshot(), $loadBefore);
         $this->assertNoDeadlock($results);
 
         $total = $writers * $perWriter;
@@ -346,17 +414,23 @@ class CommerceOrderEventsPostgresTest extends TestCase
         sort($waits);
         $pct = fn (float $p): float => round($waits[(int) floor(($p / 100) * (count($waits) - 1))], 3);
 
+        $rate = round(count($waits) / $elapsed, 1);
+
         return [
             'writers' => $writers, 'transactions' => count($waits), 'think_max_ms' => $thinkMaxMs,
-            'elapsed_s' => round($elapsed, 3), 'events_per_second' => round(count($waits) / $elapsed, 1),
+            'elapsed_s' => round($elapsed, 3), 'events_per_second' => $rate,
             'contended_p50_ms' => $pct(50), 'contended_p95_ms' => $pct(95), 'contended_p99_ms' => $pct(99), 'contended_max_ms' => round(max($waits), 3),
+            ...$cpu,
         ];
     }
 
     /** يُسجّل المقاييس دائماً: STDERR، وملفاً في `pgsql-watchdog/` حين يوجد (يرفعه CI كمرفق) — لا تُخفى نتيجة. */
     private function recordMetrics(string $name, array $metrics): void
     {
-        $payload = ['slice' => 'COPS-H1-1', 'name' => $name, 'pg' => DB::selectOne("select current_setting('synchronous_commit') as synchronous_commit, current_setting('fsync') as fsync"), ...$metrics];
+        $payload = ['slice' => 'COPS-H1-1', 'name' => $name,
+            'pg' => DB::selectOne("select current_setting('synchronous_commit') as synchronous_commit, current_setting('fsync') as fsync"),
+            'offered_rate_target_per_s' => self::OFFERED_RATE_TARGET, 'p95_budget_ms' => self::P95_BUDGET_MS,
+            'test_duration_s' => round(microtime(true) - $this->perfStartedAt, 3), ...$metrics];
         $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
         fwrite(STDERR, "\nCOPS-H1-1 feed metrics: {$json}\n");
         $dir = base_path('pgsql-watchdog');
