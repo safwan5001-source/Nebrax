@@ -95,12 +95,12 @@ Then, in the same transaction: claims insert → close event (`from reviewed to 
 
 | Suite | Result |
 |---|---|
-| `PartnerStatementCloseApiTest` (new, 25) | SQLite ✔ · PostgreSQL ✔ |
 | `PartnerStatementCloseConcurrencyPostgresTest` (new, 7, `pcntl_fork`) | PostgreSQL ✔ (skipped on SQLite by design; absence of pcntl on PG = failure) |
 | `PartnerStatementLifecycleApiTest` (updated: close now needs review, SoD, `not_reviewed` state; wall allows the 3rd update) | SQLite ✔ · PostgreSQL ✔ |
-| Related set on SQLite after Revision 2 (Rbac · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | 225 passed, 23 skipped (PostgreSQL-only), 1 failed → **fixed** (see below) and re-run green (`PartnerStatementPairReviewApiTest` 12 ✔) |
-| Same family on PostgreSQL after Revision 2 (incl. all earlier race suites) | **249 passed (4232 assertions)**; the pair-review suite re-run after the test fix: 12 ✔ |
-| Full `php artisan test` | not run locally; **CI on head `4a17030`: `php artisan test` SQLite ✔ · PostgreSQL ✔ · PostgreSQL feed-lock performance ✔ · web build ✔ · CI Gate ✔** |
+| Related set on SQLite after Revision 3 (Rbac · BranchIsolationGuard · ApplicationCatalog · all PartnerStatement* · PartnerLedger*) | **229 passed**, 23 skipped (PostgreSQL-only), 0 failed |
+| Same family on PostgreSQL after Revision 3 (incl. all race suites) | **252 passed (4286 assertions)** |
+| `PartnerStatementCloseApiTest` (now 28) | SQLite ✔ · PostgreSQL ✔ |
+| Full `php artisan test` | not run locally; **CI on head `9b01089`: `php artisan test` SQLite ✔ · PostgreSQL ✔ · PostgreSQL feed-lock performance ✔ · web build ✔ · CI Gate ✔** |
 
 **Regression found and fixed in Revision 2:** the new claims trigger (SQLite) reads the decisions' pair columns, so the **A3b** migration test (`…rolls_back_and_forward_cleanly_when_no_pair_link_exists`) could no longer drop those columns in isolation. Real rollbacks run in reverse order (A3d first), so the test now rolls A3d back before A3b and re-applies it after — no production behaviour changed.
 
@@ -142,8 +142,8 @@ Coverage highlights: atomic success with claims/event/status and **no financial 
 ## 6. Delivery
 
 - Branch `claude/imp-ps-a3d` · PR #1941 · **Base `2c0a4148be7402d56fe67daba7e93fa3d6d5c3d8`** (main after #1939).
-- Heads: first `da984b6` → report `a99c875` (CI ✔, Codex: no findings) → **Revision 2** `431d3ad` (claims policy) → `4a17030` (migration-order test fix; **all CI checks green**) → final report-only commit (this file; no code change).
-- **Codex on `40a93dc`:** one P2 — the `acknowledge_overlap` validation capped the list at 200 while the server requires the *complete* overlap list (a reconciliation overlapping >200 finals could never close). **Fixed** (cap removed; the server-side exact-equality check is the control) with a test (250 ids pass validation and are refused as `overlap_ack_stale`; mutant with the cap restored is caught). SQLite 42 ✔ · PostgreSQL 49 ✔ for the close/lifecycle/race suites.
-- **Codex on Revision 2 (`431d3ad`):** one P2 — the claims trigger does not verify that a `confirm`/`override` claim's entry belongs to the approved unit (PostgreSQL and SQLite). Verified; a documented limit (§3, Revision 2). Not changed in this slice (needs the proven entry ids persisted on the decision — an A3a/A3b contract change). Replied on the thread, **left open for the owner's decision**.
-- **Residual risks:** (1) that Codex finding (raw-SQL reservation of an unrelated entry; bounded, no ledger effect, remedy via A3e release or the follow-up slice); (2) tenant-wide pause during close; (3) per-entry (not per-line) claim granularity; (4) no undo until A3e; (5) overlap acknowledgement/run freshness are service-level guarantees. 
-- Status: **READY_TO_MERGE** pending the owner's decision on the open Codex thread. No merge, deploy or Railway change was made; PS-A3e, PS-A4 and Track B were not started.
+- Code heads: `da984b6` (first) → `431d3ad` (Revision 2, claims policy) → `4a17030` (migration-order test fix) → `c6435b7` (removed the 200-id acknowledgement cap, Codex P2) → **`9b01089` (Revision 3: entry identity enforced by the database, Codex P2) — the final code head.** The last commit after it is this report only (no code change).
+- **CI on `9b01089`:** all green — `php artisan test` SQLite ✔, PostgreSQL ✔, PostgreSQL feed-lock performance ✔, web build ✔, CI Gate ✔. (An earlier run on `c6435b7` hit a 60-minute runner timeout in the PostgreSQL job — no database error — and passed on one re-run.)
+- **Codex:** `9b01089` reviewed — *"Didn't find any major issues"*, no findings, no unresolved threads. Earlier findings (200-id cap; claim↔unit identity) are fixed and resolved. Codex has not reviewed the final report-only commit.
+- **Residual risks:** (1) a privileged raw-SQL actor who can also forge a *decision row* (arbitrary `claim_entry_ids`) can still reserve entries — decision-level tampering of an append-only log, outside this guard; (2) tenant-wide pause during close; (3) per-entry (not per-line) claim granularity; (4) no undo until A3e; (5) overlap acknowledgement, run freshness and the unit→entries equality are service-level guarantees under the anchor lock (the database now additionally enforces claim ↔ recorded identity); (6) legacy decisions without identity must be re-submitted before a close (no closed reconciliation existed before A3d).
+- Status: **READY_TO_MERGE**. No merge, deploy or Railway change was made; PS-A3e, PS-A4 and Track B were not started.
