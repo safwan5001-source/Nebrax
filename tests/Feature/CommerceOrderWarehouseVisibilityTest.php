@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceOrder;
+use App\Models\CommerceOrderEvent;
+use App\Models\CommerceOrderFulfillment;
 use App\Models\CommerceOrderLine;
 use App\Models\CommercePaymentIntent;
 use App\Models\FulfillmentPolicy;
@@ -12,6 +14,8 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\Commerce\CommerceOrderFulfillmentService;
+use App\Services\Commerce\CommerceOrderLifecycleService;
 use App\Services\Commerce\CommerceOrderWarehouseScope;
 use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\TenantApplicationService;
@@ -21,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
 
 /**
@@ -339,5 +344,141 @@ class CommerceOrderWarehouseVisibilityTest extends TestCase
         $this->assertSame(1, CommerceOrderWarehouseScope::apply(CommerceOrder::query(), null)->count());
         $this->assertSame(0, CommerceOrderWarehouseScope::apply(CommerceOrder::query(), [])->count());
         $this->assertInstanceOf(FulfillmentPolicy::class, FulfillmentPolicy::query()->firstOrFail());
+    }
+
+    // ═════════════════════════ 7) إعادة التحقق تحت الأقفال (Codex على H2-2) ═════════════════════════
+
+    private function restrictedUser(): User
+    {
+        app(TenantContext::class)->set($this->tenant->id);
+        $user = User::where('email', 'restricted-a@vis.test')->firstOrFail();
+        app(TenantContext::class)->forget();
+
+        return $user;
+    }
+
+    /** @return array{0: int, 1: int} [صفوف التنفيذ، أحداث الطلب] */
+    private function writeCounts(): array
+    {
+        app(TenantContext::class)->set($this->tenant->id);
+        $counts = [CommerceOrderFulfillment::query()->count(), CommerceOrderEvent::query()->count()];
+        app(TenantContext::class)->forget();
+
+        return $counts;
+    }
+
+    #[Test]
+    public function a_policy_change_between_the_scoped_lookup_and_the_write_cannot_create_fulfillment_outside_the_scope(): void
+    {
+        $this->policyFor($this->a);
+        $order = $this->order();
+        $actor = $this->restrictedUser();
+        // البحث المقيَّد ينجح (السياسة = A) …
+        $this->assertContains($order->id, $this->listIds($this->restrictedA));
+        $before = $this->writeCounts();
+
+        // … ثم تتحوّل السياسة إلى B قبل الكتابة.
+        $this->policyFor($this->b);
+        app(TenantContext::class)->set($this->tenant->id);
+        try {
+            app(CommerceOrderFulfillmentService::class)->act($order, $actor, 'start', 0);
+            $this->fail('كان يجب أن يُرفض: الطلب خرج من نطاق الفاعل.');
+        } catch (NotFoundHttpException) {
+            // المتوقع: 404 موحَّد وتراجع كامل
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+
+        $this->assertSame($before, $this->writeCounts(), 'لا صف تنفيذ ولا حدث');
+        $this->assertContains($order->id, $this->listIds(), 'الطلب باقٍ للمالك غير المقيَّد');
+    }
+
+    #[Test]
+    public function the_persisted_warehouse_is_always_one_the_restricted_actor_may_use(): void
+    {
+        $this->policyFor($this->a);
+        $order = $this->order();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $row = app(CommerceOrderFulfillmentService::class)->act($order, $this->restrictedUser(), 'start', 0);
+        app(TenantContext::class)->forget();
+
+        $this->assertSame($this->a->id, $row->warehouse_id);
+        // وبعد ثبوت الصف يبقى مخزنه ثابتاً: تغيّر السياسة لاحقاً لا يخرج الطلب من نطاق صاحبه.
+        $this->policyFor($this->b);
+        $this->assertContains($order->id, $this->listIds($this->restrictedA));
+    }
+
+    #[Test]
+    public function details_updates_revalidate_the_scope_under_the_locks(): void
+    {
+        $this->policyFor($this->a);
+        $order = $this->order();
+        $actor = $this->restrictedUser();
+        app(TenantContext::class)->set($this->tenant->id);
+        app(CommerceOrderFulfillmentService::class)->act($order, $actor, 'start', 0);
+        app(TenantContext::class)->forget();
+
+        // مخزن صف التنفيذ ثابت (حارس القاعدة)، لكن نطاق الفاعل قد يتغيّر بين البحث والكتابة (إعادة إسناد مخازنه) ⇒ 404 تحت الأقفال.
+        app(TenantContext::class)->set($this->tenant->id);
+        $actor->warehouses()->sync([$this->b->id]);
+        app(TenantContext::class)->forget();
+        $actor = $this->restrictedUser();
+        $before = $this->writeCounts();
+        app(TenantContext::class)->set($this->tenant->id);
+        try {
+            app(CommerceOrderFulfillmentService::class)->updateDetails($order, $actor, 1, ['carrier_name' => 'X']);
+            $this->fail('كان يجب أن يُرفض.');
+        } catch (NotFoundHttpException) {
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+        $this->assertSame($before, $this->writeCounts());
+    }
+
+    #[Test]
+    public function acceptance_and_cancellation_revalidate_the_scope_under_the_locks(): void
+    {
+        $this->policyFor($this->a);
+        $manual = $this->order(CommerceOrder::ACCEPTANCE_MANUAL);
+        $plain = $this->order();
+        $actor = $this->restrictedUser();
+        $this->policyFor($this->b);   // خرج الطلبان من نطاق A بين البحث والكتابة
+        $before = $this->writeCounts();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $lifecycle = app(CommerceOrderLifecycleService::class);
+        foreach ([
+            fn () => $lifecycle->accept($manual, $actor),
+            fn () => $lifecycle->reject($manual, $actor, null),
+            fn () => $lifecycle->cancel($plain, $actor, 'customer_request', null),
+        ] as $attempt) {
+            try {
+                $attempt();
+                $this->fail('كان يجب أن يُرفض: خارج النطاق.');
+            } catch (NotFoundHttpException) {
+            }
+        }
+        app(TenantContext::class)->forget();
+
+        $this->assertSame($before, $this->writeCounts(), 'لا حدث قبول/إلغاء');
+        app(TenantContext::class)->set($this->tenant->id);
+        $this->assertNull(CommerceOrder::query()->find($manual->id)->accepted_at);
+        $this->assertFalse(CommerceOrder::query()->find($plain->id)->isCancelled());
+        app(TenantContext::class)->forget();
+    }
+
+    #[Test]
+    public function an_unrestricted_actor_is_never_affected_by_the_revalidation(): void
+    {
+        $this->policyFor($this->b);
+        $order = $this->order();
+        $owner = User::query()->withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('role', 'owner')->firstOrFail();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $row = app(CommerceOrderFulfillmentService::class)->act($order, $owner, 'start', 0);
+        app(TenantContext::class)->forget();
+
+        $this->assertSame($this->b->id, $row->warehouse_id);
     }
 }

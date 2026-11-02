@@ -3,7 +3,9 @@
 namespace App\Services\Commerce;
 
 use App\Models\CommerceOrder;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * COPS-H2-2 (D-H2-11) — رؤية المستخدم المقيَّد بمخازن لطلبات المتجر عبر **المخزن الفعّال للطلب** (مصدر واحد للقائمة والتفاصيل والإجراءات والانتباه):
@@ -39,5 +41,34 @@ final class CommerceOrderWarehouseScope
             ) IN ({$in})",
             [CommerceOrder::class, ...array_values($allowedWarehouseIds)],
         );
+    }
+
+    /**
+     * إعادة تحقق **داخل معاملة الكتابة وبعد أقفال النية/الطلب/التنفيذ** (Codex على H2-2): البحث المقيَّد في المتحكّم يسبق المعاملة، فتغيّر سياسة القناة أو حجز الطلب
+     * بينهما قد يُخرج الطلب من نطاق الفاعل. غير المقيَّد لا يُفحص. الطلب خارج النطاق الآن ⇒ `NotFoundHttpException` (404 موحَّد، يتراجع معه كل شيء) — كأنه لم يكن مرئياً.
+     * القراءة بلا قفل إضافي (لا قفل على سياسة القناة ⇒ لا حافة قفل جديدة)؛ النافذة المتبقية تخص «من يحق له الفعل» لحظة الالتزام لا سلامة البيانات.
+     */
+    public static function assertVisible(CommerceOrder $order, ?User $actor): void
+    {
+        $allowed = $actor?->allowedWarehouseIds();
+        if ($allowed === null) {
+            return;
+        }
+        $visible = self::apply(CommerceOrder::query()->whereKey($order->id), $allowed)->exists();
+        if (! $visible) {
+            throw new NotFoundHttpException('الطلب غير موجود.');
+        }
+    }
+
+    /** مخزن سيُثبَّت في صف تنفيذ جديد يجب أن يكون ضمن نطاق الفاعل المقيَّد (يُستدعى بالمخزن المحلول نفسه الذي سيُكتب، فلا فجوة بين الفحص والكتابة). */
+    public static function assertWarehouseAllowed(?string $warehouseId, ?User $actor): void
+    {
+        $allowed = $actor?->allowedWarehouseIds();
+        if ($allowed === null) {
+            return;
+        }
+        if ($warehouseId === null || ! in_array($warehouseId, $allowed, true)) {
+            throw new NotFoundHttpException('الطلب غير موجود.');
+        }
     }
 }

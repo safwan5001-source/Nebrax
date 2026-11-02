@@ -84,6 +84,7 @@ final class CommerceOrderLifecycleService
         return DB::transaction(function () use ($order, $actor): CommerceOrder {
             $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->lockForUpdate()->first();
             $locked = CommerceOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            CommerceOrderWarehouseScope::assertVisible($locked, $actor); // COPS-H2-2 (Codex): نطاق المخازن تحت الأقفال
 
             if ($locked->isAccepted()) {
                 return $locked;
@@ -112,6 +113,7 @@ final class CommerceOrderLifecycleService
             $locked = CommerceOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
             // COPS-H2-1 (ADR-28 صف 14): ثم صف التنفيذ إن وُجد (النية ← الطلب ← التنفيذ ← الحجز). الإلغاء لا يكتبه؛ القفل يسلسل مع انتقالات التنفيذ.
             \App\Models\CommerceOrderFulfillment::query()->where('commerce_order_id', $locked->id)->lockForUpdate()->first();
+            CommerceOrderWarehouseScope::assertVisible($locked, $actor); // COPS-H2-2 (Codex): نطاق المخازن تحت الأقفال (الإلغاء/الرفض)
 
             // idempotent: لا أثر ولا تنظيف جديد ولا تغيير لحقائق الإلغاء الأصلية.
             if ($locked->isCancelled()) {
