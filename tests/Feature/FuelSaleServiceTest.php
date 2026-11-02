@@ -631,6 +631,23 @@ class FuelSaleServiceTest extends TestCase
         $this->assertSame(1, FuelSale::count());
     }
 
+    /** @test */
+    public function replaying_the_identical_request_after_finalization_returns_the_sale_even_though_finalize_rewrites_the_odometer_snapshot(): void
+    {
+        $fixture = $this->fixture('odometer-final');
+        $service = app(FuelSaleService::class);
+        $payload = [
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1234, 'odometer' => 120000, 'idempotency_key' => 'draft-odometer-final',
+        ];
+        $first = $service->createDraft($payload, $fixture['actor']);
+        // `finalize()` يكتب `odometer_snapshot` من التفويض (null لبيع غير مؤسسي) ويغيّر الحالة.
+        \Illuminate\Support\Facades\DB::table('fuel_sales')->where('id', $first->id)->update(['status' => FuelSale::STATUS_FINALIZED, 'odometer_snapshot' => null]);
+
+        $this->assertSame($first->id, $service->createDraft($payload, $fixture['actor'])->id);
+        $this->assertSame(1, FuelSale::count());
+    }
+
     private function fixture(string $suffix = 'main'): array
     {
         $auth = $this->registerTenant('fuel-sale-' . $suffix, "fuel-sale-{$suffix}@example.test");
