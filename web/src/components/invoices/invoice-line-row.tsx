@@ -147,7 +147,10 @@ export function InvoiceLineRow({
             id={`${line.key}-description`}
             placeholder={t('description')}
             value={line.description}
-            onChange={(e) => onPatch({ description: e.target.value, productId: null })}
+            // الوصف نصٌّ مخصَّص للمستند يوازي المنتج لا يبدّله: كان التحرير يمسح
+            // `productId` فيخرج السطر من المخزون والتكلفة ويعود «إدخالاً يدوياً».
+            // فكّ الربط صريحٌ عبر منتقي المنتج وحده (`onPickProduct('')`).
+            onChange={(e) => onPatch({ description: e.target.value })}
           />
         </LineField>
 

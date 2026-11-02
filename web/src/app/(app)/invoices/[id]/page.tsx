@@ -823,6 +823,10 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-baseline justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-primary-ink">{line.product_name ?? line.description ?? '—'}</div>
+                    {/* الوصف المخصَّص على السطر يُعرض كما حُفظ، لا يُستبدل باسم المنتج. */}
+                    {line.product_name && line.description && line.description !== line.product_name ? (
+                      <div className="truncate text-xs text-secondary" data-testid="invoice-line-description">{line.description}</div>
+                    ) : null}
                     <div className="num text-xs text-secondary">{line.quantity} × <Money value={line.unit_price} /></div>
                   </div>
                   <Money value={line.line_total} className="shrink-0 font-semibold" />
