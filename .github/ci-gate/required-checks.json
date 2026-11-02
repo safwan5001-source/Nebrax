@@ -21,6 +21,14 @@
       "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"]}
     },
     {
+      "name": "PostgreSQL feed-lock performance (COPS-H1-1)",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "pg-perf",
+      "tier": "always",
+      "covers": ["performance", "postgres", "commerce-orders", "feed-lock"],
+      "guard": {"step_run_contains": "vendor/bin/phpunit --group cops-h1-1-perf", "require": ["set -euo pipefail", "--fail-on-skipped"], "forbidden": ["|| true", "--filter", "--exclude-group", "--stop-on", "--parallel"]}
+    },
+    {
       "name": "Horizon dry-run evaluator (tests)",
       "workflow": ".github/workflows/horizon-eval-ci.yml",
       "job": "horizon-eval",
