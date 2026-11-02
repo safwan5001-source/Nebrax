@@ -410,6 +410,8 @@ php artisan serve
 - رفض التاجر = `CommerceOrderLifecycleService::cancel()` بسبب `merchant_rejected` (لا مسار ثانٍ)؛ القبول اليدوي خلف `COMMERCE_ORDER_ACCEPTANCE_ENABLED` المغلقة، والطلب الإلكتروني غير المدفوع خارج الطابور والتنبيه.
 - أحداث الطلب تُكتب داخل معاملة الانتقال، و`commerce_order_feed_heads` **آخر قفل** فيها دائماً (اكتمال التغذية بترتيب الالتزام) + مصالحة بالحالة؛ لا قيد ولا حركة مخزون من COPS قبل قرارات D-8/D-10.
 
+**H1-2 (أحداث النطاق + التغذية + المصالحة):** `CommerceOrderEventRecorder::append()` يسجّل `DB::afterCommit` إطلاقَ حدث Laravel (`CommerceOrderPlaced`/`Cancelled`/`PaymentPaid`/`PaymentCollected` بمعرّفات فقط: `tenantId`/`orderId`/`eventId`) — بلا عبارة قاعدة بيانات إضافية داخل المعاملة؛ لا إطلاق عند التراجع ولا للإعادات؛ استثناء مستمع يُسجَّل بالمعرّفات ولا يُعاد رميه. **لكل نوع سجل جديد حدث نطاق مقابل** (يحرسه `CommerceOrderFeedTest`). `GET commerce/orders/feed?after_seq=&limit=` (≤100، ETag/304، `CommerceOrderFeedReader` قراءة بلا أقفال: التسلسل بلا فجوات بترتيب الالتزام فالمؤشّر لا يقفز) و`GET commerce/orders/attention?storefront_id=&limit=` (`CommerceOrderAttentionQuery`، من الحالة لا التاريخ: `confirmed` غير ملغى + دفع جاهز R-5 + نافذة `commerce.attention_window_hours` الافتراضي 48؛ الأقدم أولاً، سقف + `truncated`؛ السبب الأساسي `new_order`، ويضيف H1-4 `awaiting_acceptance` وH2 `fulfillment_not_started` وH3-4 الإقرار). صلاحية `commerce.orders.view` + `EnsureApplicationActive:commerce.storefront` + المقيَّد بمخازن 403؛ استجابات بلا PII. قراءة فقط. فهرس إضافي `(tenant_id, status, created_at)`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

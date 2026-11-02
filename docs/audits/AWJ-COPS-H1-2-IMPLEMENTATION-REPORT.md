@@ -1,0 +1,88 @@
+# COPS-H1-2 — Implementation Report (أحداث النطاق بعد الالتزام + تغذية الأحداث + مصالحة الانتباه)
+
+| البند | القيمة |
+|---|---|
+| Slice | COPS-H1-2 — أحداث Laravel بعد الالتزام + `GET commerce/orders/feed` + `GET commerce/orders/attention` |
+| Branch | `claude/cops-h1-2-feed-api` |
+| Base SHA | `134244ba5fef7253fd043aa21d85b666bd3fedcb` (`origin/main` بعد إغلاق H1-1) |
+| PR / Head SHA / Merge SHA | تُسجَّل في وصف الـPR وفي `AWJ_COPS_HORIZON_HANDOFF.md` (الملف لا يضمّن هاشه) |
+| الحالة | Implemented → Merged عند اجتياز البوابات · Not deployed · Not activated · Not env-verified |
+| العقد | `ADR-29` §2.4 + §2.4.2 (تفسير H1-2 الموثَّق أدناه) · Revision 1 §2.2–§2.3 |
+| قرارات المالك | تفويض COPS-H1-2/H1-3 الذاتي (2026-11-02) |
+
+---
+
+## 0. الخلاصة
+
+- **أحداث النطاق** (`CommerceOrderPlaced`/`Cancelled`/`PaymentPaid`/`PaymentCollected`) تُطلق **بعد الالتزام فقط**، بمعرّفات فقط، من نقطة واحدة هي `CommerceOrderEventRecorder::append()` (لا من المستدعين الأربعة)؛ لا عبارة قاعدة بيانات إضافية داخل المعاملة ⇒ بوابة الأداء المعتمدة لم تتأثر (7.2–17.9ms p95 إضافي في 9 جولات محلية).
+- **التغذية** `GET commerce/orders/feed?after_seq=&limit=`: صفحة مؤشّر ≤ 100، ETag/304، قراءة بلا أقفال (الاكتمال من خاصية H1-1).
+- **المصالحة** `GET commerce/orders/attention?storefront_id=&limit=`: من **الحالة** لا التاريخ.
+- **لا أثر محاسبي ولا مخزني ولا مالي**؛ لا تغيير في Checkout أو الدفع أو الإلغاء (سلوكياتها وردودها حرفياً؛ كل اختباراتها خضراء بلا تعديل).
+
+## 1. ما نُفِّذ (الملفات)
+
+| الملف | التغيير |
+|---|---|
+| `app/Events/CommerceOrderDomainEvent.php` + 4 أحداث | **جديد.** أساس مجرّد + `CommerceOrderPlaced`، `CommerceOrderCancelled`، `CommerceOrderPaymentPaid`، `CommerceOrderPaymentCollected` — خصائص عامة ثلاث فقط: `tenantId`, `orderId`, `eventId` (بلا PII ولا مبالغ) |
+| `app/Services/Commerce/CommerceOrderEventRecorder.php` | معرّف الحدث يُولَّد قبل الإدراج؛ `DB::afterCommit` يسجّل `publish()` المحميّ (try/catch ⇒ `Log::warning('commerce.order_event.listener_failed')` بالمعرّفات ونوع الاستثناء فقط) |
+| `app/Services/Commerce/CommerceOrderFeedReader.php` | **جديد.** `page($afterSeq, $limit)`: استعلامان ثابتان (حدّ+1 ثم الطلبات المرجعية `whereIn`) |
+| `app/Services/Commerce/CommerceOrderAttentionQuery.php` | **جديد.** الاستعلام + `reasonsFor()` القابل للتوسعة |
+| `app/Support/CommerceOrderFeedSerializer.php` | **جديد.** حقول بيضاء صريحة (مسلسل موظف منفصل؛ العام لم يتغيّر) |
+| `app/Http/Controllers/Api/CommerceStaffOrderFeedController.php` | **جديد.** `feed` و`attention`؛ التحقق، الحارس (مقيَّد بمخازن ⇒ 403)، ETag |
+| `routes/api.php` | مساران بصلاحية `commerce.orders.view` + `EnsureApplicationActive:commerce.storefront`، قبل `{id}` |
+| `config/commerce.php` | `attention_window_hours` (env `COMMERCE_ATTENTION_WINDOW_HOURS`، الافتراضي 48) |
+| `database/migrations/2026_12_28_010000_add_attention_index_to_commerce_orders.php` | فهرس `(tenant_id, status, created_at)` — إضافي فقط، `down()` يحذفه |
+| `tests/Feature/CommerceOrderFeedTest.php` | **جديد، 24 اختباراً** (SQLite وPostgreSQL) |
+| `tests/Feature/CommerceOrderFeedPostgresTest.php` | **جديد، 3 اختبارات** تزامن على PostgreSQL |
+| `CLAUDE.md` · `ADR-29` §2.4.2 | توثيق العقد والتفسير |
+
+لا تغيير في `app/Models` ولا في مستدعي المسجّل الأربعة ولا في أي خدمة مالية/مخزنية/ZATCA.
+
+## 2. القرارات التصميمية (مع التعليل)
+
+1. **الإطلاق في المسجّل لا في المستدعين:** يضمن أن كل صف سجل له حدث نطاق مقابل والعكس، ولا يمكن لمسار مستقبلي (H1-4 `order.accepted`…) أن ينسى الإطلاق. اختبار يفشل إن أُضيف نوع سجل بلا حدث نطاق.
+2. **معرّفات فقط:** المستمع يقرأ ما يحتاجه تحت سياق المستأجر؛ فلا تتسرّب PII عبر الأحداث ولا تتقادم لقطتها.
+3. **لا عبارة إضافية داخل المعاملة:** لم نقرأ `feed_seq` المخصَّص للحدث (لا حاجة)؛ فزمن إمساك قفل الرأس ثابت.
+4. **التغذية بلا أقفال:** `feed_seq > after_seq` على الفهرس الفريد. لا يقفز أبداً لأن التسلسل بلا فجوات بترتيب الالتزام (H1-1): كل ما نراه بادئة متصلة.
+5. **ETag:** هاش (مستأجر، المؤشّر، الحدّ، آخر seq، العدد، `has_more`) ⇒ لمؤشّر ثابت تتغيّر الصفحة فقط حين يُلحق حدث (أو تمتلئ الصفحة)؛ 304 دقيق. `Cache-Control: private, no-cache`.
+6. **لا فلتر متجر في التغذية:** الأحداث غير موسومة بالمتجر وتصفية الصفحة بعد الترقيم تكسر المؤشّر؛ العميل يفلتر بـ`order.storefront_id`. `attention` يحتفظ بفلتره.
+7. **تفسير المصالحة في H1-2 (موثَّق في ADR §2.4.2):** القبول اليدوي والتنفيذ لا يوجدان بعد فلا يُختلق لهما سلوك؛ والاختبار الإلزامي رقم 5 (حدث مفقود ⇒ يظهر الطلب) يُحقَّق بقاعدة الحالة الأساسية: `confirmed` + غير ملغى + دفع جاهز (R-5) + نافذة، بسبب `new_order`. **النافذة 48 ساعة** (≥ ضعف أقصى مهلة حجز دفع 24 ساعة). **هذا افتراض تفسيري يستحق انتباه المالك** (انظر §6).
+
+## 3. الاختبارات والنتائج (محلياً)
+
+| الفحص | النتيجة |
+|---|---|
+| `CommerceOrderFeedTest` (24) SQLite | ✅ 24/24 (382 تأكيداً) |
+| اختبارات الطفرة (mutation) | ✅ نقل الإطلاق إلى داخل المعاملة يُفشل اختبارَي «بعد الالتزام» و«التراجع»؛ إزالة حماية المستمع يُفشل اختبار المستمع الراميّ |
+| `CommerceOrderFeedPostgresTest` (3) PostgreSQL 16 | ✅ التزام متأخر: القارئ لا يرى حدثاً غير ملتزم وكل صفحة متصلة والترتيب بترتيب الالتزام · اكتمال: 8 كتّاب × 6 + قارئ بصفحات من 7 ⇒ يجمع 1..48 بلا تكرار/فقد/فجوة · أحداث النطاق بعد الالتزام الحقيقي (مستوى المعاملة 0 والصف مرئي)، لا إطلاق عند التراجع ولا استهلاك رقم |
+| الجناح الموسَّع على PostgreSQL (`CommerceOrderFeed*`، `CommerceOrderEvents*` بما فيه بوابة الأداء، `CommerceOrderCancellation*`، `CommerceOnlinePayment*`، `CommerceCheckout*`، `CommercePaymentIntent*`، `CommerceStaffOrder*`، `CommerceOrderService/Status/Reservation*`) | ✅ 277/277 (2,537 تأكيداً) |
+| `CommerceIntentCancelPostgresTest`، `CommerceInvoicePostingPostgresConcurrencyTest`، `PaymentAttemptPostingTest` | ✅ 22/22 |
+| بوابة الأداء المخصصة (`--group cops-h1-1-perf --fail-on-skipped --fail-on-risky`) ×3 | ✅ 9/9 جولة، p95 إضافي 7.2–17.9ms (حد 50)، نافذة النشاط 172–182/ث — **لا انحدار** |
+
+الجناح المحلي الموسَّع على SQLite والجناحان الكاملان (SQLite وPostgreSQL) يُسجَّلان من CI في وصف الـPR وHandoff.
+
+## 4. الأمان وعزل المستأجر (تحقق)
+
+- **RBAC:** `commerce.orders.view` فقط (owner/admin عبر `*`؛ لا `MATRIX` ولا دور مخزَّن ولا زرع)؛ accountant/staff ⇒ 403؛ بلا رمز ⇒ نفس رفض المسار القائم؛ **مقيَّد بمخازن ⇒ 403**؛ قدرة `commerce.storefront` معطَّلة ⇒ 403. اختبار.
+- **العزل:** الاستعلامات تحت `TenantScope` (نماذج `BaseModel`)؛ لا معرّف مستأجر من العميل؛ مستأجر آخر يرى تغذية/مصالحة فارغة وتسلسله مستقل. اختبار.
+- **PII:** الاستجابتان بلا اسم/هاتف/بريد/عنوان/مبلغ/اسم موظف (يتحقق الاختبار نصّياً بإبر بحث)؛ الفاعل نوع فقط؛ `data` بالمفاتيح البيضاء فقط.
+- **المدخلات:** `after_seq` عدد صحيح ≥ 0؛ `limit` 1..100؛ `storefront_id` UUID؛ كل غير ذلك 422.
+- **قراءة فقط:** اختبار يثبت عدم تغيّر أي جدول (أحداث/طلبات/نيات/قيود/مخزون/فواتير/دفعات) ولا الرأس. لا قفل في القراءة.
+- **لا أثر مالي:** لا قيد ولا حركة مخزون ولا ZATCA.
+
+## 5. المخاطر والمتبقي
+
+| المخاطرة | المعالجة |
+|---|---|
+| مستمع يرمي يُوقف مستمعين لاحقين (Laravel متزامن) | الناشر يحمي المعاملة والاستجابة؛ **عقد المستمعين: لا يرمون** (ADR §2.4)؛ المستمعون الفعليون في H3 ملزمون به |
+| قراءة التغذية تتوسّع بطيئة مع الزمن | الفهرس الفريد `(tenant_id, feed_seq)` + حدّ 100؛ لا ترقيم بصفحات عميقة |
+| المصالحة تعيد كل الطلبات الحديثة ما دام لا إقرار | حدّ 100 + `truncated` + نافذة؛ الإقرار لكل طلب في H3-4 |
+| `attention` لا يعرف «تم التعامل معه» قبل H1-4/H2/H3-4 | موثَّق؛ الأسباب قابلة للتوسعة |
+| التنبيه/الجرس/الصوت/الواجهة | خارج النطاق (H3/H1-5) |
+
+## 6. للمالك (قرار تفسيري مُعلَن، لا يعطّل شيئاً)
+
+سبب `new_order` الأساسي ونافذة 48 ساعة تفسيرٌ لبند ADR «بانتظار القبول اليدوي أو لم يبدأ التنفيذ» قبل وجود هاتين القدرتين، لتحقيق الاختبار الإلزامي رقم 5. إن فضّلتم قائمة فارغة حتى H1-4 أو نافذة مختلفة فهو تغيير سطر واحد في الإعداد/الاستعلام.
+
+## 7. الخطوة التالية
+دمج H1-2 بعد اجتياز البوابات، تسجيل الـSHA في Handoff، ثم **H1-3** (إعدادات تشغيل القناة) بفرع وPR مستقلين.
