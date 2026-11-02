@@ -12,11 +12,27 @@ const STEPS = [
   { key: "delivered", authoritativeWhen: null },
 ] as const;
 
-type StepKey = "placed" | "preparing" | "readyForPickup" | "onTheWay" | "delivered" | "pickedUp";
+type StepKey =
+  | "placed"
+  | "preparing"
+  | "readyForPickup"
+  | "onTheWay"
+  | "delivered"
+  | "pickedUp";
 
 /** Steps per fulfilment type — pickup swaps the last two for ready/picked-up. */
-const DELIVERY_STEPS: StepKey[] = ["placed", "preparing", "onTheWay", "delivered"];
-const PICKUP_STEPS: StepKey[] = ["placed", "preparing", "readyForPickup", "pickedUp"];
+const DELIVERY_STEPS: StepKey[] = [
+  "placed",
+  "preparing",
+  "onTheWay",
+  "delivered",
+];
+const PICKUP_STEPS: StepKey[] = [
+  "placed",
+  "preparing",
+  "readyForPickup",
+  "pickedUp",
+];
 
 /**
  * How far along the journey a public stage is (index into the type's steps). `delivery_attempt_failed` keeps the
@@ -27,13 +43,20 @@ function reachedIndex(f: StorefrontFulfillment): number {
     return { preparing: 1, ready: 2, picked_up: 3 }[f.stage as string] ?? 1;
   }
   return (
-    { preparing: 1, ready: 1, out_for_delivery: 2, delivery_attempt_failed: 2, delivered: 3 }[
-      f.stage as string
-    ] ?? 1
+    {
+      preparing: 1,
+      ready: 1,
+      out_for_delivery: 2,
+      delivery_attempt_failed: 2,
+      delivered: 3,
+    }[f.stage as string] ?? 1
   );
 }
 
-function formatAt(value: string | null | undefined, locale: string): string | null {
+function formatAt(
+  value: string | null | undefined,
+  locale: string,
+): string | null {
   if (!value) return null;
   try {
     return new Intl.DateTimeFormat(locale, {
@@ -49,7 +72,14 @@ function formatAt(value: string | null | undefined, locale: string): string | nu
 
 /** When the buyer-visible stage behind a step was reached (from the API's `stages`), if it said. */
 function stepTime(f: StorefrontFulfillment, step: StepKey, locale: string) {
-  const key = { placed: "placed", preparing: "preparing", readyForPickup: "ready", onTheWay: "out_for_delivery", delivered: "delivered", pickedUp: "picked_up" }[step];
+  const key = {
+    placed: "placed",
+    preparing: "preparing",
+    readyForPickup: "ready",
+    onTheWay: "out_for_delivery",
+    delivered: "delivered",
+    pickedUp: "picked_up",
+  }[step];
   return formatAt(f.stages.find((s) => s.key === key)?.at, locale);
 }
 
@@ -113,11 +143,15 @@ export function AccountOrderStatus({
     const failed = fulfillment.stage === "delivery_attempt_failed";
     const tracking = fulfillment.tracking;
     const showTracking =
-      tracking !== null && (tracking.carrier || tracking.number || tracking.url);
+      tracking !== null &&
+      (tracking.carrier || tracking.number || tracking.url);
     const readyAt = formatAt(fulfillment.pickup?.readyAt, locale);
 
     return (
-      <section aria-labelledby="account-order-status" data-fulfillment-stage={fulfillment.stage}>
+      <section
+        aria-labelledby="account-order-status"
+        data-fulfillment-stage={fulfillment.stage}
+      >
         <h2
           id="account-order-status"
           className="text-sm font-semibold text-store-foreground"
@@ -181,11 +215,13 @@ export function AccountOrderStatus({
             </p>
           </div>
         )}
-        {fulfillment.type === "pickup" && fulfillment.stage === "ready" && readyAt && (
-          <p className="mt-3 text-xs leading-relaxed text-store-muted-foreground">
-            {t("timeline.pickupReady", { date: readyAt })}
-          </p>
-        )}
+        {fulfillment.type === "pickup" &&
+          fulfillment.stage === "ready" &&
+          readyAt && (
+            <p className="mt-3 text-xs leading-relaxed text-store-muted-foreground">
+              {t("timeline.pickupReady", { date: readyAt })}
+            </p>
+          )}
         {showTracking && (
           <div className="mt-4 rounded-store border border-store-border p-3 text-sm">
             <p className="font-semibold text-store-foreground">
@@ -195,13 +231,17 @@ export function AccountOrderStatus({
               {tracking.carrier && (
                 <div className="flex gap-2">
                   <dt>{t("timeline.trackingCarrier")}</dt>
-                  <dd className="text-store-foreground"><bdi>{tracking.carrier}</bdi></dd>
+                  <dd className="text-store-foreground">
+                    <bdi>{tracking.carrier}</bdi>
+                  </dd>
                 </div>
               )}
               {tracking.number && (
                 <div className="flex gap-2">
                   <dt>{t("timeline.trackingNumber")}</dt>
-                  <dd className="text-store-foreground"><bdi dir="ltr">{tracking.number}</bdi></dd>
+                  <dd className="text-store-foreground">
+                    <bdi dir="ltr">{tracking.number}</bdi>
+                  </dd>
                 </div>
               )}
             </dl>

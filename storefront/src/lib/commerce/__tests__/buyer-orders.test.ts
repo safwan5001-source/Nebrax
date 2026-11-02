@@ -133,7 +133,10 @@ describe("buyer order mappers", () => {
     };
     expect(buyerOrderDetailFromApi(base)?.fulfillment).toBeNull();
     expect(
-      buyerOrderDetailFromApi({ ...base, fulfillment: { type: "drone", stage: "x", stages: [] } })?.fulfillment,
+      buyerOrderDetailFromApi({
+        ...base,
+        fulfillment: { type: "drone", stage: "x", stages: [] },
+      })?.fulfillment,
     ).toBeNull();
     const detail = buyerOrderDetailFromApi({
       ...base,

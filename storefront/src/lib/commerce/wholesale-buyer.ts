@@ -12,8 +12,8 @@
  */
 
 import {
-  mapOrderFulfillment,
   type AwjOrderFulfillment,
+  mapOrderFulfillment,
   type StorefrontFulfillment,
 } from "@/lib/commerce/checkout-types";
 

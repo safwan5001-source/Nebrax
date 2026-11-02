@@ -167,7 +167,11 @@ export interface AwjOrderFulfillment {
   type: string;
   stage: string;
   stages: Array<{ key: string; at: string | null }>;
-  tracking: { carrier: string | null; number: string | null; url: string | null } | null;
+  tracking: {
+    carrier: string | null;
+    number: string | null;
+    url: string | null;
+  } | null;
   pickup: { ready_at: string | null } | null;
 }
 
@@ -267,7 +271,11 @@ export interface StorefrontCheckout {
   cart: StorefrontCart;
 }
 
-export const FULFILLMENT_TYPES = ["local_delivery", "carrier", "pickup"] as const;
+export const FULFILLMENT_TYPES = [
+  "local_delivery",
+  "carrier",
+  "pickup",
+] as const;
 export const FULFILLMENT_STAGES = [
   "preparing",
   "ready",
@@ -283,7 +291,11 @@ export interface StorefrontFulfillment {
   stage: (typeof FULFILLMENT_STAGES)[number];
   stages: Array<{ key: (typeof STAGE_KEYS)[number]; at: string | null }>;
   /** Carrier shipments after dispatch only; the link is https and nothing else. */
-  tracking: { carrier: string | null; number: string | null; url: string | null } | null;
+  tracking: {
+    carrier: string | null;
+    number: string | null;
+    url: string | null;
+  } | null;
   pickup: { readyAt: string | null } | null;
 }
 
@@ -339,9 +351,12 @@ export function mapAwjCheckoutToViewModel(
   };
 }
 
-const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+const str = (v: unknown): string | null =>
+  typeof v === "string" && v !== "" ? v : null;
 const oneOf = <T extends string>(list: readonly T[], v: unknown): T | null =>
-  typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : null;
+  typeof v === "string" && (list as readonly string[]).includes(v)
+    ? (v as T)
+    : null;
 
 /**
  * Defensive: an unknown type/stage (a newer API) or a malformed block yields `null`, so the UI falls back to the
@@ -360,21 +375,27 @@ export function mapOrderFulfillment(
     return key ? [{ key, at: str(entry?.at) }] : [];
   });
 
-  const tracking = raw.tracking && typeof raw.tracking === "object"
-    ? {
-        carrier: str(raw.tracking.carrier),
-        number: str(raw.tracking.number),
-        // https only — a tracking link is a navigation target, never trust other schemes.
-        url: str(raw.tracking.url)?.toLowerCase().startsWith("https://") ? str(raw.tracking.url) : null,
-      }
-    : null;
+  const tracking =
+    raw.tracking && typeof raw.tracking === "object"
+      ? {
+          carrier: str(raw.tracking.carrier),
+          number: str(raw.tracking.number),
+          // https only — a tracking link is a navigation target, never trust other schemes.
+          url: str(raw.tracking.url)?.toLowerCase().startsWith("https://")
+            ? str(raw.tracking.url)
+            : null,
+        }
+      : null;
 
   return {
     type,
     stage,
     stages,
     tracking,
-    pickup: raw.pickup && typeof raw.pickup === "object" ? { readyAt: str(raw.pickup.ready_at) } : null,
+    pickup:
+      raw.pickup && typeof raw.pickup === "object"
+        ? { readyAt: str(raw.pickup.ready_at) }
+        : null,
   };
 }
 
