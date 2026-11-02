@@ -79,7 +79,8 @@ final class StorefrontOrderTrackingController extends PublicApiController
                 : $this->notFound($request);
         }
 
-        $validKey = 'order-tracking-ok|'.hash('sha256', $token);
+        // المفتاح من الحقول المفكوكة والمتحقَّق منها لا من النص الخام: لا تمثيل ثانٍ للرمز نفسه يأخذ سلة معدل مستقلة.
+        $validKey = 'order-tracking-ok|'.hash('sha256', implode('|', [$parsed[0], (string) $parsed[1], $parsed[2]]));
         if (RateLimiter::tooManyAttempts($validKey, self::VALID_PER_MINUTE)) {
             return $this->tooMany($request, RateLimiter::availableIn($validKey));
         }

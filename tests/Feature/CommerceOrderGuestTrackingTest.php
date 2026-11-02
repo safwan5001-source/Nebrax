@@ -222,6 +222,30 @@ class CommerceOrderGuestTrackingTest extends TestCase
     }
 
     #[Test]
+    public function a_noncanonical_expiry_is_rejected_so_one_token_cannot_buy_extra_read_budgets(): void
+    {
+        $order = $this->order();
+        $token = $this->token($order);
+        [$prefix, $id, $exp, $sig] = explode('.', $token);
+
+        // التمثيلات ذات الأصفار البادئة كانت تتحقق بالتوقيع نفسه وتأخذ سلة معدل خاصة بها (3×30 قراءة في الدقيقة).
+        foreach (["0{$exp}", "00{$exp}", "000{$exp}"] as $variant) {
+            $this->assertNull(\App\Support\CommerceOrderTrackingToken::parse(implode('.', [$prefix, $id, $variant, $sig])));
+            $this->track(implode('.', [$prefix, $id, $variant, $sig]))->assertNotFound();
+        }
+
+        // الرمز القانوني وحده يُقرأ، وسلته 30 فقط مهما حُرِّف.
+        for ($i = 0; $i < 30; $i++) {
+            $this->track($token)->assertOk();
+        }
+        $this->track($token)->assertStatus(429);
+        $this->track(implode('.', [$prefix, $id, "0{$exp}", $sig]))->assertNotFound();
+        // أحرف كبيرة في uuid/hex ليست تمثيلاً ثانياً أيضاً.
+        $this->assertNull(\App\Support\CommerceOrderTrackingToken::parse(implode('.', [$prefix, strtoupper($id), $exp, $sig])));
+        $this->assertNull(\App\Support\CommerceOrderTrackingToken::parse(implode('.', [$prefix, $id, $exp, strtoupper($sig)])));
+    }
+
+    #[Test]
     public function issuing_links_has_its_own_budget_and_never_consumes_the_payment_start_budget(): void
     {
         $order = $this->order();

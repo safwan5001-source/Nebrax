@@ -50,7 +50,8 @@ final class CommerceOrderTrackingToken
     }
 
     /**
-     * يفكّ البنية فقط (لا توقيع): `[order_id, exp, sig]` أو null. لا يثق بشيء قبل `verify()`.
+     * يفكّ البنية فقط (لا توقيع): `[order_id, exp, sig]` أو null. لا يثق بشيء قبل `verify()`. الصيغة قانونية وحيدة التمثيل
+     * (uuid وhex بأحرف صغيرة، وexp عشري بلا أصفار بادئة) فلكل رمز صالح نصٌّ واحد فقط.
      *
      * @return array{0: string, 1: int, 2: string}|null
      */
@@ -65,7 +66,9 @@ final class CommerceOrderTrackingToken
         }
         [, $orderId, $exp, $sig] = $parts;
         if (preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/', $orderId) !== 1
-            || preg_match('/\A[0-9]{1,12}\z/', $exp) !== 1
+            // قانوني فقط: بلا أصفار بادئة. التوقيع يُحسب على العدد، فتمثيلات «01893456000» و«001893456000» كانت تتحقق بالتوقيع نفسه
+            // وتكسر وحدانية التمثيل (ثلاث سلال تحديد معدل لرمز واحد). نرفضها صراحةً بدل تطبيعها.
+            || preg_match('/\A[1-9][0-9]{0,11}\z/', $exp) !== 1
             || preg_match('/\A[0-9a-f]{64}\z/', $sig) !== 1) {
             return null;
         }
