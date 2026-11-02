@@ -212,6 +212,23 @@ describe('fulfillment section (COPS-H2-3)', () => {
       expect(btn('جاهز')).toBeNull();
     });
 
+    it('clearing a prefilled tracking field in the dispatch dialog sends an explicit empty value so the old one is not silently kept (review P2)', async () => {
+      const readyCarrier = detailFixture({
+        fulfillment: fulfillmentBlock({ status: 'ready', type: 'carrier', version: 2, carrier: { name: 'سمسا', tracking_number: 'T-OLD', tracking_url: 'https://track.example.test/OLD' }, courier: { name: null, phone: null } }),
+        fulfillment_actions: [{ action: 'dispatch', available: true, blocked_reason: null }],
+      });
+      fetchOrderMock.mockResolvedValue(readyCarrier);
+      apiMock.mockResolvedValue({ data: readyCarrier });
+      render(<OrderDetailView id="o1" />);
+      await ready();
+      fireEvent.click(btn('إرسال للتوصيل')!);
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByLabelText(/رقم التتبع/), { target: { value: '' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'إرسال' }));
+      await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1));
+      expect(apiMock.mock.calls[0][1].body).toMatchObject({ expected_version: 2, carrier_name: 'سمسا', tracking_number: '' });
+    });
+
     it('a 409 while a dispatch dialog is open closes it for good: the stale values are never resubmitted against the new version (review P2)', async () => {
       const ready = (over = {}) => detailFixture({ fulfillment: fulfillmentBlock({ status: 'ready', type: 'carrier', version: 2, carrier: { name: 'قديم', tracking_number: null, tracking_url: null }, ...over }), fulfillment_actions: [{ action: 'dispatch', available: true, blocked_reason: null }] });
       fetchOrderMock.mockResolvedValueOnce(ready());

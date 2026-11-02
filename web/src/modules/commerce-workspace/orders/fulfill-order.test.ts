@@ -7,18 +7,20 @@ vi.mock('@/lib/api', () => ({ api: (...a: unknown[]) => apiMock(...a) }));
 describe('fulfill-order.ts (COPS-H2-3 writes)', () => {
   beforeEach(() => apiMock.mockReset().mockResolvedValue({ data: { id: 'o1' } }));
 
-  it('POSTs the action with the displayed expected_version and drops blank fields', async () => {
+  it('POSTs the action with the displayed expected_version; a dispatch keeps blank fields as deliberate clears, other actions drop them', async () => {
     await fulfillOrder('o 1', 'dispatch', 3, { carrier_name: ' سمسا ', tracking_number: '', tracking_url: '  ', courier_phone: '٠٥٠٠٠٠٠٠٠٠' });
     const [path, options] = apiMock.mock.calls[0];
     expect(path).toMatch(/\/o%201\/fulfillment\/dispatch$/);
     expect(options.method).toBe('POST');
-    expect(options.body).toEqual({ expected_version: 3, carrier_name: 'سمسا', courier_phone: '٠٥٠٠٠٠٠٠٠٠' });
+    expect(options.body).toEqual({ expected_version: 3, carrier_name: 'سمسا', tracking_number: '', tracking_url: '', courier_phone: '٠٥٠٠٠٠٠٠٠٠' });
   });
 
   it('sends version 0 for the first action and the failure reason/note', async () => {
     await fulfillOrder('o1', 'start', 0);
     expect(apiMock.mock.calls[0][1].body).toEqual({ expected_version: 0 });
     await fulfillOrder('o1', 'fail', 4, { reason: 'address_issue', note: ' ملاحظة ' });
+    await fulfillOrder('o1', 'fail', 4, { reason: 'other', note: '   ' });
+    expect(apiMock.mock.calls[2][1].body).toEqual({ expected_version: 4, reason: 'other' });
     expect(apiMock.mock.calls[1][1].body).toEqual({ expected_version: 4, reason: 'address_issue', note: 'ملاحظة' });
   });
 

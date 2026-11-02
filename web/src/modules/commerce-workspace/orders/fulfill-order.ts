@@ -46,7 +46,8 @@ function compact<T extends Record<string, unknown>>(input: T, clearable: boolean
 export async function fulfillOrder(id: string, action: FulfillmentActionName, expectedVersion: number, input: FulfillmentActionInput = {}): Promise<OrderDetail> {
   const response = await api<{ data: OrderDetail }>(`${path(id)}/${encodeURIComponent(action)}`, {
     method: 'POST',
-    body: { expected_version: expectedVersion, ...compact(input, false) },
+    // dispatch: نص فارغ يُرسَل كما هو (مسح مقصود لحقل كان معبّأً مسبقاً في الحوار — الخادم يفسّره null)؛ بقية الإجراءات تحذف الفارغ.
+    body: { expected_version: expectedVersion, ...compact(input, action === 'dispatch') },
   });
 
   return response.data;
