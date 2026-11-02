@@ -13,6 +13,7 @@ use App\Services\Commerce\CommercePaymentIntentService;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -22,11 +23,18 @@ use Tests\TestCase;
  * ═══════════════════════════════════════════════════════════════
  *  1) التزام متأخر: كاتب لاحق ينتظر الرأس حتى يلتزم السابق، والتسلسل بترتيب الالتزام، ومستطلِع متزامن لا يرى فجوة أبداً.
  *  2) التراجع: لا فجوة لكاتب متزامن ولا لاحق.
- *  3) الأداء (D-H1-1-P = P-A): بوابة حمل واقعي ≈130 حدثاً/ث/مستأجر (3 جولات، p95 إضافي < 50ms، تحقق نموذج الحمل، اكتمال) +
- *     تشخيص اندفاع مشبَع يُسجَّل دائماً (اكتمال مفروض، كمون حدّ تشغيلي موثَّق لا شرط).
+ *  3) الأداء (D-H1-1-P = P-A، وتصحيح القياس D-H1-1-PERF-B): بوابة حمل واقعي (20 كاتباً × 10، تفكير 0–200ms ⇒ ≈130 حدثاً/ث/مستأجر كمتوسط للجولة)
+ *     = جولة إحماء مُعلَنة مسجَّلة ومستبعدة + 3 جولات محتسبة، كلٌّ: p95 إضافي < 50ms (لم يتغيّر)، إنتاجية **نافذة النشاط** (كل الكتّاب نشطون) ≥ 90/ث
+ *     ومعدل الجولة الكلي ≤ 170/ث، اكتمال. كل المقاييس (بما فيها إجمالي الجولة وبدء العمليات وCPU والتباين) تُسجَّل **قبل** أي تأكيد.
+ *     + تشخيص اندفاع مشبَع يُسجَّل دائماً (اكتمال مفروض، كمون حدّ تشغيلي موثَّق لا شرط).
  *  4) لا جمود: الكاتب لا يلمس `tenants`، فممسك مِرساة المستأجر (`FOR UPDATE`) المنتظر لصف يمسكه الكاتب لا يكوّن حلقة — مع ضابط سلبي
  *     يُثبت أن قفلاً على `tenants` في الموضع نفسه كان سيُنتج 40P01 (حساسية الاختبار).
  *  5) المسارات الحقيقية (إلغاء الموظف ‖ تحصيل الاستلام ‖ ممسك مِرساة يكتب حدثاً آخراً) بلا جمود وبتسلسل متصل.
+ *
+ *  **عزل القياس (COPS-H1-1 CI Performance Isolation Recovery، الخيار B):** اختبارا الأداء (المجموعة `cops-h1-1-perf`) يقيسان كموناً مقابل مؤقّت جداري،
+ *  فيتشوّه القياس حين يشاركان الجهاز مع عمّال ParaTest الأربعة (رُصد p95 إضافي 55–102ms بدل 18–26ms بلا أي تغيير في الكود). لذلك يتخطّيان نفسيهما
+ *  داخل عامل متوازٍ (`LARAVEL_PARALLEL_TESTING`) ويعملان في وظيفة CI مخصصة (`pg-perf`) على مشغّل خاص (`vendor/bin/phpunit --group cops-h1-1-perf`)
+ *  تفشل إن لم تُنتج المقاييس. حدّ 50ms وحمل العمل (20 كاتباً، تفكير 0–200ms) وكل اختبارات الصحة/الجمود/الاكتمال بلا أي تغيير ولا تخفيف.
  *
  *  على PostgreSQL **لا يُتخطّى** إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط. بلا معاملة مُغلِّفة (الأطفال يحتاجون صفوفاً مثبَّتة).
  */
@@ -37,13 +45,25 @@ class CommerceOrderEventsPostgresTest extends TestCase
     /** حدّ R-2 المعتمد (P-A): الزيادة في p95 لانتظار الرأس تحت الحمل الواقعي المعتمد. */
     private const P95_BUDGET_MS = 50.0;
 
-    /** نموذج الحمل الواقعي المعتمد (D-H1-1-P): مهلة تفكير منتظمة 0–200ms لكل كاتب ⇒ ≈130 حدثاً/ث/مستأجر بـ20 كاتباً. */
+    /** نموذج الحمل الواقعي المعتمد (D-H1-1-P): مهلة تفكير منتظمة 0–200ms لكل كاتب ⇒ ≈130 حدثاً/ث/مستأجر (متوسط الجولة الكلي) بـ20 كاتباً. */
     private const REALISTIC_THINK_MAX_MS = 200;
 
-    /** نطاق التحقق من نموذج الحمل (≈130 ± 30%): خارجَه لا يُعتدّ بالقياس. */
+    /**
+     * نطاق التحقق من نموذج الحمل (≈130 ± 30%): خارجَه لا يُعتدّ بالقياس. الحدّ الأدنى يُطبَّق على إنتاجية **نافذة النشاط** (كل الكتّاب نشطون؛
+     * لا يُقبل نجاح بحمل أخف من المعتمد)، والأعلى على معدل **الجولة الكلي** (لا يُقبل قياس بحمل أثقل من المعتمد). إنتاجية نافذة النشاط تقيس ≈165–185/ث لأن
+     * 20 كاتباً بتفكير متوسطه 100ms يولّدون ≈175/ث حين يكونون كلهم نشطين؛ والمتوسط الكلي للجولة (≈110–130) أدنى لأن ذيل الجولة يتناقص فيه الكتّاب النشطون.
+     */
     private const REALISTIC_RATE_MIN = 90.0;
 
     private const REALISTIC_RATE_MAX = 170.0;
+
+    /** المعدل المعروض المعتمد (D-H1-1-P): يُسجَّل بجانب المعدل المحقق فعلاً كي لا يُنسب للقياس حمل لم يُولَّد. */
+    private const OFFERED_RATE_TARGET = 130.0;
+
+    /** مجموعة قياسات الأداء: تعمل في الخطوة التسلسلية المعزولة في CI، وتتخطّى نفسها داخل العمّال المتوازين. */
+    public const PERF_GROUP = 'cops-h1-1-perf';
+
+    private float $perfStartedAt = 0.0;
 
     private string $dir;
 
@@ -241,26 +261,63 @@ class CommerceOrderEventsPostgresTest extends TestCase
     // ───────────────────────── 3) الأداء: بوابة الحمل الواقعي + تشخيص الاندفاع المشبَع ─────────────────────────
 
     /**
-     * بوابة R-2 المعتمدة (قرار المالك D-H1-1-P = P-A): 20 كاتباً متزامناً لمستأجر واحد، كلٌّ 10 معاملات تفصلها مهلة تفكير منتظمة
-     * 0–200ms ببذرة ثابتة ⇒ معدل معروض ≈ 130 حدثاً/ث/مستأجر. ثلاث جولات، وكلٌّ يجب أن (أ) يحقق نموذج الحمل (إنتاجية 90–170/ث)،
-     * (ب) يُكمل التسلسل بلا فجوة ولا تكرار، (ج) يبقي p95 انتظار الرأس الإضافي (p95 المتنافس − p50 خط الأساس) دون 50ms.
+     * بوابة R-2 المعتمدة (قرار المالك D-H1-1-P = P-A، وتصحيح القياس D-H1-1-PERF-B): 20 كاتباً متزامناً لمستأجر واحد، كلٌّ 10 معاملات تفصلها مهلة
+     * تفكير منتظمة 0–200ms ببذرة ثابتة (الحمل المعتمد لم يتغيّر). جولة إحماء واحدة **مُعلَنة** تُسجَّل ولا تُحتسب (أول تفرّع بعد الهجرة أبطأ بسبب البداية
+     * الباردة)، ثم ثلاث جولات محتسبة، وكلٌّ يجب أن (أ) يُبقي إنتاجية **نافذة النشاط** (حين كل الكتّاب نشطون) ≥ 90 حدثاً/ث — أي لا يُقبل نجاح بحمل أخف
+     * من المعتمد — وألا يتجاوز معدل الجولة الكلي 170/ث، (ب) يُكمل التسلسل بلا فجوة ولا تكرار ولا جمود، (ج) يبقي p95 انتظار الرأس الإضافي
+     * (p95 المتنافس − p50 خط الأساس) دون **50ms** (لم يتغيّر). كل المقاييس تُسجَّل **قبل** أي تأكيد كي لا يضيع دليل عند الفشل.
      */
     #[Test]
+    #[Group(self::PERF_GROUP)]
     public function the_realistic_load_gate_keeps_the_added_p95_feed_lock_wait_under_budget_at_about_130_events_per_second(): void
     {
+        $this->isolateFromParallelWorkers();
         $baselineP50 = $this->baselineP50();
+
+        $warmup = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: self::REALISTIC_THINK_MAX_MS, seed: 0);
+        $warmup['round'] = 0;
+        $warmup['excluded_from_evaluation'] = true;
+        $warmup['added_p95_ms'] = round($warmup['contended_p95_ms'] - $baselineP50, 3);
+
         $rounds = [];
         foreach ([1, 2, 3] as $round) {
             $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: self::REALISTIC_THINK_MAX_MS, seed: 1000 * $round);
             $m['round'] = $round;
             $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
+            $m['achieved_vs_offered_target_pct'] = round(100 * $m['active_window_events_per_second'] / self::OFFERED_RATE_TARGET, 1);
+            $m['checks'] = [
+                'active_window_rate_not_lighter_than_approved' => $m['active_window_events_per_second'] >= self::REALISTIC_RATE_MIN,
+                'total_round_rate_not_heavier_than_approved' => $m['events_per_second'] <= self::REALISTIC_RATE_MAX,
+                'added_p95_under_budget' => $m['added_p95_ms'] < self::P95_BUDGET_MS,
+            ];
             $rounds[] = $m;
-
-            $this->assertGreaterThanOrEqual(self::REALISTIC_RATE_MIN, $m['events_per_second'], 'نموذج الحمل: المعدل المحقق أدنى من المعتمد (لا يُقبل نجاح بحمل أخف) '.json_encode($m));
-            $this->assertLessThanOrEqual(self::REALISTIC_RATE_MAX, $m['events_per_second'], 'نموذج الحمل: المعدل المحقق أعلى من المعتمد '.json_encode($m));
-            $this->assertLessThan(self::P95_BUDGET_MS, $m['added_p95_ms'], "R-2 (P-A): الجولة {$round} تجاوزت p95 الإضافي المعتمد — تصعيد للمالك. ".json_encode($m));
         }
-        $this->recordMetrics('realistic_load_gate', ['baseline_p50_ms' => $baselineP50, 'rounds' => $rounds]);
+
+        // أولاً: التسجيل الكامل (بما فيه الإحماء) — لا يسبقه أي تأكيد.
+        $this->recordMetrics('realistic_load_gate', [
+            'baseline_p50_ms' => $baselineP50,
+            'disclosure' => 'الجولة 0 إحماء مُعلَن: الحمل نفسه، مسجَّلة ومستبعدة من التقييم (excluded_from_evaluation). الجولات 1–3 محتسبة. حدّ p95 الإضافي 50ms لم يتغيّر.',
+            'warmup' => $warmup,
+            'rounds' => $rounds,
+            'variance' => [
+                'added_p95_ms' => self::stats(array_column($rounds, 'added_p95_ms')),
+                'active_window_events_per_second' => self::stats(array_column($rounds, 'active_window_events_per_second')),
+                'total_round_events_per_second' => self::stats(array_column($rounds, 'events_per_second')),
+                'contended_p50_ms' => self::stats(array_column($rounds, 'contended_p50_ms')),
+                'contended_p95_ms' => self::stats(array_column($rounds, 'contended_p95_ms')),
+            ],
+        ]);
+
+        // ثانياً: النزاهة (اكتمال/لا جمود) لكل جولة بما فيها الإحماء — صحة لا أداء.
+        foreach ([$warmup, ...$rounds] as $m) {
+            $this->assertRoundIntegrity($m);
+        }
+        // ثالثاً: معايير الأداء المعتمدة على الجولات المحتسبة وحدها.
+        foreach ($rounds as $m) {
+            $this->assertTrue($m['checks']['active_window_rate_not_lighter_than_approved'], 'نموذج الحمل: إنتاجية نافذة النشاط أدنى من المعتمد (لا يُقبل نجاح بحمل أخف) '.json_encode($m));
+            $this->assertTrue($m['checks']['total_round_rate_not_heavier_than_approved'], 'نموذج الحمل: معدل الجولة أعلى من المعتمد '.json_encode($m));
+            $this->assertTrue($m['checks']['added_p95_under_budget'], "R-2 (P-A): الجولة {$m['round']} تجاوزت p95 الإضافي المعتمد — تصعيد للمالك. ".json_encode($m));
+        }
     }
 
     /**
@@ -268,13 +325,78 @@ class CommerceOrderEventsPostgresTest extends TestCase
      * ولا يُخفى؛ الصحة (اكتمال بلا فجوة ولا تكرار، لا جمود) **مفروضة** هنا أيضاً، أما الكمون تحت التشبّع فحدّ تشغيلي موثَّق لا شرط قبول.
      */
     #[Test]
+    #[Group(self::PERF_GROUP)]
     public function the_saturated_burst_diagnostic_stays_complete_and_records_its_capacity_and_latency(): void
     {
+        $this->isolateFromParallelWorkers();
         $baselineP50 = $this->baselineP50();
         $m = $this->measureWriters(writers: 20, perWriter: 10, thinkMaxMs: 0, seed: 7);
         $m['added_p95_ms'] = round($m['contended_p95_ms'] - $baselineP50, 3);
         $this->recordMetrics('saturated_burst_diagnostic', ['baseline_p50_ms' => $baselineP50, 'burst' => $m]);
+        $this->assertRoundIntegrity($m);
         $this->assertGreaterThan(0, $m['events_per_second']);
+    }
+
+    /**
+     * قياس الكمون مقابل مؤقّت جداري لا يصحّ على جهاز يشاركه أربعة عمّال اختبار متوازية (تنافس المعالج يؤخّر مُمسك القفل فيطول انتظار كل من خلفه
+     * — ضجيج بيئة لا خاصية في الكاتب). داخل عامل ParaTest نتخطّى بسبب صريح؛ وظيفة CI المخصصة (`pg-perf`) تشغّل المجموعة وحدها على مشغّل خاص
+     * وتفشل إن لم تُنتج مقاييس.
+     */
+    private function isolateFromParallelWorkers(): void
+    {
+        if (! empty($_SERVER['LARAVEL_PARALLEL_TESTING']) || ! empty(getenv('LARAVEL_PARALLEL_TESTING'))) {
+            $this->markTestSkipped('قياس الأداء يعمل في وظيفة CI مخصصة (pg-perf) على مشغّل خاص: vendor/bin/phpunit --group '.self::PERF_GROUP.' (لا داخل عمّال متوازين).');
+        }
+        $this->perfStartedAt = microtime(true);
+    }
+
+    /** @return array{busy:int,idle:int,iowait:int,steal:int,total:int}|null لقطة عدّادات المعالج التراكمية من /proc/stat (لينكس)؛ null إن تعذّرت. */
+    private static function cpuSnapshot(): ?array
+    {
+        $line = @file('/proc/stat', FILE_IGNORE_NEW_LINES)[0] ?? null;
+        if ($line === null || ! str_starts_with($line, 'cpu ')) {
+            return null;
+        }
+        $f = array_map('intval', preg_split('/\s+/', trim(substr($line, 4))) ?: []);
+        $f += array_fill(0, 8, 0);
+        // user nice system idle iowait irq softirq steal
+        $idle = $f[3] + $f[4];
+        $total = array_sum(array_slice($f, 0, 8));
+
+        return ['busy' => $total - $idle, 'idle' => $f[3], 'iowait' => $f[4], 'steal' => $f[7], 'total' => $total];
+    }
+
+    /**
+     * نسب المعالج خلال نافذة القياس (فرق لقطتين). تعكس تنافس الجهاز كله لا العملية: busy مرتفع مع أنوية محدودة = المقيس يتنافس على المعالج.
+     *
+     * @return array<string, float|int|null>
+     */
+    private static function cpuWindow(?array $a, ?array $b, float $loadBefore): array
+    {
+        $cores = max(1, (int) trim((string) @shell_exec('nproc 2>/dev/null')));
+        if ($a === null || $b === null || ($b['total'] - $a['total']) <= 0) {
+            return ['cores' => $cores, 'loadavg_1m_before' => round($loadBefore, 2), 'cpu_busy_pct' => null, 'cpu_iowait_pct' => null, 'cpu_steal_pct' => null];
+        }
+        $d = $b['total'] - $a['total'];
+        $pct = fn (int $x): float => round(100 * $x / $d, 1);
+
+        return ['cores' => $cores, 'loadavg_1m_before' => round($loadBefore, 2),
+            'cpu_busy_pct' => $pct($b['busy'] - $a['busy']), 'cpu_iowait_pct' => $pct($b['iowait'] - $a['iowait']), 'cpu_steal_pct' => $pct($b['steal'] - $a['steal'])];
+    }
+
+    /**
+     * إحصاءات تباين لقيم الجولات المحتسبة (عينة): الأدنى والأقصى والمتوسط والانحراف المعياري للعيّنة.
+     *
+     * @param  list<float|int>  $values
+     * @return array{min: float, max: float, mean: float, stdev: float}
+     */
+    private static function stats(array $values): array
+    {
+        $n = count($values);
+        $mean = $n ? array_sum($values) / $n : 0.0;
+        $var = $n > 1 ? array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $values)) / ($n - 1) : 0.0;
+
+        return ['min' => round((float) min($values), 3), 'max' => round((float) max($values), 3), 'mean' => round($mean, 3), 'stdev' => round(sqrt($var), 3)];
     }
 
     /** p50 زمن الكتابة بلا تنافس: كاتب واحد متسلسل، 30 معاملة (قفل صف الطلب ثم الحدث آخراً). */
@@ -298,9 +420,13 @@ class CommerceOrderEventsPostgresTest extends TestCase
 
     /**
      * يشغّل كتّاباً متزامنين (عملية لكل كاتب، حاجز بدء واحد)، كلٌّ يقفل صف طلبه ثم يكتب الحدث آخراً ثم يلتزم، مع مهلة تفكير منتظمة
-     * [0, thinkMaxMs] ببذرة حتمية لكل كاتب. يثبت الاكتمال (التسلسل متصل من حيث بدأ) ويعيد المقاييس.
+     * [0, thinkMaxMs] ببذرة حتمية لكل كاتب. **لا يؤكّد شيئاً** (كي يُسجَّل القياس قبل أي تأكيد): يعيد المقاييس وكتلة `integrity` تفحصها
+     * `assertRoundIntegrity` بعد التسجيل. المعدلات:
+     *  - `events_per_second`: كل أحداث الجولة ÷ زمن الجولة الكلي بما فيه تفرّع العمليات وبدء الاتصال (مسجَّل منفصلاً).
+     *  - `active_window_events_per_second`: الأحداث المكتملة داخل نافذة **كل الكتّاب نشطون** (من أحدث بدء حلقة إلى أبكر انتهاء) ÷ طول تلك النافذة.
+     *  - `span_events_per_second`: كل الأحداث ÷ (أبكر بدء حلقة → أحدث انتهاء)؛ والفرق عن زمن الجولة الكلي = `startup_overhead_s`.
      *
-     * @return array<string, float|int>
+     * @return array<string, mixed>
      */
     private function measureWriters(int $writers, int $perWriter, int $thinkMaxMs, int $seed): array
     {
@@ -316,6 +442,8 @@ class CommerceOrderEventsPostgresTest extends TestCase
             $jobs[] = function () use ($tenant, $orderId, $perWriter, $thinkMaxMs, $seed, $i) {
                 mt_srand($seed + $i);
                 $waits = [];
+                $ends = [];
+                $loopStart = microtime(true);
                 for ($j = 0; $j < $perWriter; $j++) {
                     if ($thinkMaxMs > 0) {
                         usleep(mt_rand(0, $thinkMaxMs * 1000));
@@ -326,37 +454,83 @@ class CommerceOrderEventsPostgresTest extends TestCase
                         self::append($tenant, $orderId);
                         $waits[] = (hrtime(true) - $t0) / 1e6;
                     });
+                    $ends[] = microtime(true);
                 }
 
-                return $waits;
+                return ['waits' => $waits, 'ends' => $ends, 'start' => $loopStart, 'end' => microtime(true)];
             };
         }
+        $loadBefore = (sys_getloadavg() ?: [0.0])[0];
+        $cpuBefore = self::cpuSnapshot();
         $started = microtime(true);
         $results = $this->runConcurrently($jobs);
         $elapsed = microtime(true) - $started;
-        $this->assertNoDeadlock($results);
+        $cpu = self::cpuWindow($cpuBefore, self::cpuSnapshot(), $loadBefore);
 
+        // النزاهة: تُحسب هنا وتُؤكَّد لاحقاً (بعد التسجيل). نفس الفحوص السابقة حرفياً.
+        $errors = [];
+        foreach ($results as $i => $result) {
+            if (! ($result['ok'] ?? false)) {
+                $errors[] = "العملية {$i}: ".($result['error_class'] ?? '').' '.($result['message'] ?? '');
+            } elseif (($result['message'] ?? '') !== '' && (str_contains((string) $result['message'], '40P01') || stripos((string) $result['message'], 'deadlock') !== false)) {
+                $errors[] = "جمود في العملية {$i}";
+            }
+        }
         $total = $writers * $perWriter;
-        $this->assertSame(range(1, $before + $total), $this->seqs(), 'كل الأحداث موجودة بلا فجوة ولا تكرار');
-        foreach ($orders as $i => $orderId) {
-            $this->assertSame($perWriter, DB::table('commerce_order_events')->where('commerce_order_id', $orderId)->count(), "الكاتب {$i}");
+        $sequenceComplete = $this->seqs() === range(1, $before + $total);
+        $perWriterComplete = true;
+        foreach ($orders as $orderId) {
+            if (DB::table('commerce_order_events')->where('commerce_order_id', $orderId)->count() !== $perWriter) {
+                $perWriterComplete = false;
+            }
         }
 
-        $waits = array_merge(...array_column($results, 'value'));
+        $values = array_values(array_map(fn ($r) => $r['value'], array_filter($results, fn ($r) => ($r['ok'] ?? false) && isset($r['value']['waits']))));
+        $waits = $values ? array_merge(...array_column($values, 'waits')) : [];
         sort($waits);
-        $pct = fn (float $p): float => round($waits[(int) floor(($p / 100) * (count($waits) - 1))], 3);
+        $pct = fn (float $p): float => $waits ? round($waits[(int) floor(($p / 100) * (count($waits) - 1))], 3) : 0.0;
+
+        $winStart = $values ? max(array_column($values, 'start')) : 0.0;
+        $winEnd = $values ? min(array_column($values, 'end')) : 0.0;
+        $spanStart = $values ? min(array_column($values, 'start')) : 0.0;
+        $spanEnd = $values ? max(array_column($values, 'end')) : 0.0;
+        $inWindow = 0;
+        foreach ($values as $v) {
+            foreach ($v['ends'] as $t) {
+                if ($t >= $winStart && $t <= $winEnd) {
+                    $inWindow++;
+                }
+            }
+        }
+        $winLen = max($winEnd - $winStart, 1e-9);
+        $spanLen = max($spanEnd - $spanStart, 1e-9);
 
         return [
             'writers' => $writers, 'transactions' => count($waits), 'think_max_ms' => $thinkMaxMs,
             'elapsed_s' => round($elapsed, 3), 'events_per_second' => round(count($waits) / $elapsed, 1),
-            'contended_p50_ms' => $pct(50), 'contended_p95_ms' => $pct(95), 'contended_p99_ms' => $pct(99), 'contended_max_ms' => round(max($waits), 3),
+            'active_window_s' => round($winLen, 3), 'active_window_events' => $inWindow, 'active_window_events_per_second' => round($inWindow / $winLen, 1),
+            'span_events_per_second' => round(count($waits) / $spanLen, 1), 'startup_overhead_s' => round($elapsed - $spanLen, 3),
+            'contended_p50_ms' => $pct(50), 'contended_p95_ms' => $pct(95), 'contended_p99_ms' => $pct(99), 'contended_max_ms' => $waits ? round(max($waits), 3) : 0.0,
+            ...$cpu,
+            'integrity' => ['errors' => $errors, 'sequence_complete' => $sequenceComplete, 'per_writer_complete' => $perWriterComplete],
         ];
+    }
+
+    /** النزاهة المؤجَّلة إلى ما بعد التسجيل: لا أخطاء/جمود في الكتّاب، تسلسل متصل بلا فجوة ولا تكرار، وعدد أحداث كل كاتب. */
+    private function assertRoundIntegrity(array $m): void
+    {
+        $this->assertSame([], $m['integrity']['errors'], 'أخطاء/جمود في الكتّاب المتزامنين');
+        $this->assertTrue($m['integrity']['sequence_complete'], 'كل الأحداث موجودة بلا فجوة ولا تكرار');
+        $this->assertTrue($m['integrity']['per_writer_complete'], 'عدد أحداث كل كاتب كما كُتب');
     }
 
     /** يُسجّل المقاييس دائماً: STDERR، وملفاً في `pgsql-watchdog/` حين يوجد (يرفعه CI كمرفق) — لا تُخفى نتيجة. */
     private function recordMetrics(string $name, array $metrics): void
     {
-        $payload = ['slice' => 'COPS-H1-1', 'name' => $name, 'pg' => DB::selectOne("select current_setting('synchronous_commit') as synchronous_commit, current_setting('fsync') as fsync"), ...$metrics];
+        $payload = ['slice' => 'COPS-H1-1', 'name' => $name,
+            'pg' => DB::selectOne("select current_setting('synchronous_commit') as synchronous_commit, current_setting('fsync') as fsync"),
+            'offered_rate_target_per_s' => self::OFFERED_RATE_TARGET, 'p95_budget_ms' => self::P95_BUDGET_MS,
+            'test_duration_s' => round(microtime(true) - $this->perfStartedAt, 3), ...$metrics];
         $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
         fwrite(STDERR, "\nCOPS-H1-1 feed metrics: {$json}\n");
         $dir = base_path('pgsql-watchdog');

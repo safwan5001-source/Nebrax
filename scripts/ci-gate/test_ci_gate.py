@@ -15,7 +15,8 @@ import ci_gate as g
 
 M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
-PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"]
+PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)",
+       "PostgreSQL feed-lock performance (COPS-H1-1)"]  # COPS-H1-1: dedicated perf job, tier=always (PHP[2])
 HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=paths (only PRs that touch Horizon files)
 HZ_WF = ".github/workflows/horizon-eval-ci.yml"
 HZ_FILES = ["scripts/horizon-eval/horizon_eval.py"]  # a Horizon-related diff
@@ -71,7 +72,7 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 11)  # 10 previously; +1 = path-scoped storefront Docker build context check
+        self.assertEqual(len(exp), 12)  # 10 previously; +1 = path-scoped storefront Docker build context check; +1 = COPS-H1-1 dedicated perf job (always)
         self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):
@@ -175,7 +176,7 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail")
 
     def test_rerun_uses_latest_attempt_and_warns(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901)]
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901), cr(PHP[2])]
         v, _, warns = ev(["a.md"], runs)[1]
         self.assertEqual(v, "pass")
         self.assertTrue(any("earlier attempt" in w for w in warns))
@@ -443,7 +444,7 @@ class Binding(unittest.TestCase):
 
     def test_rerun_same_suite_takes_newest(self):
         wf = [wfr(self.CI, 2)]
-        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31), scr(PHP[2], 2, 22)]
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "pass")
@@ -610,10 +611,11 @@ class EndToEnd(unittest.TestCase):
             FakeApi.files, FakeApi.impostor = ["docs/a.md"], False
 
     def test_green(self):
-        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "success"}), 0)
+        self.assertEqual(self._run(GREEN), 0)
 
     def test_pr_failure_not_hidden_by_green_push_twin(self):
-        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "failure"}), 1)
+        self.assertEqual(self._run({**GREEN, PHP[1]: "failure"}), 1)
+        self.assertEqual(self._run({**GREEN, PHP[2]: "failure"}), 1)  # COPS-H1-1: a failing perf job blocks the PR too
 
     def test_unrelated_pr_is_green_without_any_horizon_run(self):
         """End to end through run_gate: an accounting/POS/storefront-style PR is unaffected by the Horizon requirement."""
@@ -629,7 +631,7 @@ class EndToEnd(unittest.TestCase):
 
     def test_stale_head_fails_closed(self):
         with self.assertRaises(g.GateError):
-            self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
+            self._run(GREEN, head="e" * 40)
 
 
 class Timeouts(unittest.TestCase):
