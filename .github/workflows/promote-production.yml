@@ -1,0 +1,117 @@
+name: Promote to Production
+
+# AWJ-INFRA-GATE — the ONLY sanctioned way to move the `production` branch.
+#
+# Railway production services are meant to deploy from the `production` branch (not `main`). This workflow
+# fast-forwards that branch to one exact commit, and only if:
+#   1. scripts/release/release_gate.py says the commit is on main, a fast-forward of production, and CI is green on it;
+#   2. the GitHub Environment `production` approves the run (required reviewer = the owner; configured in the GitHub UI).
+#
+# INERT BY DEFAULT: dry_run defaults to true (verification only, no environment, no push), and nothing happens at all until
+# the owner creates the `production` branch and repoints Railway (docs/runbooks/AWJ_DEPLOYMENT_RUNBOOK.md §2).
+# It never calls Railway, never touches a database, and holds no secret other than the workflow's own GITHUB_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Full 40-char commit on main to release (blank = current main HEAD)'
+        required: false
+        default: ''
+      acknowledge_migrations:
+        description: 'Set true only after a database backup, when the release carries migrations (they run automatically at boot)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Verify only (default). Set false to request the approval-gated promotion'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  checks: read
+  actions: read
+
+concurrency:
+  group: promote-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      sha: ${{ steps.gate.outputs.sha }}
+      releasable: ${{ steps.gate.outputs.releasable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate self-tests
+        run: python3 -m unittest discover -s scripts/release -v
+
+      - name: Verify the exact commit
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_SHA: ${{ inputs.sha }}
+          ACK: ${{ inputs.acknowledge_migrations }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_SHA" ] && ! printf '%s' "$INPUT_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "sha must be a full 40-char lowercase commit id" >&2; exit 2
+          fi
+          flags=()
+          [ "$ACK" = "true" ] && flags+=(--acknowledge-migrations)
+          python3 scripts/release/release_gate.py verify --repo "$GITHUB_REPOSITORY" --sha "$INPUT_SHA" "${flags[@]}"
+
+  promote:
+    name: Promote (owner approval required)
+    needs: verify
+    if: inputs.dry_run == false && needs.verify.outputs.releasable == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The approval gate. Required reviewers + "deployment branches = main only" are configured on this
+    # Environment in GitHub Settings; without them the job would run unapproved, so the runbook makes a
+    # dry approval test (§2.4) a precondition of cutover.
+    environment: production
+    permissions:
+      contents: write
+      checks: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Approval can take hours: CI state, main and production may have moved. Re-verify the same commit.
+      - name: Re-verify after approval
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          ACK: ${{ inputs.acknowledge_migrations }}
+        run: |
+          set -euo pipefail
+          flags=()
+          [ "$ACK" = "true" ] && flags+=(--acknowledge-migrations)
+          python3 scripts/release/release_gate.py verify --repo "$GITHUB_REPOSITORY" --sha "$SHA" "${flags[@]}"
+
+      # GitHub auto-creates an UNPROTECTED environment when a job names one that does not exist, and that job
+      # runs with no review. Require the recorded approval itself; fail closed if there is none.
+      - name: Require a recorded owner approval
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/release/release_gate.py require-approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment production
+
+      # Plain (non-force) push: git rejects anything that is not a fast-forward of production.
+      # The push is what Railway's GitHub trigger reacts to (production services deploy from this branch).
+      - name: Fast-forward production
+        env:
+          SHA: ${{ needs.verify.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git push origin "${SHA}:refs/heads/production"
+          echo "production -> ${SHA}" >> "$GITHUB_STEP_SUMMARY"
