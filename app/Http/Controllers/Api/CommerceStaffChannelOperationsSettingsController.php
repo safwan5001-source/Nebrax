@@ -87,17 +87,36 @@ class CommerceStaffChannelOperationsSettingsController extends ApiController
      */
     private function history(string $channelId): array
     {
-        return SalesChannelSettingEvent::query()
-            ->where('sales_channel_id', $channelId)
-            ->with('actor:id,name')
-            ->orderByDesc('created_at')->orderByDesc('id')
-            ->limit(50)->get()
-            ->filter(fn (SalesChannelSettingEvent $e): bool => collect(array_keys($e->changes ?? []))->contains(fn ($k) => str_starts_with((string) $k, CommerceChannelOperationsSettingsService::AUDIT_PREFIX)))
-            ->take(10)
-            ->map(fn (SalesChannelSettingEvent $e): array => [
-                'at' => $e->created_at?->toIso8601String(),
-                'actor' => $e->actor === null ? null : ['id' => $e->actor->id, 'name' => $e->actor->name],
-                'changes' => $e->changes,
-            ])->values()->all();
+        // سجل التدقيق مشترك مع إعدادات التسعير/حسابات العملاء، و`changes` عمود JSON: نمرّر على صفحات بالترتيب
+        // ونصفّي بالمفتاح حتى نجمع عشرة (أو ننتهي/نبلغ سقف المسح) — لا نقتطع قبل التصفية فتختفي تغييرات التشغيل.
+        $matches = [];
+        $perPage = 100;
+        $maxScanned = 2000;
+        for ($page = 1; $page * $perPage - $perPage < $maxScanned && count($matches) < 10; $page++) {
+            $events = SalesChannelSettingEvent::query()
+                ->where('sales_channel_id', $channelId)
+                ->with('actor:id,name')
+                ->orderByDesc('created_at')->orderByDesc('id')
+                ->forPage($page, $perPage)->get();
+            foreach ($events as $e) {
+                $isOperations = collect(array_keys($e->changes ?? []))
+                    ->contains(fn ($k) => str_starts_with((string) $k, CommerceChannelOperationsSettingsService::AUDIT_PREFIX));
+                if ($isOperations) {
+                    $matches[] = [
+                        'at' => $e->created_at?->toIso8601String(),
+                        'actor' => $e->actor === null ? null : ['id' => $e->actor->id, 'name' => $e->actor->name],
+                        'changes' => $e->changes,
+                    ];
+                    if (count($matches) === 10) {
+                        break;
+                    }
+                }
+            }
+            if ($events->count() < $perPage) {
+                break;
+            }
+        }
+
+        return $matches;
     }
 }

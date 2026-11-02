@@ -148,6 +148,31 @@ class CommerceChannelOperationsSettingsTest extends TestCase
     }
 
     #[Test]
+    public function the_history_is_not_hidden_by_newer_audit_events_of_other_settings(): void
+    {
+        $this->save(['expected_version' => 0, 'acceptance_reminder_minutes' => 15])->assertOk();
+        $this->assertSame(1, $this->opsEvents());
+
+        // 120 تغييراً أحدث من إعدادات أخرى (تسعير/حسابات) على القناة نفسها في الجدول المشترك.
+        $rows = [];
+        for ($i = 0; $i < 120; $i++) {
+            $rows[] = [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'tenant_id' => $this->channel->tenant_id,
+                'sales_channel_id' => $this->channel->id,
+                'actor_user_id' => null,
+                'changes' => json_encode(['customer_accounts_enabled' => ['from' => false, 'to' => true]]),
+                'created_at' => now()->addMinutes($i + 1),
+            ];
+        }
+        \Illuminate\Support\Facades\DB::table('sales_channel_setting_events')->insert($rows);
+
+        $history = $this->fetch()->assertOk()->json('data.recent_changes');
+        $this->assertCount(1, $history);
+        $this->assertArrayHasKey('operations.acceptance_reminder_minutes', $history[0]['changes']);
+    }
+
+    #[Test]
     public function the_version_only_increments_on_an_effective_change_and_a_repeat_is_a_silent_no_op(): void
     {
         $this->save(['expected_version' => 0, 'acceptance_reminder_minutes' => 10])->assertOk()->assertJsonPath('data.version', 1);
