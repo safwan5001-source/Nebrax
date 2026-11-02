@@ -194,23 +194,29 @@ class AiActionHistoryListTest extends TestCase
         $this->assertArrayNotHasKey('claim_token', $row['execution']);
 
         // استعلامات ثابتة لا تنمو مع عدد الصفوف: كل قياس يسبقه نداء تسخين (ذاكرات الأدوار/الإعدادات تتغيّر بحسب ما سبق في المجموعة الكاملة).
+        // الساعة مجمَّدة حول كل قياس: Sanctum يكتب `personal_access_tokens.last_used_at` (بدقة الثانية) فقط حين تتغيّر الثانية بين طلبين،
+        // فعبور حدّ الثانية بين نداء التسخين والنداء المقيس كان يضيف استعلام UPDATE واحداً ويُفشل المقارنة على مشغّل محمَّل (عدم حتمية زمنية لا N+1).
         $this->enable($auth['tenant_id']);
+        $this->freezeTime();
         $this->list($auth['token'])->assertOk();
         \DB::enableQueryLog();
         $this->list($auth['token'])->assertOk();
         $few = count(\DB::getQueryLog());
         \DB::flushQueryLog();
+        $this->travelBack();
         for ($i = 0; $i < 6; $i++) {
             $this->withToken($auth['token'])->withHeader('Idempotency-Key', 'hist-exe-more-'.$i)
                 ->postJson('/api/ai-actions', ['type' => 'product_import.v1', 'proposal' => ['schema_version' => 1, 'rows' => [$this->good('r', 2, 'X-'.$i)]]])->assertCreated();
         }
         \DB::disableQueryLog();
+        $this->freezeTime();
         $this->list($auth['token'])->assertOk();
         \DB::enableQueryLog();
         \DB::flushQueryLog();
         $this->list($auth['token'])->assertOk()->assertJsonPath('meta.total', 7);
         $many = count(\DB::getQueryLog());
         \DB::disableQueryLog();
+        $this->travelBack();
         $this->assertSame($few, $many, 'عدد الاستعلامات لا يتغيّر بعدد الصفوف.');
     }
 
