@@ -1,7 +1,7 @@
 # COPS Horizon — Handoff (التسليم الحيّ)
 
 **البرنامج:** AWJ Commerce Operations Horizon (COPS) — امتداد لـ `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1` (المتتبّع §9).
-**آخر تحديث:** 2026-11-02 — **H1-5 مدموج وبه يكتمل COPS-H1:** #1934 ⇒ `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` (واجهة التاجر للقبول والرفض + مرشّح حالة القبول). H1-4 #1932 ⇒ `5cca769d34e89cb6ee378e891e0b32c83fe3b8af`؛ H1-3 #1926 ⇒ `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200`؛ H1-2 #1924 ⇒ `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe`؛ H1-1 مغلق (#1910/#1920/#1917). **توقّف التنفيذ بعد H1-5 كما فوَّض المالك — H2 لم يبدأ** (بأمر صريح جديد). تقرير الإغلاق: `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`.
+**آخر تحديث:** 2026-11-02 — **COPS-H1 مغلق بالكامل:** سجلات الإغلاق #1935 ⇒ `70be922d065cea8375df77ce344f65f702f6e8e4`. **H1-5 مدموج:** #1934 ⇒ `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` (واجهة التاجر للقبول والرفض + مرشّح حالة القبول). H1-4 #1932 ⇒ `5cca769d34e89cb6ee378e891e0b32c83fe3b8af`؛ H1-3 #1926 ⇒ `f4ae9fc99e3b8ab70faf4e8c08baec2a5a9a3200`؛ H1-2 #1924 ⇒ `790eff709e8c6ba673d30c0739a5eba3cc5e2dfe`؛ H1-1 مغلق (#1910/#1920/#1917). **توقّف التنفيذ بعد H1-5 كما فوَّض المالك — H2 لم يبدأ** (بأمر صريح جديد). تقرير الإغلاق: `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md`.
 **القاعدة:** يُحدَّث هذا الملف في نهاية كل شريحة (Slice) قبل التوقف. هو نقطة الاستئناف الوحيدة؛ لا يُعاد الاستكشاف.
 
 ---
@@ -43,7 +43,8 @@
 | H1-4 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL ووظيفة الأداء المخصصة وCI Gate وweb build خضراء على الرأس `4f3c07480b2f3ba1eb7fd119e56f1292460d33ce` من المحاولة الأولى؛ Codex بلا ملاحظات؛ لم يُنشر ولم يُفعَّل شيء | #1932 | `5cca769d34e89cb6ee378e891e0b32c83fe3b8af` | `AWJ-COPS-H1-4-IMPLEMENTATION-REPORT.md`؛ Base `d5e1be954`؛ هجرتان (أعمدة القبول + حراسها؛ مُشغِّلات فقط لـ`merchant_rejected` و`order.accepted`)؛ صلاحية `commerce.orders.manage`؛ البوابتان مغلقتان |
 | H1-5 | **Merged** (squash، 2026-11-02) — SQLite وPostgreSQL ووظيفة الأداء المخصصة وCI Gate وweb build (×2) خضراء على الرأس `d9dc6381bfe57220d4cfa26a02418af0af46f74a`؛ لم يُنشر ولم يُفعَّل شيء | #1934 | `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` | `AWJ-COPS-H1-5-IMPLEMENTATION-REPORT.md`؛ Base `1946d3567`؛ بلا هجرة؛ مرشّح `acceptance_status` وحيد في الخلفية؛ ملاحظة Codex P2 واحدة (قفل الإجراءات القديمة حتى نجاح التحديث) أُصلحت في `d9dc638` بـ5 اختبارات؛ البوابتان مغلقتان |
 | H1-4 closing records | **Merged** (وثائق فقط، 2026-11-02) | #1933 | `1946d3567552e827941b1b5bd0ba38e0aae71214` | SHA الدمج وأدلة CI + نقطة استئناف H1-5 |
-| H1 closing records | هذا الـPR (وثائق فقط) — تقرير `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md` | يُسجَّل بعد الدمج | — | Implemented/Tested/Merged/Deployed/Activated/Env-verified مفصولة في التقرير |
+| H1 closing records | **Merged** (وثائق فقط، 2026-11-02) — تقرير `AWJ_COPS_H1_HORIZON_CLOSURE_REPORT.md` | #1935 | `70be922d065cea8375df77ce344f65f702f6e8e4` | Implemented/Tested/Merged/Deployed/Activated/Env-verified مفصولة في التقرير. فشلت وظيفة الأداء مرة واحدة على رأس الـPR (الجولة 3 = 107.17ms، الجولتان الأخريان 15–18ms، كود مطابق لـ`main`) ونجحت بعد إعادة تشغيل واحدة بلا تغيير في الحد أو الحمل؛ التفاصيل التزامنية في التقرير §6.1 كخطر مراقَب |
+| H1 final records | هذا الـPR (وثائق فقط) | يُسجَّل بعد الدمج | — | SHA الدمج النهائي + §6.1 + أدلة CI على `main` |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 

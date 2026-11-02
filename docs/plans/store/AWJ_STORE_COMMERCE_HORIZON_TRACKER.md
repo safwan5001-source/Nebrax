@@ -211,6 +211,7 @@
 | COPS-H1-4 (حقائق القبول + `accept`/`reject` + حراس القاعدة + `operational_status` + `commerce.orders.manage`) | #1932 | `5cca769d34e89cb6ee378e891e0b32c83fe3b8af` | 2026-11-02 | لا (لم يُنشر) | — | — |
 | COPS-H1-4 closing records (SHA الدمج وأدلة CI + نقطة استئناف H1-5) | #1933 | `1946d3567552e827941b1b5bd0ba38e0aae71214` | 2026-11-02 | لا ينطبق (وثائق) | — | — |
 | COPS-H1-5 (واجهة التاجر للقبول/الرفض + مرشّح `acceptance_status`) | #1934 | `76bf5293d180456326cdc7acb8f5b1afd63ed4c8` | 2026-11-02 | لا (لم يُنشر) | — | — |
+| COPS-H1 closing records (تقرير إغلاق أفق H1 + Handoff + Tracker) | #1935 | `70be922d065cea8375df77ce344f65f702f6e8e4` | 2026-11-02 | لا ينطبق (وثائق) | — | — |
 | جاهزية إلغاء Beta (وثائق) | #1785 | `01e66d68e8e17c75bb583909dddc8414d0a5a42d` | 2026-10-29 | لا ينطبق | — | — |
 
 ## 7. Function Tracker (84 صفاً)
