@@ -482,8 +482,14 @@ class CommerceOrderFulfillmentTest extends TestCase
         ])->assertOk()->json('data.fulfillment');
         $this->assertSame(['carrier', 'سمسا', 'T-1', 'خالد', '0500000000', 2], [$d['type'], $d['carrier']['name'], $d['carrier']['tracking_number'], $d['courier']['name'], $d['courier']['phone'], $d['version']]);
 
+        // مخطط بحروف كبيرة يُقبل ويُخزَّن بحروف صغيرة (لا يتعارض مع حارس القاعدة الحساس لحالة الأحرف على PostgreSQL).
+        $upper = $this->patchDetails($order->id, ['expected_version' => 2, 'tracking_url' => 'HTTPS://Track.Example.test/T-2'])->assertOk()->json('data.fulfillment.carrier.tracking_url');
+        $this->assertSame('https://Track.Example.test/T-2', $upper);
+        $this->assertSame(3, $this->version($order->id));
+        $this->patchDetails($order->id, ['expected_version' => 3, 'tracking_url' => 'https://track.example.test/T-1'])->assertOk();
+
         $events = DB::table('commerce_order_events')->count();
-        $this->patchDetails($order->id, ['expected_version' => 2, 'carrier_name' => 'سمسا'])->assertOk()->assertJsonPath('data.fulfillment.version', 2);
+        $this->patchDetails($order->id, ['expected_version' => 4, 'carrier_name' => 'سمسا'])->assertOk()->assertJsonPath('data.fulfillment.version', 4);
         $this->assertSame($events, DB::table('commerce_order_events')->count(), 'بلا تغيير فعلي ⇒ لا نسخة ولا حدث');
 
         $this->go($order->id, 'mark_ready');
