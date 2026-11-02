@@ -224,7 +224,7 @@ export default function FuelShiftsPage() {
       <Summary icon={<WalletCards />} label={t('summaryPendingCash')} value={String(shifts.filter((shift) => shift.cash_variance?.status === 'pending_review').length)} />
       <Summary icon={<ReceiptText />} label={t('summaryLocked')} value={String(shifts.filter((shift) => shift.status === 'approved').length)} />
     </div>
-    <TruncationNotice loaded={shifts.length} total={shiftsMeta?.total} loading={loadingMore} onLoadMore={() => void loadMore()} />
+    <TruncationNotice loaded={shifts.length} meta={shiftsMeta} loading={loadingMore} onLoadMore={() => void loadMore()} onRefresh={() => void load()} />
     {error && !dialogOpen && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <DataTable columns={columns} data={shifts} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="fuel-shifts" />
 

@@ -122,6 +122,20 @@ describe('FuelShiftsPage pagination (FS-31)', () => {
     expect(await screen.findByText('listTruncated:2,3')).toBeTruthy();
   });
 
+  it('at the last page with a remaining gap it offers a refresh instead of requesting empty pages', async () => {
+    api.mockReset();
+    api.mockImplementation((path: string) => Promise.resolve(path === '/fuel-stations/shifts'
+      ? { data: [{ id: 'a', status: 'open' }], meta: { total: 2, current_page: 1, last_page: 1 } }
+      : { data: lists[path] ?? [] }));
+    render(<FuelShiftsPage />);
+
+    expect(await screen.findByText('listTruncated:1,2')).toBeTruthy();
+    expect(screen.queryByText('loadMore')).toBeNull();
+    fireEvent.click(screen.getByText('refresh'));
+    await waitFor(() => expect(api.mock.calls.filter(([path]) => path === '/fuel-stations/shifts').length).toBe(2));
+    expect(api).not.toHaveBeenCalledWith('/fuel-stations/shifts?page=2');
+  });
+
   it('shows no notice when everything fits in one page', async () => {
     api.mockReset();
     api.mockImplementation((path: string) => Promise.resolve(path === '/fuel-stations/shifts'
