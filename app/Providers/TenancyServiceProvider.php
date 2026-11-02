@@ -242,6 +242,15 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
+        // COPS-H2-5 — إصدار رابط التتبع: سلة مستقلة المسمّى (لا تشارك عدّاد `throttle:10,1` المجهول مع `checkout/payment-intent`
+        // فلا يستهلك هذا المسار الاختياري ميزانية بدء الدفع). المفتاح (متجر، طلب): معرّف الطلب UUID غير قابل للتخمين،
+        // فلا يحرق طرفٌ ثالث ميزانية طلب لا يعرفه، ولا يتقاسم المتسوّقون خلف عنوان خادم المتجر سلةً واحدة.
+        RateLimiter::for('storefront-tracking-link', function (Request $request): Limit {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+
+            return Limit::perMinute(10)->by("storefront-tracking-link|{$tenant}|order|".(string) $request->route('order'));
+        });
+
         RateLimiter::for('storefront-buyer-apply', function (Request $request): Limit {
             $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
             $identity = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());

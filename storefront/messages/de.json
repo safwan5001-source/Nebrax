@@ -1307,5 +1307,30 @@
     "verifyThenSignIn": "After you verify your email you can sign in.",
     "verifying": "Verifying your email…",
     "verifyingTitle": "Verifying"
+  },
+  "orderTracking": {
+    "title": "Bestellverfolgung",
+    "orderNumber": "Bestellnummer",
+    "placedOn": "Aufgegeben am {date}",
+    "expiresNote": "Dieser Link ist bis {date} gültig. Jeder, der ihn besitzt, kann den Fortschritt der Bestellung verfolgen, aber nicht ihren Inhalt sehen.",
+    "method": {
+      "standard": "Lieferung",
+      "pickup": "Abholung"
+    },
+    "scheduled": "Gewünschter Zeitpunkt: {date}",
+    "loading": "Ihre Bestellung wird geladen …",
+    "notFoundTitle": "Diese Bestellung wurde nicht gefunden",
+    "notFoundBody": "Der Verfolgungslink ist möglicherweise falsch oder abgelaufen. Prüfen Sie den erhaltenen Link oder kontaktieren Sie den Shop.",
+    "rateLimitedTitle": "Zu viele Versuche",
+    "rateLimitedBody": "Bitte warten Sie eine Minute und versuchen Sie es erneut.",
+    "errorTitle": "Die Verfolgung ist derzeit nicht verfügbar",
+    "errorBody": "Bitte versuchen Sie es in Kürze erneut.",
+    "retry": "Erneut versuchen",
+    "backToStore": "Zurück zum Shop",
+    "linkTitle": "Diese Bestellung verfolgen",
+    "linkBody": "Speichern Sie diesen Link, um den Fortschritt Ihrer Bestellung zu verfolgen. Jeder, der ihn besitzt, sieht den Fortschritt, nicht aber den Inhalt der Bestellung.",
+    "linkOpen": "Verfolgungsseite öffnen",
+    "linkCopy": "Link kopieren",
+    "linkCopied": "Link kopiert"
   }
 }

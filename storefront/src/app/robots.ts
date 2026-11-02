@@ -27,6 +27,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
           "/*/cart",
           "/*/checkout",
           "/*/checkout/*",
+          "/*/track/*",
           "/*?*sort=*",
           "/*?*page=*",
           "/*?*filter*=*",

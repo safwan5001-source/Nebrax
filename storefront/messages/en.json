@@ -1307,5 +1307,30 @@
     "verifyThenSignIn": "After you verify your email you can sign in.",
     "verifying": "Verifying your email…",
     "verifyingTitle": "Verifying"
+  },
+  "orderTracking": {
+    "title": "Order tracking",
+    "orderNumber": "Order number",
+    "placedOn": "Placed on {date}",
+    "expiresNote": "This link works until {date}. Anyone who has it can follow this order's progress, but cannot see what is in it.",
+    "method": {
+      "standard": "Delivery",
+      "pickup": "Pickup"
+    },
+    "scheduled": "Requested time: {date}",
+    "loading": "Loading your order…",
+    "notFoundTitle": "We couldn't find this order",
+    "notFoundBody": "The tracking link may be incorrect or expired. Check the link you were given, or contact the store.",
+    "rateLimitedTitle": "Too many attempts",
+    "rateLimitedBody": "Please wait a minute and try again.",
+    "errorTitle": "Tracking is unavailable right now",
+    "errorBody": "Please try again in a moment.",
+    "retry": "Try again",
+    "backToStore": "Back to the store",
+    "linkTitle": "Follow this order",
+    "linkBody": "Save this link to follow your order's progress. Anyone who has it can see the progress, but not what is in the order.",
+    "linkOpen": "Open tracking page",
+    "linkCopy": "Copy link",
+    "linkCopied": "Link copied"
   }
 }

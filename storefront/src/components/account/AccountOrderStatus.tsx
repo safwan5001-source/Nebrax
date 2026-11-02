@@ -100,12 +100,15 @@ export function AccountOrderStatus({
   status,
   cancelledDate = null,
   fulfillment = null,
+  showUntrackedCaption = true,
 }: {
   status: string;
   /** Pre-formatted (locale-aware) cancellation date; `null` when the API gave none. */
   cancelledDate?: string | null;
   /** COPS-H2-4 — the public fulfilment block, if the API sent one. */
   fulfillment?: StorefrontFulfillment | null;
+  /** The legacy "this store does not publish tracking yet" caption (no fulfilment block). The tracking page turns it off. */
+  showUntrackedCaption?: boolean;
 }) {
   const t = useTranslations("orders");
   const locale = useLocale();
@@ -316,7 +319,7 @@ export function AccountOrderStatus({
           })}
         </ol>
       </div>
-      {ACCOUNT_ORDER_STATUS_CAPABILITY !== "live" && (
+      {showUntrackedCaption && ACCOUNT_ORDER_STATUS_CAPABILITY !== "live" && (
         <p className="mt-3 text-xs leading-relaxed text-store-muted-foreground">
           {t("timeline.caption")}
         </p>

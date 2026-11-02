@@ -1307,5 +1307,30 @@
     "verifyThenSignIn": "After you verify your email you can sign in.",
     "verifying": "Verifying your email…",
     "verifyingTitle": "Verifying"
+  },
+  "orderTracking": {
+    "title": "Śledzenie zamówienia",
+    "orderNumber": "Numer zamówienia",
+    "placedOn": "Złożone {date}",
+    "expiresNote": "Ten link działa do {date}. Każdy, kto go ma, może śledzić postęp zamówienia, ale nie zobaczy jego zawartości.",
+    "method": {
+      "standard": "Dostawa",
+      "pickup": "Odbiór"
+    },
+    "scheduled": "Żądany termin: {date}",
+    "loading": "Wczytywanie zamówienia…",
+    "notFoundTitle": "Nie znaleziono tego zamówienia",
+    "notFoundBody": "Link do śledzenia może być nieprawidłowy lub wygasły. Sprawdź otrzymany link lub skontaktuj się ze sklepem.",
+    "rateLimitedTitle": "Zbyt wiele prób",
+    "rateLimitedBody": "Poczekaj minutę i spróbuj ponownie.",
+    "errorTitle": "Śledzenie jest chwilowo niedostępne",
+    "errorBody": "Spróbuj ponownie za chwilę.",
+    "retry": "Spróbuj ponownie",
+    "backToStore": "Wróć do sklepu",
+    "linkTitle": "Śledź to zamówienie",
+    "linkBody": "Zapisz ten link, aby śledzić postęp zamówienia. Każdy, kto go ma, zobaczy postęp, ale nie zawartość zamówienia.",
+    "linkOpen": "Otwórz stronę śledzenia",
+    "linkCopy": "Kopiuj link",
+    "linkCopied": "Skopiowano link"
   }
 }

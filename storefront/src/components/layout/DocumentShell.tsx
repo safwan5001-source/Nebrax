@@ -1,6 +1,4 @@
 import { GoogleTagManager } from "@next/third-parties/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import {
   Alexandria,
   Almarai,
@@ -21,6 +19,8 @@ import {
 import localFont from "next/font/local";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
+import { TrackingRouteTelemetryGate } from "./TrackingRouteTelemetryGate";
+import { VercelTelemetry } from "./VercelTelemetry";
 
 const gtmId = process.env.GTM_ID;
 
@@ -315,7 +315,13 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
     <html lang={locale} dir={localeDirection(locale)} suppressHydrationWarning>
       {/* biome-ignore lint/style/noHeadElement: this shell is used only by Next.js root layouts */}
       <head />
-      {gtmId && <GoogleTagManager gtmId={gtmId} />}
+      {gtmId && (
+        <Suspense fallback={null}>
+          <TrackingRouteTelemetryGate>
+            <GoogleTagManager gtmId={gtmId} />
+          </TrackingRouteTelemetryGate>
+        </Suspense>
+      )}
       <body
         className={`${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable} ${CATALOGUE_FONT_VARIABLES} antialiased min-h-screen flex flex-col`}
       >
@@ -327,10 +333,11 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
           (`X-Content-Type-Options: nosniff`) — two failing requests and two console errors on every page view.
         */}
         {process.env.VERCEL ? (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
+          <Suspense fallback={null}>
+            <TrackingRouteTelemetryGate>
+              <VercelTelemetry />
+            </TrackingRouteTelemetryGate>
+          </Suspense>
         ) : null}
       </body>
     </html>

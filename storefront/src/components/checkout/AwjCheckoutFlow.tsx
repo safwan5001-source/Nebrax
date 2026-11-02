@@ -185,6 +185,7 @@ export function AwjCheckoutFlow() {
   const [stage, setStage] = useState<CheckoutStage>("contact");
   const [checkout, setCheckout] = useState<StorefrontCheckout | null>(null);
   const [order, setOrder] = useState<StorefrontOrder | null>(null);
+  const [orderReference, setOrderReference] = useState<string | null>(null);
   const [contact, setContact] = useState<ContactForm>(EMPTY_CONTACT);
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [deliveryMethod, setDeliveryMethod] =
@@ -484,6 +485,7 @@ export function AwjCheckoutFlow() {
           clearPersistedIdempotencyKey(checkoutIdentityRef.current);
         }
         setOrder(result.order);
+        setOrderReference(result.orderReference ?? null);
         // PAY-H4-05 — an order that awaits an online payment is not "done": the
         // shopper is handed to the payment-return page, which starts (or
         // resumes) the payment and then reports what the *server* knows. The
@@ -656,7 +658,13 @@ export function AwjCheckoutFlow() {
   }
 
   if (flowState === "done" && order) {
-    return <AwjOrderConfirmation order={order} basePath={basePath} />;
+    return (
+      <AwjOrderConfirmation
+        order={order}
+        basePath={basePath}
+        orderReference={orderReference}
+      />
+    );
   }
 
   if (!checkout) {

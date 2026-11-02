@@ -102,6 +102,7 @@ describe("DocumentShell", () => {
     it("does not load Vercel Analytics / Speed Insights off Vercel (their script URLs 404 as HTML elsewhere)", () => {
       vi.stubEnv("VERCEL", "");
       const names = render();
+      expect(names).not.toContain("VercelTelemetry");
       expect(names).not.toContain("Analytics");
       expect(names).not.toContain("SpeedInsights");
       vi.unstubAllEnvs();
@@ -109,9 +110,11 @@ describe("DocumentShell", () => {
 
     it("still loads them on Vercel", () => {
       vi.stubEnv("VERCEL", "1");
+      // The Vercel client components are rendered by `VercelTelemetry` (a Client Component, so the `beforeSend`
+      // callbacks never cross the server boundary), and only behind the tracking-page gate.
       const names = render();
-      expect(names).toContain("Analytics");
-      expect(names).toContain("SpeedInsights");
+      expect(names).toContain("TrackingRouteTelemetryGate");
+      expect(names).toContain("VercelTelemetry");
       vi.unstubAllEnvs();
     });
   });

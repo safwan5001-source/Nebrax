@@ -1307,5 +1307,30 @@
     "verifyThenSignIn": "After you verify your email you can sign in.",
     "verifying": "Verifying your email…",
     "verifyingTitle": "Verifying"
+  },
+  "orderTracking": {
+    "title": "Suivi de commande",
+    "orderNumber": "Numéro de commande",
+    "placedOn": "Passée le {date}",
+    "expiresNote": "Ce lien est valable jusqu’au {date}. Toute personne qui le possède peut suivre l’avancement de la commande, sans voir son contenu.",
+    "method": {
+      "standard": "Livraison",
+      "pickup": "Retrait"
+    },
+    "scheduled": "Créneau demandé : {date}",
+    "loading": "Chargement de votre commande…",
+    "notFoundTitle": "Nous n’avons pas trouvé cette commande",
+    "notFoundBody": "Le lien de suivi est peut-être incorrect ou expiré. Vérifiez le lien reçu ou contactez la boutique.",
+    "rateLimitedTitle": "Trop de tentatives",
+    "rateLimitedBody": "Patientez une minute puis réessayez.",
+    "errorTitle": "Le suivi est indisponible pour le moment",
+    "errorBody": "Veuillez réessayer dans un instant.",
+    "retry": "Réessayer",
+    "backToStore": "Retour à la boutique",
+    "linkTitle": "Suivre cette commande",
+    "linkBody": "Conservez ce lien pour suivre l’avancement de votre commande. Toute personne qui le possède voit l’avancement, mais pas le contenu de la commande.",
+    "linkOpen": "Ouvrir la page de suivi",
+    "linkCopy": "Copier le lien",
+    "linkCopied": "Lien copié"
   }
 }
