@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Menu, Store, X } from 'lucide-react';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
@@ -199,6 +200,8 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
             <span className="hidden sm:inline">{t('backToAwj')}</span>
           </Link>
+          {/* COPS-H3-1: جرس الإشعارات نفسه (عدّاد + لوحة) في غلاف التجارة؛ إشعار «طلب جديد» يفتح الطلب. لا منطق تنبيه حي هنا (مركز التنبيه H3-3). */}
+          <NotificationBell />
           <LangToggle />
           <ThemeToggle />
         </div>
