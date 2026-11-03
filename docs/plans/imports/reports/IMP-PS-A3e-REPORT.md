@@ -2,7 +2,7 @@
 
 **Scope (owner, 2026-11-03):** PS-A3e only. **Not built:** PS-A4 (UI / bulk approval, D-PS-18), Track B (historical posting), any change to `LedgerService`, the ledger database, Railway or deployment. **No journal entry, document, payment, balance, stock, tax or ZATCA row is created or changed by anything in this slice** (proved by row-count tests on both the void and the replacement path).
 
-Base: `origin/main` `607795dac5d1be9af0454e4d666c97854e8c6234` (PS-A3d merged, #1941). Owner decisions applied: **D-PS-14** (overlap warning + exact acknowledgement; real conflicts only through shared movements) · **D-PS-15** (no automatic R-REV) · **D-PS-16** · **D-PS-17** (closer ≠ reviewer, also for the replacement) · **D-PS-18** (bulk deferred). **Two decisions are not settled and were not assumed — D-PS-19 and D-PS-20 (§5).**
+Base: `origin/main` `607795dac5d1be9af0454e4d666c97854e8c6234` (PS-A3d merged, #1941). Owner decisions applied: **D-PS-14** (overlap warning + exact acknowledgement; real conflicts only through shared movements) · **D-PS-15** (no automatic R-REV) · **D-PS-16** · **D-PS-17** (closer ≠ reviewer, also for the replacement) · **D-PS-18** (bulk deferred). **Revision 2 (2026-11-03): the owner approved D-PS-19 and D-PS-20 — a per-tenant configurable separation of duties, `strict` by default — implemented and documented in §1.6 / §5.**
 
 ## 1. What was built
 
@@ -47,7 +47,24 @@ Reviewer ≠ closer applies to the replacement unchanged (the closer is the acto
 
 - `partner_statements.void` (new, independent). **No automatic grant**: absent from `MATRIX` and from every system role (test iterates all roles); `owner`/`admin` get it only via `*` as for every permission. Requires `.view` and the application gate `accounting.partner_statements` (suspended = read-only ⇒ void/replace are POST ⇒ refused).
 - `replace` requires `close` **and** `void` (route: `close`; service: `void`).
+- Separation of duties for retirement is **per tenant** (D-PS-20, §1.6): `strict` by default.
 - Partner scope (`partners.view`) and tenant isolation are the same uniform refusal (`PARTNER_UNAVAILABLE`, 422) as in A3d; the target's **close run must be readable** — a branch-restricted user cannot void or replace an organisation-wide final (uniform refusal, no leak; `void.blocked_reason = close_scope_not_readable`).
+
+### 1.6 Revision 2 — configurable separation of duties (D-PS-20) and the replace contract (D-PS-19)
+
+**Existing mechanism reused — no parallel settings system.** The policy is one key in the existing tenant-settings store: `Settings::DEFAULTS['partner_statements']['void_separation'] = 'strict'` (`tenants.settings` JSON, read with `Settings::group/get`), wrapped by `App\Support\PartnerStatementVoidSeparation` (`effective()`, `blocks()`), the same shape as `CashSaleTreasuryPolicy`/`CommercePartnerPolicy`. No table, no migration of data, no new route.
+
+| Policy | Behaviour |
+|---|---|
+| `strict` (**default**, including every existing tenant that never set it; also the result of any missing / unknown / malformed stored value — `'FLEXIBLE'`, `''`, `1`, `true`, `[…]` are all strict) | the actor who **closed** a reconciliation cannot void it **nor supersede it** (direct void: the target; replacement: **every original** in `replaces`) → 403 `void_separation_required`, full rollback |
+| `flexible` | the closer may, **only if** they hold `partner_statements.void` (no automatic grant; a closer without it stays refused) |
+
+- **Recorded:** the effective policy at operation time is written to the event summary (`summary.void_separation` on `void` and on each `supersede`, and on the replacement's `close` event when it supersedes); `GET …/status` exposes `void.separation_policy` and `void.blocked_reason = separation_required`.
+- **Enforced in the database (both engines), no conflict with the configurable policy:** the event-insert guard reads the **same** `tenants.settings` row of the event's tenant (strict unless exactly `flexible`), requires `summary.void_separation` to **equal** it (`partner_statement_policy_mismatch`) and, under strict, rejects an actor equal to the reconciliation's `closed_by` (`partner_statement_void_separation`). Raw SQL therefore can neither retire a final as its closer under strict nor record a policy other than the effective one; another tenant's setting never affects this tenant (the trigger reads the event's own tenant).
+- **Race (documented, fail closed):** if the setting is changed between the service's read and the trigger's read, the database refuses the event (nothing written) and the service answers 409 `void_policy_changed` (retry). PostgreSQL race test: a policy change racing the closer's void never records a wrong policy (outcome is either 403/409 with the final intact, or success with `flexible` recorded).
+- **No user-reachable write path (owner condition):** there is no controller, route or request that writes this key (static test over `app/Http` and `routes`, and over every `Settings::put('partner_statements', …)` call site). The settings UI and a safe, authorised change channel are **deferred to PS-A4**; until then `flexible` can only be set by privileged data access, i.e. it is not open to users.
+- **Decision D-PS-19 as implemented:** explicit replacement without conflict allowed; default cap **20** (`MAX_REPLACES`, enforced in the request validation); reason mandatory; atomic (single transaction + PostgreSQL deferred constraint).
+- **Scope check:** one settings key + one policy class + one DB guard extension; no change to the settings architecture and no conflict between a mutable policy and the database guard (the guard reads the policy source itself), so no design-options stop was needed.
 
 ## 2. Database guards (PostgreSQL and SQLite)
 
@@ -71,12 +88,12 @@ Application-level (SQLite API suite): drop the `void` permission check in `repla
 Additive columns only; A3c/A3d behaviour and responses unchanged (the full A3d/A3c/A3b/A3a suites pass untouched except the three migration-order lines above); no data migration, no backfill; no existing permission, route or role changed; plain `close` is `performClose` with an empty replace list. `final.claims_count` still counts all claims (history) — `active_claims_count` is new.
 
 ## 5. Risks and open decisions
-- **D-PS-19 (replace contract) — open, conservative default:** explicit list of closed finals of the same partner/role the actor can read; reason mandatory; the listed finals need not conflict with the replacement; ≤ 20 per request. If the owner wants replacement restricted to finals that actually conflict (`unit_conflict`/identical period), it is a one-check change in `supersedeFinals`.
-- **D-PS-20 (permission / separation of duties for retirement) — open:** new independent `partner_statements.void`; **no rule that the voider differs from the closer/reviewer** of the retired final (every retirement is audited with actor, reason, time). If the owner requires separation it needs service + DB checks like D-PS-17.
+- **D-PS-19 / D-PS-20 approved (owner, 2026-11-03)** and implemented (§1.6). Residual: `flexible` has **no safe user-facing way to be set until PS-A4** (intended; privileged data access only). Under `flexible` a closer who also holds `void` can retire their own final — every retirement is audited with actor, reason, time and the effective policy.
+- Policy-change race (setting flipped between the service read and the DB check) refuses the operation fail-closed with a retryable 409; it never records a wrong policy.
 - No automatic grant of `partner_statements.void` to any stored role: tenants that want a non-owner voider must add it to a role explicitly.
 - A retired (voided/superseded) final no longer blocks a new final of the same scope/period (the unique index is `WHERE status = 'closed'`); the history stays in the retired row and its events.
 - Retirement does **not** reverse anything financial (nothing financial was ever created by a reconciliation); it only frees movements for re-reconciliation.
 - Fuel flake (CI only, 21:00–24:00 UTC) is pre-existing and unrelated.
 
 ## 6. Branch / PR / SHAs
-*(filled at PR time)*
+**Branch** `claude/imp-ps-a3e` · **PR** #1960 · **Base SHA** `607795dac5d1be9af0454e4d666c97854e8c6234` · **Head SHA** *(see PR; updated at each push)*

@@ -11,6 +11,7 @@ use App\Models\PartnerStatementReconciliation;
 use App\Models\PartnerStatementReconciliationEvent;
 use App\Models\PartnerStatementUnitClaim;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\LedgerService;
@@ -20,7 +21,9 @@ use App\Services\PartnerStatementImportService;
 use App\Services\PartnerStatementLifecycleService;
 use App\Support\PartnerStatementReviewException;
 use App\Services\TenantApplicationService;
+use App\Support\PartnerStatementVoidSeparation;
 use App\Support\Rbac;
+use App\Support\Settings;
 use App\Support\SpreadsheetWriter;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -255,11 +258,11 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
     }
 
     /** @return array{0: string, 1: array<string, mixed>, 2: Invoice} نهائي مُغلق ببند واحد يطالب بقيد فاتورة. */
-    private function finalized(string $date = '2026-09-01', int $price = 100000): array
+    private function finalized(string $date = '2026-09-01', int $price = 100000, ?string $closerToken = null, ?array $period = null): array
     {
         $invoice = $this->invoice($date, $price);
-        [$id, $run] = $this->ready([['date' => $date, 'our' => $invoice->number, 'credit' => intdiv($price * 115, 100)]]);
-        $this->close($this->closer, $id, $run['id'])->assertCreated();
+        [$id, $run] = $this->ready([['date' => $date, 'our' => $invoice->number, 'credit' => intdiv($price * 115, 100)]], $period ?? []);
+        $this->close($closerToken ?? $this->closer, $id, $run['id'])->assertCreated();
 
         return [$id, $run, $invoice];
     }
@@ -296,13 +299,13 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
         $decisions = DB::table('partner_statement_review_decisions')->where('reconciliation_id', $id)->count();
         $before = $this->counts();
 
-        $this->assertSame(['available' => true, 'blocked_reason' => null], $this->lcStatus($this->voider, $id)->assertOk()->json('data.void'));
+        $this->assertSame(['available' => true, 'blocked_reason' => null, 'separation_policy' => 'strict'], $this->lcStatus($this->voider, $id)->assertOk()->json('data.void'));
         $res = $this->void($this->voider, $id, 'سبب الإبطال')->assertCreated();
         $this->assertFalse($res->json('replayed'));
         $data = $res->json('data');
         $this->assertSame(['voided', $this->voiderId, 'سبب الإبطال', null], [$data['reconciliation']['status'], $data['reconciliation']['voided_by'], $data['reconciliation']['void_reason'], $data['reconciliation']['superseded_by_id']]);
         $this->assertNotNull($data['reconciliation']['voided_at']);
-        $this->assertSame(['available' => false, 'blocked_reason' => 'already_voided'], $data['void']);
+        $this->assertSame(['available' => false, 'blocked_reason' => 'already_voided', 'separation_policy' => 'strict'], $data['void']);
 
         // المطالبات: أُفرج عنها لا حُذفت (سجل تاريخي كامل)، بوقت الإبطال نفسه.
         $this->assertSame([0, 1], [$this->activeClaims($id), $this->allClaims($id)]);
@@ -398,7 +401,7 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
         $close = collect($this->events($this->retirer, $b)->json('data'))->firstWhere('action', 'close');
         $this->assertSame([$a], $close['summary']['supersedes']);
         $this->assertSame($before, $this->counts(), 'لا أثر مالي.');
-        $this->assertSame(['available' => false, 'blocked_reason' => 'already_superseded'], $this->lcStatus($this->retirer, $a)->json('data.void'));
+        $this->assertSame(['available' => false, 'blocked_reason' => 'already_superseded', 'separation_policy' => 'strict'], $this->lcStatus($this->retirer, $a)->json('data.void'));
         $this->assertSame($b, $this->lcStatus($this->retirer, $a)->json('data.reconciliation.superseded_by_id'));
     }
 
@@ -570,7 +573,7 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
         $seq = fn (): int => (int) DB::table('partner_statement_reconciliation_events')->where('reconciliation_id', $a)->max('seq') + 1;
         $event = fn (array $over = []): array => $over + [
             'id' => (string) Str::uuid(), 'tenant_id' => $t, 'reconciliation_id' => $a, 'seq' => $seq(), 'action' => 'void', 'from_status' => 'closed', 'to_status' => 'voided', 'run_id' => $runA['id'],
-            'summary' => '{}', 'reason' => 'سبب', 'created_by' => $this->voiderId, 'claims_count' => 1, 'created_at' => $now,
+            'summary' => '{"void_separation":"strict"}', 'reason' => 'سبب', 'created_by' => $this->voiderId, 'claims_count' => 1, 'created_at' => $now,
         ];
         // حدث إبطال بعدد مطالبات خاطئ/بتشغيلة غير تشغيلة الإغلاق/لمراجَعة: مرفوض.
         $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event(['claims_count' => 0])), 'عدد مطالبات خاطئ');
@@ -619,6 +622,176 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
         foreach (['voided', 'superseded'] as $status) {
             $this->assertRejected(fn () => DB::table('partner_statement_reconciliations')->insert(['id' => (string) Str::uuid(), 'status' => $status, 'period_from' => '2026-01-01', 'period_to' => '2026-01-31'] + $row), "إدراج {$status}");
         }
+    }
+
+    // ═══════════════════════════════ فصل المهام القابل للإعداد (D-PS-20) ═══════════════════════════════
+
+    /** يضبط (أو يمسح بـnull) سياسة المستأجر مباشرةً على الصف — لا مسار كتابة للمستخدمين في هذه الشريحة. */
+    private function policy(mixed $value, ?string $tenantId = null, bool $absent = false): void
+    {
+        $tenant = Tenant::query()->findOrFail($tenantId ?? $this->auth['tenant_id']);
+        $settings = $tenant->settings ?? [];
+        if ($absent) {
+            unset($settings['partner_statements']);
+        } else {
+            $settings['partner_statements'] = ['void_separation' => $value];
+        }
+        $tenant->update(['settings' => $settings]);
+    }
+
+    private function voidEvent(string $id): ?array
+    {
+        $row = DB::table('partner_statement_reconciliation_events')->where('reconciliation_id', $id)->whereIn('action', ['void', 'supersede'])->orderByDesc('seq')->first();
+
+        return $row === null ? null : ['summary' => json_decode((string) $row->summary, true), 'created_by' => $row->created_by, 'action' => $row->action];
+    }
+
+    /** @test */
+    public function strict_is_the_default_the_closer_cannot_void_their_own_final_and_the_policy_is_recorded_in_the_audit_log(): void
+    {
+        // مستأجر بلا أي إعداد (كالمستأجرين القائمين) ⇒ strict.
+        $this->assertNull(Tenant::query()->findOrFail($this->auth['tenant_id'])->settings['partner_statements'] ?? null);
+        [$id] = $this->finalized('2026-09-01', 100000, $this->retirer);   // المُغلِق يملك صلاحية الإبطال ومع ذلك يُمنع
+
+        $this->assertSame(['available' => false, 'blocked_reason' => 'separation_required', 'separation_policy' => 'strict'], $this->lcStatus($this->retirer, $id)->assertOk()->json('data.void'));
+        $denied = $this->void($this->retirer, $id)->assertStatus(403);
+        $this->assertSame(['void_separation_required', 'strict'], [$denied->json('reason'), $denied->json('details.policy')]);
+        $this->assertSame(['closed', 1, ['mark_reviewed', 'close']], [$this->reconciliation($id)->status, $this->activeClaims($id), $this->actions($id)], 'لا حدث ولا إفراج.');
+
+        // غير المُغلِق يُبطل، والسياسة الفعّالة وقت العملية مسجَّلة بالحدث.
+        $this->void($this->voider, $id)->assertCreated();
+        $event = $this->voidEvent($id);
+        $this->assertSame(['strict', $this->voiderId, 'void'], [$event['summary']['void_separation'], $event['created_by'], $event['action']]);
+        // إعادة طلب المُغلِق نفسه بعد الإبطال ترفض أيضاً (لا تُسرِّب حالة ولا تتجاوز الفصل بإعادة الطلب).
+        $this->void($this->retirer, $id)->assertStatus(403);
+        $this->assertTrue($this->void($this->voider, $id)->assertOk()->json('replayed'));
+    }
+
+    /** @test */
+    public function any_unknown_or_malformed_stored_policy_fails_closed_to_strict(): void
+    {
+        [$id] = $this->finalized('2026-09-01', 10000, $this->retirer);
+        foreach (['FLEXIBLE', 'loose', '', ' flexible', 1, true, ['flexible']] as $value) {
+            $this->policy($value);
+            $this->void($this->retirer, $id)->assertStatus(403);
+            $this->assertSame('strict', $this->lcStatus($this->retirer, $id)->json('data.void.separation_policy'), json_encode($value));
+            $this->assertSame('closed', $this->reconciliation($id)->status);
+        }
+        $this->policy(null, null, true);
+    }
+
+    /** @test */
+    public function flexible_lets_the_closer_void_only_with_the_void_permission_and_records_the_policy(): void
+    {
+        $this->policy('flexible');
+        [$mine] = $this->finalized('2026-09-01', 100000, $this->retirer);
+        $this->assertSame(['available' => true, 'blocked_reason' => null, 'separation_policy' => 'flexible'], $this->lcStatus($this->retirer, $mine)->json('data.void'));
+        $this->void($this->retirer, $mine)->assertCreated();
+        $this->assertSame(['voided', $this->retirerId, 'flexible'], [$this->reconciliation($mine)->status, $this->reconciliation($mine)->voided_by, $this->voidEvent($mine)['summary']['void_separation']]);
+
+        // لا منح تلقائي: مُغلِق بلا صلاحية الإبطال يبقى مرفوضاً حتى تحت flexible.
+        [$other] = $this->finalized('2026-10-01', 50000, $this->closer, ['period_from' => '2026-10-01', 'period_to' => '2026-10-28']);
+        $this->void($this->closer, $other)->assertStatus(403);
+        $this->assertSame(['closed', 1], [$this->reconciliation($other)->status, $this->activeClaims($other)]);
+    }
+
+    /** @test */
+    public function strict_separation_applies_to_every_original_in_a_replacement_and_a_refusal_rolls_everything_back(): void
+    {
+        $retirer2 = $this->role('ps-retirer2', ['partner_statements.view', 'partner_statements.close', 'partner_statements.void', 'partners.view'], 'retirer2@ps-a3e.test');
+        $retirer2Id = (string) User::query()->where('email', 'retirer2@ps-a3e.test')->value('id');
+        [$a, , $invoiceA] = $this->finalized('2026-09-01', 100000, $this->retirer);           // أغلقها retirer
+        [$a2] = $this->finalized('2026-10-01', 50000, $this->closer, ['period_from' => '2026-10-01', 'period_to' => '2026-10-28']);   // أغلقها closer (بلا صلاحية إبطال)
+        [$b, $runB] = $this->candidate($invoiceA);
+        $before = [$this->reconciliation($a)->status, $this->reconciliation($a2)->status, $this->activeClaims($a), $this->activeClaims($a2), DB::table('partner_statement_reconciliation_events')->count()];
+
+        // retirer أغلق أحد الأصلين ⇒ مرفوض، أياً كان ترتيب معالجة الأصلين، وتراجع كامل.
+        $this->assertSame('void_separation_required', $this->replace($this->retirer, $b, $runB['id'], [$a, $a2])->assertStatus(403)->json('reason'));
+        $this->assertSame($before, [$this->reconciliation($a)->status, $this->reconciliation($a2)->status, $this->activeClaims($a), $this->activeClaims($a2), DB::table('partner_statement_reconciliation_events')->count()]);
+        $this->assertSame('reviewed', $this->reconciliation($b)->status);
+
+        // مُنفِّذ ليس مُغلِق أيٍّ منهما ينجح، والسياسة مسجَّلة في كل supersede وفي إغلاق البديلة.
+        $this->replace($retirer2, $b, $runB['id'], [$a, $a2])->assertCreated();
+        foreach ([$a, $a2] as $orig) {
+            $event = $this->voidEvent($orig);
+            $this->assertSame(['supersede', $retirer2Id, 'strict'], [$event['action'], $event['created_by'], $event['summary']['void_separation']]);
+        }
+        $close = collect($this->events($retirer2, $b)->json('data'))->firstWhere('action', 'close');
+        $this->assertSame('strict', $close['summary']['void_separation']);
+    }
+
+    /** @test */
+    public function flexible_lets_the_closer_replace_their_own_final_with_the_policy_recorded(): void
+    {
+        [$a, , $invoice] = $this->finalized('2026-09-01', 100000, $this->retirer);
+        [$b, $runB] = $this->candidate($invoice);
+        $this->replace($this->retirer, $b, $runB['id'], [$a])->assertStatus(403);
+        $this->policy('flexible');
+        $this->replace($this->retirer, $b, $runB['id'], [$a])->assertCreated();
+        $this->assertSame(['superseded', 'flexible'], [$this->reconciliation($a)->status, $this->voidEvent($a)['summary']['void_separation']]);
+        $this->assertSame(1, $this->activeClaims($b));
+    }
+
+    /** @test */
+    public function the_database_enforces_the_effective_policy_against_raw_sql_and_a_wrongly_recorded_policy(): void
+    {
+        [$a, $runA] = $this->finalized('2026-09-01', 100000, $this->retirer);
+        $t = $this->auth['tenant_id'];
+        $now = now()->format('Y-m-d H:i:s');
+        $event = fn (string $by, ?string $policy, string $id = null): array => [
+            'id' => (string) Str::uuid(), 'tenant_id' => $t, 'reconciliation_id' => $id ?? $a, 'seq' => 3, 'action' => 'void', 'from_status' => 'closed', 'to_status' => 'voided', 'run_id' => $runA['id'],
+            'summary' => $policy === null ? '{}' : json_encode(['void_separation' => $policy]), 'reason' => 'سبب', 'created_by' => $by, 'claims_count' => 1, 'created_at' => $now,
+        ];
+
+        // strict: المُغلِق مرفوض حتى بسياسة مسجَّلة صحيحة؛ سياسة مسجَّلة ≠ الفعّالة أو غائبة مرفوضة.
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->retirerId, 'strict')), 'المُغلِق تحت strict');
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->voiderId, 'flexible')), 'سياسة مسجَّلة flexible والفعّالة strict');
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->voiderId, null)), 'سياسة غائبة');
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->retirerId, 'flexible')), 'المُغلِق يزعم flexible');
+
+        // مستأجر آخر بـflexible لا يؤثر على هذا المستأجر (المُشغّل يقرأ صف مستأجر الحدث نفسه).
+        $other = $this->registerTenant('ps-other-pol', 'owner@ps-other-pol.test');
+        $this->policy('flexible', $other['tenant_id']);
+        app(TenantContext::class)->set($t);
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->retirerId, 'flexible')), 'flexible لمستأجر آخر');
+        $this->void($this->retirer, $a)->assertStatus(403);
+        $this->assertSame(['closed', 1], [$this->reconciliation($a)->status, $this->activeClaims($a)]);
+
+        // flexible لهذا المستأجر: السياسة المسجَّلة يجب أن تكون flexible؛ strict المسجَّلة ترفض، والمُغلِق يُقبل.
+        $this->policy('flexible');
+        $this->assertRejected(fn () => DB::table('partner_statement_reconciliation_events')->insert($event($this->retirerId, 'strict')), 'سياسة مسجَّلة strict والفعّالة flexible');
+        DB::transaction(function () use ($event, $a, $now): void {
+            DB::table('partner_statement_reconciliation_events')->insert($event($this->retirerId, 'flexible'));
+            DB::table('partner_statement_reconciliations')->where('id', $a)->update(['status' => 'voided', 'voided_at' => $now, 'voided_by' => $this->retirerId, 'void_reason' => 'سبب']);
+        });
+        $this->assertSame(['voided', 0], [$this->reconciliation($a)->status, $this->activeClaims($a)]);
+    }
+
+    /** @test */
+    public function the_policy_is_read_through_the_existing_settings_mechanism_and_has_no_user_write_path_yet(): void
+    {
+        $this->assertSame('strict', Settings::DEFAULTS['partner_statements']['void_separation']);
+        $this->assertSame('strict', PartnerStatementVoidSeparation::effective());
+        $this->policy('flexible');
+        $this->assertSame('flexible', PartnerStatementVoidSeparation::effective());
+        $this->policy('anything');
+        $this->assertSame('strict', PartnerStatementVoidSeparation::effective());
+
+        // لا متحكّم ولا مسار ولا طلب يكتب هذا الإعداد (الواجهة وقناة التغيير الآمنة المصرَّح بها = PS-A4).
+        $files = array_merge(
+            glob(base_path('app/Http/**/*.php')) ?: [], glob(base_path('app/Http/*/*/*.php')) ?: [], glob(base_path('app/Http/*/*.php')) ?: [], [base_path('routes/api.php')],
+        );
+        foreach (array_unique($files) as $file) {
+            $this->assertStringNotContainsString('void_separation', (string) file_get_contents($file), $file);
+            $this->assertDoesNotMatchRegularExpression("/Settings::put\(\s*['\"]partner_statements['\"]/", (string) file_get_contents($file), $file);
+        }
+        $writers = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS)) as $f) {
+            if ($f->getExtension() === 'php' && preg_match("/Settings::put\(\s*(['\"]partner_statements['\"]|PartnerStatementVoidSeparation::GROUP)/", (string) file_get_contents($f->getPathname())) === 1) {
+                $writers[] = $f->getFilename();
+            }
+        }
+        $this->assertSame([], $writers, 'لا كاتب للإعداد في التطبيق.');
     }
 
     // ═══════════════════════════════ الهجرة والحدود المعمارية ═══════════════════════════════

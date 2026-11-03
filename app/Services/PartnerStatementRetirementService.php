@@ -6,6 +6,8 @@ use App\Models\PartnerStatementReconciliation;
 use App\Models\PartnerStatementReconciliationEvent;
 use App\Models\PartnerStatementUnitClaim;
 use App\Models\User;
+use App\Support\PartnerStatementReviewException;
+use App\Support\PartnerStatementVoidSeparation;
 use RuntimeException;
 
 /**
@@ -16,12 +18,20 @@ use RuntimeException;
 final class PartnerStatementRetirementService
 {
     /**
+     * فصل المهام (D-PS-20): تُقرأ السياسة الفعّالة للمستأجر **هنا** (داخل المعاملة، نقطة الإنفاذ الوحيدة في التطبيق) وتُسجَّل في ملخّص الحدث (`void_separation`)؛ تحت `strict` يُرفض الفاعل الذي أغلق هذا النهائي
+     * (403 `void_separation_required`) قبل أي كتابة. تفرض القاعدة الشيء نفسه (تقرأ `tenants.settings` وتطابق القيمة المسجَّلة).
+     *
      * @return int عدد المطالبات الفعّالة التي أُفرجت (يطابقها `claims_count` في الحدث، وتتحقق منه القاعدة)
      */
     public function retire(User $actor, PartnerStatementReconciliation $final, string $reason, ?string $replacementId): int
     {
         if ($final->status !== PartnerStatementReconciliation::STATUS_CLOSED) {
             throw new RuntimeException('لا يُخرَج من الخدمة إلا نهائي مُغلق.');
+        }
+
+        $policy = PartnerStatementVoidSeparation::effective();
+        if (PartnerStatementVoidSeparation::blocks($policy, $actor, $final)) {
+            throw self::separationRequired($final);
         }
 
         $superseding = $replacementId !== null;
@@ -34,7 +44,7 @@ final class PartnerStatementRetirementService
             'action' => $superseding ? PartnerStatementReconciliationEvent::ACTION_SUPERSEDE : PartnerStatementReconciliationEvent::ACTION_VOID,
             'from_status' => PartnerStatementReconciliation::STATUS_CLOSED,
             'to_status' => $superseding ? PartnerStatementReconciliation::STATUS_SUPERSEDED : PartnerStatementReconciliation::STATUS_VOIDED,
-            'run_id' => $final->reviewed_run_id, 'summary' => ['scope_key' => $final->scope_key, 'claims_released' => $released, 'closed_at' => optional($final->closed_at)->toIso8601String(), 'closed_by' => $final->closed_by],
+            'run_id' => $final->reviewed_run_id, 'summary' => ['scope_key' => $final->scope_key, 'claims_released' => $released, 'closed_at' => optional($final->closed_at)->toIso8601String(), 'closed_by' => $final->closed_by, 'void_separation' => $policy],
             'reason' => $reason, 'created_by' => $actor->getKey(), 'claims_count' => $released, 'related_reconciliation_id' => $replacementId, 'created_at' => $at,
         ]);
         $final->update([
@@ -43,5 +53,13 @@ final class PartnerStatementRetirementService
         ]);
 
         return $released;
+    }
+
+    /** رفض فصل المهام: المُغلِق لا يُخرج نهائيه تحت `strict`. */
+    public static function separationRequired(PartnerStatementReconciliation $final): PartnerStatementReviewException
+    {
+        return new PartnerStatementReviewException('void_separation_required', 'فصل المهام (D-PS-20): من أغلق المقارنة لا يُبطلها ولا يستبدلها وفق سياسة المؤسسة (strict).', 403, [
+            'policy' => PartnerStatementVoidSeparation::STRICT, 'reconciliation_id' => $final->id,
+        ]);
     }
 }

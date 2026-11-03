@@ -251,7 +251,7 @@ class PartnerStatementVoidSupersedeConcurrencyPostgresTest extends TestCase
         [$id, $runId] = $this->reviewed([$a], '2026-09-01', '2026-09-30');
         $this->closeNow($id, $runId);
 
-        $results = $this->runConcurrently([$this->voidJob(0, $id), $this->voidJob(1, $id), $this->voidJob(2, $id), $this->voidJob(0, $id)]);
+        $results = $this->runConcurrently([$this->voidJob(1, $id), $this->voidJob(2, $id), $this->voidJob(1, $id), $this->voidJob(2, $id)]);
 
         $this->assertCount(4, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
         $this->assertCount(1, array_filter($this->successes($results), fn ($v) => $v['replayed'] === false), 'فائز واحد فقط يكتب الحدث.');
@@ -267,7 +267,7 @@ class PartnerStatementVoidSupersedeConcurrencyPostgresTest extends TestCase
         [$id, $runId] = $this->reviewed([$a], '2026-09-01', '2026-09-30');
         $this->closeNow($id, $runId);
 
-        $results = $this->runConcurrently([$this->voidJob(0, $id, 'سبب أول'), $this->voidJob(1, $id, 'سبب ثانٍ')]);
+        $results = $this->runConcurrently([$this->voidJob(1, $id, 'سبب أول'), $this->voidJob(2, $id, 'سبب ثانٍ')]);
 
         $this->assertCount(1, $this->successes($results), json_encode($results, JSON_UNESCAPED_UNICODE));
         $this->assertSame(['reconciliation_already_voided'], $this->failures($results));
@@ -401,6 +401,53 @@ class PartnerStatementVoidSupersedeConcurrencyPostgresTest extends TestCase
         $this->assertClaimInvariants();
     }
 
+    private function setPolicy(?string $value): void
+    {
+        $tenant = \App\Models\Tenant::query()->findOrFail($this->tenantId);
+        $settings = $tenant->settings ?? [];
+        if ($value === null) {
+            unset($settings['partner_statements']);
+        } else {
+            $settings['partner_statements'] = ['void_separation' => $value];
+        }
+        $tenant->update(['settings' => $settings]);
+    }
+
+    /** @test */
+    public function a_policy_change_racing_the_closers_void_never_lets_a_wrong_policy_through(): void
+    {
+        foreach ([0, 80_000, 250_000] as $k => $delay) {
+            $this->setPolicy(null);
+            $m = sprintf('2026-%02d', 1 + $k);
+            $a = $this->invoice("{$m}-01", 100000);
+            [$id, $runId] = $this->reviewed([$a], "{$m}-01", "{$m}-28", null, 'P'.$k);
+            $this->closeNow($id, $runId);   // المُغلِق = closerIds[0] (يملك صلاحية الإبطال)
+
+            $flip = $this->jobAs($this->ownerId, function (User $u) use ($delay) {
+                usleep($delay);
+                $this->setPolicy('flexible');
+
+                return true;
+            });
+            $results = $this->runConcurrently([$this->voidJob(0, $id), $flip]);
+
+            $this->assertTrue($results[1]['ok'] ?? false, json_encode($results[1], JSON_UNESCAPED_UNICODE));
+            $status = $this->rowStatus($id);
+            if ($status === 'voided') {
+                $this->assertTrue($results[0]['ok'] ?? false);
+                app(TenantContext::class)->set($this->tenantId);
+                $event = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $id)->where('action', 'void')->firstOrFail();
+                $this->assertSame(['flexible', $this->closerIds[0]], [$event->summary['void_separation'], (string) $event->created_by], 'الإبطال بيد المُغلِق مسموح فقط بسياسة flexible الفعّالة المسجَّلة.');
+            } else {
+                $this->assertSame('closed', $status);
+                $this->assertContains($this->failures($results)[0] ?? 'none', ['void_separation_required', 'void_policy_changed']);
+                $this->assertSame(1, $this->activeClaimsOf($id));
+            }
+            $this->assertClaimInvariants();
+        }
+        $this->setPolicy(null);
+    }
+
     /** @test */
     public function the_deferred_constraint_refuses_a_supersede_whose_replacement_is_not_closed_at_commit(): void
     {
@@ -415,10 +462,10 @@ class PartnerStatementVoidSupersedeConcurrencyPostgresTest extends TestCase
             DB::transaction(function () use ($orig, $new, $runOrig, $now): void {
                 DB::table('partner_statement_reconciliation_events')->insert([
                     'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $this->tenantId, 'reconciliation_id' => $orig, 'seq' => 3, 'action' => 'supersede', 'from_status' => 'closed', 'to_status' => 'superseded',
-                    'run_id' => $runOrig, 'summary' => '{}', 'reason' => 'سبب', 'created_by' => $this->closerIds[0], 'claims_count' => 1, 'related_reconciliation_id' => $new, 'created_at' => $now,
+                    'run_id' => $runOrig, 'summary' => '{"void_separation":"strict"}', 'reason' => 'سبب', 'created_by' => $this->closerIds[1], 'claims_count' => 1, 'related_reconciliation_id' => $new, 'created_at' => $now,
                 ]);
                 DB::table('partner_statement_reconciliations')->where('id', $orig)->update([
-                    'status' => 'superseded', 'voided_at' => $now, 'voided_by' => $this->closerIds[0], 'void_reason' => 'سبب', 'superseded_by_id' => $new,
+                    'status' => 'superseded', 'voided_at' => $now, 'voided_by' => $this->closerIds[1], 'void_reason' => 'سبب', 'superseded_by_id' => $new,
                 ]);
             });
             $this->fail('الالتزام يجب أن يُرفض: البديلة لم تُغلق.');

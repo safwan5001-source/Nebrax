@@ -68,7 +68,7 @@ return new class extends Migration
             }
             $this->callA3d($a3d, 'postgresGuards');
         } else {
-            foreach (['partner_stmt_recon_release', 'partner_stmt_claim_release_guard', 'partner_stmt_claim_shape', 'partner_stmt_claim_insert_guard', 'partner_stmt_claim_no_delete'] as $trigger) {
+            foreach (['partner_stmt_recon_release', 'partner_stmt_claim_release_guard', 'partner_stmt_claim_shape', 'partner_stmt_claim_insert_guard', 'partner_stmt_claim_no_delete', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation'] as $trigger) {
                 DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
             }
             $this->callA3d($a3d, 'sqliteGuards');
@@ -140,6 +140,7 @@ return new class extends Migration
 
         DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION partner_stmt_event_guard_insert() RETURNS trigger LANGUAGE plpgsql AS $fn$
+            DECLARE v_policy text;
             BEGIN
                 IF NEW.seq <> 1 + COALESCE((SELECT MAX(e.seq) FROM partner_statement_reconciliation_events e
                                              WHERE e.tenant_id = NEW.tenant_id AND e.reconciliation_id = NEW.reconciliation_id), 0) THEN
@@ -175,6 +176,15 @@ return new class extends Migration
                     IF NEW.claims_count <> (SELECT COUNT(*) FROM partner_statement_unit_claims c
                                              WHERE c.tenant_id = NEW.tenant_id AND c.reconciliation_id = NEW.reconciliation_id AND c.released_at IS NULL) THEN
                         RAISE EXCEPTION 'partner_statement_reconciliation_events: claims_count must equal the active claims being released';
+                    END IF;
+                    -- D-PS-20: the policy recorded with the event must be the tenant's effective one (tenants.settings, strict unless exactly 'flexible'), and strict forbids the closer.
+                    v_policy := CASE WHEN (SELECT t.settings::jsonb #>> '{partner_statements,void_separation}' FROM tenants t WHERE t.id = NEW.tenant_id) = 'flexible' THEN 'flexible' ELSE 'strict' END;
+                    IF NEW.summary IS NULL OR (NEW.summary::jsonb ->> 'void_separation') IS DISTINCT FROM v_policy THEN
+                        RAISE EXCEPTION 'partner_statement_policy_mismatch: the recorded void separation policy must equal the tenant''s effective policy';
+                    END IF;
+                    IF v_policy = 'strict' AND EXISTS (SELECT 1 FROM partner_statement_reconciliations r
+                                                         WHERE r.tenant_id = NEW.tenant_id AND r.id = NEW.reconciliation_id AND r.closed_by IS NOT DISTINCT FROM NEW.created_by) THEN
+                        RAISE EXCEPTION 'partner_statement_void_separation: under the strict policy the closer cannot void or supersede the final';
                     END IF;
                 END IF;
                 IF NEW.action = 'supersede' AND NOT EXISTS (
@@ -373,7 +383,7 @@ return new class extends Migration
 
     private function sqliteUp(): void
     {
-        foreach (['partner_stmt_recon_lifecycle_insert', 'partner_stmt_recon_guard', 'partner_stmt_recon_insert_guard', 'partner_stmt_event_shape', 'partner_stmt_event_insert_guard', 'partner_stmt_claim_no_update'] as $trigger) {
+        foreach (['partner_stmt_recon_lifecycle_insert', 'partner_stmt_recon_guard', 'partner_stmt_recon_insert_guard', 'partner_stmt_event_shape', 'partner_stmt_event_insert_guard', 'partner_stmt_claim_no_update', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation'] as $trigger) {
             DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
         }
 
@@ -457,6 +467,23 @@ return new class extends Migration
                        AND n.id <> o.id AND n.status = 'reviewed'))
             BEGIN
                 SELECT RAISE(ABORT, 'partner_statement_reconciliation_events: seq, from_status, close or retire preconditions do not match the current state');
+            END
+            SQL);
+
+        $effective = "(CASE WHEN (SELECT json_extract(t.settings, '$.partner_statements.void_separation') FROM tenants t WHERE t.id = NEW.tenant_id) = 'flexible' THEN 'flexible' ELSE 'strict' END)";
+        DB::unprepared(<<<SQL
+            CREATE TRIGGER partner_stmt_event_void_policy BEFORE INSERT ON partner_statement_reconciliation_events
+            WHEN NEW.action IN ('void', 'supersede') AND (NEW.summary IS NULL OR json_extract(NEW.summary, '$.void_separation') IS NOT {$effective})
+            BEGIN
+                SELECT RAISE(ABORT, 'partner_statement_policy_mismatch: the recorded void separation policy must equal the tenant''s effective policy');
+            END
+            SQL);
+        DB::unprepared(<<<SQL
+            CREATE TRIGGER partner_stmt_event_void_separation BEFORE INSERT ON partner_statement_reconciliation_events
+            WHEN NEW.action IN ('void', 'supersede') AND {$effective} = 'strict'
+              AND EXISTS (SELECT 1 FROM partner_statement_reconciliations r WHERE r.tenant_id = NEW.tenant_id AND r.id = NEW.reconciliation_id AND r.closed_by IS NEW.created_by)
+            BEGIN
+                SELECT RAISE(ABORT, 'partner_statement_void_separation: under the strict policy the closer cannot void or supersede the final');
             END
             SQL);
 
