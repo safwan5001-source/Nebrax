@@ -54,13 +54,17 @@
 | H2-5 | **Merged** (squash، 2026-11-02/03 — الأدلة في `AWJ_COPS_H2_HORIZON_CLOSURE_REPORT.md`) — تتبّع الضيف الموقَّع `trk1` (404 موحَّد، 30/20 في الدقيقة، إسقاط ضيّق، صفحة المتجر)، مغلق افتراضياً؛ SQLite 16 · storefront 3709 | #1945 | `de9b1692eef055062d4f3f37a05a9f66d5c77dc3` | `AWJ-COPS-H2-5-IMPLEMENTATION-REPORT.md`؛ بلا هجرة؛ `COMMERCE_GUEST_ORDER_TRACKING_ENABLED` مغلقة |
 | H2-6 | **Merged** (squash، 2026-11-02/03 — الأدلة في `AWJ_COPS_H2_HORIZON_CLOSURE_REPORT.md`) — طابور التحضير المجدول (منطقة اللقطة + حدود القناة)، مرشّح `due`، أسباب `attention` الثلاثة خلف بوابة التنفيذ؛ SQLite 23 + PostgreSQL 129 · web 192 | #1951 | `77d338fa79c19a3b674f0aefefb2556d3c0415ea` | `AWJ-COPS-H2-6-IMPLEMENTATION-REPORT.md`؛ قراءة فقط بلا هجرة |
 
+| H3-0 | **Merged** (وثائق، 2026-11-03) — الخطة وسجل القرارات وADR-30 (Proposed) | #1954 | `23a0beaffb263df3aa5775984accde4d97c43cb8` | `AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md`؛ Base `f92eec456`، Head `b7c28d13a` |
+| H3-7 | **Merged** (2026-11-03) — دمج التفضيلات + `commerce_alerts.enabled`؛ CI كامل أخضر؛ Codex بلا ملاحظات | #1956 | `c3a84837a12658f35d579d0ec2e5478c5bb20e13` | `AWJ-COPS-H3-7-IMPLEMENTATION-REPORT.md`؛ Head `e60d5172c`؛ بلا هجرة |
+| H3-2 | **Merged** (2026-11-03) — محرّك صوت التنبيهات؛ CI كامل أخضر؛ خمس ملاحظات Codex صحيحة أُصلحت | #1955 | `59ed2640bfce7af70200237daf82bdad09f8922f` | `AWJ-COPS-H3-2-IMPLEMENTATION-REPORT.md`؛ Head `766c11297`؛ POS بلا تغيير؛ ويب فقط |
+
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 
 ---
 
 ## 3.H3 نقطة الاستئناف — COPS-H3 (مفوَّض 2026-11-03، بشرط التوقف عند بوابات القرار)
 
-**المرجع:** `docs/audits/AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md` (الخطة وسجل القرارات) + `docs/plans/store/ADR-30-COMMERCE-ALERT-RECEPTION.md` (**Proposed**).
+**الحالة: مغلق جزئياً عند بوابة قرار** — H3-0/H3-2/H3-7 مدموجة؛ تقرير الإغلاق `AWJ_COPS_H3_HORIZON_CLOSURE_REPORT.md`؛ H3-1/3/4/5 تنتظر R-8/R-10/R-11/D-H3-01/D-H3-02. **المرجع:** `docs/audits/AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md` (الخطة وسجل القرارات) + `docs/plans/store/ADR-30-COMMERCE-ALERT-RECEPTION.md` (**Proposed**).
 **تُنفَّذ:** H3-0 (وثائق) · H3-2 (محرّك الصوت) · H3-7 (دمج التفضيلات). **محجوبة بقرار المالك:** H3-1 (R-8، D-H3-01) · H3-3 (R-11، D-H3-01، D-H3-02) · H3-4 (R-10) · H3-5 (تابعة H3-3). **خارج التفويض:** H3-6 (D-OPS-3 + H4-3) · H3-P. لا تفعيل ولا نشر ولا Railway. سجل PR/Base/Head/Merge SHA لكل شريحة في `AWJ_COPS_H3_HORIZON_CLOSURE_REPORT.md` (لا PR سجلات منفصل).
 
 ## 3.A نقطة الاستئناف الحالية — H2 (تنفيذ ذاتي مفوَّض بالتتابع H2-1 … H2-6)
