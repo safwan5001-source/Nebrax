@@ -287,7 +287,8 @@ export function ReceptionOrderPanel({
           orderId={order.id}
           onClose={() => setRejectOpen(false)}
           onRejected={(next) => { setRejectOpen(false); setJustRejected(true); updated(next); }}
-          onStale={() => { setRejectOpen(false); markStale(); }}
+          // الحوار يبقى مفتوحاً مقفلاً يعرض سبب الفشل (409/شبكة) حتى يغلقه المشغّل — كما في order-detail؛ الإغلاق يفكّ تركيبه فتبدأ المحاولة التالية نظيفة (Codex P2).
+          onStale={markStale}
         />
       )}
     </>

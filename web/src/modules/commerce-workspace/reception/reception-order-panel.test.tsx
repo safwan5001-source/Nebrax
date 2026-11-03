@@ -116,8 +116,14 @@ describe('ReceptionOrderPanel (COPS-H3-5c)', () => {
     fireEvent.click(reject()!);
     fireEvent.click(await screen.findByText('تأكيد الرفض'));
     await waitFor(() => expect(screen.getByTestId('panel-stale')).toBeTruthy());
-    await waitFor(() => expect(screen.queryByText('تأكيد الرفض')).toBeNull()); // أُغلق بعد القفل
-    await waitFor(() => expect(screen.queryByTestId('panel-stale')).toBeNull()); // وصل التحديث فارتفع القفل
+    // الحوار يبقى مفتوحاً مقفلاً ويعرض سبب الفشل (لا يختفي بتحديث اللوحة — Codex P2 الثاني).
+    expect(screen.getByText(/تغيّرت حالة الطلب/)).toBeTruthy();
+    expect((screen.getByText('تأكيد الرفض').closest('button') as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect(screen.queryByTestId('panel-stale')).toBeNull()); // وصل التحديث فارتفع قفل اللوحة
+    expect(screen.getByText(/تغيّرت حالة الطلب/)).toBeTruthy(); // والسبب ما زال ظاهراً في الحوار
+    const dialog = screen.getByText('تأكيد الرفض').closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'إغلاق')!); // المشغّل يغلقه صراحةً
+    await waitFor(() => expect(screen.queryByText('تأكيد الرفض')).toBeNull());
     fireEvent.click(reject()!);
     const confirm = (await screen.findByText('تأكيد الرفض')).closest('button') as HTMLButtonElement;
     expect(confirm.disabled).toBe(false);
