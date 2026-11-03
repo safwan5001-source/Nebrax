@@ -188,6 +188,7 @@ use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\PartnerStatementImportController;
 use App\Http\Controllers\Api\PartnerStatementMatchController;
 use App\Http\Controllers\Api\PartnerStatementLifecycleController;
+use App\Http\Controllers\Api\PartnerStatementReconciliationController;
 use App\Http\Controllers\Api\PartnerStatementReviewController;
 use App\Http\Controllers\Api\StockPermitImportController;
 use App\Http\Controllers\Api\StocktakeCountImportController;
@@ -1792,6 +1793,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('partner-statements/import/fields', [PartnerStatementImportController::class, 'fields'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements')]);
         Route::post('partner-statements/import/inspect', [PartnerStatementImportController::class, 'inspect'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
         Route::post('partner-statements/import/preview', [PartnerStatementImportController::class, 'preview'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), EnsureImportFilesScanned::class]);
+        // IMP-PS-A4a0: قراءة القائمة والرأس وسطور الكشف (إضافية، قراءة فقط؛ الرؤية داخل الخدمة).
+        Route::get('partner-statement-reconciliations', [PartnerStatementReconciliationController::class, 'index'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
+        Route::get('partner-statement-reconciliations/{id}', [PartnerStatementReconciliationController::class, 'show'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
+        Route::get('partner-statement-reconciliations/{id}/lines', [PartnerStatementReconciliationController::class, 'lines'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
         // IMP-PS-A2c: مطابقة الكشوف — لا أثر مالي. التشغيل `reconcile` (+ معلَّق = قراءة فقط عبر بوابة القدرة)، القراءة والتحقق `view`. رؤية الطرف/الفرع داخل الخدمة.
         Route::post('partner-statement-reconciliations/{id}/match', [PartnerStatementMatchController::class, 'run'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::get('partner-statement-reconciliations/{id}/matches', [PartnerStatementMatchController::class, 'matches'])->middleware([$perm('partner_statements.view'), $app('accounting.partner_statements')]);
