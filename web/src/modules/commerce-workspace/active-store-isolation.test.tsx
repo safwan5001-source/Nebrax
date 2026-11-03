@@ -32,6 +32,8 @@ vi.mock('@/components/layout/lang-toggle', () => ({ LangToggle: () => null }));
 vi.mock('@/components/layout/theme-toggle', () => ({ ThemeToggle: () => null }));
 // COPS-H3-3: مركز التنبيه خارج نطاق هذا الاختبار (هذا الاختبار يحاكي `@/lib/auth` بمستخدم جديد في كل نداء فلا يصلح لـuseSyncExternalStore).
 vi.mock('@/modules/commerce-workspace/alerts/order-alert-center', () => ({ OrderAlertCenter: () => null }));
+// COPS-H3-5: المزوّد يشغّل الخطاف الحقيقي؛ هذه الاختبارات لا تخص التنبيه فيُستبدل بمرور الأبناء.
+vi.mock('@/modules/commerce-workspace/alerts/order-alerts-provider', () => ({ OrderAlertsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 
 const listVersionsMock = vi.fn();
 vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
