@@ -124,6 +124,13 @@ export type OrderSummary = {
   fulfillment?: { status: string; type: string };
   /** COPS-H2-6 — يحضر **فقط** حين طُلب مرشّح `due`: نافذة التسليم (UTC) و`prepare_from` ومنطقة اللقطة والدلاء المحسوبة بالخادم. */
   queue?: OrderQueue;
+  /** COPS-H3-5 — لقطة موعد التسليم المجدول في صفوف **القائمة** (إضافية؛ null لطلب بلا جدولة، وتغيب من خادم أقدم). */
+  schedule?: {
+    method: string | null;
+    date: string | null;
+    slot: { label: string | null; label_en: string | null; start_time: string | null; end_time: string | null };
+    timezone: string | null;
+  } | null;
   cancellation?: OrderCancellation;
   created_at: string | null;
   confirmed_at: string | null;

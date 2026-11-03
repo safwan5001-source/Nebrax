@@ -159,6 +159,39 @@ class CommerceStaffOrderApiTest extends TestCase
             ->assertJsonPath('meta.total', 1);
     }
 
+    // ── COPS-H3-5: موعد التسليم في صفوف القائمة ───────────────────────────
+
+    /** @test */
+    public function list_rows_carry_the_order_schedule_snapshot_additively_and_null_when_unscheduled(): void
+    {
+        [$tenantId, $token] = $this->owner();
+        $plain = $this->seedOrder($tenantId, ['number' => 'CORD-PLAIN']);
+
+        $ctx = app(TenantContext::class);
+        $ctx->set($tenantId);
+        $channel = SalesChannel::query()->first();
+        $order = new CommerceOrder(['sales_channel_id' => $channel->id, 'storefront_id' => Storefront::query()->first()->id, 'number' => 'CORD-SCHED', 'delivery_method' => 'standard', 'total' => 11500]);
+        $order->save();
+        CommerceOrderLine::create(['commerce_order_id' => $order->id, 'product_name_snapshot' => 'وردة', 'quantity' => 1, 'unit_price' => 5000, 'line_total' => 5000]);
+        $order->snapshot()->create(['customer_name' => 'سارة', 'phone' => '0500000001', 'email' => 's@example.test', 'shipping_city' => 'الدمام']);
+        \App\Models\CommerceOrderSchedule::create([
+            'tenant_id' => $tenantId, 'commerce_order_id' => $order->id, 'method' => 'delivery', 'delivery_date' => '2026-11-04',
+            'slot_label' => 'مساءً', 'slot_label_en' => 'Evening', 'start_time' => '17:00', 'end_time' => '20:00', 'timezone' => 'Asia/Riyadh',
+        ]);
+        $order->update(['status' => CommerceOrder::STATUS_CONFIRMED, 'confirmed_at' => now()]);
+        CommercePaymentIntent::create(['commerce_order_id' => $order->id, 'method' => CommercePaymentIntent::METHOD_COD, 'status' => CommercePaymentIntent::STATUS_AWAITING_COLLECTION, 'amount_minor' => 11500, 'currency' => 'SAR']);
+        $ctx->forget();
+
+        $rows = collect($this->withToken($token)->getJson('/api/commerce/orders')->assertOk()->json('data'))->keyBy('number');
+        $this->assertNull($rows['CORD-PLAIN']['schedule']);
+        $this->assertSame('2026-11-04', $rows['CORD-SCHED']['schedule']['date']);
+        $this->assertSame('17:00', $rows['CORD-SCHED']['schedule']['slot']['start_time']);
+        $this->assertSame('Asia/Riyadh', $rows['CORD-SCHED']['schedule']['timezone']);
+        // لا تسرّب لمفاتيح داخلية: المفاتيح الأربعة المعتمدة فقط.
+        $this->assertSame(['date', 'method', 'slot', 'timezone'], collect(array_keys($rows['CORD-SCHED']['schedule']))->sort()->values()->all());
+        $this->assertNotNull($plain);
+    }
+
     // ── المقيَّد بمخازن ──────────────────────────────────────────────────
 
     /** @test */

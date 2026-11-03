@@ -22,6 +22,8 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
       { href: '/commerce', labelKey: 'overview' },
       // COMMERCE-ORDERS-O1b — يظهر لمن يملك الصلاحية وحين تكون قدرة المتجر مفعّلة (المسار يردّ 403 بدونهما).
       { href: '/commerce/orders', labelKey: 'orders', appKey: 'commerce.storefront', permission: 'commerce.orders.view' },
+      // COPS-H3-5 — مساحة استقبال الطلبات الحية (نفس الصلاحية والقدرة؛ التنبيه الحي نفسه خلف بوابة H3-3 ويظهر حالة «غير مفعّل» عند إغلاقها).
+      { href: '/commerce/orders/live', labelKey: 'ordersLive', appKey: 'commerce.storefront', permission: 'commerce.orders.view' },
     ],
   },
   {
@@ -66,5 +68,7 @@ export function isCommerceWorkspacePath(pathname: string | null | undefined): bo
 export function isCommerceNavItemActive(href: string, pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   if (href === '/commerce') return pathname === '/commerce';
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (!(pathname === href || pathname.startsWith(`${href}/`))) return false;
+  // أطول بادئة تطابق تفوز: `/commerce/orders/live` لا تُضيء معها `/commerce/orders`.
+  return !COMMERCE_WORKSPACE_HREFS.some((other) => other.length > href.length && other !== '/commerce' && (pathname === other || pathname.startsWith(`${other}/`)));
 }
