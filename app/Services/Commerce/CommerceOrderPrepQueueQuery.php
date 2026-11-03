@@ -37,9 +37,10 @@ final class CommerceOrderPrepQueueQuery
 
     /**
      * @param  ?list<string>  $allowedWarehouseIds
+     * @param  (\Closure(Builder): mixed)|null  $narrow  مرشّحات إضافية تُطبَّق على استعلام المرشّحين **قبل** السقف (مرشّحات قائمة الموظف: قناة/دفع/بحث…) كي يضيّق التصفية المجتمعَ فعلاً.
      * @return array{items: Collection<int, array<string, mixed>>, truncated: bool}
      */
-    public function run(?string $storefrontId = null, ?string $bucket = null, ?array $allowedWarehouseIds = null, ?CarbonImmutable $now = null): array
+    public function run(?string $storefrontId = null, ?string $bucket = null, ?array $allowedWarehouseIds = null, ?CarbonImmutable $now = null, ?\Closure $narrow = null): array
     {
         $now ??= CarbonImmutable::now('UTC');
 
@@ -57,6 +58,7 @@ final class CommerceOrderPrepQueueQuery
             })
             ->whereDoesntHave('fulfillment', fn (Builder $q) => $q->whereIn('status', CommerceOrderFulfillment::COMPLETED))
             ->when($storefrontId !== null, fn (Builder $q) => $q->where('storefront_id', $storefrontId))
+            ->when($narrow !== null, fn (Builder $q) => $narrow($q))
             ->with(['schedule', 'fulfillment:id,commerce_order_id,status', 'lines:id,commerce_order_id,product_id'])
             ->orderBy('created_at')->orderBy('id')
             ->limit(self::MAX_CANDIDATES + 1)

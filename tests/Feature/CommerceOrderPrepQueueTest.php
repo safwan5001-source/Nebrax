@@ -431,6 +431,31 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function list_filters_narrow_the_candidate_population_before_the_cap(): void
+    {
+        // Codex P2: مرشّحات القائمة (بحث/قناة/دفع…) تُطبَّق على المرشّحين قبل السقف لا بعده.
+        $this->channelSettings();
+        $a = $this->scheduled('2026-11-02', '11:00', '13:00');
+        $this->scheduled('2026-11-02', '12:00', '14:00');
+        $this->scheduled('2026-11-02', '13:00', '15:00');
+
+        $loaded = 0;
+        CommerceOrder::retrieved(function () use (&$loaded): void {
+            $loaded++;
+        });
+        app(TenantContext::class)->set($this->tenant->id);
+        $result = app(CommerceOrderPrepQueueQuery::class)->run(null, 'today', null, CarbonImmutable::now('UTC'), fn ($q) => $q->where('number', $a->number));
+        app(TenantContext::class)->forget();
+
+        $this->assertSame([$a->id], $result['items']->pluck('order_id')->all());
+        $this->assertSame(1, $loaded, 'المرشّحون المحمّلون هم المطابقون للمرشّح وحدهم');
+
+        // وعبر HTTP: بحث برقم الطلب مع due يعيد ذلك الطلب وحده.
+        $response = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders?due=today&q='.$a->number)->assertOk();
+        $this->assertSame([$a->id], collect($response->json('data'))->pluck('id')->all());
+    }
+
+    #[Test]
     public function candidates_are_narrowed_by_bucket_before_the_shared_cap(): void
     {
         // Codex P2: طلبات دلو آخر لا تُحمَّل أصلاً (فلا تستنزف سقف المرشّحين).

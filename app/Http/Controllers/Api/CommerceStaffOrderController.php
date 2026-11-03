@@ -87,7 +87,7 @@ class CommerceStaffOrderController extends ApiController
         $queue = null;
         $queueTruncated = false;
         if (isset($data['due'])) {
-            $result = app(CommerceOrderPrepQueueQuery::class)->run($data['storefront_id'] ?? null, $data['due'], $request->user()?->allowedWarehouseIds());
+            $result = app(CommerceOrderPrepQueueQuery::class)->run($data['storefront_id'] ?? null, $data['due'], $request->user()?->allowedWarehouseIds(), null, fn (Builder $q) => $this->applyFilters($q, $data));
             $queue = $result['items']->keyBy('order_id');
             $queueTruncated = $result['truncated'];
             $queue->isEmpty() ? $query->whereRaw('1 = 0') : $query->whereIn('id', $queue->keys()->all());
