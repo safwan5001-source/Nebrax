@@ -30,9 +30,6 @@ final class CommerceOrderPrepQueueQuery
 
     public const MAX_CANDIDATES = 500;
 
-    /** أقدم موعد ما زال يُعدّ «متأخراً» في الطابور (أيام). */
-    private const LOOKBACK_DAYS = 30;
-
     /** أفق الدلاء الزمنية (`today`/`tomorrow`) بالأيام، بهامش يوم للمنطقة الزمنية. */
     private const LOOKAHEAD_DAYS = 3;
 
@@ -87,16 +84,16 @@ final class CommerceOrderPrepQueueQuery
      */
     private function coarse(Builder $q, string $bucket, CarbonImmutable $now): void
     {
-        $from = $now->subDays(self::LOOKBACK_DAYS + 1)->toDateString();
+        // `overdue` و`prepare_now` بلا حدّ أدنى (D-H2-20: بلا نافذة حداثة): طلب عالق لا يتوقف عن الحاجة للتحضير لأنه شاخ؛ يحدّ المعالجةَ سقفُ المرشّحين وعلم `truncated`.
         [$low, $high] = match ($bucket) {
-            'overdue' => [$from, $now->addDay()->toDateString()],
+            'overdue' => [null, $now->addDay()->toDateString()],
             // يوم القناة (UTC−12..+14، حتى 25 ساعة) ونافذة اللقطة بمنطقتها هي (تاريخ التسليم ± يوم بالتوقيت العالمي): منطقتان قد تختلفان
             // بما يصل إلى يومين، فالهامش ثلاثة أيام لـ«اليوم» وأربعة لـ«غداً» (Codex P2).
             'today' => [$now->subDays(3)->toDateString(), $now->addDays(3)->toDateString()],
             'tomorrow' => [$now->subDay()->toDateString(), $now->addDays(self::LOOKAHEAD_DAYS + 1)->toDateString()],
-            default => [$from, $now->addDays(self::prepareHorizonDays())->toDateString()],
+            default => [null, $now->addDays(self::prepareHorizonDays())->toDateString()],
         };
-        $q->whereHas('schedule', fn (Builder $s) => $s->whereBetween('delivery_date', [$low, $high]));
+        $q->whereHas('schedule', fn (Builder $s) => $low === null ? $s->where('delivery_date', '<=', $high) : $s->whereBetween('delivery_date', [$low, $high]));
         if ($bucket === 'prepare_now') {
             $q->whereDoesntHave('fulfillment');
         }

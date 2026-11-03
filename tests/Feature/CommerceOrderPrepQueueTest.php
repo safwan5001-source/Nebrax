@@ -416,6 +416,21 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function an_unstarted_order_never_ages_out_of_overdue_or_preparation_attention(): void
+    {
+        // Codex P2 / D-H2-20: بلا نافذة حداثة؛ طلب عالق منذ 90 يوماً ما زال متأخراً ويحتاج تحضيراً.
+        $this->channelSettings();
+        $ancient = $this->scheduled('2026-08-04', '10:00', '12:00');
+
+        $items = $this->queue();
+
+        $this->assertArrayHasKey($ancient->id, $items);
+        $this->assertSame(['overdue', 'prepare_now'], $items[$ancient->id]['buckets']);
+        $this->assertArrayHasKey($ancient->id, $this->queue('overdue'));
+        $this->assertArrayHasKey($ancient->id, $this->queue('prepare_now'));
+    }
+
+    #[Test]
     public function candidates_are_narrowed_by_bucket_before_the_shared_cap(): void
     {
         // Codex P2: طلبات دلو آخر لا تُحمَّل أصلاً (فلا تستنزف سقف المرشّحين).
