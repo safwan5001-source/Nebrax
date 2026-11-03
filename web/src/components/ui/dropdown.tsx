@@ -97,7 +97,7 @@ export function Dropdown({
   useEffect(() => {
     if (!open || !mobilePopover) return;
     const placeWithinViewport = () => {
-      const anchor = rootRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+      const anchor = triggerRef.current ?? rootRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup]');
       const menu = menuRef.current;
       if (!anchor || !menu) return;
       const safeMargin = 12;
@@ -118,7 +118,7 @@ export function Dropdown({
       window.removeEventListener('resize', placeWithinViewport);
       window.removeEventListener('scroll', close, true);
     };
-  }, [close, mobilePopover, open]);
+  }, [close, mobilePopover, open, triggerRef]);
 
   function toggle() {
     if (open) {
