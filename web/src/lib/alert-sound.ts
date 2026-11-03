@@ -76,6 +76,8 @@ export class AlertSoundEngine {
   private readonly exhausted = new Set<string>();
   private timer: unknown = null;
   private repeats = 0;
+  /** معرّف جلسة التكرار؛ يتغيّر عند كل بدء/إيقاف فلا يمسّ اكتمالُ تشغيلٍ قديم ميزانيةَ جلسة جديدة. */
+  private session = 0;
   private generation = 0;
   private readonly listeners = new Set<(event: AlertSoundEvent) => void>();
   private readonly source: string;
@@ -167,6 +169,7 @@ export class AlertSoundEngine {
     if (!wasIdle) return;
 
     this.repeats = 0;
+    this.session += 1;
     this.tick();
   }
 
@@ -204,8 +207,9 @@ export class AlertSoundEngine {
 
     // الميزانية تُستهلك بتشغيل **قُبل فعلاً** فقط: رفض السياسة (قبل تفعيل الصوت) لا يُنهك السقف، فيُسمع
     // التنبيه المعلّق فور نجاح `unlock()`. المحاولات المرفوضة تستمر بالفاصل نفسه (خفيفة) حتى التسليح أو الإقرار.
+    const session = this.session;
     void this.playClip().then((accepted) => {
-      if (accepted) this.repeats += 1;
+      if (accepted && this.session === session) this.repeats += 1;
     });
     this.timer = this.setTimer(this.tick, this.repeatIntervalMs);
   };
@@ -216,6 +220,7 @@ export class AlertSoundEngine {
       this.timer = null;
     }
     this.repeats = 0;
+    this.session += 1;
     try {
       this.clip?.pause();
       if (this.clip) this.clip.currentTime = 0;
