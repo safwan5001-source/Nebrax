@@ -140,6 +140,11 @@ export function useOrderAlerts(): OrderAlertsState {
       engine.reproject();
       render(); // المتابع لا محرّك له: يُعاد حساب العرض محلياً.
     });
+    // تراجع إسكات من تبويب آخر (فشل إقراره): القائد يعيد حساب اللقطة من صفوفه فيُبثّ التنبيه من جديد، والمتابع يعيد العرض.
+    const offUnsilence = coordinator.onUnsilence(() => {
+      engine.reproject();
+      render();
+    });
     const offSound = alertSound.subscribe((event) => {
       if (event.type === 'state') {
         setSoundState(event.state);
@@ -164,6 +169,7 @@ export function useOrderAlerts(): OrderAlertsState {
         } else {
           // فشل عابر (شبكة/5xx/403): الإقرار الصريح لم يحدث ⇒ يعود التنبيه ولا نوهم أن الآخرين أُسكتوا.
           silenced.remove([orderId]);
+          coordinator.broadcastUnsilence([orderId]); // القائد (إن لم يكن هذا التبويب) يعيد حساب اللقطة فيعود التنبيه للجميع فوراً
           engine.reproject();
           render();
         }
@@ -208,6 +214,7 @@ export function useOrderAlerts(): OrderAlertsState {
       offRole();
       offOwner();
       offSilence();
+      offUnsilence();
       offSound();
       coordinator.stop();
       engine.stop();

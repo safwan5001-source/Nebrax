@@ -163,6 +163,23 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1') ?? '').not.toContain('"a"');
   });
 
+  it('فشل إقرار بدأ من تبويب متابع يُعيد التنبيه فوراً في كل التبويبات (القائد يعيد الإسقاط) (Codex)', async () => {
+    ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: false, status: null, reason: null });
+    const one = renderHook(() => useOrderAlerts());
+    const two = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+    await tick(0);
+    const follower = one.result.current.role === 'follower' ? one : two;
+    const leader = follower === one ? two : one;
+    expect(follower.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+
+    await act(async () => { await follower.result.current.acknowledge('a'); });
+    // بلا انتظار دورة استطلاع جديدة (لا تقديم للمؤقّتات): التنبيه عاد في التبويبين.
+    expect(leader.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+    expect(follower.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+  });
+
   it('رفض مستقر (404/409: ملغى/غير جاهز) يُبقي الإسكات ويطلب الحقيقة من الخادم', async () => {
     ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: true, status: 409, reason: 'already_cancelled' });
     const { result } = renderHook(() => useOrderAlerts());
