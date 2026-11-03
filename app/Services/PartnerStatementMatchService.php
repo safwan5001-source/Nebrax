@@ -207,7 +207,8 @@ final class PartnerStatementMatchService
     {
         $refusal = new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
         // الصلاحيات مستقلة بلا منح ضمني (D-PS-02): التشغيل يقرأ الدفتر والنتائج فيتطلب `reconcile` **و**`view` معاً؛ القراءة والتحقق `view`. الفحص هنا إضافة إلى فحص المسار.
-        $required = $permission === 'partner_statements.reconcile' ? ['partner_statements.reconcile', 'partner_statements.view'] : [$permission];
+        // IMP-PS-A3d (D-PS-17): الإغلاق النهائي سلطة مستقلة (`close`) تقرأ التشغيلة والقرارات فتتطلب `view` معها — لا يُشترط `reconcile` (فصل المهام يُفرض على الهوية في الخدمة).
+        $required = in_array($permission, ['partner_statements.reconcile', 'partner_statements.close'], true) ? [$permission, 'partner_statements.view'] : [$permission];
         foreach ($required as $needed) {
             if (! Rbac::allows((string) $actor->role, $needed)) {
                 // ليس RuntimeException عمداً: `ApiController::domain()` يحوّل الأخيرة (وHttpException منها) إلى 422، والمطلوب 403.

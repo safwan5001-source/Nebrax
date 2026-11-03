@@ -502,7 +502,8 @@ class PartnerStatementReviewApiTest extends TestCase
     {
         [$a, $b, $d, $id, $run] = $this->scenario();
         $this->decide($this->auth['token'], $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'confirm'])->assertCreated();
-        $row = (array) DB::table('partner_statement_review_decisions')->first();
+        // هوية قيود القرار (PS-A3d) تخص confirm/override وحدهما؛ الصفوف الخام هنا تختبر النسخ والشكل فلا تنسخها (clear لا يحملها).
+        $row = ['claim_entry_ids' => null] + (array) DB::table('partner_statement_review_decisions')->first();
 
         $rejects = function (callable $fn, string $why): void {
             try {

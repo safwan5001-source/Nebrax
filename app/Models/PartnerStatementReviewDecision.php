@@ -36,11 +36,11 @@ class PartnerStatementReviewDecision extends BaseModel implements CompanyWide
     protected $fillable = [
         'tenant_id', 'reconciliation_id', 'run_id', 'line_id', 'revision', 'action', 'unit_keys', 'engine_outcome', 'expected_net_minor', 'set_net_minor',
         'difference_minor', 'accepted_difference', 'reason', 'ledger_fingerprint', 'created_by',
-        'pair_member', 'pair_original_entry_id', 'pair_reversal_entry_id', 'engine_code',
+        'pair_member', 'pair_original_entry_id', 'pair_reversal_entry_id', 'engine_code', 'claim_entry_ids',
     ];
 
     protected $casts = [
-        'revision' => 'integer', 'unit_keys' => 'array', 'expected_net_minor' => 'integer', 'set_net_minor' => 'integer', 'difference_minor' => 'integer',
+        'revision' => 'integer', 'unit_keys' => 'array', 'claim_entry_ids' => 'array', 'expected_net_minor' => 'integer', 'set_net_minor' => 'integer', 'difference_minor' => 'integer',
         'accepted_difference' => 'boolean',
     ];
 

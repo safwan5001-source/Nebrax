@@ -139,7 +139,7 @@ final class PartnerStatementReviewService
                     return ['decision' => null, 'replayed' => true, 'warnings' => []];
                 }
             } else {
-                if ($current !== null && $this->sameDecision($current, $run->id, $action, $plan['units'], $member, $reason, $source['fingerprint'])) {
+                if ($current !== null && $this->sameDecision($current, $run->id, $action, $plan['units'], $member, $reason, $source['fingerprint'], $plan['entry_ids'] ?? null)) {
                     return ['decision' => $this->present($current), 'replayed' => true, 'warnings' => $warnings];
                 }
                 foreach ($plan['claims'] as $claim) {
@@ -156,7 +156,7 @@ final class PartnerStatementReviewService
             $decision = PartnerStatementReviewDecision::create([
                 'reconciliation_id' => $reconciliation->id, 'run_id' => $run->id, 'line_id' => $line->id, 'revision' => $nextRevision, 'action' => $action,
                 'unit_keys' => $plan['units'], 'engine_outcome' => $row->outcome, 'engine_code' => $row->explanation['code'] ?? null,
-                'pair_member' => $plan['pair']['member'] ?? null, 'pair_original_entry_id' => $plan['pair']['original'] ?? null, 'pair_reversal_entry_id' => $plan['pair']['reversal'] ?? null,
+                'claim_entry_ids' => $plan['entry_ids'] ?? null, 'pair_member' => $plan['pair']['member'] ?? null, 'pair_original_entry_id' => $plan['pair']['original'] ?? null, 'pair_reversal_entry_id' => $plan['pair']['reversal'] ?? null,
                 'expected_net_minor' => $plan['net']['expected'] ?? null, 'set_net_minor' => $plan['net']['set'] ?? null, 'difference_minor' => $plan['net']['difference'] ?? null,
                 'accepted_difference' => (bool) ($plan['net']['accepted'] ?? false), 'reason' => $reason,
                 'ledger_fingerprint' => $source['fingerprint'], 'created_by' => $actor->getKey(), 'created_at' => now(),
@@ -335,7 +335,7 @@ final class PartnerStatementReviewService
             throw new PartnerStatementReviewException('reason_required', 'تأكيد مطابقة بفرق مالي يتطلب سبباً (3 محارف على الأقل).');
         }
 
-        return ['units' => [(string) $row->unit_key], 'claims' => [(string) $row->unit_key], 'net' => $net];
+        return ['units' => [(string) $row->unit_key], 'claims' => [(string) $row->unit_key], 'net' => $net, 'entry_ids' => $this->entryIdsOf($source, [(string) $row->unit_key])];
     }
 
     /**
@@ -346,7 +346,7 @@ final class PartnerStatementReviewService
     {
         sort($requested);
 
-        return ['units' => $requested, 'claims' => $requested, 'net' => $this->net($source, $requested, $line, $reconciliation, $accept)];
+        return ['units' => $requested, 'claims' => $requested, 'net' => $this->net($source, $requested, $line, $reconciliation, $accept), 'entry_ids' => $this->entryIdsOf($source, $requested)];
     }
 
     /**
@@ -435,6 +435,29 @@ final class PartnerStatementReviewService
     }
 
     /**
+     * معرّفات قيود الوحدات المعتمدة (مرتبة، بلا تكرار) كما يقرؤها الدفتر المقيَّد ببصمة القرار — تُحفظ مع القرار هويةً لما يُطالَب به عند الإغلاق (PS-A3d، حارس القاعدة يقارن بها).
+     *
+     * @param  array{units: list<array<string, mixed>>}  $source
+     * @param  list<string>  $unitKeys
+     * @return list<string>
+     */
+    private function entryIdsOf(array $source, array $unitKeys): array
+    {
+        $ids = [];
+        foreach ($source['units'] as $unit) {
+            if (in_array($unit['key'], $unitKeys, true)) {
+                foreach ($unit['entry_ids'] as $id) {
+                    $ids[(string) $id] = (string) $id;
+                }
+            }
+        }
+        $ids = array_values($ids);
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
      * يتحقق من الوحدات (موجودة · `active` · قابلة للمطابقة) ويحسب صافي المجموعة مقابل السطر. نفس صيغة `verifySet`.
      *
      * @param  array{units: list<array<string, mixed>>}  $source
@@ -509,7 +532,7 @@ final class PartnerStatementReviewService
     /**
      * @param  list<string>  $units
      */
-    private function sameDecision(PartnerStatementReviewDecision $current, string $runId, string $action, array $units, ?string $member, ?string $reason, string $fingerprint): bool
+    private function sameDecision(PartnerStatementReviewDecision $current, string $runId, string $action, array $units, ?string $member, ?string $reason, string $fingerprint, ?array $entryIds = null): bool
     {
         $existing = $current->unit_keys;
         sort($existing);
@@ -517,7 +540,9 @@ final class PartnerStatementReviewService
         sort($new);
 
         // الإعادة مرتبطة بالتشغيلة المطلوبة نفسها (Codex #1915): تشغيلتان بنطاقين مختلفين قد تشتركان في البصمة، ولا يُعاد لقارئ قرارٌ بُني على تشغيلة لا يقرؤها.
-        return $current->run_id === $runId && $current->action === $action && $existing === $new && ($current->pair_member ?? null) === $member && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint;
+        return $current->run_id === $runId && $current->action === $action && $existing === $new && ($current->pair_member ?? null) === $member && ($current->reason ?? null) === $reason && $current->ledger_fingerprint === $fingerprint
+            // هوية القيود جزء من القرار: قرار قديم بلا هوية لا يُعدّ مطابقاً فيُكتب بنسخة جديدة تحملها (PS-A3d).
+            && ($current->claim_entry_ids ?? null) === $entryIds;
     }
 
     /**
