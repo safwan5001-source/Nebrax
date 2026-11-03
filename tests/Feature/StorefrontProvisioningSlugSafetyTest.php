@@ -263,4 +263,50 @@ class StorefrontProvisioningSlugSafetyTest extends TestCase
 
         $this->assertSame('nebras-flowers.storefronts.test', ManagedStorefrontHostname::forSlug('nebras-flowers', 'storefronts.test'));
     }
+
+    /** @test */
+    public function additional_store_failures_are_attributed_to_the_tenant_slug_only_when_it_is_actually_unsafe(): void
+    {
+        // معرّف المستأجر نفسه غير صالح ⇒ فرع الإصلاح.
+        try {
+            ManagedStorefrontHostname::forAdditionalStoreSlug('shop', 'nebras_flowers', 'storefronts.test');
+            $this->fail('expected exception');
+        } catch (TenantSlugNotHostnameSafeException) {
+            $this->addToAssertionCount(1);
+        }
+
+        // المعرّفان سليمان لكن الدمج `{tenant}-{store}` تجاوز 63 ⇒ ليس خطأ معرّف المستأجر.
+        try {
+            ManagedStorefrontHostname::forAdditionalStoreSlug('shop', str_repeat('a', 60), 'storefronts.test');
+            $this->fail('expected exception');
+        } catch (StorefrontBaseDomainMisconfiguredException $e) {
+            $this->assertNotInstanceOf(TenantSlugNotHostnameSafeException::class, $e);
+        }
+    }
+
+    /** @test */
+    public function a_too_long_combined_additional_store_label_never_tells_the_user_to_fix_their_company_id(): void
+    {
+        $auth = $this->registerTenant(str_repeat('a', 60), 'owner@long-slug.test');
+        $this->withToken($auth['token'])->postJson(self::PATH)->assertCreated();
+
+        $res = $this->withToken($auth['token'])->postJson(self::PATH.'/create', ['name' => 'shop']);
+
+        $this->assertNotSame('tenant_slug_not_hostname_safe', $res->json('reason'));
+        $this->assertSame(1, $this->graphCounts($auth['tenant_id'])['storefronts']);
+    }
+
+    /** @test */
+    public function additional_store_creation_joins_the_managed_host_namespace_lock_before_locking_the_tenant_row(): void
+    {
+        $source = file_get_contents(app_path('Services/Commerce/CreateStorefrontForCurrentTenant.php'));
+
+        $shared = strpos($source, 'ManagedHostNamespaceLock::shared()');
+        $tenantLock = strpos($source, '->lockForUpdate()');
+
+        $this->assertNotFalse($shared);
+        $this->assertNotFalse($tenantLock);
+        // نفس ترتيب الأداة الحصرية (فضاء ثم صف) — عكسه يعني احتمال جمود.
+        $this->assertLessThan($tenantLock, $shared);
+    }
 }

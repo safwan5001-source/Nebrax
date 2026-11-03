@@ -6,6 +6,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
 use App\Support\Commerce\CatalogSlug;
+use App\Support\ManagedHostNamespaceLock;
 use App\Support\ManagedStorefrontHostname;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -40,6 +41,12 @@ final class CreateStorefrontForCurrentTenant
         $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
 
         return DB::transaction(function () use ($tenantId, $name, $defaultLocale, $baseDomain, $customerAccountsEnabled): array {
+            // فضاء المضيفات المُدارة مشترك بين `tenants.slug` و`storefront_domains.hostname`: قفل مشترك
+            // (كالتسجيل) يسلسلنا مع أي إجراء حصري (Backfill / `tenant:change-slug`) فلا يحجز مضيفاً
+            // يُنقَل إليه سلاج مستأجر في اللحظة نفسها. **قبل** قفل صف المستأجر دائماً (نفس ترتيب الأداة
+            // الحصرية: فضاء ثم صف) كي لا يحدث جمود.
+            ManagedHostNamespaceLock::shared();
+
             $tenant = Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
             if ($tenant === null) {
                 throw new RuntimeException('المستأجر غير موجود.');
