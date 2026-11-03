@@ -35,5 +35,7 @@ final class NotificationActions
         // PR-NOTIF-6: تحديث النظام / What's New يفتح صفحة التحديثات — لا يحتاج
         // تفويضاً مستقلاً لأن المحتوى عام من المنصة ومتاح لكل مستخدم مصادَق.
         'view_system_update' => 'system_update',
+        // COPS-H3-1: طلب متجر جديد يفتح تفاصيل الطلب في مساحة التجارة؛ الفتح يعيد تفويض `commerce.orders.view` ونطاق المخازن من جديد.
+        'view_commerce_order' => 'commerce_order',
     ];
 }

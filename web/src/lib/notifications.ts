@@ -79,6 +79,8 @@ const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
   view_pos_session: (sessionId) => `/pos/sessions/${sessionId}`,
   // PR-NOTIF-6: تحديث النظام يفتح صفحة What's New.
   view_system_update: () => '/whats-new',
+  // COPS-H3-1: طلب متجر جديد يفتح تفاصيله في مساحة التجارة (يعيد تفويض `commerce.orders.view` ونطاق المخازن من الخادم).
+  view_commerce_order: (orderId) => `/commerce/orders/${orderId}`,
 };
 
 export function notificationHref(notification: AppNotification): string | null {

@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Events\CommerceOrderPaymentPaid;
+use App\Events\CommerceOrderPlaced;
 use App\Events\CommercePaymentAttemptCaptured;
 use App\Events\PaymentAttemptCaptured;
 use App\Events\PaymentRefundConfirmed;
 use App\Listeners\CompleteCommerceOnlinePayment;
+use App\Listeners\NotifyCommerceOrderAlert;
 use App\Listeners\PostCapturedPaymentAttempt;
 use App\Listeners\PostConfirmedPaymentRefund;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -22,6 +25,10 @@ class PaymentPostingServiceProvider extends ServiceProvider
         Event::listen(PaymentAttemptCaptured::class, PostCapturedPaymentAttempt::class);
         // PAY-H4-04a: التقاط محاولة طلب متجر ⇒ تثبيت النية مدفوعة (متزامن؛ شبكة الأمان `payments:complete-commerce-captures`). لا ترحيل محاسبي.
         Event::listen(CommercePaymentAttemptCaptured::class, CompleteCommerceOnlinePayment::class);
+        // COPS-H3-1 (ADR-30): تنبيه التاجر بالطلب الجاهز (COD/استلام عند الإنشاء، إلكتروني عند الدفع) — بوابة `commerce.order_alerts_enabled` المغلقة. أسماء الدوال
+        // `onPlaced`/`onPaid` عمداً (لا `handle`) كي لا يسجّلها اكتشاف المستمعين التلقائي مرة ثانية فتتكرر المعالجة.
+        Event::listen(CommerceOrderPlaced::class, [NotifyCommerceOrderAlert::class, 'onPlaced']);
+        Event::listen(CommerceOrderPaymentPaid::class, [NotifyCommerceOrderAlert::class, 'onPaid']);
         // PAY-H3-01c: ترحيل A5 لاسترداد بوابة مؤكَّد (متزامن كذلك؛ شبكة الأمان `payments:post-refunds`).
         Event::listen(PaymentRefundConfirmed::class, PostConfirmedPaymentRefund::class);
 

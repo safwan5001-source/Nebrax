@@ -30,6 +30,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'Acme', logo: null }) }));
 vi.mock('@/components/layout/company-logo-mark', () => ({ CompanyLogoMark: () => <span>logo</span> }));
 vi.mock('@/components/layout/lang-toggle', () => ({ LangToggle: () => <button type="button">lang</button> }));
+vi.mock('@/components/layout/notification-bell', () => ({ NotificationBell: () => <button type="button" data-testid="notification-bell">bell</button> }));
 vi.mock('@/components/layout/theme-toggle', () => ({ ThemeToggle: () => <button type="button">theme</button> }));
 
 function renderShell() {
@@ -60,6 +61,13 @@ describe('Commerce workspace shell header', () => {
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.getByRole('main').className).toContain('h-screen');
     expect(screen.getByRole('main').className).toContain('overflow-hidden');
+  });
+
+  it('mounts the shared notification bell in the Commerce header (COPS-H3-1)', () => {
+    apiMock.mockResolvedValue({ data: { stores: [] } });
+    renderShell();
+
+    expect(screen.getByTestId('notification-bell')).toBeTruthy();
   });
 
   it('keeps View Store disabled and navigation working when the tenant has no stores', async () => {
