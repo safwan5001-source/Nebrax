@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SILENCE_TTL_MS, SilencedStore, cursorStore, type SilenceStorage } from './silenced-store';
+import { SILENCE_TTL_MS, TRANSIENT_SILENCE_TTL_MS, SilencedStore, cursorStore, type SilenceStorage } from './silenced-store';
 
 const mem = (): SilenceStorage & { raw: Map<string, string> } => {
   const raw = new Map<string, string>();
@@ -46,6 +46,19 @@ describe('SilencedStore / cursorStore', () => {
     timed.add(['old']);
     t = SILENCE_TTL_MS + 1;
     expect(timed.ids().size).toBe(0); // الذاكرة أيضاً تنتهي بعد 48 ساعة
+  });
+
+  it('الإسكات العابر والمبثوث ينتهيان وحدهما إن هُجر الإقرار؛ المثبَّت يبقى (Codex)', () => {
+    let t = 0;
+    const storage = mem();
+    const s = new SilencedStore(storage, 's', () => t);
+    s.absorb(['abandoned']);   // بثّ من تبويب أُغلق قبل أن يحسم
+    s.addTransient(['inflight']);
+    s.add(['settled']);        // أُقرّ فعلاً
+    expect([...s.ids()].sort()).toEqual(['abandoned', 'inflight', 'settled']);
+
+    t = TRANSIENT_SILENCE_TTL_MS + 1;
+    expect([...s.ids()]).toEqual(['settled']);
   });
 
   it('المؤشّر: يحفظ ويقرأ أعداداً صحيحة فقط، والغياب/التالف ⇒ null (الرأس)', () => {

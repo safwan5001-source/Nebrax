@@ -8,6 +8,8 @@ export interface SilenceStorage {
 }
 
 export const SILENCE_TTL_MS = 48 * 60 * 60 * 1000;
+/** عمر الإسكات المتفائل أثناء طيران إقرار خادمي (طلب مسوَّر بالمهلة): يزول وحده إن هُجر الطلب (إغلاق/إعادة تحميل التبويب المُقرّ). */
+export const TRANSIENT_SILENCE_TTL_MS = 60 * 1000;
 
 export class SilencedStore {
   constructor(
@@ -20,7 +22,7 @@ export class SilencedStore {
    * نسخة الذاكرة (احتياط حين يفشل التخزين: حصة ممتلئة/محجوب). تُدمج مع المخزَّن عند القراءة فيعمل الإسكات
    * في هذا التبويب ولو تعذّر الحفظ، وتستقبل معرّفات البث من التبويبات الأخرى.
    */
-  private readonly memory = new Map<string, number>();
+  private readonly memory = new Map<string, number>(); // المعرّف ⇒ وقت انتهاء الصلاحية (لا وقت الإنشاء)
 
   private key(): string {
     return `awj:commerce-alerts:silenced:${this.scope}`;
@@ -45,10 +47,10 @@ export class SilencedStore {
 
   ids(): ReadonlySet<string> {
     const out = this.read();
-    const cutoff = this.now() - SILENCE_TTL_MS;
-    for (const [id, ts] of this.memory) {
-      if (ts < cutoff) this.memory.delete(id);
-      else if (!(id in out)) out[id] = ts;
+    const nowMs = this.now();
+    for (const [id, expiresAt] of this.memory) {
+      if (expiresAt < nowMs) this.memory.delete(id);
+      else if (!(id in out)) out[id] = expiresAt;
     }
 
     return new Set(Object.keys(out));
@@ -56,8 +58,9 @@ export class SilencedStore {
 
   /** معرّفات وصلت عبر البث من تبويب آخر (قد لا يصلنا مخزّنها): تُحفظ في الذاكرة. */
   absorb(ids: string[]): void {
-    const stamp = this.now();
-    for (const id of ids) this.memory.set(id, stamp);
+    // قصير الأجل: ما يثبت فعلاً يصل التبويبات عبر التخزين المشترك؛ وإقرار هجره مُرسِله لا يُخفي التنبيه هنا دائماً (Codex).
+    const expiresAt = this.now() + TRANSIENT_SILENCE_TTL_MS;
+    for (const id of ids) this.memory.set(id, expiresAt);
   }
 
   /**
@@ -65,8 +68,8 @@ export class SilencedStore {
    * فلا يبقى أثر دائم يخفي تنبيهاً لم يُقَرّ فعلاً (Codex). يُثبَّت بـ`persist` بعد الحسم.
    */
   addTransient(ids: string[]): void {
-    const stamp = this.now();
-    for (const id of ids) this.memory.set(id, stamp);
+    const expiresAt = this.now() + TRANSIENT_SILENCE_TTL_MS;
+    for (const id of ids) this.memory.set(id, expiresAt);
   }
 
   /** يثبّت في التخزين المشترك ما حُسم خادمياً (إقرار ناجح/محسوم). فشل الكتابة يترك الذاكرة احتياطاً. */
@@ -105,7 +108,7 @@ export class SilencedStore {
     const stamp = this.now();
     for (const id of ids) {
       current[id] = stamp;
-      this.memory.set(id, stamp);
+      this.memory.set(id, stamp + SILENCE_TTL_MS);
     }
     try {
       this.storage?.setItem(this.key(), JSON.stringify(current));
