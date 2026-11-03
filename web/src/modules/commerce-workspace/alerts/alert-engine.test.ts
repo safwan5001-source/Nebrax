@@ -251,6 +251,29 @@ describe('AlertEngine (COPS-H3-3)', () => {
     engine.stop();
   });
 
+  it('إعادة التشغيل (stop ثم start) أثناء طلب جارٍ لا تترك المحرّك بلا مؤقّت: يستأنف الاستطلاع (Codex)', async () => {
+    let resolveHead: (n: number) => void = () => {};
+    deps.fetchFeedHead.mockImplementationOnce(() => new Promise<number>((r) => { resolveHead = r; }));
+    deps.fetchFeedHead.mockResolvedValue(42);
+    deps.fetchAttention.mockResolvedValue(attention(row('after-restart')));
+    const engine = new AlertEngine(deps);
+    engine.start(config());
+    await run(engine);                 // الطلب الأول معلّق (جيل 1)
+    engine.stop();
+    engine.start(config());            // جيل 2 يبدأ بينما طلب الجيل 1 ما زال طائراً
+    await run(engine);
+    resolveHead(7);                    // يكتمل الطلب القديم بعد التبديل
+    await run(engine);
+    await run(engine, 10_000);
+
+    expect(engine.snapshot.connection).toBe('live');
+    expect(engine.snapshot.pending.map((p) => p.orderId)).toEqual(['after-restart']);
+    const calls = deps.fetchFeedPage.mock.calls.length;
+    await run(engine, 30_000);
+    expect(deps.fetchFeedPage.mock.calls.length).toBeGreaterThan(calls); // ما زال يستطلع
+    engine.stop();
+  });
+
   it('stop يلغي كل شيء ويصفّر اللقطة', async () => {
     deps.fetchAttention.mockResolvedValue(attention(row('a')));
     const engine = new AlertEngine(deps);

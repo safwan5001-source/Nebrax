@@ -20,6 +20,7 @@ export async function fetchFeedHead(): Promise<number> {
   return res.meta.head_seq;
 }
 
+/** `pending=1`: الخادم يصفّي «ما يستدعي التنبيه» قبل السقف فلا يحجبه 100 طلب معالَج أقدم منه. */
 export function fetchAttention(): Promise<AttentionResponse> {
-  return api<AttentionResponse>('/commerce/orders/attention?limit=100');
+  return api<AttentionResponse>('/commerce/orders/attention?limit=100&pending=1');
 }

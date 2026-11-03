@@ -53,7 +53,8 @@ export class AlertEngine {
   private failures = 0;
   private timer: unknown = null;
   private running = false;
-  private inFlight = false;
+  /** جيل الدورة الجارية (لا `boolean`): دورة قديمة بعد stop/start لا تحجب دورة الجيل الحالي ولا تتركه بلا مؤقّت. */
+  private inFlight: number | null = null;
   private rerun = false;
   private rows: AttentionResponse['data'] = [];
   private truncated = false;
@@ -92,6 +93,7 @@ export class AlertEngine {
     this.lastAttentionAt = 0;
     this.failures = 0;
     this.generation += 1;
+    this.rerun = false;
     this.publish('connecting');
     this.schedule(0);
   }
@@ -140,7 +142,7 @@ export class AlertEngine {
 
   private async cycle(): Promise<void> {
     if (!this.running || this.config === null) return;
-    if (this.inFlight) {
+    if (this.inFlight === this.generation) {
       this.rerun = true;
       return;
     }
@@ -150,8 +152,8 @@ export class AlertEngine {
       return;
     }
 
-    this.inFlight = true;
     const generation = this.generation;
+    this.inFlight = generation;
     try {
       await this.poll();
       if (generation !== this.generation) return;
@@ -171,7 +173,8 @@ export class AlertEngine {
       this.failures += 1;
       this.publish('degraded');
     } finally {
-      this.inFlight = false;
+      // لا نمسح علامة جيل أحدث بدأ أثناء طيراننا.
+      if (this.inFlight === generation) this.inFlight = null;
     }
 
     if (!this.running || generation !== this.generation) return;
