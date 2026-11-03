@@ -163,6 +163,41 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     expect(engine.activeKeys).toEqual([]);
   });
 
+  it('المفتاح الذي بلغ السقف لا يُعاد تشغيله بمصالحة دورية بلا إقرار', async () => {
+    const { engine, clip } = setup({ maxRepeats: 1 });
+    await engine.unlock();
+    clip.playCalls = 0;
+    engine.syncActive(['a']);
+    vi.advanceTimersByTime(4_000);
+    expect(clip.playCalls).toBe(1);
+    expect(engine.exhaustedKeys).toEqual(['a']);
+
+    engine.syncActive(['a']); // مصالحة تالية بالمفتاح نفسه ما زال غير مُقَرّ
+    engine.startRepeating('a');
+    vi.advanceTimersByTime(60_000);
+    expect(clip.playCalls).toBe(1);
+    expect(engine.activeKeys).toEqual([]);
+  });
+
+  it('طلب جديد يبدأ بعد استنفاد قديم، والإقرار/الخروج من المجموعة يصفّران حالة الاستنفاد', async () => {
+    const { engine, clip } = setup({ maxRepeats: 1 });
+    await engine.unlock();
+    engine.syncActive(['a']);
+    vi.advanceTimersByTime(4_000);
+    expect(engine.exhaustedKeys).toEqual(['a']);
+
+    clip.playCalls = 0;
+    engine.syncActive(['a', 'b']); // b جديد: يبدأ؛ a يبقى صامتاً
+    expect(engine.activeKeys).toEqual(['b']);
+    expect(clip.playCalls).toBe(1);
+
+    engine.syncActive(['b']); // a أُقرّ/خرج من attention
+    expect(engine.exhaustedKeys).toEqual([]);
+    engine.stopAll();
+    engine.syncActive(['a']); // طلب جديد بالمعرّف نفسه لاحقاً يُسمع من جديد
+    expect(engine.activeKeys).toEqual(['a']);
+  });
+
   it('تكرار في حالة locked يحاول ولا يرمي ويبقى المشتركون على علم', async () => {
     const { engine, clip, events } = setup();
     clip.rejectWith = { name: 'NotAllowedError' };

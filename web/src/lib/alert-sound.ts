@@ -69,6 +69,11 @@ export class AlertSoundEngine {
   private stateValue: AlertSoundState = 'locked';
   private volume = 1;
   private readonly active = new Set<string>();
+  /**
+   * مفاتيح بلغت سقف التكرار دون إقرار. تبقى هنا حتى `stop(key)` أو خروجها من المجموعة المرغوبة
+   * في `syncActive`، كي لا تُعيد المصالحة الدورية للمفاتيح نفسها تشغيل صوت مقيَّد بالسقف.
+   */
+  private readonly exhausted = new Set<string>();
   private timer: unknown = null;
   private repeats = 0;
   private generation = 0;
@@ -91,6 +96,11 @@ export class AlertSoundEngine {
 
   get state(): AlertSoundState {
     return this.stateValue;
+  }
+
+  /** مفاتيح أُنهي تكرارها بالسقف ولم تُقَرّ بعد (نسخة). */
+  get exhaustedKeys(): string[] {
+    return [...this.exhausted];
   }
 
   /** المفاتيح النشطة حالياً (نسخة). */
@@ -151,7 +161,7 @@ export class AlertSoundEngine {
 
   /** يبدأ/يُبقي تكراراً لهذا المفتاح حتى `stop(key)`/`stopAll()`. المفتاح المكرر لا يضاعف الصوت. */
   startRepeating(key: string): void {
-    if (this.active.has(key)) return;
+    if (this.active.has(key) || this.exhausted.has(key)) return;
     const wasIdle = this.active.size === 0;
     this.active.add(key);
     if (!wasIdle) return;
@@ -161,19 +171,21 @@ export class AlertSoundEngine {
   }
 
   stop(key: string): void {
+    this.exhausted.delete(key);
     if (!this.active.delete(key)) return;
     if (this.active.size === 0) this.halt();
   }
 
   stopAll(): void {
     this.active.clear();
+    this.exhausted.clear();
     this.halt();
   }
 
   /** مزامنة مجموعة النشطة مع مجموعة مرغوبة (الدمج Feed ∪ Attention ينتهي هنا). */
   syncActive(keys: Iterable<string>): void {
     const wanted = new Set(keys);
-    for (const key of [...this.active]) {
+    for (const key of [...this.active, ...this.exhausted]) {
       if (!wanted.has(key)) this.stop(key);
     }
     for (const key of wanted) this.startRepeating(key);
@@ -184,6 +196,7 @@ export class AlertSoundEngine {
     if (this.active.size === 0) return;
 
     if (this.repeats >= this.maxRepeats) {
+      for (const key of this.active) this.exhausted.add(key);
       this.active.clear();
       this.emit({ type: 'exhausted' });
       return;
