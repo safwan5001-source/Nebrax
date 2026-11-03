@@ -122,6 +122,21 @@ class CommerceOrderPreparationClockTest extends TestCase
     }
 
     #[Test]
+    public function a_midnight_dst_gap_does_not_leak_its_normalised_hour_into_the_next_day(): void
+    {
+        // سانتياغو: 2026-09-06 تبدأ 01:00 (00:00–01:00 غير موجودة، UTC−3 بعد القفزة، UTC−4 قبلها).
+        $now = CarbonImmutable::parse('2026-09-06 15:00:00', 'UTC'); // 12:00 محلياً في يوم القفزة
+        [$todayStart, $todayEnd] = Clock::dayBounds('America/Santiago', $now, 0);
+        [$tomorrowStart, $tomorrowEnd] = Clock::dayBounds('America/Santiago', $now, 1);
+
+        $this->assertSame('2026-09-06T04:00:00+00:00', $todayStart->toIso8601String());      // 01:00 محلياً (أول لحظة موجودة)
+        $this->assertSame('2026-09-07T03:00:00+00:00', $todayEnd->toIso8601String());        // 09-07 00:00 محلياً
+        $this->assertSame('2026-09-07T03:00:00+00:00', $tomorrowStart->toIso8601String(), 'الغد يبدأ 00:00 لا 01:00');
+        $this->assertSame('2026-09-08T03:00:00+00:00', $tomorrowEnd->toIso8601String());
+        $this->assertTrue($todayEnd->equalTo($tomorrowStart), 'الدلوان متصلان بلا فجوة');
+    }
+
+    #[Test]
     public function the_clock_is_read_only_and_never_reads_the_request_or_browser_time(): void
     {
         $source = (string) file_get_contents(app_path('Services/Commerce/CommerceOrderPreparationClock.php'));

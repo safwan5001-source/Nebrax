@@ -70,7 +70,9 @@ final class CommerceOrderPreparationClock
     public static function dayBounds(string $channelTimezone, CarbonImmutable $now, int $offsetDays = 0): array
     {
         $tz = self::safeZone($channelTimezone);
-        $day = $now->setTimezone($tz)->startOfDay()->addDays($offsetDays);
+        // الإزاحة بالأيام التقويمية **قبل** تطبيع منتصف الليل: عند قفزة DST في 00:00 (سانتياغو) يطبّع startOfDay() اليوم إلى 01:00،
+        // وإضافة اليوم بعده كانت تحمل هذا الـ01:00 إلى الغد (Codex P2).
+        $day = $now->setTimezone($tz)->addDays($offsetDays)->startOfDay();
 
         return [$day->setTimezone('UTC'), $day->addDay()->startOfDay()->setTimezone('UTC')];
     }
