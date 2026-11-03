@@ -164,6 +164,17 @@ describe('TabCoordinator (COPS-H3-3, ADR-30 §3)', () => {
     expect(late.snapshots.at(-1)?.total).toBe(3);
   });
 
+  it('تراجع الإسكات يصل إلى الجميع (القائد يعيد حساب اللقطة)', async () => {
+    const w = world();
+    const a = w.open('a');
+    const b = w.open('b');
+    await flush();
+    const seen: string[][] = [];
+    a.coordinator.onUnsilence((ids) => seen.push(ids));
+    b.coordinator.broadcastUnsilence(['o9']);
+    expect(seen).toEqual([['o9']]);
+  });
+
   it('المتابع لا ينشر لقطته، ولا يستقبل القائد لقطات غيره', async () => {
     const w = world();
     const a = w.open('a');

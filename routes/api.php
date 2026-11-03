@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceAlertConfigController;
+use App\Http\Controllers\Api\CommerceStaffOrderAcknowledgementController;
 use App\Http\Controllers\Api\CommerceStaffOrderFeedController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1197,6 +1198,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // (owner/admin عبر `*`)، وحارس القدرة commerce.storefront. المقيَّد بمخازن مرفوض داخل المتحكّم (fail-closed).
         Route::get('commerce/orders', [CommerceStaffOrderController::class, 'index'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COPS-H3-4 (R-10): إقرار تنبيه الطلب لكل طلب — commerce.orders.view (فعل مشاهدة)، بوابة commerce.order_alerts_enabled مغلقة ⇒ 404.
+        Route::post('commerce/orders/{id}/acknowledge', [CommerceStaffOrderAcknowledgementController::class, 'acknowledge'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         // COPS-H1-2: تغذية الأحداث بالمؤشّر + مصالحة الانتباه بالحالة (ADR-29 §2.4) — قراءة فقط، الصلاحية نفسها commerce.orders.view. تُسجَّل قبل {id} (UUID فقط) فلا تلتبس.
         Route::get('commerce/orders/feed', [CommerceStaffOrderFeedController::class, 'feed'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);

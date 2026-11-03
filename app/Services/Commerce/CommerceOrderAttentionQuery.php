@@ -73,7 +73,7 @@ final class CommerceOrderAttentionQuery
         // COPS-H2-2: المقيَّد بمخازن يرى انتباه طلبات مخازنه فقط (المخزن الفعّال)؛ غير المقيَّد (`null`) كما كان.
         $rows = CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $allowedWarehouseIds)
             ->select($select)
-            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status'])
+            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status', 'acknowledgement:id,commerce_order_id,acknowledged_at'])
             ->where('status', CommerceOrder::STATUS_CONFIRMED)
             ->whereNull('cancelled_at')
             ->when(
@@ -137,7 +137,7 @@ final class CommerceOrderAttentionQuery
         $extraIds = array_values(array_diff(array_unique([...array_keys($prep->all()), ...$failedIds]), $have));
         $extras = $extraIds === [] ? collect() : CommerceOrder::query()
             ->select($select)
-            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status'])
+            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status', 'acknowledgement:id,commerce_order_id,acknowledged_at'])
             ->whereIn('id', $extraIds)->get();
 
         $all = $rows->concat($extras)->sortBy([['created_at', 'asc'], ['id', 'asc']])->values();
@@ -174,17 +174,17 @@ final class CommerceOrderAttentionQuery
     /**
      * COPS-H3-3 (ADR-30): هل ما زال الطلب «يستدعي التنبيه» — **يُحسب في الخادم** كي لا تتكرر المنطق في العميل؟ طلب `attention` ببوابة الدفع الجاهز يبقى فيها
      * بنافذة زمنية ولو عولج، فالتنبيه (الصوت) لا يُبنى على عضويته بل على أنه **لم يُعالَج بعد**: لم يُقبل (`accepted_at`) ولم يبدأ تنفيذه (صف التنفيذ).
-     * الإقرار الصريح (H3-4) يُضاف شرطاً هنا. قراءة فقط؛ الطلب يبقى في القائمة وقوائم العمل مهما كان هذا الحكم (R-10: الإقرار لا يخرج الطلب من قوائم العمل).
+     * الإقرار الصريح (H3-4، لكل طلب) شرط كذلك. قراءة فقط؛ الطلب يبقى في القائمة وقوائم العمل مهما كان هذا الحكم (R-10: الإقرار لا يخرج الطلب من قوائم العمل).
      */
     /** @param Builder<CommerceOrder> $query @return Builder<CommerceOrder> مرادف SQL لـ{@see self::alertPending()}. */
     private function pendingScope(Builder $query): Builder
     {
-        return $query->whereNull('accepted_at')->whereDoesntHave('fulfillment');
+        return $query->whereNull('accepted_at')->whereDoesntHave('fulfillment')->whereDoesntHave('acknowledgement');
     }
 
     public function alertPending(CommerceOrder $order): bool
     {
-        return $order->accepted_at === null && $order->fulfillment === null;
+        return $order->accepted_at === null && $order->fulfillment === null && $order->acknowledgement === null;
     }
 
     public static function windowHours(): int

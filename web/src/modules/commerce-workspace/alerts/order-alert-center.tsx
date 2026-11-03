@@ -20,6 +20,8 @@ export function OrderAlertCenter() {
   const alerts = useOrderAlerts();
   const [now, setNow] = useState(() => Date.now());
   const [testFailed, setTestFailed] = useState(false);
+  const [acking, setAcking] = useState<ReadonlySet<string>>(new Set());
+  const [ackFailed, setAckFailed] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     if (alerts.status !== 'on') return;
@@ -44,6 +46,15 @@ export function OrderAlertCenter() {
   const dotClass = connection === 'live' ? 'bg-positive' : connection === 'offline' || connection === 'degraded' ? 'bg-negative' : 'bg-muted';
   const seconds = snapshot.lastSuccessAt === null ? null : Math.max(0, Math.round((now - snapshot.lastSuccessAt) / 1000));
   const soundArmed = alerts.soundState === 'armed';
+
+  async function onAcknowledge(orderId: string) {
+    if (acking.has(orderId)) return; // لا إرسال مكرر
+    setAcking((cur) => new Set(cur).add(orderId));
+    setAckFailed((cur) => { const next = new Set(cur); next.delete(orderId); return next; });
+    const outcome = await alerts.acknowledge(orderId);
+    setAcking((cur) => { const next = new Set(cur); next.delete(orderId); return next; });
+    if (!outcome.ok && !outcome.settled) setAckFailed((cur) => new Set(cur).add(orderId));
+  }
 
   async function onTest() {
     setTestFailed(false);
@@ -120,16 +131,21 @@ export function OrderAlertCenter() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => alerts.silence(item.orderId)}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded border border-border px-3 text-sm text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      disabled={acking.has(item.orderId)}
+                      aria-describedby="alert-ack-hint"
+                      onClick={() => void onAcknowledge(item.orderId)}
+                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded border border-border px-3 text-sm text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
                     >
-                      {t('silence')}
+                      {acking.has(item.orderId) ? t('acking') : t('ack')}
                     </button>
                   </div>
+                  {ackFailed.has(item.orderId) && <p role="alert" data-testid="alert-ack-error" className="text-xs text-negative">{t('ackFailed')}</p>}
                 </li>
               ))
             )}
           </ul>
+
+          {pendingCount > 0 && <p id="alert-ack-hint" className="border-t border-border px-3 py-2 text-xs text-muted">{t('ackHint')}</p>}
 
           {snapshot.truncated && (
             <p className="border-t border-border px-3 py-2 text-xs text-muted">{t('truncated')}</p>

@@ -35,6 +35,7 @@ type Message =
   | { type: 'presence'; id: string; state: PresenceState; ts: number }
   | { type: 'snapshot'; id: string; snapshot: AlertSnapshot }
   | { type: 'silence'; id: string; ids: string[] }
+  | { type: 'unsilence'; id: string; ids: string[] }
   | { type: 'hello'; id: string };
 
 const PRESENCE_EVERY_MS = 3_000;
@@ -66,6 +67,7 @@ export class TabCoordinator {
   private readonly roleListeners = new Set<(role: TabRole) => void>();
   private readonly snapshotListeners = new Set<(s: AlertSnapshot) => void>();
   private readonly silenceListeners = new Set<(ids: string[]) => void>();
+  private readonly unsilenceListeners = new Set<(ids: string[]) => void>();
   private readonly ownerListeners = new Set<(isOwner: boolean) => void>();
   private ownerCache = false;
   private readonly now: () => number;
@@ -99,6 +101,12 @@ export class TabCoordinator {
   onSilence(cb: (ids: string[]) => void): () => void {
     this.silenceListeners.add(cb);
     return () => this.silenceListeners.delete(cb);
+  }
+
+  /** تراجع إسكات متفائل (فشل الإقرار الخادمي): يعيد القائد حساب اللقطة فيعود التنبيه لكل التبويبات فوراً. */
+  onUnsilence(cb: (ids: string[]) => void): () => void {
+    this.unsilenceListeners.add(cb);
+    return () => this.unsilenceListeners.delete(cb);
   }
 
   onSoundOwner(cb: (isOwner: boolean) => void): () => void {
@@ -147,6 +155,10 @@ export class TabCoordinator {
 
   broadcastSilence(ids: string[]): void {
     this.post({ type: 'silence', id: this.opts.tabId, ids });
+  }
+
+  broadcastUnsilence(ids: string[]): void {
+    this.post({ type: 'unsilence', id: this.opts.tabId, ids });
   }
 
   /** هل هذا التبويب حامل الصوت الآن؟ (يحسبه كل تبويب بالقاعدة نفسها من الحضور). */
@@ -229,6 +241,9 @@ export class TabCoordinator {
         break;
       case 'silence':
         for (const cb of [...this.silenceListeners]) cb(message.ids);
+        break;
+      case 'unsilence':
+        for (const cb of [...this.unsilenceListeners]) cb(message.ids);
         break;
       case 'hello':
         this.post({ type: 'presence', id: this.opts.tabId, state: this.opts.getPresence(), ts: this.now() });
