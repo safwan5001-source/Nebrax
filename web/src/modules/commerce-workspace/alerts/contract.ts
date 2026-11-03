@@ -63,6 +63,11 @@ export interface AlertSnapshot {
   total: number;
   truncated: boolean;
   mode: AlertMode;
+  /**
+   * عدّاد تغيّر (COPS-H3-5): يزداد حين تُسجّل التغذية حدثاً جديداً أو تتبدّل بصمة الانتباه. مساحة الاستقبال تعيد جلب لوحتها عند تغيّره
+   * بدل أن تفتح استطلاعاً ثانياً. قيمته لا معنى مطلقاً لها (تبدأ من الصفر لكل محرّك) — يُقارَن بالمساواة فقط.
+   */
+  revision: number;
 }
 
 export const EMPTY_SNAPSHOT: AlertSnapshot = {
@@ -73,6 +78,7 @@ export const EMPTY_SNAPSHOT: AlertSnapshot = {
   total: 0,
   truncated: false,
   mode: 'feed_attention',
+  revision: 0,
 };
 
 /** ADR-30 §5.1: «آخر اتصال ناجح» لا يتجاوز 30 ثانية وإلا تحذير مرئي. */

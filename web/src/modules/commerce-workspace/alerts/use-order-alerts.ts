@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { alertSound, type AlertSoundState } from '@/lib/alert-sound';
 import { useCan, useCurrentUser } from '@/lib/use-can';
 import { AlertEngine } from './alert-engine';
 import { acknowledgeOrder, type AcknowledgeOutcome } from './acknowledge-order';
+import { OrderAlertsContext } from './alerts-context';
 import { fetchAlertConfig, fetchAttention, fetchFeedHead, fetchFeedPage } from './alerts-api';
 import { EMPTY_SNAPSHOT, type AlertConfig, type AlertSnapshot } from './contract';
 import { createLeaseLocks } from './lease-locks';
@@ -32,10 +33,23 @@ function newTabId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `tab-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+/**
+ * مصدر الحالة المشترك (COPS-H3-5): داخل `OrderAlertsProvider` يقرأ كل مستهلك (جرس الترويسة، مساحة الاستقبال) **المحرّك نفسه** — لا استطلاع ثانٍ ولا
+ * حامل صوت ثانٍ ولا منسّق تبويبات ثانٍ. خارج المزوّد (اختبارات، استعمال منفرد) يعمل كما كان: مثيل خاص به. يُستدعى المتحكّم دائماً (قواعد الخطافات)
+ * لكنه خامل تماماً (لا جلب ولا اشتراك) حين يوجد مزوّد.
+ */
 export function useOrderAlerts(): OrderAlertsState {
+  const shared = useContext(OrderAlertsContext);
+  const own = useOrderAlertsController(shared !== null);
+
+  return shared ?? own;
+}
+
+/** المتحكّم الفعلي — يُستعمل من `OrderAlertsProvider` (مرة واحدة لكل غلاف) أو داخلياً عند غياب المزوّد. `inert` ⇒ لا شيء يعمل. */
+export function useOrderAlertsController(inert = false): OrderAlertsState {
   const user = useCurrentUser();
   const { can, hydrated } = useCan();
-  const allowed = hydrated && can('commerce.orders.view');
+  const allowed = !inert && hydrated && can('commerce.orders.view');
   const optedOut = (user?.preferences as { commerce_alerts?: { enabled?: boolean } } | undefined)?.commerce_alerts?.enabled === false;
   const scope = user ? `${user.tenant_id}:${user.id}` : null;
 

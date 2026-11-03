@@ -9,6 +9,7 @@ import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { NotificationBell } from '@/components/layout/notification-bell';
 import { OrderAlertCenter } from '@/modules/commerce-workspace/alerts/order-alert-center';
+import { OrderAlertsProvider } from '@/modules/commerce-workspace/alerts/order-alerts-provider';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
@@ -102,6 +103,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   }
 
   return (
+    <OrderAlertsProvider>
     <div data-posture="ledger" className="flex h-screen w-full flex-col overflow-hidden bg-background [height:100dvh]">
       <header data-awj-shell="topbar" data-awj-shell-vars="" className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
         <button
@@ -267,5 +269,6 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
         </main>
       </div>
     </div>
+    </OrderAlertsProvider>
   );
 }
