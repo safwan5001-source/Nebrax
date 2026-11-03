@@ -125,7 +125,8 @@ export function useOrderAlerts(): OrderAlertsState {
       setSoundOwner(isOwner);
       syncSound();
     });
-    const offSilence = coordinator.onSilence(() => {
+    const offSilence = coordinator.onSilence((received) => {
+      silenced.absorb(received); // التخزين قد يكون ممتلئاً/محجوباً هنا: نحتفظ بالمعرّفات المبثوثة في الذاكرة
       engine.reproject();
       // المتابع لا محرّك له: يُعاد حساب pending محلياً من اللقطة بإزالة المُسكَت.
       const ids = silenced.ids();
