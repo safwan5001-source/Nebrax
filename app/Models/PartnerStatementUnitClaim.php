@@ -7,7 +7,7 @@ use LogicException;
 
 /**
  * مطالبة نهائية بحركة (قيد يومية) استعملها قرار مراجعة فعّال في مقارنة كشف طرف مُغلقة (`basis = decision` دائماً، ومعها سطر الكشف) (IMP-PS-A3d، `CompanyWide`). تُكتب حصراً عبر `PartnerStatementClaimService` داخل معاملة الإغلاق،
- * و**لا تُعدَّل ولا تُحذف** (النموذج والقاعدة؛ إفراج A3e يفتح `released_at`). فهرس فريد جزئي في القاعدة يمنع مطالبتين فعّالتين على الحركة نفسها. **لا أثر مالي.**
+ * و**لا تُعدَّل ولا تُحذف** من التطبيق (النموذج)؛ الإفراج (`released_at`) تفعله القاعدة نفسها عند إبطال/استبدال مقارنتها (A3e، مُشغّل `AFTER UPDATE` على المقارنة) ولا مسار تعديل غيره. فهرس فريد جزئي في القاعدة يمنع مطالبتين فعّالتين على الحركة نفسها. **لا أثر مالي.**
  */
 class PartnerStatementUnitClaim extends BaseModel implements CompanyWide
 {
@@ -16,6 +16,8 @@ class PartnerStatementUnitClaim extends BaseModel implements CompanyWide
     public const BASIS_DECISION = 'decision';
 
     protected $fillable = ['tenant_id', 'reconciliation_id', 'partner_id', 'role', 'journal_entry_id', 'basis', 'line_id', 'claimed_at'];
+
+    protected $casts = ['claimed_at' => 'datetime', 'released_at' => 'datetime'];
 
     protected static function booted(): void
     {

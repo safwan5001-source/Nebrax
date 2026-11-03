@@ -1198,6 +1198,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // (owner/admin عبر `*`)، وحارس القدرة commerce.storefront. المقيَّد بمخازن مرفوض داخل المتحكّم (fail-closed).
         Route::get('commerce/orders', [CommerceStaffOrderController::class, 'index'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COPS-H3-4 (R-10): إقرار تنبيه الطلب لكل طلب — commerce.orders.view (فعل مشاهدة)، بوابة commerce.order_alerts_enabled مغلقة ⇒ 404.
+        Route::post('commerce/orders/{id}/acknowledge', [CommerceStaffOrderAcknowledgementController::class, 'acknowledge'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         // COPS-H1-2: تغذية الأحداث بالمؤشّر + مصالحة الانتباه بالحالة (ADR-29 §2.4) — قراءة فقط، الصلاحية نفسها commerce.orders.view. تُسجَّل قبل {id} (UUID فقط) فلا تلتبس.
         Route::get('commerce/orders/feed', [CommerceStaffOrderFeedController::class, 'feed'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
@@ -1206,9 +1209,6 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // COPS-H3-3 (ADR-30): إعداد مركز التنبيه من الخادم (مفعَّل؟ وضع الاستطلاع؟ الوتيرة) — قراءة فقط، commerce.orders.view؛ البوابة المغلقة ⇒ `enabled=false`.
         Route::get('commerce/alerts/config', [CommerceAlertConfigController::class, 'show'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
-        // COPS-H3-4 (R-10): إقرار تنبيه الطلب لكل طلب — commerce.orders.view (فعل مشاهدة)، بوابة commerce.order_alerts_enabled مغلقة ⇒ 404.
-        Route::post('commerce/orders/{id}/acknowledge', [CommerceStaffOrderAcknowledgementController::class, 'acknowledge'])
-            ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         // COMMERCE-ORDERS-O3a-2b: إلغاء طلب بواسطة موظف مخوّل (ADR-28) — صلاحية commerce.orders.cancel (owner/admin عبر `*` فقط)،
@@ -1804,6 +1804,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('partner-statement-reconciliations/{id}/review', [PartnerStatementLifecycleController::class, 'review'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::post('partner-statement-reconciliations/{id}/reopen', [PartnerStatementLifecycleController::class, 'reopen'])->middleware([$perm('partner_statements.reconcile'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::post('partner-statement-reconciliations/{id}/close', [PartnerStatementLifecycleController::class, 'close'])->middleware([$perm('partner_statements.close'), $app('accounting.partner_statements'), 'throttle:20,1']);
+        Route::post('partner-statement-reconciliations/{id}/void', [PartnerStatementLifecycleController::class, 'void'])->middleware([$perm('partner_statements.void'), $app('accounting.partner_statements'), 'throttle:20,1']);
+        Route::post('partner-statement-reconciliations/{id}/replace', [PartnerStatementLifecycleController::class, 'replace'])->middleware([$perm('partner_statements.close'), $app('accounting.partner_statements'), 'throttle:20,1']);
         Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

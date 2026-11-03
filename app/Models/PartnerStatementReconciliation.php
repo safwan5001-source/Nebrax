@@ -26,13 +26,19 @@ class PartnerStatementReconciliation extends BaseModel implements CompanyWide
     /** IMP-PS-A3d: إغلاق نهائي بمطالبات حركات وفصل مهام (المُغلِق ≠ المراجِع)؛ طرفية في A3d (الإبطال/الاستبدال شريحة A3e). */
     public const STATUS_CLOSED = 'closed';
 
+    /** IMP-PS-A3e: نهائي أُبطل صراحةً بسبب وفاعل ووقت؛ طرفي، تبقى بياناته وسجله للتدقيق وتُفرَج مطالباته. */
+    public const STATUS_VOIDED = 'voided';
+
+    /** IMP-PS-A3e: نهائي استُبدل صراحةً بمقارنة بديلة (`superseded_by_id`) أُغلقت في المعاملة نفسها؛ طرفي كالمُبطَل. */
+    public const STATUS_SUPERSEDED = 'superseded';
+
     /** نطاق الإغلاق النهائي: مؤسسة كاملة (`org`) أو فرع بمعرّفه. */
     public const SCOPE_ORGANIZATION = 'org';
 
     protected $fillable = [
         'tenant_id', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'status', 'original_filename', 'file_sha256', 'identity_sha256',
         'source_import_job_id', 'line_count', 'total_debit_minor', 'total_credit_minor', 'policy', 'checks', 'created_by',
-        'lines_digest', 'reviewed_at', 'reviewed_by', 'reviewed_run_id', 'closed_at', 'closed_by', 'scope_key',
+        'lines_digest', 'reviewed_at', 'reviewed_by', 'reviewed_run_id', 'closed_at', 'closed_by', 'scope_key', 'voided_at', 'voided_by', 'void_reason', 'superseded_by_id',
     ];
 
     protected $casts = [
@@ -45,6 +51,7 @@ class PartnerStatementReconciliation extends BaseModel implements CompanyWide
         'checks' => 'array',
         'reviewed_at' => 'datetime',
         'closed_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     public function lines(): HasMany

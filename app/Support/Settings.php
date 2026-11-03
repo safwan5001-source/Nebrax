@@ -455,6 +455,14 @@ class Settings
             'reports_volume_basis' => 'observed', // observed | standard
             'reports_temperature_basis' => 'observed', // observed | normalized
         ],
+        /**
+         * IMP-PS-A3e (D-PS-20): فصل مهام إبطال/استبدال مقارنات كشوف الأطراف النهائية. `strict` (الافتراضي حتى للمستأجر القائم) = لا يُبطل المُغلِقُ
+         * مقارنته؛ `flexible` = يجوز إن امتلك `partner_statements.void`. القراءة عبر `PartnerStatementVoidSeparation` (أي قيمة أخرى ⇒ strict).
+         * **لا مسار كتابة للمستخدمين** (واجهة الضبط ومسار مصرَّح آمن مؤجّلان إلى PS-A4).
+         */
+        'partner_statements' => [
+            'void_separation' => 'strict',
+        ],
     ];
 
     /** كل إعدادات مجموعة، مدموجةً فوق افتراضاتها. */
