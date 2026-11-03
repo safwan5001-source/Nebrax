@@ -25,7 +25,10 @@ export function scheduleText(schedule: OrderSummary['schedule'], locale: string)
   const { slot } = schedule;
   const label = (locale === 'en' ? slot.label_en : null) ?? slot.label ?? [slot.start_time, slot.end_time].filter(Boolean).join('–');
 
-  return label ? `${schedule.date} · ${label}` : schedule.date;
+  // التاريخ معزول LTR (LRI…PDI) كي لا يعيد سياق RTL ترتيب أجزائه.
+  const date = `\u2066${schedule.date}\u2069`;
+
+  return label ? `${date} · ${label}` : date;
 }
 
 /**
@@ -66,24 +69,26 @@ export function OrderCard({
       className={`flex flex-col gap-2 rounded border bg-surface p-3 ${alertPending ? 'border-primary border-s-4' : 'border-border'}`}
     >
       <div className="flex items-start justify-between gap-2">
-        {onSelect ? (
-          <button type="button" onClick={() => onSelect(order.id)} className="num min-h-11 text-start font-semibold text-text hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" dir="ltr">
-            {order.number}
-          </button>
-        ) : (
-          <Link href={`/commerce/orders/${order.id}`} className="num inline-flex min-h-11 items-center font-semibold text-text hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" dir="ltr">
-            {order.number}
-          </Link>
-        )}
-        <div className="flex flex-col items-end gap-1 text-xs text-muted">
-          {alertPending && <Badge tone="negative" data-testid="board-new-badge">{t('newBadge')}</Badge>}
-          {elapsed !== null && <span data-testid="board-elapsed" className="num">{elapsed}</span>}
+        <div className="min-w-0">
+          {onSelect ? (
+            <button type="button" onClick={() => onSelect(order.id)} className="num min-h-11 whitespace-nowrap text-start font-semibold text-text hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" dir="ltr">
+              {order.number}
+            </button>
+          ) : (
+            <Link href={`/commerce/orders/${order.id}`} className="num inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-text hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" dir="ltr">
+              {order.number}
+            </Link>
+          )}
+          {elapsed !== null && <div data-testid="board-elapsed" className="num -mt-2 whitespace-nowrap text-xs text-muted">{elapsed}</div>}
         </div>
+        {alertPending && <Badge tone="negative" data-testid="board-new-badge">{t('newBadge')}</Badge>}
       </div>
 
       <div className="min-w-0 text-sm">
         <div className="truncate font-medium text-text"><bdi>{customer}</bdi></div>
-        <div className="num text-xs text-muted">{formatOrderMoney(order.total)} · {t('items', { count: order.items_count })}</div>
+        <div className="text-xs text-muted">
+          <span className="num" dir="ltr">{formatOrderMoney(order.total)}</span> · <span>{t('items', { count: order.items_count })}</span>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -100,6 +105,7 @@ export function OrderCard({
           <button
             type="button"
             disabled={acking}
+            data-testid="board-card-ack"
             onClick={() => onAcknowledge(order.id)}
             className="inline-flex min-h-11 items-center justify-center rounded border border-border px-3 text-sm text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
           >

@@ -11,6 +11,9 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a>,
 }));
 
+const path = vi.hoisted(() => ({ current: '/commerce' as string | null }));
+vi.mock('next/navigation', () => ({ usePathname: () => path.current }));
+
 const state: { current: OrderAlertsState } = { current: null as never };
 vi.mock('./use-order-alerts', () => ({ useOrderAlerts: () => state.current }));
 
@@ -37,7 +40,17 @@ function make(over: Partial<OrderAlertsState> = {}): OrderAlertsState {
 const open = () => fireEvent.click(screen.getByRole('button', { name: /تنبيهات الطلبات|Order alerts/ }));
 
 describe('OrderAlertCenter', () => {
-  beforeEach(() => { locale.current = 'ar'; state.current = make(); });
+  it('شريط الصوت الثابت يغيب على مساحة الاستقبال (لها زر خاص)، ويبقى في غيرها (H3-5)', () => {
+    state.current = make({ soundState: 'locked' });
+    render(<OrderAlertCenter />);
+    expect(screen.getByTestId('alert-sound-bar')).toBeTruthy();
+    cleanup();
+    path.current = '/commerce/orders/live';
+    render(<OrderAlertCenter />);
+    expect(screen.queryByTestId('alert-sound-bar')).toBeNull();
+  });
+
+  beforeEach(() => { locale.current = 'ar'; path.current = '/commerce'; state.current = make(); });
   afterEach(cleanup);
 
   it.each(['off', 'loading'] as const)('الحالة %s: لا يعرض شيئاً (بوابة مغلقة/غير مصرَّح)', (status) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { BellRing, RefreshCw, Volume2, VolumeX } from 'lucide-react';
@@ -13,6 +13,8 @@ import { useOptionalCommerceStoreContext } from '../store-context';
 import { BOARD_COLUMNS, groupOrders, type BoardColumnKey } from './board-columns';
 import { receptionMessages } from './messages';
 import { OrderCard } from './order-card';
+import { ReceptionOrderPanel } from './reception-order-panel';
+import { ScreenControls } from './screen-controls';
 import { useReceptionBoard } from './use-reception-board';
 
 /**
@@ -27,11 +29,16 @@ export function ReceptionBoard() {
   const alerts = useOrderAlerts();
   const storeContext = useOptionalCommerceStoreContext();
   const storefrontId = storeContext?.selectedStoreId ?? null;
-  const board = useReceptionBoard({ storefrontId, enabled: true, revision: alerts.snapshot.revision });
+  // لا جلب قبل حسم سياق المتجر (وإلا جلبنا كل المتاجر ثم أعدنا الجلب للمتجر المختار). متجر مختار ⇒ لوحته؛ بلا اختيار (عدة متاجر) ⇒ كل المتاجر مع تنويه.
+  const storeResolved = storeContext === null || storeContext.storeContextStatus !== 'pending';
+  const board = useReceptionBoard({ storefrontId, enabled: storeResolved, revision: alerts.snapshot.revision });
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState<BoardColumnKey>('new');
   const [acking, setAcking] = useState<ReadonlySet<string>>(new Set());
   const [ackFailed, setAckFailed] = useState<ReadonlySet<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const closePanel = useCallback(() => setSelectedId(null), []);
+  const { refresh } = board;
 
   // مؤقّت عرض فقط (عمر الطلب والاتصال) — لا شبكة.
   useEffect(() => {
@@ -90,6 +97,7 @@ export function ReceptionBoard() {
         )}
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
+          <ScreenControls locale={locale} />
           {board.loadedAt !== null && <span className="num hidden text-xs text-muted sm:inline">{t('loadedAt', { time: formatTime(board.loadedAt, locale) })}</span>}
           <button
             type="button"
@@ -114,6 +122,9 @@ export function ReceptionBoard() {
           <p data-testid="board-alerts-off" className="font-medium text-text">{t('alertsOffTitle')}</p>
           <p className="mt-1 text-muted">{t('alertsOffBody')}</p>
         </FormAlert>
+      )}
+      {storeResolved && storefrontId === null && storeContext?.catalog.status === 'ready' && storeContext.catalog.stores.length > 1 && (
+        <p data-testid="board-all-stores" className="text-xs text-muted">{t('allStoresNote')}</p>
       )}
       {alertsOn && snapshot.mode === 'attention_only' && <p className="text-xs text-muted">{t('restrictedNote')}</p>}
       {alertsOn && (
@@ -184,6 +195,7 @@ export function ReceptionBoard() {
                         acking={acking.has(order.id)}
                         ackFailed={ackFailed.has(order.id)}
                         onAcknowledge={(id) => void onAcknowledge(id)}
+                        onSelect={setSelectedId}
                       />
                     ))}
                   </ul>
@@ -192,6 +204,19 @@ export function ReceptionBoard() {
             ))}
           </div>
         </>
+      )}
+
+      {selectedId !== null && (
+        <ReceptionOrderPanel
+          key={selectedId}
+          orderId={selectedId}
+          alertPending={pendingIds.has(selectedId)}
+          acking={acking.has(selectedId)}
+          ackFailed={ackFailed.has(selectedId)}
+          onAcknowledge={(id) => void onAcknowledge(id)}
+          onClose={closePanel}
+          onChanged={refresh}
+        />
       )}
     </div>
   );

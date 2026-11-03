@@ -109,7 +109,8 @@ export class AlertEngine {
     this.generation += 1;
     this.cancelTimer();
     this.rerun = false;
-    this.snapshotValue = { ...EMPTY_SNAPSHOT };
+    // revision يبقى رتيباً عبر stop/start لمثيل المحرّك نفسه كي لا تقرأ اللوحة تصفير الإيقاف تغيّراً (H3-5).
+    this.snapshotValue = { ...EMPTY_SNAPSHOT, revision: this.revision };
     this.emit();
   }
 
