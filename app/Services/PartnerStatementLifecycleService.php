@@ -36,6 +36,9 @@ final class PartnerStatementLifecycleService
 {
     public const MAX_PER_PAGE = 50;
 
+    /** سقف نهائيات الاستبدال في طلب واحد (يحدّ حجم المعاملة وسلسلة الأقفال). */
+    public const MAX_REPLACES = 20;
+
     private const SAMPLE = 20;
 
     public function __construct(
@@ -44,6 +47,7 @@ final class PartnerStatementLifecycleService
         private readonly PartnerStatementDigest $digest,
         private readonly TenantContext $tenant,
         private readonly PartnerStatementClaimService $claims,
+        private readonly PartnerStatementRetirementService $retirement,
     ) {}
 
     // ═══════════════════════════════ الحالة (قراءة) ═══════════════════════════════
@@ -83,14 +87,17 @@ final class PartnerStatementLifecycleService
                 'period_from' => $reconciliation->period_from->toDateString(), 'period_to' => $reconciliation->period_to->toDateString(), 'line_count' => $reconciliation->line_count,
                 'reviewed_at' => optional($reconciliation->reviewed_at)->toIso8601String(), 'reviewed_by' => $reconciliation->reviewed_by, 'reviewed_run_id' => $reconciliation->reviewed_run_id,
                 'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
+                'voided_at' => optional($reconciliation->voided_at)->toIso8601String(), 'voided_by' => $reconciliation->voided_by, 'void_reason' => $reconciliation->void_reason,
+                'superseded_by_id' => $reconciliation->superseded_by_id,
             ],
             'run' => $run === null ? null : ['id' => $run->id, 'scope' => $run->scope, 'ledger_fingerprint' => $run->ledger_fingerprint, 'created_at' => optional($run->created_at)->toIso8601String()],
             'readiness' => $evaluation['readiness'] + ['can_mark_reviewed' => $reconciliation->status === PartnerStatementReconciliation::STATUS_DRAFT && $evaluation['blockers'] === []],
             'blockers' => $evaluation['blockers'],
             'reviewed_state' => $reviewedState,
             'close' => $this->closeState($actor, $reconciliation, $reviewedState),
+            'void' => $this->voidState($actor, $reconciliation),
             // بيانات الإغلاق التي تعدّ/تصف **قيوداً** (عدد المطالبات، استثناءات الفترة) تخصّ نطاق تشغيلة الإغلاق: لا تُعرض إلا لقارئها (كما يرشّح `events()`)؛ غيرُه `null` لا عدد ولا عيّنة (Codex #1941).
-            'final' => $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED ? $this->finalBlock($actor, $reconciliation) : null,
+            'final' => in_array($reconciliation->status, [PartnerStatementReconciliation::STATUS_CLOSED, PartnerStatementReconciliation::STATUS_VOIDED, PartnerStatementReconciliation::STATUS_SUPERSEDED], true) ? $this->finalBlock($actor, $reconciliation) : null,
         ];
     }
 
@@ -201,6 +208,95 @@ final class PartnerStatementLifecycleService
      */
     public function close(User $actor, string $reconciliationId, array $input): array
     {
+        return $this->performClose($actor, $reconciliationId, $input, [], null);
+    }
+
+    /**
+     * الاستبدال الصريح (PS-A3e): يُغلق المقارنة البديلة `$newId` **ويستبدل** بها نهائيات قائمة (`replaces`) في **معاملة واحدة**: كل نهائي مُستبدَل `closed → superseded` (حدث `supersede` يربطه بالبديلة،
+     * وتُفرَج مطالباته)، ثم تُغلق البديلة بالمسار نفسه (D-PS-12/14/17: التشغيلة الحديثة، المُغلِق ≠ المراجِع، التعارض والتداخل **بعد** الاستبدال). أي فشل (حتى بعد الاستبدال) ⇒ تراجع كامل: لا أصل مُستبدَل
+     * ولا بديلة غير مُغلقة، ولا مطالبة مُفرَجة. القاعدة تتحقق عند الالتزام (PostgreSQL) أن البديلة `closed`.
+     *
+     * الصلاحية: `partner_statements.close` (البديلة) **و**`partner_statements.void` (الاستبدال)، + `.view` ونطاق الطرف/الفرع وقراءة تشغيلة إغلاق كل نهائي مُستبدَل. السبب إلزامي. العقد (قرار مفتوح موثَّق D-PS-19): قائمة
+     * `replaces` صريحة لنهائيات `closed` لنفس الطرف والدور (لا يُشترط تعارضها فعلاً)، وبلا حدّ لإقرار التداخل.
+     *
+     * @param  array{run_id: string, replaces: list<string>, reason: string, acknowledge_overlap?: ?list<string>, note?: ?string}  $input
+     * @return array{replayed: bool, status: array<string, mixed>}
+     */
+    public function replace(User $actor, string $newId, array $input): array
+    {
+        $this->matching->authorize($actor, $newId, 'partner_statements.close');
+        if (! Rbac::allows((string) $actor->role, 'partner_statements.void')) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('ليس لديك صلاحية لتنفيذ هذا الإجراء.');
+        }
+        $reason = $this->requiredReason($input['reason'] ?? null, 'سبب الاستبدال');
+        $replaces = array_values(array_unique(array_map('strval', (array) ($input['replaces'] ?? []))));
+        sort($replaces);
+        if ($replaces === []) {
+            throw new PartnerStatementReviewException('replace_targets_required', 'حدّد نهائياً واحداً على الأقل للاستبدال (replaces).');
+        }
+        if (in_array($newId, $replaces, true)) {
+            throw new PartnerStatementReviewException('replace_self', 'لا تستبدل المقارنة نفسها.');
+        }
+        foreach ($replaces as $id) {
+            if (! Str::isUuid($id)) {
+                throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+            }
+        }
+
+        return $this->performClose($actor, $newId, $input, $replaces, $reason);
+    }
+
+    // ═══════════════════════════════ closed → voided ═══════════════════════════════
+
+    /**
+     * الإبطال الصريح `closed → voided` (PS-A3e): سبب إلزامي (3..500) وفاعل ووقت، ذرّياً مع إفراج مطالبات المقارنة (تفعله القاعدة عند الانتقال). **لا أثر مالي**؛ المقارنة وقراراتها وسجلها وتشغيلتها تبقى كما هي (تاريخ
+     * قابل للتدقيق)، والحالة طرفية (لا فتح ولا تعديل ولا إغلاق ثانٍ — إعادة العمل تكون بمقارنة جديدة). الصلاحية `partner_statements.void` + `.view` ونطاق الطرف والفرع **وقراءة تشغيلة الإغلاق** (مقيَّد بفرع لا يُبطل
+     * نهائي مؤسسة). إعادة الطلب بالسبب نفسه على مقارنة مُبطَلة ⇒ `replayed`؛ بسبب مختلف أو على مُستبدَلة ⇒ 409.
+     *
+     * @return array{replayed: bool, status: array<string, mixed>}
+     */
+    public function void(User $actor, string $reconciliationId, ?string $reason): array
+    {
+        $reconciliation = $this->matching->authorize($actor, $reconciliationId, 'partner_statements.void');
+        $reason = $this->requiredReason($reason, 'سبب الإبطال');
+
+        $replayed = DB::transaction(function () use ($actor, $reconciliation, $reason): bool {
+            // نفس ترتيب الأقفال في الإغلاق: استشاري للمقارنة ← استشاري واسع للطرف/الدور (يسلسل الإبطال مع أي إغلاق/استبدال لهذا الطرف) ← صف المقارنة. لا تُقرأ بيانات الأستاذ هنا فلا مِرساة.
+            $this->review->lockReconciliation($reconciliation->id);
+            $this->claims->lockPartnerScope((string) $reconciliation->partner_id, (string) $reconciliation->role);
+            $fresh = PartnerStatementReconciliation::query()->whereKey($reconciliation->id)->lockForUpdate()->first();
+            if ($fresh === null) {
+                throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+            }
+            if ($fresh->status === PartnerStatementReconciliation::STATUS_VOIDED) {
+                $event = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $fresh->id)->where('action', PartnerStatementReconciliationEvent::ACTION_VOID)->orderByDesc('seq')->first();
+                if ($event !== null && $event->reason === $reason) {
+                    return true;   // إعادة الطلب نفسه: لا حدث جديد
+                }
+                throw new PartnerStatementReviewException('reconciliation_already_voided', 'المقارنة مُبطَلة سابقاً بسبب آخر.', 409);
+            }
+            if ($fresh->status === PartnerStatementReconciliation::STATUS_SUPERSEDED) {
+                throw new PartnerStatementReviewException('reconciliation_already_superseded', 'المقارنة مُستبدَلة بمقارنة أخرى فلا تُبطَل.', 409, ['superseded_by_id' => $fresh->superseded_by_id]);
+            }
+            if ($fresh->status !== PartnerStatementReconciliation::STATUS_CLOSED) {
+                throw new PartnerStatementReviewException('reconciliation_not_closed', 'لا يُبطَل إلا نهائي مُغلق.', 409);
+            }
+            $this->assertCloseRunReadable($actor, $fresh);
+            $this->retirement->retire($actor, $fresh, $reason, null);
+
+            return false;
+        }, 3);
+
+        return ['replayed' => $replayed, 'status' => $this->status($actor, $reconciliationId)];
+    }
+
+    /**
+     * @param  list<string>  $replaceIds  نهائيات تُستبدَل (فارغة = إغلاق عادي)
+     * @param  array{run_id: string, acknowledge_overlap?: ?list<string>, note?: ?string}  $input
+     * @return array{replayed: bool, status: array<string, mixed>}
+     */
+    private function performClose(User $actor, string $reconciliationId, array $input, array $replaceIds, ?string $replaceReason): array
+    {
         $reconciliation = $this->matching->authorize($actor, $reconciliationId, 'partner_statements.close');
         $note = isset($input['note']) ? trim((string) $input['note']) : null;
         $note = $note === '' ? null : $note;
@@ -212,7 +308,7 @@ final class PartnerStatementLifecycleService
         $run = $this->run($actor, $reconciliation, (string) ($input['run_id'] ?? ''));
 
         // 3 محاولات: تُعاد المعاملة بكاملها عند جمود قاعدة البيانات فقط (مِرساة المستأجر يشاركها الترحيل)؛ استثناءات العمل لا تُعاد.
-        $replayed = DB::transaction(function () use ($actor, $reconciliation, $run, $note, $acknowledged): bool {
+        $replayed = DB::transaction(function () use ($actor, $reconciliation, $run, $note, $acknowledged, $replaceIds, $replaceReason): bool {
             $this->review->lockReconciliation($reconciliation->id);
             $this->claims->lockPartnerScope((string) $reconciliation->partner_id, (string) $reconciliation->role);
             $fresh = PartnerStatementReconciliation::query()->whereKey($reconciliation->id)->lockForUpdate()->first();
@@ -221,8 +317,10 @@ final class PartnerStatementLifecycleService
             }
             if ($fresh->status === PartnerStatementReconciliation::STATUS_CLOSED) {
                 $closeEvent = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $fresh->id)->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first();
-                if ($closeEvent !== null && $closeEvent->run_id === $run->id) {
-                    return true;   // إعادة الطلب نفسه: لا حدث ولا مطالبات جديدة
+                $closedSet = array_values(array_map('strval', (array) ($closeEvent?->summary['supersedes'] ?? [])));
+                sort($closedSet);
+                if ($closeEvent !== null && $closeEvent->run_id === $run->id && $closedSet === $replaceIds) {
+                    return true;   // إعادة الطلب نفسه (بقائمة الاستبدال نفسها): لا حدث ولا مطالبات جديدة
                 }
                 throw new PartnerStatementReviewException('reconciliation_already_closed', 'المقارنة مُغلقة نهائياً بتشغيلة أخرى.', 409);
             }
@@ -251,10 +349,12 @@ final class PartnerStatementLifecycleService
             }
 
             $scopeKey = $this->claims->scopeKey($source['scope']);
+            // الاستبدال (PS-A3e): تُخرَج النهائيات المُسمّاة **قبل** فحوص الهوية/التعارض/التداخل فتُحسب على ما يبقى فقط؛ أي فشل لاحق يُرجع المعاملة كلها (لا أصل مُستبدَل ببديلة غير مُغلقة).
+            $superseded = $replaceIds === [] ? [] : $this->supersedeFinals($actor, $fresh, $replaceIds, (string) $replaceReason);
             $overlaps = $this->claims->overlappingFinals($fresh, $scopeKey);
             $identical = $overlaps->filter(fn (PartnerStatementReconciliation $o): bool => $o->period_from->toDateString() === $fresh->period_from->toDateString() && $o->period_to->toDateString() === $fresh->period_to->toDateString());
             if ($identical->isNotEmpty()) {
-                throw new PartnerStatementReviewException('final_already_exists', 'يوجد نهائي قائم لنفس الطرف والدور والفترة بنطاق متقاطع (مؤسسة ⇄ أي نطاق، أو الفرع نفسه): الاستبدال شريحة PS-A3e.', 409, [
+                throw new PartnerStatementReviewException('final_already_exists', 'يوجد نهائي قائم لنفس الطرف والدور والفترة بنطاق متقاطع (مؤسسة ⇄ أي نطاق، أو الفرع نفسه): لا يُغلق بديل فوقه إلا باستبداله صراحةً (replace).', 409, [
                     'reconciliation_ids' => $identical->pluck('id')->values()->all(),
                 ]);
             }
@@ -263,7 +363,7 @@ final class PartnerStatementLifecycleService
             $exceptions = $this->claims->unclaimedInPeriod($source['units'], $fresh->period_from->toDateString(), $fresh->period_to->toDateString(), $set);
             $conflicts = $this->claims->conflicts($fresh, $set);
             if ($conflicts !== []) {
-                throw new PartnerStatementReviewException('unit_conflict', 'حركة (قيد) مُطالَب بها فعلاً من مقارنة نهائية أخرى لهذا الطرف: لا مطالبة مزدوجة (الاستبدال شريحة PS-A3e).', 409, [
+                throw new PartnerStatementReviewException('unit_conflict', 'حركة (قيد) مُطالَب بها فعلاً من مقارنة نهائية أخرى لهذا الطرف: لا مطالبة مزدوجة؛ لا تُحسم إلا باستبدال ذلك النهائي صراحةً (replace) أو إبطاله.', 409, [
                     'reconciliation_ids' => array_values(array_unique(array_column($conflicts, 'reconciliation_id'))),
                     'conflicts' => count($conflicts), 'sample' => array_slice($conflicts, 0, PartnerStatementClaimService::SAMPLE),
                 ]);
@@ -287,7 +387,8 @@ final class PartnerStatementLifecycleService
                 'reconciliation_id' => $fresh->id, 'seq' => ((int) $last) + 1, 'action' => PartnerStatementReconciliationEvent::ACTION_CLOSE,
                 'from_status' => PartnerStatementReconciliation::STATUS_REVIEWED, 'to_status' => PartnerStatementReconciliation::STATUS_CLOSED, 'run_id' => $run->id,
                 'ledger_fingerprint' => $source['fingerprint'], 'statement_digest' => $digest,
-                'summary' => $evaluation['summary'] + ['scope_key' => $scopeKey, 'claims' => $written, 'unclaimed_in_period' => $exceptions, 'overlap_acknowledged' => $acknowledged],
+                'summary' => $evaluation['summary'] + ['scope_key' => $scopeKey, 'claims' => $written, 'unclaimed_in_period' => $exceptions, 'overlap_acknowledged' => $acknowledged]
+                    + ($superseded === [] ? [] : ['supersedes' => array_column($superseded, 'id'), 'superseded' => $superseded]),
                 'reason' => $note, 'created_by' => $actor->getKey(), 'reviewer_id' => $fresh->reviewed_by, 'claims_count' => $written['total'], 'created_at' => now(),
             ]);
             $fresh->update(['status' => PartnerStatementReconciliation::STATUS_CLOSED, 'closed_at' => now(), 'closed_by' => $actor->getKey(), 'scope_key' => $scopeKey]);
@@ -299,6 +400,56 @@ final class PartnerStatementLifecycleService
     }
 
     /**
+     * يستبدل النهائيات المُسمّاة (داخل معاملة الإغلاق، بعد قفل البديلة والطرف): تُقفل صفوفها بترتيب المعرّف ثم يُخرَج كلٌّ بحدث `supersede` يربطه بالبديلة. كل هدف: من المؤسسة نفسها، لنفس الطرف والدور، `closed`،
+     * وتشغيلة إغلاقه مقروءة للفاعل (نطاق الفروع)؛ وإلا رفض يُرجع المعاملة.
+     *
+     * @param  list<string>  $ids
+     * @return list<array{id: string, claims_released: int}>
+     */
+    private function supersedeFinals(User $actor, PartnerStatementReconciliation $replacement, array $ids, string $reason): array
+    {
+        $finals = PartnerStatementReconciliation::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+        if ($finals->count() !== count($ids)) {
+            throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);   // معرّف غير موجود/من مؤسسة أخرى: الرفض الموحَّد
+        }
+        $done = [];
+        foreach ($finals as $final) {
+            if ((string) $final->partner_id !== (string) $replacement->partner_id || $final->role !== $replacement->role) {
+                throw new PartnerStatementReviewException('replace_target_mismatch', 'النهائي المُستبدَل لطرف أو دور مختلف عن البديلة.', 422, ['reconciliation_id' => $final->id]);
+            }
+            if ($final->status !== PartnerStatementReconciliation::STATUS_CLOSED) {
+                throw new PartnerStatementReviewException('replace_target_not_closed', 'لا يُستبدَل إلا نهائي مُغلق.', 409, ['reconciliation_id' => $final->id, 'status' => $final->status]);
+            }
+            $this->assertCloseRunReadable($actor, $final);
+            $done[] = ['id' => (string) $final->id, 'claims_released' => $this->retirement->retire($actor, $final, $reason, (string) $replacement->id)];
+        }
+
+        return $done;
+    }
+
+    /** مقيَّد بفرع لا يُخرج من الخدمة نهائياً بنطاق أوسع: تشغيلة إغلاقه يجب أن تكون مقروءة للفاعل (الرفض الموحَّد وإلا). */
+    private function assertCloseRunReadable(User $actor, PartnerStatementReconciliation $final): void
+    {
+        $run = $final->reviewed_run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($final->reviewed_run_id)->first();
+        if ($run === null || ! $this->matching->readable($actor, $run)) {
+            throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+        }
+    }
+
+    private function requiredReason(mixed $reason, string $label): string
+    {
+        $reason = trim((string) ($reason ?? ''));
+        if (mb_strlen($reason) < 3) {
+            throw new PartnerStatementReviewException('reason_required', "{$label} إلزامي (3 محارف على الأقل).");
+        }
+        if (mb_strlen($reason) > 500) {
+            throw new PartnerStatementReviewException('reason_too_long', 'السبب أطول من 500 حرف.');
+        }
+
+        return $reason;
+    }
+
+    /**
      * كتلة الإغلاق النهائي للعرض. الهوية والتوقيت والنطاق (`closed_at/by`, `scope_key`) متاحة لمن يرى المقارنة؛ أما **عدد المطالبات واستثناءات الفترة** (معرّفات قيود وأرقام وتواريخ) فمن نطاق تشغيلة
      * الإغلاق وتُعرض لقارئ تلك التشغيلة وحده، وإلا `null`.
      *
@@ -306,6 +457,7 @@ final class PartnerStatementLifecycleService
      */
     private function finalBlock(User $actor, PartnerStatementReconciliation $reconciliation): array
     {
+        // حدث إغلاق المقارنة (يبقى بعد الإبطال/الاستبدال: تاريخ المطابقة الأصلية).
         $event = PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
             ->where('action', PartnerStatementReconciliationEvent::ACTION_CLOSE)->orderByDesc('seq')->first();
         $run = $event === null || $event->run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($event->run_id)->first();
@@ -314,6 +466,7 @@ final class PartnerStatementLifecycleService
         return [
             'closed_at' => optional($reconciliation->closed_at)->toIso8601String(), 'closed_by' => $reconciliation->closed_by, 'scope_key' => $reconciliation->scope_key,
             'claims_count' => $readable ? $this->claims->countFor((string) $reconciliation->id) : null,
+            'active_claims_count' => $readable ? $this->claims->activeCountFor((string) $reconciliation->id) : null,
             'unclaimed_in_period' => $readable ? ($event->summary['unclaimed_in_period'] ?? null) : null,
         ];
     }
@@ -328,10 +481,32 @@ final class PartnerStatementLifecycleService
     {
         $blocked = match (true) {
             $reconciliation->status === PartnerStatementReconciliation::STATUS_CLOSED => 'already_closed',
+            $reconciliation->status === PartnerStatementReconciliation::STATUS_VOIDED => 'already_voided',
+            $reconciliation->status === PartnerStatementReconciliation::STATUS_SUPERSEDED => 'already_superseded',
             $reconciliation->status !== PartnerStatementReconciliation::STATUS_REVIEWED => 'not_reviewed',
             ! Rbac::allows((string) $actor->role, 'partner_statements.close') => 'permission_required',
             (string) $reconciliation->reviewed_by === (string) $actor->getKey() => 'closer_must_differ_from_reviewer',
             ($reviewedState['ledger_changed_since_review'] ?? true) || ($reviewedState['statement_changed_since_review'] ?? true) => 'run_stale',
+            default => null,
+        };
+
+        return ['available' => $blocked === null, 'blocked_reason' => $blocked];
+    }
+
+    /**
+     * حالة الإبطال للعرض فقط: متاح لنهائي مُغلق لمن يملك `void` ويقرأ تشغيلة إغلاقه. القرار الحاسم داخل `void()`.
+     *
+     * @return array<string, mixed>
+     */
+    private function voidState(User $actor, PartnerStatementReconciliation $reconciliation): array
+    {
+        $run = $reconciliation->reviewed_run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($reconciliation->reviewed_run_id)->first();
+        $blocked = match (true) {
+            $reconciliation->status === PartnerStatementReconciliation::STATUS_VOIDED => 'already_voided',
+            $reconciliation->status === PartnerStatementReconciliation::STATUS_SUPERSEDED => 'already_superseded',
+            $reconciliation->status !== PartnerStatementReconciliation::STATUS_CLOSED => 'not_closed',
+            ! Rbac::allows((string) $actor->role, 'partner_statements.void') => 'permission_required',
+            $run === null || ! $this->matching->readable($actor, $run) => 'close_scope_not_readable',
             default => null,
         };
 
@@ -359,7 +534,7 @@ final class PartnerStatementLifecycleService
             ->orderByDesc('seq')->paginate($perPage)->through(fn (PartnerStatementReconciliationEvent $e): array => [
                 'id' => $e->id, 'seq' => $e->seq, 'action' => $e->action, 'from_status' => $e->from_status, 'to_status' => $e->to_status, 'run_id' => $e->run_id,
                 'ledger_fingerprint' => $e->ledger_fingerprint, 'statement_digest' => $e->statement_digest, 'summary' => $e->summary, 'reason' => $e->reason,
-                'created_by' => $e->created_by, 'reviewer_id' => $e->reviewer_id, 'claims_count' => $e->claims_count, 'created_at' => optional($e->created_at)->toIso8601String(),
+                'created_by' => $e->created_by, 'reviewer_id' => $e->reviewer_id, 'claims_count' => $e->claims_count, 'related_reconciliation_id' => $e->related_reconciliation_id, 'created_at' => optional($e->created_at)->toIso8601String(),
             ]);
     }
 

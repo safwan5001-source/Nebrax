@@ -6,7 +6,7 @@ use App\Tenancy\CompanyWide;
 use LogicException;
 
 /**
- * حدث دورة حالات مقارنة كشف طرف (IMP-PS-A3c، `CompanyWide`): `mark_reviewed` | `reopen` | `close` (A3d). **سجل append-only** — لا تعديل ولا حذف (النموذج والقاعدة). لا أثر مالي.
+ * حدث دورة حالات مقارنة كشف طرف (IMP-PS-A3c، `CompanyWide`): `mark_reviewed` | `reopen` | `close` (A3d) | `void` | `supersede` (A3e). **سجل append-only** — لا تعديل ولا حذف (النموذج والقاعدة). لا أثر مالي.
  */
 class PartnerStatementReconciliationEvent extends BaseModel implements CompanyWide
 {
@@ -18,8 +18,12 @@ class PartnerStatementReconciliationEvent extends BaseModel implements CompanyWi
 
     public const ACTION_CLOSE = 'close';
 
+    public const ACTION_VOID = 'void';
+
+    public const ACTION_SUPERSEDE = 'supersede';
+
     protected $fillable = [
-        'tenant_id', 'reconciliation_id', 'seq', 'action', 'from_status', 'to_status', 'run_id', 'ledger_fingerprint', 'statement_digest', 'summary', 'reason', 'created_by', 'reviewer_id', 'claims_count',
+        'tenant_id', 'reconciliation_id', 'seq', 'action', 'from_status', 'to_status', 'run_id', 'ledger_fingerprint', 'statement_digest', 'summary', 'reason', 'created_by', 'reviewer_id', 'claims_count', 'related_reconciliation_id',
     ];
 
     protected $casts = ['seq' => 'integer', 'summary' => 'array'];
