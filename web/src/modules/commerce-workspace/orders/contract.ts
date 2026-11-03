@@ -201,7 +201,14 @@ export type OrderDetail = Omit<OrderSummary, 'fulfillment'> & {
     | { posted: true; invoice_id: string; payment_id: string; accounting_date: string | null; amount: Money };
 };
 
-export type OrdersMeta = { current_page: number; per_page: number; total: number; last_page: number };
+export type OrdersMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  /** H2-6 — يأتي فقط مع مرشّح `due`: تجاوز الطابور سقف المرشّحين فالقائمة ناقصة. */
+  queue_truncated?: boolean;
+};
 
 /** حدود الخادم (O1a): per_page ≤ 50، q بين 2 و100 حرف، فرز بقائمة بيضاء. */
 export const ORDERS_MAX_PER_PAGE = 50;

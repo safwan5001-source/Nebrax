@@ -40,10 +40,41 @@ final class CommerceDeliveryScheduleService
     {
         $setting = CommerceDeliveryScheduleSetting::query()->where('sales_channel_id', $salesChannelId)->first();
 
+        return $this->settingsShape($setting, $this->timezoneFor($setting));
+    }
+
+    /**
+     * إعدادات عدة قنوات دفعةً واحدة (استعلام واحد للإعدادات + استعلام واحد على الأكثر لمنطقة المستأجر الموروثة)،
+     * بالشكل نفسه تماماً لـ`settings()`. للمستهلكين متعددي القنوات (طابور التحضير) كي لا يتبع عدد الاستعلامات عدد القنوات.
+     *
+     * @param  list<string>  $salesChannelIds
+     * @return array<string, array{enabled: bool, required: bool, timezone: string, lead_time_minutes: int, cutoff_time: ?string, max_days_ahead: int}>
+     */
+    public function settingsMany(array $salesChannelIds): array
+    {
+        $ids = array_values(array_unique($salesChannelIds));
+        if ($ids === []) {
+            return [];
+        }
+        $rows = CommerceDeliveryScheduleSetting::query()->whereIn('sales_channel_id', $ids)->get()->keyBy('sales_channel_id');
+        $tenantZone = null;
+        $out = [];
+        foreach ($ids as $id) {
+            $setting = $rows->get($id);
+            $zone = $setting?->timezone ?? ($tenantZone ??= $this->tenantTimezone());
+            $out[$id] = $this->settingsShape($setting, $zone);
+        }
+
+        return $out;
+    }
+
+    /** @return array{enabled: bool, required: bool, timezone: string, lead_time_minutes: int, cutoff_time: ?string, max_days_ahead: int} */
+    private function settingsShape(?CommerceDeliveryScheduleSetting $setting, string $timezone): array
+    {
         return [
             'enabled' => (bool) ($setting?->is_enabled ?? false),
             'required' => (bool) ($setting?->is_required ?? true),
-            'timezone' => $this->timezoneFor($setting),
+            'timezone' => $timezone,
             'lead_time_minutes' => (int) ($setting?->lead_time_minutes ?? 0),
             'cutoff_time' => $setting?->cutoff_time,
             'max_days_ahead' => (int) ($setting?->max_days_ahead ?? CommerceDeliveryScheduleSetting::DEFAULT_DAYS_AHEAD),
@@ -727,6 +758,11 @@ final class CommerceDeliveryScheduleService
             return $setting->timezone;
         }
 
+        return $this->tenantTimezone();
+    }
+
+    private function tenantTimezone(): string
+    {
         return Tenant::query()->whereKey($this->tenantId())->value('timezone') ?: 'Asia/Riyadh';
     }
 

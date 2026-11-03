@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, TriangleAlert } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { EmptyState, Pagination } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -446,6 +446,15 @@ export function OrdersList() {
         <EmptyState icon={ClipboardList} title={t('forbidden')} description={`${t('restrictedHint')} ${t('capabilityHint')}`} />
       ) : (
         <>
+          {state.due && meta.queue_truncated ? (
+            <div role="status" className="flex items-start gap-3 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+              <div>
+                <p className="font-medium text-text">{t('queueTruncatedTitle')}</p>
+                <p className="mt-1 text-muted">{t('queueTruncatedBody')}</p>
+              </div>
+            </div>
+          ) : null}
           <DataTable<OrderSummary>
             columns={visibleColumns}
             data={rows}

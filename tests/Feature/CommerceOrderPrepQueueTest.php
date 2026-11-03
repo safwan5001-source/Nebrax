@@ -436,6 +436,32 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function channel_settings_are_loaded_in_one_batch_with_the_same_shape_as_the_single_lookup(): void
+    {
+        // Codex P2: لا استعلام إعدادات لكل قناة. دفعة واحدة مهما كثرت القنوات، وبالشكل نفسه تماماً لـ settings().
+        $this->channelSettings('Europe/Berlin', 45);
+        $service = app(\App\Services\Commerce\CommerceDeliveryScheduleService::class);
+        app(TenantContext::class)->set($this->tenant->id);
+        $ids = [$this->channel->id, ...array_map(fn () => (string) Str::uuid(), range(1, 8))];
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $many = $service->settingsMany($ids);
+        $log = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(2, count($log), 'استعلام إعدادات واحد + منطقة المستأجر مرة واحدة على الأكثر');
+        $this->assertCount(9, $many);
+        foreach ($ids as $id) {
+            $this->assertSame($service->settings($id), $many[$id]);
+        }
+        $this->assertSame('Europe/Berlin', $many[$this->channel->id]['timezone']);
+        $this->assertSame(45, $many[$this->channel->id]['lead_time_minutes']);
+        $this->assertSame([], $service->settingsMany([]));
+        app(TenantContext::class)->forget();
+    }
+
+    #[Test]
     public function the_queue_reads_only_and_runs_a_bounded_number_of_queries(): void
     {
         $this->channelSettings();

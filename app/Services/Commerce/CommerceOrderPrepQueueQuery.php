@@ -69,12 +69,9 @@ final class CommerceOrderPrepQueueQuery
         $orders = $orders->take(self::MAX_CANDIDATES);
 
         $productMinutes = $this->preparation->minutesMany($orders->flatMap(fn (CommerceOrder $o) => $o->lines->pluck('product_id'))->filter()->unique()->values()->all());
-        $channelContext = [];
-        $items = $orders->map(function (CommerceOrder $order) use ($now, $productMinutes, &$channelContext): ?array {
-            $channelContext[$order->sales_channel_id] ??= $this->schedules->settings($order->sales_channel_id);
-
-            return $this->classify($order, $now, $productMinutes, $channelContext[$order->sales_channel_id]);
-        })->filter()->values();
+        // إعدادات كل القنوات المرشَّحة دفعةً واحدة (لا استعلام لكل قناة — Codex P2).
+        $channelContext = $this->schedules->settingsMany($orders->pluck('sales_channel_id')->filter()->unique()->values()->all());
+        $items = $orders->map(fn (CommerceOrder $order): ?array => $this->classify($order, $now, $productMinutes, $channelContext[$order->sales_channel_id] ?? $this->schedules->settings($order->sales_channel_id)))->filter()->values();
 
         if ($bucket !== null) {
             $items = $items->filter(fn (array $i) => in_array($bucket, $i['buckets'], true))->values();

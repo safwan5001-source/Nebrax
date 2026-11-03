@@ -319,6 +319,22 @@ describe('OrdersList', () => {
       expect(text).not.toMatch(/02:00|٠٢:٠٠/);
     });
 
+    it('warns when the server reports the queue was truncated, and only with the due filter', async () => {
+      nav.search = 'due=today';
+      fetchOrdersMock.mockResolvedValue(page([queued()], { current_page: 1, per_page: 20, total: 1, last_page: 1, queue_truncated: true } as never));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-700'));
+      expect(screen.getByText('قائمة الاستحقاق غير كاملة')).toBeTruthy();
+    });
+
+    it('shows no truncation warning when the queue is complete or the filter is off', async () => {
+      nav.search = 'due=today';
+      fetchOrdersMock.mockResolvedValue(page([queued()], { current_page: 1, per_page: 20, total: 1, last_page: 1, queue_truncated: false } as never));
+      render(<OrdersList />);
+      await waitFor(() => screen.getAllByText('CORD-700'));
+      expect(screen.queryByText('قائمة الاستحقاق غير كاملة')).toBeNull();
+    });
+
     it('clear filters resets the bucket', async () => {
       nav.search = 'due=overdue';
       render(<OrdersList />);
