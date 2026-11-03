@@ -802,6 +802,27 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
     }
 
     /** @test */
+    public function a_branch_restricted_reader_never_sees_the_claim_count_of_an_organisation_final_superseded_by_a_branch_replacement(): void
+    {
+        $branch = Branch::create(['code' => 'R1', 'name' => 'فرع']);
+        [$org] = $this->finalized('2026-09-01', 100000);                       // نهائي مؤسسة (مطالبة واحدة)
+        $inBranch = $this->invoice('2026-09-03', 50000, $branch->id);
+        [$b, $runB] = $this->ready([['date' => '2026-09-03', 'our' => $inBranch->number, 'credit' => 57500]], ['branch_id' => $branch->id]);
+        $this->assertSame('branch', $runB['scope']['kind']);
+
+        $this->replace($this->retirer, $b, $runB['id'], [$org])->assertCreated();   // المُنفِّذ غير مقيَّد: الاستبدال بين نطاقين مختلفين مسموح
+
+        $unrestricted = collect($this->events($this->retirer, $b)->assertOk()->json('data'))->firstWhere('action', 'close');
+        $this->assertSame([$org, 1], [$unrestricted['summary']['superseded'][0]['id'], $unrestricted['summary']['superseded'][0]['claims_released']]);
+
+        $restricted = $this->role('ps-redact', ['partner_statements.view', 'partners.view'], 'redact@ps-a3e.test');
+        User::query()->where('email', 'redact@ps-a3e.test')->firstOrFail()->branches()->sync([$branch->id]);
+        $seen = collect($this->events($restricted, $b)->assertOk()->json('data'))->firstWhere('action', 'close');
+        $this->assertNotNull($seen, 'تشغيلة البديلة (نطاق الفرع) مقروءة له.');
+        $this->assertSame([$org, null], [$seen['summary']['superseded'][0]['id'], $seen['summary']['superseded'][0]['claims_released']], 'عدد مطالبات نهائي المؤسسة مخفي عنه.');
+    }
+
+    /** @test */
     public function the_policy_is_read_through_the_existing_settings_mechanism_and_has_no_user_write_path_yet(): void
     {
         $this->assertSame('strict', Settings::DEFAULTS['partner_statements']['void_separation']);

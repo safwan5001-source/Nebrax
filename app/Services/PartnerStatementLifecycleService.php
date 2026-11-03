@@ -550,13 +550,42 @@ final class PartnerStatementLifecycleService
             }
         }
 
+        $originals = [];   // ذاكرة قراءة نطاق أصول الاستبدال (معرّف ← مقروء؟) لهذه الصفحة
+
         return PartnerStatementReconciliationEvent::query()->where('reconciliation_id', $reconciliation->id)
             ->where(fn ($q) => $q->whereNull('run_id')->orWhereIn('run_id', $readable))
             ->orderByDesc('seq')->paginate($perPage)->through(fn (PartnerStatementReconciliationEvent $e): array => [
                 'id' => $e->id, 'seq' => $e->seq, 'action' => $e->action, 'from_status' => $e->from_status, 'to_status' => $e->to_status, 'run_id' => $e->run_id,
-                'ledger_fingerprint' => $e->ledger_fingerprint, 'statement_digest' => $e->statement_digest, 'summary' => $e->summary, 'reason' => $e->reason,
+                'ledger_fingerprint' => $e->ledger_fingerprint, 'statement_digest' => $e->statement_digest, 'summary' => $this->redactSuperseded($actor, $e->summary, $originals), 'reason' => $e->reason,
                 'created_by' => $e->created_by, 'reviewer_id' => $e->reviewer_id, 'claims_count' => $e->claims_count, 'related_reconciliation_id' => $e->related_reconciliation_id, 'created_at' => optional($e->created_at)->toIso8601String(),
             ]);
+    }
+
+    /**
+     * حدث إغلاق البديلة ينسخ من كل أصل مُستبدَل عدد مطالباته المُفرَجة (`summary.superseded[].claims_released`)؛ نطاق الأصل قد يكون أوسع من نطاق البديلة (مؤسسة ← فرع)، فلا يُعرض العدد إلا لقارئ تشغيلة
+     * إغلاق **ذلك الأصل** (كـ`finalBlock`)، وإلا `null` (المعرّف يبقى). قراءة فقط.
+     *
+     * @param  array<string, bool>  $cache
+     * @return mixed
+     */
+    private function redactSuperseded(User $actor, mixed $summary, array &$cache): mixed
+    {
+        if (! is_array($summary) || ! isset($summary['superseded']) || ! is_array($summary['superseded'])) {
+            return $summary;
+        }
+        foreach ($summary['superseded'] as $i => $item) {
+            $id = (string) ($item['id'] ?? '');
+            if (! array_key_exists($id, $cache)) {
+                $original = Str::isUuid($id) ? PartnerStatementReconciliation::query()->whereKey($id)->first() : null;
+                $run = $original?->reviewed_run_id === null ? null : PartnerStatementMatchRun::query()->whereKey($original->reviewed_run_id)->first();
+                $cache[$id] = $run !== null && $this->matching->readable($actor, $run);
+            }
+            if (! $cache[$id]) {
+                $summary['superseded'][$i]['claims_released'] = null;
+            }
+        }
+
+        return $summary;
     }
 
     // ═══════════════════════════════ الداخل ═══════════════════════════════
