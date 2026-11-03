@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Commerce\CommerceOrderAttentionQuery;
 use App\Services\Commerce\CommerceOrderFulfillmentService;
 use App\Services\Commerce\CommerceOrderLifecycleService;
+use App\Services\Commerce\CommerceDeliveryScheduleService;
 use App\Services\Commerce\CommerceOrderPrepQueueQuery;
 use App\Services\Commerce\CommerceOrderStatusProjector;
 use App\Services\Commerce\CommerceOrderWarehouseScope;
@@ -78,7 +79,7 @@ class CommerceStaffOrderController extends ApiController
         ]);
 
         $query = self::scopedOrders($request->user())
-            ->with(['salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'paymentIntent', 'fulfillment'])
+            ->with(['salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'paymentIntent', 'fulfillment', 'schedule'])
             ->withCount('lines');
 
         $this->applyFilters($query, $data);
@@ -103,7 +104,9 @@ class CommerceStaffOrderController extends ApiController
         return response()->json([
             'data' => $page->getCollection()
                 ->map(function (CommerceOrder $o) use ($currency, $queue): array {
-                    $row = CommerceOrderStaffSerializer::summary($o, $currency);
+                    // COPS-H3-5: موعد التسليم المجدول (لقطة الطلب نفسها) لشارة «مجدول لـ…» في مساحة الاستقبال؛ إضافي ويغيب (null) لطلب بلا جدولة.
+                    $row = CommerceOrderStaffSerializer::summary($o, $currency)
+                        + ['schedule' => $o->schedule === null ? null : CommerceDeliveryScheduleService::presentOrder($o->schedule)];
                     $item = $queue?->get((string) $o->id);
 
                     return $item === null ? $row : $row + ['queue' => [

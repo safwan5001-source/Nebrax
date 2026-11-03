@@ -8,10 +8,19 @@ import {
 import { isNavEntryVisible } from '@/components/layout/nav-visibility';
 
 describe('commerce workspace navigation', () => {
+  it('H3-5: the live reception item wins over its parent on /commerce/orders/live only', () => {
+    expect(isCommerceNavItemActive('/commerce/orders/live', '/commerce/orders/live')).toBe(true);
+    expect(isCommerceNavItemActive('/commerce/orders', '/commerce/orders/live')).toBe(false);
+    expect(isCommerceNavItemActive('/commerce/orders', '/commerce/orders')).toBe(true);
+    expect(isCommerceNavItemActive('/commerce/orders', '/commerce/orders/abc')).toBe(true);
+    expect(isCommerceNavItemActive('/commerce/orders/live', '/commerce/orders/abc')).toBe(false);
+  });
+
   it('exposes the approved commerce destinations only', () => {
     expect(COMMERCE_WORKSPACE_HREFS).toEqual([
       '/commerce',
       '/commerce/orders',
+      '/commerce/orders/live',
       '/commerce/stores',
       '/commerce/published-products',
       '/commerce/merchandising',
@@ -70,9 +79,10 @@ describe('commerce workspace navigation', () => {
     expect(isNavEntryVisible(merchandising!, new Set(), { role: 'staff', permissions: ['products.view'] })).toBe(true);
   });
 
-  it('places Orders right after Overview, guarded by permission and the storefront capability', () => {
+  it('places Orders (then the live reception) right after Overview, guarded by permission and the storefront capability', () => {
     const overview = COMMERCE_WORKSPACE_NAV_GROUPS[0].items;
-    expect(overview.map((item) => item.href)).toEqual(['/commerce', '/commerce/orders']);
+    expect(overview.map((item) => item.href)).toEqual(['/commerce', '/commerce/orders', '/commerce/orders/live']);
+    expect(overview[2]).toMatchObject({ labelKey: 'ordersLive', appKey: 'commerce.storefront', permission: 'commerce.orders.view' });
     const orders = overview[1];
     expect(orders).toMatchObject({ labelKey: 'orders', appKey: 'commerce.storefront', permission: 'commerce.orders.view' });
     // بلا الصلاحية، أو بقدرة معطّلة، لا يظهر العنصر.
