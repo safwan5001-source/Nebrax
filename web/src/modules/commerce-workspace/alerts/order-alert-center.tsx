@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { BellRing, Volume2, VolumeX } from 'lucide-react';
 import { Dropdown } from '@/components/ui/dropdown';
@@ -16,6 +17,9 @@ import { useOrderAlerts } from './use-order-alerts';
  */
 export function OrderAlertCenter() {
   const locale = useLocale();
+  const pathname = usePathname();
+  // مساحة الاستقبال تعرض شريط/زر تفعيل الصوت بنفسها: لا شريط ثانٍ فوقها (COPS-H3-5).
+  const onLiveBoard = pathname === '/commerce/orders/live' || Boolean(pathname?.startsWith('/commerce/orders/live/'));
   const { t, reason } = alertMessages(locale);
   const alerts = useOrderAlerts();
   const [now, setNow] = useState(() => Date.now());
@@ -175,7 +179,7 @@ export function OrderAlertCenter() {
         </div>
       </Dropdown>
 
-      {!soundArmed && (
+      {!soundArmed && !onLiveBoard && (
         <div
           data-testid="alert-sound-bar"
           role="region"

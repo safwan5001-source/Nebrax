@@ -21,6 +21,11 @@ const alertsState: { current: OrderAlertsState } = { current: null as never };
 vi.mock('../alerts/use-order-alerts', () => ({ useOrderAlerts: () => alertsState.current }));
 const api = vi.hoisted(() => ({ fetchBoard: vi.fn() }));
 vi.mock('./reception-api', () => api);
+vi.mock('./reception-order-panel', () => ({
+  ReceptionOrderPanel: ({ orderId, onClose, onChanged }: { orderId: string; onClose: () => void; onChanged: () => void }) => (
+    <div data-testid="panel-stub">{orderId}<button type="button" onClick={onClose}>x-close</button><button type="button" onClick={onChanged}>x-changed</button></div>
+  ),
+}));
 
 import { ReceptionBoard } from './reception-board';
 
@@ -76,7 +81,7 @@ describe('ReceptionBoard (COPS-H3-5)', () => {
     expect(newCol.querySelector('[data-order-id="o2"]')).not.toBeNull();
     expect(screen.getAllByTestId('board-new-badge')).toHaveLength(1);
     expect(screen.getByTestId('board-pending-count').textContent).toContain('1');
-    await act(async () => { fireEvent.click(newCol.querySelector('[data-order-id="o2"] button:not([data-testid])')!); await Promise.resolve(); });
+    await act(async () => { fireEvent.click(newCol.querySelector('[data-order-id="o2"] [data-testid="board-card-ack"]')!); await Promise.resolve(); });
     expect(acknowledge).toHaveBeenCalledWith('o2');
   });
 
@@ -85,7 +90,7 @@ describe('ReceptionBoard (COPS-H3-5)', () => {
     alertsState.current = make({ acknowledge, snapshot: live({ pending: [pendingItem('o2', 'CORD-2')] }) });
     render(<ReceptionBoard />);
     await flush();
-    await act(async () => { fireEvent.click(screen.getByTestId('board-col-new').querySelector('[data-order-id="o2"] button:not([data-testid])')!); await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { fireEvent.click(screen.getByTestId('board-col-new').querySelector('[data-order-id="o2"] [data-testid="board-card-ack"]')!); await Promise.resolve(); await Promise.resolve(); });
     expect(screen.getByTestId('board-ack-error')).toBeTruthy();
   });
 
@@ -138,6 +143,28 @@ describe('ReceptionBoard (COPS-H3-5)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('النقر على رقم الطلب يفتح لوحته، وتغيّرها يعيد جلب اللوحة، والإغلاق يزيلها', async () => {
+    render(<ReceptionBoard />);
+    await flush();
+    expect(screen.queryByTestId('panel-stub')).toBeNull();
+    fireEvent.click(screen.getByTestId('board-col-ready').querySelector('[data-order-id="o4"] button')!);
+    expect(screen.getByTestId('panel-stub').textContent).toContain('o4');
+    await act(async () => { fireEvent.click(screen.getByText('x-changed')); await Promise.resolve(); });
+    expect(api.fetchBoard).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByText('x-close'));
+    expect(screen.queryByTestId('panel-stub')).toBeNull();
+  });
+
+  it('أزرار الشاشة موجودة (Wake Lock وملء الشاشة) وتصرّح بعدم الدعم بدل الادّعاء', async () => {
+    render(<ReceptionBoard />);
+    await flush();
+    expect(screen.getByTestId('board-wakelock')).toBeTruthy();
+    expect(screen.getByTestId('board-fullscreen')).toBeTruthy();
+    // jsdom بلا واجهتي القفل/ملء الشاشة ⇒ معطّلتان مع نص صريح.
+    expect((screen.getByTestId('board-wakelock') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('board-screen-note').textContent).toMatch(/لا يدعم/);
   });
 
   it('فشل التحميل الأول ⇒ حالة خطأ مع إعادة محاولة', async () => {

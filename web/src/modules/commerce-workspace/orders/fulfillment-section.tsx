@@ -48,12 +48,15 @@ export function FulfillmentSection({
   stale,
   onUpdated,
   onStale,
+  large = false,
 }: {
   order: OrderDetail;
   canManage: boolean;
   stale: boolean;
   onUpdated: (order: OrderDetail) => void;
   onStale: () => void;
+  /** COPS-H3-5: أزرار إجراءات الاستقبال بهدف لمس ≥ 44px (لوحة الاستقبال). الافتراضي كما كان. */
+  large?: boolean;
 }) {
   const locale = useLocale();
   const { t, label } = ordersMessages(locale);
@@ -165,6 +168,7 @@ export function FulfillmentSection({
               key={a.action}
               type="button"
               variant={a.action === 'fail' ? 'outline' : 'primary'}
+              className={large ? 'min-h-11 px-5' : undefined}
               disabled={disabled}
               aria-disabled={disabled}
               aria-busy={busy}
