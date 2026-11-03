@@ -94,6 +94,30 @@ describe('AlertEngine (COPS-H3-3)', () => {
     engine.stop();
   });
 
+  it('revision (H3-5): يزداد بحدث تغذية أو بتغيّر بصمة الانتباه فقط، ولا يزداد بدورة هادئة', async () => {
+    cursor = 10;
+    deps.fetchAttention.mockResolvedValue(attention(row('a')));
+    const engine = new AlertEngine(deps);
+    engine.start(config());
+    await run(engine);
+    const first = engine.snapshot.revision;
+    expect(first).toBeGreaterThan(0); // أول بصمة غير فارغة
+
+    await run(engine, 10_000); // دورة هادئة: لا حدث ولا تغيّر
+    expect(engine.snapshot.revision).toBe(first);
+
+    deps.fetchFeedPage.mockResolvedValueOnce(page(1, 11));
+    await run(engine, 10_000); // حدث تغذية ⇒ يزداد
+    const afterEvent = engine.snapshot.revision;
+    expect(afterEvent).toBeGreaterThan(first);
+
+    deps.fetchAttention.mockResolvedValue(attention(row('a'), row('b')));
+    engine.refresh();
+    await run(engine); // بصمة جديدة بلا حدث ⇒ يزداد
+    expect(engine.snapshot.revision).toBeGreaterThan(afterEvent);
+    engine.stop();
+  });
+
   it('المصالحة الدورية تلتقط ما فاتته التغذية (حدث مفقود)', async () => {
     cursor = 5;
     const engine = new AlertEngine(deps);
@@ -329,7 +353,7 @@ describe('AlertEngine (COPS-H3-3)', () => {
   });
 
   it('isStale: أكثر من 30ث بلا نجاح، ولا تُعدّ idle قديمة', () => {
-    const base = { connection: 'live' as const, lastSuccessAt: 1_000, consecutiveFailures: 0, pending: [], total: 0, truncated: false, mode: 'feed_attention' as const };
+    const base = { connection: 'live' as const, lastSuccessAt: 1_000, consecutiveFailures: 0, pending: [], total: 0, truncated: false, mode: 'feed_attention' as const, revision: 0 };
     expect(isStale(base, 20_000)).toBe(false);
     expect(isStale(base, 40_000)).toBe(true);
     expect(isStale({ ...base, lastSuccessAt: null }, 1)).toBe(true);

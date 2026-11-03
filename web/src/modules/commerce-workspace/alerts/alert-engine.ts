@@ -61,6 +61,9 @@ export class AlertEngine {
   private rows: AttentionResponse['data'] = [];
   private truncated = false;
   private generation = 0;
+  /** COPS-H3-5: عدّاد تغيّر يعتمده سطح الاستقبال لإعادة جلب اللوحة دون استطلاع ثانٍ. */
+  private revision = 0;
+  private signature = '';
   private readonly now: () => number;
   private readonly setTimer: (fn: () => void, ms: number) => unknown;
   private readonly clearTimer: (h: unknown) => void;
@@ -219,7 +222,10 @@ export class AlertEngine {
       if (generation !== this.generation) return;
     }
 
-    if (changed) this.needsReconcile = true;
+    if (changed) {
+      this.needsReconcile = true;
+      this.revision += 1;
+    }
     if (this.needsReconcile || nowMs - this.lastAttentionAt >= cfg.polling.attention_ms) {
       await this.reconcileAttention(generation);
     }
@@ -254,6 +260,12 @@ export class AlertEngine {
     // رد جيل سابق (فقدنا القيادة واستعدناها أثناء الطيران) لا يطمس صفوف الجيل الحالي ولا طابعه الزمني.
     if (generation !== this.generation) return;
     this.rows = Array.isArray(res.data) ? res.data : [];
+    // بصمة الانتباه (المعرّفات + علم المعالجة): تغيّرها يعني تغيّراً قد لا تلتقطه التغذية (المقيَّد بمخازن لا تغذية له).
+    const signature = this.rows.map((row) => `${row.order.id}:${row.alert?.pending === true ? 1 : 0}`).join('|');
+    if (signature !== this.signature) {
+      this.signature = signature;
+      this.revision += 1;
+    }
     this.truncated = Boolean(res.meta?.truncated);
     this.lastAttentionAt = this.now();
     this.needsReconcile = false;
@@ -294,6 +306,7 @@ export class AlertEngine {
       total: this.rows.length,
       truncated: this.truncated,
       mode: this.mode,
+      revision: this.revision,
     };
     this.emit();
   }
