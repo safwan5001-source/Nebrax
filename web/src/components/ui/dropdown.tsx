@@ -113,10 +113,16 @@ export function Dropdown({
     };
     placeWithinViewport();
     window.addEventListener('resize', placeWithinViewport);
-    window.addEventListener('scroll', close, true);
+    // التمرير داخل اللوحة نفسها (قائمة طويلة) لا يُغلقها؛ التمرير خارجها يُغلقها كما كان (Codex).
+    const closeOnOutsideScroll = (event: Event): void => {
+      const target = event.target;
+      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      close();
+    };
+    window.addEventListener('scroll', closeOnOutsideScroll, true);
     return () => {
       window.removeEventListener('resize', placeWithinViewport);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', closeOnOutsideScroll, true);
     };
   }, [close, mobilePopover, open, triggerRef]);
 

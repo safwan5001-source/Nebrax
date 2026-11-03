@@ -45,4 +45,22 @@ describe('Dropdown: محاذاة النهاية على الشاشات العري
     // top = bottom(80) + 4؛ لو لم يُعثر على المرساة لبقي الاحتياط top:12
     expect(panel.style.top).toBe('84px');
   });
+
+  it('التمرير داخل اللوحة لا يُغلقها، والتمرير خارجها يُغلقها (Codex)', () => {
+    const { getByRole } = render(
+      <Dropdown mobilePopover popupRole="dialog" menuLabel="m" triggerLabel="t" trigger={<span>x</span>} align="end">
+        <div data-testid="list">body</div>
+      </Dropdown>,
+    );
+    const trigger = screen.getByRole('button', { name: 't' });
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.scroll(screen.getByTestId('list')); // يُحاكي تمرير القائمة الداخلية
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(getByRole('dialog', { hidden: true })).toBeTruthy();
+
+    fireEvent.scroll(document.body); // تمرير الصفحة
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
 });
