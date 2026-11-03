@@ -168,8 +168,8 @@ export function useOrderAlerts(): OrderAlertsState {
           silenced.persist([orderId]);
           if (coordinator.currentRole === 'leader') engine.refresh();
         } else if (outcome.settled) {
-          // لا يستدعي التنبيه أصلاً (ملغى/غير جاهز/خارج النطاق): نُبقي الإسكات ونطلب الحقيقة من الخادم.
-          silenced.persist([orderId]);
+          // رفض مستقر (ملغى/غير جاهز/خارج النطاق/ميزة معطَّلة مؤقتاً): لم يُسجَّل إقرار، فلا نثبّت إسكاتاً دائماً
+          // (قد يصير الطلب قابلاً للتنبيه لاحقاً: دفع/إعادة تفعيل/عودة صلاحية مخزن). نبقيه عابراً (ينتهي وحده) ونطلب الحقيقة من الخادم (Codex).
           if (coordinator.currentRole === 'leader') engine.refresh();
         } else {
           // فشل عابر (شبكة/5xx/403): الإقرار الصريح لم يحدث ⇒ يعود التنبيه ولا نوهم أن الآخرين أُسكتوا.

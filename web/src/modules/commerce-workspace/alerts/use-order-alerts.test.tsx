@@ -199,7 +199,7 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(follower.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
   });
 
-  it('رفض مستقر (404/409: ملغى/غير جاهز) يُبقي الإسكات ويطلب الحقيقة من الخادم', async () => {
+  it('رفض مستقر (404/409: ملغى/غير جاهز) يطلب الحقيقة من الخادم ولا يثبّت إسكاتاً دائماً (Codex)', async () => {
     ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: true, status: 409, reason: 'already_cancelled' });
     const { result } = renderHook(() => useOrderAlerts());
     await tick(0);
@@ -211,6 +211,21 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     await tick(0);
     expect(result.current.snapshot.pending).toEqual([]);
     expect(api.fetchAttention.mock.calls.length).toBeGreaterThan(attentionCalls); // مصالحة فورية
+    expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1') ?? '').not.toContain('"a"'); // لا أثر دائم بلا إقرار فعلي
+  });
+
+  it('رفض مستقر ثم بقاء الطلب معلَّقاً في الخادم: يعود التنبيه بعد انتهاء الإسكات العابر (Codex)', async () => {
+    ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: true, status: 404, reason: null });
+    const { result } = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+
+    await act(async () => { await result.current.acknowledge('a'); });
+    await tick(0);
+    expect(result.current.snapshot.pending).toEqual([]); // صمت عابر فوري
+
+    await tick(70_000); // بعد 60ث وعدة دورات استطلاع: الخادم ما زال يقول pending
+    expect(result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
   });
 
   it('عند الإزالة (unmount) يتوقف الاستطلاع ويُصمَت الصوت', async () => {
