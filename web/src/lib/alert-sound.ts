@@ -75,9 +75,12 @@ export class AlertSoundEngine {
    */
   private readonly exhausted = new Set<string>();
   private timer: unknown = null;
-  private repeats = 0;
-  /** معرّف جلسة التكرار؛ يتغيّر عند كل بدء/إيقاف فلا يمسّ اكتمالُ تشغيلٍ قديم ميزانيةَ جلسة جديدة. */
-  private session = 0;
+  /**
+   * ميزانية التكرار **لكل مفتاح** (عدد التشغيلات المقبولة التي سمعها). المؤقّت واحد مشترك لكن السقف لا:
+   * مفتاح جديد يبدأ بميزانيته كاملة ولا يرث استنفاد غيره، واكتمال تشغيل قديم لا يُحتسب إلا للمفاتيح
+   * التي كانت نشطة وقت ذلك التشغيل وما زالت.
+   */
+  private readonly plays = new Map<string, number>();
   private generation = 0;
   private readonly listeners = new Set<(event: AlertSoundEvent) => void>();
   private readonly source: string;
@@ -168,13 +171,12 @@ export class AlertSoundEngine {
     this.active.add(key);
     if (!wasIdle) return;
 
-    this.repeats = 0;
-    this.session += 1;
     this.tick();
   }
 
   stop(key: string): void {
     this.exhausted.delete(key);
+    this.plays.delete(key);
     if (!this.active.delete(key)) return;
     if (this.active.size === 0) this.halt();
   }
@@ -198,18 +200,27 @@ export class AlertSoundEngine {
     this.timer = null;
     if (this.active.size === 0) return;
 
-    if (this.repeats >= this.maxRepeats) {
-      for (const key of this.active) this.exhausted.add(key);
-      this.active.clear();
-      this.emit({ type: 'exhausted' });
-      return;
+    // مفاتيح بلغت سقفها تُسحب إلى `exhausted` (تبقى صامتة حتى الإقرار/الخروج من المجموعة)، وغيرها يكمل.
+    let retired = false;
+    for (const key of [...this.active]) {
+      if ((this.plays.get(key) ?? 0) >= this.maxRepeats) {
+        this.active.delete(key);
+        this.plays.delete(key);
+        this.exhausted.add(key);
+        retired = true;
+      }
     }
+    if (retired) this.emit({ type: 'exhausted' });
+    if (this.active.size === 0) return;
 
     // الميزانية تُستهلك بتشغيل **قُبل فعلاً** فقط: رفض السياسة (قبل تفعيل الصوت) لا يُنهك السقف، فيُسمع
     // التنبيه المعلّق فور نجاح `unlock()`. المحاولات المرفوضة تستمر بالفاصل نفسه (خفيفة) حتى التسليح أو الإقرار.
-    const session = this.session;
+    const audience = [...this.active];
     void this.playClip().then((accepted) => {
-      if (accepted && this.session === session) this.repeats += 1;
+      if (!accepted) return;
+      for (const key of audience) {
+        if (this.active.has(key)) this.plays.set(key, (this.plays.get(key) ?? 0) + 1);
+      }
     });
     this.timer = this.setTimer(this.tick, this.repeatIntervalMs);
   };
@@ -219,8 +230,7 @@ export class AlertSoundEngine {
       this.clearTimer(this.timer);
       this.timer = null;
     }
-    this.repeats = 0;
-    this.session += 1;
+    this.plays.clear();
     try {
       this.clip?.pause();
       if (this.clip) this.clip.currentTime = 0;

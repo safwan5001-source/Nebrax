@@ -233,6 +233,22 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     expect(engine.exhaustedKeys).toEqual(['new']);
   });
 
+  it('مفتاح يصل بعد آخر تشغيل مسموح لغيره يحصل على ميزانيته كاملة', async () => {
+    const { engine, clip } = setup({ maxRepeats: 1 });
+    await engine.unlock();
+    clip.playCalls = 0;
+    engine.startRepeating('old');
+    await flush();                 // قُبل تشغيل 'old' الوحيد المسموح
+    engine.startRepeating('new');  // قبل نبضة المؤقّت التالية
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(engine.exhaustedKeys).toEqual(['old']);
+    expect(engine.activeKeys).toEqual(['new']);
+    expect(clip.playCalls).toBe(2); // 'new' سُمع مرة
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(engine.exhaustedKeys.sort()).toEqual(['new', 'old']);
+    expect(clip.playCalls).toBe(2);
+  });
+
   it('تكرار في حالة locked يحاول ولا يرمي ويبقى المشتركون على علم', async () => {
     const { engine, clip, events } = setup();
     clip.rejectWith = { name: 'NotAllowedError' };
