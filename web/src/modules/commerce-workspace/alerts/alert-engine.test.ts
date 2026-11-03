@@ -118,6 +118,21 @@ describe('AlertEngine (COPS-H3-3)', () => {
     engine.stop();
   });
 
+  it('revision في attention_only: كل مصالحة ناجحة إشارة تحديث حتى بلا تغيّر في بصمة الانتباه (لا تغذية للمقيَّد — Codex P1)', async () => {
+    deps.fetchAttention.mockResolvedValue(attention(row('a')));
+    const engine = new AlertEngine(deps);
+    engine.start(config({ mode: 'attention_only' }));
+    await run(engine);
+    const first = engine.snapshot.revision;
+    await run(engine, 15_000);
+    const second = engine.snapshot.revision;
+    expect(second).toBeGreaterThan(first);
+    await run(engine, 15_000);
+    expect(engine.snapshot.revision).toBeGreaterThan(second);
+    expect(deps.fetchFeedPage).not.toHaveBeenCalled();
+    engine.stop();
+  });
+
   it('المصالحة الدورية تلتقط ما فاتته التغذية (حدث مفقود)', async () => {
     cursor = 5;
     const engine = new AlertEngine(deps);
