@@ -249,6 +249,33 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     expect(clip.playCalls).toBe(2);
   });
 
+  it('مشترك exhausted يبدأ تنبيهاً جديداً من داخل المستمع: حلقة واحدة ومؤقّت واحد وميزانية سليمة', async () => {
+    let timers = 0;
+    const handles = new Set<number>();
+    let seq = 0;
+    const { engine, clip } = setup({
+      maxRepeats: 1,
+      setTimer: (fn, ms) => { const id = ++seq; timers += 1; handles.add(id); setTimeout(() => { handles.delete(id); fn(); }, ms); return id; },
+      clearTimer: (h) => { handles.delete(h as number); },
+    });
+    await engine.unlock();
+    clip.playCalls = 0;
+    let started = false;
+    engine.subscribe((e) => {
+      if (e.type === 'exhausted' && !started) { started = true; engine.startRepeating('next'); }
+    });
+    engine.startRepeating('first');
+    await flush();
+    await vi.advanceTimersByTimeAsync(4_000); // first يُسحب ⇒ المستمع يبدأ next
+    expect(engine.activeKeys).toEqual(['next']);
+    expect(clip.playCalls).toBe(2);          // first مرة + next مرة (لا مرتان)
+    expect(handles.size).toBe(1);            // مؤقّت معلّق واحد فقط
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(engine.exhaustedKeys.sort()).toEqual(['first', 'next']);
+    expect(clip.playCalls).toBe(2);
+    expect(timers).toBeGreaterThan(0);
+  });
+
   it('تكرار في حالة locked يحاول ولا يرمي ويبقى المشتركون على علم', async () => {
     const { engine, clip, events } = setup();
     clip.rejectWith = { name: 'NotAllowedError' };

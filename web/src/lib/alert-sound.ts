@@ -210,19 +210,23 @@ export class AlertSoundEngine {
         retired = true;
       }
     }
-    if (retired) this.emit({ type: 'exhausted' });
-    if (this.active.size === 0) return;
 
-    // الميزانية تُستهلك بتشغيل **قُبل فعلاً** فقط: رفض السياسة (قبل تفعيل الصوت) لا يُنهك السقف، فيُسمع
-    // التنبيه المعلّق فور نجاح `unlock()`. المحاولات المرفوضة تستمر بالفاصل نفسه (خفيفة) حتى التسليح أو الإقرار.
-    const audience = [...this.active];
-    void this.playClip().then((accepted) => {
-      if (!accepted) return;
-      for (const key of audience) {
-        if (this.active.has(key)) this.plays.set(key, (this.plays.get(key) ?? 0) + 1);
-      }
-    });
-    this.timer = this.setTimer(this.tick, this.repeatIntervalMs);
+    if (this.active.size > 0) {
+      // الميزانية تُستهلك بتشغيل **قُبل فعلاً** فقط: رفض السياسة (قبل تفعيل الصوت) لا يُنهك السقف، فيُسمع
+      // التنبيه المعلّق فور نجاح `unlock()`. المحاولات المرفوضة تستمر بالفاصل نفسه (خفيفة) حتى التسليح أو الإقرار.
+      const audience = [...this.active];
+      void this.playClip().then((accepted) => {
+        if (!accepted) return;
+        for (const key of audience) {
+          if (this.active.has(key)) this.plays.set(key, (this.plays.get(key) ?? 0) + 1);
+        }
+      });
+      this.timer = this.setTimer(this.tick, this.repeatIntervalMs);
+    }
+
+    // الإخطار **آخراً** بعد اتساق الحالة كلها (مؤقّت/نشط/مستنفد): مشترك يبدأ تنبيهاً جديداً من داخل
+    // المستمع يرى محرّكاً متّسقاً (خاملاً بلا مؤقّت ⇒ يبدأ دورته، أو نشطاً بمؤقّت ⇒ يُضاف فقط)، فلا حلقة مكرّرة.
+    if (retired) this.emit({ type: 'exhausted' });
   };
 
   private halt(): void {
