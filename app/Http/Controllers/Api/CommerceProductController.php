@@ -170,8 +170,11 @@ class CommerceProductController extends PublicApiController
         // instead of one full resolver round-trip per row.
         $browsePrices = $prices->browsePrices($paginator->getCollection(), $channelId);
 
+        // S10b — معارض الوسائط المشتركة للصفحة كلها باستعلام واحد (كان استعلاماً لكل منتج).
+        $sharedGalleries = $gallery->resolveSharedGalleries($paginator->getCollection());
+
         $data = $paginator->getCollection()
-            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false, $browsePrices[$product->id] ?? null))
+            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false, $browsePrices[$product->id] ?? null, $sharedGalleries[$product->id] ?? null))
             ->all();
 
         // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق (استعلامات ثابتة لا تتبع عدد الصفوف)؛ المفتاح غائب حين الجدولة معطَّلة.
@@ -285,6 +288,7 @@ class CommerceProductController extends PublicApiController
         ProductMediaGalleryService $gallery,
         bool $detailed,
         ?int $browsePrice = null,
+        ?\Illuminate\Support\Collection $preloadedGallery = null,
     ): array {
         if ($product->isVariantManaged()) {
             if ($detailed) {
@@ -310,7 +314,7 @@ class CommerceProductController extends PublicApiController
 
         // COM-MOBILE-MEDIA-1 — product-level shared gallery only (no variant
         // passed): matches the variant-media deferral documented above.
-        $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+        $galleryMedia = StorefrontProductResource::commerceMediaPayload($preloadedGallery ?? $gallery->resolveGallery($product));
 
         return (new StorefrontProductResource($product, $price, $currency, $inStock, $detailed, null, $galleryMedia))->resolve($request);
     }
