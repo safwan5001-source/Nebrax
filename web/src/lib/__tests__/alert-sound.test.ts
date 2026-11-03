@@ -157,7 +157,7 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     await engine.unlock();
     clip.playCalls = 0;
     engine.startRepeating('a');
-    vi.advanceTimersByTime(4_000 * 10);
+    for (let i = 0; i < 10; i++) { await vi.advanceTimersByTimeAsync(4_000); }
     expect(clip.playCalls).toBe(3);
     expect(events.at(-1)).toEqual({ type: 'exhausted' });
     expect(engine.activeKeys).toEqual([]);
@@ -168,7 +168,7 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     await engine.unlock();
     clip.playCalls = 0;
     engine.syncActive(['a']);
-    vi.advanceTimersByTime(4_000);
+    await vi.advanceTimersByTimeAsync(4_000);
     expect(clip.playCalls).toBe(1);
     expect(engine.exhaustedKeys).toEqual(['a']);
 
@@ -183,7 +183,7 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     const { engine, clip } = setup({ maxRepeats: 1 });
     await engine.unlock();
     engine.syncActive(['a']);
-    vi.advanceTimersByTime(4_000);
+    await vi.advanceTimersByTimeAsync(4_000);
     expect(engine.exhaustedKeys).toEqual(['a']);
 
     clip.playCalls = 0;
@@ -196,6 +196,25 @@ describe('محرّك صوت التنبيهات (COPS-H3-2)', () => {
     engine.stopAll();
     engine.syncActive(['a']); // طلب جديد بالمعرّف نفسه لاحقاً يُسمع من جديد
     expect(engine.activeKeys).toEqual(['a']);
+  });
+
+  it('رفض autoplay لا يستهلك ميزانية التكرار، فيُسمع التنبيه المعلّق بعد نجاح unlock', async () => {
+    const { engine, clip } = setup({ maxRepeats: 2 });
+    clip.rejectWith = { name: 'NotAllowedError' };
+    engine.startRepeating('a');
+    for (let i = 0; i < 10; i++) { await vi.advanceTimersByTimeAsync(4_000); }
+    expect(engine.exhaustedKeys).toEqual([]);
+    expect(engine.activeKeys).toEqual(['a']);
+    expect(engine.state).toBe('locked');
+
+    // المستخدم يفعّل الصوت: unlock ينجح، والتكرار القائم يُسمَع في الدورة التالية.
+    clip.rejectWith = null;
+    await engine.unlock();
+    clip.playCalls = 0;
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(clip.playCalls).toBe(1);
+    expect(clip.volumesAtPlay.at(-1)).toBeGreaterThan(0);
+    expect(engine.state).toBe('armed');
   });
 
   it('تكرار في حالة locked يحاول ولا يرمي ويبقى المشتركون على علم', async () => {

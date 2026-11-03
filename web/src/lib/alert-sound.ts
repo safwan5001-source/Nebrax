@@ -202,8 +202,11 @@ export class AlertSoundEngine {
       return;
     }
 
-    this.repeats += 1;
-    void this.playClip();
+    // الميزانية تُستهلك بتشغيل **قُبل فعلاً** فقط: رفض السياسة (قبل تفعيل الصوت) لا يُنهك السقف، فيُسمع
+    // التنبيه المعلّق فور نجاح `unlock()`. المحاولات المرفوضة تستمر بالفاصل نفسه (خفيفة) حتى التسليح أو الإقرار.
+    void this.playClip().then((accepted) => {
+      if (accepted) this.repeats += 1;
+    });
     this.timer = this.setTimer(this.tick, this.repeatIntervalMs);
   };
 
