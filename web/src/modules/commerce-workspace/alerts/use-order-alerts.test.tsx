@@ -199,6 +199,28 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(follower.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
   });
 
+  it('إقرار طائر ثم إزالة التأثير: فشله المتأخر لا يعيد الصوت ولا يحدّث اللقطة (Codex)', async () => {
+    let resolveAck: (v: unknown) => void = () => {};
+    ack.acknowledgeOrder.mockImplementation(() => new Promise((r) => { resolveAck = r; }));
+    const { result, unmount } = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+    await act(async () => { sound.alertSound.arm(); });
+    await tick(0);
+    expect(result.current.soundOwner).toBe(true); // حامل صوت فعلي: أي render متأخر سيعيد syncActive
+
+    let pendingAck: Promise<unknown> = Promise.resolve();
+    act(() => { pendingAck = result.current.acknowledge('a'); });
+    unmount();
+    sound.alertSound.syncActive.mockClear();
+
+    await act(async () => {
+      resolveAck({ ok: false, settled: false, status: null, reason: null }); // فشل عابر بعد الإزالة
+      await pendingAck;
+    });
+    expect(sound.alertSound.syncActive).not.toHaveBeenCalled();
+  });
+
   it('رفض مستقر (404/409: ملغى/غير جاهز) يطلب الحقيقة من الخادم ولا يثبّت إسكاتاً دائماً (Codex)', async () => {
     ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: true, status: 409, reason: 'already_cancelled' });
     const { result } = renderHook(() => useOrderAlerts());

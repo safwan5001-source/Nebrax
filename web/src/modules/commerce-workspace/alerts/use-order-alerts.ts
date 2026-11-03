@@ -101,6 +101,7 @@ export function useOrderAlerts(): OrderAlertsState {
     });
 
     let owner = false;
+    let disposed = false; // بعد التنظيف: أي استمرار متأخر (إقرار طائر) لا يلمس الحالة ولا الصوت المشترك (Codex).
     // اللقطة كما وصلت (من محرّكنا أو من القائد)؛ العرض = اللقطة مطروحاً منها المُسكَت محلياً (يُحسب عند كل تغيير فيعود التنبيه إن تراجع الإسكات).
     let raw: AlertSnapshot = EMPTY_SNAPSHOT;
     const view = (): AlertSnapshot => {
@@ -109,10 +110,12 @@ export function useOrderAlerts(): OrderAlertsState {
       return ids.size === 0 ? raw : { ...raw, pending: raw.pending.filter((p) => !ids.has(p.orderId)) };
     };
     const syncSound = (): void => {
+      if (disposed) return;
       if (owner) alertSound.syncActive(view().pending.map((p) => p.orderId));
       else alertSound.stopAll();
     };
     const render = (): void => {
+      if (disposed) return;
       setSnapshot(view());
       syncSound();
     };
@@ -164,6 +167,11 @@ export function useOrderAlerts(): OrderAlertsState {
         render();
 
         const outcome = await acknowledgeOrder(orderId);
+        if (disposed) {
+          // التأثير أُزيل أثناء الطيران (تعطيل/تبديل حساب/إزالة): نثبّت النجاح الفعلي فقط ولا نمسّ العرض ولا الصوت.
+          if (outcome.ok) silenced.persist([orderId]);
+          return outcome;
+        }
         if (outcome.ok) {
           silenced.persist([orderId]);
           if (coordinator.currentRole === 'leader') engine.refresh();
@@ -209,6 +217,7 @@ export function useOrderAlerts(): OrderAlertsState {
     coordinator.start();
 
     return () => {
+      disposed = true;
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('focus', onFocus);
