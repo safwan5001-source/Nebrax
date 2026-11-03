@@ -265,6 +265,10 @@ export class AlertEngine {
     if (signature !== this.signature) {
       this.signature = signature;
       this.revision += 1;
+    } else if (this.mode === 'attention_only') {
+      // المقيَّد بمخازن لا تغذية له: `attention` لا تُظهر انتقالات التنفيذ بعد البدء (pending فقط)، فبصمتها لا تتغيّر عند «جاهز/خرج/سُلِّم».
+      // كل مصالحة ناجحة (دورة `attention_only_ms` البطيئة) إشارة تحديث للوحة — وإلا بقيت بطاقاتها قديمة وهي تعرض «متصل» (Codex P1).
+      this.revision += 1;
     }
     this.truncated = Boolean(res.meta?.truncated);
     this.lastAttentionAt = this.now();
