@@ -68,7 +68,7 @@ return new class extends Migration
             }
             $this->callA3d($a3d, 'postgresGuards');
         } else {
-            foreach (['partner_stmt_recon_release', 'partner_stmt_claim_release_guard', 'partner_stmt_claim_shape', 'partner_stmt_claim_insert_guard', 'partner_stmt_claim_no_delete', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation', 'partner_stmt_recon_void_policy'] as $trigger) {
+            foreach (['partner_stmt_recon_release', 'partner_stmt_claim_release_guard', 'partner_stmt_claim_shape', 'partner_stmt_claim_insert_guard', 'partner_stmt_claim_no_delete', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation'] as $trigger) {
                 DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
             }
             $this->callA3d($a3d, 'sqliteGuards');
@@ -400,7 +400,7 @@ return new class extends Migration
 
     private function sqliteUp(): void
     {
-        foreach (['partner_stmt_recon_lifecycle_insert', 'partner_stmt_recon_guard', 'partner_stmt_recon_insert_guard', 'partner_stmt_event_shape', 'partner_stmt_event_insert_guard', 'partner_stmt_claim_no_update', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation', 'partner_stmt_recon_void_policy'] as $trigger) {
+        foreach (['partner_stmt_recon_lifecycle_insert', 'partner_stmt_recon_guard', 'partner_stmt_recon_insert_guard', 'partner_stmt_event_shape', 'partner_stmt_event_insert_guard', 'partner_stmt_claim_no_update', 'partner_stmt_event_void_policy', 'partner_stmt_event_void_separation'] as $trigger) {
             DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
         }
 
@@ -504,19 +504,6 @@ return new class extends Migration
             END
             SQL);
 
-        DB::unprepared(<<<SQL
-            CREATE TRIGGER partner_stmt_recon_void_policy BEFORE UPDATE ON partner_statement_reconciliations
-            WHEN OLD.status = 'closed' AND NEW.status IN ('voided', 'superseded') AND (
-                NOT EXISTS (SELECT 1 FROM partner_statement_reconciliation_events e
-                             WHERE e.tenant_id = NEW.tenant_id AND e.reconciliation_id = NEW.id
-                               AND e.seq = (SELECT MAX(x.seq) FROM partner_statement_reconciliation_events x WHERE x.tenant_id = NEW.tenant_id AND x.reconciliation_id = NEW.id)
-                               AND json_extract(e.summary, '$.void_separation') IS {$effective})
-                OR ({$effective} = 'strict' AND NEW.voided_by IS OLD.closed_by))
-            BEGIN
-                SELECT RAISE(ABORT, 'partner_statement_policy_mismatch: the retirement must record the tenant''s current effective policy and, under strict, a non-closer actor');
-            END
-            SQL);
-
         $closedShape = "(NEW.status = 'closed' AND {$reviewed} AND {$closed} AND {$noVoid})";
         $voidedShape = "(NEW.status = 'voided' AND {$reviewed} AND {$closed} AND {$voidedBase} AND NEW.superseded_by_id IS NULL)";
         $supersededShape = "(NEW.status = 'superseded' AND {$reviewed} AND {$closed} AND {$voidedBase} AND NEW.superseded_by_id IS NOT NULL AND NEW.superseded_by_id <> NEW.id)";
@@ -566,6 +553,13 @@ return new class extends Migration
                                AND e.claims_count IS (SELECT COUNT(*) FROM partner_statement_unit_claims c WHERE c.tenant_id = NEW.tenant_id AND c.reconciliation_id = NEW.id AND c.released_at IS NULL))))
                 OR (OLD.status = 'reviewed' AND NEW.status = 'draft' AND EXISTS (
                         SELECT 1 FROM partner_statement_unit_claims c WHERE c.tenant_id = NEW.tenant_id AND c.reconciliation_id = NEW.id))
+                -- D-PS-20 revalidated at the retirement transition (same trigger name as A3c/A3d so rolling an older migration back drops it with the events table).
+                OR (OLD.status = 'closed' AND NEW.status IN ('voided', 'superseded') AND (
+                        NOT EXISTS (SELECT 1 FROM partner_statement_reconciliation_events e
+                                     WHERE e.tenant_id = NEW.tenant_id AND e.reconciliation_id = NEW.id
+                                       AND e.seq = (SELECT MAX(x.seq) FROM partner_statement_reconciliation_events x WHERE x.tenant_id = NEW.tenant_id AND x.reconciliation_id = NEW.id)
+                                       AND json_extract(e.summary, '$.void_separation') IS {$effective})
+                        OR ({$effective} = 'strict' AND NEW.voided_by IS OLD.closed_by)))
             BEGIN
                 SELECT RAISE(ABORT, 'partner_statement_reconciliations: identity and policy are frozen; status changes only through a matching audit event; a closed final changes only by being voided or superseded');
             END
