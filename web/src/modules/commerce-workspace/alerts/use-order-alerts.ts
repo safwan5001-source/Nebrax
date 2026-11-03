@@ -142,7 +142,8 @@ export function useOrderAlerts(): OrderAlertsState {
       render(); // المتابع لا محرّك له: يُعاد حساب العرض محلياً.
     });
     // تراجع إسكات من تبويب آخر (فشل إقراره): القائد يعيد حساب اللقطة من صفوفه فيُبثّ التنبيه من جديد، والمتابع يعيد العرض.
-    const offUnsilence = coordinator.onUnsilence(() => {
+    const offUnsilence = coordinator.onUnsilence((restored) => {
+      silenced.forget(restored);
       engine.reproject();
       render();
     });
@@ -156,16 +157,19 @@ export function useOrderAlerts(): OrderAlertsState {
     controls.current = {
       acknowledge: async (orderId) => {
         // إسكات متفائل فوري (الصوت يتوقف قبل رد الخادم) ثم الإقرار الخادمي الذي يُسكت بقية الأجهزة عبر التغذية/المصالحة (≤ دورة استطلاع).
-        silenced.add([orderId]);
+        // عابر (ذاكرة فقط) حتى يحسم الخادم: إغلاق الصفحة أثناء الطيران لا يترك إسكاتاً دائماً بلا إقرار (Codex).
+        silenced.addTransient([orderId]);
         coordinator.broadcastSilence([orderId]);
         engine.reproject();
         render();
 
         const outcome = await acknowledgeOrder(orderId);
         if (outcome.ok) {
+          silenced.persist([orderId]);
           if (coordinator.currentRole === 'leader') engine.refresh();
         } else if (outcome.settled) {
           // لا يستدعي التنبيه أصلاً (ملغى/غير جاهز/خارج النطاق): نُبقي الإسكات ونطلب الحقيقة من الخادم.
+          silenced.persist([orderId]);
           if (coordinator.currentRole === 'leader') engine.refresh();
         } else {
           // فشل عابر (شبكة/5xx/403): الإقرار الصريح لم يحدث ⇒ يعود التنبيه ولا نوهم أن الآخرين أُسكتوا.

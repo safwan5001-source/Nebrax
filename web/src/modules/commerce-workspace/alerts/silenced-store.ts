@@ -60,11 +60,38 @@ export class SilencedStore {
     for (const id of ids) this.memory.set(id, stamp);
   }
 
+  /**
+   * إسكات **عابر** (ذاكرة التبويب فقط) أثناء إقرار خادمي لم يُحسم بعد: لو أُغلقت الصفحة قبل رد الخادم
+   * فلا يبقى أثر دائم يخفي تنبيهاً لم يُقَرّ فعلاً (Codex). يُثبَّت بـ`persist` بعد الحسم.
+   */
+  addTransient(ids: string[]): void {
+    const stamp = this.now();
+    for (const id of ids) this.memory.set(id, stamp);
+  }
+
+  /** يثبّت في التخزين المشترك ما حُسم خادمياً (إقرار ناجح/محسوم). فشل الكتابة يترك الذاكرة احتياطاً. */
+  persist(ids: string[]): void {
+    this.add(ids);
+  }
+
+  /** ينسى المعرّفات من ذاكرة هذا التبويب فقط (استقبال تراجع من تبويب آخر). */
+  forget(ids: string[]): void {
+    for (const id of ids) this.memory.delete(id);
+  }
+
   /** تراجع عن إسكات متفائل فشل إقراره الخادمي (شبكة/5xx): يعود التنبيه. */
   remove(ids: string[]): void {
     if (ids.length === 0) return;
+    this.forget(ids);
     const current = this.read();
-    for (const id of ids) delete current[id];
+    let touched = false;
+    for (const id of ids) {
+      if (id in current) {
+        delete current[id];
+        touched = true;
+      }
+    }
+    if (!touched) return;
     try {
       this.storage?.setItem(this.key(), JSON.stringify(current));
     } catch {

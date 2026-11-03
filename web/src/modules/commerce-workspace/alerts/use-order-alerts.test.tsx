@@ -149,6 +149,25 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1')).toContain('"a"');
   });
 
+  it('الإسكات أثناء طيران الإقرار عابر: لا يُكتب في التخزين الدائم قبل رد الخادم (Codex)', async () => {
+    let resolveAck: (v: unknown) => void = () => {};
+    ack.acknowledgeOrder.mockImplementation(() => new Promise((r) => { resolveAck = r; }));
+    const { result } = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+
+    let pendingAck: Promise<unknown> = Promise.resolve();
+    act(() => { pendingAck = result.current.acknowledge('a'); });
+    expect(result.current.snapshot.pending).toEqual([]); // صمت فوري محلياً
+    expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1') ?? '').not.toContain('"a"');
+
+    await act(async () => {
+      resolveAck({ ok: true, settled: true, status: 200, reason: null });
+      await pendingAck;
+    });
+    expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1')).toContain('"a"'); // يثبت بعد الحسم
+  });
+
   it('فشل الإقرار العابر (شبكة/5xx) يُرجع التنبيه ولا يوهم أن الآخرين أُسكتوا', async () => {
     ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: false, status: null, reason: null });
     const { result } = renderHook(() => useOrderAlerts());
