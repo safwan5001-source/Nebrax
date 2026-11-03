@@ -108,6 +108,21 @@ describe('ReceptionOrderPanel (COPS-H3-5c)', () => {
     expect(apiMock).not.toHaveBeenCalled();
   });
 
+  it('إعادة فتح حوار الرفض بعد 409 تبدأ نظيفة: زر التأكيد غير مقفل (Codex P2)', async () => {
+    fetchOrderMock.mockResolvedValue(awaitingFixture());
+    apiMock.mockRejectedValue(apiError(409, { reason: 'already_accepted' }));
+    render(<ReceptionOrderPanel {...props()} />);
+    await ready();
+    fireEvent.click(reject()!);
+    fireEvent.click(await screen.findByText('تأكيد الرفض'));
+    await waitFor(() => expect(screen.getByTestId('panel-stale')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByText('تأكيد الرفض')).toBeNull()); // أُغلق بعد القفل
+    await waitFor(() => expect(screen.queryByTestId('panel-stale')).toBeNull()); // وصل التحديث فارتفع القفل
+    fireEvent.click(reject()!);
+    const confirm = (await screen.findByText('تأكيد الرفض')).closest('button') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(false);
+  });
+
   it('زر الإقرار يظهر فقط حين يقول مركز التنبيه إنه بانتظار انتباه، ويستدعي الإقرار المشترك', async () => {
     fetchOrderMock.mockResolvedValue(awaitingFixture());
     const onAcknowledge = vi.fn();

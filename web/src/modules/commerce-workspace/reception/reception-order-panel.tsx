@@ -279,7 +279,8 @@ export function ReceptionOrderPanel({
         </div>
       </aside>
 
-      {order !== null && (
+      {/* يُركَّب عند الفتح فقط كما في order-detail: كل محاولة تبدأ بحالة نظيفة (قفل/أخطاء/حقول) — Codex P2. */}
+      {order !== null && rejectOpen && (
         <RejectOrderDialog
           open={rejectOpen}
           orderNumber={order.number}
