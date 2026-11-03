@@ -56,8 +56,10 @@ Query-count evidence: list = constant across 3 vs 30 rows (owner) and 1 vs 50 ro
 No-write evidence: financial table counts and `partner_statement_*` counts/rows are unchanged around every read; static test forbids `LedgerService`, journal, inventory, ZATCA, `create/insert/update/save/delete/transaction/lockForUpdate` in the new files and in `MatchController`; the new routes are exactly three GETs.
 
 ### CI (PR #1970)
-* `php artisan test (L11, pgsql)` — **success** (22:18Z), `PostgreSQL feed-lock performance` — success.
-* `php artisan test (L11, sqlite)` / `CI Gate` — see PR (recorded below when finished).
+* Head `bd1f0c9` (code): `php artisan test (L11, pgsql)` **success**, `PostgreSQL feed-lock performance` success.
+* Head `af15b6b` (docs only): `PostgreSQL feed-lock performance` failed on `CommerceOrderEventsPostgresTest::the_realistic_load_gate…` (commerce feed-lock p95 timing benchmark, 98–170 ms vs 50 ms budget on a shared runner; unrelated to partner statements and the diff is a markdown file). Superseded by the next push; not re-triggered separately.
+* Head `bdaa12e`: pgsql job — 1 failure, my own test (F9), fixed in the next commit.
+* Final head: see the PR checks (result recorded in the hand-off message).
 
 ## 4. ⚠ Decision for the owner — two existing tests refined
 N3's fields are additive, but two existing tests assert whole-payload invariants of `/matches`:
@@ -77,6 +79,7 @@ The plan says "A1–A3e green without modification". These two edits are the min
 | F5 | `status` must be sent as `status[]=…` (array); scalar ⇒ 422, mirroring `outcome[]` in `matches`. | Info | |
 | F6 | List/`matches` response shapes are new contracts; the web client (A4a) must treat `line`/`decision` as nullable. | Info | |
 | F8 | Codex review (P2, valid): `readable()` re-queried the actor's branches once per distinct run on a page, so N3's "constant queries" held only for single-run pages. Fixed: branches loaded once (`readableWithin`); new multi-run test fails on the old code (39≠37) and passes now. SQLite `PartnerStatement*` 201 passed/32 PG-only skipped; PostgreSQL 233 passed. | Fixed | Commit after `bd1f0c9`. |
+| F9 | CI on `bdaa12e` (PostgreSQL job, 11,208 tests): the only failure was my new multi-run query-count test (36≠37). Root cause: Sanctum writes `personal_access_tokens.last_used_at` only when the clock second changes between requests, so raw query counts vary by ±1 run to run. The test helper now excludes `personal_access_tokens` statements; mutation (old per-run code) still fails it (37≠36); 3 consecutive PG runs green. Test-only fix, no production change. | Fixed | |
 | F7 | Local env lacks `bcmath`, so Fuel tests cannot pass here (identical on `main`); parallel sharding caused spurious storage interference, resolved by serial re-runs. | Info | CI is authoritative. |
 
 ## 6. Financial entries

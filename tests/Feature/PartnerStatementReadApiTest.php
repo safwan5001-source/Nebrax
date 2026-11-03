@@ -121,7 +121,8 @@ class PartnerStatementReadApiTest extends TestCase
         DB::flushQueryLog();
         DB::enableQueryLog();
         $fn();
-        $count = count(DB::getQueryLog());
+        // مصادقة Sanctum ليست من استعلامات الميزة: تحديث `last_used_at` يُكتب فقط حين يتغيّر الثانية بين طلبين (±1 غير حتمي بين تشغيل وآخر)، فتُستثنى عبارات `personal_access_tokens`.
+        $count = count(array_filter(DB::getQueryLog(), fn (array $q): bool => ! str_contains($q['query'], 'personal_access_tokens')));
         DB::disableQueryLog();
 
         return $count;
