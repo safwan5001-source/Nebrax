@@ -31,6 +31,7 @@ vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'Acme', logo: null 
 vi.mock('@/components/layout/company-logo-mark', () => ({ CompanyLogoMark: () => <span>logo</span> }));
 vi.mock('@/components/layout/lang-toggle', () => ({ LangToggle: () => <button type="button">lang</button> }));
 vi.mock('@/components/layout/notification-bell', () => ({ NotificationBell: () => <button type="button" data-testid="notification-bell">bell</button> }));
+vi.mock('@/modules/commerce-workspace/alerts/order-alert-center', () => ({ OrderAlertCenter: () => null }));
 vi.mock('@/components/layout/theme-toggle', () => ({ ThemeToggle: () => <button type="button">theme</button> }));
 
 function renderShell() {

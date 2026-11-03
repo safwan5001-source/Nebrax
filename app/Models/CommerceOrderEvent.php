@@ -32,6 +32,9 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
     /** COPS-H1-4: قبول التاجر اليدوي لطلب (`data` فارغة؛ الفاعل موظف). رفض التاجر ليس نوعاً جديداً: `order.cancelled` بسبب `merchant_rejected`. */
     public const ORDER_ACCEPTED = 'order.accepted';
 
+    /** COPS-H3-4 (R-10): إقرار تنبيه الطلب لكل طلب (`data` فارغة؛ الفاعل موظف). لا يغيّر حالة الطلب. */
+    public const ORDER_ACKNOWLEDGED = 'order.acknowledged';
+
     /** القائمة المغلقة (تطابق CHECK/مُشغّل القاعدة حرفياً؛ يحرسها اختبار). الإضافة بهجرة صريحة في شريحتها. */
     /** COPS-H2-1: أحداث تنفيذ الطلب (`data` قائمة بيضاء بلا ناقل/تتبع/ساعٍ/ملاحظة). */
     public const FULFILLMENT_STARTED = 'fulfillment.started';
@@ -54,6 +57,7 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
         self::ORDER_PLACED, self::ORDER_CANCELLED, self::PAYMENT_PAID, self::PAYMENT_COLLECTED, self::ORDER_ACCEPTED,
         self::FULFILLMENT_STARTED, self::FULFILLMENT_READY, self::FULFILLMENT_DISPATCHED, self::FULFILLMENT_DELIVERY_FAILED,
         self::FULFILLMENT_RETURNED, self::FULFILLMENT_DELIVERED, self::FULFILLMENT_PICKED_UP, self::FULFILLMENT_DETAILS_UPDATED,
+        self::ORDER_ACKNOWLEDGED,
     ];
 
     public const ACTOR_USER = 'user';
@@ -73,6 +77,7 @@ class CommerceOrderEvent extends BaseModel implements CompanyWide
         self::PAYMENT_PAID => [],
         self::PAYMENT_COLLECTED => [],
         self::ORDER_ACCEPTED => [],
+        self::ORDER_ACKNOWLEDGED => [],
         self::FULFILLMENT_STARTED => [],
         self::FULFILLMENT_READY => [],
         self::FULFILLMENT_DISPATCHED => ['type', 'attempt'],

@@ -48,4 +48,13 @@ final class CommerceOrderFeedReader
             'limit' => $limit,
         ];
     }
+
+    /**
+     * آخر `feed_seq` ملتزم للمستأجر الحالي (0 إن لم يكن) — COPS-H3-3 (D-H3-02): جهاز بلا مؤشّر يبدأ من هنا لا من الصفر فلا يتصفح تاريخ المستأجر ولا يُنبَّه به.
+     * قراءة بلا قفل على الفهرس الفريد `(tenant_id, feed_seq)`؛ التسلسل بلا فجوات بترتيب الالتزام فالقيمة بادئة متصلة آمنة (ما فوقها غير ملتزم بعد).
+     */
+    public function headSeq(): int
+    {
+        return (int) (CommerceOrderEvent::query()->max('feed_seq') ?? 0);
+    }
 }

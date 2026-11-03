@@ -740,14 +740,17 @@ class PartnerStatementCloseApiTest extends TestCase
     {
         $identity = require base_path('database/migrations/2027_01_02_000100_add_claim_entry_ids_to_partner_statement_review_decisions.php');
         $claims = require base_path('database/migrations/2027_01_02_010000_add_partner_statement_final_claims.php');
+        $retire = require base_path('database/migrations/2027_01_03_010000_add_partner_statement_void_and_supersede.php');
         $a = $this->invoice('2026-09-01', 100000);
 
-        // فارغ: يتراجع بترتيب الاعتماد (المطالبات أولاً) ثم يصعد سليماً.
+        // فارغ: يتراجع بترتيب الاعتماد (الإبطال A3e ثم المطالبات A3d ثم الهوية) ثم يصعد سليماً.
+        $retire->down();
         $claims->down();
         $identity->down();
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'claim_entry_ids'));
         $identity->up();
         $claims->up();
+        $retire->up();
         $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_review_decisions', 'claim_entry_ids'));
 
         // الشكل: لا تحمل الهوية إلا confirm/override كمصفوفة غير فارغة.
@@ -758,6 +761,7 @@ class PartnerStatementCloseApiTest extends TestCase
         $this->assertRejected(fn () => DB::table('partner_statement_review_decisions')->insert(['id' => (string) Str::uuid(), 'revision' => 9, 'claim_entry_ids' => '["x"]', 'action' => 'clear', 'unit_keys' => '[]'] + $base), 'هوية على غير confirm/override');
 
         // قرار يحمل هوية ⇒ لا تراجع (أثر تدقيق).
+        $retire->down();
         $claims->down();
         try {
             $identity->down();
@@ -766,6 +770,7 @@ class PartnerStatementCloseApiTest extends TestCase
             $this->assertStringContainsString('لا يُتراجع', $e->getMessage());
         }
         $claims->up();
+        $retire->up();
     }
 
     // ═══════════════════════════════ النطاق: مؤسسة / فرع ═══════════════════════════════
@@ -1083,13 +1088,16 @@ class PartnerStatementCloseApiTest extends TestCase
         $a = $this->invoice('2026-09-01', 100000);
         [$id, $run] = $this->ready([['date' => '2026-09-01', 'our' => $a->number, 'credit' => 115000]]);
         $migration = require base_path('database/migrations/2027_01_02_010000_add_partner_statement_final_claims.php');
+        $retire = require base_path('database/migrations/2027_01_03_010000_add_partner_statement_void_and_supersede.php');
 
-        // قبل أي إغلاق: لا مطالبات ولا أحداث إغلاق ⇒ يتراجع ثم يصعد سليماً (الحراس تعود).
+        // قبل أي إغلاق: لا مطالبات ولا أحداث إغلاق ⇒ يتراجع (A3e ثم A3d) ثم يصعد سليماً (الحراس تعود).
+        $retire->down();
         $migration->down();
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('partner_statement_unit_claims'));
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('partner_statement_reconciliations', 'closed_by'));
         $this->assertRejected(fn () => DB::table('partner_statement_reconciliations')->where('id', $id)->update(['status' => 'closed']), 'A3c لا يقبل closed');
         $migration->up();
+        $retire->up();
         $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('partner_statement_unit_claims'));
 
         $this->close($this->closer, $id, $run['id'])->assertCreated();

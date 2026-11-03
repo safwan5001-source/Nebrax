@@ -30,6 +30,8 @@ vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'زهور', logo: n
 vi.mock('@/components/layout/company-logo-mark', () => ({ CompanyLogoMark: () => <span>logo</span> }));
 vi.mock('@/components/layout/lang-toggle', () => ({ LangToggle: () => null }));
 vi.mock('@/components/layout/theme-toggle', () => ({ ThemeToggle: () => null }));
+// COPS-H3-3: مركز التنبيه خارج نطاق هذا الاختبار (هذا الاختبار يحاكي `@/lib/auth` بمستخدم جديد في كل نداء فلا يصلح لـuseSyncExternalStore).
+vi.mock('@/modules/commerce-workspace/alerts/order-alert-center', () => ({ OrderAlertCenter: () => null }));
 
 const listVersionsMock = vi.fn();
 vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({

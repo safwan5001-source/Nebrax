@@ -271,7 +271,13 @@ final class PartnerStatementClaimService
         return ['decision' => count($rows), 'total' => count($rows)];
     }
 
-    /** عدد مطالبات مقارنة (للعرض والتحقق). */
+    /** عدد المطالبات الفعّالة (غير المفرَج عنها) لمقارنة. */
+    public function activeCountFor(string $reconciliationId): int
+    {
+        return PartnerStatementUnitClaim::query()->where('reconciliation_id', $reconciliationId)->whereNull('released_at')->count();
+    }
+
+    /** عدد مطالبات مقارنة كلها (التاريخ: الفعّالة والمفرَج عنها). */
     public function countFor(string $reconciliationId): int
     {
         return PartnerStatementUnitClaim::query()->where('reconciliation_id', $reconciliationId)->count();

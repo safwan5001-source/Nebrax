@@ -55,6 +55,7 @@ class CommerceModuleBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
+        'api/commerce/alerts/config', // COPS-H3-3: إعداد مركز التنبيه (قراءة فقط، commerce.orders.view)
         // H6 Batch F — إعدادات تسعير قناة الويب (commerce.channel_settings.manage؛ إعداد فقط، لا تفعيل للجملة).
         'api/commerce/channels/{id}/operations-settings', // COPS-H1-3: إعدادات تشغيل القناة (القبول فقط، commerce.channel_settings.manage)
         'api/commerce/channels/{id}/pricing-settings',
@@ -64,6 +65,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/orders/feed', // COPS-H1-2: تغذية أحداث الطلبات بالمؤشّر (قراءة فقط، commerce.orders.view)
         'api/commerce/orders/{id}',
         'api/commerce/orders/{id}/accept', // COPS-H1-4: قبول التاجر اليدوي (commerce.orders.manage، بوابة القبول)
+        'api/commerce/orders/{id}/acknowledge', // COPS-H3-4: إقرار تنبيه الطلب لكل طلب (commerce.orders.view، بوابة التنبيه)
         // COMMERCE-ORDERS-O3a-2b — إلغاء طلب بواسطة موظف مخوّل (ADR-28، commerce.orders.cancel، بوابة مغلقة افتراضياً).
         'api/commerce/orders/{id}/cancel',
         'api/commerce/orders/{id}/fulfillment', // COPS-H2-1: تحديث تفاصيل التنفيذ (PATCH، commerce.orders.manage، بوابة التنفيذ)

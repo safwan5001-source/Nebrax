@@ -223,6 +223,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->hasOne(CommerceOrderFulfillment::class, 'commerce_order_id');
     }
 
+    /** COPS-H3-4 (R-10): إقرار تنبيه الطلب (صف واحد كحدّ أقصى؛ يكتبه `CommerceOrderAcknowledgementService` وحده). */
+    public function acknowledgement(): HasOne
+    {
+        return $this->hasOne(CommerceOrderAcknowledgement::class, 'commerce_order_id');
+    }
+
     /** COM-MOBILE-PAYMENTS-1 — التزام الدفع (ADR-04) — واحدٌ لكل طلب في V1. */
     public function paymentIntent(): HasOne
     {
