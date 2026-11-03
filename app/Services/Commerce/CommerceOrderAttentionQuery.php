@@ -89,13 +89,15 @@ final class CommerceOrderAttentionQuery
             ->limit($limit + 1)
             ->get();
 
+        $queueTruncated = false;
         if ($fulfillmentOpen) {
-            $rows = $this->withFulfillmentReasons($rows, $storefrontId, $allowedWarehouseIds, $select, $limit);
+            $rows = $this->withFulfillmentReasons($rows, $storefrontId, $allowedWarehouseIds, $select, $limit, $queueTruncated);
         }
 
         return [
             'orders' => $rows->take($limit)->values(),
-            'truncated' => $rows->count() > $limit,
+            // سقف مرشّحي طابور التحضير جزء من الاكتمال: تجاوزه يعني أن المصالحة قد تكون فاتتها طلبات (لا «اكتمال» كاذب).
+            'truncated' => $queueTruncated || $rows->count() > $limit,
             'window_hours' => $hours,
             'limit' => $limit,
         ];
@@ -110,12 +112,14 @@ final class CommerceOrderAttentionQuery
      * @param  list<string>  $select
      * @return Collection<int, CommerceOrder>
      */
-    private function withFulfillmentReasons(Collection $rows, ?string $storefrontId, ?array $allowedWarehouseIds, array $select, int $limit): Collection
+    private function withFulfillmentReasons(Collection $rows, ?string $storefrontId, ?array $allowedWarehouseIds, array $select, int $limit, bool &$queueTruncated): Collection
     {
         $now = CarbonImmutable::now('UTC');
 
         // 1) الطلبات المجدولة التي حان تحضيرها (بلا نافذة) — من طابور التحضير، دلو `prepare_now`.
-        $prep = $this->prepQueue->run($storefrontId, 'prepare_now', $allowedWarehouseIds, $now)['items']->keyBy('order_id');
+        $prepResult = $this->prepQueue->run($storefrontId, 'prepare_now', $allowedWarehouseIds, $now);
+        $prep = $prepResult['items']->keyBy('order_id');
+        $queueTruncated = $prepResult['truncated'];
 
         // 2) تنفيذ فاشل/عائد غير ملغى (بلا نافذة).
         $failedIds = CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $allowedWarehouseIds)

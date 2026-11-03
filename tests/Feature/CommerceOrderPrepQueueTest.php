@@ -456,6 +456,25 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function attention_reports_truncation_when_the_preparation_queue_hit_its_candidate_cap(): void
+    {
+        // Codex P2: سقف مرشّحي الطابور جزء من اكتمال المصالحة؛ لا `truncated=false` كاذب.
+        $this->channelSettings();
+        foreach (range(1, 3) as $i) {
+            $this->scheduled('2026-11-02', '1'.$i.':00', '1'.($i + 1).':00');
+        }
+        app(TenantContext::class)->set($this->tenant->id);
+        $capped = new CommerceOrderPrepQueueQuery(app(\App\Services\Commerce\CommerceDeliveryScheduleService::class), app(\App\Services\Commerce\ProductPreparationService::class), 2);
+        $this->assertTrue($capped->run(null, 'prepare_now')['truncated']);
+
+        $this->assertTrue((new CommerceOrderAttentionQuery($capped))->run(null, 100)['truncated'], 'الانتباه يرث اقتطاع الطابور');
+        $uncapped = (new CommerceOrderAttentionQuery(app(CommerceOrderPrepQueueQuery::class)))->run(null, 100);
+        app(TenantContext::class)->forget();
+
+        $this->assertFalse($uncapped['truncated']);
+    }
+
+    #[Test]
     public function candidates_are_narrowed_by_bucket_before_the_shared_cap(): void
     {
         // Codex P2: طلبات دلو آخر لا تُحمَّل أصلاً (فلا تستنزف سقف المرشّحين).

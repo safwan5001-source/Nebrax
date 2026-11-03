@@ -33,7 +33,12 @@ final class CommerceOrderPrepQueueQuery
     /** أفق الدلاء الزمنية (`today`/`tomorrow`) بالأيام، بهامش يوم للمنطقة الزمنية. */
     private const LOOKAHEAD_DAYS = 3;
 
-    public function __construct(private readonly CommerceDeliveryScheduleService $schedules, private readonly ProductPreparationService $preparation) {}
+    public function __construct(
+        private readonly CommerceDeliveryScheduleService $schedules,
+        private readonly ProductPreparationService $preparation,
+        /** سقف المرشّحين (قابل للحقن للاختبار؛ الإنتاج = الثابت). */
+        private readonly int $maxCandidates = self::MAX_CANDIDATES,
+    ) {}
 
     /**
      * @param  ?list<string>  $allowedWarehouseIds
@@ -61,11 +66,11 @@ final class CommerceOrderPrepQueueQuery
             ->when($narrow !== null, fn (Builder $q) => $narrow($q))
             ->with(['schedule', 'fulfillment:id,commerce_order_id,status', 'lines:id,commerce_order_id,product_id'])
             ->orderBy('created_at')->orderBy('id')
-            ->limit(self::MAX_CANDIDATES + 1)
+            ->limit($this->maxCandidates + 1)
             ->get();
 
-        $truncated = $orders->count() > self::MAX_CANDIDATES;
-        $orders = $orders->take(self::MAX_CANDIDATES);
+        $truncated = $orders->count() > $this->maxCandidates;
+        $orders = $orders->take($this->maxCandidates);
 
         $productMinutes = $this->preparation->minutesMany($orders->flatMap(fn (CommerceOrder $o) => $o->lines->pluck('product_id'))->filter()->unique()->values()->all());
         // إعدادات كل القنوات المرشَّحة دفعةً واحدة (لا استعلام لكل قناة — Codex P2).
