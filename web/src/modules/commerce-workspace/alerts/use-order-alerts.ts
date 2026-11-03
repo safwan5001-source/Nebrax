@@ -136,7 +136,8 @@ export function useOrderAlerts(): OrderAlertsState {
       setSoundOwner(isOwner);
       syncSound();
     });
-    const offSilence = coordinator.onSilence(() => {
+    const offSilence = coordinator.onSilence((received) => {
+      silenced.absorb(received); // التخزين قد يكون ممتلئاً/محجوباً هنا: نحتفظ بالمعرّفات المبثوثة في الذاكرة
       engine.reproject();
       render(); // المتابع لا محرّك له: يُعاد حساب العرض محلياً.
     });

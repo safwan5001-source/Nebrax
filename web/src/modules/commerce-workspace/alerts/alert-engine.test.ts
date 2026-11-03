@@ -274,6 +274,25 @@ describe('AlertEngine (COPS-H3-3)', () => {
     engine.stop();
   });
 
+  it('رد attention متأخر من جيل سابق لا يطمس صفوف الجيل الحالي (Codex)', async () => {
+    let resolveStale: (r: AttentionResponse) => void = () => {};
+    deps.fetchAttention.mockImplementationOnce(() => new Promise<AttentionResponse>((r) => { resolveStale = r; }));
+    deps.fetchAttention.mockResolvedValue(attention()); // الجيل الحالي: لا شيء معلّق
+    const engine = new AlertEngine(deps);
+    engine.start(config());
+    await run(engine);                 // الجيل 1: الرأس جاء وattention معلّق
+    engine.stop();
+    engine.start(config());            // الجيل 2 يصالح ويجد الحالة فارغة
+    await run(engine);
+    expect(engine.snapshot.pending).toEqual([]);
+
+    resolveStale(attention(row('stale-order'))); // يصل رد الجيل 1 بعد التبديل
+    await run(engine);
+
+    expect(engine.snapshot.pending).toEqual([]);
+    engine.stop();
+  });
+
   it('stop يلغي كل شيء ويصفّر اللقطة', async () => {
     deps.fetchAttention.mockResolvedValue(attention(row('a')));
     const engine = new AlertEngine(deps);

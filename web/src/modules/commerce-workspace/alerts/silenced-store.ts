@@ -16,6 +16,12 @@ export class SilencedStore {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
+  /**
+   * نسخة الذاكرة (احتياط حين يفشل التخزين: حصة ممتلئة/محجوب). تُدمج مع المخزَّن عند القراءة فيعمل الإسكات
+   * في هذا التبويب ولو تعذّر الحفظ، وتستقبل معرّفات البث من التبويبات الأخرى.
+   */
+  private readonly memory = new Map<string, number>();
+
   private key(): string {
     return `awj:commerce-alerts:silenced:${this.scope}`;
   }
@@ -38,7 +44,20 @@ export class SilencedStore {
   }
 
   ids(): ReadonlySet<string> {
-    return new Set(Object.keys(this.read()));
+    const out = this.read();
+    const cutoff = this.now() - SILENCE_TTL_MS;
+    for (const [id, ts] of this.memory) {
+      if (ts < cutoff) this.memory.delete(id);
+      else if (!(id in out)) out[id] = ts;
+    }
+
+    return new Set(Object.keys(out));
+  }
+
+  /** معرّفات وصلت عبر البث من تبويب آخر (قد لا يصلنا مخزّنها): تُحفظ في الذاكرة. */
+  absorb(ids: string[]): void {
+    const stamp = this.now();
+    for (const id of ids) this.memory.set(id, stamp);
   }
 
   /** تراجع عن إسكات متفائل فشل إقراره الخادمي (شبكة/5xx): يعود التنبيه. */
@@ -57,11 +76,14 @@ export class SilencedStore {
     if (ids.length === 0) return;
     const current = this.read();
     const stamp = this.now();
-    for (const id of ids) current[id] = stamp;
+    for (const id of ids) {
+      current[id] = stamp;
+      this.memory.set(id, stamp);
+    }
     try {
       this.storage?.setItem(this.key(), JSON.stringify(current));
     } catch {
-      // تخزين ممتلئ/محجوب: الإسكات يبقى في ذاكرة التبويب عبر البث فقط.
+      // تخزين ممتلئ/محجوب: الإسكات يبقى في ذاكرة التبويب (memory) ويصل غيرَه بالبث.
     }
   }
 }

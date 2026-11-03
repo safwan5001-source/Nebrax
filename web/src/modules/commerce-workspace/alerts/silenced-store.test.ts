@@ -32,6 +32,22 @@ describe('SilencedStore / cursorStore', () => {
     new SilencedStore(null, 'x').add(['a']); // لا يرمي
   });
 
+  it('فشل الكتابة (حصة ممتلئة) لا يبطل الإسكات: يبقى في ذاكرة التبويب، ويقبل المعرّفات المبثوثة (Codex)', () => {
+    const failing: SilenceStorage = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } };
+    const s = new SilencedStore(failing, 's');
+    s.add(['o1']);
+    expect([...s.ids()]).toEqual(['o1']);
+
+    s.absorb(['o2']); // معرّف مبثوث من تبويب آخر لا يصلنا مخزّنه
+    expect([...s.ids()].sort()).toEqual(['o1', 'o2']);
+
+    let t = 0;
+    const timed = new SilencedStore(failing, 's', () => t);
+    timed.add(['old']);
+    t = SILENCE_TTL_MS + 1;
+    expect(timed.ids().size).toBe(0); // الذاكرة أيضاً تنتهي بعد 48 ساعة
+  });
+
   it('المؤشّر: يحفظ ويقرأ أعداداً صحيحة فقط، والغياب/التالف ⇒ null (الرأس)', () => {
     const storage = mem();
     const c = cursorStore(storage, 's');

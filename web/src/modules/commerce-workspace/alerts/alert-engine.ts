@@ -155,7 +155,7 @@ export class AlertEngine {
     const generation = this.generation;
     this.inFlight = generation;
     try {
-      await this.poll();
+      await this.poll(generation);
       if (generation !== this.generation) return;
       this.failures = 0;
       this.lastSuccessAt = this.now();
@@ -183,45 +183,51 @@ export class AlertEngine {
     this.schedule(delay);
   }
 
-  private async poll(): Promise<void> {
+  private async poll(generation: number): Promise<void> {
     const cfg = this.config as AlertConfig;
     const nowMs = this.now();
 
     if (this.mode === 'attention_only') {
-      await this.reconcileAttention();
+      await this.reconcileAttention(generation);
       return;
     }
 
     let changed = false;
     if (this.cursor === null) {
       // تهيئة (D-H3-02): الرأس الحالي لا التاريخ، ثم الحالة الحالية.
-      this.cursor = await this.deps.fetchFeedHead();
+      const head = await this.deps.fetchFeedHead();
+      if (generation !== this.generation) return;
+      this.cursor = head;
       this.deps.saveCursor(this.cursor);
       changed = true;
     } else {
       try {
-        changed = await this.drainFeed();
+        changed = await this.drainFeed(generation);
       } catch (error) {
+        if (generation !== this.generation) return;
         if (hasApiStatus(error, 403)) {
           // المقيَّد بمخازن لا تغذية له (D-H3-01) ⇒ attention وحدها.
           this.mode = 'attention_only';
-          await this.reconcileAttention();
+          await this.reconcileAttention(generation);
           return;
         }
         throw error;
       }
+      if (generation !== this.generation) return;
     }
 
     if (changed || nowMs - this.lastAttentionAt >= cfg.polling.attention_ms) {
-      await this.reconcileAttention();
+      await this.reconcileAttention(generation);
     }
   }
 
   /** يستهلك أحداث التغذية من المؤشّر؛ يعيد هل وُجد جديد. فجوة طويلة ⇒ قفز إلى الرأس. */
-  private async drainFeed(): Promise<boolean> {
+  private async drainFeed(generation: number): Promise<boolean> {
     let changed = false;
     for (let page = 0; page < MAX_FEED_PAGES; page += 1) {
       const res = await this.deps.fetchFeedPage(this.cursor as number);
+      // جيل قديم: لا يكتب المؤشّر المحفوظ ولا الحالة المشتركة.
+      if (generation !== this.generation) return false;
       if (res.data.length > 0) {
         changed = true;
         this.cursor = res.meta.next_after_seq;
@@ -239,8 +245,10 @@ export class AlertEngine {
     return changed;
   }
 
-  private async reconcileAttention(): Promise<void> {
+  private async reconcileAttention(generation: number): Promise<void> {
     const res = await this.deps.fetchAttention();
+    // رد جيل سابق (فقدنا القيادة واستعدناها أثناء الطيران) لا يطمس صفوف الجيل الحالي ولا طابعه الزمني.
+    if (generation !== this.generation) return;
     this.rows = Array.isArray(res.data) ? res.data : [];
     this.truncated = Boolean(res.meta?.truncated);
     this.lastAttentionAt = this.now();
