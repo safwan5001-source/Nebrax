@@ -118,6 +118,25 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(sound.alertSound.syncActive).toHaveBeenLastCalledWith(['a']);
   });
 
+  it('بلا BroadcastChannel: كل تبويب يستطلع لنفسه ويعرض بياناته بدل أن يبقى متابعاً بلا لقطة (Codex)', async () => {
+    const original = globalThis.BroadcastChannel;
+    // @ts-expect-error محاكاة متصفح بلا BroadcastChannel
+    delete globalThis.BroadcastChannel;
+    try {
+      const one = renderHook(() => useOrderAlerts());
+      const two = renderHook(() => useOrderAlerts());
+      await tick(0);
+      await tick(0);
+      await tick(0);
+      expect(one.result.current.role).toBe('leader');
+      expect(two.result.current.role).toBe('leader');
+      expect(one.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+      expect(two.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+    } finally {
+      globalThis.BroadcastChannel = original;
+    }
+  });
+
   it('تبويبان: واحد فقط يستطلع، والآخر يعرض اللقطة نفسها (قائد واحد لكل جهاز)', async () => {
     const one = renderHook(() => useOrderAlerts());
     const two = renderHook(() => useOrderAlerts());
