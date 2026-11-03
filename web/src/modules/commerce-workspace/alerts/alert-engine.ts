@@ -49,6 +49,8 @@ export class AlertEngine {
   private mode: AlertMode = 'feed_attention';
   private cursor: number | null = null;
   private lastAttentionAt = 0;
+  /** حدث تغذية استُهلك (والمؤشّر تقدّم) ولم تنجح بعده مصالحة الحالة بعد: يبقى مطلوباً حتى نجاح attention، لا حتى تقدّم المؤشّر. */
+  private needsReconcile = false;
   private lastSuccessAt: number | null = null;
   private failures = 0;
   private timer: unknown = null;
@@ -91,6 +93,7 @@ export class AlertEngine {
     this.mode = config.mode;
     this.cursor = this.mode === 'feed_attention' ? this.deps.loadCursor() : null;
     this.lastAttentionAt = 0;
+    this.needsReconcile = false;
     this.failures = 0;
     this.generation += 1;
     this.rerun = false;
@@ -216,7 +219,8 @@ export class AlertEngine {
       if (generation !== this.generation) return;
     }
 
-    if (changed || nowMs - this.lastAttentionAt >= cfg.polling.attention_ms) {
+    if (changed) this.needsReconcile = true;
+    if (this.needsReconcile || nowMs - this.lastAttentionAt >= cfg.polling.attention_ms) {
       await this.reconcileAttention(generation);
     }
   }
@@ -252,6 +256,7 @@ export class AlertEngine {
     this.rows = Array.isArray(res.data) ? res.data : [];
     this.truncated = Boolean(res.meta?.truncated);
     this.lastAttentionAt = this.now();
+    this.needsReconcile = false;
   }
 
   private nextDelay(): number {

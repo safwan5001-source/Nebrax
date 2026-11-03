@@ -118,6 +118,28 @@ describe('AlertEngine (COPS-H3-3)', () => {
     engine.stop();
   });
 
+  it('فشل مصالحة attention بعد حدث تغذية: إعادة المحاولة تصالح الحالة ولا تُعدّ نجاحاً دون جلبها (Codex)', async () => {
+    cursor = 10;
+    deps.fetchFeedPage
+      .mockResolvedValueOnce(page(0, 10))   // الدورة الأولى: لا جديد، مصالحة أولية
+      .mockResolvedValueOnce(page(1, 11))   // حدث جديد
+      .mockResolvedValue(page(0, 11));      // إعادة المحاولة: لا أحداث
+    deps.fetchAttention
+      .mockResolvedValueOnce(attention())
+      .mockRejectedValueOnce(new Error('boom')) // فشل المصالحة المرتبطة بالحدث
+      .mockResolvedValue(attention(row('new-order')));
+    const engine = new AlertEngine(deps);
+    engine.start(config());
+    await run(engine);
+    await run(engine, 10_000); // الحدث + فشل attention
+    expect(engine.snapshot.connection).toBe('degraded');
+
+    await run(engine, 2_000);  // إعادة المحاولة بلا أحداث جديدة في التغذية
+    expect(deps.fetchAttention.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(engine.snapshot.pending.map((p) => p.orderId)).toEqual(['new-order']);
+    engine.stop();
+  });
+
   it('المقيَّد بمخازن (attention_only) لا يستدعي التغذية أبداً (D-H3-01)', async () => {
     const engine = new AlertEngine(deps);
     engine.start(config({ mode: 'attention_only' }));
