@@ -179,7 +179,7 @@ final class CommerceOrderAttentionQuery
     /** @param Builder<CommerceOrder> $query @return Builder<CommerceOrder> مرادف SQL لـ{@see self::alertPending()}. */
     private function pendingScope(Builder $query): Builder
     {
-        return $query->whereNull('accepted_at')->whereDoesntHave('fulfillment');
+        return $query->whereNull('accepted_at')->whereDoesntHave('fulfillment')->whereDoesntHave('acknowledgement');
     }
 
     public function alertPending(CommerceOrder $order): bool

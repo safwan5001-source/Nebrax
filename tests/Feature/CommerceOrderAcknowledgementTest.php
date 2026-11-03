@@ -213,6 +213,20 @@ class CommerceOrderAcknowledgementTest extends TestCase
         $this->ack($order['order_id'])->assertOk()->assertJsonPath('data.created', true);
     }
 
+    #[Test]
+    public function the_pending_only_filter_excludes_acknowledged_orders_before_the_cap(): void
+    {
+        $first = $this->pickupOrder('idem-ack-pend-1');
+        $second = $this->pickupOrder('idem-ack-pend-2');
+        $this->ack($first)->assertOk();
+
+        $rows = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders/attention?limit=1&pending=1')->assertOk();
+        $this->assertSame([$second], array_column(array_column($rows->json('data'), 'order'), 'id'));
+        // وبلا المرشّح يبقى المُقَرّ في القائمة (R-10).
+        $all = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders/attention')->assertOk();
+        $this->assertContains($first, array_column(array_column($all->json('data'), 'order'), 'id'));
+    }
+
     // ───────────────────────── الأمان والعزل ─────────────────────────
 
     #[Test]
