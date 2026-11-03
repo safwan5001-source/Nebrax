@@ -251,6 +251,18 @@ const ar = {
   fulfillmentTimestamps: 'التوقيتات',
   fulfillmentStatus: 'حالة التنفيذ',
   allFulfillmentStatuses: 'كل حالات التنفيذ',
+  // COPS-H2-6 — طابور التحضير المجدول (الاستحقاق من الخادم بمنطقة لقطة الطلب)
+  dueFilter: 'الاستحقاق',
+  allDue: 'كل المواعيد',
+  dueColumn: 'موعد التسليم',
+  queueTruncatedTitle: 'قائمة الاستحقاق غير كاملة',
+  queueTruncatedBody: 'تجاوز الطابور الحد الأقصى للطلبات المعروضة؛ قد توجد طلبات مستحقة لا تظهر هنا. ضيّق التصفية (المتجر أو الاستحقاق) أو راجع الطلبات الأقدم أولاً.',
+  dueWindow: 'النافذة',
+  duePrepareFrom: 'ابدأ التحضير قبل',
+  'dueBucket.overdue': 'متأخر',
+  'dueBucket.today': 'مستحق اليوم',
+  'dueBucket.tomorrow': 'مستحق غداً',
+  'dueBucket.prepare_now': 'ابدأ التحضير',
   fulfillmentColumn: 'التنفيذ',
   'fulfillmentType.local_delivery': 'توصيل محلي',
   'fulfillmentType.carrier': 'ناقل خارجي',
@@ -590,6 +602,18 @@ const en: Record<keyof typeof ar, string> = {
   fulfillmentTimestamps: 'Timestamps',
   fulfillmentStatus: 'Fulfillment status',
   allFulfillmentStatuses: 'All fulfillment statuses',
+  // COPS-H2-6 — scheduled preparation queue (due times are computed by the server in each order's own timezone)
+  dueFilter: 'Due',
+  allDue: 'All dates',
+  dueColumn: 'Delivery slot',
+  queueTruncatedTitle: 'Due list is incomplete',
+  queueTruncatedBody: 'The queue exceeded the maximum number of orders it can show; some due orders may be missing here. Narrow the filters (store or due bucket) or work the oldest orders first.',
+  dueWindow: 'Window',
+  duePrepareFrom: 'Start preparing by',
+  'dueBucket.overdue': 'Overdue',
+  'dueBucket.today': 'Due today',
+  'dueBucket.tomorrow': 'Due tomorrow',
+  'dueBucket.prepare_now': 'Start preparing',
   fulfillmentColumn: 'Fulfillment',
   'fulfillmentType.local_delivery': 'Local delivery',
   'fulfillmentType.carrier': 'External carrier',
@@ -690,7 +714,7 @@ export function ordersMessages(locale: string) {
   const dict: Record<OrdersMessageKey, string> = locale === 'en' ? en : ar;
   const t = (key: OrdersMessageKey): string => dict[key];
   /** يترجم قيمة خادم بمفتاح مسبوق؛ القيمة المجهولة تعود حرفياً. */
-  const label = (prefix: 'status' | 'payment' | 'method' | 'delivery' | 'capture' | 'reason' | 'blocked' | 'cancelError' | 'acceptError' | 'acceptanceFilter' | 'acceptanceBadge' | 'acceptanceModeValue' | 'fulfillment' | 'fulfillFilter' | 'fulfillAction' | 'fulfillError' | 'fulfillmentType' | 'failReason' | 'fulfillValidation', value: string | null | undefined): string => {
+  const label = (prefix: 'status' | 'payment' | 'method' | 'delivery' | 'capture' | 'reason' | 'blocked' | 'cancelError' | 'acceptError' | 'acceptanceFilter' | 'acceptanceBadge' | 'acceptanceModeValue' | 'fulfillment' | 'fulfillFilter' | 'fulfillAction' | 'fulfillError' | 'fulfillmentType' | 'failReason' | 'fulfillValidation' | 'dueBucket', value: string | null | undefined): string => {
     if (value === null || value === undefined || value === '') return '—';
     const key = `${prefix}.${value}` as OrdersMessageKey;
     return key in dict ? dict[key] : value;

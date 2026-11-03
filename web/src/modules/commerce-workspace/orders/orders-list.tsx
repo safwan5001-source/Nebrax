@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, TriangleAlert } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { EmptyState, Pagination } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { ACTIVE_STORE_QUERY_PARAM, withStoreParam } from '@/modules/commerce-wor
 import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
   ACCEPTANCE_STATUSES,
+  DUE_BUCKETS,
   FULFILLMENT_STATUS_FILTERS,
   acceptanceBadgeOf,
   DELIVERY_METHODS,
@@ -34,7 +35,7 @@ import {
   type OrdersMeta,
 } from './contract';
 import { ordersMessages } from './messages';
-import { AcceptanceBadge, FulfillmentBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
+import { AcceptanceBadge, DueCell, FulfillmentBadge, OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrders } from './orders-api';
 
 /** يحفظ استعلام القائمة لهذا التبويب فتعود صفحة التفاصيل إلى الصفحة/التصفية نفسها. */
@@ -171,7 +172,7 @@ export function OrdersList() {
   }, [stores]);
 
   const hasFilters = Boolean(
-    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.acceptanceStatus || state.fulfillmentStatus || state.from || state.to,
+    state.q || state.salesChannelId || state.paymentStatus || state.paymentMethod || state.deliveryMethod || state.acceptanceStatus || state.fulfillmentStatus || state.due || state.from || state.to,
   );
 
   const detailHref = useCallback((id: string) => withStoreParam(`/commerce/orders/${id}`, activeStoreId), [activeStoreId]);
@@ -244,6 +245,13 @@ export function OrdersList() {
         cell: ({ row }) => (row.original.fulfillment ? <FulfillmentBadge fulfillment={row.original.fulfillment} locale={locale} /> : <span className="text-muted">—</span>),
       },
       {
+        id: 'due',
+        header: t('dueColumn'),
+        enableSorting: false,
+        accessorFn: (o) => o.queue?.window_start ?? '',
+        cell: ({ row }) => (row.original.queue ? <DueCell queue={row.original.queue} locale={locale} /> : <span className="text-muted">—</span>),
+      },
+      {
         id: 'status',
         header: t('orderStatus'),
         enableSorting: false,
@@ -259,6 +267,8 @@ export function OrdersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [detailHref, locale],
   );
+  // عمود «موعد التسليم» يظهر فقط مع مرشّح الطابور (الخادم لا يرسل `queue` بدونه) فلا ضجيج في القائمة العادية.
+  const visibleColumns = useMemo(() => (state.due ? columns : columns.filter((column) => column.id !== 'due')), [columns, state.due]);
 
   const sortValue = state.sort;
   const errorMessage =
@@ -285,6 +295,20 @@ export function OrdersList() {
         >
           {t('quickAwaiting')}
         </Button>
+        {/* COPS-H2-6: طابور التحضير المجدول — الاستحقاق يحسبه الخادم بمنطقة لقطة الطلب وحدود القناة (لا وقت المتصفح). */}
+        {DUE_BUCKETS.map((bucket) => (
+          <Button
+            key={bucket}
+            type="button"
+            size="sm"
+            className="ms-2"
+            variant={state.due === bucket ? 'primary' : 'outline'}
+            aria-pressed={state.due === bucket}
+            onClick={() => update({ due: state.due === bucket ? '' : bucket })}
+          >
+            {label('dueBucket', bucket)}
+          </Button>
+        ))}
       </div>
       <section aria-label={t('filtersLabel')} className="rounded border border-border bg-surface p-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -384,6 +408,16 @@ export function OrdersList() {
               ))}
             </Select>
           </Field>
+          <Field label={t('dueFilter')}>
+            <Select value={state.due} aria-label={t('dueFilter')} onChange={(event) => update({ due: event.target.value })}>
+              <option value="">{t('allDue')}</option>
+              {DUE_BUCKETS.map((value) => (
+                <option key={value} value={value}>
+                  {label('dueBucket', value)}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label={t('dateFrom')}>
             <Input type="date" value={state.from} max={state.to || undefined} aria-label={t('dateFrom')} onChange={(event) => update({ from: event.target.value })} />
           </Field>
@@ -400,7 +434,7 @@ export function OrdersList() {
           </Field>
           {hasFilters ? (
             <div className="flex items-end">
-              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', acceptanceStatus: '', fulfillmentStatus: '', from: '', to: '' }); }}>
+              <Button type="button" variant="ghost" onClick={() => { setSearchInput(''); update({ q: '', salesChannelId: '', paymentStatus: '', paymentMethod: '', deliveryMethod: '', acceptanceStatus: '', fulfillmentStatus: '', due: '', from: '', to: '' }); }}>
                 {t('clearFilters')}
               </Button>
             </div>
@@ -412,8 +446,17 @@ export function OrdersList() {
         <EmptyState icon={ClipboardList} title={t('forbidden')} description={`${t('restrictedHint')} ${t('capabilityHint')}`} />
       ) : (
         <>
+          {state.due && meta.queue_truncated ? (
+            <div role="status" className="flex items-start gap-3 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+              <div>
+                <p className="font-medium text-text">{t('queueTruncatedTitle')}</p>
+                <p className="mt-1 text-muted">{t('queueTruncatedBody')}</p>
+              </div>
+            </div>
+          ) : null}
           <DataTable<OrderSummary>
-            columns={columns}
+            columns={visibleColumns}
             data={rows}
             loading={loading}
             showToolbar={false}
@@ -439,6 +482,7 @@ export function OrdersList() {
                   <PaymentStatusBadge status={order.payment.status} locale={locale} />
                   <AcceptanceBadge order={order} locale={locale} />
                   <FulfillmentBadge fulfillment={order.fulfillment} locale={locale} />
+                  {order.queue ? <DueCell queue={order.queue} locale={locale} /> : null}
                 </span>
               ),
               meta: formatDateTime(order.created_at, locale),

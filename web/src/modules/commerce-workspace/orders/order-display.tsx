@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { formatDateTime, formatTime } from '@/lib/formatting';
 import { formatMinorRiyal, minorToRiyal } from '@/lib/money';
 import { acceptanceBadgeOf, type AcceptanceBadgeKind, type Money, type OrderSummary } from './contract';
 import { ordersMessages } from './messages';
@@ -66,4 +67,33 @@ export function FulfillmentBadge({ fulfillment, locale }: { fulfillment: { statu
   const text = fulfillment.status === 'ready' && fulfillment.type === 'pickup' ? t('fulfillment.ready_pickup') : label('fulfillment', fulfillment.status);
 
   return <Badge tone={FULFILLMENT_TONE[fulfillment.status] ?? 'muted'}>{text}</Badge>;
+}
+
+/**
+ * خلية موعد التسليم في الطابور (COPS-H2-6). التوقيتات تأتي من الخادم UTC، وتُعرض **بمنطقة لقطة الطلب** (`queue.timezone`) لا بمنطقة المتصفح:
+ * موظف مسافر يرى الموعد نفسه الذي التقطه الطلب. لا حساب استحقاق في المتصفح.
+ */
+export function DueCell({ queue, locale }: { queue: { window_start: string; window_end: string; prepare_from: string; timezone: string; buckets: string[] }; locale: string }) {
+  const { t } = ordersMessages(locale);
+  // المنسّق المركزي فقط (حارس التنسيق): أرقام لاتينية وتقويم ميلادي، بمنطقة اللقطة لا المتصفح.
+  const fmt = (iso: string, withDate: boolean): string => {
+    try {
+      return withDate
+        ? formatDateTime(iso, locale, { timeZone: queue.timezone, dateStyle: 'short' })
+        : formatTime(iso, locale, { timeZone: queue.timezone });
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <div className="space-y-0.5 text-xs">
+      <div className="num">
+        {fmt(queue.window_start, true)} – {fmt(queue.window_end, false)}
+      </div>
+      <div className="text-muted">
+        {t('duePrepareFrom')} <span className="num">{fmt(queue.prepare_from, true)}</span>
+      </div>
+    </div>
+  );
 }

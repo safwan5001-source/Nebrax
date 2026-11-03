@@ -165,6 +165,8 @@ export function formatShortDate(
 
 export type FormatTimeOptions = {
   fallback?: string;
+  /** Explicit IANA timezone (additive; omitted = the browser's local timezone, as before). */
+  timeZone?: string;
 };
 
 /**
@@ -182,6 +184,7 @@ export function formatTime(
   return formatWithParts(date, locale, {
     timeStyle: 'short',
     hour12: true,
+    ...(options.timeZone ? { timeZone: options.timeZone } : {}),
   });
 }
 

@@ -70,6 +70,10 @@ export const OPERATIONAL_STATUSES = [
 export const FULFILLMENT_STATUSES = ['preparing', 'ready', 'out_for_delivery', 'delivery_failed', 'returned_to_store', 'delivered', 'picked_up'] as const;
 export type FulfillmentStatus = (typeof FULFILLMENT_STATUSES)[number];
 export const FULFILLMENT_STATUS_FILTERS = [...FULFILLMENT_STATUSES, 'not_started'] as const;
+/** COPS-H2-6 — دلاء طابور التحضير المجدول (الخادم يحسبها بمنطقة لقطة الطلب وحدود القناة؛ لا حساب في المتصفح). */
+export const DUE_BUCKETS = ['overdue', 'today', 'tomorrow', 'prepare_now'] as const;
+export type DueBucket = (typeof DUE_BUCKETS)[number];
+
 export const FULFILLMENT_ACTIONS = ['start', 'mark_ready', 'dispatch', 'deliver', 'fail', 'return', 'pickup'] as const;
 export type FulfillmentActionName = (typeof FULFILLMENT_ACTIONS)[number];
 export const FAILURE_REASONS = ['customer_unreachable', 'address_issue', 'recipient_absent', 'customer_refused', 'other'] as const;
@@ -100,6 +104,14 @@ export type RejectAction = { available: boolean; blocked_reason: string | null }
 export const REJECTION_REASON = 'merchant_rejected';
 export const REJECTION_NOTE_MAX = 500;
 
+export type OrderQueue = {
+  window_start: string;
+  window_end: string;
+  prepare_from: string;
+  timezone: string;
+  buckets: string[];
+};
+
 export type OrderSummary = {
   id: string;
   number: string;
@@ -110,6 +122,8 @@ export type OrderSummary = {
   acceptance?: OrderAcceptance;
   /** موجز التنفيذ في القائمة — يغيب حين لا صف. */
   fulfillment?: { status: string; type: string };
+  /** COPS-H2-6 — يحضر **فقط** حين طُلب مرشّح `due`: نافذة التسليم (UTC) و`prepare_from` ومنطقة اللقطة والدلاء المحسوبة بالخادم. */
+  queue?: OrderQueue;
   cancellation?: OrderCancellation;
   created_at: string | null;
   confirmed_at: string | null;
@@ -187,7 +201,14 @@ export type OrderDetail = Omit<OrderSummary, 'fulfillment'> & {
     | { posted: true; invoice_id: string; payment_id: string; accounting_date: string | null; amount: Money };
 };
 
-export type OrdersMeta = { current_page: number; per_page: number; total: number; last_page: number };
+export type OrdersMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  /** H2-6 — يأتي فقط مع مرشّح `due`: تجاوز الطابور سقف المرشّحين فالقائمة ناقصة. */
+  queue_truncated?: boolean;
+};
 
 /** حدود الخادم (O1a): per_page ≤ 50، q بين 2 و100 حرف، فرز بقائمة بيضاء. */
 export const ORDERS_MAX_PER_PAGE = 50;
@@ -214,6 +235,7 @@ export type OrdersListState = {
   deliveryMethod: string;
   acceptanceStatus: string;
   fulfillmentStatus: string;
+  due: string;
   from: string;
   to: string;
   /** `-created_at` | `created_at` | `-total` ... */
@@ -231,6 +253,7 @@ export const DEFAULT_ORDERS_STATE: OrdersListState = {
   deliveryMethod: '',
   acceptanceStatus: '',
   fulfillmentStatus: '',
+  due: '',
   from: '',
   to: '',
   sort: '-created_at',
@@ -264,6 +287,7 @@ export function parseOrdersState(params: URLSearchParams): OrdersListState {
     deliveryMethod: oneOf(params.get('delivery_method'), DELIVERY_METHODS),
     acceptanceStatus: oneOf(params.get('acceptance_status'), ACCEPTANCE_STATUSES),
     fulfillmentStatus: oneOf(params.get('fulfillment_status'), FULFILLMENT_STATUS_FILTERS),
+    due: oneOf(params.get('due'), DUE_BUCKETS),
     from: DATE.test(from) ? from : '',
     to: DATE.test(to) ? to : '',
     sort: (ORDERS_SORT_COLUMNS as readonly string[]).includes(sortKey) ? sortRaw : DEFAULT_ORDERS_STATE.sort,
@@ -283,6 +307,7 @@ export function serializeOrdersState(state: OrdersListState): URLSearchParams {
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
   if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
   if (state.fulfillmentStatus) p.set('fulfillment_status', state.fulfillmentStatus);
+  if (state.due) p.set('due', state.due);
   if (state.from) p.set('from', state.from);
   if (state.to) p.set('to', state.to);
   if (state.sort !== DEFAULT_ORDERS_STATE.sort) p.set('sort', state.sort);
@@ -306,6 +331,7 @@ export function buildOrdersQuery(state: OrdersListState, storefrontId: string | 
   if (state.deliveryMethod) p.set('delivery_method', state.deliveryMethod);
   if (state.acceptanceStatus) p.set('acceptance_status', state.acceptanceStatus);
   if (state.fulfillmentStatus) p.set('fulfillment_status', state.fulfillmentStatus);
+  if (state.due) p.set('due', state.due);
   if (state.from) p.set('from', state.from);
   if (state.to && (!state.from || state.to >= state.from)) p.set('to', state.to);
   p.set('sort', state.sort.replace(/^-/, ''));
