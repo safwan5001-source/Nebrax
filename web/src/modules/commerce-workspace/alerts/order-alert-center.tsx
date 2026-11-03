@@ -80,7 +80,7 @@ export function OrderAlertCenter() {
               <span
                 data-testid="alert-badge"
                 aria-hidden="true"
-                className="num absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-negative px-1 text-[10px] font-semibold leading-none text-white"
+                className="num absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-negative px-1 text-[10px] font-semibold leading-none text-primary-foreground"
               >
                 {pendingCount > 99 ? '99+' : pendingCount}
               </span>
@@ -125,7 +125,7 @@ export function OrderAlertCenter() {
                   <div className="flex gap-2">
                     <Link
                       href={`/commerce/orders/${item.orderId}`}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded bg-primary px-3 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       {t('open')}
                     </Link>
@@ -158,7 +158,7 @@ export function OrderAlertCenter() {
                 {soundArmed ? t('soundOn') : t('soundOff')}
               </span>
               {!soundArmed && (
-                <button type="button" onClick={() => void alerts.enableSound()} className="inline-flex min-h-11 items-center rounded bg-primary px-3 text-sm font-medium text-white hover:opacity-90">
+                <button type="button" onClick={() => void alerts.enableSound()} className="inline-flex min-h-11 items-center rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
                   {t('soundEnable')}
                 </button>
               )}
@@ -183,7 +183,7 @@ export function OrderAlertCenter() {
           className="no-print fixed inset-x-3 bottom-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-surface px-3 py-2 shadow-lg sm:inset-x-auto sm:end-4 sm:max-w-md"
         >
           <span className="text-sm text-text">{t('soundBarText')}</span>
-          <button type="button" onClick={() => void alerts.enableSound()} className="inline-flex min-h-11 items-center rounded bg-primary px-3 text-sm font-medium text-white hover:opacity-90">
+          <button type="button" onClick={() => void alerts.enableSound()} className="inline-flex min-h-11 items-center rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
             {t('soundEnable')}
           </button>
         </div>
