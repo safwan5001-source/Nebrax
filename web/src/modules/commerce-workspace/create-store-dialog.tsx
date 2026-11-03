@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { commerceWorkspaceMessage } from './messages';
+import { describeCreateStoreFailure } from './create-store-error';
 import { createCommerceStorefront, type CommerceStoreLocale } from './stores';
 
 export function CreateStoreDialog({
@@ -37,7 +38,7 @@ export function CreateStoreDialog({
     try {
       const result = await createCommerceStorefront(trimmed, defaultLocale);
       if (!result.ok) {
-        setError(t('createStoreFailed'));
+        setError(describeCreateStoreFailure(result, locale));
         return;
       }
       await onCreated(result.store.id);

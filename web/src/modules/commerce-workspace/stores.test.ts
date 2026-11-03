@@ -343,3 +343,22 @@ describe('business vertical (FLOWERS-H1)', () => {
     expect(apiMock).toHaveBeenLastCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: {} });
   });
 });
+
+// نفس شكل ApiError الحقيقي (Error + status + body) دون الاعتماد على تصدير الصنف من المحاكي.
+const httpError = (status: number, message: string, body: unknown) => Object.assign(new Error(message), { status, body });
+
+describe('structured create failures (STORE-CREATE-500)', () => {
+  it('exposes the HTTP status and server reason code on provisioning failures without changing message', async () => {
+    apiMock.mockRejectedValue(httpError(422, 'نص الخادم', { message: 'نص الخادم', reason: 'tenant_slug_not_hostname_safe' }));
+
+    await expect(provisionCommerceStorefront()).resolves.toEqual({
+      ok: false, message: 'نص الخادم', status: 422, reason: 'tenant_slug_not_hostname_safe',
+    });
+  });
+
+  it('exposes the status on multi-store failures and omits reason when the body has none', async () => {
+    apiMock.mockRejectedValue(httpError(500, 'x', { message: 'x' }));
+
+    await expect(createCommerceStorefront('متجر')).resolves.toEqual({ ok: false, message: 'x', status: 500 });
+  });
+});
