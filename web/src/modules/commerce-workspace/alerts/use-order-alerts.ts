@@ -78,15 +78,20 @@ export function useOrderAlerts(): OrderAlertsState {
     const storage = window.localStorage;
     const silenced = new SilencedStore(storage, scope);
     const cursor = cursorStore(storage, scope);
-    const locks: LockManagerLike = typeof navigator !== 'undefined' && navigator.locks
-      ? { request: (name, options, cb) => navigator.locks.request(name, options, cb as never) as unknown as Promise<void> }
-      : createLeaseLocks(storage, tabId);
+    // بلا BroadcastChannel لا طريق لنقل اللقطة من القائد إلى المتابعين: ننتخب قائداً واحداً فيبقى الباقون بلا بيانات.
+    // فنُعطّل القيادة المشتركة (locks=null) ويستطلع كل تبويب لنفسه — عزل أضعف مُعلن لكنه يعمل (Codex).
+    const hasChannel = typeof BroadcastChannel !== 'undefined';
+    const locks: LockManagerLike | null = !hasChannel
+      ? null
+      : typeof navigator !== 'undefined' && navigator.locks
+        ? { request: (name, options, cb) => navigator.locks.request(name, options, cb as never) as unknown as Promise<void> }
+        : createLeaseLocks(storage, tabId);
 
     const coordinator = new TabCoordinator({
       scope,
       tabId,
       locks,
-      createChannel: (name) => (typeof BroadcastChannel !== 'undefined' ? (new BroadcastChannel(name) as never) : null),
+      createChannel: (name) => (hasChannel ? (new BroadcastChannel(name) as never) : null),
       getPresence: () => ({ visible: document.visibilityState !== 'hidden', armed: alertSound.state === 'armed', interactedAt: interactedAt.current }),
     });
     const engine = new AlertEngine({
