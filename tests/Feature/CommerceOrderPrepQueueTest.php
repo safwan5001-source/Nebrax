@@ -399,6 +399,23 @@ class CommerceOrderPrepQueueTest extends TestCase
     }
 
     #[Test]
+    public function the_coarse_date_bounds_cover_a_channel_zone_that_differs_from_the_snapshot_zone(): void
+    {
+        // Codex P2: القناة Pacific/Pago_Pago (UTC−11) والطلب بلقطة Kiritimati (UTC+14). في 2026-11-02 23:00Z
+        // يوم القناة هو 11-02 11:00Z..11-03 11:00Z؛ نافذة 2026-11-04 00:30 بتوقيت Kiritimati = 11-03T10:30Z ⇒ «اليوم»
+        // بينما تاريخ تسليمها الاسمي 11-04 (خارج نافذة «يوم واحد» القديمة).
+        $this->travelTo(CarbonImmutable::parse('2026-11-02 23:00:00', 'UTC'));
+        $this->channelSettings('Pacific/Pago_Pago');
+        $today = $this->scheduled('2026-11-04', '00:30', '02:30', 'Pacific/Kiritimati');
+        $this->assertSame(['today'], $this->queue('today')[$today->id]['buckets'] ?? null);
+
+        // والعكس: قناة Kiritimati (اليوم التالي بدأ 11-03T10:00Z) ولقطة Pago ⇒ 2026-11-03 01:00 هناك = 11-03T12:00Z ⇒ «غداً».
+        $this->channelSettings('Pacific/Kiritimati');
+        $tomorrow = $this->scheduled('2026-11-03', '01:00', '03:00', 'Pacific/Pago_Pago');
+        $this->assertSame(['tomorrow'], $this->queue('tomorrow')[$tomorrow->id]['buckets'] ?? null);
+    }
+
+    #[Test]
     public function candidates_are_narrowed_by_bucket_before_the_shared_cap(): void
     {
         // Codex P2: طلبات دلو آخر لا تُحمَّل أصلاً (فلا تستنزف سقف المرشّحين).

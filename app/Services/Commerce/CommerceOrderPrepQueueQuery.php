@@ -93,8 +93,10 @@ final class CommerceOrderPrepQueueQuery
         $from = $now->subDays(self::LOOKBACK_DAYS + 1)->toDateString();
         [$low, $high] = match ($bucket) {
             'overdue' => [$from, $now->addDay()->toDateString()],
-            'today' => [$now->subDay()->toDateString(), $now->addDay()->toDateString()],
-            'tomorrow' => [$now->toDateString(), $now->addDays(self::LOOKAHEAD_DAYS)->toDateString()],
+            // يوم القناة (UTC−12..+14، حتى 25 ساعة) ونافذة اللقطة بمنطقتها هي (تاريخ التسليم ± يوم بالتوقيت العالمي): منطقتان قد تختلفان
+            // بما يصل إلى يومين، فالهامش ثلاثة أيام لـ«اليوم» وأربعة لـ«غداً» (Codex P2).
+            'today' => [$now->subDays(3)->toDateString(), $now->addDays(3)->toDateString()],
+            'tomorrow' => [$now->subDay()->toDateString(), $now->addDays(self::LOOKAHEAD_DAYS + 1)->toDateString()],
             default => [$from, $now->addDays(self::prepareHorizonDays())->toDateString()],
         };
         $q->whereHas('schedule', fn (Builder $s) => $s->whereBetween('delivery_date', [$low, $high]));
