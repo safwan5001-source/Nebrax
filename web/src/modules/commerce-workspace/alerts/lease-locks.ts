@@ -43,8 +43,18 @@ export function createLeaseLocks(storage: LeaseStorage, ownerId: string, now: ()
               waiter = setInterval(poll, RENEW_MS);
               return;
             }
-            const renew = setInterval(() => storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() })), RENEW_MS);
-            callback()
+            const lostCtl = new AbortController();
+            const renew = setInterval(() => {
+              // لا نكتب فوق إيجار خلَفٍ تولّاه بعد انتهاء مهلتنا (تبويب مُجمَّد/مؤقّتات متأخرة): نتخلّى بدل السرقة.
+              const current = read(key);
+              if (current !== null && current.owner !== ownerId) {
+                clearInterval(renew);
+                lostCtl.abort();
+                return;
+              }
+              storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() }));
+            }, RENEW_MS);
+            callback({ lost: lostCtl.signal })
               .catch(() => {})
               .finally(() => {
                 clearInterval(renew);

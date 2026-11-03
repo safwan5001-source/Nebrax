@@ -58,4 +58,25 @@ describe('lease locks (سقوط بلا Web Locks)', () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(await rejected).toBe('AbortError');
   });
+
+  it('حامل تأخّر تجديده فتولّاه غيره: لا يكتب فوق إيجار الخلف ويُعلن الضياع فيتنازل (Codex)', async () => {
+    const storage = memory();
+    let t = 0;
+    const now = () => t;
+    const a = createLeaseLocks(storage, 'a', now);
+    const lost = vi.fn();
+    void a.request('n', { mode: 'exclusive' }, (lock) => new Promise<void>((resolve) => {
+      lock?.lost?.addEventListener('abort', () => { lost(); resolve(); });
+    }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(JSON.parse(storage.getItem('awj:lease:n') as string).owner).toBe('a');
+
+    // تبويب a مُجمَّد: انتهت مهلته وتولّى b الإيجار.
+    storage.setItem('awj:lease:n', JSON.stringify({ owner: 'b', ts: 10_000 }));
+    t = 11_000;
+    await vi.advanceTimersByTimeAsync(2_500); // يستأنف مؤقّت التجديد في a
+
+    expect(lost).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(storage.getItem('awj:lease:n') as string).owner).toBe('b'); // لم يُسرق
+  });
 });
