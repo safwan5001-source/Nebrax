@@ -95,13 +95,21 @@ final class HostnameNormalizer
         }
 
         foreach ($labels as $label) {
-            if (
-                $label === ''
-                || strlen($label) > self::MAX_LABEL_LENGTH
-                || ! preg_match('/\A[a-z0-9]([a-z0-9-]*[a-z0-9])?\z/', $label)
-            ) {
+            if (! self::isValidLabel($label)) {
                 throw new InvalidHostnameException('اسم النطاق غير صالح.');
             }
         }
+    }
+
+    /**
+     * شريحة hostname واحدة صالحة: a-z 0-9 وشرطة داخلية فقط، تبدأ وتنتهي بحرف/رقم،
+     * حتى 63 حرفاً. المصدر الوحيد لهذه القاعدة (يستعمله `assertValid` وفحص
+     * معرّف المستأجر عند التسجيل) فلا تنحرف قاعدتان.
+     */
+    public static function isValidLabel(string $label): bool
+    {
+        return $label !== ''
+            && strlen($label) <= self::MAX_LABEL_LENGTH
+            && preg_match('/\A[a-z0-9]([a-z0-9-]*[a-z0-9])?\z/', $label) === 1;
     }
 }

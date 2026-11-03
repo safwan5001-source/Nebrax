@@ -22,7 +22,7 @@ const schema = z.object({
   email: z.string().email(),
   // E.164 دولي («+9665XXXXXXXX»)؛ يتحقق من نمط الدولة الفعلي لا من السعودية وحدها.
   phone: z.string().refine((value) => isValidE164(value)),
-  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/).refine((value) => !isReservedTenantSlug(value), { message: 'reserved' }),
+  slug: z.string().min(1).max(63).regex(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/).refine((value) => !isReservedTenantSlug(value), { message: 'reserved' }),
   password: z.string().min(8),
 });
 

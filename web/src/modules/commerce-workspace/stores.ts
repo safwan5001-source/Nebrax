@@ -59,6 +59,24 @@ export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> 
 }
 
 /**
+ * فشل إنشاء/تزويد متجر. `message` كما كان (رمز/نص خام للتوافق)، و`status`/`reason` إضافيان
+ * ويظهران فقط حين يكون الخطأ استجابة HTTP من الخادم — تعتمد عليهما الواجهة لعرض سبب واضح.
+ */
+export type CommerceStoreCreateFailure = { ok: false; message: string; status?: number; reason?: string };
+
+function createFailureFrom(error: unknown, fallback: string): CommerceStoreCreateFailure {
+  const message = error instanceof Error ? error.message : fallback;
+  // فحص شكلي لا `instanceof ApiError`: يعمل مع الخطأ الحقيقي ومع محاكيات الاختبار التي لا تصدّر الصنف.
+  const http = error as { status?: unknown; body?: unknown } | null;
+  if (error instanceof Error && typeof http?.status === 'number') {
+    const body = http.body as { reason?: unknown } | null;
+    const reason = body && typeof body === 'object' && typeof body.reason === 'string' ? body.reason : undefined;
+    return { ok: false, message, status: http.status, ...(reason ? { reason } : {}) };
+  }
+  return { ok: false, message };
+}
+
+/**
  * COM-STORE-PROVISION-1 — يزوّد أول متجر إلكتروني للمستأجر الحالي. لا يقبل
  * أي هوية (مستأجر/نطاق/قناة) — الخادم وحده يشتقّها من `TenantContext`
  * الموثوق. `name` اختياري ويُستعمل فقط عند إنشاء متجر جديد فعلياً.
@@ -66,7 +84,7 @@ export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> 
 export async function provisionCommerceStorefront(
   name?: string,
   businessVertical?: CommerceBusinessVertical,
-): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+): Promise<{ ok: true; store: CommerceStoreOption } | CommerceStoreCreateFailure> {
   try {
     const body: Record<string, string> = {};
     if (name && name.trim() !== '') body.name = name.trim();
@@ -79,8 +97,7 @@ export async function provisionCommerceStorefront(
     if (!store) return { ok: false, message: 'invalid_payload' };
     return { ok: true, store };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'provision_failed';
-    return { ok: false, message };
+    return createFailureFrom(error, 'provision_failed');
   }
 }
 
@@ -88,7 +105,7 @@ export async function provisionCommerceStorefront(
 export async function createCommerceStorefront(
   name: string,
   defaultLocale: CommerceStoreLocale = 'ar',
-): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+): Promise<{ ok: true; store: CommerceStoreOption } | CommerceStoreCreateFailure> {
   try {
     const payload = await api<unknown>(COMMERCE_STORE_CREATE_PATH, {
       method: 'POST',
@@ -98,8 +115,7 @@ export async function createCommerceStorefront(
     if (!store) return { ok: false, message: 'invalid_payload' };
     return { ok: true, store };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'create_failed';
-    return { ok: false, message };
+    return createFailureFrom(error, 'create_failed');
   }
 }
 

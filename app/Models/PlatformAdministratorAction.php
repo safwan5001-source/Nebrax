@@ -27,6 +27,7 @@ class PlatformAdministratorAction extends Model
     public const ACTION_APPLICATION_GLOBAL_BULK = 'application_global_bulk';
     public const ACTION_FILE_SCAN_EXCEPTION_GRANTED = 'file_scan_exception_granted';
     public const ACTION_FILE_SCAN_EXCEPTION_REVOKED = 'file_scan_exception_revoked';
+    public const ACTION_SLUG_CHANGED = 'tenant_slug_changed';
 
     public $incrementing = false;
 

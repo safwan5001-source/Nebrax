@@ -25,8 +25,11 @@ use App\Support\Commerce\BusinessVertical;
 use App\Support\Dns\DnsOperationalException;
 use App\Support\InvalidHostnameException;
 use App\Support\StorefrontBaseDomainMisconfiguredException;
+use App\Support\TenantSlugNotHostnameSafeException;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -75,7 +78,10 @@ class CommerceWorkspaceStorefrontsController extends ApiController
                 BusinessVertical::tryFrom((string) $request->validated('business_vertical')),
                 $request->customerAccountsEnabled(),
             );
+        } catch (TenantSlugNotHostnameSafeException $e) {
+            return $this->tenantSlugNotHostnameSafe($e);
         } catch (StorefrontBaseDomainMisconfiguredException $e) {
+            $this->reportBaseDomainMisconfigured($e);
             abort(500, $e->getMessage());
         } catch (StorefrontHostnameConflictException $e) {
             abort(409, $e->getMessage());
@@ -103,7 +109,10 @@ class CommerceWorkspaceStorefrontsController extends ApiController
 
         try {
             $store = $creator->create($request->normalizedName(), $request->locale(), $request->customerAccountsEnabled());
+        } catch (TenantSlugNotHostnameSafeException $e) {
+            return $this->tenantSlugNotHostnameSafe($e);
         } catch (StorefrontBaseDomainMisconfiguredException $e) {
+            $this->reportBaseDomainMisconfigured($e);
             abort(500, $e->getMessage());
         } catch (StorefrontHostnameConflictException $e) {
             abort(409, $e->getMessage());
@@ -410,6 +419,32 @@ class CommerceWorkspaceStorefrontsController extends ApiController
 
         return response()->json([
             'data' => ['domain' => $domain],
+        ]);
+    }
+
+    /**
+     * معرّف المستأجر (slug) لا يصلح شريحة hostname — مشكلة بيانات خاصة بالمستأجر لا خلل خادم:
+     * 422 برمز ثابت ورسالة قابلة للتنفيذ، بدل 500 صامت (HttpException لا يُسجَّل في Laravel).
+     * يُرمى قبل أي كتابة في المعاملة فلا أثر جزئي.
+     */
+    private function tenantSlugNotHostnameSafe(TenantSlugNotHostnameSafeException $e): JsonResponse
+    {
+        Log::warning('storefront.provisioning.tenant_slug_not_hostname_safe', [
+            'tenant_id' => app(TenantContext::class)->id(),
+        ]);
+
+        return response()->json([
+            'message' => 'تعذّر إنشاء المتجر: معرّف حساب الشركة الحالي لا يصلح لتكوين عنوان المتجر (المسموح: أحرف إنجليزية صغيرة وأرقام وشرطات فقط). تواصل مع الدعم لتصحيح المعرّف ثم أعد المحاولة.',
+            'reason' => 'tenant_slug_not_hostname_safe',
+        ], 422);
+    }
+
+    /** النطاق الأساسي المُدار مضبوط خطأً في الخادم: يبقى 500 لكن يُسجَّل (بلا قيم إعداد) كي لا يكون صامتاً. */
+    private function reportBaseDomainMisconfigured(StorefrontBaseDomainMisconfiguredException $e): void
+    {
+        Log::error('storefront.provisioning.base_domain_misconfigured', [
+            'tenant_id' => app(TenantContext::class)->id(),
+            'reason' => $e->getMessage(),
         ]);
     }
 }

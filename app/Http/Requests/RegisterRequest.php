@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\Commerce\ManagedHostnameAvailability;
+use App\Support\ManagedStorefrontHostname;
 use App\Tenancy\ReservedTenantSlugs;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -69,13 +70,27 @@ class RegisterRequest extends FormRequest
     {
         return [
             'company_name' => ['required', 'string', 'max:255'],
-            'slug'         => ['required', 'string', 'alpha_dash', 'max:255', 'unique:tenants,slug', Rule::notIn(ReservedTenantSlugs::all()), $this->slugNotUsedByManagedStorefrontHost()],
+            'slug'         => ['required', 'string', 'max:63', $this->slugIsHostnameSafe(), 'unique:tenants,slug', Rule::notIn(ReservedTenantSlugs::all()), $this->slugNotUsedByManagedStorefrontHost()],
             'vat_number'   => ['nullable', 'string', 'size:15'],
             'name'         => ['nullable', 'string', 'max:255'], // اسم المالك — يُشتق من الاسم التجاري إن غاب
             'phone'        => ['nullable', 'string', 'max:255', $this->phoneRule()], // رقم الجوال: E.164 إن بدأ بـ+ وإلا كما كان (توافق)
             'email'        => ['required', 'email', 'max:255', 'unique:users,email'], // فريد عالمياً (الدخول بالبريد)
             'password'     => ['required', 'string', 'min:8'],
         ];
+    }
+
+    /**
+     * المعرّف يصير شريحة hostname (`{slug}.{base}`) لعنوان الحساب وللمتجر المُدار، فيجب أن يكون
+     * شريحة صالحة: a-z وأرقام وشرطة داخلية فقط. كان `alpha_dash` يقبل الحروف غير اللاتينية
+     * و`_` فيُنشأ مستأجر يستحيل تزويد متجره لاحقاً (HTTP 500). المصدر: `HostnameNormalizer::isValidLabel`.
+     */
+    private function slugIsHostnameSafe(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (is_string($value) && ! ManagedStorefrontHostname::isHostnameSafeSlug($value)) {
+                $fail('المعرّف يقبل أحرفاً إنجليزية صغيرة وأرقاماً وشرطات فقط، ويبدأ وينتهي بحرف أو رقم.');
+            }
+        };
     }
 
     /**

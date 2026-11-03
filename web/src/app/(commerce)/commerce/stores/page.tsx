@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { describeCreateStoreFailure } from '@/modules/commerce-workspace/create-store-error';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
@@ -51,7 +52,7 @@ export default function CommerceStoresPage() {
     try {
       const result = await provisionCommerceStorefront();
       if (!result.ok) {
-        showErrorToast(t('createStoreFailed'));
+        showErrorToast(describeCreateStoreFailure(result, locale));
         return;
       }
       await refresh(result.store.id);
