@@ -48,6 +48,8 @@ final class CommerceOrderFeedSerializer
             ],
             'payment' => ['method' => $intent?->method, 'status' => $intent?->status],
             'reasons' => $query->reasonsFor($order),
+            // COPS-H3-3: ما يُبنى عليه الصوت/الشارة (غير المُعالَج) — حكم الخادم الوحيد؛ العميل لا يستنتجه من الأسباب.
+            'alert' => ['pending' => $query->alertPending($order)],
         ];
     }
 }

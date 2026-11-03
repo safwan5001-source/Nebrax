@@ -53,6 +53,7 @@ use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
 use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
+use App\Http\Controllers\Api\CommerceAlertConfigController;
 use App\Http\Controllers\Api\CommerceStaffOrderFeedController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1200,6 +1201,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('commerce/orders/feed', [CommerceStaffOrderFeedController::class, 'feed'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/attention', [CommerceStaffOrderFeedController::class, 'attention'])
+            ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COPS-H3-3 (ADR-30): إعداد مركز التنبيه من الخادم (مفعَّل؟ وضع الاستطلاع؟ الوتيرة) — قراءة فقط، commerce.orders.view؛ البوابة المغلقة ⇒ `enabled=false`.
+        Route::get('commerce/alerts/config', [CommerceAlertConfigController::class, 'show'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);

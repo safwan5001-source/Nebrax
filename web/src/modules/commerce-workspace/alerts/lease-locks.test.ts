@@ -1,0 +1,61 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createLeaseLocks, type LeaseStorage } from './lease-locks';
+
+function memory(): LeaseStorage {
+  const m = new Map<string, string>();
+
+  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k) };
+}
+
+describe('lease locks (سقوط بلا Web Locks)', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('إيجار حصري: الثاني ينتظر حتى يحرّر الأول', async () => {
+    const storage = memory();
+    const now = () => Date.now();
+    const a = createLeaseLocks(storage, 'a', now);
+    const b = createLeaseLocks(storage, 'b', now);
+    const order: string[] = [];
+    let releaseA: () => void = () => {};
+
+    void a.request('n', { mode: 'exclusive' }, () => new Promise<void>((r) => { order.push('a'); releaseA = r; }));
+    await vi.advanceTimersByTimeAsync(0);
+    void b.request('n', { mode: 'exclusive' }, () => new Promise<void>((r) => { order.push('b'); r(); }));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(order).toEqual(['a']);
+
+    releaseA();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(order).toEqual(['a', 'b']);
+  });
+
+  it('إيجار ميت (تبويب أُغلق بلا تجديد) يتولاه المنتظر بعد المهلة', async () => {
+    const storage = memory();
+    storage.setItem('awj:lease:n', JSON.stringify({ owner: 'ghost', ts: 0 }));
+    const b = createLeaseLocks(storage, 'b', () => Date.now());
+    const got = vi.fn();
+    void b.request('n', { mode: 'exclusive' }, () => new Promise<void>((r) => { got(); r(); }));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(got).not.toHaveBeenCalled(); // الإيجار ما زال حيّاً (ts=0, الآن=1000 < 6000)
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(got).toHaveBeenCalledTimes(1);
+  });
+
+  it('الحامل يجدّد فلا يسرقه المنتظر، والإلغاء بالإشارة يرفض الطلب المنتظِر', async () => {
+    const storage = memory();
+    const now = () => Date.now();
+    const a = createLeaseLocks(storage, 'a', now);
+    const b = createLeaseLocks(storage, 'b', now);
+    void a.request('n', { mode: 'exclusive' }, () => new Promise<void>(() => {}));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const ctl = new AbortController();
+    const waiting = b.request('n', { mode: 'exclusive', signal: ctl.signal }, async () => {});
+    const rejected = waiting.then(() => 'ok', (e: Error) => e.name);
+    await vi.advanceTimersByTimeAsync(30_000); // أكثر من TTL: a يجدّد كل 2ث
+    ctl.abort();
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(await rejected).toBe('AbortError');
+  });
+});

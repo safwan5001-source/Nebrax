@@ -63,6 +63,17 @@ return [
     'order_alerts_enabled' => (bool) env('COMMERCE_ORDER_ALERTS_ENABLED', false),
 
     /*
+    | وتيرة استطلاع مركز التنبيه (COPS-H3-3، يعلنها الخادم عبر `GET commerce/alerts/config` فيمكن ضبطها/إيقافها دون نشر واجهة). القيم بالمللي ثانية:
+    | `feed_ms` استطلاع التغذية (مؤشّر تغيّر رخيص مع ETag/304) في الوضع المدعوم؛ `attention_ms` مصالحة الحالة؛ `attention_only_ms` للمقيَّد بمخازن (لا تغذية له).
+    | الهدف الداخلي ≤ 15ث p95 (ADR-30 §0 R-11): 10ث + زمن الطلب + مهلة. القيم تُقيَّد في المتحكّم (feed ≥ 5000، attention ≥ 15000، attention_only ≥ 10000).
+    */
+    'order_alerts_polling' => [
+        'feed_ms' => (int) env('COMMERCE_ORDER_ALERTS_FEED_MS', 10_000),
+        'attention_ms' => (int) env('COMMERCE_ORDER_ALERTS_ATTENTION_MS', 60_000),
+        'attention_only_ms' => (int) env('COMMERCE_ORDER_ALERTS_ATTENTION_ONLY_MS', 15_000),
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | نافذة حداثة مصالحة الانتباه — COPS-H1-2 (ADR-29 §2.4)
     |--------------------------------------------------------------------------

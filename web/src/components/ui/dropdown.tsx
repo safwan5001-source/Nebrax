@@ -163,7 +163,8 @@ export function Dropdown({
             : 'absolute top-full z-50 mt-1 min-w-36 rounded border border-border bg-surface p-1 shadow-md',
           'transition duration-150 ease-out',
           mobilePopover
-            ? (align === 'end' ? 'lg:end-0' : 'lg:start-0')
+            // `lg:!left-auto` يلغي موضع الجوال المضمَّن؛ في RTL يسقط `end-0` (= left) فيعود الموضع الساكن إلى اليمين ويخرج القائمة عن الشاشة، فنثبّت left:0 صراحةً (COPS-H3-3).
+            ? (align === 'end' ? 'lg:end-0 lg:rtl:!left-0' : 'lg:start-0')
             : (align === 'end' ? 'end-0' : 'start-0'),
           open ? 'opacity-100 translate-y-0' : 'pointer-events-none translate-y-1 opacity-0',
           menuClassName
