@@ -1,7 +1,7 @@
 # COPS Horizon — Handoff (التسليم الحيّ)
 
 **البرنامج:** AWJ Commerce Operations Horizon (COPS) — امتداد لـ `AWJ_STORE_COMMERCE_MASTER_HORIZON_V1` (المتتبّع §9).
-**آخر تحديث:** 2026-11-03 — **COPS-H2 مغلق (H2-1 … H2-6 مدموجة؛ التفاصيل في `AWJ_COPS_H2_HORIZON_CLOSURE_REPORT.md`؛ التوقف قبل H3 بتفويض المالك).** سجل سابق: **COPS-H2 قيد التنفيذ الذاتي المفوَّض (H2-1 … H2-6):** اعتُمدت القرارات التسعة المتبقية (D-H2-11، 13..20) وفُوِّض Sonnet بالتنفيذ والدمج بالتتابع بشروط التوقف؛ H2-0 مدموج (#1937 ⇒ `0f4606720`، #1938 ⇒ `4768967a9`). **H2-1 (نواة التنفيذ):** مُنفَّذ ومُختبَر — الدمج وSHA في تقرير إغلاق H2. COPS-H1 مغلق (#1936 ⇒ `21b59852c`).
+**آخر تحديث:** 2026-11-03 — **COPS-H3 مكتمل ضمن التفويض (H3-1/3/4 مدموجة؛ `AWJ_COPS_H3_FINAL_REPORT.md`)؛ H3-5 بانتظار مرجع بصري.** سجل سابق: **COPS-H2 مغلق (H2-1 … H2-6 مدموجة؛ التفاصيل في `AWJ_COPS_H2_HORIZON_CLOSURE_REPORT.md`؛ التوقف قبل H3 بتفويض المالك).** سجل سابق: **COPS-H2 قيد التنفيذ الذاتي المفوَّض (H2-1 … H2-6):** اعتُمدت القرارات التسعة المتبقية (D-H2-11، 13..20) وفُوِّض Sonnet بالتنفيذ والدمج بالتتابع بشروط التوقف؛ H2-0 مدموج (#1937 ⇒ `0f4606720`، #1938 ⇒ `4768967a9`). **H2-1 (نواة التنفيذ):** مُنفَّذ ومُختبَر — الدمج وSHA في تقرير إغلاق H2. COPS-H1 مغلق (#1936 ⇒ `21b59852c`).
 **القاعدة:** يُحدَّث هذا الملف في نهاية كل شريحة (Slice) قبل التوقف. هو نقطة الاستئناف الوحيدة؛ لا يُعاد الاستكشاف.
 
 ---
@@ -57,15 +57,19 @@
 | H3-0 | **Merged** (وثائق، 2026-11-03) — الخطة وسجل القرارات وADR-30 (Proposed) | #1954 | `23a0beaffb263df3aa5775984accde4d97c43cb8` | `AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md`؛ Base `f92eec456`، Head `b7c28d13a` |
 | H3-7 | **Merged** (2026-11-03) — دمج التفضيلات + `commerce_alerts.enabled`؛ CI كامل أخضر؛ Codex بلا ملاحظات | #1956 | `c3a84837a12658f35d579d0ec2e5478c5bb20e13` | `AWJ-COPS-H3-7-IMPLEMENTATION-REPORT.md`؛ Head `e60d5172c`؛ بلا هجرة |
 | H3-2 | **Merged** (2026-11-03) — محرّك صوت التنبيهات؛ CI كامل أخضر؛ خمس ملاحظات Codex صحيحة أُصلحت | #1955 | `59ed2640bfce7af70200237daf82bdad09f8922f` | `AWJ-COPS-H3-2-IMPLEMENTATION-REPORT.md`؛ Head `766c11297`؛ POS بلا تغيير؛ ويب فقط |
+| H3-1 | **Merged** (2026-11-03) — منتج إشعار الطلب الجديد (R-8، R-5) + الجرس في غلاف Commerce؛ مغلق بـ`COMMERCE_ORDER_ALERTS_ENABLED` | #1959 | `f34d0d157642c554905d71337d3bf44e78ce4cc7` | `AWJ-COPS-H3-1-IMPLEMENTATION-REPORT.md`؛ Head `fa83bda83`؛ بلا هجرة |
+| H3-3 | **Merged** (2026-11-03) — مركز التنبيه: قائد واحد/جهاز، مصالحة attention، تسليح الصوت، `alerts/config`/`head_seq`/ETag/`pending=1`؛ CI كامل أخضر؛ 11 ملاحظة Codex صحيحة أُصلحت باختبارات انحدار | #1961 | `a1a8c4328cca86e951bb3ffccef978fa64317dc2` | `AWJ-COPS-H3-3-IMPLEMENTATION-REPORT.md`؛ Head `c0eafe349`؛ بلا هجرة |
+| H3-4 | **Merged** (2026-11-03) — إقرار لكل طلب (R-10): جدول + حدث `order.acknowledged` + `POST …/acknowledge`؛ CI كامل أخضر؛ 5 ملاحظات Codex أُصلحت | #1962 | `da1b33ee0cff38e3b17a20f760ab4a758d2da2ff` | `AWJ-COPS-H3-4-IMPLEMENTATION-REPORT.md`؛ Head `8ae0c8b25`؛ هجرة إضافية `2027_01_03_010000` |
+| H3-قرارات | **Merged** (وثائق) — اعتماد R-8/R-10/R-11/D-H3-01/D-H3-02؛ ADR-30 **Accepted** | #1958 | `97d6cbf77b188390dfe063b55a283f65d06b244f` | `AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md` §5 |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 
 ---
 
-## 3.H3 نقطة الاستئناف — COPS-H3 (مفوَّض 2026-11-03، بشرط التوقف عند بوابات القرار)
+## 3.H3 نقطة الاستئناف — COPS-H3 (اكتمل النطاق المفوَّض 2026-11-03)
 
-**الحالة: مغلق جزئياً عند بوابة قرار** — H3-0/H3-2/H3-7 مدموجة؛ تقرير الإغلاق `AWJ_COPS_H3_HORIZON_CLOSURE_REPORT.md`؛ H3-1/3/4/5 تنتظر R-8/R-10/R-11/D-H3-01/D-H3-02. **المرجع:** `docs/audits/AWJ_COPS_H3_0_DECISION_AND_EXECUTION_PLAN.md` (الخطة وسجل القرارات) + `docs/plans/store/ADR-30-COMMERCE-ALERT-RECEPTION.md` (**Proposed**).
-**تُنفَّذ:** H3-0 (وثائق) · H3-2 (محرّك الصوت) · H3-7 (دمج التفضيلات). **محجوبة بقرار المالك:** H3-1 (R-8، D-H3-01) · H3-3 (R-11، D-H3-01، D-H3-02) · H3-4 (R-10) · H3-5 (تابعة H3-3). **خارج التفويض:** H3-6 (D-OPS-3 + H4-3) · H3-P. لا تفعيل ولا نشر ولا Railway. سجل PR/Base/Head/Merge SHA لكل شريحة في `AWJ_COPS_H3_HORIZON_CLOSURE_REPORT.md` (لا PR سجلات منفصل).
+**الحالة: النطاق المفوَّض مكتمل (H3-0 · H3-1 · H3-2 · H3-3 · H3-4 · H3-7 مدموجة).** التقرير النهائي (PR/Base/Head/Merge SHA، الاختبارات، CI، Codex، المخاطر، GO/NO-GO): `docs/audits/AWJ_COPS_H3_FINAL_REPORT.md`. القرارات الخمسة معتمدة وADR-30 **Accepted**.
+**الخطوة التالية: لا شيء مفوَّض.** H3-5 تنتظر **مرجعاً بصرياً من المالك** (المتطلبات جاهزة في `docs/plans/store/AWJ_COPS_H3_5_RECEPTION_WORKSPACE_REQUIREMENTS.md`). H3-6 (D-OPS-3 + H4-3) وH3-P وH4 وH2-7 وH2-8 خارج التفويض ولم تُبدأ. **تفعيل البوابة `COMMERCE_ORDER_ALERTS_ENABLED` NO-GO حتى** قرار تفعيل مستقل + اختبار أجهزة حقيقي. لا نشر ولا Railway.
 
 ## 3.A نقطة الاستئناف الحالية — H2 (تنفيذ ذاتي مفوَّض بالتتابع H2-1 … H2-6)
 
