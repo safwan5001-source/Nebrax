@@ -51,6 +51,32 @@ class PartnerStatementLifecycleController extends ApiController
         return response()->json(['data' => $result['status'], 'replayed' => $result['replayed']], $result['replayed'] ? 200 : 201);
     }
 
+    /** إبطال مطابقة مغلقة (PS-A3e): `closed → voided` بسبب إلزامي، وتُفرَج مطالباتها النشطة في المعاملة نفسها. `partner_statements.void`. */
+    public function void(Request $request, string $id): JsonResponse
+    {
+        $this->rejectUnknown($request, ['reason']);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        $result = $this->domain(fn () => $this->lifecycle->void($request->user(), $id, $data['reason']));
+
+        return response()->json(['data' => $result['status'], 'replayed' => $result['replayed']], $result['replayed'] ? 200 : 201);
+    }
+
+    /**
+     * استبدال ذرّي (PS-A3e): يُبطَل كل نهائي في `replaces` (`closed → superseded`) ثم تُغلق مطابقة `{id}` المراجَعة في معاملة واحدة.
+     * يتطلب الإغلاق (`partner_statements.close` على المسار) **و**الإبطال (`partner_statements.void` تتحقق منه الخدمة).
+     */
+    public function replace(Request $request, string $id): JsonResponse
+    {
+        $this->rejectUnknown($request, ['run_id', 'replaces', 'reason', 'acknowledge_overlap', 'note']);
+        $data = $request->validate([
+            'run_id' => ['required', 'uuid'], 'replaces' => ['required', 'array', 'min:1', 'max:'.PartnerStatementLifecycleService::MAX_REPLACES], 'replaces.*' => ['uuid', 'distinct'],
+            'reason' => ['required', 'string', 'max:500'], 'acknowledge_overlap' => ['nullable', 'array'], 'acknowledge_overlap.*' => ['uuid'], 'note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $result = $this->domain(fn () => $this->lifecycle->replace($request->user(), $id, $data));
+
+        return response()->json(['data' => $result['status'], 'replayed' => $result['replayed']], $result['replayed'] ? 200 : 201);
+    }
+
     public function events(Request $request, string $id): JsonResponse
     {
         $this->rejectUnknown($request, ['per_page', 'page']);
