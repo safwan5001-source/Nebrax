@@ -54,6 +54,7 @@ final class CommerceOrderEventRecorder
         CommerceOrderEvent::PAYMENT_PAID => CommerceOrderPaymentPaid::class,
         CommerceOrderEvent::PAYMENT_COLLECTED => CommerceOrderPaymentCollected::class,
         CommerceOrderEvent::ORDER_ACCEPTED => CommerceOrderAccepted::class,
+        CommerceOrderEvent::ORDER_ACKNOWLEDGED => \App\Events\CommerceOrderAcknowledged::class,
         CommerceOrderEvent::FULFILLMENT_STARTED => \App\Events\CommerceOrderFulfillmentStarted::class,
         CommerceOrderEvent::FULFILLMENT_READY => \App\Events\CommerceOrderFulfillmentReady::class,
         CommerceOrderEvent::FULFILLMENT_DISPATCHED => \App\Events\CommerceOrderFulfillmentDispatched::class,

@@ -27,7 +27,7 @@ function make(over: Partial<OrderAlertsState> = {}): OrderAlertsState {
     role: 'leader',
     soundState: 'armed',
     soundOwner: true,
-    silence: vi.fn(),
+    acknowledge: vi.fn().mockResolvedValue({ ok: true, created: true }),
     enableSound: vi.fn().mockResolvedValue('armed'),
     testSound: vi.fn().mockResolvedValue(true),
     ...over,
@@ -55,9 +55,9 @@ describe('OrderAlertCenter', () => {
     expect(screen.getByText('قد يتأخر التنبيه أو لا يصل إذا كانت الصفحة في الخلفية أو كان الجهاز مقفلاً.')).toBeTruthy();
   });
 
-  it('طلبات معلّقة: شارة بالعدد، وصف لكل طلب برقمه وأسبابه ورابط فتح صحيح وزر إسكات', () => {
-    const silence = vi.fn();
-    state.current = make({ snapshot: live({ pending: [pendingItem('o-1', 'CORD-1'), pendingItem('o-2', 'CORD-2')], total: 2 }), silence });
+  it('طلبات معلّقة: شارة بالعدد، وصف لكل طلب برقمه وأسبابه ورابط فتح صحيح وزر إقرار مع شرحه', () => {
+    const acknowledge = vi.fn().mockResolvedValue({ ok: true, created: true });
+    state.current = make({ snapshot: live({ pending: [pendingItem('o-1', 'CORD-1'), pendingItem('o-2', 'CORD-2')], total: 2 }), acknowledge });
     render(<OrderAlertCenter />);
     expect(screen.getByTestId('alert-badge').textContent).toBe('2');
     open();
@@ -67,8 +67,35 @@ describe('OrderAlertCenter', () => {
     expect(items[0].textContent).toContain('طلب جديد');
     expect(items[0].textContent).toContain('بانتظار القبول');
     expect(screen.getAllByRole('link', { name: 'فتح الطلب' })[1].getAttribute('href')).toBe('/commerce/orders/o-2');
-    fireEvent.click(screen.getAllByRole('button', { name: 'إسكات على هذا الجهاز' })[0]);
-    expect(silence).toHaveBeenCalledWith('o-1');
+    expect(screen.getByText(/يُسكت التنبيه على كل الأجهزة والمستخدمين، ولا يغيّر حالة الطلب/)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'إقرار الطلب' })[0]);
+    expect(acknowledge).toHaveBeenCalledWith('o-1');
+  });
+
+  it('الإقرار: تعطيل أثناء الطلب (لا إرسال مكرر)، وفشل عابر يعرض رسالة، وحالة مستقرة (settled) بلا رسالة', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    const acknowledge = vi.fn()
+      .mockImplementationOnce(() => new Promise((r) => { resolve = r; }))
+      .mockResolvedValueOnce({ ok: false, settled: false, status: null, reason: null })
+      .mockResolvedValueOnce({ ok: false, settled: true, status: 409, reason: 'already_cancelled' });
+    state.current = make({ snapshot: live({ pending: [pendingItem('o-1', 'CORD-1')], total: 1 }), acknowledge });
+    render(<OrderAlertCenter />);
+    open();
+    const button = () => screen.getAllByRole('button').find((b) => /إقرار الطلب|جارٍ الإقرار/.test(b.textContent ?? '')) as HTMLButtonElement;
+
+    fireEvent.click(button());
+    fireEvent.click(button()); // نقرة ثانية أثناء الطلب
+    expect(acknowledge).toHaveBeenCalledTimes(1);
+    expect(button().disabled).toBe(true);
+    expect(button().textContent).toBe('جارٍ الإقرار…');
+    await act(async () => { resolve({ ok: true, created: true }); });
+    expect(button().textContent).toBe('إقرار الطلب');
+
+    await act(async () => { fireEvent.click(button()); });
+    expect(screen.getByTestId('alert-ack-error').textContent).toContain('تعذّر إقرار الطلب');
+
+    await act(async () => { fireEvent.click(button()); });
+    expect(screen.queryByTestId('alert-ack-error')).toBeNull(); // تُمسح الرسالة عند المحاولة، والحالة المستقرة لا تُظهر خطأً
   });
 
   it('الشارة 99+ للأعداد الكبيرة', () => {

@@ -41,6 +41,18 @@ export class SilencedStore {
     return new Set(Object.keys(this.read()));
   }
 
+  /** تراجع عن إسكات متفائل فشل إقراره الخادمي (شبكة/5xx): يعود التنبيه. */
+  remove(ids: string[]): void {
+    if (ids.length === 0) return;
+    const current = this.read();
+    for (const id of ids) delete current[id];
+    try {
+      this.storage?.setItem(this.key(), JSON.stringify(current));
+    } catch {
+      // لا يمنع الاستطلاع.
+    }
+  }
+
   add(ids: string[]): void {
     if (ids.length === 0) return;
     const current = this.read();

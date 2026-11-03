@@ -49,7 +49,12 @@ final class CommerceOrderFeedSerializer
             'payment' => ['method' => $intent?->method, 'status' => $intent?->status],
             'reasons' => $query->reasonsFor($order),
             // COPS-H3-3: ما يُبنى عليه الصوت/الشارة (غير المُعالَج) — حكم الخادم الوحيد؛ العميل لا يستنتجه من الأسباب.
-            'alert' => ['pending' => $query->alertPending($order)],
+            'alert' => [
+                'pending' => $query->alertPending($order),
+                // COPS-H3-4 (R-10): الإقرار لكل طلب؛ الطلب يبقى في القائمة (لا يُخرَج) ويُعلَن الإقرار فقط.
+                'acknowledged' => $order->acknowledgement !== null,
+                'acknowledged_at' => $order->acknowledgement?->acknowledged_at?->toIso8601String(),
+            ],
         ];
     }
 }

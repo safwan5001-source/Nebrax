@@ -2,8 +2,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
  * COPS-H3-3 — مركز تنبيه الطلبات في متصفح حقيقي (سطح مكتب 1440 + جوال 390، عربي/إنجليزي RTL/LTR، فاتح/داكن). الخادم مُعترَض بالكامل.
- * يتحقق من: بوابة مغلقة ⇒ لا طلبات استطلاع، تهيئة من الرأس لا التاريخ، الشارة والقائمة، شريط تفعيل الصوت، الإسكات، الاتجاه، عدم تجاوز العرض الأفقي،
- * وأن المقيَّد بمخازن لا يستدعي التغذية. اللقطات تُكتب فقط حين يُضبط `H33_SHOTS`.
+ * يتحقق من: بوابة مغلقة ⇒ لا طلبات استطلاع، تهيئة من الرأس لا التاريخ، الشارة والقائمة، شريط تفعيل الصوت، الإقرار، الاتجاه، عدم تجاوز العرض الأفقي،
+ * وأن المقيَّد بمخازن لا يستدعي التغذية، والإقرار POST واحد. اللقطات تُكتب فقط حين يُضبط `H33_SHOTS`.
  */
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 const shots = process.env.H33_SHOTS;
@@ -38,6 +38,9 @@ async function open(page: Page, opts: Opts = {}) {
       return json(route, { data: [], meta: { after_seq: 5, next_after_seq: 5, has_more: false, limit: 100, head_seq: 5 } });
     }
     if (p === '/commerce/orders/attention') return json(route, { data: rows, meta: { truncated: false, window_hours: 48, limit: 100 } });
+    if (method === 'POST' && /^\/commerce\/orders\/[0-9a-f-]+\/acknowledge$/.test(p)) {
+      return json(route, { data: { order_id: p.split('/')[3], acknowledged: true, acknowledged_at: '2026-11-03T10:05:00+03:00', created: true } });
+    }
     if (p === '/notifications/unread-count') return json(route, { data: { count: 0 } });
     if (p === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
@@ -83,14 +86,16 @@ for (const locale of ['ar', 'en'] as const) {
   }
 }
 
-test('الإسكات يُنقص الشارة والعنصر، والطلب لا يُحذف من الخادم (لا كتابة)', async ({ page }) => {
+test('الإقرار (R-10) يُنقص الشارة والعنصر ويرسل POST إقرار واحداً فقط ولا يلمس غيره', async ({ page }) => {
   const requests = await open(page);
   await expect(page.getByTestId('alert-badge')).toHaveText('2', { timeout: 15_000 });
   await trigger(page).click();
-  await page.getByRole('button', { name: /إسكات على هذا الجهاز/ }).first().click();
+  await page.getByRole('button', { name: /إقرار الطلب/ }).first().click();
   await expect(page.getByTestId('alert-item')).toHaveCount(1);
   await expect(page.getByTestId('alert-badge')).toHaveText('1');
-  expect(requests.filter((r) => !r.startsWith('GET')).length).toBe(0);
+  const writes = requests.filter((r) => !r.startsWith('GET'));
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toMatch(/^POST \/commerce\/orders\/[0-9a-f-]+\/acknowledge$/);
 });
 
 test('تفعيل الصوت بنقرة يُخفي الشريط الدائم', async ({ page }) => {

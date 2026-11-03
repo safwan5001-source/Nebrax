@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { alertSound, type AlertSoundState } from '@/lib/alert-sound';
 import { useCan, useCurrentUser } from '@/lib/use-can';
 import { AlertEngine } from './alert-engine';
+import { acknowledgeOrder, type AcknowledgeOutcome } from './acknowledge-order';
 import { fetchAlertConfig, fetchAttention, fetchFeedHead, fetchFeedPage } from './alerts-api';
 import { EMPTY_SNAPSHOT, type AlertConfig, type AlertSnapshot } from './contract';
 import { createLeaseLocks } from './lease-locks';
@@ -21,7 +22,8 @@ export interface OrderAlertsState {
   role: TabRole;
   soundState: AlertSoundState;
   soundOwner: boolean;
-  silence: (orderId: string) => void;
+  /** إقرار الطلب (R-10): يُسكت محلياً فوراً ثم يطلب الخادم؛ الفشل العابر يُرجع التنبيه. */
+  acknowledge: (orderId: string) => Promise<AcknowledgeOutcome>;
   enableSound: () => Promise<AlertSoundState>;
   testSound: () => Promise<boolean>;
 }
@@ -43,7 +45,7 @@ export function useOrderAlerts(): OrderAlertsState {
   const [role, setRole] = useState<TabRole>('follower');
   const [soundState, setSoundState] = useState<AlertSoundState>(alertSound.state);
   const [soundOwner, setSoundOwner] = useState(false);
-  const controls = useRef<{ silence: (id: string) => void } | null>(null);
+  const controls = useRef<{ acknowledge: (id: string) => Promise<AcknowledgeOutcome> } | null>(null);
   const interactedAt = useRef(Date.now());
 
   // 1) إعداد الخادم مرة لكل (مستخدم، تركيب). مغلق/غير مصرَّح ⇒ off بلا أي استطلاع.
@@ -99,15 +101,24 @@ export function useOrderAlerts(): OrderAlertsState {
     });
 
     let owner = false;
-    let latest: AlertSnapshot = EMPTY_SNAPSHOT;
+    // اللقطة كما وصلت (من محرّكنا أو من القائد)؛ العرض = اللقطة مطروحاً منها المُسكَت محلياً (يُحسب عند كل تغيير فيعود التنبيه إن تراجع الإسكات).
+    let raw: AlertSnapshot = EMPTY_SNAPSHOT;
+    const view = (): AlertSnapshot => {
+      const ids = silenced.ids();
+
+      return ids.size === 0 ? raw : { ...raw, pending: raw.pending.filter((p) => !ids.has(p.orderId)) };
+    };
     const syncSound = (): void => {
-      if (owner) alertSound.syncActive(latest.pending.map((p) => p.orderId));
+      if (owner) alertSound.syncActive(view().pending.map((p) => p.orderId));
       else alertSound.stopAll();
     };
-    const apply = (s: AlertSnapshot): void => {
-      latest = s;
-      setSnapshot(s);
+    const render = (): void => {
+      setSnapshot(view());
       syncSound();
+    };
+    const apply = (s: AlertSnapshot): void => {
+      raw = s;
+      render();
     };
 
     const offEngine = engine.subscribe((s) => {
@@ -127,9 +138,7 @@ export function useOrderAlerts(): OrderAlertsState {
     });
     const offSilence = coordinator.onSilence(() => {
       engine.reproject();
-      // المتابع لا محرّك له: يُعاد حساب pending محلياً من اللقطة بإزالة المُسكَت.
-      const ids = silenced.ids();
-      apply({ ...latest, pending: latest.pending.filter((p) => !ids.has(p.orderId)) });
+      render(); // المتابع لا محرّك له: يُعاد حساب العرض محلياً.
     });
     const offSound = alertSound.subscribe((event) => {
       if (event.type === 'state') {
@@ -139,12 +148,27 @@ export function useOrderAlerts(): OrderAlertsState {
     });
 
     controls.current = {
-      silence: (orderId) => {
+      acknowledge: async (orderId) => {
+        // إسكات متفائل فوري (الصوت يتوقف قبل رد الخادم) ثم الإقرار الخادمي الذي يُسكت بقية الأجهزة عبر التغذية/المصالحة (≤ دورة استطلاع).
         silenced.add([orderId]);
         coordinator.broadcastSilence([orderId]);
         engine.reproject();
-        const ids = silenced.ids();
-        apply({ ...latest, pending: latest.pending.filter((p) => !ids.has(p.orderId)) });
+        render();
+
+        const outcome = await acknowledgeOrder(orderId);
+        if (outcome.ok) {
+          if (coordinator.currentRole === 'leader') engine.refresh();
+        } else if (outcome.settled) {
+          // لا يستدعي التنبيه أصلاً (ملغى/غير جاهز/خارج النطاق): نُبقي الإسكات ونطلب الحقيقة من الخادم.
+          if (coordinator.currentRole === 'leader') engine.refresh();
+        } else {
+          // فشل عابر (شبكة/5xx/403): الإقرار الصريح لم يحدث ⇒ يعود التنبيه ولا نوهم أن الآخرين أُسكتوا.
+          silenced.remove([orderId]);
+          engine.reproject();
+          render();
+        }
+
+        return outcome;
       },
     };
 
@@ -206,7 +230,10 @@ export function useOrderAlerts(): OrderAlertsState {
     };
   }, [status, snapshot.pending.length]);
 
-  const silence = useCallback((orderId: string) => controls.current?.silence(orderId), []);
+  const acknowledge = useCallback(
+    async (orderId: string): Promise<AcknowledgeOutcome> => (controls.current ? controls.current.acknowledge(orderId) : { ok: false, settled: false, status: null, reason: null }),
+    [],
+  );
   // يجب أن يُستدعيا متزامنَين داخل معالج نقر (WebKit/autoplay): أول عبارة فيهما `alertSound.unlock()`.
   const enableSound = useCallback(() => alertSound.unlock(), []);
   const testSound = useCallback(async () => {
@@ -216,5 +243,5 @@ export function useOrderAlerts(): OrderAlertsState {
     return alertSound.playOnce();
   }, []);
 
-  return { status, config, snapshot, role, soundState, soundOwner, silence, enableSound, testSound };
+  return { status, config, snapshot, role, soundState, soundOwner, acknowledge, enableSound, testSound };
 }

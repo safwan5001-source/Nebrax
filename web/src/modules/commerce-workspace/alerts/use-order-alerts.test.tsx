@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AlertConfig, AttentionRow } from './contract';
 import { FakeLocks, createChannelHub } from './test-fakes';
 
+const ack = vi.hoisted(() => ({ acknowledgeOrder: vi.fn() }));
+vi.mock('./acknowledge-order', () => ack);
+
 const api = vi.hoisted(() => ({
   fetchAlertConfig: vi.fn(),
   fetchFeedHead: vi.fn(),
@@ -57,7 +60,8 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     user.current = { id: 'u1', tenant_id: 't1', preferences: {} };
     user.can = true;
     sound.alertSound.state = 'locked';
-    for (const fn of [...Object.values(api), sound.alertSound.syncActive, sound.alertSound.stopAll]) fn.mockReset();
+    for (const fn of [...Object.values(api), sound.alertSound.syncActive, sound.alertSound.stopAll, ack.acknowledgeOrder]) fn.mockReset();
+    ack.acknowledgeOrder.mockResolvedValue({ ok: true, created: true });
     api.fetchAlertConfig.mockResolvedValue(cfg());
     api.fetchFeedHead.mockResolvedValue(7);
     api.fetchFeedPage.mockResolvedValue({ data: [], meta: { after_seq: 7, next_after_seq: 7, has_more: false, limit: 100, head_seq: 7 } });
@@ -129,18 +133,48 @@ describe('useOrderAlerts (COPS-H3-3)', () => {
     expect(two.result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
   });
 
-  it('الإسكات المحلي يزيل الطلب من pending في كل التبويبات ويُحفظ للجهاز', async () => {
+  it('الإقرار يُسكت فوراً في كل التبويبات ويطلب الخادم مرة واحدة ويحفظ الإسكات للجهاز', async () => {
     const one = renderHook(() => useOrderAlerts());
     const two = renderHook(() => useOrderAlerts());
     await tick(0);
     await tick(0);
     await tick(0);
 
-    await act(async () => { two.result.current.silence('a'); });
+    await act(async () => { await two.result.current.acknowledge('a'); });
     await tick(0);
+    expect(ack.acknowledgeOrder).toHaveBeenCalledTimes(1);
+    expect(ack.acknowledgeOrder).toHaveBeenCalledWith('a');
     expect(one.result.current.snapshot.pending).toEqual([]);
     expect(two.result.current.snapshot.pending).toEqual([]);
     expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1')).toContain('"a"');
+  });
+
+  it('فشل الإقرار العابر (شبكة/5xx) يُرجع التنبيه ولا يوهم أن الآخرين أُسكتوا', async () => {
+    ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: false, status: null, reason: null });
+    const { result } = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+
+    let outcome: unknown;
+    await act(async () => { outcome = await result.current.acknowledge('a'); });
+    await tick(0);
+    expect(outcome).toMatchObject({ ok: false, settled: false });
+    expect(result.current.snapshot.pending.map((p) => p.orderId)).toEqual(['a']);
+    expect(window.localStorage.getItem('awj:commerce-alerts:silenced:t1:u1') ?? '').not.toContain('"a"');
+  });
+
+  it('رفض مستقر (404/409: ملغى/غير جاهز) يُبقي الإسكات ويطلب الحقيقة من الخادم', async () => {
+    ack.acknowledgeOrder.mockResolvedValue({ ok: false, settled: true, status: 409, reason: 'already_cancelled' });
+    const { result } = renderHook(() => useOrderAlerts());
+    await tick(0);
+    await tick(0);
+    const attentionCalls = api.fetchAttention.mock.calls.length;
+    api.fetchAttention.mockResolvedValue({ data: [], meta: { truncated: false, window_hours: 48, limit: 100 } });
+
+    await act(async () => { await result.current.acknowledge('a'); });
+    await tick(0);
+    expect(result.current.snapshot.pending).toEqual([]);
+    expect(api.fetchAttention.mock.calls.length).toBeGreaterThan(attentionCalls); // مصالحة فورية
   });
 
   it('عند الإزالة (unmount) يتوقف الاستطلاع ويُصمَت الصوت', async () => {

@@ -276,6 +276,7 @@ class CommerceOrderFeedTest extends TestCase
     {
         $classes = [
             CommerceOrderPlaced::class, CommerceOrderCancelled::class, CommerceOrderPaymentPaid::class, CommerceOrderPaymentCollected::class, CommerceOrderAccepted::class,
+            \App\Events\CommerceOrderAcknowledged::class, // COPS-H3-4
             // COPS-H2-1: لكل نوع تنفيذ حدث نطاق مقابل.
             \App\Events\CommerceOrderFulfillmentStarted::class, \App\Events\CommerceOrderFulfillmentReady::class, \App\Events\CommerceOrderFulfillmentDispatched::class,
             \App\Events\CommerceOrderFulfillmentDeliveryFailed::class, \App\Events\CommerceOrderFulfillmentReturned::class, \App\Events\CommerceOrderFulfillmentDelivered::class,

@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceAlertConfigController;
+use App\Http\Controllers\Api\CommerceStaffOrderAcknowledgementController;
 use App\Http\Controllers\Api\CommerceStaffOrderFeedController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1205,6 +1206,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // COPS-H3-3 (ADR-30): إعداد مركز التنبيه من الخادم (مفعَّل؟ وضع الاستطلاع؟ الوتيرة) — قراءة فقط، commerce.orders.view؛ البوابة المغلقة ⇒ `enabled=false`.
         Route::get('commerce/alerts/config', [CommerceAlertConfigController::class, 'show'])
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COPS-H3-4 (R-10): إقرار تنبيه الطلب لكل طلب — commerce.orders.view (فعل مشاهدة)، بوابة commerce.order_alerts_enabled مغلقة ⇒ 404.
+        Route::post('commerce/orders/{id}/acknowledge', [CommerceStaffOrderAcknowledgementController::class, 'acknowledge'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         // COMMERCE-ORDERS-O3a-2b: إلغاء طلب بواسطة موظف مخوّل (ADR-28) — صلاحية commerce.orders.cancel (owner/admin عبر `*` فقط)،
