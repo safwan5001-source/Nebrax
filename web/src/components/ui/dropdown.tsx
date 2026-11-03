@@ -97,7 +97,7 @@ export function Dropdown({
   useEffect(() => {
     if (!open || !mobilePopover) return;
     const placeWithinViewport = () => {
-      const anchor = rootRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+      const anchor = triggerRef.current ?? rootRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup]');
       const menu = menuRef.current;
       if (!anchor || !menu) return;
       const safeMargin = 12;
@@ -113,12 +113,18 @@ export function Dropdown({
     };
     placeWithinViewport();
     window.addEventListener('resize', placeWithinViewport);
-    window.addEventListener('scroll', close, true);
+    // التمرير داخل اللوحة نفسها (قائمة طويلة) لا يُغلقها؛ التمرير خارجها يُغلقها كما كان (Codex).
+    const closeOnOutsideScroll = (event: Event): void => {
+      const target = event.target;
+      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      close();
+    };
+    window.addEventListener('scroll', closeOnOutsideScroll, true);
     return () => {
       window.removeEventListener('resize', placeWithinViewport);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', closeOnOutsideScroll, true);
     };
-  }, [close, mobilePopover, open]);
+  }, [close, mobilePopover, open, triggerRef]);
 
   function toggle() {
     if (open) {
@@ -163,7 +169,8 @@ export function Dropdown({
             : 'absolute top-full z-50 mt-1 min-w-36 rounded border border-border bg-surface p-1 shadow-md',
           'transition duration-150 ease-out',
           mobilePopover
-            ? (align === 'end' ? 'lg:end-0' : 'lg:start-0')
+            // `lg:!left-auto` يلغي موضع الجوال المضمَّن؛ في RTL يسقط `end-0` (= left) فيعود الموضع الساكن إلى اليمين ويخرج القائمة عن الشاشة، فنثبّت left:0 صراحةً (COPS-H3-3).
+            ? (align === 'end' ? 'lg:end-0 lg:rtl:!left-0' : 'lg:start-0')
             : (align === 'end' ? 'end-0' : 'start-0'),
           open ? 'opacity-100 translate-y-0' : 'pointer-events-none translate-y-1 opacity-0',
           menuClassName

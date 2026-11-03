@@ -8,6 +8,7 @@ import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { NotificationBell } from '@/components/layout/notification-bell';
+import { OrderAlertCenter } from '@/modules/commerce-workspace/alerts/order-alert-center';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
@@ -201,6 +202,8 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
             <span className="hidden sm:inline">{t('backToAwj')}</span>
           </Link>
           {/* COPS-H3-1: جرس الإشعارات نفسه (عدّاد + لوحة) في غلاف التجارة؛ إشعار «طلب جديد» يفتح الطلب. لا منطق تنبيه حي هنا (مركز التنبيه H3-3). */}
+          {/* COPS-H3-3: مركز تنبيه الطلبات (بوابة مغلقة ⇒ لا يعرض شيئاً ولا يستطلع). */}
+          <OrderAlertCenter />
           <NotificationBell />
           <LangToggle />
           <ThemeToggle />

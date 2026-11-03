@@ -60,7 +60,7 @@ final class CommerceOrderAttentionQuery
      * @param  ?list<string>  $allowedWarehouseIds  null = غير مقيَّد
      * @return array{orders: Collection<int, CommerceOrder>, truncated: bool, window_hours: int, limit: int}
      */
-    public function run(?string $storefrontId = null, int $limit = self::DEFAULT_LIMIT, ?array $allowedWarehouseIds = null): array
+    public function run(?string $storefrontId = null, int $limit = self::DEFAULT_LIMIT, ?array $allowedWarehouseIds = null, bool $pendingOnly = false): array
     {
         $limit = max(1, min(self::MAX_LIMIT, $limit));
         $hours = self::windowHours();
@@ -73,7 +73,7 @@ final class CommerceOrderAttentionQuery
         // COPS-H2-2: المقيَّد بمخازن يرى انتباه طلبات مخازنه فقط (المخزن الفعّال)؛ غير المقيَّد (`null`) كما كان.
         $rows = CommerceOrderWarehouseScope::apply(CommerceOrder::query(), $allowedWarehouseIds)
             ->select($select)
-            ->with('paymentIntent:id,commerce_order_id,method,status')
+            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status'])
             ->where('status', CommerceOrder::STATUS_CONFIRMED)
             ->whereNull('cancelled_at')
             ->when(
@@ -84,6 +84,8 @@ final class CommerceOrderAttentionQuery
                 fn ($q) => $q->where('created_at', '>=', $since),
             )
             ->whereHas('paymentIntent', fn ($q) => $q->whereIn('status', self::PAYMENT_READY))
+            // COPS-H3-3 (Codex): `pending_only` يصفّي «ما يستدعي التنبيه» **في SQL قبل السقف** — وإلا حجبت ≥ 100 طلب معالَج أقدم الطلبات الجديدة عن مركز التنبيه (الترتيب الأقدم أولاً).
+            ->when($pendingOnly, fn ($q) => $this->pendingScope($q))
             ->when($storefrontId !== null, fn ($q) => $q->where('storefront_id', $storefrontId))
             ->orderBy('created_at')->orderBy('id')
             ->limit($limit + 1)
@@ -92,6 +94,9 @@ final class CommerceOrderAttentionQuery
         $queueTruncated = false;
         if ($fulfillmentOpen) {
             $rows = $this->withFulfillmentReasons($rows, $storefrontId, $allowedWarehouseIds, $select, $limit, $queueTruncated);
+            if ($pendingOnly) {
+                $rows = $rows->filter(fn (CommerceOrder $o) => $this->alertPending($o))->values();
+            }
         }
 
         return [
@@ -132,7 +137,7 @@ final class CommerceOrderAttentionQuery
         $extraIds = array_values(array_diff(array_unique([...array_keys($prep->all()), ...$failedIds]), $have));
         $extras = $extraIds === [] ? collect() : CommerceOrder::query()
             ->select($select)
-            ->with('paymentIntent:id,commerce_order_id,method,status')
+            ->with(['paymentIntent:id,commerce_order_id,method,status', 'fulfillment:id,commerce_order_id,status'])
             ->whereIn('id', $extraIds)->get();
 
         $all = $rows->concat($extras)->sortBy([['created_at', 'asc'], ['id', 'asc']])->values();
@@ -164,6 +169,22 @@ final class CommerceOrderAttentionQuery
         }
 
         return $reasons;
+    }
+
+    /**
+     * COPS-H3-3 (ADR-30): هل ما زال الطلب «يستدعي التنبيه» — **يُحسب في الخادم** كي لا تتكرر المنطق في العميل؟ طلب `attention` ببوابة الدفع الجاهز يبقى فيها
+     * بنافذة زمنية ولو عولج، فالتنبيه (الصوت) لا يُبنى على عضويته بل على أنه **لم يُعالَج بعد**: لم يُقبل (`accepted_at`) ولم يبدأ تنفيذه (صف التنفيذ).
+     * الإقرار الصريح (H3-4) يُضاف شرطاً هنا. قراءة فقط؛ الطلب يبقى في القائمة وقوائم العمل مهما كان هذا الحكم (R-10: الإقرار لا يخرج الطلب من قوائم العمل).
+     */
+    /** @param Builder<CommerceOrder> $query @return Builder<CommerceOrder> مرادف SQL لـ{@see self::alertPending()}. */
+    private function pendingScope(Builder $query): Builder
+    {
+        return $query->whereNull('accepted_at')->whereDoesntHave('fulfillment');
+    }
+
+    public function alertPending(CommerceOrder $order): bool
+    {
+        return $order->accepted_at === null && $order->fulfillment === null;
     }
 
     public static function windowHours(): int
