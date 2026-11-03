@@ -660,6 +660,35 @@ class PartnerStatementReadApiTest extends TestCase
         $this->assertSame($own['id'], $second['decision']['run_id']);
     }
 
+    /** @test */
+    public function decision_context_loads_the_actors_branches_once_even_when_decisions_span_several_runs(): void
+    {
+        $this->invoice('2026-09-03', 100000);
+        $id = $this->importStatement([['date' => '2026-09-03', 'credit' => 115000], ['date' => '2026-09-10', 'credit' => 5000], ['date' => '2026-09-11', 'credit' => 6000], ['date' => '2026-09-12', 'credit' => 7000]]);
+        $token = $this->auth['token'];
+        $decide = fn (array $run, int $ordinal, array $extra) => $this->withToken($token)->postJson(self::BASE."/{$id}/decisions", [
+            'run_id' => $run['id'], 'line_id' => $this->lineId($id, $ordinal),
+        ] + $extra)->assertCreated();
+
+        $run1 = $this->match($token, $id);
+        $decide($run1, 2, ['action' => 'confirm']);
+        $decide($run1, 3, ['action' => 'dismiss', 'reason' => 'غير موجود في الدفاتر']);
+        // تغيّر الدفتر ⇒ تشغيلة ثانية، وقراراها الجديدان عليها؛ القراران الأولان يبقيان على التشغيلة الأولى.
+        $this->invoice('2026-09-20', 31337);
+        $run2 = $this->match($token, $id);
+        $this->assertNotSame($run1['id'], $run2['id']);
+        $decide($run2, 4, ['action' => 'dismiss', 'reason' => 'غير موجود في الدفاتر']);
+        $decide($run2, 5, ['action' => 'dismiss', 'reason' => 'غير موجود في الدفاتر']);
+
+        $url = fn (int $perPage): string => self::BASE."/{$id}/matches?side=statement&per_page={$perPage}";
+        $this->withToken($token)->getJson($url(4))->assertOk();   // تسخين
+        $oneRun = $this->queryCount(fn () => $this->withToken($token)->getJson($url(2))->assertOk());     // ترتيب 2،3 ⇒ تشغيلة واحدة
+        $twoRuns = $this->queryCount(fn () => $this->withToken($token)->getJson($url(4))->assertOk());    // 2..5 ⇒ تشغيلتان
+        $rows = $this->withToken($token)->getJson($url(4))->json('data');
+        $this->assertSame([$run1['id'], $run1['id'], $run2['id'], $run2['id']], array_map(fn (array $r): string => $r['decision']['run_id'], $rows));
+        $this->assertSame($oneRun, $twoRuns, 'تحميل فروع الفاعل يجب أن يكون مرة واحدة لا لكل تشغيلة');
+    }
+
     // ═══════════════════════════════ لا أثر مالي ولا كتابة ═══════════════════════════════
 
     /** @test */

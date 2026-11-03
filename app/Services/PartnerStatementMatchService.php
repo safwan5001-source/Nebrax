@@ -312,7 +312,16 @@ final class PartnerStatementMatchService
      */
     public function readable(User $actor, PartnerStatementMatchRun $run): bool
     {
-        $allowed = $actor->allowedBranchIds();
+        return $this->readableWithin($actor->allowedBranchIds(), $run);
+    }
+
+    /**
+     * نفس قاعدة `readable` بنطاق فروع محمَّل مسبقاً (`null` = غير مقيَّد): تتيح لقراءات متعددة التشغيلات (IMP-PS-A4a0) تحميل فروع الفاعل **مرة واحدة** بدل استعلام لكل تشغيلة.
+     *
+     * @param  array<int, string>|null  $allowed
+     */
+    public function readableWithin(?array $allowed, PartnerStatementMatchRun $run): bool
+    {
         if ($allowed === null) {
             return true;
         }

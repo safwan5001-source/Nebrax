@@ -176,9 +176,10 @@ final class PartnerStatementReconciliationQuery
         }
 
         $readable = [];
+        $allowed = $actor->allowedBranchIds();   // استعلام واحد لكل طلب، لا لكل تشغيلة
         $runIds = array_values(array_unique(array_map(fn (PartnerStatementReviewDecision $d): string => (string) $d->run_id, $latest)));
         foreach (PartnerStatementMatchRun::query()->where('reconciliation_id', $reconciliationId)->whereIn('id', $runIds)->get() as $run) {
-            $readable[$run->id] = $this->matching->readable($actor, $run);
+            $readable[$run->id] = $this->matching->readableWithin($allowed, $run);
         }
 
         $out = [];

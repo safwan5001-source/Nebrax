@@ -29,7 +29,8 @@ Read-only, additive backend. No migration, permission, policy/Settings, write AP
 | `app/Http/Controllers/Api/PartnerStatementReconciliationController.php` | new (79) |
 | `app/Http/Controllers/Api/PartnerStatementMatchController.php` | +8/−2: injects the query service, decorates rows |
 | `routes/api.php` | +3 GET routes (+1 import), same `$perm('partner_statements.view')` + `$app('accounting.partner_statements')` middleware as siblings |
-| `tests/Feature/PartnerStatementReadApiTest.php` | new (18 tests, 390 assertions) |
+| `app/Services/PartnerStatementMatchService.php` | +`readableWithin(?array $allowed, Run)`; `readable()` delegates (identical behaviour) — added after Codex review F8 |
+| `tests/Feature/PartnerStatementReadApiTest.php` | new (19 tests, 403 assertions) |
 | `tests/Feature/PartnerStatementMatchApiTest.php`, `…PairReviewApiTest.php` | refined, see §4 |
 
 ## 2. Access model (how leaks are prevented)
@@ -45,13 +46,13 @@ Read-only, additive backend. No migration, permission, policy/Settings, write AP
 ### Local (sandbox: PHP 8.3.6, PostgreSQL 16, **no `bcmath`**)
 | Run | Result |
 |---|---|
-| `PartnerStatementReadApiTest` | SQLite 18/18, PostgreSQL 18/18 (390 assertions) |
+| `PartnerStatementReadApiTest` | SQLite 19/19, PostgreSQL 19/19 (403 assertions) |
 | All `PartnerStatement*` suites (A1–A3e incl. `pcntl_fork` concurrency on PG) | SQLite green (after §4 refinements); PostgreSQL 230 passed + the 2 refined tests re-verified green (44/44 on the three affected classes) |
 | Mutation controls (against the read test) | removing the branch filter → 2 fail; removing partner-existence → 2 fail; ignoring decision readability → 1 fail; OR-ing the search → 3 fail |
 | Full backend suite, SQLite (4 shards, 11,206 Feature + 1 Unit) | 92 non-passing entries: **50 Fuel** (`bcmath` missing here; identical 50 failures on `main`) + **42 sharding interference** (shared storage between parallel processes) → all 239 re-run serially: pass |
 | Full backend suite, PostgreSQL (4 shards, one DB each) | **0 `PartnerStatement*` failures.** 84 entries: 50 Fuel (same cause) + 30 interference (re-run serially: pass) + 4 environmental, **identical on `main`**: 3× `PostgresTestLockTimeoutTest` (needs CI's `PGOPTIONS=-c lock_timeout=60s`) and 1× `StorefrontMediaApiTest` (same `escape '\'` PDO issue, see §5) |
 
-Query-count evidence: list = constant across 3 vs 30 rows (owner) and 1 vs 50 rows (restricted); `matches` context = constant 2 vs 4 decided rows.
+Query-count evidence: list = constant across 3 vs 30 rows (owner) and 1 vs 50 rows (restricted); `matches` context = constant 2 vs 4 decided rows, **including decisions spanning two match runs** (F8).
 No-write evidence: financial table counts and `partner_statement_*` counts/rows are unchanged around every read; static test forbids `LedgerService`, journal, inventory, ZATCA, `create/insert/update/save/delete/transaction/lockForUpdate` in the new files and in `MatchController`; the new routes are exactly three GETs.
 
 ### CI (PR #1970)
@@ -75,6 +76,7 @@ The plan says "A1–A3e green without modification". These two edits are the min
 | F4 | Performance: visibility uses a correlated `EXISTS` on `partners` and JSON-path predicates on `policy`; no index helps the JSON predicate. Fine for per-tenant volumes (hundreds), would need a generated column/index only if a tenant reaches tens of thousands. | Low | Branch list is one tiny extra query. |
 | F5 | `status` must be sent as `status[]=…` (array); scalar ⇒ 422, mirroring `outcome[]` in `matches`. | Info | |
 | F6 | List/`matches` response shapes are new contracts; the web client (A4a) must treat `line`/`decision` as nullable. | Info | |
+| F8 | Codex review (P2, valid): `readable()` re-queried the actor's branches once per distinct run on a page, so N3's "constant queries" held only for single-run pages. Fixed: branches loaded once (`readableWithin`); new multi-run test fails on the old code (39≠37) and passes now. SQLite `PartnerStatement*` 201 passed/32 PG-only skipped; PostgreSQL 233 passed. | Fixed | Commit after `bd1f0c9`. |
 | F7 | Local env lacks `bcmath`, so Fuel tests cannot pass here (identical on `main`); parallel sharding caused spurious storage interference, resolved by serial re-runs. | Info | CI is authoritative. |
 
 ## 6. Financial entries
