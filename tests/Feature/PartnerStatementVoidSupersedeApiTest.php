@@ -768,6 +768,40 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
     }
 
     /** @test */
+    public function a_retirement_event_accepted_under_one_policy_cannot_complete_the_transition_under_another(): void
+    {
+        [$a, $runA] = $this->finalized('2026-09-01', 100000, $this->retirer);
+        $t = $this->auth['tenant_id'];
+        $now = now()->format('Y-m-d H:i:s');
+        $event = fn (string $by, string $policy): array => [
+            'id' => (string) Str::uuid(), 'tenant_id' => $t, 'reconciliation_id' => $a, 'seq' => 3, 'action' => 'void', 'from_status' => 'closed', 'to_status' => 'voided', 'run_id' => $runA['id'],
+            'summary' => json_encode(['void_separation' => $policy]), 'reason' => 'سبب', 'created_by' => $by, 'claims_count' => 1, 'created_at' => $now,
+        ];
+        $retire = fn (string $by) => DB::table('partner_statement_reconciliations')->where('id', $a)->update(['status' => 'voided', 'voided_at' => $now, 'voided_by' => $by, 'void_reason' => 'سبب']);
+
+        // (1) حدث المُغلِق قُبل تحت flexible وأُلزم (معاملة منفصلة)، ثم صارت السياسة strict ⇒ الانتقال مرفوض (إعادة التحقق عند الانتقال لا عند الحدث وحده).
+        $this->policy('flexible');
+        $eventId = $event($this->retirerId, 'flexible');
+        DB::table('partner_statement_reconciliation_events')->insert($eventId);
+        $this->policy('strict');
+        $this->assertRejected(fn () => $retire($this->retirerId), 'انتقال المُغلِق بعد تحوّل السياسة إلى strict');
+        $this->assertSame(['closed', 1], [$this->reconciliation($a)->status, $this->activeClaims($a)]);
+
+        // (2) والعكس: الحدث مسجَّل strict لغير المُغلِق ثم صارت السياسة flexible ⇒ مرفوض أيضاً (السياسة المسجَّلة ≠ الفعّالة الآن).
+        // الحدث الأول باقٍ (سجل لا يُحذف) فنفحص بحدث لاحق.
+        $this->policy('strict');
+        DB::table('partner_statement_reconciliation_events')->insert(['id' => (string) Str::uuid(), 'seq' => 4] + $event($this->voiderId, 'strict'));
+        $this->policy('flexible');
+        $this->assertRejected(fn () => $retire($this->voiderId), 'سياسة مسجَّلة strict والفعّالة الآن flexible');
+        $this->assertSame(['closed', 1], [$this->reconciliation($a)->status, $this->activeClaims($a)]);
+
+        // ضابط موجب: الحدث الأخير يطابق السياسة الفعّالة الآن وفاعل مسموح ⇒ ينجح.
+        $this->policy('strict');
+        $this->assertSame(1, DB::transaction(fn () => $retire($this->voiderId)));
+        $this->assertSame(['voided', 0], [$this->reconciliation($a)->status, $this->activeClaims($a)]);
+    }
+
+    /** @test */
     public function the_policy_is_read_through_the_existing_settings_mechanism_and_has_no_user_write_path_yet(): void
     {
         $this->assertSame('strict', Settings::DEFAULTS['partner_statements']['void_separation']);
