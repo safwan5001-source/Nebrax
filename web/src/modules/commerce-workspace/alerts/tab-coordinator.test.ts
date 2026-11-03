@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EMPTY_SNAPSHOT, type AlertSnapshot } from './contract';
 import { FakeLocks, createChannelHub, flush } from './test-fakes';
+import { createLeaseLocks } from './lease-locks';
 import { TabCoordinator, type PresenceState } from './tab-coordinator';
 
 interface Tab {
@@ -192,5 +193,48 @@ describe('TabCoordinator (COPS-H3-3, ADR-30 §3)', () => {
     a.coordinator.stop();
     await flush();
     expect(a.coordinator.currentRole).toBe('follower');
+  });
+});
+
+
+describe('TabCoordinator مع عقد إيجار localStorage (سقوط بلا Web Locks) — تنازل بلا حلقة مجهرية (Codex)', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1_000_000); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('قائد مخفي يتنازل لنظير مرئي مُسلَّح فيتولاه خلال ثوانٍ، ولا يعيد المتنازل الإمساك به في حلقة', async () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
+    const channel = createChannelHub();
+    const presence: Record<string, PresenceState> = {
+      a: { visible: false, armed: false, interactedAt: 0 },
+      b: { visible: true, armed: false, interactedAt: 0 },
+    };
+    const make = (id: string) => {
+      const roles: string[] = [];
+      const c = new TabCoordinator({ scope: 's', tabId: id, locks: createLeaseLocks(storage, id), createChannel: channel, getPresence: () => presence[id] });
+      c.onRole((r) => roles.push(r));
+      c.start();
+
+      return { c, roles };
+    };
+    const a = make('a');
+    await vi.advanceTimersByTimeAsync(0);
+    const b = make('b');
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(a.c.currentRole).toBe('leader');
+
+    presence.b = { visible: true, armed: true, interactedAt: 5 }; // المستخدم فعّل الصوت في b
+    b.c.presenceChanged();
+    await vi.advanceTimersByTimeAsync(0);
+    // لا حلقة مجهرية: بعد التنازل مباشرة لم يُعِد a الإمساك عشرات المرات.
+    expect(a.roles.filter((r) => r === 'leader').length).toBeLessThanOrEqual(1);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(b.c.currentRole).toBe('leader');
+    expect(a.c.currentRole).toBe('follower');
+    expect(a.roles.filter((r) => r === 'leader').length).toBe(1);
+
+    a.c.stop();
+    b.c.stop();
   });
 });

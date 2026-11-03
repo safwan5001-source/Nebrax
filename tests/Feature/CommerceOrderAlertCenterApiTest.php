@@ -216,4 +216,28 @@ class CommerceOrderAlertCenterApiTest extends TestCase
         $this->withToken($forA)->getJson('/api/commerce/orders/attention')->assertOk()->assertJsonPath('data.0.alert.pending', true);
         $this->withToken($forB)->getJson('/api/commerce/orders/attention')->assertOk()->assertJsonPath('data', []);
     }
+
+    #[Test]
+    public function pending_only_filters_before_the_cap_so_processed_orders_cannot_starve_new_ones(): void
+    {
+        $first = $this->pickupOrder('idem-ac-starve-1');
+        $second = $this->pickupOrder('idem-ac-starve-2');
+        $third = $this->pickupOrder('idem-ac-starve-3');
+        foreach ([$first, $second] as $handled) {
+            $this->withToken($this->ownerToken)->postJson("/api/commerce/orders/{$handled}/fulfillment/start", ['expected_version' => 0])->assertOk();
+        }
+
+        // بلا مرشّح: الأقدم أولاً بسقف 1 ⇒ طلب معالَج يحجب الجديد (سلوك H1-2 كما هو).
+        $plain = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders/attention?limit=1')->assertOk();
+        $this->assertSame($first, $plain->json('data.0.order.id'));
+        $this->assertFalse($plain->json('data.0.alert.pending'));
+
+        // مع `pending=1`: يُصفّى في SQL قبل السقف فيصل الطلب الجديد.
+        $pending = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders/attention?limit=1&pending=1')->assertOk();
+        $this->assertSame([$third], array_column(array_column($pending->json('data'), 'order'), 'id'));
+        $this->assertTrue($pending->json('data.0.alert.pending'));
+        $pending->assertJsonPath('meta.truncated', false);
+
+        $this->withToken($this->ownerToken)->getJson('/api/commerce/orders/attention?pending=maybe')->assertStatus(422);
+    }
 }

@@ -74,9 +74,11 @@ class CommerceStaffOrderFeedController extends ApiController
         $data = $request->validate([
             'storefront_id' => ['sometimes', 'uuid'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:'.CommerceOrderAttentionQuery::MAX_LIMIT],
+            // COPS-H3-3: `pending=1` ⇒ «ما يستدعي التنبيه» فقط (يُصفّى في SQL قبل السقف).
+            'pending' => ['sometimes', 'boolean'],
         ]);
 
-        $result = $query->run($data['storefront_id'] ?? null, (int) ($data['limit'] ?? CommerceOrderAttentionQuery::DEFAULT_LIMIT), $request->user()?->allowedWarehouseIds());
+        $result = $query->run($data['storefront_id'] ?? null, (int) ($data['limit'] ?? CommerceOrderAttentionQuery::DEFAULT_LIMIT), $request->user()?->allowedWarehouseIds(), $request->boolean('pending'));
 
         $payload = [
             'data' => $result['orders']->map(fn ($o) => CommerceOrderFeedSerializer::attention($o, $query))->values()->all(),

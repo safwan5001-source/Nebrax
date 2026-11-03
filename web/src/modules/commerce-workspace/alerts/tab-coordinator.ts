@@ -38,6 +38,8 @@ type Message =
 
 const PRESENCE_EVERY_MS = 3_000;
 const PRESENCE_TTL_MS = 10_000;
+/** مهلة قبل إعادة طلب القفل بعد تنازل طوعي: > فاصل استطلاع عقد الإيجار (2ث) كي يتولاه النظير المؤهل بدل أن يعيد التبويب نفسه الإمساك به فوراً. */
+const YIELD_BACKOFF_MS = 4_000;
 
 export interface TabCoordinatorOptions {
   scope: string;
@@ -56,6 +58,7 @@ export class TabCoordinator {
   private channel: ChannelLike | null = null;
   private abort: AbortController | null = null;
   private releaseLock: (() => void) | null = null;
+  private yielded = false;
   private ticker: unknown = null;
   private readonly peers = new Map<string, { state: PresenceState; ts: number }>();
   private lastSnapshot: AlertSnapshot | null = null;
@@ -181,6 +184,11 @@ export class TabCoordinator {
       }
       this.releaseLock = null;
       this.setRole('follower');
+      if (this.yielded) {
+        // تنازل طوعي: لا نعيد الطلب فوراً (عقد الإيجار يمنح الحرّ متزامناً بلا طابور FIFO فيُعيد المتنازل نفسه الإمساك في حلقة مجهرية).
+        this.yielded = false;
+        await new Promise<void>((resolve) => setTimeout(resolve, YIELD_BACKOFF_MS));
+      }
     }
   }
 
@@ -199,6 +207,7 @@ export class TabCoordinator {
     if (better) {
       const release = this.releaseLock;
       this.releaseLock = null;
+      this.yielded = true;
       release();
     }
   }
