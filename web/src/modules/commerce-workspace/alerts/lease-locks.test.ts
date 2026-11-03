@@ -79,4 +79,23 @@ describe('lease locks (سقوط بلا Web Locks)', () => {
     expect(lost).toHaveBeenCalledTimes(1);
     expect(JSON.parse(storage.getItem('awj:lease:n') as string).owner).toBe('b'); // لم يُسرق
   });
+
+  it('فشل كتابة الإيجار عند الاستحواذ لا يترك الطلب معلّقاً: يعيد المحاولة بعد تعافي التخزين (Codex)', async () => {
+    const m = new Map<string, string>();
+    let failWrites = true;
+    const storage: LeaseStorage = {
+      getItem: (k) => m.get(k) ?? null,
+      setItem: (k, v) => { if (failWrites) throw new Error('QuotaExceededError'); m.set(k, v); },
+      removeItem: (k) => void m.delete(k),
+    };
+    const a = createLeaseLocks(storage, 'a', () => Date.now());
+    const got = vi.fn();
+    void a.request('n', { mode: 'exclusive' }, () => new Promise<void>((r) => { got(); r(); }));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(got).not.toHaveBeenCalled(); // التخزين معطوب: لا قيادة، ولا استثناء غير ملتقط
+
+    failWrites = false;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(got).toHaveBeenCalledTimes(1); // استأنف بعد التعافي
+  });
 });

@@ -36,7 +36,13 @@ export function createLeaseLocks(storage: LeaseStorage, ownerId: string, now: ()
           const held = read(key);
           if (held === null || held.owner === ownerId || now() - held.ts > TTL_MS) {
             clearInterval(waiter);
-            storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() }));
+            try {
+              storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() }));
+            } catch {
+              // فشل الكتابة (حصة ممتلئة/محجوب): لا نعلق بلا مؤقّت ولا ننتهي بلا حسم؛ نعود للانتظار ونعيد المحاولة بعد تعافي التخزين (Codex).
+              waiter = setInterval(poll, RENEW_MS);
+              return;
+            }
             // تحقق ثانٍ بعد الكتابة: إن سبقنا آخر في السباق نعود للانتظار.
             const confirmed = read(key);
             if (confirmed?.owner !== ownerId) {
@@ -52,14 +58,24 @@ export function createLeaseLocks(storage: LeaseStorage, ownerId: string, now: ()
                 lostCtl.abort();
                 return;
               }
-              storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() }));
+              try {
+                storage.setItem(key, JSON.stringify({ owner: ownerId, ts: now() }));
+              } catch {
+                // لا نستطيع تجديد الإيجار فسينتهي ويتولاه غيرنا: نتخلّى الآن بدل قيادة بلا إيجار صالح.
+                clearInterval(renew);
+                lostCtl.abort();
+              }
             }, RENEW_MS);
             callback({ lost: lostCtl.signal })
               .catch(() => {})
               .finally(() => {
                 clearInterval(renew);
-                const current = read(key);
-                if (current?.owner === ownerId) storage.removeItem(key);
+                try {
+                  const current = read(key);
+                  if (current?.owner === ownerId) storage.removeItem(key);
+                } catch {
+                  // فشل التحرير لا يمنع إنهاء الطلب؛ ينتهي الإيجار بالمهلة.
+                }
                 resolve();
               });
           }
