@@ -73,14 +73,16 @@ final class ManagedStorefrontHostname
             ? self::configuredBaseDomain()
             : self::normalizeBaseDomain($baseDomain);
 
+        // النطاق الأساسي سُلِّم هنا مطبَّعاً وصالحاً؛ أي فشل بعده سببه سلاج المستأجر
+        // (TenantSlugNotHostnameSafeException) لا إعداد الخادم.
         if (trim($tenantSlug) === '') {
-            throw new StorefrontBaseDomainMisconfiguredException('سلاج المستأجر فارغ — لا يمكن توليد نطاق متجر.');
+            throw new TenantSlugNotHostnameSafeException('سلاج المستأجر فارغ — لا يمكن توليد نطاق متجر.');
         }
 
         try {
             $hostname = HostnameNormalizer::normalize($tenantSlug.'.'.$baseDomain);
         } catch (InvalidHostnameException $e) {
-            throw new StorefrontBaseDomainMisconfiguredException(
+            throw new TenantSlugNotHostnameSafeException(
                 'تعذّر توليد نطاق متجر صالح لهذا المستأجر: '.$e->getMessage()
             );
         }
@@ -89,7 +91,7 @@ final class ManagedStorefrontHostname
             // خط دفاعٍ إضافي: سلاج قد يحتوي نقطة (لا ينبغي أن يجتاز `alpha_dash`
             // في `RegisterRequest` أصلاً) قد يُنتج مضيفاً بعدة شرائح لا شريحة
             // واحدة فوق النطاق الأساسي — يُرفض هنا صراحةً مهما كان مصدره.
-            throw new StorefrontBaseDomainMisconfiguredException(
+            throw new TenantSlugNotHostnameSafeException(
                 'الاسم المولَّد لا يقع ضمن النطاق الأساسي المُهيَّأ لمتاجر Commerce المُدارة.'
             );
         }
@@ -114,12 +116,12 @@ final class ManagedStorefrontHostname
             ? self::configuredBaseDomain()
             : self::normalizeBaseDomain($baseDomain);
         if (trim($storeSlug) === '' || trim($tenantSlug) === '') {
-            throw new StorefrontBaseDomainMisconfiguredException('هوية المتجر أو المستأجر فارغة — لا يمكن توليد نطاق متجر.');
+            throw new TenantSlugNotHostnameSafeException('هوية المتجر أو المستأجر فارغة — لا يمكن توليد نطاق متجر.');
         }
         try {
             $hostname = HostnameNormalizer::normalize($tenantSlug.'-'.$storeSlug.'.'.$baseDomain);
         } catch (InvalidHostnameException $e) {
-            throw new StorefrontBaseDomainMisconfiguredException(
+            throw new TenantSlugNotHostnameSafeException(
                 'تعذّر توليد نطاق متجر إضافي صالح: '.$e->getMessage()
             );
         }
@@ -127,12 +129,21 @@ final class ManagedStorefrontHostname
         // خط دفاع: أي نقطة في الأجزاء (لا تجتاز alpha_dash/CatalogSlug أصلاً) تُنتج
         // أكثر من شريحة — يُرفض مغلقاً بدل إنتاج مضيف بلا شهادة.
         if (! self::isUnderBaseDomain($hostname, $baseDomain)) {
-            throw new StorefrontBaseDomainMisconfiguredException(
+            throw new TenantSlugNotHostnameSafeException(
                 'الاسم المولَّد لا يقع بشريحة واحدة ضمن النطاق الأساسي المُهيَّأ لمتاجر Commerce المُدارة.'
             );
         }
 
         return $hostname;
+    }
+
+    /**
+     * هل يصلح `$slug` شريحةَ hostname لمتجر مُدار؟ (دالة نقية — للتحقق وقت التسجيل
+     * كي لا يُنشأ مستأجرٌ يستحيل تزويد متجره لاحقاً.)
+     */
+    public static function isHostnameSafeSlug(string $slug): bool
+    {
+        return HostnameNormalizer::isValidLabel($slug);
     }
 
     /** الشريحة الوحيدة فوق النطاق الأساسي (`null` إن لم يكن مضيفاً بشريحة واحدة بالضبط). */
