@@ -36,6 +36,91 @@ class AccountSettingsTest extends TestCase
     }
 
     /** @test */
+    public function preferences_save_merges_and_keeps_keys_the_request_does_not_carry(): void
+    {
+        $auth = $this->registerTenant();
+        $user = User::withoutGlobalScopes()->where('email', 'owner@acme.test')->firstOrFail();
+        // مفتاح مخزَّن غير معروف لهذا الطلب (مثلاً من إصدار أحدث) لا يجوز أن يضيع عند حفظ العرض.
+        $user->forceFill(['preferences' => ['locale' => 'ar', 'theme' => 'system', 'appTheme' => 'ink', 'future_key' => ['a' => 1]]])->save();
+
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['locale' => 'en', 'theme' => 'dark'])
+            ->assertOk()
+            ->assertJsonPath('user.preferences.locale', 'en')
+            ->assertJsonPath('user.preferences.appTheme', 'ink')
+            ->assertJsonPath('user.preferences.future_key.a', 1);
+    }
+
+    /** @test */
+    public function commerce_alerts_preference_is_saved_alone_and_survives_display_saves(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->registerTenant('globex', 'owner@globex.test');
+
+        // حفظ التنبيه وحده بلا locale/theme (توافق: الحسابات الجديدة تحصل على افتراضات /me).
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['commerce_alerts' => ['enabled' => false]])
+            ->assertOk()
+            ->assertJsonPath('user.preferences.commerce_alerts.enabled', false)
+            ->assertJsonPath('user.preferences.locale', 'ar')
+            ->assertJsonPath('user.preferences.theme', 'system')
+            ->assertJsonPath('user.preferences.appTheme', 'default');
+
+        // حفظ عرض لاحق لا يمحو التنبيه.
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['locale' => 'en', 'theme' => 'light'])
+            ->assertOk()
+            ->assertJsonPath('user.preferences.commerce_alerts.enabled', false)
+            ->assertJsonPath('user.preferences.locale', 'en');
+
+        // وحفظ التنبيه لا يمحو العرض.
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['commerce_alerts' => ['enabled' => true]])
+            ->assertOk()
+            ->assertJsonPath('user.preferences.commerce_alerts.enabled', true)
+            ->assertJsonPath('user.preferences.locale', 'en')
+            ->assertJsonPath('user.preferences.theme', 'light');
+
+        $this->withToken($auth['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('user.preferences.commerce_alerts.enabled', true);
+
+        // شخصي: مستخدم مؤسسة أخرى لا يتأثر.
+        $this->withToken($other['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonMissingPath('user.preferences.commerce_alerts');
+    }
+
+    /** @test */
+    public function commerce_alerts_preference_is_strictly_validated(): void
+    {
+        $auth = $this->registerTenant();
+
+        foreach ([
+            ['commerce_alerts' => ['enabled' => 'maybe']],
+            ['commerce_alerts' => ['enabled' => true, 'storefronts' => ['x']]], // مفتاح غير مسموح بعد
+            ['commerce_alerts' => 'on'],
+            ['commerce_alerts' => []],      // لا مفتاح ⇒ لا locale/theme ⇒ طلب فارغ
+            [],
+            ['locale' => 'en'],             // locale بلا theme كما كان 422
+        ] as $body) {
+            $this->withToken($auth['token'])->putJson('/api/account/preferences', $body)->assertStatus(422);
+        }
+
+        $this->withToken($auth['token'])->getJson('/api/me')->assertJsonMissingPath('user.preferences.commerce_alerts');
+    }
+
+    /** @test */
+    public function saves_of_different_keys_from_different_devices_do_not_overwrite_each_other(): void
+    {
+        $auth = $this->registerTenant();
+
+        // تسلسل جهازين: كل حفظ يقرأ آخر حالة مقفولة فيدمج عليها (السباق الحقيقي يحرسه قفل الصف على PostgreSQL).
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['locale' => 'en', 'theme' => 'dark', 'appTheme' => 'core'])->assertOk();
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['commerce_alerts' => ['enabled' => false]])->assertOk();
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', ['locale' => 'ar', 'theme' => 'dark'])
+            ->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'core')
+            ->assertJsonPath('user.preferences.commerce_alerts.enabled', false);
+    }
+
+    /** @test */
     public function app_theme_defaults_to_default_and_is_not_dropped_by_a_locale_only_save(): void
     {
         $auth = $this->registerTenant();

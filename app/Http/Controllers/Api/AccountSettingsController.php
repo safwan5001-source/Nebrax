@@ -34,6 +34,7 @@ use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -46,16 +47,30 @@ class AccountSettingsController extends ApiController
 {
     public function updatePreferences(UpdateAccountPreferencesRequest $request): JsonResponse
     {
-        $user = $request->user();
         $data = $request->validated();
-        // AWJ v3 theme (Default/Ink/Core): `preferences` column is replaced wholesale (not
-        // merged) by this endpoint, so a client that doesn't yet send `appTheme` would
-        // otherwise silently drop whatever was stored. Keep the previous value, or the
-        // documented default, instead of losing it on every locale/mode-only save.
-        $data['appTheme'] = $data['appTheme'] ?? ($user->preferences['appTheme'] ?? 'default');
-        $user->update(['preferences' => $data]);
 
-        return response()->json(['user' => $this->userPayload($user->fresh())]);
+        // COPS-H3-7: **دمج لا استبدال**. كان العمود يُستبدل كاملاً (فيضيع أي مفتاح غير مُرسَل، وكان `appTheme`
+        // يُحمى بحيلة خاصة). الآن تُحفظ المفاتيح غير المُرسَلة كما هي (مع الافتراض الموثّق لـ`appTheme` عند أول
+        // حفظ)، ويُدمج `commerce_alerts` على مستوى مفاتيحه. القراءة-التعديل-الكتابة تحت قفل صف المستخدم كي
+        // لا يمحو حفظ سمة من جهاز تبديل تنبيه من جهاز آخر في اللحظة نفسها.
+        $fresh = DB::transaction(function () use ($request, $data) {
+            $locked = User::query()->whereKey($request->user()->getKey())->lockForUpdate()->firstOrFail();
+            // افتراضات الحساب الجديد نفسها التي يعيدها `/me` حين يكون العمود فارغاً (AuthController).
+            $existing = array_merge(
+                ['locale' => 'ar', 'theme' => 'system', 'appTheme' => 'default'],
+                is_array($locked->preferences) ? $locked->preferences : [],
+            );
+
+            if (isset($data['commerce_alerts'])) {
+                $nested = is_array($existing['commerce_alerts'] ?? null) ? $existing['commerce_alerts'] : [];
+                $data['commerce_alerts'] = array_merge($nested, $data['commerce_alerts']);
+            }
+            $locked->update(['preferences' => array_merge($existing, $data)]);
+
+            return $locked->fresh();
+        });
+
+        return response()->json(['user' => $this->userPayload($fresh)]);
     }
 
     public function updateEmail(UpdateAccountEmailRequest $request): JsonResponse
