@@ -12,7 +12,8 @@ import type { AlertSnapshot } from './contract';
  */
 
 export interface LockManagerLike {
-  request(name: string, options: { mode: 'exclusive'; signal?: AbortSignal }, callback: () => Promise<void>): Promise<void>;
+  /** `lock.lost` (اختياري): إشارة تُطلقها عقود الإيجار البديلة حين يضيع الإيجار (انتهى فتولاه غيرنا) فنتخلّى عن القيادة. */
+  request(name: string, options: { mode: 'exclusive'; signal?: AbortSignal }, callback: (lock?: { lost?: AbortSignal }) => Promise<void>): Promise<void>;
 }
 
 export interface ChannelLike {
@@ -172,8 +173,10 @@ export class TabCoordinator {
     while (this.started) {
       this.abort = new AbortController();
       try {
-        await locks.request(`awj-commerce-alerts:${this.opts.scope}`, { mode: 'exclusive', signal: this.abort.signal }, () => new Promise<void>((resolve) => {
+        await locks.request(`awj-commerce-alerts:${this.opts.scope}`, { mode: 'exclusive', signal: this.abort.signal }, (lock) => new Promise<void>((resolve) => {
           this.releaseLock = resolve;
+          // ضياع الإيجار (ليس Web Locks): نتنازل فوراً كي لا يبقى قائدان.
+          lock?.lost?.addEventListener('abort', () => resolve(), { once: true });
           this.setRole('leader');
           this.evaluateYield();
         }));
