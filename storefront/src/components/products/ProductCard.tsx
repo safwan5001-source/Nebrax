@@ -92,7 +92,8 @@ export const ProductCard = memo(function ProductCard({
       data-card=""
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none",
-        isLuxe && "shadow-sm hover:-translate-y-0.5 hover:shadow-lg focus-within:shadow-lg motion-reduce:hover:translate-y-0",
+        isLuxe &&
+          "shadow-sm hover:-translate-y-0.5 hover:shadow-lg focus-within:shadow-lg motion-reduce:hover:translate-y-0",
       )}
     >
       {/* Image. Bounded by height rather than aspect ratio: a square tile grows
@@ -151,7 +152,10 @@ export const ProductCard = memo(function ProductCard({
       {/* Content */}
       <div
         data-card-body=""
-        className={cn(publishedProductCardBodyClass(cardStyle), isLuxe && "gap-0.5 p-3.5 sm:p-4")}
+        className={cn(
+          publishedProductCardBodyClass(cardStyle),
+          isLuxe && "gap-0.5 p-3.5 sm:p-4",
+        )}
       >
         {categoryName && (
           <span className="mb-0.5 line-clamp-1 text-[0.625rem] font-medium text-store-muted-foreground">
@@ -159,7 +163,12 @@ export const ProductCard = memo(function ProductCard({
           </span>
         )}
 
-        <h3 className={cn("line-clamp-2 text-xs font-bold leading-snug text-store-foreground transition-colors group-hover:text-store-primary sm:text-sm", isLuxe && "text-sm leading-relaxed sm:text-base")}>
+        <h3
+          className={cn(
+            "line-clamp-2 text-xs font-bold leading-snug text-store-foreground transition-colors group-hover:text-store-primary sm:text-sm",
+            isLuxe && "text-sm leading-relaxed sm:text-base",
+          )}
+        >
           {/* Stretched link: the ::after overlay keeps the whole card clickable
               without wrapping the content in an <a> — HiddenPricePrompt renders
               its own link, and anchors can't nest. */}
@@ -174,7 +183,10 @@ export const ProductCard = memo(function ProductCard({
 
         <div
           data-card-price=""
-          className={cn("mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1", isLuxe && "mt-2.5")}
+          className={cn(
+            "mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1",
+            isLuxe && "mt-2.5",
+          )}
         >
           {displayPrice ? (
             <span className="text-sm font-black text-store-primary md:text-base">
@@ -208,7 +220,12 @@ export const ProductCard = memo(function ProductCard({
         */}
         <div className={cn("relative z-10 mt-2.5", isLuxe && "mt-auto pt-3")}>
           {!product.purchasable ? (
-            <span className={cn("block rounded-store border border-store-border px-3 py-1.5 text-center text-xs font-medium text-store-muted-foreground", isLuxe && "flex min-h-11 items-center justify-center")}>
+            <span
+              className={cn(
+                "block rounded-store border border-store-border px-3 py-1.5 text-center text-xs font-medium text-store-muted-foreground",
+                isLuxe && "flex min-h-11 items-center justify-center",
+              )}
+            >
               {product.wholesale_unavailable
                 ? t("wholesaleUnavailable")
                 : t("outOfStock")}
@@ -221,14 +238,21 @@ export const ProductCard = memo(function ProductCard({
               */
             <Link
               href={`${basePath}/products/${product.slug}${categoryId ? `?category_id=${categoryId}` : ""}`}
-              className={cn("block rounded-store border border-store-primary px-3 py-1.5 text-center text-xs font-bold text-store-primary transition-colors hover:bg-store-primary-soft", isLuxe && "flex min-h-11 items-center justify-center")}
+              className={cn(
+                "block rounded-store border border-store-primary px-3 py-1.5 text-center text-xs font-bold text-store-primary transition-colors hover:bg-store-primary-soft",
+                isLuxe && "flex min-h-11 items-center justify-center",
+              )}
             >
               {t("selectOptions")}
             </Link>
           ) : (
             <button
               type="button"
-              className={cn("block w-full rounded-store bg-store-primary px-3 py-1.5 text-xs font-bold text-store-primary-foreground transition-colors hover:bg-store-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground disabled:opacity-60", isLuxe && "min-h-11 text-sm shadow-sm active:scale-[0.98] motion-reduce:active:scale-100")}
+              className={cn(
+                "block w-full rounded-store bg-store-primary px-3 py-1.5 text-xs font-bold text-store-primary-foreground transition-colors hover:bg-store-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground disabled:opacity-60",
+                isLuxe &&
+                  "min-h-11 text-sm shadow-sm active:scale-[0.98] motion-reduce:active:scale-100",
+              )}
               // Guards a second submit while the first is in flight; the
               // server remains the authority on whether either succeeds.
               disabled={adding}
