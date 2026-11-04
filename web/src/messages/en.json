@@ -9374,6 +9374,31 @@
       "paid": "Payment vouchers only",
       "none": "Do not apply fees currently"
     },
+    "channels": {
+      "title": "Availability by channel",
+      "hint": "By default each channel follows “Available for online payments”. Choose “Enabled” or “Disabled” to override it for one channel; the change applies to the store checkout immediately and does not touch existing payments.",
+      "loading": "Loading channels…",
+      "loadFailed": "Could not load channel availability.",
+      "empty": "There are no web or mobile channels to configure.",
+      "methodInactive": "This method is disabled, so it appears in no channel whatever you choose here.",
+      "saved": "Channel availability updated",
+      "saveFailed": "Could not save availability. Refresh and try again.",
+      "choiceLabel": "Channel availability",
+      "channelInactive": "Inactive channel",
+      "type": {
+        "web": "Web",
+        "mobile": "Mobile"
+      },
+      "effective": {
+        "on": "Shown to shoppers",
+        "off": "Not shown"
+      },
+      "choice": {
+        "default": "Default",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      }
+    },
     "form": {
       "name": "Method name",
       "nameEn": "English name",
