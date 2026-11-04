@@ -1,9 +1,9 @@
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
-import type { ThemePresetId } from "@/lib/presentation/tokens";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { StoreProvider } from "@/contexts/StoreContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 /**
  * CUST-H2-5 — shared provider stack for `/dev/product-visual` and
