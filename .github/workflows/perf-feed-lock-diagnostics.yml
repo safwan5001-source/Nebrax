@@ -302,10 +302,11 @@ jobs:
         shell: bash
         env:
           EXPECT_PER_VARIANT: ${{ length(fromJSON(needs.plan.outputs.matrix).repeat) }}
+          EXPECT_VARIANTS: ${{ join(fromJSON(needs.plan.outputs.matrix).variant, ',') }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts/ci-perf-diag
-          python3 scripts/ci-perf-diag/analyze.py artifacts diag-report.md --expect="$EXPECT_PER_VARIANT"
+          python3 scripts/ci-perf-diag/analyze.py artifacts diag-report.md --expect="$EXPECT_PER_VARIANT" --variants="$EXPECT_VARIANTS"
           cat diag-report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

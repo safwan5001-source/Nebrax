@@ -100,6 +100,9 @@ def load_runs(root: str) -> list[dict[str, Any]]:
 # ───────────────────────── تصنيف ─────────────────────────
 
 def txn_end(t: dict[str, Any]) -> float:
+    """وقت إكمال المعاملة: الطابع الفعلي `end` إن سُجّل (لا يفترض اتصال المكوّنات)، وإلا مجموع المكوّنات (بيانات قديمة/اصطناعية)."""
+    if "end" in t:
+        return float(t["end"])
     return t["at"] + (t["wait_ms"] + t["gap_ms"] + t["commit_ms"]) / 1000.0
 
 
@@ -221,11 +224,12 @@ def median_or_nan(v: list[float]) -> float:
     return statistics.median(v) if v else float("nan")
 
 
-def build_report(runs: list[dict[str, Any]], expect: int = 0) -> str:
+def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants: list[str] | None = None) -> str:
     all_rows = round_rows(runs)
     invalid_rows = [r for r in all_rows if r.get("invalid")]
     rows = [r for r in all_rows if not r.get("invalid")]
-    variants = sorted({r["variant"] for r in all_rows})
+    # المتغيّرات = الملاحَظة ∪ المخطَّطة: متغيّر لم يصل منه أي ملف يظهر صراحةً بصفر تشغيلات لا يختفي من التقرير.
+    variants = sorted({r["variant"] for r in all_rows} | set(expected_variants or []))
     out: list[str] = []
     out.append("## COPS-H1-1 — تشخيص توقف قفل التغذية (Issue #1975، المرحلة 1)")
     out.append("")
@@ -233,7 +237,7 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0) -> str:
     hosts = Counter((r["host"].get("nproc"), r["host"].get("cpu_model"), r["pg"].get("server_version")) for r in runs)
     out.append("المضيف: " + "; ".join(f"nproc={n} · {m} · PG {v} ×{c}" for (n, m, v), c in hosts.items()))
     out.append("")
-    if invalid_rows or expect:
+    if invalid_rows or expect or expected_variants:
         out.append("### 0) صلاحية البيانات")
         out.append("")
         if invalid_rows:
@@ -241,12 +245,12 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0) -> str:
             out.append(f"⚠ **{len(invalid_rows)} جولة غير صالحة استُبعدت من كل الإحصاءات** (نزاهة/عدد عيّنات): " +
                        "; ".join(f"{v}#{rep}: {n}" for (v, rep), n in sorted(by_job.items(), key=lambda kv: str(kv[0]))) +
                        ". الأسباب: " + ", ".join(sorted({r["invalid"] for r in invalid_rows})))
-        if expect:
+        if expect or expected_variants:
             for v in variants:
                 got = len({r["repeat"] for r in all_rows if r["variant"] == v})
-                if got < expect:
+                if got < expect or (expected_variants and v in expected_variants and got == 0):
                     out.append(f"⚠ المتغيّر {v}: وصل {got} من {expect} تشغيلات متوقعة (وظائف قياس فشلت أو لم تُنتج مخرجات) — المقارنة ناقصة.")
-        if not invalid_rows and all(len({r['repeat'] for r in all_rows if r['variant'] == v}) >= expect for v in variants):
+        if not invalid_rows and all(len({r['repeat'] for r in all_rows if r['variant'] == v}) >= max(expect, 1) for v in variants):
             out.append("كل التشغيلات المتوقعة وصلت وكل الجولات صالحة.")
         out.append("")
 
@@ -340,14 +344,15 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0) -> str:
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     expect = next((int(a.split("=", 1)[1]) for a in argv[1:] if a.startswith("--expect=")), 0)
+    expected_variants = next(([v for v in a.split("=", 1)[1].split(",") if v] for a in argv[1:] if a.startswith("--variants=")), None)
     if not args:
-        print("usage: analyze.py <artifacts-dir> [report.md] [--expect=N]", file=sys.stderr)
+        print("usage: analyze.py <artifacts-dir> [report.md] [--expect=N] [--variants=a,b]", file=sys.stderr)
         return 2
     runs = load_runs(args[0])
     if not runs:
         print("no cops-h1-1-diag.json found", file=sys.stderr)
         return 1
-    report = build_report(runs, expect)
+    report = build_report(runs, expect, expected_variants)
     print(report)
     if len(args) > 1:
         with open(args[1], "w", encoding="utf-8") as fh:

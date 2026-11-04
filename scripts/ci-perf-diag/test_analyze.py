@@ -92,6 +92,18 @@ class Classification(unittest.TestCase):
         t = stalled_queue(gap=80.0, rq_gap=1.0, rq_commit=70.0)
         self.assertEqual(A.classify(A.freeze_of(rnd(t))), "client_gap_other")
 
+    def test_explicit_end_timestamp_exposes_a_pause_the_components_do_not_cover(self):
+        # توقف بين مكوّنين مسجَّلين (القفل ممسوك) لا تلتقطه مجموع المكوّنات؛ الطابع الفعلي `end` يكشفه ولا يُصنَّف «بلا تجمّد».
+        t = stalled_queue(commit=1.0)
+        stalled = t[10]
+        stalled["end"] = stalled["at"] + 0.150
+        for k in range(11, 20):
+            t[k]["wait_ms"] += 150.0
+        fr = A.freeze_of(rnd(t))
+        self.assertGreaterEqual(fr["freeze_ms"], 100.0)
+        self.assertEqual(A.classify(fr), "mixed")
+        self.assertEqual(A.txn_end(stalled), stalled["end"])
+
     def test_handoff_latency(self):
         # لا إمساك طويل؛ التسليم للتالي تأخر 90ms بعد انتهاء السابق (أو إدراجه بطيء).
         t = steady()
@@ -147,6 +159,14 @@ class Report(unittest.TestCase):
             text = A.build_report(A.load_runs(root), expect=2)
         self.assertIn("المتغيّر main: وصل 1 من 2", text)
         self.assertNotIn("المتغيّر pr1972: وصل", text)
+
+    def test_a_planned_variant_with_no_artifacts_is_reported_not_silently_dropped(self):
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [rnd(steady(), added=12.0)])
+            text = A.build_report(A.load_runs(root), expect=1, expected_variants=["main", "pr1972"])
+        self.assertIn("المتغيّر pr1972: وصل 0 من 1", text)
+        self.assertNotIn("كل التشغيلات المتوقعة وصلت", text)
+        self.assertIn("pr1972", text)
 
 
 if __name__ == "__main__":
