@@ -83,6 +83,32 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
     pack: "flowers-gifts",
   },
   {
+    id: "awj-luxe-motion",
+    version: 1,
+    name: { ar: "أَوْج لوكس موشن", en: "AWJ Luxe Motion" },
+    description: {
+      ar: "ثيم فاخر متعدد الأنشطة: عناوين تحريرية، بطاقات صور بارزة، أزرار واضحة وحركة هادئة قابلة للتخصيص.",
+      en: "A cross-vertical luxury theme with editorial headings, image-led cards, clear actions and restrained motion.",
+    },
+    vertical: "general",
+    // Reuse a runtime-backed preset; the theme ID itself is not a new themePreset contract value.
+    themePreset: "awj-bloom",
+    primaryColor: "#71243F",
+    accentColor: "#B88A43",
+    fontPreset: "cairo-geist",
+    density: "comfortable",
+    productCard: "standard",
+    typography: { headingFamily: "amiri-lora", headingScale: "lg", headingWeight: 700, sectionHeading: "centered", lineHeight: "relaxed" },
+    buttons: { style: "solid", size: "lg", radius: "md", hover: "lift" },
+    surfaces: { radius: "md", border: { width: "hairline" }, shadow: "soft" },
+    cards: { align: "start", imageRatio: "3:4", imageFit: "cover", hover: "zoom" },
+    layout: { contentWidth: "standard" },
+    motion: { duration: "slow", easing: "emphasized" },
+    header: { style: "standard", design: { layout: "centered", sticky: "always", shadow: "soft" } },
+    footer: { layout: "columns" },
+    // No merchant branding, imagery, product content, pricing, delivery or checkout data.
+  },
+  {
     id: "awj-atelier",
     version: 1,
     name: { ar: "أَوْج أتيليه", en: "AWJ Atelier" },
