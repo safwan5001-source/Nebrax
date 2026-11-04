@@ -20,6 +20,8 @@ interface QuickViewProps {
   basePath: string;
   categoryId?: string;
   isVariantManaged: boolean;
+  /** Opt-in 44px touch target for spacious mobile themes. */
+  largeHitTarget?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function QuickView({
   basePath,
   categoryId,
   isVariantManaged,
+  largeHitTarget = false,
 }: QuickViewProps) {
   const t = useTranslations("products");
   const { addItem } = useCart();
@@ -75,7 +78,7 @@ export function QuickView({
           event.stopPropagation();
           setOpen(true);
         }}
-        className="relative z-10 inline-flex size-8 items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm backdrop-blur-xs transition-colors hover:bg-store-surface"
+        className={`relative z-10 inline-flex items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm backdrop-blur-xs transition-colors hover:bg-store-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary ${largeHitTarget ? "size-11" : "size-8"}`}
       >
         <Eye className="size-4" aria-hidden="true" />
       </button>
