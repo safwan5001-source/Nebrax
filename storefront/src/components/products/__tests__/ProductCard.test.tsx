@@ -209,7 +209,7 @@ describe("ProductCard", () => {
     expect(link).toHaveAttribute("href", "/products/classic-t-shirt");
   });
 
-  it("offers quick view only under the AWJ Market theme marker", () => {
+  it("offers quick view under Market and Luxe Motion only, with a 44px target for Luxe", () => {
     const { queryByLabelText, rerender } = render(
       <ProductCard product={baseProduct} basePath="/us/en" />,
     );
@@ -221,6 +221,12 @@ describe("ProductCard", () => {
       </PublishedThemeMarkerProvider>,
     );
     expect(queryByLabelText("quickView")).toBeInTheDocument();
+    rerender(
+      <PublishedThemeMarkerProvider themePreset="awj-luxe-motion">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(queryByLabelText("quickView")).toHaveClass("size-11");
   });
 });
 
