@@ -315,6 +315,95 @@ class CommerceChannelOperationsSettingsPostgresTest extends TestCase
         $this->assertSame(1, $this->rows($channel));
     }
 
+    #[Test]
+    public function intake_control_check_constraints_reject_out_of_contract_values_even_when_the_service_is_bypassed(): void
+    {
+        $channel = $this->channel();
+        $base = ['tenant_id' => $this->tenantId, 'sales_channel_id' => $channel, 'acceptance_mode' => 'auto', 'version' => 1, 'created_at' => now(), 'updated_at' => now()];
+        $cases = [
+            'سياسة خارج الساعات غير معتمدة' => ['outside_hours_policy' => 'maybe'],
+            'نطاق حد أدنى غير معتمد' => ['min_order_scope' => 'pickup_only'],
+            'حد أدنى صفر' => ['min_order_minor' => 0],
+            'حد أدنى فوق السقف' => ['min_order_minor' => 100000000001],
+            'رسالة إيقاف أطول من 200' => ['pause_message' => str_repeat('a', 201)],
+            'موعد استئناف والطلبات مقبولة' => ['accepting_orders' => true, 'paused_until' => now()->addHour()],
+        ];
+        foreach ($cases as $label => $override) {
+            try {
+                DB::transaction(fn () => DB::table('commerce_channel_operation_settings')->insert(['id' => (string) Str::uuid()] + $override + $base));
+                $this->fail("{$label}: كان يجب أن يُرفض");
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('commerce_ops_settings_intake_chk', $e->getMessage(), $label);
+            }
+        }
+        $this->assertSame(0, $this->rows($channel));
+
+        // حالة سليمة على الحدود: إيقاف بموعد استئناف وحدّ أدنى بالسقف ورسالة بالحد الأقصى.
+        DB::table('commerce_channel_operation_settings')->insert(['id' => (string) Str::uuid(), 'accepting_orders' => false, 'paused_until' => now()->addHour(),
+            'min_order_minor' => 100000000000, 'pause_message' => str_repeat('a', 200), 'outside_hours_policy' => 'block', 'min_order_scope' => 'delivery_only'] + $base);
+        $this->assertSame(1, $this->rows($channel));
+    }
+
+    #[Test]
+    public function opening_hours_check_constraints_and_uniqueness_hold_even_when_the_service_is_bypassed(): void
+    {
+        $channel = $this->channel();
+        $base = ['tenant_id' => $this->tenantId, 'sales_channel_id' => $channel, 'weekday' => 1, 'opens_at' => '09:00', 'closes_at' => '17:00', 'created_at' => now(), 'updated_at' => now()];
+        $cases = [
+            'يوم 7' => ['weekday' => 7],
+            'بداية بصيغة خاطئة' => ['opens_at' => '9:00'],
+            'بداية 24:00' => ['opens_at' => '24:00', 'closes_at' => '24:00'],
+            'نهاية 24:01' => ['closes_at' => '24:01'],
+            'بداية بعد النهاية' => ['opens_at' => '18:00'],
+            'بداية تساوي النهاية' => ['opens_at' => '09:00', 'closes_at' => '09:00'],
+        ];
+        foreach ($cases as $label => $override) {
+            try {
+                DB::transaction(fn () => DB::table('commerce_channel_opening_hours')->insert(['id' => (string) Str::uuid()] + $override + $base));
+                $this->fail("{$label}: كان يجب أن يُرفض");
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('commerce_channel_opening_hours_shape_chk', $e->getMessage(), $label);
+            }
+        }
+        $this->assertSame(0, DB::table('commerce_channel_opening_hours')->where('sales_channel_id', $channel)->count());
+
+        DB::table('commerce_channel_opening_hours')->insert(['id' => (string) Str::uuid(), 'opens_at' => '00:00', 'closes_at' => '24:00'] + $base);
+        try {
+            DB::transaction(fn () => DB::table('commerce_channel_opening_hours')->insert(['id' => (string) Str::uuid(), 'opens_at' => '00:00', 'closes_at' => '12:00'] + $base));
+            $this->fail('فترة مكررة (قناة، يوم، بداية) كان يجب أن تُرفض');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('commerce_channel_opening_hours_period_unique', $e->getMessage());
+        }
+    }
+
+    #[Test]
+    public function two_writers_replacing_the_opening_hours_with_the_same_expected_version_have_exactly_one_winner_and_no_mixed_set(): void
+    {
+        $tenant = $this->tenantId;
+        $user = $this->userId;
+
+        foreach ([1, 2, 3] as $round) {
+            $channel = $this->channel();
+            $a = [['weekday' => 0, 'opens_at' => '08:00', 'closes_at' => '12:00'], ['weekday' => 0, 'opens_at' => '14:00', 'closes_at' => '18:00']];
+            $b = [['weekday' => 3, 'opens_at' => '10:00', 'closes_at' => '20:00']];
+            $results = $this->runConcurrently([
+                fn () => self::attempt($tenant, $user, $channel, 0, ['opening_hours' => $a]),
+                fn () => self::attempt($tenant, $user, $channel, 0, ['opening_hours' => $b]),
+            ]);
+            $this->assertNoDeadlock($results);
+            $values = array_column($results, 'value');
+            $this->assertCount(1, array_filter($values, fn (array $v) => $v['ok']), "الجولة {$round}: فائز واحد");
+            $loser = array_values(array_filter($values, fn (array $v) => ! $v['ok']))[0];
+            $this->assertSame('settings_version_conflict', $loser['reason']);
+
+            // المجموعة المخزَّنة كاملةً مجموعة أحد الكاتبين لا خليطاً منهما.
+            $stored = DB::table('commerce_channel_opening_hours')->where('sales_channel_id', $channel)->orderBy('weekday')->orderBy('opens_at')
+                ->get(['weekday', 'opens_at', 'closes_at'])->map(fn ($r) => ['weekday' => (int) $r->weekday, 'opens_at' => $r->opens_at, 'closes_at' => $r->closes_at])->all();
+            $this->assertTrue($stored === $a || $stored === $b, 'مجموعة ساعات كاملة لأحد الكاتبين فقط');
+            $this->assertSame(1, SalesChannelSettingEvent::query()->where('sales_channel_id', $channel)->count());
+        }
+    }
+
     // ───────────────────────── تشغيل متزامن ─────────────────────────
 
     /** @param list<callable> $jobs @return array<int, array<string, mixed>> */
