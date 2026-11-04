@@ -138,3 +138,18 @@ Use AWJ existing management workspace/report permissions; do not rebuild general
 - Do not hard-code the number of shifts, product catalog, fuel prices, pumps, nozzles, tanks, payment methods, station list or locale per tenant; load these from authorized AWJ services.
 - Tenant isolation and server-side role/scope checks are mandatory. Tenant branding must never affect the authentication boundary, records, accounting ledger or audit trail.
 - Test two distinct tenants with different catalogs/roles/logos and confirm isolation, role-dependent screen content, correct fallback and no cross-tenant cache/data leakage.
+
+
+## Authoritative data contract — AWJ Fuel Stations only (approved)
+The new operator/supervisor workspaces are **presentation and workflow clients** of the existing AWJ Fuel Stations domain. **No second source of truth** may be created for master data, fuel transactions, inventory, or accounting.
+
+- Tenant, branch, fuel stations, products and station-product mapping, effective fuel prices, tanks, pumps, nozzles, meters/readings, physical stock, receipts, shifts, staff, sales, collections and reporting must be read from their authoritative AWJ services/API.
+- Employee identity, permissions and station scope come from AWJ authentication/RBAC. Server-side tenant/branch/station/warehouse/asset checks remain required.
+- On station selection, fetch only the authorized and associated products, pumps/nozzles and tanks; never ship hard-coded diesel/91/95 catalogs, fixed prices, station identifiers, shift counts or mock balances in production.
+- If a record is missing, display an honest unavailable/not-configured state and point permitted admins to the **existing AWJ setup flow**. Do not silently create placeholder master data.
+- Any future edit uses the existing AWJ domain API with server authorization rather than storing a parallel copy in this workspace.
+- Transactions, meter readings, delivery receipts and approvals must commit through established AWJ commands with idempotency and without double-posting sales, ledger or inventory movements.
+- Where needed API coverage is absent, record a specific gap and extend the existing module, not a new duplicate backend.
+- Mock data is permitted only in clearly labeled demos/tests, never production screens.
+- QA must cover at least two tenants with differing products/assets/roles to prove isolation, configuration propagation and non-leaking caches.
+
