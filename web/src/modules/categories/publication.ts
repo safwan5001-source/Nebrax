@@ -1,6 +1,12 @@
 import { api } from '@/lib/api';
 
-import type { ProductPublicationStore, PublicationStatusFilter } from '@/modules/products/publication';
+import { mapBulkPublicationPayload } from '@/modules/products/publication';
+import type {
+  BulkPublicationAction,
+  BulkPublicationResult,
+  ProductPublicationStore,
+  PublicationStatusFilter,
+} from '@/modules/products/publication';
 
 /**
  * COM-CATALOG-2 — Category Publication Workspace.
@@ -121,4 +127,21 @@ export async function replaceCategoryPublication(categoryId: string, storefrontI
     name: store.name,
     isPublished: store.is_published === true,
   }));
+}
+
+export function categoryBulkPublicationPath(): string {
+  return `${categoryPublicationListPath()}/bulk`;
+}
+
+/** COM-CATALOG-3 — نشر/إلغاء نشر تصنيفات بمعرّفات صريحة على متجر واحد (CommerceCategoryListing فقط). */
+export async function bulkSetCategoryPublication(params: {
+  action: BulkPublicationAction;
+  storefrontId: string;
+  ids: string[];
+}): Promise<BulkPublicationResult> {
+  const payload = await api<Parameters<typeof mapBulkPublicationPayload>[0]>(categoryBulkPublicationPath(), {
+    method: 'POST',
+    body: { action: params.action, storefront_id: params.storefrontId, ids: params.ids },
+  });
+  return mapBulkPublicationPayload(payload);
 }
