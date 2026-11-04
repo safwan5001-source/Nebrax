@@ -83,6 +83,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/wholesale/partners/eligible',
         // COM-CATALOG-2 — مساحة عمل نشر التصنيفات (قراءة + استبدال مجموعة النشر).
         'api/commerce/workspace/categories/publication',
+        'api/commerce/workspace/categories/publication/bulk', // COM-CATALOG-3: نشر جماعي لمعرّفات صريحة (products.manage)
         'api/commerce/workspace/categories/{id}/publication',
         // FLOWERS-H2 / ADR-14 — الأبعاد الوصفية للكتالوج وقيمها وإسنادها للمنتجات.
         'api/commerce/workspace/collections',
@@ -102,6 +103,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/mobile-channel/delivery-schedule/slots',
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
+        'api/commerce/workspace/products/publication/bulk', // COM-CATALOG-3: نشر جماعي لمعرّفات صريحة (products.manage)
         // FLOWERS-H6 / ADR-18 — إضافات المنتج الاختيارية.
         'api/commerce/workspace/products/{id}/addons',
         // FLOWERS-H5 / ADR-17 — كتل محتوى المنتج المهيكلة.

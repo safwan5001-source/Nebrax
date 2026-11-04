@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CommercePublishedProductsPage from './page';
 
@@ -22,21 +22,28 @@ vi.mock('next/link', () => ({
 
 const listMock = vi.fn();
 const replaceMock = vi.fn();
+const bulkMock = vi.fn();
 vi.mock('@/modules/products/publication', () => ({
   loadProductPublicationList: (...args: unknown[]) => listMock(...args),
   replaceProductPublication: (...args: unknown[]) => replaceMock(...args),
+  bulkSetProductPublication: (...args: unknown[]) => bulkMock(...args),
 }));
 
 const categoryListMock = vi.fn();
 const categoryReplaceMock = vi.fn();
+const categoryBulkMock = vi.fn();
 vi.mock('@/modules/categories/publication', () => ({
   loadCategoryPublicationList: (...args: unknown[]) => categoryListMock(...args),
   replaceCategoryPublication: (...args: unknown[]) => categoryReplaceMock(...args),
+  bulkSetCategoryPublication: (...args: unknown[]) => categoryBulkMock(...args),
 }));
 
+const storeFixture = {
+  current: [{ id: 's1', name: 'المتجر', isActive: true }] as Array<{ id: string; name: string; isActive: boolean }>,
+};
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
-    catalog: { status: 'ready', stores: [{ id: 's1', name: 'المتجر', isActive: true }] },
+    catalog: { status: 'ready', stores: storeFixture.current },
   }),
 }));
 
@@ -46,7 +53,8 @@ vi.mock('@/components/ui/toast', () => ({
   useToast: () => ({ error: toastError, success: toastSuccess }),
 }));
 
-vi.mock('@/lib/auth', () => ({ currentUser: () => ({ role: 'owner', permissions: ['*'] }) }));
+const userFixture = { current: { role: 'owner', permissions: ['*'] } as { role: string; permissions: string[] } };
+vi.mock('@/lib/auth', () => ({ currentUser: () => userFixture.current }));
 
 const emptyPage = { items: [], meta: { currentPage: 1, lastPage: 1, perPage: 25, total: 0 } };
 const publishedPage = {
@@ -224,5 +232,320 @@ describe('COM-CATALOG-2 Category Publication tab', () => {
     screen.getByRole('tab', { name: 'Categories' }).click();
     await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
     expect(screen.getAllByText(/Under أساسيات/).length).toBeGreaterThan(0);
+  });
+});
+
+// ── COM-CATALOG-3 — Bulk selection & publishing ─────────────────────────────
+
+const row = (id: string, name: string, published = false, stores = [{ id: 's1', name: 'المتجر', isPublished: published }]) => ({
+  id,
+  sku: `SKU-${id}`,
+  name,
+  nameEn: null,
+  isActive: true,
+  isPublished: published,
+  stores,
+});
+const bulkPage = (lastPage = 1, currentPage = 1) => ({
+  items: [row('p1', 'بن يمني'), row('p2', 'هيل'), row('p3', 'زعفران')],
+  meta: { currentPage, lastPage, perPage: 25, total: 3 * lastPage },
+});
+const okResult = (action: 'publish' | 'unpublish', ids: string[], storefrontId = 's1') => ({
+  action,
+  storefrontId,
+  summary: { requested: ids.length, updated: ids.length, unchanged: 0, rejected: 0, failed: 0 },
+  results: ids.map((id) => ({ id, status: 'updated' as const, reason: null })),
+});
+
+/** كل صف يُرسم مرتين (جدول سطح المكتب + سجل الجوال) — النسخة الأولى هي الجدول. */
+const rowBox = (name: string) => screen.getAllByLabelText(`تحديد: ${name}`)[0] as HTMLInputElement;
+const pageBox = () => screen.getAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')[0] as HTMLInputElement;
+const countText = () => screen.queryByTestId('bulk-selected-count')?.textContent ?? null;
+
+describe('COM-CATALOG-3 bulk selection', () => {
+  afterEach(() => {
+    cleanup();
+    [listMock, replaceMock, bulkMock, categoryListMock, categoryReplaceMock, categoryBulkMock, toastError, toastSuccess].forEach((m) => m.mockReset());
+    storeFixture.current = [{ id: 's1', name: 'المتجر', isActive: true }];
+    userFixture.current = { role: 'owner', permissions: ['*'] };
+    locale.current = 'ar';
+  });
+
+  const renderProducts = async (page = bulkPage()) => {
+    listMock.mockResolvedValue(page);
+    render(<CommercePublishedProductsPage />);
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+  };
+
+  it('shows no bulk bar until something is selected, and selection toggles per row', async () => {
+    await renderProducts();
+    expect(countText()).toBeNull();
+
+    fireEvent.click(rowBox('بن يمني'));
+    expect(countText()).toBe('المحدد: 1');
+    fireEvent.click(rowBox('هيل'));
+    expect(countText()).toBe('المحدد: 2');
+    fireEvent.click(rowBox('بن يمني'));
+    expect(countText()).toBe('المحدد: 1');
+    fireEvent.click(rowBox('هيل'));
+    expect(countText()).toBeNull();
+  });
+
+  it('select-all affects the current page only, reports indeterminate, and toggles off', async () => {
+    await renderProducts();
+    fireEvent.click(rowBox('بن يمني'));
+    expect(pageBox().indeterminate).toBe(true);
+
+    fireEvent.click(pageBox());
+    expect(countText()).toBe('المحدد: 3');
+    expect(pageBox().checked).toBe(true);
+    expect(pageBox().indeterminate).toBe(false);
+
+    fireEvent.click(pageBox());
+    expect(countText()).toBeNull();
+  });
+
+  it('clears the selection (with a notice) when the search changes — never silently widening it', async () => {
+    await renderProducts();
+    fireEvent.click(pageBox());
+    expect(countText()).toBe('المحدد: 3');
+
+    fireEvent.change(screen.getByLabelText('بحث في المنتجات'), { target: { value: 'هيل' } });
+    expect(countText()).toBeNull();
+    expect(screen.getByText('أُلغي التحديد لأن البحث أو الفلاتر تغيّرت.')).toBeTruthy();
+  });
+
+  it('clears the selection when the status filter changes', async () => {
+    await renderProducts();
+    fireEvent.click(rowBox('هيل'));
+    fireEvent.change(screen.getByLabelText('حالة النشر'), { target: { value: 'published' } });
+    expect(countText()).toBeNull();
+  });
+
+  it('keeps the selection across pagination and shows the off-page count', async () => {
+    await renderProducts(bulkPage(2, 1));
+    fireEvent.click(pageBox());
+    expect(countText()).toBe('المحدد: 3');
+
+    listMock.mockResolvedValue({
+      items: [row('p9', 'قرفة')],
+      meta: { currentPage: 2, lastPage: 2, perPage: 25, total: 6 },
+    });
+    fireEvent.click(screen.getByLabelText('nextPage'));
+    await waitFor(() => expect(screen.getAllByText('قرفة').length).toBeGreaterThan(0));
+
+    expect(countText()).toBe('المحدد: 3');
+    expect(screen.getByText(/في صفحات أخرى: 3/)).toBeTruthy();
+    expect(rowBox('قرفة').checked).toBe(false);
+  });
+
+  it('confirms with exact scope, then sends only the selected ids to the single store', async () => {
+    await renderProducts();
+    bulkMock.mockResolvedValue(okResult('publish', ['p1', 'p3']));
+    fireEvent.click(rowBox('بن يمني'));
+    fireEvent.click(rowBox('زعفران'));
+    fireEvent.click(screen.getByRole('button', { name: 'نشر المحدد' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/سيُنشر 2 من المنتجات في المتجر «المتجر»/)).toBeTruthy();
+    expect(bulkMock).not.toHaveBeenCalled(); // لا تنفيذ قبل التأكيد
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'تأكيد النشر' }));
+    await waitFor(() => expect(bulkMock).toHaveBeenCalledTimes(1));
+    expect(bulkMock).toHaveBeenCalledWith({ action: 'publish', storefrontId: 's1', ids: ['p1', 'p3'] });
+    expect(await screen.findByText('اكتملت العملية على كل العناصر المحددة.')).toBeTruthy();
+    // الإعادة من الخادم + تفريغ التحديد المكتمل.
+    await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(1));
+    expect(countText()).toBeNull();
+    // لا استدعاء لمسار المفرد ولا للتصنيفات.
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(categoryBulkMock).not.toHaveBeenCalled();
+  });
+
+  it('can be cancelled from the confirmation without any request', async () => {
+    await renderProducts();
+    fireEvent.click(rowBox('هيل'));
+    fireEvent.click(screen.getByRole('button', { name: 'إلغاء نشر المحدد' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'رجوع' }));
+    expect(bulkMock).not.toHaveBeenCalled();
+    expect(countText()).toBe('المحدد: 1');
+  });
+
+  it('reports partial failure by name and keeps only the failed items selected', async () => {
+    await renderProducts();
+    bulkMock.mockResolvedValue({
+      action: 'unpublish',
+      storefrontId: 's1',
+      summary: { requested: 3, updated: 1, unchanged: 0, rejected: 1, failed: 1 },
+      results: [
+        { id: 'p1', status: 'updated', reason: null },
+        { id: 'p2', status: 'rejected', reason: 'not_found' },
+        { id: 'p3', status: 'failed', reason: 'error' },
+      ],
+    });
+    fireEvent.click(pageBox());
+    fireEvent.click(screen.getByRole('button', { name: 'إلغاء نشر المحدد' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأكيد إلغاء النشر' }));
+
+    expect(await screen.findByText('اكتملت العملية جزئياً: بعض العناصر لم تُنفَّذ.')).toBeTruthy();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/غير موجود في حسابك/)).toBeTruthy();
+    expect(within(dialog).getByText('هيل')).toBeTruthy();
+    expect(within(dialog).getByText('زعفران')).toBeTruthy();
+    expect(within(dialog).getByText('بقيت العناصر الفاشلة محددة لتعيد المحاولة.')).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إغلاق' }));
+    await waitFor(() => expect(countText()).toBe('المحدد: 1'));
+    expect(rowBox('زعفران').checked).toBe(true);
+    expect(rowBox('هيل').checked).toBe(false);
+  });
+
+  it('on a failed request says the outcome is unconfirmed and keeps the selection intact', async () => {
+    await renderProducts();
+    bulkMock.mockRejectedValue(new Error('network'));
+    fireEvent.click(rowBox('هيل'));
+    fireEvent.click(screen.getByRole('button', { name: 'نشر المحدد' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأكيد النشر' }));
+
+    expect(await screen.findByText(/ولا يمكن الجزم بما تغيّر/)).toBeTruthy();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'إغلاق' }));
+    await waitFor(() => expect(countText()).toBe('المحدد: 1'));
+  });
+
+  it('with several stores the target must be chosen explicitly — no guessing, no all-stores', async () => {
+    storeFixture.current = [
+      { id: 's1', name: 'المتجر', isActive: true },
+      { id: 's2', name: 'متجر الهدايا', isActive: true },
+    ];
+    await renderProducts();
+    fireEvent.click(rowBox('هيل'));
+
+    const publish = screen.getByRole('button', { name: 'نشر المحدد' }) as HTMLButtonElement;
+    expect(publish.disabled).toBe(true);
+    expect(screen.getByText('اختر المتجر المستهدف أولاً.')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('المتجر المستهدف'), { target: { value: 's2' } });
+    expect(publish.disabled).toBe(false);
+
+    bulkMock.mockResolvedValue(okResult('publish', ['p2'], 's2'));
+    fireEvent.click(publish);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/في المتجر «متجر الهدايا»/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'تأكيد النشر' }));
+    await waitFor(() => expect(bulkMock).toHaveBeenCalledWith({ action: 'publish', storefrontId: 's2', ids: ['p2'] }));
+  });
+
+  it('hides all selection controls without products.manage', async () => {
+    userFixture.current = { role: 'staff', permissions: ['products.view'] };
+    await renderProducts();
+    expect(screen.queryAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')).toHaveLength(0);
+    expect(screen.queryAllByLabelText('تحديد: بن يمني')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
+  });
+
+  it('offers no selection when there is no active web store to target', async () => {
+    storeFixture.current = [];
+    await renderProducts();
+    expect(screen.queryAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')).toHaveLength(0);
+  });
+
+  it('keeps the individual per-store actions working alongside bulk', async () => {
+    await renderProducts();
+    replaceMock.mockResolvedValue([{ id: 's1', name: 'المتجر', isPublished: true }]);
+    screen.getAllByRole('button', { name: /^نشر · المتجر/ })[0].click();
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('p1', ['s1']));
+  });
+
+  it('drops the selection when switching tabs and bulk-publishes categories through the category contract', async () => {
+    await renderProducts();
+    fireEvent.click(pageBox());
+    expect(countText()).toBe('المحدد: 3');
+
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+    await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
+    expect(countText()).toBeNull();
+
+    categoryBulkMock.mockResolvedValue(okResult('publish', ['c1']));
+    fireEvent.click(screen.getAllByLabelText('تحديد: مشروبات')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'نشر المحدد' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/سيُنشر 1 من التصنيفات/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'تأكيد النشر' }));
+    await waitFor(() => expect(categoryBulkMock).toHaveBeenCalledWith({ action: 'publish', storefrontId: 's1', ids: ['c1'] }));
+    expect(bulkMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks bulk actions while a single-record update is in flight (no overlapping full-set writes)', async () => {
+    await renderProducts();
+    fireEvent.click(rowBox('هيل'));
+    const publish = screen.getByRole('button', { name: 'نشر المحدد' }) as HTMLButtonElement;
+    expect(publish.disabled).toBe(false);
+
+    let release: (value: unknown) => void = () => {};
+    replaceMock.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    screen.getAllByRole('button', { name: /^نشر · المتجر/ })[0].click();
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(publish.disabled).toBe(true));
+    expect((screen.getByRole('button', { name: 'إلغاء نشر المحدد' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(publish);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(bulkMock).not.toHaveBeenCalled();
+
+    release([{ id: 's1', name: 'المتجر', isPublished: true }]);
+    await waitFor(() => expect(publish.disabled).toBe(false));
+  });
+
+  it('recovers when a bulk change removes the current page: goes back to the last existing page', async () => {
+    // المرشّح «منشور» والصفحة 2 هي الأخيرة؛ بعد الإجراء الجماعي لا يبقى إلا صفحة واحدة.
+    let afterBulk = false;
+    listMock.mockImplementation(async (params: { page?: number }) => {
+      const page = params.page ?? 1;
+      if (!afterBulk) {
+        return page === 2
+          ? { items: [row('p9', 'قرفة', true)], meta: { currentPage: 2, lastPage: 2, perPage: 25, total: 26 } }
+          : { items: [row('p1', 'بن يمني', true)], meta: { currentPage: 1, lastPage: 2, perPage: 25, total: 26 } };
+      }
+      // بعد الإجراء: صفحة 2 لم تعد موجودة (الخادم يُرجع عناصر فارغة مع lastPage = 1).
+      return page === 1
+        ? { items: [row('p1', 'بن يمني', true)], meta: { currentPage: 1, lastPage: 1, perPage: 25, total: 1 } }
+        : { items: [], meta: { currentPage: page, lastPage: 1, perPage: 25, total: 1 } };
+    });
+    render(<CommercePublishedProductsPage />);
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    // مؤقّت تأجيل البحث عند التركيب (300ms) يعيد الصفحة إلى 1 — نتركه يعمل قبل التنقل حتى لا يخفي الخلل.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    fireEvent.change(screen.getByLabelText('حالة النشر'), { target: { value: 'published' } });
+    await waitFor(() => expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'published', page: 1 })));
+    fireEvent.click(screen.getByLabelText('nextPage'));
+    await waitFor(() => expect(screen.getAllByText('قرفة').length).toBeGreaterThan(0));
+
+    bulkMock.mockImplementation(async () => {
+      afterBulk = true;
+      return okResult('unpublish', ['p9']);
+    });
+    fireEvent.click(rowBox('قرفة'));
+    fireEvent.click(screen.getByRole('button', { name: 'إلغاء نشر المحدد' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأكيد إلغاء النشر' }));
+    await screen.findByText('اكتملت العملية على كل العناصر المحددة.');
+
+    // لا شاشة «فارغ»، والعودة لآخر صفحة موجودة مع بقاء الترقيم.
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    expect(screen.queryByText('لا منتجات بعد')).toBeNull();
+    expect(screen.queryByText('لا نتائج مطابقة')).toBeNull();
+    expect(screen.getByLabelText('nextPage')).toBeTruthy();
+  });
+
+  it('renders the bulk UI in English', async () => {
+    locale.current = 'en';
+    listMock.mockResolvedValue(bulkPage());
+    render(<CommercePublishedProductsPage />);
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByLabelText('Select all items on the current page only')[0]);
+    expect(screen.getByTestId('bulk-selected-count').textContent).toBe('Selected: 3');
+    expect(screen.getByRole('button', { name: 'Publish selected' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unpublish selected' })).toBeTruthy();
   });
 });

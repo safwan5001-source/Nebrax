@@ -67,6 +67,31 @@ final class CommerceProductPublicationController extends ApiController
         ]);
     }
 
+    /**
+     * Bulk publish/unpublish of an explicit id list on exactly one storefront.
+     * RBAC (products.manage) is enforced by the route; tenant/store isolation
+     * and per-record validation live in the service. 200 even on partial
+     * success — the per-record `results` carry the truth.
+     */
+    public function bulk(Request $request, CommerceProductPublicationService $publication): JsonResponse
+    {
+        $this->denySelfService($request);
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:publish,unpublish'],
+            'storefront_id' => ['required', 'string', 'uuid'],
+            'ids' => ['required', 'array', 'min:1', 'max:'.CommerceProductPublicationService::BULK_MAX_IDS],
+            'ids.*' => ['required', 'string', 'uuid', 'distinct'],
+        ]);
+
+        return response()->json([
+            'data' => $publication->bulkSet(
+                array_values($validated['ids']),
+                $validated['storefront_id'],
+                $validated['action'] === 'publish',
+            ),
+        ]);
+    }
+
     private function denySelfService(Request $request): void
     {
         if ($request->user()?->role === 'self_service') {
