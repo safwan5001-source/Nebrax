@@ -31,6 +31,7 @@ describe('commerce workspace navigation', () => {
       '/commerce/domains',
       '/commerce/delivery',
       '/commerce/order-policies',
+      '/commerce/store-operations',
       '/commerce/shipping-zones',
       '/commerce/customer-accounts',
       '/commerce/gifting',

@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import {
   Boxes,
   ClipboardList,
+  Clock,
   Gift,
   Globe,
   Layers3,
@@ -51,6 +52,7 @@ const ICONS: Record<string, typeof Store> = {
   '/commerce/domains': Globe,
   '/commerce/delivery': Truck,
   '/commerce/order-policies': SlidersHorizontal,
+  '/commerce/store-operations': Clock,
   '/commerce/shipping-zones': MapPin,
   '/commerce/customer-accounts': UserRound,
   '/commerce/gifting': Gift,
