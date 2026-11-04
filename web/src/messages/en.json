@@ -7591,6 +7591,8 @@
     "c_quotes_d": "Configure how quotes are created, managed, and converted to invoices.",
     "c_orders_t": "Sales order settings",
     "c_orders_d": "Control how sales orders are issued, managed, and converted to invoices.",
+    "not_applied_badge": "Not in effect",
+    "not_applied_notice": "This screen currently has no effect on orders, invoices or shipping: nothing in the system reads the values saved here. To control online store orders use “E-commerce → Store settings”. This page will be hidden in a later release; your saved data is not deleted.",
     "invoices_title": "Invoice settings",
     "quotes_title": "Quote settings",
     "back": "Back",
