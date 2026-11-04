@@ -15,6 +15,7 @@ export const THEME_PRESETS = [
   { id: "slate", primary: "#334155", labelKey: "presetSlate" },
   { id: "awj-market", primary: "#0f766e", labelKey: "presetAwjMarket" },
   { id: "awj-bloom", primary: "#9d2449", labelKey: "presetAwjBloom" },
+  { id: "awj-luxe-motion", primary: "#71243f", labelKey: "presetAwjLuxeMotion" },
 ] as const;
 
 export type ThemePresetId = (typeof THEME_PRESETS)[number]["id"];
