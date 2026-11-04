@@ -107,6 +107,38 @@ describe("built-in themes (V10a)", () => {
   }
 });
 
+describe("AWJ Luxe Motion section composition", () => {
+  const luxe = builtInTheme("awj-luxe-motion");
+
+  it("is discoverable as a reusable bilingual theme with no tenant-specific branding or assets", () => {
+    expect(luxe?.name.ar).toBe("أَوْج لوكس موشن");
+    expect(luxe?.vertical).toBe("general");
+    expect(luxe?.assets ?? []).toEqual([]);
+    expect(JSON.stringify(luxe)).not.toMatch(/nebras|نبراس|mediaId|logoDataUrl/i);
+  });
+
+  it("styles existing homepage sections without replacing content, order or visibility", () => {
+    expect(luxe).toBeDefined();
+    const before = configWithContent();
+    const result = applyTheme(before, luxe!);
+    if (!result.ok) throw new Error("Luxe Motion failed to apply");
+    expect(result.config.homepage.sections.map((s) => [s.id, s.type, s.visible])).toEqual(
+      before.homepage.sections.map((s) => [s.id, s.type, s.visible]),
+    );
+    const hero = result.config.homepage.sections.find((s) => s.id === "hero");
+    const featured = result.config.homepage.sections.find((s) => s.id === "featured-1");
+    expect(hero?.design?.layout).toBe("split");
+    expect(hero?.design?.motion?.reveal).toBe("fade-up");
+    expect(featured?.design?.layout).toBe("grid");
+    expect(featured?.content).toEqual(before.homepage.sections.find((s) => s.id === "featured-1")?.content);
+    expect(result.config.branding).toEqual(before.branding);
+    expect(result.summary.kept).toContain("media");
+    expect(result.summary.kept).toContain("content");
+    const repeated = applyTheme(result.config, luxe!);
+    expect(repeated.ok && repeated.summary.noop).toBe(true);
+  });
+});
+
 describe("applyTheme summary (V10a)", () => {
   it("lists every area, in order, and what is kept", () => {
     const result = applyTheme(configWithContent(), BUILT_IN_THEMES[1]);
