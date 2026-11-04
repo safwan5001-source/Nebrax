@@ -106,36 +106,42 @@ def txn_end(t: dict[str, Any]) -> float:
     return t["at"] + (t["wait_ms"] + t["gap_ms"] + t["commit_ms"]) / 1000.0
 
 
-QUEUE_MIN = 3             # أقل عدد منتظرين خلف الالتزام ليُعدّ الفاصل «تجمّداً» (لا فراغاً طبيعياً في ذيل الجولة)
+QUEUE_MIN = 3             # أقل عدد منتظرين على القفل ليُعدّ الفاصل «تجمّداً» (لا فراغاً طبيعياً في ذيل الجولة أو وقت تفكير)
+
+
+def acquired_at(t: dict[str, Any]) -> float:
+    """لحظة اكتمال حيازة المعاملة للقفل وإدراجها (نهاية append): `at + wait_ms`."""
+    return t["at"] + t["wait_ms"] / 1000.0
 
 
 def freeze_of(rnd: dict[str, Any]) -> dict[str, Any] | None:
-    """أكبر فاصل بين التزامين متتاليين **كان خلفه طابور** (≥ QUEUE_MIN كاتباً بدأوا ولم ينتهوا لحظة الالتزام الثاني).
+    """أكبر فاصل بين التزامين متتاليين **كان خلفه طابور فعلي**، مقيساً من لحظة تكوّن الطابور لا من آخر التزام.
 
-    فاصل بلا منتظرين (ذيل الجولة حيث تبقى قلة من الكتّاب بمهلة تفكير تصل 200ms) فراغ طبيعي لا تجمّد: لا يؤثر في أي انتظار.
+    المنتظرون لحظة الالتزام الثاني = معاملات بدأت (`at`) ولم تُكمل حيازة القفل بعد (`acquired_at`). يبدأ التجمّد من
+    max(آخر التزام، لحظة وصول المنتظر رقم QUEUE_MIN) — فوقت التفكير الذي سبق تكوّن الطابور (كتّاب نائمون) لا يُحتسب تجمّداً ولا تسليماً.
+    فاصل لا ينتظر خلفه ≥ QUEUE_MIN كتّاب (ذيل الجولة) ليس تجمّداً. أول التزام يُقاس من أبكر بدء نشاط معاملات في الجولة.
     """
     txns = sorted(rnd.get("txns", []), key=txn_end)
     ends = [txn_end(t) for t in txns]
     best = None
-    # أول التزام يُقاس من بدء أول نشاط معاملات في الجولة (أبكر `at`) — لا من بدء العملية — كي لا يُخفى توقف المعاملة الأولى.
     first_start = min((t["at"] for t in txns), default=0.0)
     for idx in range(len(txns)):
         cur = txns[idx]
         prev_end = first_start if idx == 0 else ends[idx - 1]
         cur_end = ends[idx]
-        queued = sum(1 for j, t in enumerate(txns) if j != idx and t["at"] < cur_end and ends[j] > cur_end)
-        if queued < QUEUE_MIN:
+        waiting_since = sorted(t["at"] for j, t in enumerate(txns) if j != idx and t["at"] < cur_end < acquired_at(t))
+        if len(waiting_since) < QUEUE_MIN:
             continue
-        gap_ms = (cur_end - prev_end) * 1000.0
-        if best is None or gap_ms > best["freeze_ms"]:
-            acquired = cur["at"] + cur["wait_ms"] / 1000.0
+        start = max(prev_end, waiting_since[QUEUE_MIN - 1])
+        freeze_ms = (cur_end - start) * 1000.0
+        if best is None or freeze_ms > best["freeze_ms"]:
             best = {
-                "freeze_ms": round(gap_ms, 1),
-                "handoff_ms": round(max(0.0, (acquired - prev_end) * 1000.0), 1),
+                "freeze_ms": round(freeze_ms, 1),
+                "handoff_ms": round(max(0.0, (acquired_at(cur) - start) * 1000.0), 1),
                 "hold_ms": round(cur["gap_ms"] + cur["commit_ms"], 1),
-                "queued": queued,
+                "queued": len(waiting_since),
                 "root": cur,
-                "t_start": prev_end,
+                "t_start": start,
                 "t_end": cur_end,
             }
     return best

@@ -92,6 +92,18 @@ class Classification(unittest.TestCase):
         t = stalled_queue(gap=80.0, rq_gap=1.0, rq_commit=70.0)
         self.assertEqual(A.classify(A.freeze_of(rnd(t))), "client_gap_other")
 
+    def test_idle_think_time_before_the_queue_forms_is_not_counted_as_freeze(self):
+        # سيناريو Codex: stalled_queue(commit=120) ثم 4 معاملات قصيرة تبدأ بعد 180ms من آخر التزام وتنتظر 1–4ms فقط.
+        t = stalled_queue(commit=120.0)
+        last_end = max(A.txn_end(x) for x in t)
+        for i in range(4):
+            t.append(txn(i % 5, last_end + 0.18 + i * 0.0002, wait=1.0 + i))
+        fr = A.freeze_of(rnd(t))
+        self.assertEqual(A.classify(fr), "commit_stall")
+        self.assertLess(fr["freeze_ms"], 200.0)                       # لا يضمّ فراغ الـ180ms
+        short_only = A.freeze_of(rnd(steady() + t[20:]))
+        self.assertTrue(short_only is None or short_only["freeze_ms"] < 30.0)
+
     def test_explicit_end_timestamp_exposes_a_pause_the_components_do_not_cover(self):
         # توقف بين مكوّنين مسجَّلين (القفل ممسوك) لا تلتقطه مجموع المكوّنات؛ الطابع الفعلي `end` يكشفه ولا يُصنَّف «بلا تجمّد».
         t = stalled_queue(commit=1.0)
