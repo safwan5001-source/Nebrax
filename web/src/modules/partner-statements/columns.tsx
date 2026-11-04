@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import type { MobileRecord } from '@/components/nebrax';
@@ -32,7 +33,7 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
       header: t('col.partner'),
       cell: ({ row }) => (
         <div className="min-w-0">
-          <p className="truncate font-medium text-text">{partnerDisplayName(row.original)}</p>
+          <Link href={`/partner-statements/${encodeURIComponent(row.original.id)}`} className="block truncate font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" data-testid="open-workspace">{partnerDisplayName(row.original)}</Link>
           <p className="text-xs text-muted">{t(`role.${row.original.role}`)}</p>
         </div>
       ),
@@ -103,6 +104,11 @@ export function mobileRecordFor(row: ReconciliationRow, t: Translate): MobileRec
     amount: <span dir="ltr">{formatMinor(row.total_debit_minor)}</span>,
     secondary: { label: t('col.credit_short'), value: <span dir="ltr">{formatMinor(row.total_credit_minor)}</span> },
     status: <StatusBadge status={row.status} t={t} />,
+    actions: (
+      <Link href={`/partner-statements/${encodeURIComponent(row.id)}`} className="inline-flex min-h-[44px] items-center px-3 text-sm font-medium text-primary" data-testid="open-workspace-mobile">
+        {t('open_workspace')}
+      </Link>
+    ),
     meta: (
       <span>
         <span className="num">{row.line_count}</span> {t('col.lines_unit')} · <span className="num" dir="ltr">{iso(row.created_at)}</span>

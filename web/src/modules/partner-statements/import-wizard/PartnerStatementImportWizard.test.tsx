@@ -426,7 +426,7 @@ describe('preview verdicts', () => {
     await toPreview(user);
     expect(await screen.findByText('wizard.already_imported')).toBeTruthy();
     const link = screen.getByText('wizard.open_existing').closest('a');
-    expect(link?.getAttribute('href')).toBe('/partner-statements?highlight=eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+    expect(link?.getAttribute('href')).toBe('/partner-statements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
     expect((screen.getByText('wizard.next').closest('button') as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -453,7 +453,7 @@ describe('result step', () => {
     h.engine.job = job({ status: 'completed', apply_result: { reconciliation_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', created: 1, replayed: false, lines: 12 } });
     render(<PartnerStatementImportWizard />);
     const open = await screen.findByText('wizard.open_result');
-    expect(open.closest('a')?.getAttribute('href')).toBe('/partner-statements?highlight=ffffffff-ffff-4fff-8fff-ffffffffffff');
+    expect(open.closest('a')?.getAttribute('href')).toBe('/partner-statements/ffffffff-ffff-4fff-8fff-ffffffffffff');
     expect(screen.getByText(/wizard.result_created:12/)).toBeTruthy();
   });
 
@@ -462,7 +462,7 @@ describe('result step', () => {
     render(<PartnerStatementImportWizard />);
     expect(await screen.findByText('wizard.result_replayed')).toBeTruthy();
     expect(screen.queryByText(/wizard.result_created/)).toBeNull();
-    expect(screen.getByText('wizard.open_result').closest('a')?.getAttribute('href')).toContain('highlight=ffffffff');
+    expect(screen.getByText('wizard.open_result').closest('a')?.getAttribute('href')).toContain('/partner-statements/ffffffff');
   });
 
   it('never renders a broken link when the result carries no reconciliation id', async () => {

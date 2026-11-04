@@ -14,12 +14,15 @@ export interface ErrorDescriptor {
   kind: ErrorKind;
   /** الرمز المستعمل في الحسم (للاختبار والتتبّع)، لا للعرض. */
   code: string | null;
+  /** تفاصيل آمنة من الخادم (معرّفات/أرقام فقط، مثل `difference_minor` و`tolerance_minor`) — لا نص. */
+  details?: Record<string, unknown>;
 }
 
 /** عائلات أسباب دورة المراجعة (§2.3 من الخطة) — تُترجَم بعائلة لا برمز رمز، وتُستعمل بدءاً من A4b. */
 const REASON_FAMILIES: Record<string, string> = {
   run_stale: 'family_stale',
-  statement_changed: 'family_stale',
+  // سطور الكشف تغيّرت خارج التطبيق: **حظر كامل** — إعادة تشغيل المطابقة لا تُصلحه (يرفضها الخادم بالرمز نفسه).
+  statement_changed: 'statement_changed',
   run_is_not_the_reviewed_run: 'family_stale',
   void_policy_changed: 'family_stale',
   reconciliation_not_draft: 'family_state',
@@ -37,6 +40,26 @@ const REASON_FAMILIES: Record<string, string> = {
   void_separation_required: 'family_separation',
   platform_emergency_stop: 'family_unavailable',
   duplicate_document: 'family_conflict',
+  // ——— قرارات المراجعة الفردية (PS-A4b) ———
+  reason_required: 'reason_required',
+  reason_too_long: 'reason_too_long',
+  difference_exceeds_tolerance: 'difference_exceeds_tolerance',
+  unit_already_decided: 'unit_already_decided',
+  dismiss_requires_missing_in_books: 'dismiss_requires_missing_in_books',
+  nothing_to_confirm: 'nothing_to_confirm',
+  line_not_in_run: 'line_unavailable',
+  line_not_found: 'line_unavailable',
+  unit_keys_invalid: 'units_invalid',
+  unit_keys_not_allowed: 'units_invalid',
+  unit_not_in_ledger: 'units_invalid',
+  unit_not_reviewable: 'units_invalid',
+  pair_member_required: 'pair_invalid',
+  pair_member_not_allowed: 'pair_invalid',
+  pair_not_proven: 'pair_invalid',
+  pair_not_simple: 'pair_invalid',
+  pair_incomplete: 'pair_invalid',
+  unit_not_a_reversed_pair: 'pair_invalid',
+  action_invalid: 'validation',
 };
 
 /** رموز المعاينة/التنفيذ المربوط (`ImportPreviewException`، المفتاح `code`). */
@@ -75,7 +98,7 @@ const KNOWN_MESSAGES: { match: string; key: string }[] = [
   { match: 'معرّف الفرع غير صالح', key: 'unavailable' },
 ];
 
-function bodyOf(error: ApiError): { message?: unknown; reason?: unknown; code?: unknown; errors?: unknown } {
+function bodyOf(error: ApiError): { message?: unknown; reason?: unknown; code?: unknown; errors?: unknown; details?: unknown } {
   return error.body && typeof error.body === 'object' ? (error.body as Record<string, unknown>) : {};
 }
 
@@ -101,7 +124,10 @@ export function describeError(error: unknown): ErrorDescriptor {
   const message = typeof body.message === 'string' ? body.message : error.message;
 
   if (reason && PREVIEW_CODES[reason]) return { key: PREVIEW_CODES[reason], kind: 'conflict', code: reason };
-  if (reason && REASON_FAMILIES[reason]) return { key: REASON_FAMILIES[reason], kind: error.status === 409 ? 'conflict' : 'validation', code: reason };
+  if (reason && REASON_FAMILIES[reason]) {
+    const details = body.details && typeof body.details === 'object' && !Array.isArray(body.details) ? (body.details as Record<string, unknown>) : undefined;
+    return { key: REASON_FAMILIES[reason], kind: error.status === 409 ? 'conflict' : 'validation', code: reason, ...(details ? { details } : {}) };
+  }
 
   switch (error.status) {
     case 401:
