@@ -12,9 +12,13 @@ describe('capability resolution', () => {
     expect(resolveCapability({ navVisible: true })).toBe('enabled');
   });
 
-  it('prefers the explicit application status over nav visibility', () => {
+  it('uses the explicit application status when nav-state does not hide the capability', () => {
     expect(resolveCapability({ appStatus: 'suspended', navVisible: true })).toBe('suspended');
-    expect(resolveCapability({ appStatus: 'enabled', navVisible: false })).toBe('enabled');
+    expect(resolveCapability({ appStatus: 'suspended', navVisible: null })).toBe('suspended');
+  });
+
+  it('lets nav-state hiding win even when the tenant enabled it (commercial entitlement missing)', () => {
+    expect(resolveCapability({ appStatus: 'enabled', navVisible: false })).toBe('disabled');
   });
 
   it('lets what the server just answered override everything', () => {

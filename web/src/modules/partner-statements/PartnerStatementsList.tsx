@@ -82,13 +82,13 @@ export function PartnerStatementsList() {
   }, [searchText, filters.q, ready]);
 
   useEffect(() => {
-    if (!ready || !capability.canView) return;
+    if (!ready || !capability.settled || !capability.canView || capability.state === 'disabled') return;
     let live = true;
     fetchBranches().then((list) => live && setBranches(list)).catch(() => {});
     return () => {
       live = false;
     };
-  }, [ready, capability.canView]);
+  }, [ready, capability.settled, capability.canView, capability.state]);
 
   const inversion = hasPeriodInversion(filters);
 
@@ -116,13 +116,14 @@ export function PartnerStatementsList() {
   }, [filters]);
 
   useEffect(() => {
-    if (!ready || !capability.canView || capability.state === 'disabled' || inversion) return;
+    // لا نداء قبل استقرار حالة القدرة: وإلا انطلق طلب القائمة ثم أُلغي منطقياً بحالة «معطّلة» وصلت متأخرة.
+    if (!ready || !capability.settled || !capability.canView || capability.state === 'disabled' || inversion) return;
     load();
-  }, [ready, capability.canView, capability.state, inversion, load]);
+  }, [ready, capability.settled, capability.canView, capability.state, inversion, load]);
 
   // المقارنة المستوردة حديثاً (N2): رأس واحد بنفس رفض الخادم الموحّد؛ فشله لا يكشف سبباً.
   useEffect(() => {
-    if (!highlight || !capability.canView || capability.state === 'disabled') return;
+    if (!highlight || !capability.settled || !capability.canView || capability.state === 'disabled') return;
     let live = true;
     fetchReconciliation(highlight)
       .then((row) => live && setHighlighted(row))
@@ -130,7 +131,7 @@ export function PartnerStatementsList() {
     return () => {
       live = false;
     };
-  }, [highlight, capability.canView, capability.state]);
+  }, [highlight, capability.settled, capability.canView, capability.state]);
 
   const columns = useMemo(() => buildColumns(t as never), [t]);
 

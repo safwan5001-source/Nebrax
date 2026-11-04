@@ -3,7 +3,7 @@
 /**
  * حالة قدرة `accounting.partner_statements` للشاشة — **ثلاثة مصادر مرتّبة، والخادم هو الحَكَم دائماً**:
  *  1. `GET /applications` (من يملك `apps.view`): الحالة الصريحة `enabled | suspended | disabled`.
- *  2. `GET /applications/nav-state` (كل الأدوار): `false` ⇒ القدرة غير متاحة فعلياً (معطّلة أو بلا استحقاق).
+ *  2. `GET /applications/nav-state` (كل الأدوار): `false` ⇒ القدرة غير متاحة فعلياً (معطّلة أو بلا استحقاق) **وتغلب (1)**.
  *  3. رفض 403 فعلي من نداء الشاشة (`markFromError`): يُقدَّم على ما سبق لأنه ما قاله الخادم الآن.
  * فشل قراءة المصدرين الأولين لا يُخفي الشاشة (نفس سياسة الشريط الجانبي): نفترض `enabled` ونترك الحارس الخادمي يحسم.
  * الظهور في الواجهة ليس تفويضاً: أزرار الكتابة تُشترط فيها الصلاحية **و**الحالة `enabled`.
@@ -22,8 +22,10 @@ export function resolveCapability(input: {
   observed?: CapabilityState | null;
 }): CapabilityState {
   if (input.observed) return input.observed;
-  if (input.appStatus) return input.appStatus;
+  // `nav-state` هو القرار الفعلي المركّب (قرار المستأجر + الاستحقاق التجاري): `false` يغلب حتى حالة `enabled` في `/applications`
+  // (تفعيل المستأجر لا يكفي إن غاب الاستحقاق). أما `suspended` فقراءة فقط وتبقى ظاهرة في `nav-state`.
   if (input.navVisible === false) return 'disabled';
+  if (input.appStatus) return input.appStatus;
   return 'enabled';
 }
 

@@ -115,6 +115,14 @@ async function open(page: Page, path: string, opts: Options = {}) {
     return json(route, { data: [] });
   });
 
+  // مؤشر أدوات Next في وضع التطوير يعترض نقرات الأزرار السفلية على الجوال؛ لا وجود له في الإنتاج.
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none !important}';
+      document.head.appendChild(style);
+    });
+  });
   await page.addInitScript(([userJson, theme]) => {
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', userJson);
@@ -123,6 +131,9 @@ async function open(page: Page, path: string, opts: Options = {}) {
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
   return requests;
 }
+
+/** النص في خلية/بطاقة مرئية — يتخطى `<option>` في فلتر الطرف الذي يحمل الاسم نفسه. */
+const visibleText = (page: Page, text: string | RegExp) => page.getByText(text).locator('visible=true').first();
 
 const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
@@ -155,8 +166,8 @@ for (const locale of ['ar', 'en'] as const) {
   test.describe(`قائمة الكشوف — ${locale}`, () => {
     test(`تعرض الصفوف من الخادم بالاتجاه ${dir} بلا تجاوز أفقي`, async ({ page }) => {
       const requests = await open(page, '/partner-statements', { locale });
-      await expect(page.getByText('شركة النور للتجارة').first()).toBeVisible();
-      await expect(page.getByText('مؤسسة الأفق').first()).toBeVisible();
+      await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();
+      await expect(visibleText(page, 'مؤسسة الأفق')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.dir)).toBe(dir);
       await noHorizontalOverflow(page);
       // المبالغ بأرقام لاتينية وكسران
@@ -170,7 +181,7 @@ for (const locale of ['ar', 'en'] as const) {
 
     test('الوضع الداكن', async ({ page }) => {
       await open(page, '/partner-statements', { locale, theme: 'dark' });
-      await expect(page.getByText('شركة النور للتجارة').first()).toBeVisible();
+      await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();
       await noHorizontalOverflow(page);
       await shot(page, `list-${locale}-${isMobile(page) ? 'mobile' : 'desktop'}-dark`);
     });
@@ -181,7 +192,7 @@ test.describe('حالات الوصول', () => {
   test('قدرة موقوفة: قراءة فقط بلا زر استيراد', async ({ page }) => {
     await open(page, '/partner-statements', { appStatus: 'suspended' });
     await expect(page.getByText('هذه القدرة موقوفة مؤقتاً', { exact: false })).toBeVisible();
-    await expect(page.getByText('شركة النور للتجارة').first()).toBeVisible();
+    await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();
     await expect(page.getByRole('link', { name: 'استيراد كشف' })).toHaveCount(0);
     await shot(page, `list-suspended-${isMobile(page) ? 'mobile' : 'desktop'}`);
   });
@@ -206,7 +217,7 @@ test.describe('حالات الوصول', () => {
 
   test('عرض فقط: لا زر استيراد، والمعالج يمنعه بلا أي نداء كتابة', async ({ page }) => {
     const requests = await open(page, '/partner-statements', { permissions: ['partner_statements.view'] });
-    await expect(page.getByText('شركة النور للتجارة').first()).toBeVisible();
+    await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();
     await expect(page.getByRole('link', { name: 'استيراد كشف' })).toHaveCount(0);
 
     await page.goto(`${baseUrl}/partner-statements/import`, { waitUntil: 'domcontentloaded' });
@@ -227,7 +238,7 @@ for (const locale of ['ar', 'en'] as const) {
       await shot(page, `wizard-${locale}-file-${isMobile(page) ? 'mobile' : 'desktop'}`);
 
       await runToPreview(page, locale);
-      await expect(page.getByText('INV-1001').first()).toBeVisible();
+      await expect(visibleText(page, 'INV-1001')).toBeVisible();
       await noHorizontalOverflow(page);
       expect(await page.locator('main').innerText()).toContain('1,150.00');
       await shot(page, `wizard-${locale}-preview-${isMobile(page) ? 'mobile' : 'desktop'}`);
@@ -307,12 +318,15 @@ test.describe('مسارات خاصة بالمعالج', () => {
     await shot(page, `wizard-branch-restricted-${isMobile(page) ? 'mobile' : 'desktop'}`);
   });
 
-  test('لوحة المفاتيح: التنقل بين الحقول بـTab وإظهار حلقة التركيز', async ({ page }) => {
+  test('لوحة المفاتيح: بعد اختيار الملف ينتقل Tab إلى زر «التالي» المفعّل', async ({ page }) => {
     await open(page, '/partner-statements/import');
+    await page.setInputFiles('#ps-file', { name: 'nour.csv', mimeType: 'text/csv', buffer: Buffer.from('date,ref,debit,credit\n2026-01-05,INV-1001,1150.00,\n') });
+    const next = page.getByRole('button', { name: 'التالي' });
+    await expect(next).toBeEnabled();
     await page.locator('#ps-file').focus();
-    await expect(page.locator('#ps-file')).toBeFocused();
     await page.keyboard.press('Tab');
-    const active = await page.evaluate(() => document.activeElement?.tagName);
-    expect(['BUTTON', 'A', 'INPUT']).toContain(active);
+    await expect(next).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#ps-role')).toBeVisible();
   });
 });

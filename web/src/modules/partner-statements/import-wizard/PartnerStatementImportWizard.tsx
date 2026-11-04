@@ -116,13 +116,13 @@ export function PartnerStatementImportWizard() {
   }, [engine.job?.id, engine.job?.status]);
 
   useEffect(() => {
-    if (!capability.canImport) return;
+    if (!capability.settled || !capability.canImport) return;
     let live = true;
     fetchBranches().then((list) => live && setBranches(list)).catch(() => {});
     return () => {
       live = false;
     };
-  }, [capability.canImport]);
+  }, [capability.settled, capability.canImport]);
 
   const restricted = Boolean(scope && scope.branches.length > 0);
   const branchOptions = restricted ? branches.filter((branch) => scope?.branches.includes(branch.id)) : branches;
@@ -564,8 +564,14 @@ export function PartnerStatementImportWizard() {
           <Card>
             <CardHeader><CardTitle>{t('wizard.step_preview')}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-text">
-                <span className="font-medium">{preview.partner_name}</span> · {t(`role.${preview.role}`)} · <span className="num" dir="ltr">{preview.period_from} → {preview.period_to}</span> · {sar}
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text">
+                <bdi className="font-medium">{preview.partner_name}</bdi>
+                <span aria-hidden="true">·</span>
+                <span>{t(`role.${preview.role}`)}</span>
+                <span aria-hidden="true">·</span>
+                <span className="num" dir="ltr">{preview.period_from} → {preview.period_to}</span>
+                <span aria-hidden="true">·</span>
+                <span dir="ltr">{sar}</span>
               </p>
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 <Counter label={t('wizard.counter_rows')} value={preview.total_rows} />
@@ -760,7 +766,7 @@ function Summary({ label, value, ltr = false }: { label: string; value: string; 
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className={cn('mt-0.5 truncate text-text', ltr && 'num')} dir={ltr ? 'ltr' : 'auto'}>{value}</dd>
+      <dd className={cn('mt-0.5 truncate text-text', ltr && 'num')} dir={ltr ? 'ltr' : undefined}>{ltr ? value : <bdi>{value}</bdi>}</dd>
     </div>
   );
 }

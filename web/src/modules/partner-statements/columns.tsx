@@ -84,12 +84,9 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
 export function mobileRecordFor(row: ReconciliationRow, t: Translate): MobileRecord {
   return {
     title: <span className="font-medium text-text">{partnerDisplayName(row)}</span>,
-    subtitle: (
-      <span>
-        {t(`role.${row.role}`)} · <span className="num" dir="ltr">{periodLabel(row)}</span>
-      </span>
-    ),
-    caption: scopeLabel(row, t),
+    subtitle: `${t(`role.${row.role}`)} · ${scopeLabel(row, t)}`,
+    // الفترة سطر مستقل معزول الاتجاه: بدمجها مع الدور كان الاقتطاع يقصّ التاريخ ويعكس ترتيبه في RTL.
+    caption: <span className="num whitespace-nowrap" dir="ltr">{periodLabel(row)}</span>,
     amountLabel: t('col.debit_short'),
     amount: <span dir="ltr">{formatMinor(row.total_debit_minor)}</span>,
     secondary: { label: t('col.credit_short'), value: <span dir="ltr">{formatMinor(row.total_credit_minor)}</span> },
