@@ -1,4 +1,5 @@
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { StoreProvider } from "@/contexts/StoreContext";
@@ -19,9 +20,12 @@ import { WishlistProvider } from "@/contexts/WishlistContext";
  */
 export function DevStorefrontProviders({
   locale,
+  themePreset = "awj-modern",
   children,
 }: {
   locale: "ar" | "en";
+  /** Demo-only selector; public storefront always resolves its published theme server-side. */
+  themePreset?: ThemePresetId;
   children: React.ReactNode;
 }) {
   return (
@@ -53,7 +57,7 @@ export function DevStorefrontProviders({
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
-            <PublishedThemeMarkerProvider themePreset="awj-modern">
+            <PublishedThemeMarkerProvider themePreset={themePreset}>
               {children}
             </PublishedThemeMarkerProvider>
           </WishlistProvider>
