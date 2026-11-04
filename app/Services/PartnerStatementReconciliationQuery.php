@@ -36,9 +36,6 @@ final class PartnerStatementReconciliationQuery
     public const DEFAULT_PER_PAGE = 25;
 
     /** مفاتيح الفرز المسموحة (قائمة بيضاء) ← عمود أو تعبير فرز. */
-    /** رسالة رفض الفرع في `assertAccess` (غير موحَّدة تاريخياً)؛ تُوحَّد في N2/N4 الجديدتين كي لا تفرّق بين «غير موجود» و«فرع خارج نطاقك». */
-    private const BRANCH_REFUSAL = 'هذا الفرع خارج نطاق صلاحياتك.';
-
     public const SORTS = ['created_at', 'period_from', 'period_to', 'status', 'line_count', 'original_filename', 'partner_name'];
 
     public function __construct(private readonly TenantContext $tenant, private readonly PartnerStatementMatchService $matching) {}
@@ -96,7 +93,7 @@ final class PartnerStatementReconciliationQuery
     public function header(User $actor, string $reconciliationId): array
     {
         // نفس بوابة بقية قراءات الوحدة حرفياً: الصلاحية ← معرّف صالح ← وجود ← `assertAccess` (رفض موحَّد `PARTNER_UNAVAILABLE`).
-        $reconciliation = $this->authorizeUniformly($actor, $reconciliationId);
+        $reconciliation = $this->matching->authorize($actor, $reconciliationId, 'partner_statements.view');
         $branchId = $reconciliation->policy['branch_id'] ?? null;
 
         return $this->present(
@@ -125,7 +122,7 @@ final class PartnerStatementReconciliationQuery
      */
     public function lines(User $actor, string $reconciliationId, array $filters): LengthAwarePaginator
     {
-        $reconciliation = $this->authorizeUniformly($actor, $reconciliationId);
+        $reconciliation = $this->matching->authorize($actor, $reconciliationId, 'partner_statements.view');
         $perPage = max(1, min(self::MAX_PER_PAGE, (int) ($filters['per_page'] ?? self::DEFAULT_PER_PAGE)));
 
         return PartnerStatementLine::query()->where('reconciliation_id', $reconciliation->id)->orderBy('ordinal')->orderBy('id')
@@ -193,22 +190,6 @@ final class PartnerStatementReconciliationQuery
     }
 
     // ═══════════════════════════════ الرؤية ═══════════════════════════════
-
-    /**
-     * بوابة الرأس والسطور: `PartnerStatementMatchService::authorize` نفسها، لكن فرعٌ خارج نطاق الفاعل يُرفض بالرسالة الموحَّدة `PARTNER_UNAVAILABLE`
-     * (كالمجهول والطرف غير المتاح) فلا يكشف وجود مقارنة في فرع محجوب. الصلاحية (403) وعملة المؤسسة تبقيان كما هما.
-     */
-    private function authorizeUniformly(User $actor, string $reconciliationId): PartnerStatementReconciliation
-    {
-        try {
-            return $this->matching->authorize($actor, $reconciliationId, 'partner_statements.view');
-        } catch (RuntimeException $e) {
-            if ($e->getMessage() === self::BRANCH_REFUSAL) {
-                throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
-            }
-            throw $e;
-        }
-    }
 
     /**
      * ثوابت الفاعل في `assertAccess` — تنطبق على كل المقارنات سواء، فتُفحص مرة واحدة وتُرفض بالرسالة نفسها التي يرفض بها الرأس (لا تفاصيل إضافية).
