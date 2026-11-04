@@ -16,7 +16,7 @@
 2. **Truthful numbers**: show sourced liters and sale totals separately from counted cash/card amounts; differences must be computed, never hidden by deriving sales from collections.
 3. **Clarity by role**: operator, supervisor, and manager see contextual workspaces governed by AWJ RBAC server-side.
 4. **One primary action per stage**: large, accessible touch targets; no high-impact action without confirmation.
-5. **Explain status**: pending, approved, returned, offline, loading, failed, incomplete and locked must have readable labels and iconography, not color alone.
+5. **Explain status**: existing open/closed/approved and ordinary pending/offline/loading/error states must have readable labels and iconography, not color alone. A «returned for correction» shift state is **future-only until AWJ implements it**.
 6. **Reliable audit trail**: approvals, receipt measurements and post-approval corrections must be traceable; do not mutate locked accounting records casually.
 7. **Progressive disclosure**: short summary first, pump/nozzle and audit detail on demand.
 
@@ -65,8 +65,8 @@ Build dark-mode counterparts by semantic role, **not by blindly inverting hex va
 - **KPI summary**: sales, liters, cash, card and variance; allow source/drill-down and indicate pending/stale data.
 - **Meter reading row**: pump/nozzle, product, opening, closing, computed liters, error/help, optional evidence.
 - **Collection block**: sales amount independent from counted cash + card + other methods, clear variance; special handling for credit sales, advances, expenses and float per approved policy.
-- **Shift action panel**: draft, open, submitted, returned, approved/locked; confirmations and irreversible boundaries.
-- **Supervisor review card**: staffed shift, status, products, readings, payment totals, discrepancy, document links, approve/return with reason.
+- **Shift action panel**: reflect current AWJ backend states **open → closed → approved**. Additional draft/submitted/returned states are proposals requiring backend transition and authorization support; never display unsupported production actions. Provide confirmations and respect irreversible boundaries.
+- **Supervisor review card**: staffed shift, status, products, readings, payment totals, discrepancy, document links and approval. «Return with reason» is a **future workflow pending API implementation**, not currently operable.
 - **Fuel receipt stepper**: shipment identity → pre-unload tank measurement → actual delivered quantity/post-unload measurement → attachments/variance → authorized approval.
 - **Settings page**: user preferences separated from station/financial policies (role restricted); products/prices/pumps/station shifts always AWJ-owned.
 - **Profile page**: AWJ-backed user identity, role and station scope read-only, permitted profile preferences, security/password redirect to AWJ mechanism, activity, logout.
@@ -75,7 +75,7 @@ Build dark-mode counterparts by semantic role, **not by blindly inverting hex va
 ## 7. Role-specific navigation
 ### Operator
 Home (current shift) · Products & meter readings · Cash & Card / shift handover · Shift history · Profile/Settings.
-- Focus on closing two daily shifts; never force per-vehicle manual sale entry if no forecourt integration.
+- Focus on the station's **configured number and schedule of shifts** (two daily shifts in the Nebras pilot only); never force per-vehicle manual sale entry if no forecourt integration.
 - Operator must only access assigned station/shift/assets as granted by AWJ.
 
 ### Supervisor
@@ -87,7 +87,7 @@ Operations overview · Shift reviews/approvals · Fuel receiving · Tanks and al
 Use AWJ existing management workspace/report permissions; do not rebuild general ledger, accounting or RBAC management in this design.
 
 ## 8. Interaction contracts
-- **Shift**: open → record opening readings → collect sales/closing readings → submit → approve or return with reason → locked. Post-approval adjustments require authorized correction and audit record.
+- **Shift, current backend:** open → record opening readings → record collections/closing readings → close → approve. **Proposed future branch:** close → supervisor returns with reason → corrected/resubmitted → approve, only after backend state transitions, authorization, audit and tests are implemented. Post-approval adjustments require authorized correction and audit record.
 - **Products**: product-nozzle mapping determines readings/sales; totals grouped by fuel; changed prices during a shift must use correct effective-price/transaction history, not a single later price.
 - **Reconciliation**: distinguish fuel meter variance, cash/card collection variance, tank physical/book variance and supplier delivery variance.
 - **Fuel receiving**: measure before/after unload and account for possible concurrent dispensing; capture evidence, transport details, discrepancy causes; receiving inventory movement must not duplicate purchase posting.
@@ -109,16 +109,16 @@ Use AWJ existing management workspace/report permissions; do not rebuild general
 4. Cash/card/other payment reconciliation and handover.
 5. Shift history/detail/corrections.
 6. Supervisor home + work queue.
-7. Shift approval/return with evidence and audit trail.
+7. Shift approval with evidence and audit trail; future return-for-correction only after backend implementation.
 8. Fuel supply receipt wizard + document upload.
 9. Tank levels, deliveries, shortages/alerts.
-10. Daily reports (two shifts; per product, liters, cash/card, variance) + Excel/PDF.
+10. Daily reports (all configured daily shifts; per product, liters, cash/card, variance) + Excel/PDF.
 11. Settings (personal + operational restricted).
 12. My Profile/security/logout.
 
 ## 11. Design QA gates — before implementation approval
 - No unexplained dummy numbers or hard-coded catalog in production UI; fixture/mock labeling must be obvious in prototypes.
-- Validate with station staff that each flow matches real operations, including two shifts daily.
+- Validate with station staff that each flow matches real operations and a **variable number of shifts** (including a two-shift pilot).
 - Verify AWJ APIs, field mappings, active prices, role/branch/station security and ledger posting boundaries **before** connecting prototypes.
 - Review against [fuel audit](../audits/FUEL-STATIONS-COMPREHENSIVE-AUDIT.md) and [remediation plan](./FUEL_REMEDIATION_HORIZON.md), including open decisions.
 - Test both themes, RTL/LTR, all interaction states and 44pt touch target requirements on actual iPhone.
