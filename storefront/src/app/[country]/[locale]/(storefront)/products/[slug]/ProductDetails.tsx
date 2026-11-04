@@ -76,7 +76,10 @@ export function ProductDetails({
   const { currency } = useStore();
   const t = useTranslations("products");
   const tw = useTranslations("wholesale");
-  const isMarket = usePublishedThemeMarker() === "awj-market";
+  const themePreset = usePublishedThemeMarker();
+  const isMarket = themePreset === "awj-market";
+  const isLuxe = themePreset === "awj-luxe-motion";
+  const hasMobilePurchaseBar = isMarket || isLuxe;
   // Non-null inside a HiddenPricingProvider (wholesale `prices_hidden`, guest
   // view): prices are null on purpose, and ordering is gated behind sign-in.
   const hiddenPricing = useHiddenPricing();
@@ -290,7 +293,7 @@ export function ProductDetails({
     // Rendered in its own gallery column above, never from this map.
     media_gallery: null,
     identity: (
-      <div>
+      <div className={cn(isLuxe && "border-b border-store-border pb-5")}>
         {product.categories?.[0]?.name && (
           <p className="mb-1 text-xs font-medium text-store-muted-foreground">
             {product.categories[0].name}
@@ -298,13 +301,13 @@ export function ProductDetails({
         )}
 
         <div className="flex items-start justify-between gap-3">
-          <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+          <h1 className={cn("min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl", isLuxe && "text-2xl font-bold leading-relaxed md:text-3xl")}>
             {product.name}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             <WishlistButton productId={product.id} variant="detail" />
-            {/* AWJ Market only — see the coverage matrix's PDP evidence. */}
-            {isMarket && (
+            {/* Market and Luxe Motion share the existing browser-native share action. */}
+            {(isMarket || isLuxe) && (
               <ShareButton
                 title={product.name}
                 className="grid size-10 place-items-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground transition-colors hover:border-store-border-strong hover:text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground"
@@ -315,9 +318,9 @@ export function ProductDetails({
       </div>
     ),
     price: (
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className={cn("mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1", isLuxe && "mt-5 gap-x-4")}>
         {displayPrice ? (
-          <span className="text-xl font-black text-store-primary md:text-2xl">
+          <span className={cn("text-xl font-black text-store-primary md:text-2xl", isLuxe && "text-2xl md:text-3xl")}>
             {/*
                 For a variant-managed product with nothing selected yet, the
                 figure the API sends is its cheapest active variant — stating
@@ -448,14 +451,14 @@ export function ProductDetails({
         <div
           className={cn(
             "mt-5 border-t border-store-border pt-5",
-            isMarket &&
+            hasMobilePurchaseBar &&
               "fixed inset-x-0 bottom-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 mt-0 border-t bg-store-surface px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] md:static md:inset-auto md:z-auto md:mt-5 md:bg-transparent md:px-0 md:py-0 md:pt-5 md:shadow-none",
           )}
         >
           {pricesHidden ? (
             // Guest on a prices-hidden channel: no pricing, no ordering —
             // route them through the wholesale sign-in first.
-            <Button asChild size="lg" className={cn(isMarket && "w-full")}>
+            <Button asChild size="lg" className={cn(hasMobilePurchaseBar && "w-full")}>
               <Link href={hiddenPricing.signInHref}>
                 {tw("hiddenPrice.signInToOrder")}
               </Link>
@@ -470,7 +473,7 @@ export function ProductDetails({
 
               <Button
                 size="lg"
-                className="min-w-40 flex-1"
+                className={cn("min-w-40 flex-1", isLuxe && "min-h-12 rounded-store text-base shadow-sm")}
                 onClick={handleAddToCart}
                 disabled={loading || !isPurchasable}
               >
@@ -496,7 +499,7 @@ export function ProductDetails({
           )}
         </div>
         {/* Keeps the fixed bar above from covering the rest of the page. */}
-        {isMarket && <div aria-hidden="true" className="h-20 md:hidden" />}
+        {hasMobilePurchaseBar && <div aria-hidden="true" className="h-20 md:hidden" />}
       </>
     ),
     description:
@@ -566,7 +569,7 @@ export function ProductDetails({
       }
     >
       {/* The product leads. No marketing band above it. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10">
+      <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10", isLuxe && "gap-7 lg:gap-14")}>
         {/*
           The gallery is capped rather than left to fill its track. It is a
           square, so an uncapped column made it ~880px tall at 1440 and pushed
@@ -574,7 +577,7 @@ export function ProductDetails({
           product-first. `media_gallery` is FIXED_REQUIRED and never
           reorderable, so it always renders here regardless of `regionOrder`.
         */}
-        <div className="w-full lg:sticky lg:top-(--store-header-offset) lg:self-start">
+        <div className={cn("w-full lg:sticky lg:top-(--store-header-offset) lg:self-start", isLuxe && "overflow-hidden rounded-store border border-store-border bg-store-surface-muted")}>
           <MediaGallery
             images={galleryImages}
             productName={product.name}
@@ -583,7 +586,7 @@ export function ProductDetails({
           />
         </div>
 
-        <div className="min-w-0 lg:max-w-2xl">
+        <div className={cn("min-w-0 lg:max-w-2xl", isLuxe && "pb-2 lg:pt-5")}>
           {regionOrder
             .filter(
               (key) => key !== "media_gallery" && regionNodes[key] !== null,
