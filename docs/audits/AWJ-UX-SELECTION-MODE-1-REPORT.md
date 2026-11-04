@@ -93,9 +93,9 @@ Chromium (Playwright) على 1440×960 و390×844، عربي RTL وإنجليز�
 
 ## 6. الفرع والـPR
 - **الفرع:** `claude/selection-mode-ux-1`
-- **PR:** انظر الرابط في خانة الدفع.
+- **PR:** https://github.com/safwan5001-source/Nebrax/pull/1980
 - **Base SHA:** `3b6165830fccc62873050a7403c9ed17f4586221` (`main`، يحتوي #1973 عند `39ed104`)
-- **Head SHA:** يُسجَّل في وصف الـPR بعد الدفع.
+- **Head SHA (التنفيذ):** `829ebeca4b3046af3dfdc1e8841f2b26d0b7d0de` — رأس الفرع الفعلي يتقدّم بالتزام توثيقي واحد يحمل هذا التقرير؛ المرجع الجاري هو `git rev-parse origin/claude/selection-mode-ux-1`.
 
 ## 7. الخطوة التالية الموصى بها
 مراجعة PR ودمجها بعد اجتياز CI، ثم (اختيارياً) تعميم `SelectionModeToggle` على بقية الشاشات القائمة على التحديد الدائم (مثل لوحة المتغيرات `product-variants-panel`) كشريحة منفصلة بعد اعتماد هذا النمط.
