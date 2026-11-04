@@ -134,7 +134,9 @@ describe("ProductCard", () => {
     );
     const card = () => container.querySelector("[data-card]");
     expect(card()).not.toHaveClass("hover:-translate-y-0.5");
-    expect(container.querySelector("[data-card-body]")).not.toHaveClass("p-3.5");
+    expect(container.querySelector("[data-card-body]")).not.toHaveClass(
+      "p-3.5",
+    );
 
     rerender(
       <PublishedThemeMarkerProvider themePreset="awj-luxe-motion">
@@ -143,7 +145,9 @@ describe("ProductCard", () => {
     );
     expect(card()).toHaveClass("hover:-translate-y-0.5");
     expect(container.querySelector("[data-card-body]")).toHaveClass("p-3.5");
-    expect(screen.getByRole("button", { name: "addToCart" })).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "addToCart" })).toHaveClass(
+      "min-h-11",
+    );
     expect(screen.getByText("$25.00")).toBeInTheDocument();
   });
 
