@@ -265,6 +265,8 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     await userEvent.type(within(form).getByRole('textbox'), 'agreed');
     const submit = within(form).getByText('workspace.action.confirm').closest('button') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
+    // سطر مدين: فرق المحرّك +50.00 يُعرض بإشارة الخادم −50.00 (ما سيُسجَّل في القرار)
+    expect(within(form).getByRole('checkbox').closest('label')?.textContent).toContain('-50.00');
     await userEvent.click(within(form).getByRole('checkbox'));
     expect(submit.disabled).toBe(false);
     await userEvent.click(submit);
@@ -451,6 +453,25 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByTestId('line-history')).toBeNull();
     expect(document.body.textContent).not.toContain('belongs to line one');
+  });
+
+  it('refreshes the header after a state conflict so write controls disappear when another reviewer already moved the reconciliation', async () => {
+    h.postDecision.mockRejectedValueOnce(new ApiError(409, 'x', { reason: 'reconciliation_not_editable' }));
+    await open();
+    await selectLine(2);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.confirm'));
+    const form = await screen.findByTestId('decision-form-confirm');
+    await userEvent.type(within(form).getByRole('textbox'), 'reasoned');
+    // بين الإرسال والرفض: مراجِع آخر نقل المقارنة إلى «مراجَعة»
+    h.fetchHeader.mockResolvedValue(header({ status: 'reviewed' }));
+    h.fetchStatus.mockResolvedValue(status({
+      reconciliation: { id: ID, status: 'reviewed', reviewed_at: null, reviewed_by: 'other', reviewed_run_id: RUN }, blockers: [],
+      reviewed_state: { run_id: RUN, ledger_changed_since_review: false, statement_changed_since_review: false },
+    }, { can_mark_reviewed: false, resolved: 4, unresolved: 0 }));
+    await userEvent.click(within(form).getByText('workspace.action.confirm'));
+    await waitFor(() => expect(screen.queryByTestId('action-bar')).toBeNull());
+    expect(screen.getByTestId('reviewed-banner')).toBeTruthy();
+    expect(h.postDecision).toHaveBeenCalledTimes(1);
   });
 
   it('blocks an override whose verification reports problems', async () => {

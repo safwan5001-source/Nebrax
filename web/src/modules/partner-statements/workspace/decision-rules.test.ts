@@ -9,6 +9,7 @@ import {
   nextUndecidedIndex,
   reasonLength,
   reasonRequired,
+  signedNetDifference,
   type DecisionDraft,
 } from './decision-rules';
 import type { DecisionAction, MatchOutcome } from './types';
@@ -176,5 +177,15 @@ describe('decision state and next undecided', () => {
     expect(nextUndecidedIndex(rows, 2, 'r1')).toBe(3);
     expect(nextUndecidedIndex(rows, 3, 'r1')).toBe(2);
     expect(nextUndecidedIndex([], 0, 'r1')).toBe(-1);
+  });
+});
+
+describe('signedNetDifference (engine difference → server net convention)', () => {
+  it('flips the sign for a debit statement line and keeps it for a credit line', () => {
+    expect(signedNetDifference(1000, { debit_minor: 10000 })).toBe(-1000);   // سطر مدين 100 مقابل وحدة دائنة 90: المحرّك +10، الخادم −10
+    expect(signedNetDifference(-250, { debit_minor: 10000 })).toBe(250);
+    expect(signedNetDifference(1000, { debit_minor: 0 })).toBe(1000);
+    expect(signedNetDifference(0, { debit_minor: 10000 })).toBe(0);
+    expect(signedNetDifference(null, { debit_minor: 10000 })).toBeNull();
   });
 });

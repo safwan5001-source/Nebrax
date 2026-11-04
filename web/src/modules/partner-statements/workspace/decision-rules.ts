@@ -54,6 +54,16 @@ export function acceptDifferenceRequired(differenceMinor: number | null, toleran
   return differenceMinor !== null && Math.abs(differenceMinor) > toleranceMinor;
 }
 
+/**
+ * فرق المحرّك (`difference_minor` = مبلغ سطر الكشف − مبلغ الوحدة، بقيمتين موجبتين) ⇒ **صافي الفرق بإشارة الخادم** (`settle()`: المتوقع − صافي المجموعة، حيث المتوقع = −المبلغ لسطر مدين و+المبلغ لدائن).
+ * لسطر مدين تنعكس الإشارة؛ لدائن تبقى. الإشارة لا تغيّر حكم «صفر/غير صفر» ولا التسامح (قيمة مطلقة) لكنها تغيّر ما يُعرض في الإقرار ويُسجَّل في القرار.
+ */
+export function signedNetDifference(engineDifferenceMinor: number | null, line: { debit_minor: number }): number | null {
+  if (engineDifferenceMinor === null) return null;
+  if (engineDifferenceMinor === 0) return 0;
+  return line.debit_minor > 0 ? -engineDifferenceMinor : engineDifferenceMinor;
+}
+
 export type DecisionBlock =
   | 'reason_required'
   | 'reason_too_long'

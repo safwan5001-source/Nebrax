@@ -12,7 +12,7 @@ import { describeError } from '../errors';
 import { fetchLineHistory } from './client';
 import { CandidatePicker, selectionSignature, type VerifiedSet } from './candidate-picker';
 import { DecisionForm } from './decision-form';
-import { reasonRequired, decisionState } from './decision-rules';
+import { reasonRequired, decisionState, signedNetDifference } from './decision-rules';
 import { explanationKey, safeParams, warningKey } from './explanation';
 import { DecisionBadge, LineAmount, Money, OutcomeBadge } from './presentation';
 import { ReversedPairsPanel } from './reversed-pairs';
@@ -115,7 +115,9 @@ export function LineDetail(props: LineDetailProps) {
     else if (result.lineId === activeLineRef.current) setQuickError(describeError(result.error).key);
   };
 
-  const immediateConfirm = row !== null && !reasonRequired({ action: 'confirm', engineOutcome: row.outcome, netDifferenceMinor: row.difference_minor });
+  // صافي الفرق بإشارة الخادم (لا فرق المحرّك الخام): ما يُعرض في الإقرار هو ما سيُسجَّل في القرار.
+  const signedDifference = row ? signedNetDifference(row.difference_minor, line) : null;
+  const immediateConfirm = row !== null && !reasonRequired({ action: 'confirm', engineOutcome: row.outcome, netDifferenceMinor: signedDifference });
   const verifyOk = picker.verify !== null && picker.verify.problems.length === 0;
   const overrideBlock = picker.unitKeys.length === 0 ? t('workspace.picker.verify_required') : picker.verify === null ? t('workspace.picker.verify_required') : !verifyOk ? t('workspace.picker.has_problems') : null;
 
@@ -151,7 +153,7 @@ export function LineDetail(props: LineDetailProps) {
             <p className="font-medium text-text" data-testid="explanation">{t(`workspace.explanation.${explanationKey(row.explanation?.code)}`, safeParams(row.explanation?.params))}</p>
             <p className="text-xs text-muted">
               {row.rule ? t('workspace.detail.rule', { rule: row.rule }) : null}
-              {row.difference_minor !== null && row.difference_minor !== 0 ? <> · {t('workspace.detail.difference')} <Money minor={row.difference_minor} signed /></> : null}
+              {signedDifference !== null && signedDifference !== 0 ? <> · {t('workspace.detail.difference')} <Money minor={signedDifference} signed /></> : null}
               {row.day_difference ? <> · {t('workspace.detail.days', { days: row.day_difference })}</> : null}
             </p>
             {row.warnings.map((warning, index) => (
@@ -240,7 +242,7 @@ export function LineDetail(props: LineDetailProps) {
             lineId={line.id}
             action="confirm"
             row={row}
-            netDifferenceMinor={row.difference_minor}
+            netDifferenceMinor={signedDifference}
             toleranceMinor={props.toleranceMinor}
             job={job}
             submitLabel={t('workspace.action.confirm')}

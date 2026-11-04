@@ -235,7 +235,7 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
 
   const reloadAfterChange = useCallback(() => {
     setRefreshKey((key) => key + 1);
-    void load({ withHeader: false });
+    void load({});   // مع الرأس: تغيّر حالة المقارنة (مراجِع آخر/إغلاق) يجب أن يُسقط أزرار الكتابة
   }, [load]);
 
   const submit = useCallback(
