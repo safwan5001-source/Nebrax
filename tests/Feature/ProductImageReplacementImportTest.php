@@ -79,6 +79,9 @@ class ProductImageReplacementImportTest extends TestCase
         $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         foreach ($entries as $entry => $bytes) {
             $zip->addFromString($entry, $bytes);
+            // ثابت عمداً: addFromString يختم كل مدخل بالوقت الحالي (دقة ثانيتين)، فيبني الاستدعاءان المتتاليان (المعاينة ثم إنشاء المهمة) أرشيفين
+            // مختلفين بايتاً حين يعبران حدّ ثانيتين، فتُرفض المهمة بحق «الملف تغيّر عمّا عاينته». وقت ثابت = بصمة محتوى ثابتة.
+            $zip->setMtimeName($entry, 1700000000);
         }
         $zip->close();
 
