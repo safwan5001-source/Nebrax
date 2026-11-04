@@ -3048,6 +3048,26 @@ const demoOperations: Record<string, unknown> & { version: number } = {
   min_order_minor: null, min_order_scope: 'all', intake_controls_deployment_enabled: true,
 };
 const DEMO_OPERATION_KEYS = ['accepting_orders', 'paused_until', 'pause_message', 'outside_hours_policy', 'opening_hours', 'min_order_minor', 'min_order_scope'] as const;
+/** COPS-H4-6 (تجريبي): تجاوزات إتاحة الوسيلة لكل قناة، بالذاكرة. `null` = الافتراضي (available_online). */
+const demoChannelOverrides = new Map<string, boolean | null>();
+const DEMO_CHANNELS = [
+  { id: 'demo-channel-web', name: 'متجر الويب', type: 'web' },
+  { id: 'demo-channel-mobile', name: 'تطبيق الجوال', type: 'mobile' },
+];
+function demoAvailabilityRows(method: { id: string; is_active: boolean; available_online?: boolean }) {
+  return DEMO_CHANNELS.map((channel) => {
+    const override = demoChannelOverrides.get(`${method.id}:${channel.id}`) ?? null;
+
+    return {
+      sales_channel_id: channel.id,
+      name: channel.name,
+      type: channel.type,
+      is_active: true,
+      override,
+      effective: method.is_active && (override ?? method.available_online ?? true),
+    };
+  });
+}
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const mediaResponse = handleStorefrontMediaDemo(path, method.toUpperCase(), body);
@@ -3343,6 +3363,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       }
       if (changed) demoOperations.version += 1;
       return resolve({ data: { sales_channel_id: 'demo', configured: demoOperations.version > 0, recent_changes: [], ...demoOperations } });
+    }
+    // COPS-H4-6: PUT إتاحة قناة (`is_enabled` true|false|null=الافتراضي) — يُحفظ في الذاكرة ويُعاد الصف بالنتيجة الفعلية.
+    const availabilityPut = clean.match(/^\/payment-methods\/([^/]+)\/channel-availability\/([^/]+)$/);
+    if (availabilityPut && m === 'PUT') {
+      const method = mockPaymentMethods.find((candidate) => candidate.id === availabilityPut[1]);
+      const row = method ? demoAvailabilityRows(method).find((candidate) => candidate.sales_channel_id === availabilityPut[2]) : undefined;
+      if (!method || !row) return Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
+      const enabled = (body as { is_enabled?: unknown } | undefined)?.is_enabled;
+      if (enabled !== null && typeof enabled !== 'boolean') return Promise.reject(Object.assign(new Error('Invalid'), { status: 422 }));
+      demoChannelOverrides.set(`${method.id}:${row.sales_channel_id}`, enabled);
+      return resolve({ data: demoAvailabilityRows(method).find((candidate) => candidate.sales_channel_id === row.sales_channel_id) });
     }
     if (clean === '/account/preferences' && m === 'PUT') {
       const requested = body as { locale?: unknown; theme?: unknown; appTheme?: unknown } | undefined;
@@ -4161,6 +4192,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (/^\/commerce\/channels\/[^/]+\/operations-settings$/.test(clean)) return resolve({ data: { sales_channel_id: 'demo', configured: demoOperations.version > 0, recent_changes: [], ...demoOperations } });
+  // COPS-H4-6 — إتاحة وسيلة الدفع لكل قناة (تجريبي، بحالة في الذاكرة): الافتراضي = available_online (true).
+  const availabilityGet = clean.match(/^\/payment-methods\/([^/]+)\/channel-availability$/);
+  if (availabilityGet) {
+    const method = mockPaymentMethods.find((candidate) => candidate.id === availabilityGet[1]);
+    if (!method) return Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
+    return resolve({ data: { payment_method: { id: method.id, name: method.name, is_active: method.is_active, available_online: (method as { available_online?: boolean }).available_online ?? true }, channels: demoAvailabilityRows(method) } });
+  }
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });
   const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
   if (salesConfigMatch) {
