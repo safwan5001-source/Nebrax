@@ -243,3 +243,52 @@ describe("AWJ Luxe Motion — Product Customizer preview parity", () => {
     expect(shell?.querySelector("h1")).not.toHaveClass("text-2xl");
   });
 });
+
+
+describe("AWJ Luxe Motion — Category product-card preview parity", () => {
+  afterEach(() => cleanup());
+
+  const luxeConfig = { ...DEFAULT_PRESENTATION_CONFIG, themePreset: "awj-luxe-motion" as const };
+
+  it("uses the portrait image ratio and comfortable two-line card body only for Luxe Motion", () => {
+    const { container, rerender } = render(
+      <StorefrontPreviewCanvas
+        config={luxeConfig}
+        locale="ar"
+        viewport="mobile"
+        page="category"
+        categoryPreviewState="ready"
+        previewCategory={category}
+        categoryRegions={categoryRegions}
+        categoryGridProductsState="ready"
+        categoryGridProducts={gridProducts}
+        categoryGridProductsTotal={gridProducts.length}
+      />,
+    );
+    let shell = container.querySelector('[data-category-preview="ready"]');
+    expect(shell).toHaveAttribute("data-luxe-motion");
+    const card = shell?.querySelector('[data-card]');
+    expect(card).toHaveClass("border-store-border");
+    expect(card?.querySelector('[data-card-image]')).toHaveClass("aspect-[3/4]");
+    expect(card?.querySelector("p")).toHaveClass("line-clamp-2", "text-sm", "px-3.5");
+
+    rerender(
+      <StorefrontPreviewCanvas
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="ar"
+        viewport="mobile"
+        page="category"
+        categoryPreviewState="ready"
+        previewCategory={category}
+        categoryRegions={categoryRegions}
+        categoryGridProductsState="ready"
+        categoryGridProducts={gridProducts}
+        categoryGridProductsTotal={gridProducts.length}
+      />,
+    );
+    shell = container.querySelector('[data-category-preview="ready"]');
+    expect(shell).not.toHaveAttribute("data-luxe-motion");
+    expect(shell?.querySelector('[data-card-image]')).toHaveClass("aspect-square");
+    expect(shell?.querySelector('[data-card-image]')).not.toHaveClass("aspect-[3/4]");
+  });
+});
