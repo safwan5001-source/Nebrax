@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Bot, Copy, Download, Eye, FileSpreadsheet, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
+import { ListToolbar, PageHeader, Pagination, SelectionModeToggle, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type Product } from '@/components/products/product-dialog';
@@ -78,6 +78,8 @@ export default function ProductsPage() {
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // AWJ-UX-SELECTION-MODE-1 — مربعات التحديد والإجراء الجماعي لا تظهر إلا داخل وضع التحديد.
+  const [selectionMode, setSelectionMode] = useState(false);
   const storedColumnVisibility = useDataTableColumnVisibility('products');
   const columnVisibility = useMemo(() => ({
     ...storedColumnVisibility,
@@ -108,6 +110,32 @@ export default function ProductsPage() {
   // منتجاتٍ لم تعد ظاهرة أمام المستخدم أصلاً.
   const filterQuery = useMemo(() => productFilterQuery(explorer), [explorer]);
   useEffect(() => { setSelectedIds([]); }, [filterQuery]);
+
+  // الخروج من الوضع يُفرغ التحديد دائماً: لا يبقى محدَّدٌ مخفيٌّ يدخل نطاق «المحدد» في التصدير.
+  const enterSelectionMode = useCallback(() => {
+    setSelectedIds([]);
+    setSelectionMode(true);
+  }, []);
+  const exitSelectionMode = useCallback(() => {
+    setSelectedIds([]);
+    setSelectionMode(false);
+  }, []);
+
+  // «تحديد الصفحة» للجوال: جدول سطح المكتب يحمله في رأسه، أما سجلات الجوال فلا رأس لها. يعمل على صفوف
+  // الصفحة الحالية وحدها ويُبقي تحديد الصفحات الأخرى كما هو (نفس دلالة رأس الجدول).
+  const pageIds = useMemo(() => data.map((product) => product.id), [data]);
+  const pageHits = pageIds.filter((id) => selectedIds.includes(id)).length;
+  const pageAllSelected = pageIds.length > 0 && pageHits === pageIds.length;
+  const pageBoxRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (pageBoxRef.current) pageBoxRef.current.indeterminate = pageHits > 0 && !pageAllSelected;
+  }, [pageHits, pageAllSelected]);
+  const togglePageSelection = () => {
+    setSelectedIds((current) => {
+      const rest = current.filter((id) => !pageIds.includes(id));
+      return pageAllSelected ? rest : [...rest, ...pageIds];
+    });
+  };
 
   const load = useCallback(() => {
     loadProducts();
@@ -331,17 +359,44 @@ export default function ProductsPage() {
         totalCount={total}
       />
 
-      {selectedIds.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-sm">
-          <span className="num text-text">{t('selected_count', { count: selectedIds.length })}</span>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-            {t('clear_selection')}
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="ms-auto" onClick={() => setExportOpen(true)}>
-            <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
-            {t('export')}
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <SelectionModeToggle
+          active={selectionMode}
+          onEnter={enterSelectionMode}
+          onExit={exitSelectionMode}
+          enterLabel={t('selection_mode_enter')}
+          exitLabel={t('selection_mode_exit')}
+          disabled={!selectionMode && (loading || data.length === 0)}
+          status={
+            selectedIds.length > 0
+              ? <span className="text-text">{t('selected_count', { count: selectedIds.length })}</span>
+              : t('selection_mode_hint')
+          }
+        />
+        {selectionMode && selectedIds.length > 0 ? (
+          <>
+            <Button type="button" variant="ghost" size="sm" className="min-h-11 md:min-h-8" onClick={() => setSelectedIds([])}>
+              {t('clear_selection')}
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="ms-auto min-h-11 md:min-h-8" onClick={() => setExportOpen(true)}>
+              <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+              {t('export')}
+            </Button>
+          </>
+        ) : null}
+      </div>
+
+      {selectionMode && !loading && pageIds.length > 0 ? (
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-border bg-sunken px-3 text-sm text-text md:hidden">
+          <input
+            ref={pageBoxRef}
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={pageAllSelected}
+            onChange={togglePageSelection}
+          />
+          {t('select_page')}
+        </label>
       ) : null}
 
       <DataTable
@@ -357,11 +412,11 @@ export default function ProductsPage() {
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
           columns: PRODUCT_SORT_COLUMNS,
         }}
-        selection={{
+        selection={selectionMode ? {
           selectedIds,
           onChange: setSelectedIds,
           getRowId: (product) => product.id,
-        }}
+        } : undefined}
         columnVisibility={columnVisibility}
         stickyHeader
         stickyStartColumn

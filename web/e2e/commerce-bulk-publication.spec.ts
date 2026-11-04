@@ -58,6 +58,10 @@ async function open(page: Page, opts: { locale?: 'ar' | 'en'; stores?: number } 
 const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
 };
+/** AWJ-UX-SELECTION-MODE-1: مربعات التحديد مخفية افتراضياً؛ يلزم دخول وضع التحديد أولاً. */
+const enterSelectionMode = async (page: Page, label = 'تحديد') => {
+  await page.getByRole('button', { name: label, exact: true }).locator('visible=true').first().click();
+};
 const noHorizontalOverflow = async (page: Page) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
@@ -75,6 +79,15 @@ for (const locale of ['ar', 'en'] as const) {
     await expect(page.getByText(L.name).locator('visible=true').first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dir)).toBe(locale === 'ar' ? 'rtl' : 'ltr');
 
+    // الوضع الافتراضي: لا مربعات تحديد.
+    await expect(page.getByRole('checkbox').locator('visible=true')).toHaveCount(0);
+    await noHorizontalOverflow(page);
+    await shot(page, `selection-default-${locale}-${info.project.name}`);
+    await enterSelectionMode(page, locale === 'ar' ? 'تحديد' : 'Select');
+    await expect(page.getByTestId('bulk-selected-count')).toHaveCount(0); // الدخول لا يحدد شيئاً
+    await expect(page.getByRole('button', { name: locale === 'ar' ? 'إنهاء التحديد' : 'Done', exact: true })).toBeEnabled();
+    await page.waitForTimeout(300); // انتهاء انتقال لون الزر قبل اللقطة
+    await shot(page, `selection-mode-${locale}-${info.project.name}`);
     await visibleBox(page, L.row).check();
     await visibleBox(page, L.all).check();
     await expect(page.getByTestId('bulk-selected-count')).toHaveText(locale === 'ar' ? 'المحدد: 3' : 'Selected: 3');
@@ -107,6 +120,7 @@ for (const locale of ['ar', 'en'] as const) {
 
 test('changing the search clears the selection', async ({ page }) => {
   await open(page);
+  await enterSelectionMode(page);
   await visibleBox(page, 'تحديد كل عناصر الصفحة الحالية فقط').check();
   await expect(page.getByTestId('bulk-selected-count')).toBeVisible();
   await page.getByLabel('بحث في المنتجات').fill('ورد');
@@ -116,10 +130,26 @@ test('changing the search clears the selection', async ({ page }) => {
 
 test('with two stores the target store must be chosen before acting', async ({ page }, info) => {
   await open(page, { stores: 2 });
+  await enterSelectionMode(page);
   await visibleBox(page, 'تحديد: باقة ورد جوري').check();
   await expect(page.getByRole('button', { name: 'نشر المحدد', exact: true })).toBeDisabled();
   await shot(page, `bulk-two-stores-${info.project.name}`);
   await page.getByLabel('المتجر المستهدف').selectOption('s2');
   await expect(page.getByRole('button', { name: 'نشر المحدد', exact: true })).toBeEnabled();
   await noHorizontalOverflow(page);
+});
+
+test('Done clears the selection and restores the default UI with no overflow', async ({ page }, info) => {
+  await open(page);
+  await enterSelectionMode(page);
+  await visibleBox(page, 'تحديد كل عناصر الصفحة الحالية فقط').check();
+  await expect(page.getByTestId('bulk-selected-count')).toBeVisible();
+  await page.getByRole('button', { name: 'إنهاء التحديد', exact: true }).click();
+  await expect(page.getByRole('checkbox').locator('visible=true')).toHaveCount(0);
+  await expect(page.getByTestId('bulk-selected-count')).toHaveCount(0);
+  await noHorizontalOverflow(page);
+  await shot(page, `selection-done-${info.project.name}`);
+  // إعادة الدخول تبدأ فارغة.
+  await enterSelectionMode(page);
+  await expect(page.getByTestId('bulk-selected-count')).toHaveCount(0);
 });

@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
-import { EmptyState, ErrorState, LoadingState, MobileRecordItem, PageHeader, Pagination } from '@/components/nebrax';
+import { EmptyState, ErrorState, LoadingState, MobileRecordItem, PageHeader, Pagination, SelectionModeToggle } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
@@ -278,6 +278,9 @@ function PublicationSection<T extends PublicationListItem>({
   const selectionSizeRef = useRef(0);
   selectionSizeRef.current = selection.size;
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  // AWJ-UX-SELECTION-MODE-1 — مربعات التحديد وشريط الإجراءات الجماعية لا يظهران إلا داخل وضع التحديد.
+  // الحالة محلية لكل قسم (منتجات/تصنيفات)، فلا يتشارك القسمان وضعاً ولا تحديداً.
+  const [selectionMode, setSelectionMode] = useState(false);
   const [bulkTargetStoreId, setBulkTargetStoreId] = useState('');
   const [bulkDialog, setBulkDialog] = useState<BulkDialogState>({ phase: 'closed' });
   const bulkRunning = bulkDialog.phase === 'running';
@@ -342,6 +345,15 @@ function PublicationSection<T extends PublicationListItem>({
   }, [storefrontId]);
 
   const canSelect = canManage && storefrontOptions.length > 0;
+  // مربعات التحديد ظاهرة فقط في الوضع؛ الصلاحية وقاعدة المتجر الهدف (canSelect) كما كانتا.
+  const selecting = canSelect && selectionMode;
+  // فقدان القدرة على التحديد (صلاحية أو لا متجر نشط) يُنهي الوضع ويُفرغ التحديد، فلا يعود لاحقاً بتحديد قديم مخفي.
+  useEffect(() => {
+    if (canSelect || bulkRunning) return;
+    if (selectionMode) setSelectionMode(false);
+    if (selectionSizeRef.current > 0) setSelection(EMPTY_SELECTION);
+    setBulkNotice(null);
+  }, [canSelect, bulkRunning, selectionMode]);
   // متجر واحد = هدف حتمي؛ عدة متاجر = اختيار صريح ولا تخمين.
   const bulkTargetStore =
     storefrontOptions.length === 1
@@ -360,6 +372,21 @@ function PublicationSection<T extends PublicationListItem>({
     const next = togglePage(selection, pageItems);
     setSelection(next.selection);
     setBulkNotice(next.limitReached ? fillTemplate(t('bulkLimitReached'), { n: SELECTION_LIMIT }) : null);
+  };
+
+  // الدخول لا يحدد شيئاً؛ الخروج يفرغ التحديد والإشعار فيعود العرض الافتراضي بلا أثر باقٍ.
+  const enterSelectionMode = () => {
+    if (bulkRunning) return;
+    setSelection(EMPTY_SELECTION);
+    setBulkNotice(null);
+    setSelectionMode(true);
+  };
+  const exitSelectionMode = () => {
+    if (bulkRunning) return; // تنفيذ جماعي جارٍ: لا نُفرغ التحديد من تحت الطلب.
+    setSelection(EMPTY_SELECTION);
+    setBulkNotice(null);
+    setBulkDialog({ phase: 'closed' });
+    setSelectionMode(false);
   };
 
   const openBulkDialog = (action: BulkPublicationAction) => {
@@ -481,6 +508,18 @@ function PublicationSection<T extends PublicationListItem>({
         idPrefix={idPrefix}
       />
 
+      {canSelect ? (
+        <SelectionModeToggle
+          active={selectionMode}
+          onEnter={enterSelectionMode}
+          onExit={exitSelectionMode}
+          enterLabel={t('selectModeEnter')}
+          exitLabel={t('selectModeExit')}
+          disabled={bulkRunning || (!selectionMode && state !== 'ready')}
+          status={selection.size === 0 ? t('selectModeHint') : null}
+        />
+      ) : null}
+
       {state === 'loading' ? <LoadingState variant="table" rows={6} label={loadingLabel} /> : null}
 
       {state === 'error' ? <ErrorState message={loadFailedLabel} onRetry={() => void load()} /> : null}
@@ -500,7 +539,7 @@ function PublicationSection<T extends PublicationListItem>({
             <Table>
               <THead>
                 <TR>
-                  {canSelect ? (
+                  {selecting ? (
                     <TH className="w-10">
                       <PageSelectBox
                         label={t('bulkSelectAllPage')}
@@ -518,7 +557,7 @@ function PublicationSection<T extends PublicationListItem>({
               <TBody>
                 {(result.items as T[]).map((item) => (
                   <TR key={item.id}>
-                    {canSelect ? (
+                    {selecting ? (
                       <TD className="w-10">
                         <RowSelectBox
                           label={`${t('bulkSelectRow')}: ${item.name}`}
@@ -539,7 +578,7 @@ function PublicationSection<T extends PublicationListItem>({
 
           {/* Mobile: سجلات لمسية بلا خسارة معلومات — الحالة لكل متجر والإجراءات كاملة. */}
           <div className="divide-y divide-border rounded border border-border bg-surface md:hidden">
-            {canSelect ? (
+            {selecting ? (
               <div className="flex items-center gap-1 border-b border-border bg-sunken ps-1.5 pe-3">
                 <PageSelectBox
                   label={t('bulkSelectAllPage')}
@@ -552,7 +591,7 @@ function PublicationSection<T extends PublicationListItem>({
             ) : null}
             {(result.items as T[]).map((item) => (
               <div key={item.id} className="flex items-start">
-                {canSelect ? (
+                {selecting ? (
                   <div className="shrink-0 ps-1.5 pt-1">
                     <RowSelectBox
                       label={`${t('bulkSelectRow')}: ${item.name}`}
@@ -589,7 +628,7 @@ function PublicationSection<T extends PublicationListItem>({
         </>
       ) : null}
 
-      {canSelect ? (
+      {selecting ? (
         <BulkActionBar
           t={t}
           selection={selection}

@@ -49,6 +49,10 @@ const { api, downloadFile, translate, getSystemTaxInclusive, getShowStockQuantit
     clear_selection: 'Clear selection',
     selectRow: 'Select row',
     selectAllRows: 'Select all visible rows',
+    selection_mode_enter: 'Select',
+    selection_mode_exit: 'Done',
+    selection_mode_hint: 'Select products to export them.',
+    select_page: 'Select all products on this page',
   };
   // بديلٌ مبسّط لـ`t`: `rich` تُرجع القيم غير الدالّية فقط، فيكفي لاختبار سجلّ
   // الجوال دون محاكاة ICU كاملاً — الترجمة نفسها مُختبَرة في `nebrax/`.
@@ -278,6 +282,7 @@ describe('ProductsPage server-side export, sorting and selection', () => {
     render(<ProductsPage />);
     await screen.findByRole('list');
 
+    await user.click(screen.getByRole('button', { name: 'Select' }));
     await user.click(screen.getAllByRole('checkbox', { name: 'Select row' })[0]);
     expect(screen.getByText('Selected')).toBeTruthy();
 
@@ -297,6 +302,7 @@ describe('ProductsPage server-side export, sorting and selection', () => {
     render(<ProductsPage />);
     await screen.findByRole('list');
 
+    await user.click(screen.getByRole('button', { name: 'Select' }));
     const selectAll = screen.getByRole('checkbox', { name: 'Select all visible rows' });
     await user.click(selectAll);
     expect(screen.getAllByRole('checkbox', { name: 'Select row' }).every((box) => (box as HTMLInputElement).checked)).toBe(true);
@@ -327,3 +333,128 @@ describe('ProductsPage server-side export, sorting and selection', () => {
     expect(screen.getAllByRole('link', { name: 'View' }).some((link) => link.getAttribute('href') === '/products/p1')).toBe(true);
   });
 });
+
+/**
+ * AWJ-UX-SELECTION-MODE-1 — التحديد صريح: لا مربعات ولا شريط جماعي خارج وضع التحديد.
+ */
+describe('ProductsPage explicit selection mode', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    api.mockReset();
+    downloadFile.mockReset();
+    downloadFile.mockResolvedValue(undefined);
+    getSystemTaxInclusive.mockResolvedValue(false);
+    getShowStockQuantities.mockResolvedValue(true);
+  });
+
+  const two = [baseProduct, { ...baseProduct, id: 'p2', sku: 'SKU-1001', name: 'Air filter' }];
+  const boxes = () => screen.queryAllByRole('checkbox');
+
+  it('default mode shows no checkboxes, no select-all and no selection bar', async () => {
+    respondWith(two);
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    expect(boxes()).toHaveLength(0);
+    expect(screen.queryByText('Selected')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear selection' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Select' })).toBeTruthy();
+    // التنقل وإجراءات الصف سليمة خارج الوضع.
+    expect(screen.getAllByRole('link', { name: 'Edit' }).length).toBeGreaterThan(0);
+  });
+
+  it('entering the mode reveals the checkboxes but selects nothing', async () => {
+    respondWith(two);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    expect(boxes().length).toBeGreaterThan(0);
+    expect(boxes().every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+    expect(screen.queryByText('Selected')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear selection' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+  });
+
+  it('Done clears the selection: the checkboxes vanish and the export scope no longer offers "selected"', async () => {
+    respondWith(two);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    expect(screen.getByText('Selected')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(boxes()).toHaveLength(0);
+    expect(screen.queryByText('Selected')).toBeNull();
+
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    expect(screen.queryByLabelText('Scope selected')).toBeNull();
+
+    // الدخول من جديد يبدأ فارغاً.
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    expect(boxes().every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('select-all only touches the rows of the current page', async () => {
+    respondWith(two);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    await user.click(await screen.findByLabelText('Scope selected'));
+    await user.click(screen.getByRole('button', { name: 'Run export' }));
+
+    await waitFor(() => expect(downloadFile).toHaveBeenCalled());
+    const params = new URLSearchParams(String(downloadFile.mock.calls.at(-1)?.[0]).split('?')[1] ?? '');
+    expect(params.getAll('ids[]').sort()).toEqual(['p1', 'p2']);
+  });
+
+  it('a search change keeps the mode but drops every selected row', async () => {
+    respondWith(two);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    expect(screen.getByText('Selected')).toBeTruthy();
+
+    await user.type(screen.getByRole('searchbox'), 'oil');
+    await waitFor(() => expect(screen.queryByText('Selected')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(boxes().every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('offers a mobile-only "select this page" control that touches the current page only', async () => {
+    respondWith(two);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    // خارج الوضع: لا شيء.
+    expect(screen.queryByRole('checkbox', { name: 'Select all products on this page' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+
+    const pageBox = screen.getByRole('checkbox', { name: 'Select all products on this page' }) as HTMLInputElement;
+    expect(pageBox.checked).toBe(false);
+    expect(pageBox.closest('label')?.className).toContain('md:hidden'); // سطح المكتب يستعمل رأس الجدول
+
+    await user.click(screen.getAllByRole('checkbox', { name: 'Select row' })[0]);
+    expect(pageBox.indeterminate).toBe(true);
+    await user.click(pageBox);
+    expect(pageBox.checked).toBe(true);
+    expect(screen.getAllByRole('checkbox', { name: 'Select row' }).every((box) => (box as HTMLInputElement).checked)).toBe(true);
+    await user.click(pageBox);
+    expect(screen.getAllByRole('checkbox', { name: 'Select row' }).every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+});
+
