@@ -131,17 +131,18 @@ export const ProductCard = memo(function ProductCard({
           className="absolute top-2 end-2"
         />
         {/*
-          AWJ Market only (see the coverage matrix's product-card evidence).
+          AWJ Market and Luxe Motion share the already data-backed quick view.
           Bottom-start, not top-start, so it never shares a corner with the
           sale badge above — both can be true for the same card at once.
         */}
-        {themePreset === "awj-market" && (
+        {(themePreset === "awj-market" || isLuxe) && (
           <div className="absolute bottom-2 start-2">
             <QuickView
               product={product}
               basePath={basePath}
               categoryId={categoryId}
               isVariantManaged={isVariantManaged}
+              largeHitTarget={isLuxe}
             />
           </div>
         )}
