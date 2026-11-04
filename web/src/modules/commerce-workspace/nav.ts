@@ -46,6 +46,8 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
       { href: '/commerce/delivery', labelKey: 'delivery' },
       // COPS-H4-5 — سياسات الطلب الإلكتروني على مستوى المؤسسة (تحرير مدة الحجز: company.manage؛ القراءة: invoices.view في الخادم).
       { href: '/commerce/order-policies', labelKey: 'orderPolicies', permission: 'company.manage' },
+      // COPS-H4-3 (UI) — إيقاف مؤقت/ساعات عمل/حد أدنى لقناة المتجر (الخادم يشترط commerce.channel_settings.manage وقدرة المتجر).
+      { href: '/commerce/store-operations', labelKey: 'storeOperations', appKey: 'commerce.storefront', permission: 'commerce.channel_settings.manage' },
       // COPS-H4-2 — محرر مناطق الشحن (الخادم يشترط commerce.manage؛ المناطق على مستوى المؤسسة).
       { href: '/commerce/shipping-zones', labelKey: 'shippingZones', permission: 'commerce.manage' },
       // حسابات عملاء التجزئة لقناة الويب — الخادم يشترط commerce.channel_settings.manage (مالك/مدير) وقدرة المتجر.
