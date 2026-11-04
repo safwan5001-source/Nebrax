@@ -31,6 +31,8 @@ interface Options {
   ledgerChanged?: boolean;
   statementChanged?: boolean;
   lineCount?: number;
+  /** فرق verify-set بالهللات (الافتراضي 0 = مجموعة مساوية للسطر). */
+  verifyDiff?: number;
 }
 
 interface State {
@@ -111,7 +113,7 @@ async function open(page: Page, opts: Options = {}) {
       return json(route, { data, run: { id: RUN, reconciliation_id: ID, created: false, replayed: true, engine_version: 1, status: 'completed', policy: {}, scope: {}, ledger_fingerprint: 'fp', created_at: null, counts: { 'statement.matched': total - 3, 'statement.date_difference': 1, 'statement.missing_in_books': 1, 'statement.ambiguous': 1, 'ledger.missing_in_statement': 1 } }, ledger_changed: opts.ledgerChanged === true, meta: { current_page: 1, last_page: 1, per_page: 25, total: data.length } });
     }
     if (p === `${base}/verify-set`) {
-      return json(route, { data: { applied: false, line: { id: 'line-4', ordinal: 4, date: '2026-01-04', debit_minor: 400000, credit_minor: 0 }, units: [{ key: 'c1', kind: 'invoice', doc_number: 'S-c1', date: '2026-01-02', state: 'active', direction: 'credit', net_minor: -400000 }], expected_net_minor: -400000, set_net_minor: -400000, difference_minor: 0, tolerance_minor: 100, equal_within_tolerance: true, problems: [] } });
+      return json(route, { data: { applied: false, line: { id: 'line-4', ordinal: 4, date: '2026-01-04', debit_minor: 400000, credit_minor: 0 }, units: [{ key: 'c1', kind: 'invoice', doc_number: 'S-c1', date: '2026-01-02', state: 'active', direction: 'credit', net_minor: -400000 }], expected_net_minor: -400000, set_net_minor: -400000 + (opts.verifyDiff ?? 0), difference_minor: -(opts.verifyDiff ?? 0), tolerance_minor: 100, equal_within_tolerance: (opts.verifyDiff ?? 0) === 0, problems: [] } });
     }
     if (p === `${base}/reversed-pairs`) return json(route, { data: { pairs: [], truncated: false } });
     if (p === `${base}/decisions` && method === 'POST') {
@@ -294,6 +296,61 @@ for (const locale of ['ar', 'en'] as const) {
       await expect(error).not.toContainText('RAW SERVER TEXT');
       expect(state.decisionBodies).toHaveLength(0);
       await shot(page, `stale-${locale}-${isMobile(page) ? 'mobile' : 'desktop'}`);
+    });
+
+    test('override بفرق خارج التسامح: الإقرار الصريح إلزامي، وتغيير المجموعة يُبطل التحقق والإقرار، ولا POST قبل الاستيفاء', async ({ page }) => {
+      const state = await open(page, { locale, verifyDiff: 50000 });
+      await waitLoaded(page);
+      const posts = () => state.requests.filter((r) => r === `POST /partner-statement-reconciliations/${ID}/decisions`).length;
+      await selectLine(page, 4);
+      await actionBar(page).getByRole('button', { name: t.override }).click();
+      const picker = page.getByTestId('candidate-picker');
+      const form = page.getByTestId('decision-form-override');
+      const submit = form.getByRole('button', { name: t.override });
+      const reason = 'فرق متفق عليه مع المورد';
+
+      // 1) اختيار وحدة ثم تحقق: الفرق خارج التسامح ⇒ المجموعة لا تساوي السطر
+      await picker.locator('input[type="checkbox"]').first().check();
+      await picker.getByRole('button', { name: t.verify }).click();
+      await expect(page.getByTestId('verify-result')).toHaveAttribute('data-equal', 'false');
+
+      // 2) السبب وحده لا يكفي: لا إرسال دون الإقرار الصريح
+      await form.getByRole('textbox').fill(reason);
+      await expect(submit).toBeDisabled();
+      const acknowledge = form.getByRole('checkbox');
+      await expect(acknowledge).toBeVisible();
+      await expect(acknowledge).not.toBeChecked();
+      expect(posts()).toBe(0);
+
+      // 3) بعد الإقرار يصير الإرسال ممكناً (ولم يُرسَل شيء بعد)
+      await acknowledge.check();
+      await expect(submit).toBeEnabled();
+      expect(posts()).toBe(0);
+
+      // 4) تغيير مجموعة الحركات يُبطل التحقق السابق والإقرار السابق معاً
+      await picker.locator('input[type="checkbox"]').nth(1).check();
+      await expect(page.getByTestId('verify-result')).toHaveCount(0);
+      await expect(page.getByTestId('verify-required')).toBeVisible();
+      await expect(submit).toBeDisabled();
+      expect(posts()).toBe(0);
+
+      // 5) تحقق جديد: الإقرار القديم لا يعود (يلزم إقرار جديد) ونص السبب باقٍ
+      await picker.getByRole('button', { name: t.verify }).click();
+      await expect(page.getByTestId('verify-result')).toBeVisible();
+      await expect(form.getByRole('checkbox')).not.toBeChecked();
+      await expect(form.getByRole('textbox')).toHaveValue(reason);
+      await expect(submit).toBeDisabled();
+      expect(posts()).toBe(0);
+
+      // 6) إقرار جديد ثم إرسال: accept_difference مع الوحدات المختارة والسبب
+      await form.getByRole('checkbox').check();
+      await submit.click();
+      await expect(page.getByTestId('progress-count')).toHaveText('1/4');
+      expect(posts()).toBe(1);
+      expect(state.decisionBodies[0]).toMatchObject({ run_id: RUN, line_id: 'line-4', action: 'override', accept_difference: true, reason });
+      expect([...((state.decisionBodies[0] as { unit_keys: string[] }).unit_keys)].sort()).toEqual(['c1', 'c2']);
+      await shot(page, `override-acknowledge-${locale}-${isMobile(page) ? 'mobile' : 'desktop'}`);
+      await noHorizontalOverflow(page);
     });
 
     test('سطور الكشف تغيّرت: حظر ظاهر', async ({ page }) => {
