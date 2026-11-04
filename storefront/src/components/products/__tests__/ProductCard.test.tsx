@@ -128,6 +128,25 @@ describe("ProductCard", () => {
     expect(container.querySelector(".group > div")).toHaveClass("h-28");
   });
 
+  it("uses the Luxe Motion card treatment only for its own published theme preset", () => {
+    const { container, rerender } = render(
+      <ProductCard product={baseProduct} basePath="/us/en" />,
+    );
+    const card = () => container.querySelector("[data-card]");
+    expect(card()).not.toHaveClass("hover:-translate-y-0.5");
+    expect(container.querySelector("[data-card-body]")).not.toHaveClass("p-3.5");
+
+    rerender(
+      <PublishedThemeMarkerProvider themePreset="awj-luxe-motion">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(card()).toHaveClass("hover:-translate-y-0.5");
+    expect(container.querySelector("[data-card-body]")).toHaveClass("p-3.5");
+    expect(screen.getByRole("button", { name: "addToCart" })).toHaveClass("min-h-11");
+    expect(screen.getByText("$25.00")).toBeInTheDocument();
+  });
+
   it("links to the product page", () => {
     render(<ProductCard product={baseProduct} basePath="/us/en" />);
 
