@@ -325,7 +325,6 @@ class CommerceChannelOperationsSettingsPostgresTest extends TestCase
             'نطاق حد أدنى غير معتمد' => ['min_order_scope' => 'pickup_only'],
             'حد أدنى صفر' => ['min_order_minor' => 0],
             'حد أدنى فوق السقف' => ['min_order_minor' => 100000000001],
-            'رسالة إيقاف أطول من 200' => ['pause_message' => str_repeat('a', 201)],
             'موعد استئناف والطلبات مقبولة' => ['accepting_orders' => true, 'paused_until' => now()->addHour()],
         ];
         foreach ($cases as $label => $override) {
@@ -335,6 +334,15 @@ class CommerceChannelOperationsSettingsPostgresTest extends TestCase
             } catch (QueryException $e) {
                 $this->assertStringContainsString('commerce_ops_settings_intake_chk', $e->getMessage(), $label);
             }
+        }
+        $this->assertSame(0, $this->rows($channel));
+
+        // رسالة أطول من 200: عمود `varchar(200)` يرفضها (SQLSTATE 22001) قبل أن يُقيَّم قيد CHECK، فتُختبر منفصلةً.
+        try {
+            DB::transaction(fn () => DB::table('commerce_channel_operation_settings')->insert(['id' => (string) Str::uuid(), 'pause_message' => str_repeat('a', 201)] + $base));
+            $this->fail('رسالة إيقاف أطول من 200: كان يجب أن تُرفض');
+        } catch (QueryException $e) {
+            $this->assertSame('22001', (string) $e->getCode(), 'تجاوز طول العمود');
         }
         $this->assertSame(0, $this->rows($channel));
 
