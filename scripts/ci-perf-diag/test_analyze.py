@@ -195,6 +195,18 @@ class Report(unittest.TestCase):
             self.assertIn(pair, text)
         self.assertNotIn("pr1972 مقابل main-tmpfs", text)
 
+    def test_holder_state_pipes_do_not_break_markdown_table_columns(self):
+        stalled = stalled_queue(commit=120.0)
+        r = rnd(stalled, kind="sampled", added=80.0, slow=12, over=True)
+        r["sampler"] = {"queue_episodes": [{"t0": -1e12, "t1": 1e12, "holder_keys": {"active|IO:WALSync": 5}}]}
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [r])
+            text = A.build_report(A.load_runs(root))
+        row = [l for l in text.splitlines() if l.startswith("| main#1 |")][0]
+        header = [l for l in text.splitlines() if l.startswith("| تشغيل |")][0]
+        self.assertEqual(row.count("|"), header.count("|"))
+        self.assertIn("active/IO:WALSync×5", row)
+
     def test_old_schema_rounds_are_reported_invalid_instead_of_crashing_the_report(self):
         old = rnd(steady(), added=9.0)
         for x in old["txns"]:

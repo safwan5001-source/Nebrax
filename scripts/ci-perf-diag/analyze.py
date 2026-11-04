@@ -340,7 +340,7 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants:
             fr = r["freeze"]
             root = fr["root"] if fr else None
             hold = f"{fr['hold_ms']} ({fr['gap_win_ms']}/{fr['commit_win_ms']}/{fr['rq_gap_win_ms']})" if fr else "—"
-            holders = ", ".join(f"{k}×{v}" for k, v in sorted(r["holders"].items(), key=lambda kv: -kv[1])[:3]) or "—"
+            holders = ", ".join(f"{k.replace('|', '/')}×{v}" for k, v in sorted(r["holders"].items(), key=lambda kv: -kv[1])[:3]) or "—"  # `|` يكسر أعمدة جدول Markdown
             out.append(
                 f"| {r['variant']}#{r['repeat']} | {r['round']} | {r['kind']} | {r['added_p95_ms']} | {r['slow_count']} | "
                 f"{fr['freeze_ms'] if fr else '—'} | {fr['handoff_ms'] if fr else '—'} | {hold} | **{r['category']}** | {holders} | "
