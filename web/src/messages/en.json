@@ -14284,6 +14284,7 @@
       "closedAt": "Closed",
       "approvedAt": "Approved",
       "operationalLiters": "Operational liters (from meters)",
+      "operationalLitersShort": "Meter liters",
       "multipleOpen": "Notice: more than one open shift appeared for this station; the most recent is shown. Review shifts in AWJ.",
       "noPermission": {
         "title": "Shifts aren't available for your permissions",
@@ -14461,6 +14462,140 @@
       "cash": "Cash",
       "card": "Card",
       "unavailable": "Not available yet"
+    },
+    "shiftDetail": {
+      "title": "Shift details",
+      "subtitle": "View only · from AWJ",
+      "back": "All shifts",
+      "openedAtLabel": "Opened",
+      "duration": "Duration: {hours} h {minutes} m",
+      "durationRunning": "Running for {hours} h {minutes} m",
+      "zoneStation": "Times shown in the station's time zone ({zone})",
+      "zoneDevice": "This station has no time zone set; times use your device's time zone.",
+      "staff": "Assigned to the shift: {count}",
+      "staffYou": "You are assigned",
+      "staffUnknown": "Assigned staff: not available",
+      "freshness": {
+        "updatedAt": "Updated {time}",
+        "refresh": "Refresh",
+        "refreshing": "Refreshing…",
+        "stale": "This data may be out of date (updated {time}).",
+        "failed": "Couldn't refresh; showing the last loaded data ({time})."
+      },
+      "notFound": {
+        "title": "Shift not available",
+        "body": "We couldn't find this shift at the selected station, or you may not have permission to view it.",
+        "back": "Back to shifts"
+      },
+      "liters": {
+        "captionClosed": "Shift liters from the meters",
+        "captionOpen": "Meter liters so far",
+        "cellComplete": "Nozzles complete",
+        "cellPending": "Awaiting a reading",
+        "cellInvalid": "Need review",
+        "partial": "Partial total: only nozzles with both opening and closing readings are counted ({complete} of {expected}).",
+        "noneYet": "No nozzle has both readings yet, so no liters are computed (this is not zero).",
+        "meterNote": "Liters here are the difference between operational meter readings — not POS sales, not collections and not a stock movement.",
+        "mismatch": "Warning: the server total ({server}) doesn't match the sum of the nozzle differences shown ({computed}). Review the shift in AWJ.",
+        "invalid": "Nozzles whose closing reading is lower than the opening reading: {count}. They are excluded from the total and need review."
+      },
+      "progress": {
+        "title": "Shift progress",
+        "note": "AWJ shift states: open → closed → approved.",
+        "step": {
+          "opened": "Shift opened",
+          "opening_readings": "Opening readings",
+          "closing_readings": "Closing readings",
+          "closed": "Shift closed",
+          "approved": "Shift approved"
+        },
+        "state": {
+          "done": "Done",
+          "current": "Next",
+          "pending": "Not yet",
+          "none": "None recorded"
+        },
+        "countOf": "{done} of {total} nozzles",
+        "countOnly": "{done} nozzles"
+      },
+      "readings": {
+        "title": "Meter readings",
+        "setupNote": "Nozzle, pump and product names come from the station's current setup, which may differ from its setup when this shift ran.",
+        "opening": "Opening",
+        "closing": "Closing",
+        "computed": "Computed quantity",
+        "notRecorded": "Not recorded",
+        "invalidDetail": "Closing reading is lower than opening",
+        "empty": {
+          "title": "No meter readings",
+          "body": "No meter readings have been recorded in this shift yet."
+        },
+        "status": {
+          "complete": "Complete",
+          "awaiting_closing_open": "Awaiting closing reading",
+          "awaiting_closing_closed": "No closing reading",
+          "closing_without_opening": "No opening reading",
+          "not_recorded": "Not recorded",
+          "invalid_order": "Needs review"
+        },
+        "blockedNow": "Currently disabled: {reason}",
+        "outside": {
+          "title": "Nozzles outside the station's current setup",
+          "body": "Readings for nozzles that aren't in this station's setup now (they may have been removed or moved). They are shown, not hidden."
+        },
+        "unknownNozzle": "Unknown nozzle",
+        "unknownPump": "Unknown pump",
+        "assetsFailed": "Couldn't load the pumps and nozzles needed to show the readings."
+      },
+      "tanks": {
+        "title": "Tank readings",
+        "note": "Tank measurements are operational evidence for the shift; they don't change stock balances and aren't a stocktake variance.",
+        "type": {
+          "physical": "Physical measurement",
+          "atg": "Automatic gauge (ATG)"
+        },
+        "opening": "Opening",
+        "closing": "Closing",
+        "empty": "No tank readings in this shift.",
+        "unknownTank": "Unknown tank",
+        "notRecorded": "Not recorded"
+      },
+      "cash": {
+        "title": "Operational shift cash",
+        "openingFloat": "Opening float",
+        "counted": "Counted cash",
+        "expected": "Operationally expected",
+        "variance": "Cash variance",
+        "notCounted": "Not counted yet",
+        "direction": {
+          "overage": "Overage",
+          "shortage": "Shortage",
+          "none": "Matches"
+        },
+        "review": {
+          "label": "Variance review",
+          "pending_review": "Pending review",
+          "reviewed": "Reviewed",
+          "not_required": "Not required"
+        },
+        "note": "Operational cash for the shift — not sales revenue, not card/network collections and not an accounting entry."
+      },
+      "soon": {
+        "title": "Coming next",
+        "note": "This screen is view-only and records nothing in AWJ. To perform operations use the full shifts screen in AWJ.",
+        "readings": "Record meter readings",
+        "close": "Close and hand over the shift",
+        "approval": "Approve the shift"
+      },
+      "list": {
+        "viewDetails": "View details",
+        "notComputed": "Computed when the shift closes"
+      },
+      "home": {
+        "litersOpen": "Meter liters so far",
+        "details": "Shift details and meter readings",
+        "liveUnavailable": "Couldn't compute liters right now"
+      }
     }
   }
 }

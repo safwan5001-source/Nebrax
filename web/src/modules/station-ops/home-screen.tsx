@@ -4,22 +4,55 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, ChevronRight, Clock, CreditCard, Droplets, Gauge, Settings, Wallet } from 'lucide-react';
 import { useStationOps } from './context';
-import { useCurrentShift, useStationAssets, useStationPrices } from './data';
-import { formatLitersNumberFromText } from './format';
+import { useCurrentShift, useShiftDetail, useStationAssets, useStationPrices } from './data';
+import { formatLitersFixedFromMl } from './format';
 import { HomeMasthead, ScreenBody } from './masthead';
 import { COMING_SOON, OPS_BASE, deriveOpsMode } from './nav';
 import { PriceLabel } from './price-label';
+import { buildShiftReadings } from './readings';
 import { CurrentShiftBanner, FinancialSummary, MetricCard } from './shift-card';
 import { StationGate } from './station-gate';
 import { ErrorState, InlineNote, LoadingBlock } from './state-views';
-import type { Station } from './schemas';
+import type { Shift, Station } from './schemas';
+import type { StationCatalog } from './catalog';
 
-function ShiftAndSummary({ station, productCount, pumpCount }: { station: Station; productCount: number | null; pumpCount: number | null }) {
+/**
+ * الرقم الرئيسي للوردية الحالية (دائماً مفتوحة: الاستعلام `status=open` ويُعاد التحقق منه). الخادم لا يثبّت إجمالي اللترات إلا
+ * عند الإغلاق (يبقى 0 قبله) فلا يُعرض؛ يُحسب من قراءات الفوهات المكتملة في تفاصيل الوردية، ويُوسَم جزئياً،
+ * و«—» إن لم تكتمل فوهة أو تعذّر الحساب.
+ */
+function ShiftLiters({ station, shift, catalog, productCount, pumpCount }: { station: Station; shift: Shift; catalog: StationCatalog | null; productCount: number | null; pumpCount: number | null }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
+  const detail = useShiftDetail(station, shift.id);
+  const count = (value: number | null) => (value === null ? '—' : String(value));
+  const cells = [
+    { label: t('home.cellProducts'), value: count(productCount) },
+    { label: t('home.cellPumps'), value: count(pumpCount) },
+  ];
+
+  let value: string | null = null;
+  let note: string | undefined;
+  if (detail.state.status === 'loading' || !catalog) {
+    note = detail.state.status === 'error' ? t('shiftDetail.home.liveUnavailable') : t('loading');
+  } else if (detail.state.status === 'error') {
+    note = t('shiftDetail.home.liveUnavailable');
+  } else {
+    const { summary } = buildShiftReadings(detail.state.data, catalog);
+    if (summary.complete > 0) {
+      value = formatLitersFixedFromMl(summary.computedMl, locale);
+      if (summary.partial && summary.expected !== null) note = t('shiftDetail.liters.partial', { complete: String(summary.complete), expected: String(summary.expected) });
+    } else {
+      note = t('shiftDetail.liters.noneYet');
+    }
+  }
+  return <FinancialSummary caption={t('shiftDetail.home.litersOpen')} value={value} unit={t('unit.liter')} note={note} cells={cells} />;
+}
+
+function ShiftAndSummary({ station, catalog, productCount, pumpCount }: { station: Station; catalog: StationCatalog | null; productCount: number | null; pumpCount: number | null }) {
+  const t = useTranslations('stationOps');
   const current = useCurrentShift(station);
   const shift = current.state.status === 'success' ? current.state.data.shift : null;
-  const count = (value: number | null) => (value === null ? '—' : String(value));
 
   let banner: React.ReactNode = null;
   if (!current.allowed) {
@@ -47,19 +80,32 @@ function ShiftAndSummary({ station, productCount, pumpCount }: { station: Statio
       <CurrentShiftBanner shift={shift} timeZone={station.timezone}>
         {banner}
         {current.state.status === 'success' && current.state.data.multiple ? <div className="mt-3"><InlineNote tone="warning">{t('shift.multipleOpen')}</InlineNote></div> : null}
+        {shift ? (
+          <Link
+            href={`${OPS_BASE}/shifts/${encodeURIComponent(shift.id)}`}
+            className="mt-3 flex min-h-11 items-center justify-between gap-2 border-t border-border pt-3 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('shiftDetail.home.details')}
+            <ChevronRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.8} />
+          </Link>
+        ) : null}
       </CurrentShiftBanner>
 
       <div className="space-y-3 pt-1">
         <h2 className="text-base font-semibold text-text">{t('home.summary')}</h2>
-        <FinancialSummary
-          caption={t('home.summaryLiters')}
-          value={shift ? formatLitersNumberFromText(shift.operational_liters, locale) : null}
-          unit={t('unit.liter')}
-          cells={[
-            { label: t('home.cellProducts'), value: count(productCount) },
-            { label: t('home.cellPumps'), value: count(pumpCount) },
-          ]}
-        />
+        {shift ? (
+          <ShiftLiters key={shift.id} station={station} shift={shift} catalog={catalog} productCount={productCount} pumpCount={pumpCount} />
+        ) : (
+          <FinancialSummary
+            caption={t('home.summaryLiters')}
+            value={null}
+            unit={t('unit.liter')}
+            cells={[
+              { label: t('home.cellProducts'), value: productCount === null ? '—' : String(productCount) },
+              { label: t('home.cellPumps'), value: pumpCount === null ? '—' : String(pumpCount) },
+            ]}
+          />
+        )}
         <div className="grid grid-cols-2 gap-2.5 !mt-2.5">
           <MetricCard label={t('metric.cash')} value={null} note={t('metric.unavailable')} icon={<Wallet aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />} />
           <MetricCard label={t('metric.card')} value={null} note={t('metric.unavailable')} icon={<CreditCard aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />} />
@@ -191,7 +237,7 @@ function Body({ station }: { station: Station }) {
   const pumpCount = catalog ? catalog.pumps.filter(({ nozzles }) => nozzles.some((view) => view.blockedBy === null)).length : null;
   return (
     <div className="space-y-5">
-      <ShiftAndSummary station={station} productCount={catalog ? catalog.products.length : null} pumpCount={pumpCount} />
+      <ShiftAndSummary station={station} catalog={catalog} productCount={catalog ? catalog.products.length : null} pumpCount={pumpCount} />
       <NextAction />
       <ProductsSection station={station} assets={assets} />
       <ComingSoon />

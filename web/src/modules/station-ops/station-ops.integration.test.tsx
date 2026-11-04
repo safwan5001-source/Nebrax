@@ -22,7 +22,7 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 import { ApiError, api } from '@/lib/api';
 import { AUTH_SESSION_CHANGED_EVENT, type AuthUser } from '@/lib/auth';
 import { BRANCH_CHANGED_EVENT, setActiveBranchId } from '@/lib/branch';
-import { shift as makeShift, nozzle, price, product, pump, station, tank } from './__fixtures__';
+import { meter, shift as makeShift, shiftDetail, nozzle, price, product, pump, station, tank } from './__fixtures__';
 import { createBackend, type Backend, type TenantData } from './__test-harness';
 import { HomeScreen } from './home-screen';
 import { ProductsScreen } from './products-screen';
@@ -401,16 +401,20 @@ describe('shifts', () => {
     makeShift('x1', 'b', { number: 'SH-OTHER', status: 'open' }),
   ];
 
-  it('shows the current open shift on the home screen with real status and liters', async () => {
+  it('shows the current open shift on the home screen with real status and liters computed from the completed nozzles', async () => {
     seedUser();
     const data = tenantData();
     data.shifts = shifts('a');
+    // الخادم يُبقي إجمالي الوردية المفتوحة 0/قديماً حتى الإغلاق (هنا '1250.5' عمداً): يجب ألا يُعرض. الرقم من قراءات الفوهات المكتملة.
+    data.details = { s1: shiftDetail('s1', 'a', { number: 'SH-001', operational_liters: '1250.5', meter_readings: [meter('m1', 'n1', 'opening', 100_000_000), meter('m2', 'n1', 'closing', 100_690_500)] }) };
     connect(data);
     renderOps(<HomeScreen />);
     expect(await screen.findByText('SH-001')).toBeTruthy();
     expect(screen.getByText('Open')).toBeTruthy();
-    expect(screen.getByText('1,250.5')).toBeTruthy();
-    expect(screen.getByText('1,250.5').nextElementSibling?.textContent).toBe('L');
+    expect(await screen.findByText('690.500')).toBeTruthy();
+    expect(screen.getByText('690.500').nextElementSibling?.textContent).toBe('L');
+    expect(screen.queryByText('1,250.5')).toBeNull();
+    expect(screen.getByText(/Partial total/)).toBeTruthy(); // n2 لم تكتمل
     expect(screen.queryByText('SH-OTHER')).toBeNull();
   });
 
@@ -635,11 +639,14 @@ describe('V2 composition (visual contract, PR #1990)', () => {
   it('the raised current-shift card shows the real shift; the big figure is liters, the cash/card cards say "not available yet" (never zero)', async () => {
     seedUser();
     const data = tenantData();
-    data.shifts = [makeShift('s1', 'a', { number: 'SH-777', operational_liters: '5740' })];
+    data.shifts = [makeShift('s1', 'a', { number: 'SH-777', operational_liters: '0' })];
+    // قراءة افتتاح 0 فعلية (عداد جديد) وإغلاق 5,740 لتراً: الفرق حقيقي، و«0» الأولى ليست «غائبة».
+    data.details = { s1: shiftDetail('s1', 'a', { number: 'SH-777', meter_readings: [meter('m1', 'n1', 'opening', 0), meter('m2', 'n1', 'closing', 5_740_000), meter('m3', 'n2', 'opening', 10), meter('m4', 'n2', 'closing', 10)] }) };
     connect(data);
     const { container } = renderOps(<HomeScreen />);
     expect(await screen.findByText('SH-777')).toBeTruthy();
-    expect(screen.getByText('5,740')).toBeTruthy();
+    expect(await screen.findByText('5,740.000')).toBeTruthy();
+    expect(screen.queryByText(/Partial total/)).toBeNull(); // الفوهتان الفعّالتان مكتملتان
     expect(screen.getAllByText('Not available yet')).toHaveLength(2);
     expect(screen.getByText('Cash')).toBeTruthy();
     expect(screen.getByText('Card')).toBeTruthy();

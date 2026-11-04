@@ -87,6 +87,43 @@ export const shiftSchema = z.object({
   cash_variance: z.object({ status: text }).nullable().optional(),
 });
 
+/**
+ * UI-1 — تفاصيل الوردية (`GET /fuel-stations/shifts/{id}` → `FuelShiftResource` مع العلاقات المحمَّلة).
+ * القائمة لا تحمل القراءات؛ التفاصيل وحدها تحملها. المصفوفتان إلزاميتان: غيابهما ≠ «لا قراءات» (يُرفض الرد كاملاً).
+ * لا نحوّل الأدلة (`evidence`) ولا الملاحظات الحرة ولا الحمولات إلى الواجهة: غير لازمة للقراءة وقد تحمل بيانات حساسة.
+ */
+const stage = z.enum(['opening', 'closing']);
+const instant = z.string().nullable();
+
+export const meterReadingSchema = z.object({
+  id: text.min(1),
+  nozzle_id: text.min(1),
+  reading_stage: stage,
+  meter_milliliters: z.number().int().nonnegative(),
+  measured_at: instant,
+});
+
+export const tankReadingSchema = z.object({
+  id: text.min(1),
+  tank_id: text.min(1),
+  reading_stage: stage,
+  reading_type: text,
+  quantity_milliliters: z.number().int().nonnegative(),
+  measured_at: instant,
+});
+
+export const shiftDetailSchema = shiftSchema.extend({
+  branch_id: nullableText,
+  counted_cash_minor: z.number().int().nullable().optional(),
+  expected_operational_cash_minor: z.number().int().nullable().optional(),
+  operational_meter_milliliters: z.number().int().nonnegative(),
+  locked_at: nullableText,
+  meter_readings: z.array(meterReadingSchema),
+  tank_readings: z.array(tankReadingSchema),
+  staff_assignments: z.array(z.object({ user_id: text.min(1) })).optional(),
+  cash_variance: z.object({ status: text, variance_direction: nullableText }).nullable().optional(),
+});
+
 const collection = <T extends z.ZodTypeAny>(item: T) => z.object({ data: z.array(item) });
 
 /** مجمّع Laravel القياسي (`paginate(50)`): `meta` غير مضمون الوجود في كل إصدار، فنقبل غيابه. */
@@ -103,6 +140,7 @@ export const nozzlesResponse = collection(nozzleSchema);
 export const tanksResponse = collection(tankSchema);
 export const pricesResponse = paginated(priceSchema);
 export const shiftsResponse = paginated(shiftSchema);
+export const shiftDetailResponse = z.object({ data: shiftDetailSchema });
 
 export type Station = z.infer<typeof stationSchema>;
 export type FuelProduct = z.infer<typeof fuelProductSchema>;
@@ -112,3 +150,6 @@ export type Tank = z.infer<typeof tankSchema>;
 export type FuelPrice = z.infer<typeof priceSchema>;
 export type Shift = z.infer<typeof shiftSchema>;
 export type ShiftsPage = z.infer<typeof shiftsResponse>;
+export type MeterReading = z.infer<typeof meterReadingSchema>;
+export type TankReading = z.infer<typeof tankReadingSchema>;
+export type ShiftDetail = z.infer<typeof shiftDetailSchema>;

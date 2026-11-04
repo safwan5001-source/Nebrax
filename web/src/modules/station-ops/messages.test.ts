@@ -47,6 +47,14 @@ describe('stationOps messages', () => {
       ['settings.themeOption', ['system', 'light', 'dark']],
       ['roles', ['owner', 'admin', 'accountant', 'cashier', 'viewer', 'employee']],
       ['profile.accessRow', ['stations', 'shifts', 'prices', 'open', 'approve']],
+      // UI-1 — تفاصيل الوردية (مفاتيح تُبنى ديناميكياً)
+      ['shiftDetail.readings.status', ['complete', 'awaiting_closing_open', 'awaiting_closing_closed', 'closing_without_opening', 'not_recorded', 'invalid_order']],
+      ['shiftDetail.progress.step', ['opened', 'opening_readings', 'closing_readings', 'closed', 'approved']],
+      ['shiftDetail.progress.state', ['done', 'current', 'pending', 'none']],
+      ['shiftDetail.tanks.type', ['physical', 'atg']],
+      ['shiftDetail.cash.direction', ['overage', 'shortage', 'none']],
+      ['shiftDetail.cash.review', ['pending_review', 'reviewed', 'not_required']],
+      ['shiftDetail.soon', ['readings', 'close', 'approval']],
     ];
     const missing: string[] = [];
     for (const [family, members] of families) {

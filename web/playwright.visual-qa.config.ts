@@ -15,7 +15,7 @@ const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /fuel-ops-visual-qa\.spec\.ts/,
+  testMatch: /fuel-ops-visual-qa(-ui1)?\.spec\.ts/,
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

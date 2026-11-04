@@ -1,0 +1,1762 @@
+[
+  {
+    "id": "home-ar-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1274,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3897,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3674,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3542,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1274,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3897,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3674,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3542,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-ar-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-ar-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1162,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-ar-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3661,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-ar-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3514,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-ar-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3398,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1707,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1318,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 4199,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3952,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-light-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3804,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3813,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3606,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-light-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3490,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3813,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3606,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-light-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3490,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3729,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3582,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-light-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3466,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1186,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3705,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3558,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-light-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3442,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1707,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1318,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 4199,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3952,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-dark-320",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3804,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3813,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3606,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-dark-375",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3490,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1683,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3813,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3606,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-dark-390",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3490,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1238,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3729,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3582,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-dark-414",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3466,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "home-en-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 1677,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "list-en-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [],
+    "clearance": 41,
+    "pageHeight": 1186,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-open-en-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3705,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-closed-en-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 41,
+    "pageHeight": 3558,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "detail-approved-en-dark-430",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "tiny": [
+      "11px"
+    ],
+    "clearance": 42,
+    "pageHeight": 3442,
+    "fieldFont": 16,
+    "devtools": false,
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "issues": [],
+    "writes": 0
+  }
+]

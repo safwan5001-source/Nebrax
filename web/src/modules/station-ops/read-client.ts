@@ -30,8 +30,22 @@ const ALLOWED_READ_PATHS: RegExp[] = [
   /^\/fuel-stations\/shifts$/,
 ];
 
+/** UI-1: قراءة وردية واحدة بمعرّفها. المعرّف يُحقَّق بشكله قبل أي طلب فلا يتحوّل رابط/معامل إلى مسار آخر (`../`). */
+const SHIFT_DETAIL_PATH = /^\/fuel-stations\/shifts\/[A-Za-z0-9_-]{1,64}$/;
+const SHIFT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** `open` اسم مسار POST موجود (فتح وردية) — لا يُعامل معرّفاً حتى في القراءة. */
+export function isValidShiftId(id: string): boolean {
+  return SHIFT_ID.test(id) && id !== 'open';
+}
+
+export function shiftDetailPath(id: string): string {
+  if (!isValidShiftId(id)) throw new StationOpsError('not_found', 404);
+  return `/fuel-stations/shifts/${id}`;
+}
+
 export function isAllowedReadPath(path: string): boolean {
-  return ALLOWED_READ_PATHS.some((pattern) => pattern.test(path));
+  return ALLOWED_READ_PATHS.some((pattern) => pattern.test(path)) || (SHIFT_DETAIL_PATH.test(path) && isValidShiftId(path.slice(path.lastIndexOf('/') + 1)));
 }
 
 function isAbort(error: unknown): boolean {
