@@ -178,3 +178,68 @@ describe("web customizer preview — CUST-H3-3 productCard on the Category page 
     expect(tile.className).not.toContain("px-2");
   });
 });
+
+
+describe("AWJ Luxe Motion — Product Customizer preview parity", () => {
+  afterEach(() => cleanup());
+
+  const previewProduct = {
+    id: "luxe-1",
+    name: "Luxury Gift Box",
+    nameEn: "Luxury Gift Box",
+    description: "Real merchant-authored copy",
+    sku: "GIFT-1",
+    categoryName: "Gifts",
+    priceAmountMinor: 12500,
+    currency: "SAR",
+    inStock: true,
+    media: [],
+    isVariantManaged: false,
+    options: null,
+    variants: null,
+  };
+  const productRegions = [
+    { id: "media_gallery", key: "media_gallery", visible: true },
+    { id: "identity", key: "identity", visible: true },
+    { id: "price", key: "price", visible: true },
+    { id: "quantity_cta", key: "quantity_cta", visible: true },
+  ] as const;
+
+  it("shows Luxe-only gallery, title, price and purchase geometry in the real product preview", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...DEFAULT_PRESENTATION_CONFIG, themePreset: "awj-luxe-motion" }}
+        locale="en"
+        viewport="mobile"
+        page="product"
+        productPreviewState="ready"
+        previewProduct={previewProduct}
+        productRegions={[...productRegions]}
+      />,
+    );
+    const shell = container.querySelector('[data-product-preview="ready"]');
+    expect(shell).toHaveAttribute("data-luxe-motion");
+    expect(shell?.querySelector("h1")).toHaveClass("text-2xl");
+    expect(shell?.querySelector(".border-store-border.bg-store-surface-muted")).not.toBeNull();
+    expect(shell?.querySelector(".h-12")).not.toBeNull();
+    expect(container.textContent).toContain("Luxury Gift Box");
+  });
+
+  it("leaves the standard preview layout unchanged for AWJ Modern", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        viewport="mobile"
+        page="product"
+        productPreviewState="ready"
+        previewProduct={previewProduct}
+        productRegions={[...productRegions]}
+      />,
+    );
+    const shell = container.querySelector('[data-product-preview="ready"]');
+    expect(shell).not.toHaveAttribute("data-luxe-motion");
+    expect(shell?.querySelector("h1")).toHaveClass("text-lg");
+    expect(shell?.querySelector("h1")).not.toHaveClass("text-2xl");
+  });
+});
