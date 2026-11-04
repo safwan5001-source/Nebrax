@@ -422,7 +422,10 @@ class PartnerStatementMatchApiTest extends TestCase
 
         $body = (string) $this->getMatches($token, $id, ['per_page' => 50])->assertOk()->getContent();
         $this->assertStringContainsString($mine->number, $body);
-        $this->assertStringNotContainsString($foreign->number, $body, 'قيود الفرع الآخر لا تظهر.');
+        // IMP-PS-A4a0 (N3): كتلة `line` تعرض نص الكشف المرفوع كما هو (قد يذكر رقماً عند الطرف الآخر)؛ التحقق من عزل **بيانات الدفتر** يتم على الصفوف بعد استثنائها.
+        $ledgerDerived = json_encode(array_map(fn (array $row): array => array_diff_key($row, ['line' => true]), json_decode($body, true)['data']), JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString($foreign->number, (string) $ledgerDerived, 'قيود الفرع الآخر لا تظهر.');
+        $this->assertStringNotContainsString($foreign->number, (string) json_encode(json_decode($body, true)['run'], JSON_UNESCAPED_UNICODE));
         $this->assertSame('missing_in_books', $this->statementRows($token, $id)[3]['outcome']);
 
         // غير المقيَّد يرى الفرعين: الرقم ‎00001‎ يصيب وثيقتين في فرعين ⇒ غموض صريح لا تخمين.
