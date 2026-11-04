@@ -25,16 +25,12 @@ function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
-function tint(fg: string, bg: string, alpha: number): string {
-  const mixed = [0, 1, 2].map((i) => Math.round(channel(fg, i) * alpha + channel(bg, i) * (1 - alpha)));
-  return `#${mixed.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-}
 
 const themes = { light: block('[data-fuel-ops]'), dark: block('.dark [data-fuel-ops]') };
 
 describe.each(Object.entries(themes))('V2 tokens — %s', (_name, t) => {
   it('defines the full semantic set', () => {
-    for (const key of ['background', 'surface', 'text', 'muted', 'border', 'primary', 'primary-soft', 'primary-foreground', 'positive', 'negative', 'warning', 'fo-navy', 'fo-accent', 'fo-control', 'fo-on-navy', 'fo-on-navy-muted', 'fo-header-line', 'fo-header-hover', 'fo-logo-bg']) {
+    for (const key of ['background', 'surface', 'text', 'muted', 'border', 'primary', 'primary-soft', 'primary-foreground', 'positive', 'negative', 'warning', 'fo-navy', 'fo-accent', 'fo-control', 'fo-on-navy', 'fo-on-navy-muted', 'fo-header-line', 'fo-header-hover', 'fo-logo-bg', 'fo-navy2', 'fo-outline', 'fo-cta-bg', 'fo-cta-fg', 'fo-positive-tint', 'fo-warning-tint', 'fo-negative-tint']) {
       expect(t[key], key).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
@@ -47,9 +43,8 @@ describe.each(Object.entries(themes))('V2 tokens — %s', (_name, t) => {
     expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(['positive', 'warning', 'negative'])('%s text on its own 15%% badge tint ≥ 4.5:1 (on surface and background)', (key) => {
-    expect(contrast(t[key], tint(t[key], t.surface, 0.15))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(t[key], tint(t[key], t.background, 0.15))).toBeGreaterThanOrEqual(4.5);
+  it.each(['positive', 'warning', 'negative'])('%s text on its explicit badge tint ≥ 4.5:1', (key) => {
+    expect(contrast(t[key], t[`fo-${key}-tint`])).toBeGreaterThanOrEqual(4.5);
   });
 
   it('control borders are identifiable (≥ 3:1) on surface and background', () => {
@@ -62,6 +57,12 @@ describe.each(Object.entries(themes))('V2 tokens — %s', (_name, t) => {
     expect(contrast(t['fo-on-navy-muted'], t['fo-navy'])).toBeGreaterThanOrEqual(4.5);
     expect(contrast(t['fo-on-navy'], t['fo-header-hover'])).toBeGreaterThanOrEqual(4.5);
     expect(contrast(t['fo-navy'], t['fo-accent'])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('masthead station field (on-navy text on navy2) and the orange CTA label are AA', () => {
+    expect(contrast(t['fo-on-navy'], t['fo-navy2'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(t['fo-on-navy-muted'], t['fo-navy2'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(t['fo-cta-fg'], t['fo-cta-bg'])).toBeGreaterThanOrEqual(4.5);
   });
 });
 

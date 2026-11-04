@@ -1,6 +1,8 @@
 # AWJ Fuel Stations — UI-0 Implementation Report
 **Task:** #1988 `[P0/UI-0]` — mobile shell + read-only AWJ data integration · **Parent:** #1984
-**Date:** 2026-11-04 · **Status:** PR open, **not merged, not deployed** (awaiting explicit owner approval)
+**Date:** 2026-11-04 · **Status:** PR open, **not merged, not deployed** (awaiting independent visual review + explicit owner approval)
+
+> **Visual correction (PR #1990 contract):** the first UI-0 drop passed its tests but did not match the approved operator prototype. The presentation layer was rebuilt (non-sticky navy masthead with greeting and station picker, raised current-shift card, 32px summary, cash/card cards, orange CTA, shortcuts, fixed bottom tabs) while keeping the data adapters, routing, auth/RBAC and tests. Evidence and verdict: [`visual-qa/VISUAL_QA_REPORT.md`](./visual-qa/VISUAL_QA_REPORT.md). Where this report describes the old header (language/theme toggles, sticky bar), the visual QA report supersedes it.
 **Governing docs:** [Operator/Supervisor Plan](./AWJ_FUEL_STATIONS_OPERATOR_SUPERVISOR_PLAN.md) · [Design System V2](./AWJ_FUEL_STATIONS_DESIGN_SYSTEM_V2.md) · [UI↔API Integration Matrix](./AWJ_FUEL_STATIONS_UI_API_INTEGRATION_MATRIX.md)
 
 ## 1. What shipped
@@ -56,10 +58,10 @@ Every response is parsed with zod against the **actual resource fields**; a mism
 | Check | Result |
 |---|---|
 | `npx tsc --noEmit` — files added/changed by UI-0 | 0 errors (repo has unrelated pre-existing type errors in other test files; not touched) |
-| `vitest run src/modules/station-ops` | **10 files / 229 tests passed** (catalog 12 · prices 14 · tokens 37 · messages 4 · read-only guard 87 · nav 4 · rtl 13 · integration 43 · read-client 9 · scoped-query 6) |
-| **Entire `web` Vitest suite** (`npx vitest run`) | **853 files / 10,175 tests passed.** A first full run caught one real regression — the repo-wide *drift ratchet* flagged fixed-palette classes (`text-white`, `bg-white`…) in my shell; replaced by scoped semantic tokens and re-run green |
-| `next build` (final tree) | **Passed**; all five routes emitted (`/fuel-stations/ops`, `/products`, `/shifts`, `/settings`, `/profile`, ≈2–6 kB page JS each) |
-| Playwright `e2e/fuel-ops-ui-0.spec.ts` — Chromium, 390×844 touch (iPhone-size) + 1440 desktop, AR/RTL + EN/LTR, light/dark | **18/18 passed** (final tree). Screenshots reviewed manually; one visual issue found and fixed (Arabic unit rendered in the monospace numeric font, repeated "Pump 1" inside the pump card, "1 pumps" plural wording) |
+| `vitest run src/modules/station-ops` | **10 files / 241 tests passed** (catalog 12 · prices 14 · tokens 37 · messages 4 · read-only guard 87 · nav 4 · rtl 13 · integration 43 · read-client 9 · scoped-query 6) |
+| **Entire `web` Vitest suite** (`npx vitest run`) | **853 files / 10,187 tests passed** (final tree after the visual rebuild). A first full run caught one real regression — the repo-wide *drift ratchet* flagged fixed-palette classes (`text-white`, `bg-white`…) in my shell; replaced by scoped semantic tokens and re-run green |
+| `next build` (final tree) | **Passed** (rebuilt for the visual QA run); all five routes emitted (`/fuel-stations/ops`, `/products`, `/shifts`, `/settings`, `/profile`, ≈2–6 kB page JS each) |
+| Playwright `e2e/fuel-ops-ui-0.spec.ts` — Chromium, 390×844 touch (iPhone-size) + 1440 desktop, AR/RTL + EN/LTR, light/dark | **18/18 passed** (final tree) + 133/133 visual-QA probes on a production build (see `visual-qa/`). Screenshots reviewed manually; one visual issue found and fixed (Arabic unit rendered in the monospace numeric font, repeated "Pump 1" inside the pump card, "1 pumps" plural wording) |
 | CI (GitHub Actions, `web-ci.yml`) | See the PR checks — recorded in the PR description once complete; not claimed here |
 
 Test files (`web/src/modules/station-ops/`):

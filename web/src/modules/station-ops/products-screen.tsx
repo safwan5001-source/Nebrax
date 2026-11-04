@@ -7,13 +7,14 @@ import type { NozzleView } from './catalog';
 import { formatLitersNumberFromMl } from './format';
 import { Quantity } from './quantity';
 import { PriceLabel } from './price-label';
+import { PageMasthead, ScreenBody } from './masthead';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import type { Station } from './schemas';
 
 const STATUS_STYLE: Record<string, string> = {
-  active: 'bg-positive/15 text-positive',
-  maintenance: 'bg-warning/15 text-warning',
+  active: 'bg-[color:var(--fo-positive-tint)] text-positive',
+  maintenance: 'bg-[color:var(--fo-warning-tint)] text-warning',
   inactive: 'border border-border text-muted',
 };
 
@@ -64,14 +65,14 @@ function Content({ station }: { station: Station }) {
   return (
     <>
       <section aria-labelledby="fo-dispensable-h" className="space-y-3">
-        <h2 id="fo-dispensable-h" className="text-lg font-semibold text-text">{t('products.dispensable')}</h2>
+        <h2 id="fo-dispensable-h" className="text-base font-semibold text-text">{t('products.dispensable')}</h2>
         {catalog.products.length === 0 ? (
           <EmptyState title={t('products.none.title')} body={t('products.none.body')} />
         ) : (
           <ul className="space-y-3">
             {catalog.products.map((entry) => (
               <li key={entry.product.id}>
-                <details className="group rounded-xl border border-border bg-surface open:shadow-sm">
+                <details className="group rounded-[14px] border border-border bg-surface open:shadow-sm">
                   <summary className="flex min-h-[64px] cursor-pointer list-none items-center justify-between gap-3 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0">
                       <span className="block truncate text-base font-semibold text-text">{entry.product.name}</span>
@@ -90,7 +91,7 @@ function Content({ station }: { station: Station }) {
           </ul>
         )}
         {catalog.unmappedProducts.length > 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-4">
+          <div className="rounded-[14px] border border-dashed border-border p-4">
             <InlineNote>{t('home.unmapped', { count: String(catalog.unmappedProducts.length) })}</InlineNote>
             {canSeeRegistryGaps ? (
               <ul className="mt-2 list-inside list-disc text-sm text-muted">
@@ -102,13 +103,13 @@ function Content({ station }: { station: Station }) {
       </section>
 
       <section aria-labelledby="fo-pumps-h" className="space-y-3">
-        <h2 id="fo-pumps-h" className="text-lg font-semibold text-text">{t('products.pumps')}</h2>
+        <h2 id="fo-pumps-h" className="text-base font-semibold text-text">{t('products.pumps')}</h2>
         {catalog.pumps.length === 0 ? (
           <EmptyState title={t('products.noPumps.title')} body={t('products.noPumps.body')} />
         ) : (
           <ul className="space-y-3">
             {catalog.pumps.map(({ pump, nozzles }) => (
-              <li key={pump.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={pump.id} className="rounded-[14px] border border-border bg-surface p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-base font-semibold text-text">{t('products.pump')} <span className="num">{pump.pump_number}</span>{pump.name ? ` · ${pump.name}` : ''}</p>
                   <AssetStatus status={pump.status} />
@@ -127,13 +128,13 @@ function Content({ station }: { station: Station }) {
       </section>
 
       <section aria-labelledby="fo-tanks-h" className="space-y-3">
-        <h2 id="fo-tanks-h" className="text-lg font-semibold text-text">{t('products.tanks')}</h2>
+        <h2 id="fo-tanks-h" className="text-base font-semibold text-text">{t('products.tanks')}</h2>
         {catalog.tanks.length === 0 ? (
           <EmptyState title={t('products.noTanks.title')} body={t('products.noTanks.body')} />
         ) : (
           <ul className="space-y-3">
             {catalog.tanks.map(({ tank, product, nozzleCount }) => (
-              <li key={tank.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={tank.id} className="rounded-[14px] border border-border bg-surface p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="min-w-0 truncate text-base font-semibold text-text">{tank.name} <span className="num text-sm font-normal text-muted">({tank.code})</span></p>
                   <AssetStatus status={tank.status} />
@@ -166,8 +167,10 @@ export function ProductsScreen() {
   const t = useTranslations('stationOps');
   return (
     <>
-      <h1 className="text-[1.4rem] font-bold leading-8 text-text">{t('products.title')}</h1>
-      <StationGate>{(station) => <Content station={station} />}</StationGate>
+      <PageMasthead title={t('products.title')} subtitle={t('products.subtitle')} />
+      <ScreenBody>
+        <StationGate>{(station) => <Content station={station} />}</StationGate>
+      </ScreenBody>
     </>
   );
 }

@@ -23,7 +23,7 @@ const ICONS: Record<StationOpsErrorKind, typeof AlertTriangle> = {
 
 function Panel({ icon: Icon, title, body, action, role }: { icon: typeof AlertTriangle; title: string; body?: string; action?: ReactNode; role: 'alert' | 'status' }) {
   return (
-    <div role={role} className="flex flex-col items-center gap-2 rounded-xl border border-border bg-surface px-5 py-8 text-center">
+    <div role={role} className="flex flex-col items-center gap-2 rounded-[14px] border border-border bg-surface px-5 py-8 text-center">
       <Icon aria-hidden="true" className="h-7 w-7 text-muted" strokeWidth={1.6} />
       <p className="text-base font-semibold text-text">{title}</p>
       {body ? <p className="max-w-sm text-sm leading-6 text-muted">{body}</p> : null}
@@ -70,7 +70,7 @@ export function LoadingBlock({ rows = 3, label }: { rows?: number; label?: strin
     <div role="status" aria-live="polite" aria-busy="true" className="space-y-3">
       <span className="sr-only">{label ?? t('loading')}</span>
       {Array.from({ length: rows }, (_, index) => (
-        <Skeleton key={index} className="h-20 w-full rounded-xl" />
+        <Skeleton key={index} className="h-20 w-full rounded-[14px]" />
       ))}
     </div>
   );

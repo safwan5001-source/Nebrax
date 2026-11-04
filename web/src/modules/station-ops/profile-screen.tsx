@@ -7,7 +7,8 @@ import { useTranslations } from 'next-intl';
 import { LogOut, ShieldCheck } from 'lucide-react';
 import { logout } from '@/lib/auth';
 import { useStationOps } from './context';
-import { deriveOpsMode } from './nav';
+import { OPS_BASE, deriveOpsMode } from './nav';
+import { PageMasthead, ScreenBody } from './masthead';
 import { LoadingBlock } from './state-views';
 
 /** الصلاحيات التي تعتمد عليها واجهة UI-0 فعلاً — عرض شفاف لما يُسمح به، لا لتعديله. */
@@ -39,11 +40,11 @@ export function ProfileScreen() {
 
   return (
     <>
-      <h1 className="text-[1.4rem] font-bold leading-8 text-text">{t('profile.title')}</h1>
-
+      <PageMasthead title={t('profile.title')} subtitle={t('profile.subtitle')} />
+      <ScreenBody>
       <section aria-labelledby="fo-id-h" className="space-y-3">
-        <h2 id="fo-id-h" className="text-lg font-semibold text-text">{t('profile.identity')}</h2>
-        <dl className="divide-y divide-border rounded-xl border border-border bg-surface px-4 text-sm">
+        <h2 id="fo-id-h" className="text-base font-semibold text-text">{t('profile.identity')}</h2>
+        <dl className="divide-y divide-border rounded-[14px] border border-border bg-surface px-4 text-sm">
           <div className="flex justify-between gap-4 py-3"><dt className="text-muted">{t('profile.name')}</dt><dd className="min-w-0 break-words text-end text-text">{viewer.name}</dd></div>
           <div className="flex justify-between gap-4 py-3"><dt className="text-muted">{t('profile.email')}</dt><dd className="min-w-0 break-all text-end text-text" dir="ltr">{viewer.email}</dd></div>
           <div className="flex justify-between gap-4 py-3"><dt className="text-muted">{t('profile.role')}</dt><dd className="text-end text-text">{roleLabel(viewer.role, t)}</dd></div>
@@ -56,8 +57,8 @@ export function ProfileScreen() {
       </section>
 
       <section aria-labelledby="fo-scope-h" className="space-y-3">
-        <h2 id="fo-scope-h" className="text-lg font-semibold text-text">{t('profile.scope')}</h2>
-        <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+        <h2 id="fo-scope-h" className="text-base font-semibold text-text">{t('profile.scope')}</h2>
+        <div className="rounded-[14px] border border-border bg-surface p-4 text-sm">
           <p className="text-muted">{t('profile.branches')}</p>
           <p className="mt-0.5 text-text">
             {viewer.branch_ids === undefined ? t('profile.scopeUnknown') : unrestricted ? t('profile.allBranches') : t('profile.branchCount', { count: String(viewer.branch_ids.length) })}
@@ -78,8 +79,8 @@ export function ProfileScreen() {
       </section>
 
       <section aria-labelledby="fo-access-h" className="space-y-3">
-        <h2 id="fo-access-h" className="text-lg font-semibold text-text">{t('profile.access')}</h2>
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface px-4 text-sm">
+        <h2 id="fo-access-h" className="text-base font-semibold text-text">{t('profile.access')}</h2>
+        <ul className="divide-y divide-border rounded-[14px] border border-border bg-surface px-4 text-sm">
           {ACCESS_ROWS.map((row) => (
             <li key={row.key} className="flex items-center justify-between gap-4 py-3">
               <span className="text-text">{t(`profile.accessRow.${row.key}`)}</span>
@@ -93,20 +94,24 @@ export function ProfileScreen() {
       </section>
 
       <section aria-labelledby="fo-sec-h" className="space-y-3">
-        <h2 id="fo-sec-h" className="text-lg font-semibold text-text">{t('profile.security')}</h2>
-        <Link href="/settings" className="flex min-h-12 items-center justify-between rounded-xl border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <h2 id="fo-sec-h" className="text-base font-semibold text-text">{t('profile.security')}</h2>
+        <Link href={`${OPS_BASE}/settings`} className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          {t('navSettings')}
+        </Link>
+        <Link href="/settings" className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           {t('profile.securityLink')}
         </Link>
         <button
           type="button"
           onClick={signOut}
           disabled={leaving}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-negative/40 bg-surface px-4 text-base font-semibold text-negative hover:bg-negative/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative disabled:opacity-60"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[14px] border border-negative bg-surface px-4 text-base font-semibold text-negative hover:bg-[color:var(--fo-negative-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative disabled:opacity-60"
         >
           <LogOut aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
           {t('profile.logout')}
         </button>
       </section>
+      </ScreenBody>
     </>
   );
 }

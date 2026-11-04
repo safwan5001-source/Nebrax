@@ -573,4 +573,71 @@ describe('accessibility', () => {
   });
 });
 
+describe('V2 composition (visual contract, PR #1990)', () => {
+  it('masthead carries one action icon (settings) and the station field — no language/theme toggles', async () => {
+    seedUser();
+    connect(tenantData());
+    const { container } = renderOps(<HomeScreen />);
+    await screen.findByText('Alpha');
+    const header = container.querySelector('header') as HTMLElement;
+    const actions = [...header.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label'));
+    expect(actions).toEqual(['Settings']);
+    expect(header.querySelector('select')).not.toBeNull();
+    expect(container.querySelectorAll('main').length).toBe(1);
+    expect(container.querySelectorAll('h1').length).toBe(1);
+  });
+
+  it('the raised current-shift card shows the real shift; the big figure is liters, the cash/card cards say "not available yet" (never zero)', async () => {
+    seedUser();
+    const data = tenantData();
+    data.shifts = [makeShift('s1', 'a', { number: 'SH-777', operational_liters: '5740' })];
+    connect(data);
+    const { container } = renderOps(<HomeScreen />);
+    expect(await screen.findByText('SH-777')).toBeTruthy();
+    expect(screen.getByText('5,740')).toBeTruthy();
+    expect(screen.getAllByText('Not available yet')).toHaveLength(2);
+    expect(screen.getByText('Cash')).toBeTruthy();
+    expect(screen.getByText('Card')).toBeTruthy();
+    expect(container.textContent).not.toMatch(/\b0\.00\b/);
+  });
+
+  it('without an open shift the big figure is "—", not 0', async () => {
+    seedUser();
+    connect(tenantData());
+    renderOps(<HomeScreen />);
+    await screen.findByText('No open shift');
+    const figure = screen.getByText('Operational liters from meters').nextElementSibling as HTMLElement;
+    expect(figure.textContent).toBe('—');
+  });
+
+  it('the orange CTA is a real link into the AWJ shifts screen, and only with shift permission', async () => {
+    seedUser();
+    connect(tenantData());
+    renderOps(<HomeScreen />);
+    const cta = await screen.findByRole('link', { name: /Manage the shift in AWJ/ });
+    expect(cta.getAttribute('href')).toBe('/fuel-stations/shifts');
+    cleanup();
+    localStorage.clear();
+    seedUser({ permissions: ['fuel_stations.view'] });
+    connect(tenantData());
+    renderOps(<HomeScreen />);
+    await screen.findByText('Alpha');
+    expect(screen.queryByRole('link', { name: /Manage the shift in AWJ/ })).toBeNull();
+  });
+
+  it('greets by time of day', async () => {
+    seedUser();
+    connect(tenantData());
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 4, 9, 0));
+    renderOps(<HomeScreen />);
+    expect(await screen.findByText('Good morning, Sami Operator')).toBeTruthy();
+    cleanup();
+    vi.setSystemTime(new Date(2026, 10, 4, 20, 0));
+    renderOps(<HomeScreen />);
+    expect(await screen.findByText('Good evening, Sami Operator')).toBeTruthy();
+    vi.useRealTimers();
+  });
+});
+
 void fireEvent;

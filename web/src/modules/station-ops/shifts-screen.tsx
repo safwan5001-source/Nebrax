@@ -7,6 +7,7 @@ import { ExternalLink } from 'lucide-react';
 import { useStationOps } from './context';
 import { useShiftHistory, type ShiftFilter } from './data';
 import { ShiftCard } from './shift-card';
+import { PageMasthead, ScreenBody } from './masthead';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, LoadingBlock } from './state-views';
 import type { Station } from './schemas';
@@ -53,7 +54,7 @@ function Content({ station }: { station: Station }) {
         <>
           <ul className="space-y-3">
             {history.state.data.shifts.map((shift) => (
-              <li key={shift.id}><ShiftCard shift={shift} /></li>
+              <li key={shift.id}><ShiftCard shift={shift} timeZone={station.timezone} /></li>
             ))}
           </ul>
           {history.state.data.hasMore ? (
@@ -74,7 +75,7 @@ function Content({ station }: { station: Station }) {
         </>
       )}
 
-      <aside className="rounded-xl border border-dashed border-border p-4 text-sm leading-6 text-muted">
+      <aside className="rounded-[14px] border border-dashed border-border p-4 text-sm leading-6 text-muted">
         <p>{t('shifts.readOnlyNote')}</p>
         {can('fuel.shift.approve') || can('fuel.shift.open') ? (
           <Link href="/fuel-stations/shifts" className="mt-2 inline-flex min-h-11 items-center gap-1.5 font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -91,8 +92,10 @@ export function ShiftsScreen() {
   const t = useTranslations('stationOps');
   return (
     <>
-      <h1 className="text-[1.4rem] font-bold leading-8 text-text">{t('shifts.title')}</h1>
-      <StationGate>{(station) => <Content station={station} />}</StationGate>
+      <PageMasthead title={t('shifts.title')} subtitle={t('shifts.subtitle')} />
+      <ScreenBody>
+        <StationGate>{(station) => <Content station={station} />}</StationGate>
+      </ScreenBody>
     </>
   );
 }

@@ -13,24 +13,32 @@
   --fo-navy: #142238;
   --fo-accent: #e87722;
   --fo-on-navy: #ffffff;
-  --fo-on-navy-muted: #c3cddb;
+  --fo-on-navy-muted: #b9c7d6;
   --fo-header-line: #2a3b56;
   --fo-header-hover: #25354f;
   --fo-logo-bg: #ffffff;
+  --fo-navy2: #20344c;
+  --fo-outline: #4b5b6d;
+  --fo-cta-bg: #e87722;
+  --fo-cta-fg: #142238;
+  --fo-shadow: 0 5px 18px rgb(20 34 56 / 0.09);
   --background: #f7f8fa;
   --surface: #ffffff;
   --text: #142238;
   --muted: #586576;
   --border: #e3e7ec;
-  --primary: #a8470a;
-  --primary-hover: #8f3b08;
-  --primary-soft: #fdf0e4;
+  --primary: #b3500a;
+  --primary-hover: #973f07;
+  --primary-soft: #fff3e8;
   --primary-foreground: #ffffff;
   --positive: #0b6e5a;
   --negative: #b42332;
   --warning: #8f4d08;
   --danger-fg: #ffffff;
   --fo-control: #7a8aa0;
+  --fo-positive-tint: #e8f5f0;
+  --fo-warning-tint: #fdf1e3;
+  --fo-negative-tint: #fbe9eb;
   font-feature-settings: 'tnum' 1;
 }
 
@@ -38,10 +46,15 @@
   --fo-navy: #0a121e;
   --fo-accent: #f08a3c;
   --fo-on-navy: #ffffff;
-  --fo-on-navy-muted: #c3cddb;
+  --fo-on-navy-muted: #b9c7d6;
   --fo-header-line: #22324a;
   --fo-header-hover: #1b2b43;
   --fo-logo-bg: #ffffff;
+  --fo-navy2: #17273d;
+  --fo-outline: #3c4d63;
+  --fo-cta-bg: #f08a3c;
+  --fo-cta-fg: #142238;
+  --fo-shadow: 0 5px 18px rgb(0 0 0 / 0.35);
   --background: #0d1624;
   --surface: #142238;
   --text: #eef2f7;
@@ -56,6 +69,9 @@
   --warning: #f2b068;
   --danger-fg: #142238;
   --fo-control: #7388a6;
+  --fo-positive-tint: #12372f;
+  --fo-warning-tint: #3a2a1c;
+  --fo-negative-tint: #3d1f26;
 }
 
 /* أزرار أدوات الرأس (لغة/سمة) على خلفية الهيدر الكحلية: نص أبيض، تحويم شفاف. */
@@ -71,8 +87,9 @@
   outline-offset: 2px;
 }
 
-/* الأرقام والكميات: خط موحد بأرقام جدولية 0–9. */
+/* الأرقام والكميات: خط الواجهة نفسه بأرقام جدولية 0–9 (كالنموذج المعتمد) لا Mono — فلا تتباعد الفواصل ولا تُرسم الوحدات بخط مختلف. */
 [data-fuel-ops] .num {
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
 }
 

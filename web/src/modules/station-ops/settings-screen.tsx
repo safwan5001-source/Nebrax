@@ -9,6 +9,7 @@ import { switchLocale } from '@/components/layout/lang-toggle';
 import { formatDate } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { useStationOps } from './context';
+import { PageMasthead, ScreenBody } from './masthead';
 import { StationGate } from './station-gate';
 import type { Station } from './schemas';
 
@@ -36,11 +37,11 @@ function PersonalPreferences() {
   return (
     <section aria-labelledby="fo-prefs-h" className="space-y-3">
       <div>
-        <h2 id="fo-prefs-h" className="text-lg font-semibold text-text">{t('settings.personal.title')}</h2>
+        <h2 id="fo-prefs-h" className="text-base font-semibold text-text">{t('settings.personal.title')}</h2>
         <p className="mt-1 text-sm text-muted">{t('settings.personal.hint')}</p>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-border bg-surface p-4">
+      <div className="space-y-4 rounded-[14px] border border-border bg-surface p-4">
         <fieldset>
           <legend className="text-sm font-medium text-text">{t('settings.language')}</legend>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -88,10 +89,10 @@ function StationInfo({ station }: { station: Station }) {
   return (
     <section aria-labelledby="fo-station-h" className="space-y-3">
       <div>
-        <h2 id="fo-station-h" className="text-lg font-semibold text-text">{t('settings.station.title')}</h2>
+        <h2 id="fo-station-h" className="text-base font-semibold text-text">{t('settings.station.title')}</h2>
         <p className="mt-1 text-sm text-muted">{t('settings.station.hint')}</p>
       </div>
-      <dl className="divide-y divide-border rounded-xl border border-border bg-surface px-4">
+      <dl className="divide-y divide-border rounded-[14px] border border-border bg-surface px-4">
         <Row label={t('settings.station.name')} value={station.name} />
         <Row label={t('settings.station.code')} value={station.code} />
         <Row label={t('settings.station.status')} value={['active', 'inactive', 'maintenance'].includes(station.status) ? t(`assetStatus.${station.status}`) : station.status} />
@@ -115,9 +116,11 @@ export function SettingsScreen() {
   const t = useTranslations('stationOps');
   return (
     <>
-      <h1 className="text-[1.4rem] font-bold leading-8 text-text">{t('settings.title')}</h1>
-      <PersonalPreferences />
-      <StationGate>{(station) => <StationInfo station={station} />}</StationGate>
+      <PageMasthead title={t('settings.title')} subtitle={t('settings.subtitle')} />
+      <ScreenBody>
+        <PersonalPreferences />
+        <StationGate>{(station) => <StationInfo station={station} />}</StationGate>
+      </ScreenBody>
     </>
   );
 }

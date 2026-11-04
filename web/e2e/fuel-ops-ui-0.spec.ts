@@ -139,7 +139,7 @@ for (const locale of ['ar', 'en'] as const) {
     test('products, shifts, settings and profile render without overflow', async ({ page }, info) => {
       for (const path of ['/fuel-stations/ops/products', '/fuel-stations/ops/shifts', '/fuel-stations/ops/settings', '/fuel-stations/ops/profile']) {
         await open(page, path, { locale });
-        await expect(page.locator('main h1')).toBeVisible();
+        await expect(page.locator('h1')).toBeVisible();
         expect(await noHorizontalOverflow(page), path).toBe(true);
         if (shots) await page.screenshot({ path: `${shots}/ui0-${path.split('/').pop()}-${locale}-${info.project.name}.png`, fullPage: true });
       }
