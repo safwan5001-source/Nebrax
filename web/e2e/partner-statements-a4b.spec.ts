@@ -154,7 +154,10 @@ async function open(page: Page, opts: Options = {}) {
 }
 
 const shot = async (page: Page, name: string) => {
-  if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+  if (!shots) return;
+  // Sheet الجوال `fixed` بطول الشاشة: لقطة الصفحة الكاملة تكبّر النافذة مؤقتاً فتفسد تخطيطه (وتقلب `useIsDesktop` لحظياً). لقطة النافذة الحقيقية أصدق.
+  const sheetOpen = isMobile(page) && (await page.getByTestId('line-detail').count()) > 0;
+  await page.screenshot({ path: `${shots}/${name}.png`, fullPage: !sheetOpen });
 };
 const isMobile = (page: Page) => (page.viewportSize()?.width ?? 1440) < 768;
 const noHorizontalOverflow = async (page: Page) => {
@@ -163,6 +166,11 @@ const noHorizontalOverflow = async (page: Page) => {
 };
 /** يفتح سطراً: صفّ الجدول على المكتب، بطاقة على الجوال (تفتح Sheet). */
 const selectLine = async (page: Page, n: number) => {
+  // الجوال: لوحة السطر Sheet كامل الشاشة تغطي القائمة؛ تُغلق قبل فتح سطر آخر (كما يفعل المستخدم).
+  if (isMobile(page) && (await page.getByTestId('line-detail').count()) > 0) {
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('line-detail')).toHaveCount(0);
+  }
   const target = isMobile(page) ? page.locator(`button[data-line-id="line-${n}"]`) : page.locator(`tr[data-line-id="line-${n}"]`);
   await target.click();
   return page.getByTestId('line-detail');
