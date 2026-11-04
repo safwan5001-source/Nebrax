@@ -223,14 +223,7 @@ final class PartnerStatementMatchService
         if ($reconciliation === null) {
             throw $refusal;
         }
-        try {
-            $this->access->assertAccess([
-                'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role, 'branch_id' => $reconciliation->policy['branch_id'] ?? null,
-            ], (string) $actor->getKey());
-        } catch (PartnerStatementBranchScopeException) {
-            // SEC #1974: فرع السياسة المجمَّدة خارج نطاق الفاعل ⇒ الرفض الموحَّد نفسه لغير الموجودة/الأخرى/الطرف غير المتاح (لا رسالة فرع مميِّزة تكشف الوجود).
-            throw $refusal;
-        }
+        $this->assertReconciliationReadable($actor, $reconciliation);
 
         return $reconciliation;
     }
@@ -246,6 +239,21 @@ final class PartnerStatementMatchService
             'amount_tolerance_minor' => (int) ($frozen['amount_tolerance_minor'] ?? PartnerStatementImportService::DEFAULT_AMOUNT_TOLERANCE_MINOR),
             'branch_id' => $frozen['branch_id'] ?? null,
         ];
+    }
+
+    /**
+     * أهلية قراءة مقارنة محمَّلة: الطرف والدور وفرع السياسة المجمَّدة ضمن نطاق الفاعل، وإلا الرفض الموحَّد (فرع السياسة خارج النطاق ⇒ الرفض الموحَّد لا رسالة فرع مميِّزة، SEC #1974).
+     * المصدر الوحيد لهذه القاعدة: يستعملها `authorize` وفحص أهداف الاستبدال (SEC #1978) فلا تنفصلان.
+     */
+    public function assertReconciliationReadable(User $actor, PartnerStatementReconciliation $reconciliation): void
+    {
+        try {
+            $this->access->assertAccess([
+                'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role, 'branch_id' => $reconciliation->policy['branch_id'] ?? null,
+            ], (string) $actor->getKey());
+        } catch (PartnerStatementBranchScopeException) {
+            throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+        }
     }
 
     /** @return array{units: list<array<string, mixed>>, scope: array<string, mixed>, fingerprint: string} */
