@@ -248,6 +248,14 @@ def median_or_nan(v: list[float]) -> float:
     return statistics.median(v) if v else float("nan")
 
 
+def comparison_pairs(variants: list[str]) -> list[tuple[str, str]]:
+    """أزواج المقارنة: متغيّران ⇒ زوجهما؛ وإلا (main↔pr1972) و(main↔main-tmpfs: تجربة السببية) و(main-tmpfs↔pr1972-tmpfs: انحدار بلا ضجيج القرص)."""
+    if len(variants) == 2:
+        return [(variants[0], variants[1])]
+    wanted = [("main", "pr1972"), ("main", "main-tmpfs"), ("main-tmpfs", "pr1972-tmpfs")]
+    return [(a, b) for a, b in wanted if a in variants and b in variants]
+
+
 def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants: list[str] | None = None) -> str:
     all_rows = round_rows(runs)
     invalid_rows = [r for r in all_rows if r.get("invalid")]
@@ -301,8 +309,7 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants:
         )
     out.append("")
     out.append("\\* «فشل الوظيفة» = أي جولة gate_equiv (الجولات 1–3 ببذور البوابة) تجاوزت الحدّ المرجعي — أي ما كانت البوابة ستحكم به.")
-    if len(variants) == 2:
-        a, b = variants
+    for a, b in comparison_pairs(variants):
         sa, sb = stats[a], stats[b]
         out.append("")
         out.append("| المقارنة ({} مقابل {}) | Fisher p (ثنائي الطرف) | ملاحظة |".format(a, b))

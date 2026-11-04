@@ -185,6 +185,16 @@ class Report(unittest.TestCase):
         row = [l for l in text.splitlines() if l.startswith("| main |")][0]
         self.assertTrue(row.rstrip().endswith("| 12.0 |"), row)
 
+    def test_four_variants_compare_causality_and_regression_pairs(self):
+        with tempfile.TemporaryDirectory() as root:
+            for v in ("main", "pr1972", "main-tmpfs", "pr1972-tmpfs"):
+                for rep in (1, 2):
+                    self._write(root, v, rep, [rnd(steady(), added=12.0)])
+            text = A.build_report(A.load_runs(root))
+        for pair in ("main مقابل pr1972", "main مقابل main-tmpfs", "main-tmpfs مقابل pr1972-tmpfs"):
+            self.assertIn(pair, text)
+        self.assertNotIn("pr1972 مقابل main-tmpfs", text)
+
     def test_old_schema_rounds_are_reported_invalid_instead_of_crashing_the_report(self):
         old = rnd(steady(), added=9.0)
         for x in old["txns"]:

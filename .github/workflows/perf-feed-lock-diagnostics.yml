@@ -37,7 +37,7 @@ on:
         description: 'عدد التكرارات لكل متغيّر (1–10)'
         type: choice
         options: ['2', '4', '6', '8', '10']
-        default: '6'
+        default: '4'
       pr_sha:
         description: 'SHA رأس PR #1972 المدموج في متغيّر pr1972 (فارغ = المثبَّت أدناه)'
         type: string
@@ -68,12 +68,12 @@ jobs:
         env:
           REPEATS_INPUT: ${{ inputs.repeats }}
         run: |
-          n="${REPEATS_INPUT:-6}"
-          case "$n" in 2|4|6|8|10) ;; *) n=6 ;; esac
+          n="${REPEATS_INPUT:-4}"
+          case "$n" in 2|4|6|8|10) ;; *) n=4 ;; esac
           list=$(seq -s, 1 "$n")
-          echo "matrix={\"variant\":[\"main\",\"pr1972\"],\"repeat\":[${list}]}" >> "$GITHUB_OUTPUT"
+          echo "matrix={\"variant\":[\"main\",\"pr1972\",\"main-tmpfs\",\"pr1972-tmpfs\"],\"repeat\":[${list}]}" >> "$GITHUB_OUTPUT"
           echo "repeats=${n}" >> "$GITHUB_OUTPUT"
-          echo "variants=main,pr1972" >> "$GITHUB_OUTPUT"
+          echo "variants=main,pr1972,main-tmpfs,pr1972-tmpfs" >> "$GITHUB_OUTPUT"
 
   measure:
     name: Diag (${{ matrix.variant }} #${{ matrix.repeat }})
@@ -103,6 +103,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          ${{ endsWith(matrix.variant, '-tmpfs') && '--tmpfs /var/lib/postgresql/data:rw' || '' }}
 
 
     steps:
@@ -122,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           sha="${PR_SHA_INPUT:-$PR1972_SHA}"
-          if [ "$VARIANT" = "pr1972" ]; then
+          if [[ "$VARIANT" == pr1972* ]]; then
             git config user.email "diag@example.invalid"; git config user.name "perf-diag"
             git fetch --no-tags origin "$sha"
             git merge --no-edit "$sha"
@@ -276,7 +277,7 @@ jobs:
           export PGOPTIONS="-c lock_timeout=60s"
           WD_DIR="$PWD/pgsql-watchdog"; mkdir -p "$WD_DIR"
           rm -f "$WD_DIR"/cops-h1-1-diag.json
-          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg) variant=$COPS_DIAG_VARIANT repeat=$COPS_DIAG_REPEAT head=$(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)" | tee "$WD_DIR/perf-environment.txt"
+          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg) variant=$COPS_DIAG_VARIANT repeat=$COPS_DIAG_REPEAT head=$(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD) pgdata_tmpfs=$(docker ps -q --filter ancestor=postgres:16 | head -1 | xargs -r docker inspect --format '{{json .HostConfig.Tmpfs}}')" | tee "$WD_DIR/perf-environment.txt"
           vendor/bin/phpunit --group cops-h1-1-diag --fail-on-skipped --fail-on-risky 2>&1 | tee test-output-diag.txt
 
       - name: حفظ مخرجات التشخيص
