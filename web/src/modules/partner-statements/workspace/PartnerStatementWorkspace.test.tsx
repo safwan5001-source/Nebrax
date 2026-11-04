@@ -449,6 +449,20 @@ describe('PartnerStatementWorkspace — keyboard, filters and next undecided', (
     await waitFor(() => expect(document.querySelector('tr[aria-selected="true"]')?.getAttribute('data-line-id')).toBe('line-2'));
   });
 
+  it('keeps searching later pages while only other-run (outdated) decisions remain', async () => {
+    const decided = rows().map((row, index) => ({ ...row, decision: { ...(rows()[0].decision as NonNullable<MatchRow['decision']>), id: `dd${index}`, line_id: `line-${index + 1}`, run_id: RUN } }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse(decided, { meta: { current_page: q.page, last_page: 2, per_page: 25, total: 8 } })));
+    h.fetchStatus.mockResolvedValue(status({ blockers: [{ code: 'decisions_on_other_runs', count: 2 }] }, { unresolved: 0, decisions_on_other_runs: 2, resolved: 4 }));
+    await open();
+    const first = document.querySelector('tr[data-line-id="line-1"]') as HTMLElement;
+    first.focus();
+    fireEvent.keyDown(first, { key: 'n' });
+    await waitFor(() => expect(h.fetchMatches.mock.calls.some(([, q]) => q.side === 'statement' && q.page === 2)).toBe(true));
+    expect(screen.queryByTestId('workspace-notice')?.textContent ?? '').not.toContain('workspace.no_more_undecided');
+  });
+
   it('filters by engine outcome through the server and exposes the counts from the run', async () => {
     await open();
     await userEvent.click(screen.getAllByRole('button', { name: /workspace\.outcome\.date_difference/, pressed: false })[0]);

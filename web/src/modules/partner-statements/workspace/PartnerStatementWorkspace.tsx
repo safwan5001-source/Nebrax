@@ -172,7 +172,8 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
       pick(rows[index].line.id);
       return;
     }
-    if (meta.last_page > 1 && (status?.readiness.unresolved ?? 1) > 0) {
+    // القرارات على تشغيلة أخرى تمنع المراجعة كالسطور بلا قرار: تُحتسب في استمرار البحث بين الصفحات.
+    if (meta.last_page > 1 && (status ? status.readiness.unresolved + status.readiness.decisions_on_other_runs : 1) > 0) {
       advance.current = { kind: 'undecided', visited: 1 };
       setPage(meta.current_page >= meta.last_page ? 1 : meta.current_page + 1);
       return;
