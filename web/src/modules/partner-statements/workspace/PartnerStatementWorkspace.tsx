@@ -437,8 +437,7 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
                   capability.observe(err);
                   throw err;
                 } finally {
-                  void load({});
-                  setRefreshKey((key) => key + 1);
+                  reloadAfterChange();   // أحدث `load` (الصفحة/المرشحات الحالية) في النجاح والفشل معاً
                 }
               }}
               onReopen={async (reason) => {
@@ -448,8 +447,7 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
                   capability.observe(err);
                   throw err;
                 } finally {
-                  void load({});
-                  setRefreshKey((key) => key + 1);
+                  reloadAfterChange();   // أحدث `load` (الصفحة/المرشحات الحالية) في النجاح والفشل معاً
                 }
               }}
             />

@@ -522,6 +522,41 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(screen.getAllByText('INV-26').length).toBeGreaterThan(0);
   });
 
+  it.each([['review'], ['reopen']] as const)('a %s request that completes after the reviewer moved to another page refreshes the CURRENT page', async (kind) => {
+    const pages: Record<number, MatchRow[]> = { 1: rows(), 2: [match(26), match(27)] };
+    const reviewed = kind === 'reopen';
+    h.fetchHeader.mockResolvedValue(header({ status: reviewed ? 'reviewed' : 'draft' }));
+    h.fetchStatus.mockResolvedValue(reviewed
+      ? status({ reconciliation: { id: ID, status: 'reviewed', reviewed_at: null, reviewed_by: 'u', reviewed_run_id: RUN }, blockers: [], reviewed_state: { run_id: RUN, ledger_changed_since_review: false, statement_changed_since_review: false } }, { lines_total: 40, can_mark_reviewed: false, resolved: 4, unresolved: 0 })
+      : status({ blockers: [] }, { lines_total: 40, can_mark_reviewed: true, resolved: 4, unresolved: 0 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse(pages[q.page] ?? [], { meta: { current_page: q.page, last_page: 2, per_page: 25, total: 6 } })));
+    let release: (value: unknown) => void = () => {};
+    const pending = new Promise((resolve) => (release = resolve));
+    h.markReviewed.mockReturnValue(pending);
+    h.reopenReconciliation.mockReturnValue(pending);
+    await open();
+
+    if (reviewed) {
+      await userEvent.click(screen.getByText('workspace.readiness.reopen'));
+      await userEvent.type(screen.getByRole('textbox', { name: /workspace\.readiness\.reopen_reason/ }), 'needs a change');
+      await userEvent.click(screen.getByText('workspace.readiness.reopen_confirm'));
+      await waitFor(() => expect(h.reopenReconciliation).toHaveBeenCalledTimes(1));
+    } else {
+      await userEvent.click(screen.getByTestId('review-button'));
+      await waitFor(() => expect(h.markReviewed).toHaveBeenCalledTimes(1));
+    }
+
+    await userEvent.click(screen.getByLabelText('nextPage'));
+    await screen.findAllByText('INV-26');
+    const before = h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement').length;
+    release(undefined);
+    await waitFor(() => expect(h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement').length).toBeGreaterThan(before));
+    expect(h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement').at(-1)?.[1].page).toBe(2);
+    expect(screen.getAllByText('INV-26').length).toBeGreaterThan(0);
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,
