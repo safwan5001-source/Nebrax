@@ -665,6 +665,23 @@ describe('PartnerStatementWorkspace — keyboard, filters and next undecided', (
     expect(screen.queryByTestId('workspace-notice')?.textContent ?? '').not.toContain('workspace.no_more_undecided');
   });
 
+  it('"next undecided" skips the selected line (the only undecided one on this page) and searches the following pages', async () => {
+    const decide = (row: MatchRow, index: number): MatchRow => ({ ...row, decision: { ...(rows()[0].decision as NonNullable<MatchRow['decision']>), id: `d${index}`, line_id: row.line_id as string, run_id: RUN } });
+    const page1 = rows().map((row, index) => (index === 1 ? row : decide(row, index)));   // السطر 2 وحده بلا قرار
+    const pages: Record<number, MatchRow[]> = { 1: page1, 2: [match(26), match(27)] };
+    h.fetchStatus.mockResolvedValue(status({}, { lines_total: 40, unresolved: 3, resolved: 37 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse(pages[q.page] ?? [], { meta: { current_page: q.page, last_page: 2, per_page: 25, total: 6 } })));
+    await open();
+    await selectLine(2);
+    const row2 = document.querySelector('tr[data-line-id="line-2"]') as HTMLElement;
+    row2.focus();
+    fireEvent.keyDown(row2, { key: 'n' });
+    await waitFor(() => expect(h.fetchMatches.mock.calls.some(([, q]) => q.side === 'statement' && q.page === 2)).toBe(true));
+    await waitFor(() => expect(document.querySelector('tr[aria-selected="true"]')?.getAttribute('data-line-id')).toBe('line-26'));
+  });
+
   it('filters by engine outcome through the server and exposes the counts from the run', async () => {
     await open();
     await userEvent.click(screen.getAllByRole('button', { name: /workspace\.outcome\.date_difference/, pressed: false })[0]);

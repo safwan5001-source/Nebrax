@@ -175,7 +175,8 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
     const matchRows = rows.map((row) => ({ decision: row.match?.decision ?? null }));
     const from = rows.findIndex((row) => row.line.id === selectedId);
     const index = nextUndecidedIndex(matchRows, from, runId);
-    if (index >= 0 && decisionState(matchRows[index], runId) !== 'current') {
+    // السطر المحدَّد نفسه (يعود به الالتفاف حين يكون الوحيد بلا قرار في الصفحة) ليس «التالي»: يُبحث في الصفحات التالية قبل العودة إليه.
+    if (index >= 0 && index !== from && decisionState(matchRows[index], runId) !== 'current') {
       pick(rows[index].line.id);
       return;
     }
