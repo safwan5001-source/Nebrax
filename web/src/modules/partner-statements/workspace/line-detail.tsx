@@ -4,7 +4,7 @@
  * تفاصيل سطر الكشف (لوحة جانبية على المكتب، Sheet كامل الشاشة على الجوال): سطر الكشف ثم حكم المحرّك وتفسيره ثم المرشّحون **متراصّين عمودياً** ثم القرار الفعّال ثم شريط الإجراءات.
  * الإجراءات من `editable` (صلاحية `reconcile` + قدرة `enabled` + مقارنة `draft`) لا من الحالة وحدها. القرارات تمرّ بطابور محدود؛ لا حسم يظهر قبل ردّ الخادم.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Ban, CheckCircle2, GitMerge, Link2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,6 +64,10 @@ export function LineDetail(props: LineDetailProps) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const lineId = line?.id ?? '';
+  // السطر النشط الآن (لا السطر وقت بدء الإرسال): قرار سطر سابق يكتمل لاحقاً **لا يمسّ** عمل/إشعارات السطر الجاري تحريره.
+  const activeLineRef = useRef(lineId);
+  activeLineRef.current = lineId;
+
   useEffect(() => {
     setHistory(null);
     setHistoryError(null);
@@ -93,17 +97,19 @@ export function LineDetail(props: LineDetailProps) {
   };
 
   const finish = (result: QueueJob) => {
-    const warnings = result.result?.warnings ?? [];
-    setNotice(result.result?.replayed ? t('workspace.detail.replayed') : warnings.length > 0 ? warnings.map((w) => t(`workspace.warning.${warningKey(w.code)}`, safeParams(w.params))).join(' · ') : null);
-    props.onWork({ ...EMPTY_WORK });
-    props.onDecided(result);
+    if (result.lineId === activeLineRef.current) {
+      const warnings = result.result?.warnings ?? [];
+      setNotice(result.result?.replayed ? t('workspace.detail.replayed') : warnings.length > 0 ? warnings.map((w) => t(`workspace.warning.${warningKey(w.code)}`, safeParams(w.params))).join(' · ') : null);
+      props.onWork({ ...EMPTY_WORK });
+    }
+    props.onDecided(result);   // إعادة قراءة الحال من الخادم دائماً
   };
 
   const quick = async (request: DecisionRequest) => {
     setQuickError(null);
     const result = await props.submit(request);
     if (result.status === 'done') finish(result);
-    else setQuickError(describeError(result.error).key);
+    else if (result.lineId === activeLineRef.current) setQuickError(describeError(result.error).key);
   };
 
   const immediateConfirm = row !== null && !reasonRequired({ action: 'confirm', engineOutcome: row.outcome, netDifferenceMinor: row.difference_minor });

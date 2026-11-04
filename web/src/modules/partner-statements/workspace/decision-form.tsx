@@ -56,6 +56,9 @@ export function DecisionForm(props: DecisionFormProps) {
   const [serverDifference, setServerDifference] = useState<number | null>(null);
   const [failure, setFailure] = useState<{ key: string; code: string | null; retrying: boolean } | null>(null);
   const submitting = useRef(false);
+  // المفتاح النشط الآن: نموذج السطر السابق قد يُعاد استعماله لسطر آخر قبل اكتمال إرساله، فلا تُطبَّق نتيجته المتأخرة على السطر الجاري.
+  const activeKey = useRef(key);
+  activeKey.current = key;
 
   // استرجاع مسودة السبب (نص فقط) عند فتح النموذج.
   useEffect(() => {
@@ -97,6 +100,7 @@ export function DecisionForm(props: DecisionFormProps) {
         props.onDone(result);
         return;
       }
+      if (activeKey.current !== key) return;
       const descriptor = describeError(result.error);
       if (descriptor.code === 'difference_exceeds_tolerance' && typeof descriptor.details?.difference_minor === 'number') {
         setServerDifference(descriptor.details.difference_minor);

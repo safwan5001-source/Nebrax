@@ -355,6 +355,30 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(h.postDecision).not.toHaveBeenCalled();
   });
 
+  it('a late success for line A neither clears nor disturbs the work in progress on line B (it still refreshes from the server)', async () => {
+    let release: (value: unknown) => void = () => {};
+    h.postDecision.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    await open();
+    await selectLine(2);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.confirm'));
+    const formA = await screen.findByTestId('decision-form-confirm');
+    await userEvent.type(within(formA).getByRole('textbox'), 'reason for A');
+    await userEvent.click(within(formA).getByText('workspace.action.confirm'));
+    await waitFor(() => expect(h.postDecision).toHaveBeenCalledTimes(1));
+
+    await selectLine(4);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.override'));
+    const picker = await screen.findByTestId('candidate-picker');
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-c1'));
+
+    const statusCalls = h.fetchStatus.mock.calls.length;
+    release(doneDecision);
+    await waitFor(() => expect(h.fetchStatus.mock.calls.length).toBeGreaterThan(statusCalls));
+    expect(screen.getByTestId('candidate-picker')).toBeTruthy();
+    expect((within(screen.getByTestId('candidate-picker')).getByLabelText('workspace.picker.select_unit:D-c1') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByTestId('decision-form-override')).toBeTruthy();
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,
