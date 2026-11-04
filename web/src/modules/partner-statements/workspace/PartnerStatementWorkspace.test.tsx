@@ -494,6 +494,34 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(h.postDecision).not.toHaveBeenCalled();
   });
 
+  it('a decision that completes after the reviewer moved to another page refreshes the CURRENT page, not the page it was submitted from', async () => {
+    const pages: Record<number, MatchRow[]> = { 1: rows(), 2: [match(26), match(27)] };
+    h.fetchStatus.mockResolvedValue(status({}, { lines_total: 40 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse(pages[q.page] ?? [], { meta: { current_page: q.page, last_page: 2, per_page: 25, total: 6 } })));
+    let release: (value: unknown) => void = () => {};
+    h.postDecision.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    await open();
+    await selectLine(2);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.confirm'));
+    const form = await screen.findByTestId('decision-form-confirm');
+    await userEvent.type(within(form).getByRole('textbox'), 'reason for line 2');
+    await userEvent.click(within(form).getByText('workspace.action.confirm'));
+    await waitFor(() => expect(h.postDecision).toHaveBeenCalledTimes(1));
+
+    // انتقال إلى الصفحة 2 قبل اكتمال القرار
+    await userEvent.click(screen.getByLabelText('nextPage'));
+    await screen.findAllByText('INV-26');
+
+    const before = h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement').length;
+    release(doneDecision);
+    await waitFor(() => expect(h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement').length).toBeGreaterThan(before));
+    const statementCalls = h.fetchMatches.mock.calls.filter(([, q]) => q.side === 'statement');
+    expect(statementCalls.at(-1)?.[1].page).toBe(2);
+    expect(screen.getAllByText('INV-26').length).toBeGreaterThan(0);
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,

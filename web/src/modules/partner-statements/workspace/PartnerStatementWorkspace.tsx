@@ -233,10 +233,13 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
     setPage(target);
   };
 
+  // أحدث `load` (بالصفحة والمرشحات الحالية) لا نسخة وقت الإرسال: قرار يكتمل بعد أن انتقل المراجع لصفحة أخرى يجب أن يُحدِّث الصفحة الحالية لا القديمة.
+  const loadRef = useRef(load);
+  loadRef.current = load;
   const reloadAfterChange = useCallback(() => {
     setRefreshKey((key) => key + 1);
-    void load({});   // مع الرأس: تغيّر حالة المقارنة (مراجِع آخر/إغلاق) يجب أن يُسقط أزرار الكتابة
-  }, [load]);
+    void loadRef.current({});   // مع الرأس: تغيّر حالة المقارنة (مراجِع آخر/إغلاق) يجب أن يُسقط أزرار الكتابة
+  }, []);
 
   const submit = useCallback(
     async (request: DecisionRequest): Promise<QueueJob> => {
