@@ -27,6 +27,8 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
   return [
     {
       id: 'partner_name',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => partnerDisplayName(row),
       header: t('col.partner'),
       cell: ({ row }) => (
         <div className="min-w-0">
@@ -37,6 +39,8 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
     },
     {
       id: 'period_from',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => row.period_from,
       header: t('col.period'),
       cell: ({ row }) => <span className="num whitespace-nowrap text-text" dir="ltr">{periodLabel(row.original)}</span>,
     },
@@ -48,11 +52,15 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
     },
     {
       id: 'original_filename',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => row.original_filename ?? '',
       header: t('col.file'),
       cell: ({ row }) => <span className="block max-w-[14rem] truncate text-muted" dir="auto" title={row.original.original_filename ?? undefined}>{row.original.original_filename ?? '—'}</span>,
     },
     {
       id: 'line_count',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => row.line_count,
       header: t('col.lines'),
       cell: ({ row }) => <div className="num text-end text-text">{row.original.line_count}</div>,
     },
@@ -69,11 +77,15 @@ export function buildColumns(t: Translate): ColumnDef<ReconciliationRow, unknown
     },
     {
       id: 'status',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => row.status,
       header: t('col.status'),
       cell: ({ row }) => <StatusBadge status={row.original.status} t={t} />,
     },
     {
       id: 'created_at',
+      // TanStack لا يعدّ العمود قابلاً للفرز بلا accessor (والفرز خادمي: القيمة هنا للتعريف لا للترتيب المحلي).
+      accessorFn: (row) => row.created_at ?? '',
       header: t('col.created'),
       cell: ({ row }) => <span className="num text-muted" dir="ltr">{iso(row.original.created_at)}</span>,
     },

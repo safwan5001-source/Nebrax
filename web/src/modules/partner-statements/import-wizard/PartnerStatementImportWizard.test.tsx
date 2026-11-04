@@ -231,6 +231,29 @@ describe('inspection race and branch fallback (review findings)', () => {
     expect(options.mapping).toEqual({ 0: 'line_date', 1: 'credit', 2: 'debit' });
   });
 
+  it('discards a preview that was invalidated by an edit while its request was pending', async () => {
+    let release: (value: PreviewResult) => void = () => {};
+    h.previewStatement.mockImplementationOnce(() => new Promise<PreviewResult>((resolve) => { release = resolve; }));
+    const user = userEvent.setup();
+    render(<PartnerStatementImportWizard />);
+    await uploadFile(user);
+    await user.click(screen.getByText('wizard.next'));
+    await fillSetup(user);
+    await user.click(screen.getByText('wizard.next'));
+    await user.click(await screen.findByText('wizard.run_preview'));
+    await waitFor(() => expect(h.previewStatement).toHaveBeenCalledTimes(1));
+
+    // أثناء الطلب: المستخدم يعدّل المطابقة (عمود المدين ⇒ تجاهل)
+    await user.selectOptions(screen.getByLabelText('wizard.mapping_target_for:مدين'), '');
+    release(preview());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // المعاينة القديمة لا تُعرض ولا تُنفَّذ: الشاشة ما زالت على المطابقة
+    expect(screen.queryByText('wizard.no_blocking_errors')).toBeNull();
+    expect(screen.getByText('wizard.run_preview')).toBeTruthy();
+    expect(h.engine.upload).not.toHaveBeenCalled();
+  });
+
   it('lets a branch-restricted actor without branches.view still pick an assigned branch (shown by short code)', async () => {
     h.scope = { branches: [BRANCH_ID, '33333333-3333-4333-8333-333333333333'], warehouses: [] };
     h.fetchBranches.mockRejectedValue(new ApiError(403, 'ليست لديك الصلاحية', {}));

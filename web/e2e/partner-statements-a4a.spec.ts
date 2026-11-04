@@ -179,6 +179,14 @@ for (const locale of ['ar', 'en'] as const) {
       await shot(page, `list-${locale}-${isMobile(page) ? 'mobile' : 'desktop'}-light`);
     });
 
+    test('الفرز من رأس العمود خادمي (سطح المكتب)', async ({ page }) => {
+      test.skip(isMobile(page), 'رؤوس الأعمدة مخفية على الجوال؛ منتقي الفرز يغطيه');
+      const requests = await open(page, '/partner-statements', { locale });
+      await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();
+      await page.getByRole('columnheader').nth(1).getByRole('button').click();
+      await expect.poll(() => requests.some((r) => r.startsWith('GET /partner-statement-reconciliations?') && r.includes('sort=period_from'))).toBe(true);
+    });
+
     test('الوضع الداكن', async ({ page }) => {
       await open(page, '/partner-statements', { locale, theme: 'dark' });
       await expect(visibleText(page, 'شركة النور للتجارة')).toBeVisible();

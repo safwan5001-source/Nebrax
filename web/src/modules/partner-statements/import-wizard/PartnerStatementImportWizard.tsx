@@ -79,6 +79,8 @@ export function PartnerStatementImportWizard() {
   const fileInput = useRef<HTMLInputElement | null>(null);
   // «جيل» الفحص: ردّ فحص ملف سابق لا يجوز أن يستبدل فحص/مطابقة الملف الحالي (وإلا انعكست أعمدة المدين/الدائن عند الاستيراد).
   const inspectSeq = useRef(0);
+  // «جيل» المعاينة: أي تعديل (إعداد/مطابقة/ملف/رجوع) يُبطل معاينة قيد الطلب، فلا يعيد ردّها المتأخر نتيجةً وخياراتٍ قديمة تُنفَّذ لاحقاً.
+  const previewSeq = useRef(0);
   const engine = useImportJobEngine(DOMAIN);
 
   const [step, setStep] = useState<WizardStep>('file');
@@ -165,6 +167,8 @@ export function PartnerStatementImportWizard() {
   const errorText = errorKey ? t(`errors.${errorKey}`) : null;
 
   function invalidate() {
+    previewSeq.current += 1;
+    setPreviewing(false);
     setPreview(null);
     setPreviewOptions(null);
     setAcknowledged(false);
@@ -172,6 +176,8 @@ export function PartnerStatementImportWizard() {
 
   function reset() {
     inspectSeq.current += 1;
+    previewSeq.current += 1;
+    setPreviewing(false);
     setStep('file');
     setFile(null);
     setInspection(null);
@@ -260,20 +266,23 @@ export function PartnerStatementImportWizard() {
     setTouched(true);
     if (!file || !mappingReady(mapping, direction) || !setupReady(setup, MAX_DATE_TOLERANCE_DAYS)) return;
     const options = previewOptionsFrom(setup, mapping, direction);
+    const seq = ++previewSeq.current;
     setPreviewing(true);
     setErrorKey(null);
     try {
       const result = await previewStatement(file, options);
+      if (seq !== previewSeq.current) return;
       setPreview(result);
       setPreviewOptions(options);
       setAcknowledged(false);
       setStep('preview');
     } catch (err) {
+      if (seq !== previewSeq.current) return;
       capability.observe(err);
       invalidate();
       setErrorKey(describeError(err).key);
     } finally {
-      setPreviewing(false);
+      if (seq === previewSeq.current) setPreviewing(false);
     }
   }
 
@@ -353,7 +362,7 @@ export function PartnerStatementImportWizard() {
       {header}
 
       <p className="num text-xs text-muted md:hidden">{t('wizard.step_of', { current: String(stepIndex(step) + 1), total: String(steps.length) })}</p>
-      <Stepper steps={steps} current={stepIndex(step)} onSelect={(index) => index < stepIndex(step) && !engine.job && setStep(WIZARD_STEPS[index])} label={t('wizard.steps_label')} />
+      <Stepper steps={steps} current={stepIndex(step)} onSelect={(index) => { if (index < stepIndex(step) && !engine.job) { if (stepIndex(step) < stepIndex('preview')) invalidate(); setStep(WIZARD_STEPS[index]); } }} label={t('wizard.steps_label')} />
 
       {errorText || engineError ? (
         <div role="alert" className="flex items-start gap-2 rounded-md border border-negative/40 bg-negative/5 p-3 text-sm text-negative">
@@ -570,7 +579,7 @@ export function PartnerStatementImportWizard() {
             ) : null}
 
             <FormActions
-              secondary={<Button variant="outline" onClick={() => setStep('setup')}>{t('wizard.previous')}</Button>}
+              secondary={<Button variant="outline" onClick={() => { invalidate(); setStep('setup'); }}>{t('wizard.previous')}</Button>}
               primary={
                 <Button disabled={!mappingReady(mapping, direction) || previewing} onClick={() => void runPreview()}>
                   {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : null}

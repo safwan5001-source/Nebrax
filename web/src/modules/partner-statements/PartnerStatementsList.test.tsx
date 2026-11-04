@@ -99,6 +99,17 @@ describe('PartnerStatementsList', () => {
     expect(window.location.search).toContain('status%5B%5D=closed');
   });
 
+  it('lets desktop users sort from the column headers (server-side), toggling direction', async () => {
+    const user = userEvent.setup();
+    render(<PartnerStatementsList />);
+    await screen.findAllByText('شركة النور');
+
+    await user.click(screen.getByRole('button', { name: /col\.lines/ }));
+    await waitFor(() => expect(h.fetchReconciliations.mock.calls.at(-1)?.[0]).toMatchObject({ sort: 'line_count', page: 1 }));
+    await user.click(screen.getByRole('button', { name: /col\.lines/ }));
+    await waitFor(() => expect(h.fetchReconciliations.mock.calls.at(-1)?.[0]).toMatchObject({ sort: '-line_count' }));
+  });
+
   it('debounces search and resets to the first page', async () => {
     const user = userEvent.setup();
     render(<PartnerStatementsList />);
