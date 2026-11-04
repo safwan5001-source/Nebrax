@@ -67,8 +67,8 @@ const visibleBox = (page: Page, label: string) => page.getByLabel(label).locator
 
 for (const locale of ['ar', 'en'] as const) {
   const L = locale === 'ar'
-    ? { name: 'باقة ورد جوري', row: 'تحديد: باقة ورد جوري', all: 'تحديد كل عناصر هذه الصفحة', publish: 'نشر المحدد', confirm: 'تأكيد النشر', selected: 'المحدد: 2', partial: 'اكتملت العملية جزئياً: بعض العناصر لم تُنفَّذ.' }
-    : { name: 'باقة ورد جوري', row: 'Select: باقة ورد جوري', all: 'Select all items on this page', publish: 'Publish selected', confirm: 'Confirm publish', selected: 'Selected: 2', partial: 'The operation completed partially: some items were not processed.' };
+    ? { name: 'باقة ورد جوري', row: 'تحديد: باقة ورد جوري', all: 'تحديد كل عناصر الصفحة الحالية فقط', publish: 'نشر المحدد', confirm: 'تأكيد النشر', selected: 'المحدد: 2', partial: 'اكتملت العملية جزئياً: بعض العناصر لم تُنفَّذ.' }
+    : { name: 'باقة ورد جوري', row: 'Select: باقة ورد جوري', all: 'Select all items on the current page only', publish: 'Publish selected', confirm: 'Confirm publish', selected: 'Selected: 2', partial: 'The operation completed partially: some items were not processed.' };
 
   test(`select, confirm, partial report, no overflow (${locale})`, async ({ page }, info) => {
     const calls = await open(page, { locale });
@@ -107,7 +107,7 @@ for (const locale of ['ar', 'en'] as const) {
 
 test('changing the search clears the selection', async ({ page }) => {
   await open(page);
-  await visibleBox(page, 'تحديد كل عناصر هذه الصفحة').check();
+  await visibleBox(page, 'تحديد كل عناصر الصفحة الحالية فقط').check();
   await expect(page.getByTestId('bulk-selected-count')).toBeVisible();
   await page.getByLabel('بحث في المنتجات').fill('ورد');
   await expect(page.getByTestId('bulk-selected-count')).toHaveCount(0);

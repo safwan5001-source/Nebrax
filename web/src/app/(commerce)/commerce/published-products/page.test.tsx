@@ -259,7 +259,7 @@ const okResult = (action: 'publish' | 'unpublish', ids: string[], storefrontId =
 
 /** كل صف يُرسم مرتين (جدول سطح المكتب + سجل الجوال) — النسخة الأولى هي الجدول. */
 const rowBox = (name: string) => screen.getAllByLabelText(`تحديد: ${name}`)[0] as HTMLInputElement;
-const pageBox = () => screen.getAllByLabelText('تحديد كل عناصر هذه الصفحة')[0] as HTMLInputElement;
+const pageBox = () => screen.getAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')[0] as HTMLInputElement;
 const countText = () => screen.queryByTestId('bulk-selected-count')?.textContent ?? null;
 
 describe('COM-CATALOG-3 bulk selection', () => {
@@ -439,7 +439,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
   it('hides all selection controls without products.manage', async () => {
     userFixture.current = { role: 'staff', permissions: ['products.view'] };
     await renderProducts();
-    expect(screen.queryAllByLabelText('تحديد كل عناصر هذه الصفحة')).toHaveLength(0);
+    expect(screen.queryAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')).toHaveLength(0);
     expect(screen.queryAllByLabelText('تحديد: بن يمني')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
   });
@@ -447,7 +447,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
   it('offers no selection when there is no active web store to target', async () => {
     storeFixture.current = [];
     await renderProducts();
-    expect(screen.queryAllByLabelText('تحديد كل عناصر هذه الصفحة')).toHaveLength(0);
+    expect(screen.queryAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')).toHaveLength(0);
   });
 
   it('keeps the individual per-store actions working alongside bulk', async () => {
@@ -482,7 +482,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
     listMock.mockResolvedValue(bulkPage());
     render(<CommercePublishedProductsPage />);
     await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByLabelText('Select all items on this page')[0]);
+    fireEvent.click(screen.getAllByLabelText('Select all items on the current page only')[0]);
     expect(screen.getByTestId('bulk-selected-count').textContent).toBe('Selected: 3');
     expect(screen.getByRole('button', { name: 'Publish selected' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Unpublish selected' })).toBeTruthy();

@@ -360,7 +360,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     categoryPublicationEmptySearchDescription: 'جرّب تعديل البحث أو الفلاتر الحالية.',
     // COM-CATALOG-3 — Bulk publish / unpublish.
     bulkRegion: 'إجراءات النشر الجماعي',
-    bulkSelectAllPage: 'تحديد كل عناصر هذه الصفحة',
+    bulkSelectAllPage: 'تحديد كل عناصر الصفحة الحالية فقط',
     bulkSelectRow: 'تحديد',
     bulkSelectedCount: 'المحدد: {n}',
     bulkSelectedOnPage: 'في هذه الصفحة: {n}',
@@ -759,7 +759,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     categoryPublicationEmptySearchDescription: 'Try adjusting the current search or filters.',
     // COM-CATALOG-3 — Bulk publish / unpublish.
     bulkRegion: 'Bulk publication actions',
-    bulkSelectAllPage: 'Select all items on this page',
+    bulkSelectAllPage: 'Select all items on the current page only',
     bulkSelectRow: 'Select',
     bulkSelectedCount: 'Selected: {n}',
     bulkSelectedOnPage: 'On this page: {n}',
