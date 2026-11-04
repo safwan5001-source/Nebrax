@@ -170,6 +170,10 @@ class ProductController extends ApiController
         $options = $request->importOptions();
         $mediaOptions = $request->mediaOptions();
 
+        if ($mediaOptions['mode'] === ProductImportMediaService::MODE_REPLACE) {
+            return response()->json(['data' => $this->domain(fn (): array => $this->replacementPreview($request, $options, $mediaOptions))]);
+        }
+
         return response()->json([
             'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
                 $withPlan = $this->imports->previewWithPlan(
@@ -197,6 +201,52 @@ class ProductController extends ApiController
         ]);
     }
 
+    /**
+     * معاينة «استبدال الصور الموجودة»: لا معاينة كتالوج (هذا الوضع لا يكتب بيانات منتج أصلاً)، بل مطابقة SKU ↔ الأرشيف وما سيُضاف
+     * ويُبقى ويُزال لكل منتج. تُصدر المعاينة المربوطة بالخيارات نفسها (بما فيها تأكيد الاستبدال) فيُنفَّذ ما عُوين فقط.
+     *
+     * @param  array<string, mixed>  $options
+     * @param  array{apply:bool,approve_existing_updates:bool,mode:string,confirm_replacement:bool}  $mediaOptions
+     * @return array<string, mixed>
+     */
+    private function replacementPreview(ImportProductsRequest $request, array $options, array $mediaOptions): array
+    {
+        $media = $this->importMedia->preview(
+            $request->file('file'), $options, $request->file('media_archive'), $request->maxRows(), false,
+            ProductImportMediaService::MODE_REPLACE, $mediaOptions['confirm_replacement'],
+        );
+        // بصمة معرض كل منتج كما عُوين: تُحفظ مع المعاينة فيرفض التنفيذ أي انجراف (صورة رُفعت بعدها) قبل الحذف.
+        $galleryPlan = $media['gallery_plan'];
+        unset($media['gallery_plan']);
+
+        return [
+            'mode' => ProductImportService::MODE_UPDATE,
+            'blank_policy' => ProductImportService::BLANK_IGNORE,
+            'master_data_policy' => ProductImportService::MASTER_DATA_ERROR,
+            'media_mode' => ProductImportMediaService::MODE_REPLACE,
+            'total_rows' => $media['window_rows'],
+            'create_rows' => 0,
+            'update_rows' => 0,
+            'skipped_rows' => $media['window_rows'],
+            'warning_rows' => 0,
+            'error_rows' => 0,
+            'rows' => [],
+            'rows_shown' => 0,
+            'rows_truncated' => false,
+            'errors' => [],
+            'media' => $media,
+            'binding' => app(ImportPreviewService::class)->issue(
+                ImportJobDomain::PRODUCT_CATALOG, $request->file('file'), $request->file('media_archive'),
+                $options + [
+                    'media_mode' => ProductImportMediaService::MODE_REPLACE,
+                    'confirm_media_replacement' => $mediaOptions['confirm_replacement'],
+                ],
+                $request->user()?->id,
+                $galleryPlan,
+            ),
+        ];
+    }
+
     /** يكرر التحقق ثم ينشئ أو يحدّث الكتالوج في معاملة واحدة. */
     public function importApply(ImportProductsRequest $request): JsonResponse
     {
@@ -205,6 +255,11 @@ class ProductController extends ApiController
 
         return response()->json([
             'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
+                // استبدال الصور عملية هدّامة (يُزيل ارتباط صور قائمة) فلا يُنفَّذ إلا عبر تشغيلة الاستيراد الدائمة: معاينة مربوطة،
+                // خيارات مجمَّدة، قطع قابلة للاستئناف وإعادة المحاولة. المسار المتزامن لا يدعمه عمداً.
+                if ($mediaOptions['mode'] === ProductImportMediaService::MODE_REPLACE) {
+                    throw new RuntimeException('استبدال الصور يُنفَّذ عبر تشغيلة الاستيراد الدائمة فقط (/import-jobs).');
+                }
                 // IMP-H1-S3c: ربط التطبيق المتزامن بمعاينته (اختياري حتى التفعيل): إنفاق المعاينة وكتابة الكتالوج في معاملةٍ واحدة،
                 // وخطّتها تُقارَن بالواقع قبل أي كتابة (`plan_drift`).
                 $previews = app(ImportPreviewService::class);

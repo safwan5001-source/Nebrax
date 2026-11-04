@@ -4,6 +4,7 @@ import {
   fieldLabel,
   importFormData,
   mappingGaps,
+  replaceMissingSku,
   reportRows,
   suggestedMapping,
   type ImportField,
@@ -157,5 +158,37 @@ describe('fieldLabel', () => {
   it('يختار التسمية بحسب اللغة النشطة', () => {
     expect(fieldLabel(field('sku'), 'ar')).toBe('عربي sku');
     expect(fieldLabel(field('sku'), 'en')).toBe('English sku');
+  });
+});
+
+describe('استبدال الصور الموجودة (media_mode=replace)', () => {
+  const file = new File(['sku\nA'], 'skus.csv', { type: 'text/csv' });
+  const archive = new File(['zip'], 'images.zip', { type: 'application/zip' });
+
+  it('لا يرسل أي حقل جديد في وضع الإضافة (العقد القديم كما هو)', () => {
+    const form = importFormData(file, { mode: 'update', mediaArchive: archive, applyProductImages: true });
+    expect(form.has('media_mode')).toBe(false);
+    expect(form.has('confirm_media_replacement')).toBe(false);
+    expect(form.get('apply_product_images')).toBe('1');
+  });
+
+  it('يرسل الوضع والتأكيد معاً، والتأكيد وحده لا يُرسَل بلا وضع الاستبدال', () => {
+    const replace = importFormData(file, { mediaArchive: archive, mediaMode: 'replace', confirmMediaReplacement: true });
+    expect(replace.get('media_mode')).toBe('replace');
+    expect(replace.get('confirm_media_replacement')).toBe('1');
+
+    const unconfirmed = importFormData(file, { mediaArchive: archive, mediaMode: 'replace' });
+    expect(unconfirmed.get('media_mode')).toBe('replace');
+    expect(unconfirmed.has('confirm_media_replacement')).toBe(false);
+
+    const addOnly = importFormData(file, { mediaArchive: archive, mediaMode: 'add', confirmMediaReplacement: true });
+    expect(addOnly.has('media_mode')).toBe(false);
+    expect(addOnly.has('confirm_media_replacement')).toBe(false);
+  });
+
+  it('يطالب بربط عمود SKU تحديداً (لا الباركود ولا معرّف نبراكس)', () => {
+    expect(replaceMissingSku({ 0: 'barcode', 1: 'nebrax_id' })).toBe(true);
+    expect(replaceMissingSku({ 0: 'sku' })).toBe(false);
+    expect(replaceMissingSku({})).toBe(true);
   });
 });

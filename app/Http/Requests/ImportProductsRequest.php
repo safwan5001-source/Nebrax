@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ProductImportMediaService;
 use App\Services\ProductImportService;
 use App\Support\ProductImportFields;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,6 +32,14 @@ class ImportProductsRequest extends FormRequest
             'media_archive' => ['sometimes', 'nullable', 'file', 'mimes:zip', 'max:51200'],
             'apply_product_images' => ['sometimes', 'boolean'],
             'approve_existing_media_updates' => ['sometimes', 'boolean'],
+            // وضع الصور: `add` (الافتراضي، السلوك القائم) أو `replace` (استبدال معرض الصور بصور الأرشيف المطابقة بـ SKU) + تأكيده الصريح.
+            'media_mode' => ['sometimes', Rule::in([ProductImportMediaService::MODE_ADD, ProductImportMediaService::MODE_REPLACE]), function ($attribute, $value, $fail) {
+                // `sometimes` يتخطى قاعدة «مطلوب» حين يغيب الحقل، فيُفحص وجود الأرشيف هنا صراحةً.
+                if ($value === ProductImportMediaService::MODE_REPLACE && ! $this->hasFile('media_archive')) {
+                    $fail('وضع استبدال الصور يتطلب رفع أرشيف ZIP للصور.');
+                }
+            }],
+            'confirm_media_replacement' => ['sometimes', 'boolean'],
             'mode' => ['sometimes', Rule::in([
                 ProductImportService::MODE_CREATE,
                 ProductImportService::MODE_UPDATE,
@@ -126,12 +135,17 @@ class ImportProductsRequest extends FormRequest
         return $options;
     }
 
-    /** @return array{apply:bool,approve_existing_updates:bool} */
+    /** @return array{apply:bool,approve_existing_updates:bool,mode:string,confirm_replacement:bool} */
     public function mediaOptions(): array
     {
+        $replace = $this->input('media_mode') === ProductImportMediaService::MODE_REPLACE;
+
         return [
-            'apply' => $this->boolean('apply_product_images'),
+            // الاستبدال تنفيذٌ للصور بذاته: «تطبيق الصور» مفترض فيه ولا يُترك للعميل.
+            'apply' => $replace || $this->boolean('apply_product_images'),
             'approve_existing_updates' => $this->boolean('approve_existing_media_updates'),
+            'mode' => $replace ? ProductImportMediaService::MODE_REPLACE : ProductImportMediaService::MODE_ADD,
+            'confirm_replacement' => $replace && $this->boolean('confirm_media_replacement'),
         ];
     }
 }

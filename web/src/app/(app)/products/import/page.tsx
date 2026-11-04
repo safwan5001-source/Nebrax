@@ -23,21 +23,25 @@ import { FormActions } from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/export';
 import { Stepper } from '@/modules/products/import/stepper';
+import { ReplacePreview } from '@/modules/products/import/ReplacePreview';
 import {
   ACCEPTED_IMPORT_TYPES,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
   type BlankPolicy,
   type ColumnMapping,
+  type ImageMode,
   type ImportField,
   type ImportMode,
   type ImportPreview,
   type InspectResult,
   type MasterDataPolicy,
   type PreviewRow,
+  type ReplaceTotals,
   fieldLabel,
   importFormData,
   mappingGaps,
+  replaceMissingSku,
   reportRows,
   suggestedMapping,
 } from '@/modules/products/import/contract';
@@ -72,6 +76,9 @@ export default function ProductImportPage() {
   const [mediaArchive, setMediaArchive] = useState<File | null>(null);
   const [applyProductImages, setApplyProductImages] = useState(false);
   const [approveExistingMediaUpdates, setApproveExistingMediaUpdates] = useState(false);
+  // وضع الصور: «إضافة» (الافتراضي، لا يمسّ الموجود) أو «استبدال الصور الموجودة» (بـ SKU، هدّام فيُؤكَّد صراحةً بعد المعاينة).
+  const [imageMode, setImageMode] = useState<ImageMode>('add');
+  const [confirmMediaReplacement, setConfirmMediaReplacement] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [inspection, setInspection] = useState<InspectResult | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -106,10 +113,20 @@ export default function ProductImportPage() {
 
   const fields = inspection?.fields ?? [];
   const writableFields = useMemo(() => fields.filter((field) => field.writable || field.key === 'nebrax_id'), [fields]);
-  const gaps = useMemo(() => mappingGaps(mapping, fields, mode), [mapping, fields, mode]);
+  const replaceMode = imageMode === 'replace';
+  // الاستبدال لا يكتب بيانات منتج: يكفيه معرّفٌ واحد (SKU) ولا حقول مطلوبة، فتُحسب الفجوات بوضع «تحديث» وتُضاف قاعدة SKU.
+  const gaps = useMemo(() => mappingGaps(mapping, fields, replaceMode ? 'update' : mode), [mapping, fields, mode, replaceMode]);
   const mappingReady = !inspection || (gaps.missingRequired.length === 0 && !gaps.missingIdentifier && !gaps.duplicate);
-  const canPreview = Boolean(file) && mappingReady;
-  const canApplyPreview = Boolean(preview && preview.total_rows > 0 && preview.error_rows === 0);
+  const replaceMissingArchive = replaceMode && !mediaArchive;
+  const replaceNeedsSku = replaceMode && Boolean(inspection) && replaceMissingSku(mapping);
+  const canPreview = Boolean(file) && mappingReady && !replaceMissingArchive && !replaceNeedsSku;
+  const replaceReady = Boolean(
+    preview?.media
+    && preview.media.error_rows === 0
+    && preview.media.needs_approval_rows === 0
+    && (preview.media.affected_products ?? 0) > 0
+  );
+  const canApplyPreview = replaceMode ? replaceReady : Boolean(preview && preview.total_rows > 0 && preview.error_rows === 0);
 
   function reset() {
     setStep(0);
@@ -117,6 +134,8 @@ export default function ProductImportPage() {
     setMediaArchive(null);
     setApplyProductImages(false);
     setApproveExistingMediaUpdates(false);
+    setImageMode('add');
+    setConfirmMediaReplacement(false);
     setInspection(null);
     setMapping({});
     setPreview(null);
@@ -168,17 +187,23 @@ export default function ProductImportPage() {
     void acceptFile(event.dataTransfer.files?.[0] ?? null);
   }
 
-  async function runPreview() {
+  async function runPreview(overrides: { confirmReplacement?: boolean } = {}) {
     if (!file) return;
+    const confirmReplacement = overrides.confirmReplacement ?? confirmMediaReplacement;
     setPreviewing(true);
     setError(null);
     try {
       const response = await api<{ data: ImportPreview }>('/products/import/preview', {
         method: 'POST',
-        body: importFormData(file, {
-          mode, blankPolicy, masterDataPolicy, mapping, forDurable: true,
-          mediaArchive, applyProductImages, approveExistingMediaUpdates,
-        }),
+        body: importFormData(file, replaceMode
+          ? {
+              mapping, forDurable: true, mediaArchive,
+              mediaMode: 'replace', confirmMediaReplacement: confirmReplacement,
+            }
+          : {
+              mode, blankPolicy, masterDataPolicy, mapping, forDurable: true,
+              mediaArchive, applyProductImages, approveExistingMediaUpdates,
+            }),
       });
       setPreview(response.data);
       setStep(1);
@@ -191,6 +216,14 @@ export default function ProductImportPage() {
   }
 
   function applyOptionsPayload(): ApplyOptions {
+    if (replaceMode) {
+      // الخيارات المجمَّدة مع المعاينة: المطابقة + الوضع + التأكيد فقط (لا خيارات كتالوج: الاستبدال لا يكتب بيانات منتج).
+      return {
+        ...(file ? { mapping } : {}),
+        media_mode: 'replace',
+        confirm_media_replacement: confirmMediaReplacement,
+      };
+    }
     return {
       mode,
       blank_policy: blankPolicy,
@@ -250,7 +283,12 @@ export default function ProductImportPage() {
       setStep(3);
       const created = (engine.job.apply_result?.created as number | undefined) ?? 0;
       const updated = (engine.job.apply_result?.updated as number | undefined) ?? 0;
-      success(t('import_success', { created, updated }));
+      const totals = (engine.job.apply_result as { media?: { totals?: ReplaceTotals } } | null)?.media?.totals;
+      if (engine.job.apply_result?.media_mode === 'replace' && totals) {
+        success(t('import_replace_success', { products: totals.products_replaced, added: totals.images_added, removed: totals.images_removed }));
+      } else {
+        success(t('import_success', { created, updated }));
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.job?.status]);
@@ -284,9 +322,10 @@ export default function ProductImportPage() {
   }
 
   const applyResult = engine.job?.apply_result as
-    | { created?: number; updated?: number; skipped?: number; results?: PreviewRow[] }
+    | { created?: number; updated?: number; skipped?: number; results?: PreviewRow[]; media_mode?: string; media?: { totals?: ReplaceTotals } }
     | null
     | undefined;
+  const replaceTotals = applyResult?.media_mode === 'replace' ? applyResult.media?.totals ?? null : null;
 
   return (
     <div className="space-y-4 pb-24 lg:pb-0">
@@ -424,15 +463,63 @@ export default function ProductImportPage() {
                       // اختيار الأرشيف ليس موافقةً على الحفظ؛ التأكيد مستقل
                       // ويظهر بعد المعاينة كي يرى المستخدم المطابقة أولاً.
                       setApplyProductImages(false);
+                      setConfirmMediaReplacement(false);
                       setPreview(null);
                     }}
                   />
                   <p className="text-xs leading-relaxed text-muted">{t('import_images_archive_hint')}</p>
+
+                  <fieldset className="space-y-2 pt-2">
+                    <legend className="mb-1 text-sm font-medium text-text">{t('import_images_mode_legend')}</legend>
+                    {(['add', 'replace'] as ImageMode[]).map((value) => (
+                      <label
+                        key={value}
+                        className={cn(
+                          'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
+                          imageMode === value ? 'border-primary bg-primary-soft' : 'border-border hover:bg-surface'
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="import-images-mode"
+                          value={value}
+                          checked={imageMode === value}
+                          aria-label={t(`import_images_mode_${value}` as 'import_images_mode_add')}
+                          aria-describedby={`import-images-mode-${value}-hint`}
+                          onChange={() => {
+                            setImageMode(value);
+                            setApplyProductImages(false);
+                            setApproveExistingMediaUpdates(false);
+                            setConfirmMediaReplacement(false);
+                            setPreview(null);
+                          }}
+                          className="mt-0.5 h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-text">{t(`import_images_mode_${value}` as 'import_images_mode_add')}</span>
+                          <span id={`import-images-mode-${value}-hint`} className="mt-0.5 block text-xs leading-relaxed text-muted">
+                            {t(`import_images_mode_${value}_hint` as 'import_images_mode_add_hint')}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  {replaceMode ? (
+                    <div className="space-y-1">
+                      <p className="text-xs leading-relaxed text-muted">{t('import_replace_info')}</p>
+                      {replaceMissingArchive ? (
+                        <p role="alert" className="text-xs text-negative">{t('import_replace_needs_archive')}</p>
+                      ) : null}
+                      {replaceNeedsSku ? (
+                        <p role="alert" className="text-xs text-negative">{t('import_replace_needs_sku')}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
 
-            {inspection ? (
+            {inspection && !replaceMode ? (
               <Card>
                 <CardHeader>
                   <CardTitle>{t('import_step_mode')}</CardTitle>
@@ -582,6 +669,20 @@ export default function ProductImportPage() {
             <CardTitle>{t('import_step_preview')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {replaceMode && preview.media ? (
+              <ReplacePreview
+                media={preview.media}
+                confirmed={confirmMediaReplacement}
+                busy={previewing}
+                onConfirmChange={(value) => {
+                  // التأكيد جزء من الخيارات المربوطة بالمعاينة: يُعاد إصدار المعاينة من الخادم بالقيمة الجديدة وتبقى الشاشة في مكانها.
+                  setConfirmMediaReplacement(value);
+                  void runPreview({ confirmReplacement: value });
+                }}
+                t={t}
+              />
+            ) : (
+            <>
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
               {(
                 [
@@ -703,8 +804,10 @@ export default function ProductImportPage() {
             ) : (
               <PreviewTable rows={preview.rows} />
             )}
+            </>
+            )}
 
-            {!canApplyPreview ? (
+            {!canApplyPreview && !replaceMode ? (
               <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
                 {t('import_fix_errors')}
               </p>
@@ -765,21 +868,49 @@ export default function ProductImportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  ['created', applyResult?.created ?? 0],
-                  ['updated', applyResult?.updated ?? 0],
-                  ['skipped', applyResult?.skipped ?? 0],
-                ] as const
-              ).map(([key, value]) => (
-                <div key={key} className="rounded-md border border-border bg-background px-3 py-2">
-                  <dt className="text-xs text-muted">{t(`import_result_${key}` as 'import_result_created')}</dt>
-                  <dd className="num mt-0.5 text-lg font-semibold text-text">{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="text-xs leading-relaxed text-muted">{t('import_result_last_chunk_hint')}</p>
+            {replaceTotals ? (
+              <>
+                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5" data-testid="replace-result">
+                  {(
+                    [
+                      ['products', replaceTotals.products_replaced],
+                      ['added', replaceTotals.images_added],
+                      ['removed', replaceTotals.images_removed],
+                      ['kept', replaceTotals.images_kept],
+                      ['failed', replaceTotals.failed],
+                    ] as const
+                  ).map(([key, value]) => (
+                    <div key={key} className="rounded-md border border-border bg-background px-3 py-2">
+                      <dt className="text-xs text-muted">{t(`import_replace_result_${key}` as 'import_replace_result_products')}</dt>
+                      <dd className={cn('num mt-0.5 text-lg font-semibold', key === 'failed' && value > 0 ? 'text-negative' : 'text-text')}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {replaceTotals.failed > 0 ? (
+                  <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
+                    {t('import_replace_retry_hint')}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <dl className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      ['created', applyResult?.created ?? 0],
+                      ['updated', applyResult?.updated ?? 0],
+                      ['skipped', applyResult?.skipped ?? 0],
+                    ] as const
+                  ).map(([key, value]) => (
+                    <div key={key} className="rounded-md border border-border bg-background px-3 py-2">
+                      <dt className="text-xs text-muted">{t(`import_result_${key}` as 'import_result_created')}</dt>
+                      <dd className="num mt-0.5 text-lg font-semibold text-text">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="text-xs leading-relaxed text-muted">{t('import_result_last_chunk_hint')}</p>
+              </>
+            )}
 
             <FormActions
               secondary={
