@@ -41,8 +41,16 @@ class PerfJobParity(unittest.TestCase):
                 for key in ("run", "uses", "with", "working-directory", "shell", "env"):
                     self.assertEqual(self.ts[name].get(key), self.ps[name].get(key), f"{name!r}: {key} انحرف بين test وpg-perf")
 
+    TMPFS_OPTION = "--tmpfs /var/lib/postgresql/data:rw"
+
     def test_same_postgres_service_and_app_dir(self):
-        self.assertEqual(self.test_job["services"]["postgres"], self.perf_job["services"]["postgres"])
+        # PERF-TMPFS (#1975): الفرق الوحيد المسموح بين خدمتَي postgres هو tmpfs على pg-perf (قياس تنافس القفل بلا ضجيج قرص المشغّل المشترك).
+        # وظيفة `test` الكاملة تبقى على القرص عمداً. أي فرق آخر (صورة/بيئة/منفذ/فحص صحة) يفشل.
+        test_pg, perf_pg = self.test_job["services"]["postgres"], self.perf_job["services"]["postgres"]
+        self.assertNotIn(self.TMPFS_OPTION, test_pg["options"], "وظيفة test الكاملة يجب أن تبقى على قرص المشغّل")
+        self.assertIn(self.TMPFS_OPTION, perf_pg["options"], "pg-perf يجب أن تشغّل PostgreSQL على tmpfs")
+        self.assertEqual(perf_pg["options"].count("--tmpfs"), 1)
+        self.assertEqual(test_pg, {**perf_pg, "options": perf_pg["options"].replace(" " + self.TMPFS_OPTION, "")})
         self.assertEqual(self.test_job["env"], self.perf_job["env"])
         self.assertEqual(self.test_job["runs-on"], self.perf_job["runs-on"])
 
@@ -54,6 +62,24 @@ class PerfJobParity(unittest.TestCase):
             self.assertIn(need, run)
         for bad in ("|| true", "--filter", "--exclude-group", "--stop-on", "--parallel"):
             self.assertNotIn(bad, run)
+
+    def test_tmpfs_verification_step_fails_closed_before_the_measurement(self):
+        names = [s.get("name") for s in self.perf_job["steps"]]
+        verify = "تحقق أن بيانات PostgreSQL على tmpfs"
+        self.assertIn(verify, names)
+        self.assertLess(names.index("تهيئة قاعدة بيانات القياس (pgsql)"), names.index(verify))
+        self.assertLess(names.index(verify), names.index(PERF_STEP), "التحقق يسبق القياس")
+        step = self.ps[verify]
+        self.assertNotIn("if", step)
+        self.assertNotIn("continue-on-error", step)
+        run = step["run"]
+        for need in ("set -euo pipefail", "stat -f -c %T", "pg_wal", "pg_relation_filepath", '"tmpfs"', "exit 1"):
+            self.assertIn(need, run)
+        self.assertNotIn("|| true", run)
+
+    def test_p95_budget_and_workload_are_unchanged_by_the_storage_fix(self):
+        php = (ROOT / "tests" / "Feature" / "CommerceOrderEventsPostgresTest.php").read_text(encoding="utf-8")
+        self.assertIn("private const P95_BUDGET_MS = 50.0;", php)
 
     def test_perf_job_is_not_skippable(self):
         self.assertNotIn("if", self.perf_job, "job-level if يجعل الوظيفة المتخطّاة تُحتسب نجاحاً")

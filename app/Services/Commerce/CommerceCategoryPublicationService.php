@@ -199,6 +199,93 @@ final class CommerceCategoryPublicationService
         });
     }
 
+    /** أقصى عدد معرّفات في طلب نشر جماعي واحد (حد صريح لا يُوسَّع بالتصفية). */
+    public const BULK_MAX_IDS = 100;
+
+    /**
+     * Bulk publish/unpublish an *explicit* set of categories on ONE storefront.
+     *
+     * - The target is exactly one tenant-authorized active web storefront; a
+     *   foreign/unknown/inactive id is rejected (422) before any write.
+     * - Only the listed ids are touched, and only that storefront's channel
+     *   listing — never the other stores, never anything outside the tenant.
+     * - Ids that do not resolve through the tenant-scoped query are rejected
+     *   with a uniform `not_found` (a foreign id is indistinguishable from a
+     *   missing one). One record's failure never rolls back the others: each
+     *   record commits in its own transaction and is reported individually.
+     * - Writes CommerceCategoryListing.is_published only; no inventory/financial/accounting
+     *   data is read or written.
+     *
+     * @param list<string> $ids
+     * @return array{action:string,storefront_id:string,summary:array<string,int>,results:list<array{id:string,status:string,reason?:string}>}
+     */
+    public function bulkSet(array $ids, string $storefrontId, bool $publish): array
+    {
+        $tenantId = $this->tenantId();
+        $storefront = $this->webStorefronts($tenantId)
+            ->first(fn (Storefront $candidate) => (string) $candidate->id === $storefrontId);
+        if ($storefront === null) {
+            abort(422, 'المتجر المحدد غير متاح لهذا المستأجر.');
+        }
+        $channelId = $storefront->sales_channel_id;
+
+        $requestedIds = array_values(array_unique(array_map('strval', $ids)));
+        $records = ProductCategory::query()
+            ->whereIn('id', $requestedIds)
+            ->get(['id', 'tenant_id'])
+            ->filter(fn (ProductCategory $record) => $record->tenant_id === $tenantId)
+            ->keyBy('id');
+        $listings = CommerceCategoryListing::query()
+            ->whereIn('category_id', $records->keys()->all())
+            ->where('sales_channel_id', $channelId)
+            ->get()
+            ->keyBy('category_id');
+
+        $results = [];
+        $summary = ['requested' => count($requestedIds), 'updated' => 0, 'unchanged' => 0, 'rejected' => 0, 'failed' => 0];
+
+        foreach ($requestedIds as $id) {
+            if (! $records->has($id)) {
+                $results[] = ['id' => $id, 'status' => 'rejected', 'reason' => 'not_found'];
+                $summary['rejected']++;
+
+                continue;
+            }
+
+            $current = $listings->get($id);
+            $isPublishedNow = $current !== null && (bool) $current->is_published;
+            // يشمل إلغاء نشر سجل بلا قائمة نشر أصلاً: لا شيء لفعله ولا صف يُنشأ بلا داعٍ.
+            if ($isPublishedNow === $publish) {
+                $results[] = ['id' => $id, 'status' => 'unchanged'];
+                $summary['unchanged']++;
+
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($id, $tenantId, $channelId, $publish): void {
+                    CommerceCategoryListing::query()->updateOrCreate(
+                        ['category_id' => $id, 'sales_channel_id' => $channelId],
+                        ['tenant_id' => $tenantId, 'is_published' => $publish],
+                    );
+                });
+                $results[] = ['id' => $id, 'status' => 'updated'];
+                $summary['updated']++;
+            } catch (\Throwable $exception) {
+                report($exception);
+                $results[] = ['id' => $id, 'status' => 'failed', 'reason' => 'error'];
+                $summary['failed']++;
+            }
+        }
+
+        return [
+            'action' => $publish ? 'publish' : 'unpublish',
+            'storefront_id' => (string) $storefront->id,
+            'summary' => $summary,
+            'results' => $results,
+        ];
+    }
+
     private function tenantId(): string
     {
         $tenantId = app(TenantContext::class)->id();

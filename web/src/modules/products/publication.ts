@@ -149,3 +149,61 @@ export async function loadProductPublicationList(params: {
     },
   };
 }
+
+// ── COM-CATALOG-3 — Bulk publish / unpublish ───────────────────────────────
+
+export type BulkPublicationAction = 'publish' | 'unpublish';
+export type BulkPublicationItemStatus = 'updated' | 'unchanged' | 'rejected' | 'failed';
+
+export type BulkPublicationResult = {
+  action: BulkPublicationAction;
+  storefrontId: string;
+  summary: { requested: number; updated: number; unchanged: number; rejected: number; failed: number };
+  results: Array<{ id: string; status: BulkPublicationItemStatus; reason: string | null }>;
+};
+
+type BulkPublicationPayload = {
+  data: {
+    action: BulkPublicationAction;
+    storefront_id: string;
+    summary: BulkPublicationResult['summary'];
+    results: Array<{ id: string; status: BulkPublicationItemStatus; reason?: string }>;
+  };
+};
+
+/** سقف الخادم لطلب جماعي واحد — يطابق `BULK_MAX_IDS` ولا يُوسَّع بالتصفية. */
+export const BULK_PUBLICATION_MAX_IDS = 100;
+
+export function productBulkPublicationPath(): string {
+  return `${productPublicationListPath()}/bulk`;
+}
+
+/** يحوّل ردّ النشر الجماعي (مشترك بين المنتجات والتصنيفات) إلى شكل العميل. */
+export function mapBulkPublicationPayload(payload: BulkPublicationPayload): BulkPublicationResult {
+  return {
+    action: payload.data.action,
+    storefrontId: payload.data.storefront_id,
+    summary: payload.data.summary,
+    results: payload.data.results.map((entry) => ({
+      id: entry.id,
+      status: entry.status,
+      reason: entry.reason ?? null,
+    })),
+  };
+}
+
+/**
+ * نشر/إلغاء نشر **معرّفات صريحة** على **متجر واحد**. لا يُرسل العميل أي tenant_id،
+ * ولا «كل المتاجر»، ولا مرشّحات: الخادم هو سلطة العزل والصلاحية، ويردّ بنتيجة لكل معرّف.
+ */
+export async function bulkSetProductPublication(params: {
+  action: BulkPublicationAction;
+  storefrontId: string;
+  ids: string[];
+}): Promise<BulkPublicationResult> {
+  const payload = await api<BulkPublicationPayload>(productBulkPublicationPath(), {
+    method: 'POST',
+    body: { action: params.action, storefront_id: params.storefrontId, ids: params.ids },
+  });
+  return mapBulkPublicationPayload(payload);
+}
