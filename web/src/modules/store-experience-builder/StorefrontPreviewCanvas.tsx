@@ -941,6 +941,7 @@ export function StorefrontPreviewCanvas({
           locale={locale}
           density={density}
           productCard={config.productCard}
+          isLuxe={isLuxe}
           state={categoryPreviewState}
           category={previewCategory}
           regions={categoryRegions ?? []}
@@ -2400,6 +2401,7 @@ function CategoryPagePreview({
   locale,
   density,
   productCard,
+  isLuxe,
   state,
   category,
   regions,
@@ -2412,6 +2414,7 @@ function CategoryPagePreview({
   locale: CustomizerLocale;
   density: "compact" | "comfortable";
   productCard: ProductCardStyleId;
+  isLuxe: boolean;
   state: "idle" | "loading" | "error" | "empty" | "ready";
   category: WorkspaceCategoryDetail | null;
   regions: PageRegionInstance<CategoryPageRegionKey>[];
@@ -2466,6 +2469,7 @@ function CategoryPagePreview({
   return (
     <div
       data-category-preview="ready"
+      data-luxe-motion={isLuxe ? "" : undefined}
       className={cn(
         storeContainerClassName,
         density === "compact" ? "space-y-3" : "space-y-4",
@@ -2560,8 +2564,8 @@ function CategoryPagePreview({
               ) : (
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                   {(gridProducts ?? []).map((product) => (
-                    <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
-                      <div className="aspect-square">
+                    <div key={product.id} data-card="" className={cn("overflow-hidden rounded-store bg-store-surface-muted", isLuxe && "flex flex-col border border-store-border bg-store-surface shadow-sm")}>
+                      <div data-card-image="" className={cn("aspect-square", isLuxe && "aspect-[3/4] bg-store-surface-muted")}>
                         {product.thumbnailUrl ? (
                           <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
@@ -2570,11 +2574,12 @@ function CategoryPagePreview({
                         className={cn(
                           "truncate text-[11px] text-store-foreground",
                           productCard === "compact" ? "px-1.5 py-1" : "px-2 py-1.5",
+                          isLuxe && "line-clamp-2 whitespace-normal px-3.5 pt-3 pb-1 text-sm font-bold leading-relaxed",
                         )}
                       >
                         <bdi>{product.name}</bdi>
                       </p>
-                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                      <div data-card-price="" className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5", isLuxe && "px-3.5 pb-3")}>
                         <PreviewProductMeta product={product} locale={locale} />
                       </div>
                     </div>
