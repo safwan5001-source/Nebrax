@@ -14,7 +14,8 @@
     hold_ms    = من اكتمال الحيازة حتى انتهاء التزامه (gap + commit)                           ← إمساك القفل: العميل (gap) أو الالتزام (commit)
   التصنيف (الأول المنطبق):
     commit_stall       hold_ms ≥ 50% من التجمّد وcommit_ms ≥ gap_ms
-    client_gap_cpu     hold_ms ≥ 50% وgap_ms > commit_ms وrq_after_ms ≥ 50% من gap_ms   (عملية PHP جاهزة ولم تحصل على معالج وهي ممسكة بالقفل)
+    client_gap_cpu     hold_ms ≥ 50% وgap_ms > commit_ms وrq_gap_ms ≥ 50% من gap_ms   (عملية PHP جاهزة ولم تحصل على معالج وهي ممسكة بالقفل؛ rq_gap_ms
+                       يقيس تأخر الطابور داخل نافذة gap_ms نفسها، لا COMMIT وما بعده)
     client_gap_other   hold_ms ≥ 50% وgap_ms > commit_ms بلا تأخر طابور   (عميل متوقف لسبب آخر: GC/تبديل/انتظار نظام)
     handoff_latency    handoff_ms ≥ 50% من التجمّد   (تأخر بين تحرير القفل وإتمام الحيازة التالية: جدولة الخادم/الإدراج)
     mixed              غير ذلك
@@ -113,22 +114,25 @@ def freeze_of(rnd: dict[str, Any]) -> dict[str, Any] | None:
     txns = sorted(rnd.get("txns", []), key=txn_end)
     ends = [txn_end(t) for t in txns]
     best = None
-    for idx in range(1, len(txns)):
-        prev, cur = txns[idx - 1], txns[idx]
+    # أول التزام يُقاس من بدء أول نشاط معاملات في الجولة (أبكر `at`) — لا من بدء العملية — كي لا يُخفى توقف المعاملة الأولى.
+    first_start = min((t["at"] for t in txns), default=0.0)
+    for idx in range(len(txns)):
+        cur = txns[idx]
+        prev_end = first_start if idx == 0 else ends[idx - 1]
         cur_end = ends[idx]
         queued = sum(1 for j, t in enumerate(txns) if j != idx and t["at"] < cur_end and ends[j] > cur_end)
         if queued < QUEUE_MIN:
             continue
-        gap_ms = (cur_end - ends[idx - 1]) * 1000.0
+        gap_ms = (cur_end - prev_end) * 1000.0
         if best is None or gap_ms > best["freeze_ms"]:
             acquired = cur["at"] + cur["wait_ms"] / 1000.0
             best = {
                 "freeze_ms": round(gap_ms, 1),
-                "handoff_ms": round(max(0.0, (acquired - ends[idx - 1]) * 1000.0), 1),
+                "handoff_ms": round(max(0.0, (acquired - prev_end) * 1000.0), 1),
                 "hold_ms": round(cur["gap_ms"] + cur["commit_ms"], 1),
                 "queued": queued,
                 "root": cur,
-                "t_start": ends[idx - 1],
+                "t_start": prev_end,
                 "t_end": cur_end,
             }
     return best
@@ -141,7 +145,7 @@ def classify(fr: dict[str, Any] | None) -> str:
     if fr["hold_ms"] >= SHARE * fr["freeze_ms"]:
         if root["commit_ms"] >= root["gap_ms"]:
             return "commit_stall"
-        if root["rq_after_ms"] >= SHARE * root["gap_ms"]:
+        if root["rq_gap_ms"] >= SHARE * root["gap_ms"]:
             return "client_gap_cpu"
         return "client_gap_other"
     if fr["handoff_ms"] >= SHARE * fr["freeze_ms"]:
@@ -160,10 +164,30 @@ def sampler_holders(rnd: dict[str, Any], fr: dict[str, Any] | None) -> dict[str,
     return dict(out)
 
 
+def round_validity(run: dict[str, Any], rnd: dict[str, Any]) -> str | None:
+    """سبب بطلان الجولة (None = صالحة). جولة ناقصة (كاتب فشل/تسلسل غير متصل/معاملات أقل) تُخفض p95 زيفاً فلا تدخل أي إحصاء."""
+    wl = run.get("workload", {})
+    expected = wl.get("writers", 20) * wl.get("per_writer", 10)
+    integ = rnd.get("integrity") or {}
+    if integ.get("errors"):
+        return "writer_errors"
+    if not integ.get("sequence_complete", False):
+        return "sequence_incomplete"
+    if not integ.get("per_writer_complete", False):
+        return "per_writer_incomplete"
+    if rnd.get("transactions") != expected or len(rnd.get("txns", [])) != expected:
+        return f"sample_count_{rnd.get('transactions')}_of_{expected}"
+    return None
+
+
 def round_rows(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = []
     for run in runs:
         for rnd in run["rounds"]:
+            invalid = round_validity(run, rnd)
+            if invalid is not None:
+                rows.append({"variant": run["variant"], "repeat": run["repeat"], "round": rnd["round"], "kind": rnd["kind"], "invalid": invalid})
+                continue
             fr = freeze_of(rnd)
             rows.append({
                 "variant": run["variant"], "repeat": run["repeat"], "round": rnd["round"], "kind": rnd["kind"],
@@ -197,9 +221,11 @@ def median_or_nan(v: list[float]) -> float:
     return statistics.median(v) if v else float("nan")
 
 
-def build_report(runs: list[dict[str, Any]]) -> str:
-    rows = round_rows(runs)
-    variants = sorted({r["variant"] for r in rows})
+def build_report(runs: list[dict[str, Any]], expect: int = 0) -> str:
+    all_rows = round_rows(runs)
+    invalid_rows = [r for r in all_rows if r.get("invalid")]
+    rows = [r for r in all_rows if not r.get("invalid")]
+    variants = sorted({r["variant"] for r in all_rows})
     out: list[str] = []
     out.append("## COPS-H1-1 — تشخيص توقف قفل التغذية (Issue #1975، المرحلة 1)")
     out.append("")
@@ -207,6 +233,22 @@ def build_report(runs: list[dict[str, Any]]) -> str:
     hosts = Counter((r["host"].get("nproc"), r["host"].get("cpu_model"), r["pg"].get("server_version")) for r in runs)
     out.append("المضيف: " + "; ".join(f"nproc={n} · {m} · PG {v} ×{c}" for (n, m, v), c in hosts.items()))
     out.append("")
+    if invalid_rows or expect:
+        out.append("### 0) صلاحية البيانات")
+        out.append("")
+        if invalid_rows:
+            by_job = Counter((r["variant"], r["repeat"]) for r in invalid_rows)
+            out.append(f"⚠ **{len(invalid_rows)} جولة غير صالحة استُبعدت من كل الإحصاءات** (نزاهة/عدد عيّنات): " +
+                       "; ".join(f"{v}#{rep}: {n}" for (v, rep), n in sorted(by_job.items(), key=lambda kv: str(kv[0]))) +
+                       ". الأسباب: " + ", ".join(sorted({r["invalid"] for r in invalid_rows})))
+        if expect:
+            for v in variants:
+                got = len({r["repeat"] for r in all_rows if r["variant"] == v})
+                if got < expect:
+                    out.append(f"⚠ المتغيّر {v}: وصل {got} من {expect} تشغيلات متوقعة (وظائف قياس فشلت أو لم تُنتج مخرجات) — المقارنة ناقصة.")
+        if not invalid_rows and all(len({r['repeat'] for r in all_rows if r['variant'] == v}) >= expect for v in variants):
+            out.append("كل التشغيلات المتوقعة وصلت وكل الجولات صالحة.")
+        out.append("")
 
     # 1) المقارنة الموحّدة
     out.append("### 1) مقارنة موحّدة بين المتغيّرين (المنهجية والحمل والتوقيت نفسها)")
@@ -256,12 +298,12 @@ def build_report(runs: list[dict[str, Any]]) -> str:
     if not over:
         out.append("لا جولة متجاوزة في هذه العيّنة.")
     else:
-        out.append("| تشغيل | جولة | نوع | p95 إضافي | بطيئة | تجمّد ms | handoff ms | hold ms (gap/commit/rq) | تصنيف | ماسك مرصود | PSI cpu/io ms | WAL sync ms | nivcsw (جذر/أعلى) |")
+        out.append("| تشغيل | جولة | نوع | p95 إضافي | بطيئة | تجمّد ms | handoff ms | hold ms (gap/commit/rq_gap) | تصنيف | ماسك مرصود | PSI cpu/io ms | WAL sync ms | nivcsw (جذر/أعلى) |")
         out.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         for r in over:
             fr = r["freeze"]
             root = fr["root"] if fr else None
-            hold = f"{fr['hold_ms']} ({root['gap_ms']}/{root['commit_ms']}/{root['rq_after_ms']})" if fr else "—"
+            hold = f"{fr['hold_ms']} ({root['gap_ms']}/{root['commit_ms']}/{root['rq_gap_ms']})" if fr else "—"
             holders = ", ".join(f"{k}×{v}" for k, v in sorted(r["holders"].items(), key=lambda kv: -kv[1])[:3]) or "—"
             out.append(
                 f"| {r['variant']}#{r['repeat']} | {r['round']} | {r['kind']} | {r['added_p95_ms']} | {r['slow_count']} | "
@@ -296,17 +338,19 @@ def build_report(runs: list[dict[str, Any]]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        print("usage: analyze.py <artifacts-dir> [report.md]", file=sys.stderr)
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    expect = next((int(a.split("=", 1)[1]) for a in argv[1:] if a.startswith("--expect=")), 0)
+    if not args:
+        print("usage: analyze.py <artifacts-dir> [report.md] [--expect=N]", file=sys.stderr)
         return 2
-    runs = load_runs(argv[1])
+    runs = load_runs(args[0])
     if not runs:
         print("no cops-h1-1-diag.json found", file=sys.stderr)
         return 1
-    report = build_report(runs)
+    report = build_report(runs, expect)
     print(report)
-    if len(argv) > 2:
-        with open(argv[2], "w", encoding="utf-8") as fh:
+    if len(args) > 1:
+        with open(args[1], "w", encoding="utf-8") as fh:
             fh.write(report)
     return 0
 

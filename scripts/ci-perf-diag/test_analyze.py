@@ -6,8 +6,8 @@ import unittest
 import analyze as A
 
 
-def txn(w, at, wait=1.0, gap=0.05, commit=1.0, rq_wait=0.0, rq_after=0.0):
-    return {"w": w, "at": at, "wait_ms": wait, "gap_ms": gap, "commit_ms": commit, "rq_wait_ms": rq_wait, "rq_after_ms": rq_after}
+def txn(w, at, wait=1.0, gap=0.05, commit=1.0, rq_wait=0.0, rq_gap=0.0, rq_commit=0.0):
+    return {"w": w, "at": at, "wait_ms": wait, "gap_ms": gap, "commit_ms": commit, "rq_wait_ms": rq_wait, "rq_gap_ms": rq_gap, "rq_commit_ms": rq_commit}
 
 
 def steady(n=20, step=0.01, start=100.0):
@@ -31,7 +31,8 @@ def stalled_queue(stall_at=10, **stall):
 
 def rnd(txns, kind="gate_equiv", added=10.0, slow=0, over=False, **extra):
     base = {"round": 1, "kind": kind, "sampled": kind == "sampled", "added_p95_ms": added, "slow_count": slow,
-            "over_gate_budget": over, "txns": txns, "writers": [{"w": i, "pg_pid": 1000 + i, "ru": {"nivcsw": 3 * i}} for i in range(5)]}
+            "over_gate_budget": over, "txns": txns, "transactions": len(txns),
+            "integrity": {"errors": [], "sequence_complete": True, "per_writer_complete": True}, "writers": [{"w": i, "pg_pid": 1000 + i, "ru": {"nivcsw": 3 * i}} for i in range(5)]}
     base.update(extra)
     return base
 
@@ -73,11 +74,22 @@ class Classification(unittest.TestCase):
         self.assertGreaterEqual(fr["queued"], A.QUEUE_MIN)
 
     def test_client_gap_with_runqueue_delay_is_cpu(self):
-        t = stalled_queue(gap=80.0, rq_after=70.0)
+        t = stalled_queue(gap=80.0, rq_gap=70.0)
         self.assertEqual(A.classify(A.freeze_of(rnd(t))), "client_gap_cpu")
 
     def test_client_gap_without_runqueue_delay_is_other(self):
-        t = stalled_queue(gap=80.0, rq_after=1.0)
+        t = stalled_queue(gap=80.0, rq_gap=1.0)
+        self.assertEqual(A.classify(A.freeze_of(rnd(t))), "client_gap_other")
+
+    def test_stall_of_the_very_first_transaction_is_not_hidden(self):
+        t = stalled_queue(stall_at=0, commit=120.0)
+        fr = A.freeze_of(rnd(t))
+        self.assertEqual(A.classify(fr), "commit_stall")
+        self.assertGreaterEqual(fr["freeze_ms"], 100.0)
+
+    def test_commit_phase_runqueue_delay_is_not_charged_to_the_client_gap(self):
+        # فجوة العميل طويلة لكن تأخر الطابور وقع بعد COMMIT (rq_commit) لا داخل الفجوة ⇒ ليس client_gap_cpu.
+        t = stalled_queue(gap=80.0, rq_gap=1.0, rq_commit=70.0)
         self.assertEqual(A.classify(A.freeze_of(rnd(t))), "client_gap_other")
 
     def test_handoff_latency(self):
@@ -93,7 +105,8 @@ class Report(unittest.TestCase):
     def _write(self, root, variant, repeat, rounds):
         d = os.path.join(root, f"{variant}-{repeat}")
         os.makedirs(d)
-        payload = {"host": {"variant": variant, "repeat": repeat, "nproc": 4, "cpu_model": "x"}, "pg": {"server_version": "16"}, "rounds": rounds}
+        payload = {"host": {"variant": variant, "repeat": repeat, "nproc": 4, "cpu_model": "x"}, "pg": {"server_version": "16"},
+                   "workload": {"writers": 5, "per_writer": 4}, "rounds": rounds}
         with open(os.path.join(d, "cops-h1-1-diag.json"), "w", encoding="utf-8") as fh:
             json.dump(payload, fh)
 
@@ -111,6 +124,29 @@ class Report(unittest.TestCase):
         self.assertIn("commit_stall", text)
         self.assertIn("Fisher", text)
         self.assertIn("1/3", text)       # فشل وظيفة واحدة من ثلاث في pr1972
+
+    def test_integrity_failed_rounds_are_excluded_and_reported_not_counted_as_clean(self):
+        incomplete = rnd(steady(), added=3.0)                       # p95 منخفض زيفاً لأن كاتباً فشل
+        incomplete["integrity"] = {"errors": ["العملية 3: RuntimeException x"], "sequence_complete": False, "per_writer_complete": False}
+        short = rnd(steady(10), added=2.0)                          # عيّنات أقل من المتوقع (20)
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [incomplete, short])
+            self._write(root, "main", 2, [rnd(steady(), added=12.0)])
+            text = A.build_report(A.load_runs(root), expect=2)
+        self.assertIn("جولة غير صالحة استُبعدت", text)
+        self.assertIn("writer_errors", text)
+        self.assertIn("main#1: 2", text)
+        self.assertIn("وسيط p95 للجولات النظيفة", text)
+        self.assertNotIn("| main | 2 |", text)                        # التشغيل 1 لا يُحتسب وظيفةً ناجحة؛ يبقى تشغيل صالح واحد فقط
+
+    def test_missing_runs_are_reported_when_expected_count_is_given(self):
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [rnd(steady(), added=12.0)])
+            self._write(root, "pr1972", 1, [rnd(steady(), added=12.0)])
+            self._write(root, "pr1972", 2, [rnd(steady(), added=12.0)])
+            text = A.build_report(A.load_runs(root), expect=2)
+        self.assertIn("المتغيّر main: وصل 1 من 2", text)
+        self.assertNotIn("المتغيّر pr1972: وصل", text)
 
 
 if __name__ == "__main__":

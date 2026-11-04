@@ -30,8 +30,9 @@ use Tests\TestCase;
  *   • `wait_ms` — انتظار القفل + الإدراج (كالبوابة).
  *   • `gap_ms` — من عودة `append()` حتى بدء COMMIT: القفل ممسوك ولا شيء يُنفَّذ في PostgreSQL (الكاتب PHP نفسه). توقف هنا = العميل لا الخادم.
  *   • `commit_ms` — `DB::commit()` كاملاً (COMMIT + مزامنة WAL + مستمعو `afterCommit` داخل العملية). توقف هنا = الالتزام (غالباً fsync).
- *   • `rq_wait_ms`/`rq_after_ms` — زمن انتظار طابور التشغيل (`/proc/self/schedstat`، الحقل الثالث) للعملية نفسها أثناء `append()` وبعده:
- *     يميّز «العملية كانت جاهزة ولم تحصل على معالج» عن «كانت نائمة بانتظار قرص/قفل».
+ *   • `rq_wait_ms`/`rq_gap_ms`/`rq_commit_ms` — زمن انتظار طابور التشغيل (`/proc/self/schedstat`، الحقل الثالث) للعملية نفسها في نافذة `append()`
+ *     ونافذة الفجوة (نفسها نافذة `gap_ms` بالضبط) ونافذة COMMIT وما بعده: يميّز «جاهزة ولم تحصل على معالج» عن «نائمة بانتظار قرص/قفل».
+ *     قراءتا schedstat داخل الفجوة (≈25µs لكل قراءة) إضافة وحيدة تحت القفل خارج فاصل البوابة.
  *   • لكل كاتب: `ru_nivcsw` (تبديلات سياق قسرية) و`ru_nvcsw` و`utime/stime`.
  *   • لكل جولة: فرق `pg_stat_wal` (وقت مزامنة WAL)، وضغط المعالج/القرص على مستوى المشغّل (`/proc/pressure/{cpu,io}`).
  *   • جولات «مُعاينة» (sampled) فقط: عملية رصد تستعلم `pg_stat_activity` + `pg_blocking_pids()` كل ≈5ms وتسجّل **حالة الماسك الجذري** وقت الاصطفاف
@@ -205,23 +206,26 @@ class CommerceOrderEventsStallDiagnosticTest extends TestCase
                         $wall = microtime(true);
                         $t0 = hrtime(true);
                         self::append($tenant, $orderId);
-                        $t1 = hrtime(true);
-                        $rqB = self::runDelayNs();
+                        $t1 = hrtime(true);                 // نهاية فاصل البوابة (wait_ms) — لا شيء قبله يتغيّر
+                        $rqB = self::runDelayNs();          // بداية فجوة العميل (القفل ممسوك)
+                        $t1b = hrtime(true);
                         if ($injectMs > 0 && $i === 0 && $j === 5) {
                             usleep($injectMs * 1000);
                         }
+                        $rqG = self::runDelayNs();          // نهاية الفجوة: قبل COMMIT مباشرةً
                         $t2 = hrtime(true);
                         DB::commit();
                         $t3 = hrtime(true);
-                        $rqC = self::runDelayNs();
+                        $rqC = self::runDelayNs();          // بعد الالتزام (تأخر الاستيقاظ بعده لا يطيل إمساك القفل)
                     } catch (\Throwable $e) {
                         DB::rollBack();
                         throw $e;
                     }
                     $txns[] = [
                         'w' => $i, 'at' => round($wall, 6),
-                        'wait_ms' => round(($t1 - $t0) / 1e6, 3), 'gap_ms' => round(($t2 - $t1) / 1e6, 3), 'commit_ms' => round(($t3 - $t2) / 1e6, 3),
-                        'rq_wait_ms' => round(($rqB - $rqA) / 1e6, 3), 'rq_after_ms' => round(($rqC - $rqB) / 1e6, 3),
+                        'wait_ms' => round(($t1 - $t0) / 1e6, 3), 'gap_ms' => round(($t2 - $t1b) / 1e6, 3), 'commit_ms' => round(($t3 - $t2) / 1e6, 3),
+                        // تأخر طابور المعالج للعملية نفسها في نافذة كلٍّ من: append / فجوة العميل (نفس نافذة gap_ms) / COMMIT وما بعده.
+                        'rq_wait_ms' => round(($rqB - $rqA) / 1e6, 3), 'rq_gap_ms' => round(($rqG - $rqB) / 1e6, 3), 'rq_commit_ms' => round(($rqC - $rqG) / 1e6, 3),
                     ];
                 }
                 $ru1 = getrusage();
@@ -385,7 +389,7 @@ class CommerceOrderEventsStallDiagnosticTest extends TestCase
     private static function componentStats(array $txns): array
     {
         $out = [];
-        foreach (['wait_ms', 'gap_ms', 'commit_ms', 'rq_wait_ms', 'rq_after_ms'] as $k) {
+        foreach (['wait_ms', 'gap_ms', 'commit_ms', 'rq_wait_ms', 'rq_gap_ms', 'rq_commit_ms'] as $k) {
             $v = array_column($txns, $k);
             sort($v);
             $n = count($v);

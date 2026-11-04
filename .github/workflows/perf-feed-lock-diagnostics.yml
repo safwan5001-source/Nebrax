@@ -288,7 +288,7 @@ jobs:
 
   collect:
     name: Collect + unified comparison
-    needs: measure
+    needs: [plan, measure]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -300,10 +300,12 @@ jobs:
           path: artifacts
       - name: تقرير المقارنة الموحّدة
         shell: bash
+        env:
+          EXPECT_PER_VARIANT: ${{ length(fromJSON(needs.plan.outputs.matrix).repeat) }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts/ci-perf-diag
-          python3 scripts/ci-perf-diag/analyze.py artifacts diag-report.md
+          python3 scripts/ci-perf-diag/analyze.py artifacts diag-report.md --expect="$EXPECT_PER_VARIANT"
           cat diag-report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
