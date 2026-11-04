@@ -75,7 +75,10 @@ export function StationOpsProvider({ children }: { children: ReactNode }) {
   usePermissionRefresh(viewer !== null);
 
   if (!hydrated || viewer === null) return null;
-  const scopeKey = `${viewer.tenant_id}|${viewer.id}|${branchId ?? 'default'}`;
+  // نطاق الوصول المحدَّث من `/me` (فروع/مخازن) جزء من حدّ الإبطال: تغييره يُسقط قائمة المحطات والمحطة المختارة وكل ما حُمِّل لها.
+  // غياب الحقل (`undefined`) ≠ القائمة الفارغة (غير مقيَّد).
+  const access = (ids: string[] | undefined) => (ids === undefined ? 'unknown' : [...ids].sort().join(','));
+  const scopeKey = `${viewer.tenant_id}|${viewer.id}|${branchId ?? 'default'}|${access(viewer.branch_ids)}|${access(viewer.warehouse_ids)}`;
 
   return (
     <ScopedProvider key={scopeKey} scopeKey={scopeKey}>

@@ -59,7 +59,7 @@ export type ReadQuery = Record<string, string | number | undefined>;
 export async function opsGet<S extends z.ZodTypeAny>(
   path: string,
   schema: S,
-  options: { query?: ReadQuery; signal?: AbortSignal } = {},
+  options: { query?: ReadQuery; signal?: AbortSignal; branchId?: string | null } = {},
 ): Promise<z.infer<S>> {
   if (!isAllowedReadPath(path)) throw new Error(`station-ops: path is not an allowed read endpoint: ${path}`);
   // وضع المعاينة لا يتصل بخادم ويعيد بيانات وهمية؛ لا نعرضها كأنها بيانات محطة.
@@ -73,7 +73,10 @@ export async function opsGet<S extends z.ZodTypeAny>(
 
   let body: unknown;
   try {
-    body = await api<unknown>(url, { method: 'GET', signal: options.signal });
+    // الورديات يقيّدها الخادم بالفرع الفعّال (`X-Branch-Id`)، ومحطات المستخدم قد تكون في فروع مختلفة: يُرسَل فرع المحطة المختارة نفسها
+    // (من قائمة المحطات المصرّح بها). الترويسة طلبٌ لا إذن — `SetBranch` يتجاهل فرعاً خارج نطاق المستخدم، فلا تصعيد من الواجهة.
+    const headers = options.branchId ? { 'X-Branch-Id': options.branchId } : undefined;
+    body = await api<unknown>(url, { method: 'GET', signal: options.signal, ...(headers ? { headers } : {}) });
   } catch (error) {
     if (isAbort(error)) throw error;
     throw toStationOpsError(error);

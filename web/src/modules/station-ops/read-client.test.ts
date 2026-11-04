@@ -39,6 +39,16 @@ describe('opsGet — read-only client', () => {
     expect(options).not.toHaveProperty('body');
   });
 
+  it('sends X-Branch-Id only when a branch override is given', async () => {
+    apiMock.mockResolvedValue({ data: [] });
+    await opsGet('/fuel-stations/shifts', listSchema, { branchId: 'branch-9' });
+    await opsGet('/fuel-stations/shifts', listSchema, { branchId: null });
+    await opsGet('/fuel-stations/shifts', listSchema);
+    expect(apiMock.mock.calls[0][1]).toMatchObject({ method: 'GET', headers: { 'X-Branch-Id': 'branch-9' } });
+    expect(apiMock.mock.calls[1][1]).not.toHaveProperty('headers');
+    expect(apiMock.mock.calls[2][1]).not.toHaveProperty('headers');
+  });
+
   it('classifies HTTP failures honestly', async () => {
     const cases: Array<[number, string]> = [[401, 'unauthorized'], [403, 'forbidden'], [404, 'not_found'], [500, 'server'], [503, 'server']];
     for (const [status, kind] of cases) {

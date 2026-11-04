@@ -19,6 +19,7 @@ export interface Hold { release: () => void }
 
 export function createBackend(data: TenantData, options: { pageSize?: number } = {}) {
   const calls: string[] = [];
+  const headersByCall: Array<{ url: string; headers: Record<string, string> }> = [];
   const holds: Array<{ match: (url: string) => boolean; promise: Promise<void>; release: () => void }> = [];
   const failures: Array<{ match: (url: string) => boolean; error: unknown }> = [];
   const pageSize = options.pageSize ?? 50;
@@ -40,8 +41,9 @@ export function createBackend(data: TenantData, options: { pageSize?: number } =
     return { data: rows.slice((page - 1) * pageSize, page * pageSize), meta: { current_page: page, last_page: last } };
   }
 
-  async function handler(url: string): Promise<unknown> {
+  async function handler(url: string, headers: Record<string, string> = {}): Promise<unknown> {
     calls.push(url);
+    headersByCall.push({ url, headers });
     const [path, search = ''] = url.split('?');
     const query = new URLSearchParams(search);
     for (const h of holds) if (h.match(url)) await h.promise;
@@ -69,7 +71,7 @@ export function createBackend(data: TenantData, options: { pageSize?: number } =
     }
   }
 
-  return { calls, handler, hold, fail, callsTo: (fragment: string) => calls.filter((call) => call.includes(fragment)) };
+  return { calls, headersByCall, handler, hold, fail, callsTo: (fragment: string) => calls.filter((call) => call.includes(fragment)) };
 }
 
 export type Backend = ReturnType<typeof createBackend>;

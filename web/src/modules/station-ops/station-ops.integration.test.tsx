@@ -65,9 +65,9 @@ let backend: Backend;
 
 function connect(data: TenantData, options?: { pageSize?: number }) {
   backend = createBackend(data, options);
-  apiMock.mockImplementation(async (path: string) => {
+  apiMock.mockImplementation(async (path: string, options?: { headers?: HeadersInit }) => {
     if (path === '/me') return { user: JSON.parse(localStorage.getItem('user') as string) };
-    return backend.handler(path) as never;
+    return backend.handler(path, options?.headers as Record<string, string> | undefined) as never;
   });
   return backend;
 }
@@ -268,6 +268,51 @@ describe('tenant and branch isolation', () => {
     const slow = server.hold((url) => url.includes('/fuel-stations/stations'));
     act(() => { setActiveBranchId('branch-2'); });
     expect(screen.queryByText('Alpha')).toBeNull();
+    await act(async () => { slow.release(); });
+    expect(await screen.findByText('Alpha')).toBeTruthy();
+    expect(server.callsTo('/fuel-stations/stations').length).toBeGreaterThan(before);
+  });
+
+  it('asks for shifts in the SELECTED station\'s own branch (X-Branch-Id), not whatever branch is active', async () => {
+    seedUser();
+    const data = tenantData();
+    data.stations = [{ ...data.stations[0], branch_id: 'branch-A' }, { ...data.stations[1], branch_id: 'branch-B' }];
+    data.shifts = [makeShift('sb1', 'b', { number: 'SH-B1' })];
+    const server = connect(data);
+    nav.pathname = '/fuel-stations/ops';
+    renderOps(<HomeScreen />);
+    await screen.findByText('Alpha');
+    await userEvent.selectOptions(await stationSelect(), 'b');
+    expect(await screen.findByText('SH-B1')).toBeTruthy();
+    const shiftCalls = server.headersByCall.filter((call) => call.url.includes('/fuel-stations/shifts'));
+    expect(shiftCalls.some((call) => call.url.includes('station_id=b') && call.headers['X-Branch-Id'] === 'branch-B')).toBe(true);
+    expect(shiftCalls.filter((call) => call.url.includes('station_id=a')).every((call) => call.headers['X-Branch-Id'] === 'branch-A')).toBe(true);
+    // الأصول والأسعار لا تحمل فرعاً مفروضاً من الواجهة.
+    expect(server.headersByCall.filter((call) => call.url.includes('/products')).every((call) => call.headers['X-Branch-Id'] === undefined)).toBe(true);
+  });
+
+  it('a station without a branch sends no branch override', async () => {
+    seedUser();
+    const data = tenantData();
+    data.shifts = [makeShift('s1', 'a')];
+    const server = connect(data);
+    renderOps(<HomeScreen />);
+    await screen.findByText('SH-s1');
+    expect(server.headersByCall.filter((call) => call.url.includes('/shifts')).every((call) => call.headers['X-Branch-Id'] === undefined)).toBe(true);
+  });
+
+  it('reloads from scratch when AWJ changes the user\'s authorized branches while the workspace is open', async () => {
+    seedUser({ branch_ids: [] });
+    const server = connect(tenantData());
+    renderOps(<HomeScreen />);
+    await screen.findByText('Alpha');
+    const before = server.callsTo('/fuel-stations/stations').length;
+    const slow = server.hold((url) => url.includes('/fuel-stations/stations'));
+    act(() => {
+      localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user') as string), branch_ids: ['branch-A'] }));
+      window.dispatchEvent(new Event('nibras:user-changed'));
+    });
+    expect(screen.queryByText('Alpha')).toBeNull(); // لا بقايا نطاق الوصول السابق
     await act(async () => { slow.release(); });
     expect(await screen.findByText('Alpha')).toBeTruthy();
     expect(server.callsTo('/fuel-stations/stations').length).toBeGreaterThan(before);

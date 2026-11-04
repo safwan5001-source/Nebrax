@@ -110,6 +110,7 @@ export function useCurrentShift(station: Station | null): CurrentShiftResult {
   const query = useScopedQuery(key, async (signal) => {
     const page = await opsGet('/fuel-stations/shifts', shiftsResponse, {
       signal,
+      branchId: station?.branch_id,
       query: { station_id: stationId as string, status: 'open' },
     });
     // الخادم يصفّي بالمحطة؛ نتحقق مرة ثانية قبل العرض (دفاع بالعمق).
@@ -155,6 +156,7 @@ export function useShiftHistory(station: Station | null, filter: ShiftFilter): S
   const first = useScopedQuery(key, async (signal) => {
     const page = await opsGet('/fuel-stations/shifts', shiftsResponse, {
       signal,
+      branchId: station?.branch_id,
       query: { station_id: stationId as string, status: filter === 'all' ? undefined : filter, page: 1 },
     });
     return { rows: page.data.filter((shift) => shift.station_id === stationId), lastPage: page.meta?.last_page ?? 1 };
@@ -176,6 +178,7 @@ export function useShiftHistory(station: Station | null, filter: ShiftFilter): S
     const seed: MoreState = { base: firstData, rows: current?.rows ?? [], lastLoaded: current?.lastLoaded ?? 1, lastPage, loading: true, failed: false };
     setMore({ ...seed, key: requestKey });
     opsGet('/fuel-stations/shifts', shiftsResponse, {
+      branchId: station?.branch_id,
       query: { station_id: stationId, status: filter === 'all' ? undefined : filter, page: nextPage },
     }).then(
       (page) => {
@@ -189,7 +192,7 @@ export function useShiftHistory(station: Station | null, filter: ShiftFilter): S
         setMore({ ...seed, key: requestKey, loading: false, failed: true });
       },
     );
-  }, [key, firstData, stationId, filter, activeMore]);
+  }, [key, firstData, stationId, station?.branch_id, filter, activeMore]);
 
   // تبدّل المفتاح يُسقط الصفحات الإضافية فور تغيّر `key`؛ الحالة القديمة لا تُعرض (انظر activeMore) وتُمسح هنا.
   useEffect(() => {
