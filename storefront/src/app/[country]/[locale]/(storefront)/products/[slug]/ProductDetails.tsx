@@ -301,7 +301,12 @@ export function ProductDetails({
         )}
 
         <div className="flex items-start justify-between gap-3">
-          <h1 className={cn("min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl", isLuxe && "text-2xl font-bold leading-relaxed md:text-3xl")}>
+          <h1
+            className={cn(
+              "min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl",
+              isLuxe && "text-2xl font-bold leading-relaxed md:text-3xl",
+            )}
+          >
             {product.name}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
@@ -318,9 +323,19 @@ export function ProductDetails({
       </div>
     ),
     price: (
-      <div className={cn("mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1", isLuxe && "mt-5 gap-x-4")}>
+      <div
+        className={cn(
+          "mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1",
+          isLuxe && "mt-5 gap-x-4",
+        )}
+      >
         {displayPrice ? (
-          <span className={cn("text-xl font-black text-store-primary md:text-2xl", isLuxe && "text-2xl md:text-3xl")}>
+          <span
+            className={cn(
+              "text-xl font-black text-store-primary md:text-2xl",
+              isLuxe && "text-2xl md:text-3xl",
+            )}
+          >
             {/*
                 For a variant-managed product with nothing selected yet, the
                 figure the API sends is its cheapest active variant — stating
@@ -458,7 +473,11 @@ export function ProductDetails({
           {pricesHidden ? (
             // Guest on a prices-hidden channel: no pricing, no ordering —
             // route them through the wholesale sign-in first.
-            <Button asChild size="lg" className={cn(hasMobilePurchaseBar && "w-full")}>
+            <Button
+              asChild
+              size="lg"
+              className={cn(hasMobilePurchaseBar && "w-full")}
+            >
               <Link href={hiddenPricing.signInHref}>
                 {tw("hiddenPrice.signInToOrder")}
               </Link>
@@ -473,7 +492,10 @@ export function ProductDetails({
 
               <Button
                 size="lg"
-                className={cn("min-w-40 flex-1", isLuxe && "min-h-12 rounded-store text-base shadow-sm")}
+                className={cn(
+                  "min-w-40 flex-1",
+                  isLuxe && "min-h-12 rounded-store text-base shadow-sm",
+                )}
                 onClick={handleAddToCart}
                 disabled={loading || !isPurchasable}
               >
@@ -499,7 +521,9 @@ export function ProductDetails({
           )}
         </div>
         {/* Keeps the fixed bar above from covering the rest of the page. */}
-        {hasMobilePurchaseBar && <div aria-hidden="true" className="h-20 md:hidden" />}
+        {hasMobilePurchaseBar && (
+          <div aria-hidden="true" className="h-20 md:hidden" />
+        )}
       </>
     ),
     description:
@@ -569,7 +593,12 @@ export function ProductDetails({
       }
     >
       {/* The product leads. No marketing band above it. */}
-      <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10", isLuxe && "gap-7 lg:gap-14")}>
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10",
+          isLuxe && "gap-7 lg:gap-14",
+        )}
+      >
         {/*
           The gallery is capped rather than left to fill its track. It is a
           square, so an uncapped column made it ~880px tall at 1440 and pushed
@@ -577,7 +606,13 @@ export function ProductDetails({
           product-first. `media_gallery` is FIXED_REQUIRED and never
           reorderable, so it always renders here regardless of `regionOrder`.
         */}
-        <div className={cn("w-full lg:sticky lg:top-(--store-header-offset) lg:self-start", isLuxe && "overflow-hidden rounded-store border border-store-border bg-store-surface-muted")}>
+        <div
+          className={cn(
+            "w-full lg:sticky lg:top-(--store-header-offset) lg:self-start",
+            isLuxe &&
+              "overflow-hidden rounded-store border border-store-border bg-store-surface-muted",
+          )}
+        >
           <MediaGallery
             images={galleryImages}
             productName={product.name}
