@@ -88,11 +88,14 @@ export function LineDetail(props: LineDetailProps) {
   const busy = job?.status === 'queued' || job?.status === 'sending' || job?.status === 'backoff';
 
   const loadHistory = async () => {
+    const requested = line.id;
     setHistoryError(null);
     try {
-      setHistory(await fetchLineHistory(props.reconciliationId, line.id));
+      const items = await fetchLineHistory(props.reconciliationId, requested);
+      // ردّ سطر سابق لا يُعرض تحت سطر آخر (السطر النشط الآن قد تغيّر أثناء الانتظار).
+      if (requested === activeLineRef.current) setHistory(items);
     } catch (error) {
-      setHistoryError(describeError(error).key);
+      if (requested === activeLineRef.current) setHistoryError(describeError(error).key);
     }
   };
 

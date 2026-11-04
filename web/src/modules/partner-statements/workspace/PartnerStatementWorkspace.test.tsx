@@ -438,6 +438,21 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     await waitFor(() => expect(screen.getByTestId('summary-bar')).toBeTruthy());
   });
 
+  it('discards a decision-history response that arrives after the reviewer moved to another line', async () => {
+    const decidedRows = rows().map((row, index) => (index === 1 ? { ...row, decision: { ...(rows()[0].decision as NonNullable<MatchRow['decision']>), id: 'd2', line_id: 'line-2', run_id: RUN } } : row));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string }) => (q.side === 'ledger' ? matchesResponse([]) : matchesResponse(decidedRows)));
+    let release: (value: unknown) => void = () => {};
+    h.fetchLineHistory.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    await open();
+    await selectLine(1);
+    await userEvent.click(screen.getByText('workspace.detail.history'));
+    await selectLine(2);
+    release([{ id: 'x', revision: 7, action: 'override', reason: 'belongs to line one', created_at: '2026-04-03T10:00:00Z' }]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId('line-history')).toBeNull();
+    expect(document.body.textContent).not.toContain('belongs to line one');
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,
