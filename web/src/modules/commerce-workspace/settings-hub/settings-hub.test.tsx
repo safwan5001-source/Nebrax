@@ -31,12 +31,13 @@ describe('SettingsHub (COPS-H4-1)', () => {
 
   it('renders one link per section for the owner and performs read-only navigation (no writes)', async () => {
     render(<SettingsHub />);
-    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(8));
     expect(linkHrefs()).toEqual([
       '/commerce/appearance',
       '/commerce/domains',
       '/commerce/delivery',
       '/commerce/shipping-zones',
+      '/commerce/order-policies',
       '/commerce/customer-accounts',
       '/commerce/gifting',
       '/commerce/integrations',
@@ -49,7 +50,7 @@ describe('SettingsHub (COPS-H4-1)', () => {
   it('keeps the active store on every link', async () => {
     store.id = 'store-1';
     render(<SettingsHub />);
-    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(8));
     expect(linkHrefs().every((href) => href?.includes('store=store-1'))).toBe(true);
   });
 
@@ -60,20 +61,20 @@ describe('SettingsHub (COPS-H4-1)', () => {
     expect(screen.getByRole('status')).toBeTruthy();
     expect(linkHrefs()).toHaveLength(0);
     release({ data: {} });
-    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(8));
   });
 
   it('hides the customer-accounts card when the storefront capability is off', async () => {
     apiMock.mockResolvedValue({ data: { 'commerce.storefront': false } });
     render(<SettingsHub />);
-    await waitFor(() => expect(linkHrefs()).toHaveLength(6));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
     expect(linkHrefs()).not.toContain('/commerce/customer-accounts');
   });
 
   it('a nav-state failure hides nothing (server routes stay guarded)', async () => {
     apiMock.mockRejectedValue(new Error('network'));
     render(<SettingsHub />);
-    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(8));
   });
 
   it('a viewer with no permissions only gets the two ungated cards', async () => {
@@ -92,7 +93,7 @@ describe('SettingsHub (COPS-H4-1)', () => {
   it('renders Arabic copy under the ar locale', async () => {
     locale.current = 'ar';
     render(<SettingsHub />);
-    await waitFor(() => expect(linkHrefs()).toHaveLength(7));
+    await waitFor(() => expect(linkHrefs()).toHaveLength(8));
     expect(screen.getByRole('heading', { name: 'إعدادات المتجر' })).toBeTruthy();
   });
 });

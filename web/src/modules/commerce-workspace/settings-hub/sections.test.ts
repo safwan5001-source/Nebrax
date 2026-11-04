@@ -56,6 +56,11 @@ describe('settings hub sections (COPS-H4-1)', () => {
     expect(isSettingsSectionVisible(domains, new Set(), { role: 'viewer', permissions: ['commerce.manage'] })).toBe(true);
   });
 
+  it('order policies (company.manage) is shown to a company manager only', () => {
+    expect(hrefs({ role: 'viewer', permissions: ['company.manage'] })).toContain('/commerce/order-policies');
+    expect(hrefs({ role: 'viewer', permissions: ['commerce.manage'] })).not.toContain('/commerce/order-policies');
+  });
+
   it('a missing viewer sees nothing that needs a permission', () => {
     expect(hrefs(null)).toEqual(['/commerce/appearance', '/commerce/integrations']);
   });
