@@ -190,6 +190,9 @@ def sampler_holders(rnd: dict[str, Any], fr: dict[str, Any] | None) -> dict[str,
 
 def round_validity(run: dict[str, Any], rnd: dict[str, Any]) -> str | None:
     """سبب بطلان الجولة (None = صالحة). جولة ناقصة (كاتب فشل/تسلسل غير متصل/معاملات أقل) تُخفض p95 زيفاً فلا تدخل أي إحصاء."""
+    required = {"at", "wait_ms", "gap_ms", "commit_ms", "rq_gap_ms"}
+    if any(not required <= set(t) for t in rnd.get("txns", [])):
+        return "schema_mismatch"          # مخرجات بمخطط مختلف: تُعلَن ولا تنهار بها المقارنة كلها
     wl = run.get("workload", {})
     expected = wl.get("writers", 20) * wl.get("per_writer", 10)
     integ = rnd.get("integrity") or {}

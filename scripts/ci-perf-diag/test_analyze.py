@@ -177,6 +177,17 @@ class Report(unittest.TestCase):
         self.assertIn("وسيط p95 للجولات النظيفة", text)
         self.assertNotIn("| main | 2 |", text)                        # التشغيل 1 لا يُحتسب وظيفةً ناجحة؛ يبقى تشغيل صالح واحد فقط
 
+    def test_old_schema_rounds_are_reported_invalid_instead_of_crashing_the_report(self):
+        old = rnd(steady(), added=9.0)
+        for x in old["txns"]:
+            x.pop("rq_gap_ms")
+            x["rq_after_ms"] = 0.0
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [old])
+            self._write(root, "main", 2, [rnd(steady(), added=12.0)])
+            text = A.build_report(A.load_runs(root))
+        self.assertIn("schema_mismatch", text)
+
     def test_missing_runs_are_reported_when_expected_count_is_given(self):
         with tempfile.TemporaryDirectory() as root:
             self._write(root, "main", 1, [rnd(steady(), added=12.0)])
