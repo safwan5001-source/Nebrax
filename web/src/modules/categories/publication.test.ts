@@ -4,6 +4,7 @@ const apiMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: (...args: unknown[]) => apiMock(...args) }));
 
 import {
+  bulkSetCategoryPublication,
   categoryPublicationListPath,
   categoryPublicationPath,
   loadCategoryPublicationList,
@@ -84,5 +85,26 @@ describe('category publication workspace list API (COM-CATALOG-2)', () => {
     });
     expect(JSON.stringify(apiMock.mock.calls[0])).not.toContain('tenant');
     expect(stores).toEqual([{ id: 's1', name: 'Store', isPublished: false }]);
+  });
+});
+
+describe('COM-CATALOG-3 bulk category publication API', () => {
+  it('posts explicit category ids to the category-only bulk endpoint', async () => {
+    apiMock.mockResolvedValue({
+      data: {
+        action: 'unpublish',
+        storefront_id: 's1',
+        summary: { requested: 1, updated: 1, unchanged: 0, rejected: 0, failed: 0 },
+        results: [{ id: 'c1', status: 'updated' }],
+      },
+    });
+
+    const result = await bulkSetCategoryPublication({ action: 'unpublish', storefrontId: 's1', ids: ['c1'] });
+
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/categories/publication/bulk', {
+      method: 'POST',
+      body: { action: 'unpublish', storefront_id: 's1', ids: ['c1'] },
+    });
+    expect(result.results).toEqual([{ id: 'c1', status: 'updated', reason: null }]);
   });
 });

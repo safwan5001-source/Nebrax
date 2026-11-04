@@ -201,7 +201,13 @@ class PartnerStatementPairReviewApiTest extends TestCase
         $this->assertSame([true, $this->lineId($id, 2), true, $this->lineId($id, 3)], [$after['original']['claimed'], $after['original']['line_id'], $after['reversal']['claimed'], $after['reversal']['line_id']]);
 
         // نتائج المحرّك الحتمي كما هي حرفياً، ولا أثر مالي، والقرارات في سجلها فقط.
-        $this->assertEquals($beforeRows, $this->matchRows($token, $id), 'reversed_in_books وmissing_in_books تبقى كما هي.');
+        // نتائج المحرّك (كل الحقول القائمة) لا تتغيّر بالقرارات؛ الحقل الإضافي `decision` (IMP-PS-A4a0) هو وحده ما يعكس القرار فيُستثنى من المقارنة، ويُثبَت ظهوره.
+        $withoutDecision = fn (array $rows): array => array_map(fn (array $row): array => array_diff_key($row, ['decision' => true]), $rows);
+        $afterRows = $this->matchRows($token, $id);
+        $this->assertEquals($withoutDecision($beforeRows), $withoutDecision($afterRows), 'reversed_in_books وmissing_in_books تبقى كما هي.');
+        $decided = array_column(array_filter($afterRows, fn ($r) => $r['side'] === 'statement' && $r['decision'] !== null), 'decision', 'ordinal');
+        $this->assertSame([2, 3], array_keys($decided));
+        $this->assertSame(['link_pair', 'link_pair'], array_column($decided, 'action'));
         $this->assertSame($before, $this->counts());
         $this->assertSame(2, $this->decisionCount());
 

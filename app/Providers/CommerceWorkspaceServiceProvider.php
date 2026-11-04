@@ -51,6 +51,9 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
             // before {id} so the literal segment can never be shadowed.
             Route::get('publication', [CommerceProductPublicationController::class, 'index'])
                 ->middleware(EnsurePermission::class.':products.view');
+            // COM-CATALOG-3 — نشر/إلغاء نشر جماعي لمعرّفات صريحة على متجر واحد. RBAC = products.manage.
+            Route::post('publication/bulk', [CommerceProductPublicationController::class, 'bulk'])
+                ->middleware(EnsurePermission::class.':products.manage');
             Route::get('{id}/publication', [CommerceProductPublicationController::class, 'show'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
@@ -113,6 +116,9 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
             // write — no new permission.
             Route::get('publication', [CommerceCategoryPublicationController::class, 'index'])
                 ->middleware(EnsurePermission::class.':products.view');
+            // COM-CATALOG-3 — نشر/إلغاء نشر جماعي لمعرّفات صريحة على متجر واحد. RBAC = products.manage.
+            Route::post('publication/bulk', [CommerceCategoryPublicationController::class, 'bulk'])
+                ->middleware(EnsurePermission::class.':products.manage');
             Route::get('{id}/publication', [CommerceCategoryPublicationController::class, 'show'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');

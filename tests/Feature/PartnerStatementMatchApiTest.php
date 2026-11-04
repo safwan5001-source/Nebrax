@@ -422,7 +422,10 @@ class PartnerStatementMatchApiTest extends TestCase
 
         $body = (string) $this->getMatches($token, $id, ['per_page' => 50])->assertOk()->getContent();
         $this->assertStringContainsString($mine->number, $body);
-        $this->assertStringNotContainsString($foreign->number, $body, 'قيود الفرع الآخر لا تظهر.');
+        // IMP-PS-A4a0 (N3): كتلة `line` تعرض نص الكشف المرفوع كما هو (قد يذكر رقماً عند الطرف الآخر)؛ التحقق من عزل **بيانات الدفتر** يتم على الصفوف بعد استثنائها.
+        $ledgerDerived = json_encode(array_map(fn (array $row): array => array_diff_key($row, ['line' => true]), json_decode($body, true)['data']), JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString($foreign->number, (string) $ledgerDerived, 'قيود الفرع الآخر لا تظهر.');
+        $this->assertStringNotContainsString($foreign->number, (string) json_encode(json_decode($body, true)['run'], JSON_UNESCAPED_UNICODE));
         $this->assertSame('missing_in_books', $this->statementRows($token, $id)[3]['outcome']);
 
         // غير المقيَّد يرى الفرعين: الرقم ‎00001‎ يصيب وثيقتين في فرعين ⇒ غموض صريح لا تخمين.
@@ -430,10 +433,10 @@ class PartnerStatementMatchApiTest extends TestCase
         $this->assertSame('organization', $orgRun['scope']['kind']);
         $this->assertSame('ambiguous_multiple_documents_for_reference', $this->statementRows($this->auth['token'], $id)[2]['explanation']['code']);
 
-        // مقارنة بفلتر فرع خارج نطاقه: مرفوضة.
+        // مقارنة بفلتر فرع خارج نطاقه: مرفوضة بالرفض الموحَّد نفسه لغير الموجودة (SEC #1974: لا رسالة فرع تكشف الوجود).
         $outsideRecon = $this->statement([['date' => '2026-09-02', 'credit' => 80500]], ['branch_id' => $outside->id]);
-        $this->assertSame('هذا الفرع خارج نطاق صلاحياتك.', $this->postMatch($token, $outsideRecon)->assertStatus(422)->json('message'));
-        $this->getMatches($token, $outsideRecon)->assertStatus(422);
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $this->postMatch($token, $outsideRecon)->assertStatus(422)->json('message'));
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $this->getMatches($token, $outsideRecon)->assertStatus(422)->json('message'));
     }
 
     /**

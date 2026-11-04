@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Services\PartnerStatementMatchService;
+use App\Services\PartnerStatementReconciliationQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rule;
  */
 class PartnerStatementMatchController extends ApiController
 {
-    public function __construct(protected PartnerStatementMatchService $matching) {}
+    public function __construct(protected PartnerStatementMatchService $matching, protected PartnerStatementReconciliationQuery $reads) {}
 
     public function run(Request $request, string $id): JsonResponse
     {
@@ -37,8 +38,13 @@ class PartnerStatementMatchController extends ApiController
         $result = $this->domain(fn () => $this->matching->matches($request->user(), $id, $filters));
         $page = $result['page'];
 
+        // IMP-PS-A4a0 (N3): حقلان **إضافيان** `line`/`decision` لصفوف جهة الكشف (ثلاثة استعلامات ثابتة لكل صفحة)؛ كل الحقول القائمة بحالها.
+        $rows = $page === null ? [] : $this->reads->withLineContext(
+            $request->user(), strtolower($id), $page->getCollection()->map(fn ($m): array => $this->present($m))->values()->all(),
+        );
+
         return response()->json([
-            'data' => $page === null ? [] : $page->getCollection()->map(fn ($m): array => $this->present($m))->values()->all(),
+            'data' => $rows,
             'run' => $result['run'],
             'ledger_changed' => $result['ledger_changed'],
             'meta' => $page === null ? ['current_page' => 1, 'last_page' => 1, 'per_page' => 0, 'total' => 0] : [
