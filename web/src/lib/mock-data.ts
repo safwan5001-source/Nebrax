@@ -3042,6 +3042,13 @@ function handleMockOffers(method: string, offerId: string | null, body: unknown)
   return offerRejection(405, 'Method not allowed.');
 }
 
+/** COPS-H4-3 (UI، تجريبي): إعدادات تشغيل القناة بالذاكرة، تحاكي الخادم: `expected_version` إلزامي، تعارض النسخة 409، النسخة تزداد بتغيير فعلي. */
+const demoOperations: Record<string, unknown> & { version: number } = {
+  version: 0, accepting_orders: true, paused_until: null, pause_message: null, outside_hours_policy: 'accept', opening_hours: [],
+  min_order_minor: null, min_order_scope: 'all', intake_controls_deployment_enabled: true,
+};
+const DEMO_OPERATION_KEYS = ['accepting_orders', 'paused_until', 'pause_message', 'outside_hours_policy', 'opening_hours', 'min_order_minor', 'min_order_scope'] as const;
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const mediaResponse = handleStorefrontMediaDemo(path, method.toUpperCase(), body);
   if (mediaResponse.handled) {
@@ -3319,6 +3326,23 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         mockSalesSettings.commerce_payment_hold_minutes = minutes;
         return resolve({ data: mockSalesSettings });
       }
+    }
+    // COPS-H4-3 (UI): PUT إعدادات التشغيل — expected_version إلزامي (428)، نسخة قديمة 409، وتُطبَّق المفاتيح المرسلة فقط.
+    if (/^\/commerce\/channels\/[^/]+\/operations-settings$/.test(clean) && m === 'PUT') {
+      const sent = (body ?? {}) as Record<string, unknown>;
+      if (typeof sent.expected_version !== 'number') return Promise.reject(Object.assign(new Error('expected_version is required.'), { status: 428, body: { reason: 'expected_version_required' } }));
+      if (sent.expected_version !== demoOperations.version) {
+        return Promise.reject(Object.assign(new Error('conflict'), { status: 409, body: { reason: 'settings_version_conflict', current_version: demoOperations.version } }));
+      }
+      let changed = false;
+      for (const key of DEMO_OPERATION_KEYS) {
+        if (key in sent && JSON.stringify(sent[key]) !== JSON.stringify(demoOperations[key])) {
+          demoOperations[key] = sent[key];
+          changed = true;
+        }
+      }
+      if (changed) demoOperations.version += 1;
+      return resolve({ data: { sales_channel_id: 'demo', configured: demoOperations.version > 0, recent_changes: [], ...demoOperations } });
     }
     if (clean === '/account/preferences' && m === 'PUT') {
       const requested = body as { locale?: unknown; theme?: unknown; appTheme?: unknown } | undefined;
@@ -4136,6 +4160,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: { matched: price !== null, price } });
   }
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
+  if (/^\/commerce\/channels\/[^/]+\/operations-settings$/.test(clean)) return resolve({ data: { sales_channel_id: 'demo', configured: demoOperations.version > 0, recent_changes: [], ...demoOperations } });
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });
   const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
   if (salesConfigMatch) {
