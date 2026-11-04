@@ -357,6 +357,12 @@ jobs:
       COMPOSER_NO_INTERACTION: '1'
       APP_DIR: /tmp/nibras-app
 
+    # ── PERF-TMPFS (#1975): بيانات PostgreSQL (وWAL داخلها) على tmpfs في هذه الوظيفة فقط ──
+    #  البوابة تقيس **التنافس على قفل رأس التغذية** (ترتيب الالتزام وانتظار الكتّاب)، لا زمن fsync لقرص المشغّل المشترك. التشخيص (#1975/#1976)
+    #  أثبت أن كل تجاوز لـ50ms كان `commit_stall` ينتظر `IO:WALSync` على القرص المشترك (≈37% من الوظائف تفشل على القرص مقابل 0 على tmpfs)،
+    #  أي ضجيج بيئة لا انحدار كود. حدّ p95 < 50ms وحمل العمل وعدد الجولات بلا أي تغيير. خطوة «تحقق أن بيانات PostgreSQL على tmpfs» أدناه تُفشل
+    #  الوظيفة إن لم يتحقق الشرط (فلا يعود القياس إلى القرص بصمت). وظيفة `test` الكاملة تبقى على القرص عمداً.
+    #  قياس fsync/WAL على التخزين الحقيقي يبقى منفصلاً وغير مانع: `perf-feed-lock-baseline.yml` (جدولة/يدوي، pg_test_fsync) — لا يدخل شروط الدمج.
     services:
       postgres:
         image: postgres:16
@@ -371,6 +377,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw
 
     steps:
       - name: Checkout core (النواة)
@@ -503,6 +510,33 @@ jobs:
           sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" .env
           printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
           php artisan migrate:fresh --force
+
+      # يثبت أن بيانات PostgreSQL وWAL فعلاً على tmpfs وأن قاعدة القياس تكتب عليها (بعد migrate:fresh). يفشل صراحةً وإلا عاد القياس إلى قرص المشغّل بصمت.
+      - name: تحقق أن بيانات PostgreSQL على tmpfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          WD_DIR="$APP_DIR/pgsql-watchdog"; mkdir -p "$WD_DIR"
+          cid="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          [ -n "$cid" ] || { echo "::error::لم يُعثر على حاوية خدمة postgres"; exit 1; }
+          pgdata=/var/lib/postgresql/data
+          datadir="$(docker exec "$cid" psql -U nibras -d nibras -Atc 'SHOW data_directory')"
+          relpath="$(docker exec "$cid" psql -U nibras -d nibras -Atc "SELECT pg_relation_filepath('tenants')")"
+          fs_pgdata="$(docker exec "$cid" stat -f -c %T "$pgdata")"
+          fs_relation="$(docker exec "$cid" stat -f -c %T "$pgdata/$relpath")"
+          fs_wal="$(docker exec "$cid" stat -f -c %T "$pgdata/pg_wal")"
+          used_kb="$(docker exec "$cid" sh -c "du -sk $pgdata | cut -f1")"
+          {
+            echo "data_directory=$datadir"
+            echo "pgdata_fstype=$fs_pgdata relation_file_fstype=$fs_relation pg_wal_fstype=$fs_wal"
+            echo "tenants_relation_file=$relpath pgdata_used_kb=$used_kb"
+            docker inspect --format 'tmpfs_mounts={{json .HostConfig.Tmpfs}}' "$cid"
+          } | tee "$WD_DIR/storage-evidence.txt"
+          [ "$datadir" = "$pgdata" ] || { echo "::error::data_directory غير المتوقع: $datadir"; exit 1; }
+          for t in "$fs_pgdata" "$fs_relation" "$fs_wal"; do
+            [ "$t" = "tmpfs" ] || { echo "::error::بيانات PostgreSQL ليست على tmpfs (النوع: $t) — القياس لم يعد يعزل ضجيج القرص"; exit 1; }
+          done
+          [ "$used_kb" -gt 10000 ] || { echo "::error::حجم PGDATA صغير جداً ($used_kb KB): قاعدة القياس لا تكتب هنا"; exit 1; }
 
       - name: اختبارات مُلخِّص المقاييس
         run: python3 -m unittest discover -s scripts/ci-perf -v
