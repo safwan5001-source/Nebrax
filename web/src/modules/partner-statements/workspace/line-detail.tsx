@@ -57,7 +57,7 @@ export function LineDetail(props: LineDetailProps) {
   const setMode = (next: Mode) => props.onWork({ mode: next });
   const setPair = (next: LineWork['pair']) => props.onWork({ pair: next });
   const signature = selectionSignature(props.work.unitKeys);
-  const picker = { unitKeys: props.work.unitKeys, verify: props.work.verify && props.work.verify.lineId === (row?.line?.id ?? bareLine?.id) && props.work.verify.signature === signature ? props.work.verify.result : null };
+  const picker = { unitKeys: props.work.unitKeys, verify: props.work.verify && props.work.verify.lineId === (row?.line?.id ?? bareLine?.id) && props.work.verify.runId === runId && props.work.verify.signature === signature ? props.work.verify.result : null };
   const [history, setHistory] = useState<Decision[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [quickError, setQuickError] = useState<string | null>(null);
@@ -175,6 +175,7 @@ export function LineDetail(props: LineDetailProps) {
             <CandidatePicker
               reconciliationId={props.reconciliationId}
               lineId={line.id}
+              runId={runId}
               row={row}
               ledgerUnits={props.ledgerUnits}
               selected={props.work.unitKeys}

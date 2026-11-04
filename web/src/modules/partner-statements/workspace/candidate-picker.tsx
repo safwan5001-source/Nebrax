@@ -20,6 +20,8 @@ import type { MatchRow, Suggestion, UnitSnapshot, VerifySetResponse } from './ty
 export interface VerifiedSet {
   /** السطر الذي أُجري التحقق له: نتيجة سطر لا تُقبل لسطر آخر ولو تطابقت الوحدات. */
   lineId: string;
+  /** التشغيلة التي أُجري التحقق في سياقها: تشغيلة جديدة تُبطل التحقق (الفرق المعروض يخصّ دفتر التشغيلة السابقة). */
+  runId: string | null;
   signature: string;
   result: VerifySetResponse;
 }
@@ -29,6 +31,7 @@ export const selectionSignature = (keys: readonly string[]): string => [...keys]
 export function CandidatePicker({
   reconciliationId,
   lineId,
+  runId,
   row,
   ledgerUnits,
   selected,
@@ -38,6 +41,7 @@ export function CandidatePicker({
 }: {
   reconciliationId: string;
   lineId: string;
+  runId: string | null;
   row: Pick<MatchRow, 'candidates' | 'unit' | 'suggestions'>;
   ledgerUnits: UnitSnapshot[];
   /** الاختيار والتحقق **مرفوعان إلى المالك** كي لا يضيعا إن انقلب التخطيط (دوران الجهاز/تغيير النافذة) فأُعيد تركيب اللوحة. */
@@ -65,7 +69,7 @@ export function CandidatePicker({
   }, [ledgerUnits, engineKeys, search]);
 
   const signature = selectionSignature(selected);
-  const verified = verify !== null && verify.lineId === lineId && verify.signature === signature ? verify.result : null;
+  const verified = verify !== null && verify.lineId === lineId && verify.runId === runId && verify.signature === signature ? verify.result : null;
 
   // تحقق معلّق لسطر سابق لا يُكتب بعد تغيير السطر أو إلغاء التركيب (وإلا اتُّخذ فرق سطر آخر لهذا السطر).
   useEffect(
@@ -88,7 +92,7 @@ export function CandidatePicker({
     try {
       const result = await verifySet(reconciliationId, lineId, selected);
       // لا نقبل ردّاً لسطر غير المطلوب (دفاعي: الخادم يعيد معرّف السطر نفسه).
-      if (mine === seq.current && result.line.id === lineId) onVerified({ lineId, signature: selectionSignature(selected), result });
+      if (mine === seq.current && result.line.id === lineId) onVerified({ lineId, runId, signature: selectionSignature(selected), result });
     } catch (error) {
       if (mine === seq.current) setErrorKey(describeError(error).key);
     } finally {

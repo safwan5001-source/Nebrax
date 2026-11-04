@@ -70,8 +70,8 @@ export function DecisionForm(props: DecisionFormProps) {
 
   const net = props.netDifferenceMinor ?? serverDifference;
 
-  // إقرار الفرق يخص **هذه** المجموعة وهذا الفرق: أي تغيير في الوحدات أو العضو أو الفرق المعروف يُسقطه فيُطلب إقرار جديد (يبقى نص السبب).
-  const acceptScope = `${[...unitKeys].sort().join('|')}#${pairMember ?? ''}#${net ?? ''}`;
+  // إقرار الفرق يخص **هذه** التشغيلة وهذه المجموعة وهذا الفرق: أي تغيير في الوحدات أو العضو أو الفرق المعروف يُسقطه فيُطلب إقرار جديد (يبقى نص السبب).
+  const acceptScope = `${props.runId}#${[...unitKeys].sort().join('|')}#${pairMember ?? ''}#${net ?? ''}`;
   useEffect(() => setAccept(false), [acceptScope]);
   const needReason = reasonRequired({ action, engineOutcome: row.outcome, netDifferenceMinor: net });
   const needAccept = action !== 'dismiss' && acceptDifferenceRequired(net, toleranceMinor);

@@ -68,7 +68,8 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
 
   const canView = can('partner_statements.view');
   const canWrite = can('partner_statements.reconcile') && capability.state === 'enabled';
-  const runId = status?.run?.id ?? run?.id ?? null;
+  // تشغيلة **الصفوف المعروضة** (تُنشر معها ذرّياً)؛ كل قرار يُرسَل بها لا بتشغيلة حالة أحدث لم تُعرض صفوفها بعد.
+  const runId = run?.id ?? null;
   const toleranceMinor = header?.policy?.amount_tolerance_minor ?? 0;
   const editable = canWrite && header?.status === 'draft' && runId !== null;
 
@@ -80,14 +81,15 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
       try {
         const [nextHeader, nextStatus] = await Promise.all([opts.withHeader === false ? Promise.resolve(null) : fetchHeader(id), fetchStatus(id)]);
         if (mine !== seq.current) return;
-        if (nextHeader) setHeader(nextHeader);
-        setStatus(nextStatus);
         const activeRun = nextStatus.run?.id ?? null;
         const wantedPage = opts.page ?? page;
         const wantedOutcomes = opts.outcomes ?? outcomes;
         if (activeRun) {
           const matches = await fetchMatches(id, { runId: activeRun, side: 'statement', outcomes: wantedOutcomes.length > 0 ? wantedOutcomes : undefined, page: wantedPage, perPage: PER_PAGE });
           if (mine !== seq.current) return;
+          // نشر ذرّي: الرأس والحالة والتشغيلة والصفوف معاً، فلا يُرى (ولا يُرسَل قرار على) تشغيلة جديدة بصفوف تشغيلة سابقة.
+          if (nextHeader) setHeader(nextHeader);
+          setStatus(nextStatus);
           setRun(matches.run);
           setLedgerChanged(matches.ledger_changed);
           setMeta(matches.meta);
@@ -95,6 +97,8 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
         } else {
           const lines = await fetchLines(id, wantedPage, PER_PAGE);
           if (mine !== seq.current) return;
+          if (nextHeader) setHeader(nextHeader);
+          setStatus(nextStatus);
           setRun(null);
           setLedgerChanged(null);
           setMeta(lines.meta);
@@ -155,6 +159,9 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
     setPage(meta.current_page >= meta.last_page ? 1 : meta.current_page + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, loading]);
+
+  // تشغيلة جديدة ⇒ كل تحقق/اختيار/إقرار قيد التحرير يخص تشغيلة سابقة: يُسقَط ويُطلب تحقق وإقرار جديدان.
+  useEffect(() => setWork(EMPTY_WORK), [runId]);
 
   const pick = (lineId: string) => {
     if (lineId !== selectedId) setWork(EMPTY_WORK);

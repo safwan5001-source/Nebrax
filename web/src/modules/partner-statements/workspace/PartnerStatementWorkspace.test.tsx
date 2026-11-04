@@ -379,6 +379,65 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(screen.getByTestId('decision-form-override')).toBeTruthy();
   });
 
+  it('a new matching run drops the verification and the difference acknowledgement being edited (fresh verify + fresh acknowledgement required)', async () => {
+    const RUN2 = 'rrrrrrrr-2222-4rrr-8rrr-rrrrrrrrrrrr';
+    h.verifySet.mockResolvedValue({
+      applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 400000, credit_minor: 0 }, units: [], expected_net_minor: -400000, set_net_minor: -300000,
+      difference_minor: -100000, tolerance_minor: 100, equal_within_tolerance: false, problems: [],
+    });
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse(rows(), { ledger_changed: true })));
+    await open();
+    await selectLine(4);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.override'));
+    const picker = await screen.findByTestId('candidate-picker');
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-c1'));
+    await userEvent.click(within(picker).getByText('workspace.picker.verify'));
+    const form = await screen.findByTestId('decision-form-override');
+    await userEvent.type(within(form).getByRole('textbox'), 'because');
+    await userEvent.click(await within(form).findByRole('checkbox'));
+    expect((within(form).getByText('workspace.action.override').closest('button') as HTMLButtonElement).disabled).toBe(false);
+
+    // الدفتر تغيّر ⇒ تشغيلة جديدة
+    h.runMatching.mockResolvedValue({ ...matchesResponse().run, id: RUN2, created: true, replayed: false });
+    h.fetchStatus.mockResolvedValue(status({ run: { id: RUN2, scope: {}, ledger_fingerprint: 'fp2', created_at: null } }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : { ...matchesResponse(rows()), run: { ...(matchesResponse().run as object), id: RUN2 } }));
+    await userEvent.click(within(screen.getByTestId('ledger-changed')).getByText('workspace.match.run_again'));
+    await waitFor(() => expect(screen.queryByTestId('candidate-picker')).toBeNull());
+    expect(screen.queryByTestId('verify-result')).toBeNull();
+    expect(screen.queryByTestId('decision-form-override')).toBeNull();
+    expect(h.postDecision).not.toHaveBeenCalled();
+  });
+
+  it('never submits a decision with a newer run id against rows of the previous run (atomic run + rows publication)', async () => {
+    const RUN2 = 'rrrrrrrr-2222-4rrr-8rrr-rrrrrrrrrrrr';
+    const plain = [match(1), ...rows().slice(1)];
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string }) => (q.side === 'ledger' ? matchesResponse([]) : matchesResponse(plain)));
+    await open();
+    await selectLine(1);
+
+    // تحديث يكتشف تشغيلة جديدة، بينما صفوفها لم تصل بعد
+    let finish: (value: unknown) => void = () => {};
+    h.fetchStatus.mockResolvedValue(status({ run: { id: RUN2, scope: {}, ledger_fingerprint: 'fp2', created_at: null } }));
+    h.fetchMatches.mockImplementation((_i: string, q: { side: string }) => (q.side === 'ledger'
+      ? Promise.resolve(matchesResponse([]))
+      : new Promise((resolve) => (finish = resolve))));
+    await userEvent.click(screen.getAllByRole('button', { name: /workspace\.outcome\.matched/, pressed: false })[0]);
+    await waitFor(() => expect(h.fetchMatches.mock.calls.some(([, q]) => q.side === 'statement' && Array.isArray(q.outcomes) && q.outcomes[0] === 'matched')).toBe(true));
+
+    // الصفوف المعروضة ما زالت للتشغيلة القديمة: أي قرار الآن يجب أن يحمل التشغيلة القديمة، لا الجديدة
+    const confirm = within(screen.getByTestId('action-bar')).queryByText('workspace.action.confirm');
+    expect(confirm).toBeTruthy();
+    await userEvent.click(confirm as HTMLElement);
+    await waitFor(() => expect(h.postDecision).toHaveBeenCalledTimes(1));
+    expect(h.postDecision.mock.calls[0][1].run_id).toBe(RUN);
+    finish(matchesResponse(plain, { run: { ...(matchesResponse().run as object), id: RUN2 } }));
+    await waitFor(() => expect(screen.getByTestId('summary-bar')).toBeTruthy());
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,
