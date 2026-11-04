@@ -477,6 +477,67 @@ describe('COM-CATALOG-3 bulk selection', () => {
     expect(bulkMock).not.toHaveBeenCalled();
   });
 
+  it('blocks bulk actions while a single-record update is in flight (no overlapping full-set writes)', async () => {
+    await renderProducts();
+    fireEvent.click(rowBox('هيل'));
+    const publish = screen.getByRole('button', { name: 'نشر المحدد' }) as HTMLButtonElement;
+    expect(publish.disabled).toBe(false);
+
+    let release: (value: unknown) => void = () => {};
+    replaceMock.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    screen.getAllByRole('button', { name: /^نشر · المتجر/ })[0].click();
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(publish.disabled).toBe(true));
+    expect((screen.getByRole('button', { name: 'إلغاء نشر المحدد' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(publish);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(bulkMock).not.toHaveBeenCalled();
+
+    release([{ id: 's1', name: 'المتجر', isPublished: true }]);
+    await waitFor(() => expect(publish.disabled).toBe(false));
+  });
+
+  it('recovers when a bulk change removes the current page: goes back to the last existing page', async () => {
+    // المرشّح «منشور» والصفحة 2 هي الأخيرة؛ بعد الإجراء الجماعي لا يبقى إلا صفحة واحدة.
+    let afterBulk = false;
+    listMock.mockImplementation(async (params: { page?: number }) => {
+      const page = params.page ?? 1;
+      if (!afterBulk) {
+        return page === 2
+          ? { items: [row('p9', 'قرفة', true)], meta: { currentPage: 2, lastPage: 2, perPage: 25, total: 26 } }
+          : { items: [row('p1', 'بن يمني', true)], meta: { currentPage: 1, lastPage: 2, perPage: 25, total: 26 } };
+      }
+      // بعد الإجراء: صفحة 2 لم تعد موجودة (الخادم يُرجع عناصر فارغة مع lastPage = 1).
+      return page === 1
+        ? { items: [row('p1', 'بن يمني', true)], meta: { currentPage: 1, lastPage: 1, perPage: 25, total: 1 } }
+        : { items: [], meta: { currentPage: page, lastPage: 1, perPage: 25, total: 1 } };
+    });
+    render(<CommercePublishedProductsPage />);
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    // مؤقّت تأجيل البحث عند التركيب (300ms) يعيد الصفحة إلى 1 — نتركه يعمل قبل التنقل حتى لا يخفي الخلل.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    fireEvent.change(screen.getByLabelText('حالة النشر'), { target: { value: 'published' } });
+    await waitFor(() => expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'published', page: 1 })));
+    fireEvent.click(screen.getByLabelText('nextPage'));
+    await waitFor(() => expect(screen.getAllByText('قرفة').length).toBeGreaterThan(0));
+
+    bulkMock.mockImplementation(async () => {
+      afterBulk = true;
+      return okResult('unpublish', ['p9']);
+    });
+    fireEvent.click(rowBox('قرفة'));
+    fireEvent.click(screen.getByRole('button', { name: 'إلغاء نشر المحدد' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأكيد إلغاء النشر' }));
+    await screen.findByText('اكتملت العملية على كل العناصر المحددة.');
+
+    // لا شاشة «فارغ»، والعودة لآخر صفحة موجودة مع بقاء الترقيم.
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    expect(screen.queryByText('لا منتجات بعد')).toBeNull();
+    expect(screen.queryByText('لا نتائج مطابقة')).toBeNull();
+    expect(screen.getByLabelText('nextPage')).toBeTruthy();
+  });
+
   it('renders the bulk UI in English', async () => {
     locale.current = 'en';
     listMock.mockResolvedValue(bulkPage());

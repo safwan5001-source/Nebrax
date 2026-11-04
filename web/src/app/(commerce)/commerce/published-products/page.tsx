@@ -281,6 +281,9 @@ function PublicationSection<T extends PublicationListItem>({
   const [bulkTargetStoreId, setBulkTargetStoreId] = useState('');
   const [bulkDialog, setBulkDialog] = useState<BulkDialogState>({ phase: 'closed' });
   const bulkRunning = bulkDialog.phase === 'running';
+  // الكتابة المفردة تستبدل مجموعة النشر كلها لكل المتاجر من حالة الصف وقت النقر؛ فلا تتداخل مع الجماعية
+  // (وإلا قد تُلغي كتابةٌ مفردة متأخرة نتيجة جماعية على متجر آخر). كل منهما يمنع الأخرى.
+  const singleBusy = busyKey !== null;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -302,6 +305,12 @@ function PublicationSection<T extends PublicationListItem>({
         perPage,
       });
       if (seq !== requestSeq.current) return; // ردّ متأخر لطلب أقدم — يُتجاهل
+      // الصفحة الحالية لم تعد موجودة (مثلاً بعد نشر/إلغاء نشر جماعي تحت مرشّح حالة): لا نعرض «فارغ» وفي
+      // الصفحات السابقة نتائج — نعود لآخر صفحة موجودة (يُعيد load عبر الاعتماد على page؛ ينتهي لأن lastPage < page).
+      if (next.items.length === 0 && page > next.meta.lastPage && next.meta.lastPage >= 1) {
+        setPage(next.meta.lastPage);
+        return;
+      }
       setResult(next);
       setState(next.items.length === 0 ? 'empty' : 'ready');
     } catch {
@@ -354,7 +363,7 @@ function PublicationSection<T extends PublicationListItem>({
   };
 
   const openBulkDialog = (action: BulkPublicationAction) => {
-    if (!bulkTargetStore || selection.size === 0) return;
+    if (!bulkTargetStore || selection.size === 0 || singleBusy) return;
     setBulkNotice(null);
     setBulkDialog({
       phase: 'confirm',
@@ -365,7 +374,7 @@ function PublicationSection<T extends PublicationListItem>({
   };
 
   const runBulk = async () => {
-    if (bulkDialog.phase !== 'confirm' || !bulkTargetStore) return;
+    if (bulkDialog.phase !== 'confirm' || !bulkTargetStore || singleBusy) return;
     const { action, storeName, items } = bulkDialog;
     setBulkDialog({ phase: 'running', action, storeName, items });
     let outcome: BulkPublicationResult | null = null;
@@ -429,7 +438,7 @@ function PublicationSection<T extends PublicationListItem>({
             type="button"
             variant="outline"
             size="sm"
-            disabled={busyKey !== null}
+            disabled={busyKey !== null || bulkRunning}
             onClick={() => void togglePublication(item, store.id, !store.isPublished)}
           >
             {busy
@@ -588,7 +597,7 @@ function PublicationSection<T extends PublicationListItem>({
           storefrontOptions={storefrontOptions}
           targetStoreId={bulkTargetStoreId}
           onTargetStoreChange={setBulkTargetStoreId}
-          busy={bulkRunning}
+          busy={bulkRunning || singleBusy}
           notice={bulkNotice}
           idPrefix={idPrefix}
           onAction={openBulkDialog}
