@@ -359,6 +359,9 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     categoryPublicationEmptySearchTitle: 'لا نتائج مطابقة',
     categoryPublicationEmptySearchDescription: 'جرّب تعديل البحث أو الفلاتر الحالية.',
     // COM-CATALOG-3 — Bulk publish / unpublish.
+    selectModeEnter: 'تحديد',
+    selectModeExit: 'إنهاء التحديد',
+    selectModeHint: 'اختر عناصر لإظهار إجراءات النشر الجماعي.',
     bulkRegion: 'إجراءات النشر الجماعي',
     bulkSelectAllPage: 'تحديد كل عناصر الصفحة الحالية فقط',
     bulkSelectRow: 'تحديد',
@@ -758,6 +761,9 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     categoryPublicationEmptySearchTitle: 'No matching results',
     categoryPublicationEmptySearchDescription: 'Try adjusting the current search or filters.',
     // COM-CATALOG-3 — Bulk publish / unpublish.
+    selectModeEnter: 'Select',
+    selectModeExit: 'Done',
+    selectModeHint: 'Select items to show the bulk publication actions.',
     bulkRegion: 'Bulk publication actions',
     bulkSelectAllPage: 'Select all items on the current page only',
     bulkSelectRow: 'Select',

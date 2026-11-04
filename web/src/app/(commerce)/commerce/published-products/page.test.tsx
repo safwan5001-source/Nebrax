@@ -260,6 +260,7 @@ const okResult = (action: 'publish' | 'unpublish', ids: string[], storefrontId =
 /** كل صف يُرسم مرتين (جدول سطح المكتب + سجل الجوال) — النسخة الأولى هي الجدول. */
 const rowBox = (name: string) => screen.getAllByLabelText(`تحديد: ${name}`)[0] as HTMLInputElement;
 const pageBox = () => screen.getAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')[0] as HTMLInputElement;
+const enterSelect = () => fireEvent.click(screen.getByRole('button', { name: 'تحديد' }));
 const countText = () => screen.queryByTestId('bulk-selected-count')?.textContent ?? null;
 
 describe('COM-CATALOG-3 bulk selection', () => {
@@ -279,6 +280,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('shows no bulk bar until something is selected, and selection toggles per row', async () => {
     await renderProducts();
+    enterSelect();
     expect(countText()).toBeNull();
 
     fireEvent.click(rowBox('بن يمني'));
@@ -293,6 +295,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('select-all affects the current page only, reports indeterminate, and toggles off', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(rowBox('بن يمني'));
     expect(pageBox().indeterminate).toBe(true);
 
@@ -307,6 +310,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('clears the selection (with a notice) when the search changes — never silently widening it', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(pageBox());
     expect(countText()).toBe('المحدد: 3');
 
@@ -317,6 +321,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('clears the selection when the status filter changes', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(rowBox('هيل'));
     fireEvent.change(screen.getByLabelText('حالة النشر'), { target: { value: 'published' } });
     expect(countText()).toBeNull();
@@ -324,6 +329,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('keeps the selection across pagination and shows the off-page count', async () => {
     await renderProducts(bulkPage(2, 1));
+    enterSelect();
     fireEvent.click(pageBox());
     expect(countText()).toBe('المحدد: 3');
 
@@ -341,6 +347,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('confirms with exact scope, then sends only the selected ids to the single store', async () => {
     await renderProducts();
+    enterSelect();
     bulkMock.mockResolvedValue(okResult('publish', ['p1', 'p3']));
     fireEvent.click(rowBox('بن يمني'));
     fireEvent.click(rowBox('زعفران'));
@@ -364,6 +371,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('can be cancelled from the confirmation without any request', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(rowBox('هيل'));
     fireEvent.click(screen.getByRole('button', { name: 'إلغاء نشر المحدد' }));
     const dialog = await screen.findByRole('dialog');
@@ -374,6 +382,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('reports partial failure by name and keeps only the failed items selected', async () => {
     await renderProducts();
+    enterSelect();
     bulkMock.mockResolvedValue({
       action: 'unpublish',
       storefrontId: 's1',
@@ -403,6 +412,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('on a failed request says the outcome is unconfirmed and keeps the selection intact', async () => {
     await renderProducts();
+    enterSelect();
     bulkMock.mockRejectedValue(new Error('network'));
     fireEvent.click(rowBox('هيل'));
     fireEvent.click(screen.getByRole('button', { name: 'نشر المحدد' }));
@@ -419,6 +429,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
       { id: 's2', name: 'متجر الهدايا', isActive: true },
     ];
     await renderProducts();
+    enterSelect();
     fireEvent.click(rowBox('هيل'));
 
     const publish = screen.getByRole('button', { name: 'نشر المحدد' }) as HTMLButtonElement;
@@ -459,6 +470,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('drops the selection when switching tabs and bulk-publishes categories through the category contract', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(pageBox());
     expect(countText()).toBe('المحدد: 3');
 
@@ -466,6 +478,9 @@ describe('COM-CATALOG-3 bulk selection', () => {
     screen.getByRole('tab', { name: 'التصنيفات' }).click();
     await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
     expect(countText()).toBeNull();
+    // كل تبويبة بوضعها المستقل: تعود إلى الافتراضي بلا مربعات تحديد حتى يُفعَّل التحديد فيها.
+    expect(screen.queryAllByLabelText('تحديد: مشروبات')).toHaveLength(0);
+    enterSelect();
 
     categoryBulkMock.mockResolvedValue(okResult('publish', ['c1']));
     fireEvent.click(screen.getAllByLabelText('تحديد: مشروبات')[0]);
@@ -479,6 +494,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
 
   it('blocks bulk actions while a single-record update is in flight (no overlapping full-set writes)', async () => {
     await renderProducts();
+    enterSelect();
     fireEvent.click(rowBox('هيل'));
     const publish = screen.getByRole('button', { name: 'نشر المحدد' }) as HTMLButtonElement;
     expect(publish.disabled).toBe(false);
@@ -522,6 +538,7 @@ describe('COM-CATALOG-3 bulk selection', () => {
     fireEvent.click(screen.getByLabelText('nextPage'));
     await waitFor(() => expect(screen.getAllByText('قرفة').length).toBeGreaterThan(0));
 
+    enterSelect();
     bulkMock.mockImplementation(async () => {
       afterBulk = true;
       return okResult('unpublish', ['p9']);
@@ -543,9 +560,149 @@ describe('COM-CATALOG-3 bulk selection', () => {
     listMock.mockResolvedValue(bulkPage());
     render(<CommercePublishedProductsPage />);
     await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }));
     fireEvent.click(screen.getAllByLabelText('Select all items on the current page only')[0]);
     expect(screen.getByTestId('bulk-selected-count').textContent).toBe('Selected: 3');
     expect(screen.getByRole('button', { name: 'Publish selected' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Unpublish selected' })).toBeTruthy();
+  });
+});
+
+describe('AWJ-UX-SELECTION-MODE-1 explicit selection mode (commerce publication)', () => {
+  afterEach(() => {
+    cleanup();
+    [listMock, replaceMock, bulkMock, categoryListMock, categoryReplaceMock, categoryBulkMock, toastError, toastSuccess].forEach((m) => m.mockReset());
+    storeFixture.current = [{ id: 's1', name: 'المتجر', isActive: true }];
+    userFixture.current = { role: 'owner', permissions: ['*'] };
+    locale.current = 'ar';
+  });
+
+  const renderProducts = async () => {
+    listMock.mockResolvedValue(bulkPage());
+    render(<CommercePublishedProductsPage />);
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+  };
+  const rowBoxes = () => screen.queryAllByLabelText(/^تحديد: /);
+  const doneButton = () => screen.getByRole('button', { name: 'إنهاء التحديد' }) as HTMLButtonElement;
+
+  it('default mode: no checkboxes, no select-all, no bulk bar — just an accessible Select button and the normal row actions', async () => {
+    await renderProducts();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط')).toHaveLength(0);
+    expect(screen.queryByRole('region', { name: 'إجراءات النشر الجماعي' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'تحديد' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'إنهاء التحديد' })).toBeNull();
+    // إجراءات الصف الفردية تعمل كما هي خارج الوضع.
+    expect(screen.getAllByRole('button', { name: /^نشر · المتجر/ }).length).toBeGreaterThan(0);
+  });
+
+  it('entering the mode reveals the checkboxes and select-all, selects nothing, and shows no bulk actions', async () => {
+    await renderProducts();
+    enterSelect();
+
+    expect(rowBoxes().length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('تحديد كل عناصر الصفحة الحالية فقط').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('checkbox').every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+    expect(countText()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'إلغاء نشر المحدد' })).toBeNull();
+    expect(screen.getByText('اختر عناصر لإظهار إجراءات النشر الجماعي.')).toBeTruthy();
+    expect(doneButton()).toBeTruthy();
+  });
+
+  it('bulk actions appear only once something is selected, and disappear again when it is deselected', async () => {
+    await renderProducts();
+    enterSelect();
+    fireEvent.click(rowBox('هيل'));
+    expect(screen.getByRole('button', { name: 'نشر المحدد' })).toBeTruthy();
+    fireEvent.click(rowBox('هيل'));
+    expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
+  });
+
+  it('Done clears the selection, hides everything and restores the default UI; re-entering starts empty', async () => {
+    await renderProducts();
+    enterSelect();
+    fireEvent.click(pageBox());
+    expect(countText()).toBe('المحدد: 3');
+
+    fireEvent.click(doneButton());
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(countText()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'نشر المحدد' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'تحديد' })).toBeTruthy();
+
+    enterSelect();
+    expect(countText()).toBeNull();
+    expect(screen.getAllByRole('checkbox').every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('a filter change keeps the mode but never leaves records selected behind the new query', async () => {
+    await renderProducts();
+    enterSelect();
+    fireEvent.click(pageBox());
+    fireEvent.change(screen.getByLabelText('حالة النشر'), { target: { value: 'published' } });
+    expect(countText()).toBeNull();
+    expect(doneButton()).toBeTruthy();
+    await waitFor(() => expect(screen.queryAllByRole('checkbox').length).toBeGreaterThan(0)); // القائمة أُعيد تحميلها
+    expect(screen.getAllByRole('checkbox').every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('Done is blocked while a bulk request is running, so the selection cannot be dropped under it', async () => {
+    await renderProducts();
+    enterSelect();
+    fireEvent.click(rowBox('هيل'));
+    let release: (value: unknown) => void = () => {};
+    bulkMock.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'نشر المحدد' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'تأكيد النشر' }));
+    await waitFor(() => expect(bulkMock).toHaveBeenCalledTimes(1));
+
+    const done = screen.getByRole('button', { name: 'إنهاء التحديد', hidden: true }) as HTMLButtonElement;
+    expect(done.disabled).toBe(true);
+    fireEvent.click(done);
+    expect(bulkMock).toHaveBeenCalledTimes(1); // لا طلب مكرر
+
+    release(okResult('publish', ['p2']));
+    await screen.findByText('اكتملت العملية على كل العناصر المحددة.');
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'إغلاق' }));
+    await waitFor(() => expect(doneButton().disabled).toBe(false));
+  });
+
+  it('products and categories keep independent modes and selections', async () => {
+    await renderProducts();
+    enterSelect();
+    fireEvent.click(rowBox('بن يمني'));
+
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+    await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'تحديد' })).toBeTruthy();
+
+    // العودة إلى المنتجات: الوضع الافتراضي، لا تحديد باقٍ.
+    listMock.mockResolvedValue(bulkPage());
+    screen.getByRole('tab', { name: 'المنتجات' }).click();
+    await waitFor(() => expect(screen.getAllByText('بن يمني').length).toBeGreaterThan(0));
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(countText()).toBeNull();
+  });
+
+  it('shows no Select button without products.manage or without an active web store', async () => {
+    userFixture.current = { role: 'staff', permissions: ['products.view'] };
+    await renderProducts();
+    expect(screen.queryByRole('button', { name: 'تحديد' })).toBeNull();
+    cleanup();
+    userFixture.current = { role: 'owner', permissions: ['*'] };
+    storeFixture.current = [];
+    await renderProducts();
+    expect(screen.queryByRole('button', { name: 'تحديد' })).toBeNull();
+  });
+
+  it('renders the Select / Done labels in English', async () => {
+    locale.current = 'en';
+    await renderProducts();
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
   });
 });
