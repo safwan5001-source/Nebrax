@@ -26,18 +26,16 @@ on:
   # (حارس test_repo_is_clean)، والمالك منع تعديل CI Gate. فلا يظهر هذا الـworkflow للبوابة ولا يتحول إلى فحص مطلوب. (سابقة: perf-feed-lock-baseline.yml)
   push:
     branches:
-      - claude/feed-lock-stall-diagnostics-1975
+      - claude/feed-lock-stall-tmpfs-exp-1975
     paths:
       - '.github/workflows/perf-feed-lock-diagnostics.yml'
-      - 'tests/Feature/CommerceOrderEventsStallDiagnosticTest.php'
-      - 'scripts/ci-perf-diag/**'
   workflow_dispatch:
     inputs:
       repeats:
-        description: 'عدد التكرارات لكل متغيّر (1–10)'
+        description: 'عدد الوظائف (تجربة #1975 الحاسمة: 20)'
         type: choice
-        options: ['2', '4', '6', '8', '10']
-        default: '4'
+        options: ['20']
+        default: '20'
       pr_sha:
         description: 'SHA رأس PR #1972 المدموج في متغيّر pr1972 (فارغ = المثبَّت أدناه)'
         type: string
@@ -68,12 +66,12 @@ jobs:
         env:
           REPEATS_INPUT: ${{ inputs.repeats }}
         run: |
-          n="${REPEATS_INPUT:-4}"
-          case "$n" in 2|4|6|8|10) ;; *) n=4 ;; esac
+          n="${REPEATS_INPUT:-20}"
+          case "$n" in 20) ;; *) n=20 ;; esac
           list=$(seq -s, 1 "$n")
-          echo "matrix={\"variant\":[\"main\",\"pr1972\",\"main-tmpfs\",\"pr1972-tmpfs\"],\"repeat\":[${list}]}" >> "$GITHUB_OUTPUT"
+          echo "matrix={\"variant\":[\"main-tmpfs\"],\"repeat\":[${list}]}" >> "$GITHUB_OUTPUT"
           echo "repeats=${n}" >> "$GITHUB_OUTPUT"
-          echo "variants=main,pr1972,main-tmpfs,pr1972-tmpfs" >> "$GITHUB_OUTPUT"
+          echo "variants=main-tmpfs" >> "$GITHUB_OUTPUT"
 
   measure:
     name: Diag (${{ matrix.variant }} #${{ matrix.repeat }})
@@ -262,10 +260,49 @@ jobs:
           printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
           php artisan migrate:fresh --force
 
+      # يثبت أن PGDATA وpg_wal وملف علاقة tenants على tmpfs (يفشل مغلقاً) — نفس خطوة وظيفة pg-perf في PR #1979.
+      - name: تحقق أن بيانات PostgreSQL على tmpfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          WD_DIR="$APP_DIR/pgsql-watchdog"; mkdir -p "$WD_DIR"
+          cid="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          [ -n "$cid" ] || { echo "::error::لم يُعثر على حاوية خدمة postgres"; exit 1; }
+          pgdata=/var/lib/postgresql/data
+          datadir="$(docker exec "$cid" psql -U nibras -d nibras -Atc 'SHOW data_directory')"
+          relpath="$(docker exec "$cid" psql -U nibras -d nibras -Atc "SELECT pg_relation_filepath('tenants')")"
+          fs_pgdata="$(docker exec "$cid" stat -f -c %T "$pgdata")"
+          fs_relation="$(docker exec "$cid" stat -f -c %T "$pgdata/$relpath")"
+          fs_wal="$(docker exec "$cid" stat -f -c %T "$pgdata/pg_wal")"
+          {
+            echo "data_directory=$datadir"
+            echo "pgdata_fstype=$fs_pgdata relation_file_fstype=$fs_relation pg_wal_fstype=$fs_wal"
+          } | tee "$WD_DIR/storage-evidence.txt"
+          [ "$datadir" = "$pgdata" ] || { echo "::error::data_directory غير المتوقع"; exit 1; }
+          for t in "$fs_pgdata" "$fs_relation" "$fs_wal"; do
+            [ "$t" = "tmpfs" ] || { echo "::error::بيانات PostgreSQL ليست على tmpfs ($t)"; exit 1; }
+          done
+
+      # تسجيل الخادم للتشخيص فقط (لا يغيّر سلوك المعاملات): العبارات ≥15ms (يظهر COMMIT الماسك بمدته داخل الخادم)، checkpoints، autovacuum. يُحفظ في pg.log.
+      - name: تفعيل سجلّ PostgreSQL التشخيصي
+        shell: bash
+        run: |
+          set -euo pipefail
+          cid="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          for kv in "log_min_duration_statement=15" "log_checkpoints=on" "log_autovacuum_min_duration=0"; do
+            docker exec "$cid" psql -U nibras -d nibras -qc "ALTER SYSTEM SET ${kv%%=*} = '${kv#*=}'"
+          done
+          docker exec "$cid" psql -U nibras -d nibras -qc "SELECT pg_reload_conf()" >/dev/null
+          sleep 1
+          for g in log_min_duration_statement log_checkpoints log_autovacuum_min_duration; do
+            echo "$g=$(docker exec "$cid" psql -U nibras -d nibras -Atc "SHOW $g")"
+          done | tee -a "$APP_DIR/pgsql-watchdog/storage-evidence.txt"
+
       - name: اختبارات المحلّل (وحدة)
         run: python3 -m unittest discover -s scripts/ci-perf-diag -v
 
-      # الاختبار التشخيصي لا يؤكّد أي كمون (نزاهة فقط) — فشله يعني خطأ بنيوياً لا فشل أداء. بلا `|| true` ولا إعادة محاولة.
+      # الاختبار التشخيصي لا يؤكّد أي كمون (نزاهة فقط) — فشله يعني خطأ بنيوياً لا فشل أداء. بلا `|| true` ولا إعادة محاولة على الاختبار.
+      # مرصد الجدولة (sched_sampler.py) يعمل من المضيف طوال الاختبار ويُوقَف دائماً بـtrap؛ فشله لا يُفشل القياس (يُعلن ok:false في sched.json).
       - name: تشخيص توقف قفل التغذية (تسلسلي على مشغّل خاص)
         working-directory: ${{ env.APP_DIR }}
         shell: bash
@@ -276,8 +313,19 @@ jobs:
           set -euo pipefail
           export PGOPTIONS="-c lock_timeout=60s"
           WD_DIR="$PWD/pgsql-watchdog"; mkdir -p "$WD_DIR"
-          rm -f "$WD_DIR"/cops-h1-1-diag.json
-          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg) variant=$COPS_DIAG_VARIANT repeat=$COPS_DIAG_REPEAT head=$(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD) pgdata_tmpfs=$(docker ps -q --filter ancestor=postgres:16 | head -1 | xargs -r docker inspect --format '{{json .HostConfig.Tmpfs}}')" | tee "$WD_DIR/perf-environment.txt"
+          rm -f "$WD_DIR"/cops-h1-1-diag.json "$WD_DIR"/sched.json "$WD_DIR"/pg.log
+          cid="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          echo "runner: nproc=$(nproc) loadavg_before=$(cut -d' ' -f1-3 /proc/loadavg) variant=$COPS_DIAG_VARIANT repeat=$COPS_DIAG_REPEAT head=$(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)" | tee "$WD_DIR/perf-environment.txt"
+          python3 "$GITHUB_WORKSPACE/scripts/ci-perf-diag/sched_sampler.py" "$WD_DIR/sched.json" --interval-ms=5 &
+          SAMPLER=$!
+          stop_observers() {
+            kill -TERM "$SAMPLER" 2>/dev/null || true
+            wait "$SAMPLER" 2>/dev/null || true
+            docker logs --timestamps "$cid" > "$WD_DIR/pg.log" 2>&1 || true
+          }
+          trap stop_observers EXIT
+          sleep 0.5
+          kill -0 "$SAMPLER" 2>/dev/null || echo "::warning::مرصد الجدولة لم يبدأ — يُعلَن في التقرير"
           vendor/bin/phpunit --group cops-h1-1-diag --fail-on-skipped --fail-on-risky 2>&1 | tee test-output-diag.txt
 
       - name: حفظ مخرجات التشخيص
@@ -288,6 +336,9 @@ jobs:
           path: |
             ${{ env.APP_DIR }}/pgsql-watchdog/cops-h1-1-diag.json
             ${{ env.APP_DIR }}/pgsql-watchdog/perf-environment.txt
+            ${{ env.APP_DIR }}/pgsql-watchdog/sched.json
+            ${{ env.APP_DIR }}/pgsql-watchdog/pg.log
+            ${{ env.APP_DIR }}/pgsql-watchdog/storage-evidence.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -313,8 +364,12 @@ jobs:
           python3 -m unittest discover -s scripts/ci-perf-diag
           python3 scripts/ci-perf-diag/analyze.py artifacts diag-report.md --expect="$EXPECT_PER_VARIANT" --variants="$EXPECT_VARIANTS"
           cat diag-report.md >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci-perf-diag/stall_evidence.py artifacts exp-report.md > /dev/null
+          cat exp-report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: diag-report
-          path: diag-report.md
+          path: |
+            diag-report.md
+            exp-report.md
           retention-days: 30
