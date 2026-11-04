@@ -40,6 +40,8 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
   {
     labelKey: 'groupChannel',
     items: [
+      // COPS-H4-1 — مركز تنقّل نحو أقسام الإعداد القائمة (بلا صلاحية خاصة: كل بطاقة تُصفّى بصلاحية قسمها).
+      { href: '/commerce/settings', labelKey: 'settingsHub' },
       { href: '/commerce/domains', labelKey: 'domains' },
       { href: '/commerce/delivery', labelKey: 'delivery' },
       // حسابات عملاء التجزئة لقناة الويب — الخادم يشترط commerce.channel_settings.manage (مالك/مدير) وقدرة المتجر.
