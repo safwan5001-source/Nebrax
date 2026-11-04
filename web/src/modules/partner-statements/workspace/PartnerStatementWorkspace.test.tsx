@@ -325,6 +325,36 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     await waitFor(() => expect(h.postDecision).toHaveBeenCalledWith(ID, { run_id: RUN, line_id: 'line-4', action: 'override', unit_keys: ['c1'], reason: 'chosen manually' }));
   });
 
+  it('drops the difference acknowledgement when the selected set (and its difference) changes, keeping the reason', async () => {
+    const verify = (difference: number) => ({
+      applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 400000, credit_minor: 0 }, units: [], expected_net_minor: -400000, set_net_minor: -400000 + difference,
+      difference_minor: difference, tolerance_minor: 100, equal_within_tolerance: false, problems: [],
+    });
+    h.verifySet.mockResolvedValueOnce(verify(10000)).mockResolvedValueOnce(verify(50000));
+    await open();
+    await selectLine(4);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.override'));
+    const picker = await screen.findByTestId('candidate-picker');
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-c1'));
+    await userEvent.click(within(picker).getByText('workspace.picker.verify'));
+    const form = await screen.findByTestId('decision-form-override');
+    await userEvent.type(within(form).getByRole('textbox'), 'because');
+    const box = await within(form).findByRole('checkbox');
+    await userEvent.click(box);
+    expect((box as HTMLInputElement).checked).toBe(true);
+    const submit = within(form).getByText('workspace.action.override').closest('button') as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-c2'));
+    await userEvent.click(within(picker).getByText('workspace.picker.verify'));
+    await waitFor(() => expect(screen.getByTestId('verify-result').textContent).toContain('500.00'));
+    const fresh = await within(screen.getByTestId('decision-form-override')).findByRole('checkbox');
+    expect((fresh as HTMLInputElement).checked).toBe(false);
+    expect((within(screen.getByTestId('decision-form-override')).getByRole('textbox') as HTMLTextAreaElement).value).toBe('because');
+    expect((within(screen.getByTestId('decision-form-override')).getByText('workspace.action.override').closest('button') as HTMLButtonElement).disabled).toBe(true);
+    expect(h.postDecision).not.toHaveBeenCalled();
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,
