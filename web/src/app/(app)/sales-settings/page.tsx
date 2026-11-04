@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
-interface Item { key: string; href: string | null; icon: LucideIcon; appKey?: string }
+interface Item { key: string; href: string | null; icon: LucideIcon; appKey?: string; /** COPS-H4-7: لا يقرؤها أي مسار في النظام اليوم. */ notApplied?: boolean }
 interface Group { title: string; items: Item[] }
 
 const GROUPS: Group[] = [
@@ -33,7 +33,7 @@ const GROUPS: Group[] = [
       { key: 'c_fields', href: '/sales-settings/fields', icon: ListPlus },
       { key: 'c_pricelists', href: '/sales-settings/pricelists', icon: Tags },
       { key: 'c_sources', href: '/sales-settings/sources', icon: Tag },
-      { key: 'c_shipping', href: '/sales-settings/shipping', icon: Truck },
+      { key: 'c_shipping', href: '/sales-settings/shipping', icon: Truck, notApplied: true },
     ],
   },
   {
@@ -42,7 +42,7 @@ const GROUPS: Group[] = [
   },
   {
     title: 'g_orders',
-    items: [{ key: 'c_orders', href: '/sales-settings/orders', icon: ShoppingCart }],
+    items: [{ key: 'c_orders', href: '/sales-settings/orders', icon: ShoppingCart, notApplied: true }],
   },
 ];
 
@@ -88,6 +88,11 @@ export default function SalesSettingsHubPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-text">{t(`${item.key}_t`)}</h3>
+                      {item.notApplied && (
+                        <span data-testid={`not-applied-${item.key}`} className="shrink-0 rounded border border-warning/40 bg-warning/5 px-1.5 py-0.5 text-[10px] font-normal text-warning">
+                          {t('not_applied_badge')}
+                        </span>
+                      )}
                       {!item.href && (
                         <span className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-normal text-muted">
                           {tn('soon')}
