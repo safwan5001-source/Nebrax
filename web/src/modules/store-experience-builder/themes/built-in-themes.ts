@@ -106,6 +106,26 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
     motion: { duration: "slow", easing: "emphasized" },
     header: { style: "standard", design: { layout: "centered", sticky: "always", shadow: "soft" } },
     footer: { layout: "columns" },
+    sectionDefaults: {
+      hero: {
+        layout: "split",
+        spacing: { top: "lg", bottom: "lg", inner: "lg" },
+        mediaTreatment: { height: "tall", mobileHeight: "standard" },
+        typography: { headingScale: "xl", lineHeight: "relaxed" },
+        radius: "lg",
+        motion: { reveal: "fade-up" },
+      },
+      banner: { layout: "split", spacing: { top: "lg", bottom: "lg" }, radius: "lg", motion: { reveal: "fade-up" } },
+      categories: {
+        spacing: { top: "lg", bottom: "lg" },
+        typography: { headingStyle: "centered" },
+        display: { layout: "grid", columns: { mobile: 2, tablet: 3, desktop: 4 }, card: { style: "border", radius: 16, padding: 12 }, image: { aspect: "1:1", shape: "square" }, name: { placement: "below", align: "center", weight: 700 } },
+      },
+      newArrivals: { layout: "rail", typography: { headingStyle: "centered" }, spacing: { top: "lg", bottom: "lg" }, cards: { imageRatio: "3:4", hover: "zoom" } },
+      featured: { layout: "grid", columns: 4, typography: { headingStyle: "centered" }, spacing: { top: "lg", bottom: "lg" }, cards: { imageRatio: "3:4", hover: "zoom" } },
+      productShelf: { layout: "rail", typography: { headingStyle: "centered" }, spacing: { top: "lg", bottom: "lg" }, cards: { imageRatio: "3:4", hover: "zoom" } },
+      benefits: { layout: "flat", spacing: { top: "lg", bottom: "lg" }, typography: { headingStyle: "centered" } },
+    },
     // No merchant branding, imagery, product content, pricing, delivery or checkout data.
   },
   {
