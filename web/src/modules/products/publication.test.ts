@@ -4,6 +4,7 @@ const apiMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: (...args: unknown[]) => apiMock(...args) }));
 
 import {
+  bulkSetProductPublication,
   loadAvailableProductStores,
   loadProductPublication,
   loadProductPublicationList,
@@ -107,5 +108,34 @@ describe('product publication workspace list API (COM-CATALOG-1)', () => {
     expect(url).not.toContain('status=');
     expect(url).not.toContain('search=');
     expect(url).toContain('page=1');
+  });
+});
+
+describe('COM-CATALOG-3 bulk product publication API', () => {
+  it('posts explicit ids for one storefront and nothing else (no tenant, no filters)', async () => {
+    apiMock.mockResolvedValue({
+      data: {
+        action: 'publish',
+        storefront_id: 's1',
+        summary: { requested: 2, updated: 1, unchanged: 0, rejected: 1, failed: 0 },
+        results: [
+          { id: 'p1', status: 'updated' },
+          { id: 'p2', status: 'rejected', reason: 'not_found' },
+        ],
+      },
+    });
+
+    const result = await bulkSetProductPublication({ action: 'publish', storefrontId: 's1', ids: ['p1', 'p2'] });
+
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/products/publication/bulk', {
+      method: 'POST',
+      body: { action: 'publish', storefront_id: 's1', ids: ['p1', 'p2'] },
+    });
+    expect(result.storefrontId).toBe('s1');
+    expect(result.results).toEqual([
+      { id: 'p1', status: 'updated', reason: null },
+      { id: 'p2', status: 'rejected', reason: 'not_found' },
+    ]);
+    expect(result.summary.rejected).toBe(1);
   });
 });

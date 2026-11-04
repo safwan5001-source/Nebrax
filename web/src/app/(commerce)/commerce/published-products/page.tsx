@@ -16,18 +16,33 @@ import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
+  bulkSetCategoryPublication,
   loadCategoryPublicationList,
   replaceCategoryPublication,
   type CategoryPublicationListItem,
   type CategoryPublicationListPage,
 } from '@/modules/categories/publication';
 import {
+  bulkSetProductPublication,
   loadProductPublicationList,
   replaceProductPublication,
+  type BulkPublicationAction,
+  type BulkPublicationResult,
   type ProductPublicationListItem,
   type ProductPublicationListPage,
   type PublicationStatusFilter,
 } from '@/modules/products/publication';
+import { BulkActionBar, BulkDialog, type BulkDialogState } from '@/modules/commerce-workspace/publication-bulk/bulk-publication';
+import {
+  EMPTY_SELECTION,
+  keepFailedOnly,
+  pageSelectionState,
+  SELECTION_LIMIT,
+  fillTemplate,
+  toggleOne,
+  togglePage,
+  type Selection,
+} from '@/modules/commerce-workspace/publication-bulk/selection';
 
 type WorkspaceTab = 'products' | 'categories';
 type MessageKey = Parameters<typeof commerceWorkspaceMessage>[1];
@@ -204,6 +219,8 @@ function PublicationSection<T extends PublicationListItem>({
   unpublishFailed,
   loadList,
   replacePublication,
+  bulkNounLabel,
+  bulkSetPublication,
 }: {
   t: (key: MessageKey) => string;
   storefrontOptions: StorefrontOption[];
@@ -231,6 +248,13 @@ function PublicationSection<T extends PublicationListItem>({
     perPage?: number;
   }) => Promise<PublicationListPage>;
   replacePublication: (id: string, storefrontIds: string[]) => Promise<T['stores']>;
+  /** COM-CATALOG-3 — اسم الكيان في رسائل الإجراء الجماعي + دالة التنفيذ الخاصة بالتبويبة. */
+  bulkNounLabel: string;
+  bulkSetPublication: (params: {
+    action: BulkPublicationAction;
+    storefrontId: string;
+    ids: string[];
+  }) => Promise<BulkPublicationResult>;
 }) {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
 
@@ -248,6 +272,15 @@ function PublicationSection<T extends PublicationListItem>({
   const [result, setResult] = useState<PublicationListPage | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const requestSeq = useRef(0);
+
+  // COM-CATALOG-3 — التحديد معرّفات صريحة؛ يُفرغ عند أي تغيّر في البحث/الحالة/المتجر.
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
+  const selectionSizeRef = useRef(0);
+  selectionSizeRef.current = selection.size;
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  const [bulkTargetStoreId, setBulkTargetStoreId] = useState('');
+  const [bulkDialog, setBulkDialog] = useState<BulkDialogState>({ phase: 'closed' });
+  const bulkRunning = bulkDialog.phase === 'running';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -281,6 +314,70 @@ function PublicationSection<T extends PublicationListItem>({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // أي تغيير في معايير الاستعلام (البحث الخام لا المؤجَّل: فوراً) يُفرغ التحديد —
+  // لا يتسع التحديد صامتاً ولا يبقى مخفياً خلف قائمة مختلفة. التنقل بين الصفحات لا يمسّه.
+  const queryKey = `${search}\u0000${status}\u0000${storefrontId}`;
+  const lastQueryKey = useRef(queryKey);
+  useEffect(() => {
+    if (lastQueryKey.current === queryKey) return;
+    lastQueryKey.current = queryKey;
+    if (selectionSizeRef.current > 0) setBulkNotice(t('bulkSelectionCleared'));
+    setSelection(EMPTY_SELECTION);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
+
+  // اختيار المتجر في المرشّح يضبط المتجر المستهدف افتراضياً (يبقى قابلاً للتغيير صراحةً).
+  useEffect(() => {
+    if (storefrontId) setBulkTargetStoreId(storefrontId);
+  }, [storefrontId]);
+
+  const canSelect = canManage && storefrontOptions.length > 0;
+  // متجر واحد = هدف حتمي؛ عدة متاجر = اختيار صريح ولا تخمين.
+  const bulkTargetStore =
+    storefrontOptions.length === 1
+      ? storefrontOptions[0]
+      : (storefrontOptions.find((store) => store.id === bulkTargetStoreId) ?? null);
+
+  const pageItems = ((result?.items ?? []) as T[]).map((item) => ({ id: item.id, name: item.name }));
+  const pageIds = pageItems.map((item) => item.id);
+
+  const onToggleRow = (item: T) => {
+    const next = toggleOne(selection, { id: item.id, name: item.name });
+    setSelection(next.selection);
+    setBulkNotice(next.limitReached ? fillTemplate(t('bulkLimitReached'), { n: SELECTION_LIMIT }) : null);
+  };
+  const onTogglePage = () => {
+    const next = togglePage(selection, pageItems);
+    setSelection(next.selection);
+    setBulkNotice(next.limitReached ? fillTemplate(t('bulkLimitReached'), { n: SELECTION_LIMIT }) : null);
+  };
+
+  const openBulkDialog = (action: BulkPublicationAction) => {
+    if (!bulkTargetStore || selection.size === 0) return;
+    setBulkNotice(null);
+    setBulkDialog({
+      phase: 'confirm',
+      action,
+      storeName: bulkTargetStore.name,
+      items: [...selection].map(([id, name]) => ({ id, name })),
+    });
+  };
+
+  const runBulk = async () => {
+    if (bulkDialog.phase !== 'confirm' || !bulkTargetStore) return;
+    const { action, storeName, items } = bulkDialog;
+    setBulkDialog({ phase: 'running', action, storeName, items });
+    let outcome: BulkPublicationResult | null = null;
+    try {
+      outcome = await bulkSetPublication({ action, storefrontId: bulkTargetStore.id, ids: items.map((item) => item.id) });
+    } catch {
+      outcome = null; // الحالة الفعلية غير مؤكدة: لا نعدّل التحديد ونطلب التحقق.
+    }
+    if (outcome) setSelection((current) => keepFailedOnly(current, outcome.results));
+    setBulkDialog({ phase: 'result', action, storeName, items, result: outcome });
+    void load(); // مصدر الحقيقة الخادم: أعد القراءة (قد تخرج الصفوف من مرشّح الحالة).
+  };
 
   /** نشر/إلغاء نشر عبر عقد الاستبدال نفسه — مصدر الحقيقة يبقى خادمياً دائماً. */
   const togglePublication = async (item: T, storeId: string, publish: boolean) => {
@@ -394,6 +491,16 @@ function PublicationSection<T extends PublicationListItem>({
             <Table>
               <THead>
                 <TR>
+                  {canSelect ? (
+                    <TH className="w-10">
+                      <PageSelectBox
+                        label={t('bulkSelectAllPage')}
+                        state={pageSelectionState(selection, pageIds)}
+                        disabled={busyKey !== null || bulkRunning}
+                        onChange={onTogglePage}
+                      />
+                    </TH>
+                  ) : null}
                   <TH>{columnSubject}</TH>
                   <TH>{t('publicationColumnStores')}</TH>
                   {canManage ? <TH>{t('publicationColumnActions')}</TH> : null}
@@ -402,6 +509,16 @@ function PublicationSection<T extends PublicationListItem>({
               <TBody>
                 {(result.items as T[]).map((item) => (
                   <TR key={item.id}>
+                    {canSelect ? (
+                      <TD className="w-10">
+                        <RowSelectBox
+                          label={`${t('bulkSelectRow')}: ${item.name}`}
+                          checked={selection.has(item.id)}
+                          disabled={busyKey !== null || bulkRunning}
+                          onChange={() => onToggleRow(item)}
+                        />
+                      </TD>
+                    ) : null}
                     <TD>{renderSubject(item)}</TD>
                     <TD>{storeBadges(item)}</TD>
                     {canManage ? <TD>{rowActions(item)}</TD> : null}
@@ -413,15 +530,38 @@ function PublicationSection<T extends PublicationListItem>({
 
           {/* Mobile: سجلات لمسية بلا خسارة معلومات — الحالة لكل متجر والإجراءات كاملة. */}
           <div className="divide-y divide-border rounded border border-border bg-surface md:hidden">
+            {canSelect ? (
+              <div className="flex items-center gap-1 border-b border-border bg-sunken ps-1.5 pe-3">
+                <PageSelectBox
+                  label={t('bulkSelectAllPage')}
+                  state={pageSelectionState(selection, pageIds)}
+                  disabled={busyKey !== null || bulkRunning}
+                  onChange={onTogglePage}
+                />
+                <span className="text-xs text-muted">{t('bulkSelectAllPage')}</span>
+              </div>
+            ) : null}
             {(result.items as T[]).map((item) => (
-              <MobileRecordItem
-                key={item.id}
-                record={{
-                  title: item.name,
-                  status: storeBadges(item),
-                  actions: canManage ? rowActions(item) : undefined,
-                }}
-              />
+              <div key={item.id} className="flex items-start">
+                {canSelect ? (
+                  <div className="shrink-0 ps-1.5 pt-1">
+                    <RowSelectBox
+                      label={`${t('bulkSelectRow')}: ${item.name}`}
+                      checked={selection.has(item.id)}
+                      disabled={busyKey !== null || bulkRunning}
+                      onChange={() => onToggleRow(item)}
+                    />
+                  </div>
+                ) : null}
+                <MobileRecordItem
+                  className="min-w-0 flex-1"
+                  record={{
+                    title: item.name,
+                    status: storeBadges(item),
+                    actions: canManage ? rowActions(item) : undefined,
+                  }}
+                />
+              </div>
             ))}
           </div>
 
@@ -435,11 +575,94 @@ function PublicationSection<T extends PublicationListItem>({
               setPerPage(next);
               setPage(1);
             }}
-            disabled={busyKey !== null}
+            disabled={busyKey !== null || bulkRunning}
           />
         </>
       ) : null}
+
+      {canSelect ? (
+        <BulkActionBar
+          t={t}
+          selection={selection}
+          pageIds={pageIds}
+          storefrontOptions={storefrontOptions}
+          targetStoreId={bulkTargetStoreId}
+          onTargetStoreChange={setBulkTargetStoreId}
+          busy={bulkRunning}
+          notice={bulkNotice}
+          idPrefix={idPrefix}
+          onAction={openBulkDialog}
+          onClear={() => {
+            setSelection(EMPTY_SELECTION);
+            setBulkNotice(null);
+          }}
+        />
+      ) : null}
+      <BulkDialog
+        t={t}
+        nounLabel={bulkNounLabel}
+        state={bulkDialog}
+        onConfirm={() => void runBulk()}
+        onClose={() => setBulkDialog({ phase: 'closed' })}
+      />
     </>
+  );
+}
+
+/** خانة تحديد بمساحة لمس ≥ 44px (الجوال أولاً) وتسمية قابلة للقراءة الآلية. */
+function RowSelectBox({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center md:h-8 md:w-8">
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className="h-4 w-4 rounded border-border accent-primary"
+      />
+    </label>
+  );
+}
+
+/** «تحديد الصفحة» بحالة وسطى (indeterminate) حين يكون بعضها محدداً. */
+function PageSelectBox({
+  label,
+  state,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  state: 'none' | 'some' | 'all';
+  disabled: boolean;
+  onChange: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = state === 'some';
+  }, [state]);
+  return (
+    <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center md:h-8 md:w-8">
+      <input
+        ref={ref}
+        type="checkbox"
+        aria-label={label}
+        checked={state === 'all'}
+        disabled={disabled}
+        onChange={onChange}
+        className="h-4 w-4 rounded border-border accent-primary"
+      />
+    </label>
   );
 }
 
@@ -474,6 +697,8 @@ function ProductsPublicationSection({
       unpublishFailed={t('publicationUnpublishFailed')}
       loadList={loadProductPublicationList}
       replacePublication={replaceProductPublication}
+      bulkNounLabel={t('bulkNounProducts')}
+      bulkSetPublication={bulkSetProductPublication}
       renderSubject={(item) => (
         <>
           <div className="font-medium text-text">{item.name}</div>
@@ -518,6 +743,8 @@ function CategoriesPublicationSection({
       unpublishFailed={t('categoryPublicationUnpublishFailed')}
       loadList={loadCategoryPublicationList}
       replacePublication={replaceCategoryPublication}
+      bulkNounLabel={t('bulkNounCategories')}
+      bulkSetPublication={bulkSetCategoryPublication}
       renderSubject={(item) => (
         <>
           <div className="font-medium text-text">{item.name}</div>
