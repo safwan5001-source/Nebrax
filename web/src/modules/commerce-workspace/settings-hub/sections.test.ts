@@ -30,11 +30,12 @@ describe('settings hub sections (COPS-H4-1)', () => {
     expect(hrefs({ role: 'viewer', permissions: [] })).toEqual(['/commerce/appearance', '/commerce/integrations']);
   });
 
-  it('commerce.manage unlocks domains, delivery and gifting but not customer accounts', () => {
+  it('commerce.manage unlocks domains, delivery, shipping zones and gifting but not customer accounts', () => {
     expect(hrefs({ role: 'viewer', permissions: ['commerce.manage'] })).toEqual([
       '/commerce/appearance',
       '/commerce/domains',
       '/commerce/delivery',
+      '/commerce/shipping-zones',
       '/commerce/gifting',
       '/commerce/integrations',
     ]);
@@ -53,6 +54,11 @@ describe('settings hub sections (COPS-H4-1)', () => {
     expect(navItemForSection(domains.href)?.permission).toBeUndefined();
     expect(isSettingsSectionVisible(domains, new Set(), { role: 'viewer', permissions: [] })).toBe(false);
     expect(isSettingsSectionVisible(domains, new Set(), { role: 'viewer', permissions: ['commerce.manage'] })).toBe(true);
+  });
+
+  it('order policies (company.manage) is shown to a company manager only', () => {
+    expect(hrefs({ role: 'viewer', permissions: ['company.manage'] })).toContain('/commerce/order-policies');
+    expect(hrefs({ role: 'viewer', permissions: ['commerce.manage'] })).not.toContain('/commerce/order-policies');
   });
 
   it('a missing viewer sees nothing that needs a permission', () => {

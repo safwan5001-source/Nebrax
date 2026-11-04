@@ -1828,6 +1828,11 @@ export const mockSalesSettings = {
   quote_validity_days: 14,
   invoice_prefix: 'INV',
   default_terms: 'الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+  // COPS-H4-5 — سياسات الطلب الإلكتروني (الافتراضيات الحقيقية للخادم). مدة الحجز وحدها قابلة للتحرير في الواجهة.
+  commerce_payment_hold_minutes: 60,
+  commerce_invoice_trigger: 'none',
+  commerce_price_tax_mode: null as string | null,
+  commerce_partner_policy: 'link_verified_else_create',
 };
 
 export const mockSubscription = {
@@ -3304,6 +3309,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    // COPS-H4-5: PUT /sales-settings يدمج المفاتيح المرسلة فقط (كالخادم)؛ مدة الحجز تُقبل ضمن 15..1440 وإلا 422. غيرها يبقى نجاحاً صورياً كما كان.
+    if (clean === '/sales-settings' && m === 'PUT' && body && typeof body === 'object') {
+      const minutes = (body as Record<string, unknown>).commerce_payment_hold_minutes;
+      if (minutes !== undefined) {
+        if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 15 || minutes > 1440) {
+          return Promise.reject(Object.assign(new Error('مدة الحجز غير صالحة.'), { status: 422 }));
+        }
+        mockSalesSettings.commerce_payment_hold_minutes = minutes;
+        return resolve({ data: mockSalesSettings });
+      }
+    }
     if (clean === '/account/preferences' && m === 'PUT') {
       const requested = body as { locale?: unknown; theme?: unknown; appTheme?: unknown } | undefined;
       const locale = requested?.locale === 'en' || requested?.locale === 'ar' ? requested.locale : mockAccountPreferences.locale;

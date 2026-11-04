@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Globe, Gift, Paintbrush, Plug, Settings2, Truck, UserRound, type LucideIcon } from 'lucide-react';
+import { Globe, Gift, MapPin, Paintbrush, Plug, Settings2, SlidersHorizontal, Truck, UserRound, type LucideIcon } from 'lucide-react';
 import { EmptyState, PageHeader } from '@/components/nebrax';
 import { hiddenApplicationKeys } from '@/components/layout/nav-visibility';
 import { api } from '@/lib/api';
@@ -17,6 +17,8 @@ const ICONS: Record<string, LucideIcon> = {
   '/commerce/appearance': Paintbrush,
   '/commerce/domains': Globe,
   '/commerce/delivery': Truck,
+  '/commerce/shipping-zones': MapPin,
+  '/commerce/order-policies': SlidersHorizontal,
   '/commerce/customer-accounts': UserRound,
   '/commerce/gifting': Gift,
   '/commerce/integrations': Plug,

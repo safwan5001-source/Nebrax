@@ -20,6 +20,8 @@ export const SETTINGS_HUB_SECTIONS: readonly SettingsHubSection[] = [
   { href: '/commerce/appearance', labelKey: 'appearance', descriptionKey: 'settingsHubDescAppearance' },
   { href: '/commerce/domains', labelKey: 'domains', descriptionKey: 'settingsHubDescDomains', requires: 'commerce.manage' },
   { href: '/commerce/delivery', labelKey: 'delivery', descriptionKey: 'settingsHubDescDelivery', requires: 'commerce.manage' },
+  { href: '/commerce/shipping-zones', labelKey: 'shippingZones', descriptionKey: 'settingsHubDescShippingZones' },
+  { href: '/commerce/order-policies', labelKey: 'orderPolicies', descriptionKey: 'settingsHubDescOrderPolicies' },
   { href: '/commerce/customer-accounts', labelKey: 'customerAccounts', descriptionKey: 'settingsHubDescCustomerAccounts' },
   { href: '/commerce/gifting', labelKey: 'gifting', descriptionKey: 'settingsHubDescGifting' },
   { href: '/commerce/integrations', labelKey: 'integrations', descriptionKey: 'settingsHubDescIntegrations' },
