@@ -45,6 +45,10 @@ class ImportRepairService
         if ($adapter->unit() !== ImportDomainAdapter::UNIT_ROW || ! $adapter instanceof ImportFailureExportAdapter) {
             throw new ImportRepairException('repair_domain_unsupported', 'هذا المجال لا يدعم الإصلاح الجزئي (وحدته ذرّية: صحّح الملف وأعد رفعه).');
         }
+        // تشغيلة استبدال الصور لا يُصلحها ملف جدول مصحَّح (لا بيانات منتج فيها): تُعاد بالأرشيف نفسه كتشغيلة جديدة وهي idempotent.
+        if (data_get($parent->apply_options, 'media_mode') === ProductImportMediaService::MODE_REPLACE) {
+            throw new ImportRepairException('repair_domain_unsupported', 'تشغيلة استبدال الصور لا تدعم الإصلاح الجزئي: أعد تشغيلها بالملف والأرشيف نفسيهما (الصور المتطابقة لا تتكرر).');
+        }
         if ($parent->branch_id !== null && $parent->branch_id !== $this->branch->id()) {
             throw new ImportRepairException('repair_branch_mismatch', 'الإصلاح يُنفَّذ في الفرع الذي أُنشئت فيه التشغيلة الأصلية.');
         }

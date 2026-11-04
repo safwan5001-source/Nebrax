@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -170,6 +171,150 @@ class ProductMediaService
         }
 
         return $created;
+    }
+
+    /**
+     * يستبدل معرض الصور **المشترك** للمنتج (مستوى المنتج فقط؛ وسائط قيم الخيارات والمتغيّرات لا تُمسّ) بالصور
+     * المعطاة بترتيبها النهائي (الأولى = الغلاف). عقد الأمان (استيراد الصور — وضع الاستبدال):
+     *
+     *  1. **فحص قبل أي كتابة:** كل ملف يُفحص (النوع/الحجم/البكسل/البصمة) والدفعة لا تقبل تكرار بصمة ولا تتجاوز ٨ صور ولا
+     *     تكون فارغة (لا يُفرَّغ معرض بلا بديل أبداً).
+     *  2. **إضافة البدائل أولاً:** تُحفظ الصور الجديدة (الأصل + المشتقات + الصف) ولا يُفكّ ارتباط أي صورة قديمة بعد. فشل أي
+     *     بديل يُرجع كل ما أُضيف في هذه المحاولة (صفوفاً بالمعاملة وملفاتٍ بالتنظيف) فيبقى المعرض القديم كما كان بالضبط.
+     *  3. **ثم الإزالة:** بعد نجاح كل البدائل تُعاد ترتيب المعرض وتُحذف صفوف القديم في المعاملة نفسها.
+     *  4. **الملفات الفعلية بعد الالتزام النهائي فقط** (`afterCommit`) وبشرط ألّا يستعملها صفٌّ آخر؛ تراجع معاملة خارجية
+     *     (قطعة استيراد) لا يفقد الملفات القديمة.
+     *  5. **idempotent:** صورة موجودة بالبصمة نفسها تُبقى ولا يُعاد رفعها؛ فإعادة التشغيل بعد نجاح أو انقطاع جزئي لا تكرّر
+     *     صورة ولا تحذف شيئاً زائداً (انقطاع بين الإضافة والإزالة يُستكمل في المحاولة التالية).
+     *
+     * يقفل صف المنتج (`FOR UPDATE`) فيتسلسل استبدالان متزامنان لمنتجٍ واحد.
+     *
+     * @param  list<UploadedFile>  $files  الصور الجديدة بالترتيب النهائي.
+     * @return array{added:int,kept:int,removed:int}
+     */
+    public function replaceProductGallery(Product $product, array $files, ?string $uploadedBy): array
+    {
+        $files = array_values($files);
+        if ($files === []) {
+            throw new RuntimeException('لا يمكن استبدال معرض الصور بقائمة فارغة.');
+        }
+        if (count($files) > self::MAX_PER_SCOPE) {
+            throw new RuntimeException('الحد الأقصى للوسائط في هذا النطاق هو '.self::MAX_PER_SCOPE.' صور.');
+        }
+
+        // ١) فحص الدفعة كاملةً قبل أي قفل أو كتابة.
+        $desired = [];
+        $seen = [];
+        foreach ($files as $file) {
+            $inspected = $this->inspector->inspect($file);
+            if (isset($seen[$inspected->sha256])) {
+                throw new RuntimeException('الصور الجديدة تحتوي صورة مكررة بالمحتوى نفسه.');
+            }
+            $seen[$inspected->sha256] = true;
+            $desired[] = ['file' => $file, 'sha256' => $inspected->sha256];
+        }
+
+        $removedFiles = [];
+        $summary = DB::transaction(function () use ($product, $desired, $uploadedBy, &$removedFiles): array {
+            $locked = Product::query()->whereKey($product->id)->lockForUpdate()->first();
+            if ($locked === null) {
+                throw new RuntimeException('تعذّر العثور على المنتج عند استبدال الصور.');
+            }
+
+            $productLevel = fn () => ProductMedia::query()
+                ->where('product_id', $locked->id)
+                ->whereNull('product_option_value_id')->whereNull('product_variant_id');
+
+            $current = $productLevel()->orderBy('sort_order')->orderBy('id')->get();
+            $keepBySha = [];
+            foreach ($current as $row) {
+                if ($row->content_sha256 !== null && ! isset($keepBySha[$row->content_sha256])) {
+                    $keepBySha[$row->content_sha256] = $row;
+                }
+            }
+
+            $liveIds = [];
+            foreach ($desired as $item) {
+                if (isset($keepBySha[$item['sha256']])) {
+                    $liveIds[] = $keepBySha[$item['sha256']]->id;
+                }
+            }
+
+            // ٢) إضافة البدائل غير الموجودة. العدّ يشمل المُبقاة والمُضافة فقط (القديمة المراد إزالتها لا تُحتسب).
+            $created = [];
+            $added = 0;
+            $finalRows = [];
+            try {
+                foreach ($desired as $item) {
+                    if (isset($keepBySha[$item['sha256']])) {
+                        $finalRows[] = $keepBySha[$item['sha256']];
+                        continue;
+                    }
+                    $media = $this->store($locked, [$item['file']], $uploadedBy, [
+                        'countQuery' => fn () => $productLevel()->whereIn('id', $liveIds),
+                    ], true)[0];
+                    $created[] = $media;
+                    $liveIds[] = $media->id;
+                    $finalRows[] = $media;
+                    $added++;
+                }
+            } catch (\Throwable $exception) {
+                // المعاملة ستُرجع الصفوف؛ الملفات خارجها فتُنظَّف هنا لتبقى حالة التخزين كما كانت قبل المحاولة.
+                $this->deleteFiles(array_map(fn (ProductMedia $media): array => $this->fileDescriptor($media), $created));
+
+                throw $exception;
+            }
+
+            // ٣) ترتيب نهائي ثم إزالة القديم — بعد نجاح كل البدائل فقط.
+            foreach ($finalRows as $position => $row) {
+                if ((int) $row->sort_order !== $position) {
+                    ProductMedia::query()->whereKey($row->id)->update(['sort_order' => $position]);
+                }
+            }
+            $removeIds = $current->pluck('id')->diff($liveIds)->values()->all();
+            if ($removeIds !== []) {
+                $removedFiles = $this->collectAndQueueDeletion(ProductMedia::query()->whereIn('id', $removeIds));
+            }
+
+            return ['added' => $added, 'kept' => count($desired) - $added, 'removed' => count($removeIds)];
+        });
+
+        // ٤) حذف الملفات الفعلية بعد الالتزام النهائي لأقصى معاملة قائمة، وبشرط عدم استعمالها في موضع آخر.
+        if ($removedFiles !== []) {
+            DB::afterCommit(fn () => $this->deleteFilesUnlessReferenced($removedFiles));
+        }
+
+        return $summary;
+    }
+
+    /**
+     * يحذف ملفات الوسائط التي لم يعد يشير إليها أي صف `product_media` (المسار والقرص نفسهما). ملف ما زال مستعملاً
+     * في موضع آخر يبقى كاملاً (الأصل ومشتقاته). الاستعلام يمرّ بنطاق المستأجر الحالي: المسار يحمل معرّف المستأجر
+     * والمنتج ومعرّفاً عشوائياً فلا تصادم عابراً للمستأجرين.
+     *
+     * @param  list<array{id: string, disk: string, path: string, mime_type: ?string, product_id: string}>  $files
+     */
+    private function deleteFilesUnlessReferenced(array $files): void
+    {
+        $deletable = [];
+        foreach ($files as $item) {
+            $stillUsed = ProductMedia::query()
+                ->where('disk', $item['disk'])->where('path', $item['path'])
+                ->exists();
+            if (! $stillUsed) {
+                $deletable[] = $item;
+            }
+        }
+        $this->deleteFiles($deletable);
+    }
+
+    /** @return array{id: string, disk: string, path: string, mime_type: ?string, product_id: string} */
+    private function fileDescriptor(ProductMedia $media): array
+    {
+        return [
+            'id' => (string) $media->id, 'disk' => (string) $media->disk, 'path' => (string) $media->path,
+            'mime_type' => $media->mime_type, 'product_id' => (string) $media->product_id,
+        ];
     }
 
     public function delete(ProductMedia $media): void

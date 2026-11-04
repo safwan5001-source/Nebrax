@@ -8,6 +8,7 @@ use App\Services\ProductTaxonomyImportService;
 use App\Services\ExpenseImportService;
 use App\Services\StocktakeCountImportService;
 use App\Services\UnitTemplateImportService;
+use App\Services\ProductImportMediaService;
 use App\Services\ProductImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
@@ -130,6 +131,8 @@ class ApplyImportJobRequest extends FormRequest
             'branch_id' => ['sometimes', 'nullable', 'uuid'],
             'apply_product_images' => ['sometimes', 'boolean'],
             'approve_existing_media_updates' => ['sometimes', 'boolean'],
+            'media_mode' => ['sometimes', Rule::in([ProductImportMediaService::MODE_ADD, ProductImportMediaService::MODE_REPLACE])],
+            'confirm_media_replacement' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -154,7 +157,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id', 'permit_type', 'permit_date', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'amount_direction', 'date_tolerance_days', 'amount_tolerance_minor'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'media_mode', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id', 'permit_type', 'permit_date', 'partner_id', 'role', 'period_from', 'period_to', 'currency', 'amount_direction', 'date_tolerance_days', 'amount_tolerance_minor'] as $key) {
             // قيمة null الصريحة لنسبة الضريبة = غياب (تفضيل المؤسسة)، لا نصّاً فارغاً يخالف المجمَّد.
             if ($this->has($key) && ! ($key === 'default_tax_rate' && $this->input($key) === null)) {
                 $options[$key] = $this->string($key)->toString();
@@ -187,7 +190,7 @@ class ApplyImportJobRequest extends FormRequest
         if ($this->has('reason')) {
             $options['reason'] = $this->input('reason');
         }
-        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates', 'confirm_media_replacement'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->boolean($key);
             }
@@ -250,6 +253,12 @@ class ApplyImportJobRequest extends FormRequest
         }
         if ($this->has('approve_existing_media_updates')) {
             $options['approve_existing_media_updates'] = $this->boolean('approve_existing_media_updates');
+        }
+        if ($this->has('media_mode')) {
+            $options['media_mode'] = $this->string('media_mode')->toString();
+        }
+        if ($this->has('confirm_media_replacement')) {
+            $options['confirm_media_replacement'] = $this->boolean('confirm_media_replacement');
         }
 
         return $options;

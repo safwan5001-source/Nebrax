@@ -85,12 +85,42 @@ export interface ImportPreview {
       barcode: string | null;
       product_id: string | null;
       product_action: string;
-      status: 'ready' | 'needs_approval' | 'error';
+      status: 'ready' | 'needs_approval' | 'error' | 'unchanged';
       sources: Array<{ kind: 'url' | 'archive'; name: string; role: 'primary' | 'additional' }>;
+      /** وضع الاستبدال فقط: ما سيحدث لمعرض هذا المنتج (القديم مقابل الجديد). */
+      replacement?: {
+        existing_count: number;
+        new_count: number;
+        keep_count: number;
+        add_count: number;
+        remove_count: number;
+        existing_names: string[];
+      } | null;
       messages: string[];
     }>;
+    /** وضع الاستبدال فقط (غيابها = وضع الإضافة الأصلي). */
+    mode?: 'replace';
+    unchanged_rows?: number;
+    affected_products?: number;
+    images_to_add?: number;
+    images_to_remove?: number;
+    images_kept?: number;
   };
 }
+
+/** مجاميع تشغيلة استبدال الصور (تراكمية عبر القطع) كما يحفظها الخادم في `apply_result.media.totals`. */
+export interface ReplaceTotals {
+  products_replaced: number;
+  images_added: number;
+  images_kept: number;
+  images_removed: number;
+  unchanged: number;
+  skipped: number;
+  failed: number;
+}
+
+/** وضع الصور: إضافة (الافتراضي، لا يمسّ الموجود) أو استبدال معرض الصور بصور الأرشيف المطابقة بـ SKU. */
+export type ImageMode = 'add' | 'replace';
 
 export interface ImportResult {
   mode: ImportMode;
@@ -146,6 +176,10 @@ export function importFormData(
     /** يُرسَل مع المعاينة لأنه جزء من خياراتها المقيَّدة بالبصمة (IMP-H1-S3b) — تغيّره بعدها يُبطل المعاينة. */
     applyProductImages?: boolean;
     approveExistingMediaUpdates?: boolean;
+    /** `replace` = استبدال الصور الموجودة (بـ SKU)، ويُجمَّد مع المعاينة؛ الغياب = الإضافة. */
+    mediaMode?: ImageMode;
+    /** تأكيد الاستبدال الصريح؛ جزء من الخيارات المربوطة بالمعاينة (تغيّره يستلزم معاينة جديدة). */
+    confirmMediaReplacement?: boolean;
   } = {}
 ): FormData {
   const form = new FormData();
@@ -153,6 +187,10 @@ export function importFormData(
   if (options.mediaArchive) form.append('media_archive', options.mediaArchive);
   if (options.applyProductImages) form.append('apply_product_images', '1');
   if (options.approveExistingMediaUpdates) form.append('approve_existing_media_updates', '1');
+  if (options.mediaMode === 'replace') {
+    form.append('media_mode', 'replace');
+    if (options.confirmMediaReplacement) form.append('confirm_media_replacement', '1');
+  }
   if (options.mode) form.append('mode', options.mode);
   if (options.blankPolicy) form.append('blank_policy', options.blankPolicy);
   if (options.masterDataPolicy) form.append('master_data_policy', options.masterDataPolicy);
@@ -194,6 +232,11 @@ export function mappingGaps(
     missingIdentifier: needsIdentifier && !IDENTIFIER_FIELDS.some((key) => counts.has(key)),
     duplicate: [...counts.values()].some((count) => count > 1),
   };
+}
+
+/** وضع الاستبدال يطابق المنتجات بـ SKU وحده: لا بديل بالباركود ولا بمعرّف نبراكس. */
+export function replaceMissingSku(mapping: ColumnMapping): boolean {
+  return !Object.values(mapping).includes('sku');
 }
 
 /** يحوّل الاقتراح الخادميّ إلى حالة مطابقة قابلة للتحرير. */

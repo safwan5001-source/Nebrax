@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Services\ExpenseImportService;
 use App\Services\PurchaseImportService;
 use App\Services\ImportJobAccess;
+use App\Services\ProductImportMediaService;
 use App\Services\ProductImportService;
 use App\Services\PartnerImportService;
 use App\Services\PriceListItemImportService;
@@ -116,6 +117,16 @@ class StoreImportJobRequest extends FormRequest
             'options.branch_id' => ['sometimes', 'nullable', 'uuid'],
             'options.apply_product_images' => ['sometimes', 'boolean'],
             'options.approve_existing_media_updates' => ['sometimes', 'boolean'],
+            // استبدال معرض الصور بصور الأرشيف المطابقة بـ SKU (مجال كتالوج المنتجات فقط) + تأكيده الصريح؛ كلاهما يُجمَّد مع المعاينة.
+            'options.media_mode' => ['sometimes', Rule::in([ProductImportMediaService::MODE_ADD, ProductImportMediaService::MODE_REPLACE]), function ($attribute, $value, $fail) {
+                if ($value === ProductImportMediaService::MODE_REPLACE && $this->input('domain') !== ImportJobDomain::PRODUCT_CATALOG) {
+                    $fail('استبدال الصور متاح لاستيراد كتالوج المنتجات فقط.');
+                } elseif ($value === ProductImportMediaService::MODE_REPLACE && ! $this->hasFile('media_archive')) {
+                    // `sometimes` على الأرشيف يتخطى قاعدة «مطلوب» عند غيابه، فيُفحص هنا صراحةً.
+                    $fail('وضع استبدال الصور يتطلب رفع أرشيف ZIP للصور.');
+                }
+            }],
+            'options.confirm_media_replacement' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -130,7 +141,7 @@ class StoreImportJobRequest extends FormRequest
         if (! is_array($options)) {
             return null;
         }
-        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates', 'confirm_media_replacement'] as $key) {
             if (array_key_exists($key, $options)) {
                 $options[$key] = filter_var($options[$key], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
             }

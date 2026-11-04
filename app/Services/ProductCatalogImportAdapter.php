@@ -75,6 +75,20 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
 
     public function canonicalOptions(array $raw): array
     {
+        // وضع استبدال الصور مسارٌ للصور وحدها: لا يكتب بيانات المنتج (الاسم/السعر/المخزون) إطلاقاً، فتُثبَّت خيارات الكتالوج على قيم
+        // محايدة ثابتة كي لا تتغيّر البصمة بعوامل لا أثر لها، ومفتاحا الوضع لا يظهران إلا فيه — فتبقى بصمة معاينات «الإضافة» كما هي.
+        if (($raw['media_mode'] ?? ProductImportMediaService::MODE_ADD) === ProductImportMediaService::MODE_REPLACE) {
+            return $this->withMapping([
+                'mode' => ProductImportService::MODE_UPDATE,
+                'blank_policy' => ProductImportService::BLANK_IGNORE,
+                'master_data_policy' => ProductImportService::MASTER_DATA_ERROR,
+                'apply_product_images' => true,
+                'approve_existing_media_updates' => false,
+                'media_mode' => ProductImportMediaService::MODE_REPLACE,
+                'confirm_media_replacement' => $this->canonicalBool($raw['confirm_media_replacement'] ?? false),
+            ], $raw);
+        }
+
         $options = [
             'mode' => (string) ($raw['mode'] ?? ProductImportService::MODE_CREATE),
             'blank_policy' => (string) ($raw['blank_policy'] ?? ProductImportService::BLANK_IGNORE),
@@ -104,6 +118,11 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
             'batch_offset' => $chunk->offset,
             'batch_size' => $chunk->batchSize,
         ]);
+
+        if (($chunkOptions['media_mode'] ?? ProductImportMediaService::MODE_ADD) === ProductImportMediaService::MODE_REPLACE) {
+            return $this->applyReplacementChunk($chunk, $chunkOptions);
+        }
+
         // IMP-H1-S3c: تشغيلةٌ مربوطةٌ بمعاينةٍ تحمل خطّتها؛ كل قطعة تتحقق أن صفوف نافذتها ما زالت تفعل ما اعتُمد (plan_drift).
         $plan = ImportPreviewService::decodePlan(
             $job->preview_id === null ? null : ImportPreview::query()->whereKey($job->preview_id)->value('plan')
@@ -155,5 +174,67 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
             : $media;
 
         return new ImportChunkResult($result['created'] + $result['updated'] + $result['skipped'], $result);
+    }
+
+    /**
+     * IMG-REPLACE: قطعة استبدال صور — **لا** تستدعي `ProductImportService` أبداً (فلا اسم ولا سعر ولا مخزون ولا بيانات مالية تُكتب)،
+     * ولا تحمل خطّة صفوف كتالوج. الفحص المسبق يفشل القطعة كلها (تراجع كامل قبل أي كتابة) عند أي خطأ أو تأكيدٍ ناقص؛ بعده يُستبدل
+     * كل منتج بمعاملة فرعية مستقلة فيُسجَّل فشله دون أن يُسقط غيره. الإعادة بعد فشلٍ جزئي idempotent (الصور المتطابقة بالبصمة تُبقى).
+     *
+     * @param  array<string, mixed>  $chunkOptions
+     */
+    private function applyReplacementChunk(ImportChunk $chunk, array $chunkOptions): ImportChunkResult
+    {
+        $job = $chunk->job;
+        if ($chunk->archiveTmpPath === null || $chunk->userId === null) {
+            throw new RuntimeException('استبدال الصور يتطلب أرشيف ZIP ومستخدماً منفِّذاً.');
+        }
+        $archive = new UploadedFile(
+            $chunk->archiveTmpPath,
+            (string) $job->media_archive_original_filename,
+            $job->media_archive_mime_type,
+            null,
+            true,
+        );
+        $confirmed = (bool) ($chunkOptions['confirm_media_replacement'] ?? false);
+        $service = app(ProductImportMediaService::class);
+
+        $preflight = $service->preview(
+            $chunk->file, $chunkOptions, $archive, ProductImportService::DURABLE_MAX_ROWS, false,
+            ProductImportMediaService::MODE_REPLACE, $confirmed,
+        );
+        if ($preflight['error_rows'] > 0) {
+            throw new RuntimeException('معاينة استبدال الصور تحتوي أخطاء؛ صحّح الملف أو الأرشيف وأعد المعاينة.');
+        }
+        if ($preflight['needs_approval_rows'] > 0) {
+            throw new RuntimeException('استبدال الصور الموجودة لم يُؤكَّد صراحةً.');
+        }
+
+        $media = $service->apply(
+            $chunk->file, $chunkOptions, [], $archive, $chunk->userId, ProductImportService::DURABLE_MAX_ROWS, false,
+            ProductImportMediaService::MODE_REPLACE, $confirmed,
+        );
+
+        // المجاميع تراكمية عبر القطع (نتيجة التشغيلة تُستبدل بآخر قطعة): تُبنى على مجاميع القطعة السابقة المحفوظة.
+        $previous = (array) (((array) $job->apply_result)['media']['totals'] ?? []);
+        $totals = [];
+        foreach (['products_replaced', 'images_added', 'images_kept', 'images_removed', 'unchanged', 'skipped', 'failed'] as $key) {
+            $totals[$key] = (int) ($previous[$key] ?? 0) + (int) ($media[$key] ?? 0);
+        }
+        $media['totals'] = $totals;
+        $window = (int) $media['window_rows'];
+
+        return new ImportChunkResult($window, [
+            'mode' => ProductImportService::MODE_UPDATE,
+            'media_mode' => ProductImportMediaService::MODE_REPLACE,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => $window,
+            'total_rows' => $window,
+            'batch_offset' => $chunk->offset,
+            'batch_size' => $chunk->batchSize,
+            'results' => [],
+            'media' => $media,
+        ]);
     }
 }
