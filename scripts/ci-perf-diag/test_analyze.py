@@ -174,8 +174,16 @@ class Report(unittest.TestCase):
         self.assertIn("جولة غير صالحة استُبعدت", text)
         self.assertIn("writer_errors", text)
         self.assertIn("main#1: 2", text)
-        self.assertIn("وسيط p95 للجولات النظيفة", text)
+        self.assertIn("وسيط p95 لجولات gate_equiv النظيفة", text)
         self.assertNotIn("| main | 2 |", text)                        # التشغيل 1 لا يُحتسب وظيفةً ناجحة؛ يبقى تشغيل صالح واحد فقط
+
+    def test_primary_clean_median_uses_gate_equiv_only(self):
+        # جولة sampled نظيفة بقيمة بعيدة لا يجوز أن تُحرّك الوسيط الأساسي.
+        with tempfile.TemporaryDirectory() as root:
+            self._write(root, "main", 1, [rnd(steady(), added=12.0), rnd(steady(), kind="sampled", added=90.0)])
+            text = A.build_report(A.load_runs(root))
+        row = [l for l in text.splitlines() if l.startswith("| main |")][0]
+        self.assertTrue(row.rstrip().endswith("| 12.0 |"), row)
 
     def test_old_schema_rounds_are_reported_invalid_instead_of_crashing_the_report(self):
         old = rnd(steady(), added=9.0)

@@ -281,7 +281,7 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants:
     # 1) المقارنة الموحّدة
     out.append("### 1) مقارنة موحّدة بين المتغيّرين (المنهجية والحمل والتوقيت نفسها)")
     out.append("")
-    out.append("| المتغيّر | وظائف | فشل الوظيفة* | جولات gate_equiv > 50ms | جولات sampled > 50ms | وسيط p95 للجولات النظيفة (ms) |")
+    out.append("| المتغيّر | وظائف | فشل الوظيفة* | جولات gate_equiv > 50ms | جولات sampled > 50ms | وسيط p95 لجولات gate_equiv النظيفة (ms) |")
     out.append("|---|---|---|---|---|---|")
     stats: dict[str, dict[str, Any]] = {}
     for v in variants:
@@ -292,7 +292,8 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants:
         job_fail = sum(1 for rs in jobs.values() if any(x["over"] for x in rs if x["kind"] == "gate_equiv"))
         ge = [r for r in vr if r["kind"] == "gate_equiv"]
         sm = [r for r in vr if r["kind"] == "sampled"]
-        clean = [r["added_p95_ms"] for r in vr if r["kind"] in ("gate_equiv", "sampled") and not r["over"]]
+        # الوسيط الأساسي من gate_equiv وحدها (مقارنة صالحة بالبوابة)؛ جولات sampled يغيّرها الرصد فلا تُخلط (تُعرض منفصلة أدناه).
+        clean = [r["added_p95_ms"] for r in ge if not r["over"]]
         stats[v] = {"jobs": len(jobs), "job_fail": job_fail, "ge": ge, "sm": sm, "clean": clean}
         out.append(
             f"| {v} | {len(jobs)} | {rate_cell(job_fail, len(jobs))} | {rate_cell(sum(r['over'] for r in ge), len(ge))} | "
