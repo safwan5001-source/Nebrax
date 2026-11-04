@@ -13,6 +13,7 @@ use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Models\User;
 use App\Services\Reporting\PartnerLedgerCandidates;
+use App\Support\PartnerStatementBranchScopeException;
 use App\Support\PartnerStatementReviewException;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
@@ -222,9 +223,14 @@ final class PartnerStatementMatchService
         if ($reconciliation === null) {
             throw $refusal;
         }
-        $this->access->assertAccess([
-            'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role, 'branch_id' => $reconciliation->policy['branch_id'] ?? null,
-        ], (string) $actor->getKey());
+        try {
+            $this->access->assertAccess([
+                'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role, 'branch_id' => $reconciliation->policy['branch_id'] ?? null,
+            ], (string) $actor->getKey());
+        } catch (PartnerStatementBranchScopeException) {
+            // SEC #1974: فرع السياسة المجمَّدة خارج نطاق الفاعل ⇒ الرفض الموحَّد نفسه لغير الموجودة/الأخرى/الطرف غير المتاح (لا رسالة فرع مميِّزة تكشف الوجود).
+            throw $refusal;
+        }
 
         return $reconciliation;
     }
@@ -246,11 +252,16 @@ final class PartnerStatementMatchService
     public function source(User $actor, PartnerStatementReconciliation $reconciliation): array
     {
         $policy = $this->policy($reconciliation);
-        $result = $this->candidates->for($actor, [
-            'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role,
-            'period_from' => $reconciliation->period_from->toDateString(), 'period_to' => $reconciliation->period_to->toDateString(),
-            'date_tolerance_days' => $policy['date_tolerance_days'], 'branch_id' => $policy['branch_id'],
-        ]);
+        try {
+            $result = $this->candidates->for($actor, [
+                'partner_id' => (string) $reconciliation->partner_id, 'role' => (string) $reconciliation->role,
+                'period_from' => $reconciliation->period_from->toDateString(), 'period_to' => $reconciliation->period_to->toDateString(),
+                'date_tolerance_days' => $policy['date_tolerance_days'], 'branch_id' => $policy['branch_id'],
+            ]);
+        } catch (PartnerStatementBranchScopeException) {
+            // SEC #1974: دفاعٌ ثانٍ — نفس التحويل الموحَّد لو تغيّر نطاق الفاعل بين `authorize` والقراءة.
+            throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+        }
 
         return ['units' => $result['units'], 'scope' => $result['scope'], 'fingerprint' => $result['fingerprint']];
     }

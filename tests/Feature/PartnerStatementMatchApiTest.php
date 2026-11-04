@@ -433,10 +433,10 @@ class PartnerStatementMatchApiTest extends TestCase
         $this->assertSame('organization', $orgRun['scope']['kind']);
         $this->assertSame('ambiguous_multiple_documents_for_reference', $this->statementRows($this->auth['token'], $id)[2]['explanation']['code']);
 
-        // مقارنة بفلتر فرع خارج نطاقه: مرفوضة.
+        // مقارنة بفلتر فرع خارج نطاقه: مرفوضة بالرفض الموحَّد نفسه لغير الموجودة (SEC #1974: لا رسالة فرع تكشف الوجود).
         $outsideRecon = $this->statement([['date' => '2026-09-02', 'credit' => 80500]], ['branch_id' => $outside->id]);
-        $this->assertSame('هذا الفرع خارج نطاق صلاحياتك.', $this->postMatch($token, $outsideRecon)->assertStatus(422)->json('message'));
-        $this->getMatches($token, $outsideRecon)->assertStatus(422);
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $this->postMatch($token, $outsideRecon)->assertStatus(422)->json('message'));
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $this->getMatches($token, $outsideRecon)->assertStatus(422)->json('message'));
     }
 
     /**

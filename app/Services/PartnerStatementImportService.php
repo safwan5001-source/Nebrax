@@ -9,6 +9,7 @@ use App\Models\PartnerStatementReconciliation;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\ImportUnitFailureException;
+use App\Support\PartnerStatementBranchScopeException;
 use App\Support\PartnerStatementCellParser as Cells;
 use App\Support\PartnerStatementImportFields as Fields;
 use App\Support\Rbac;
@@ -284,7 +285,7 @@ class PartnerStatementImportService
         if ($options['branch_id'] !== null) {
             $branch = Branch::query()->whereKey($options['branch_id'])->first();
             if ($branch === null || ! $user->canAccessBranch($branch->id)) {
-                throw new RuntimeException('هذا الفرع خارج نطاق صلاحياتك.');
+                throw new PartnerStatementBranchScopeException;
             }
         }
 
