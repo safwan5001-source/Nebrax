@@ -76,6 +76,30 @@ class Evidence(unittest.TestCase):
         self.assertIn("P1_sampler_starved", ev["proofs"])
         self.assertEqual(ev["cause"], "cpu_scheduling")
 
+    @staticmethod
+    def handoff_round(rq_wait):
+        """نافذة يغلب عليها التسليم: الماسك الجذري (w=2) ينتظر 60ms ثم يمسك ≈1ms؛ ثلاثة كتّاب يصلون أثناء انتظاره."""
+        from test_analyze import txn
+        t = [txn(i % 5, 100.0 + i * 0.01, wait=1.0, gap=0.05, commit=1.0) for i in range(9)]       # نظيفة حتى 100.09
+        root = txn(2, 100.100, wait=60.0, gap=0.05, commit=1.0, rq_wait=rq_wait)                    # يحوز عند 100.160 وينتهي 100.161
+        waiters = [txn(3, 100.105, wait=70.0), txn(4, 100.106, wait=71.0), txn(0, 100.107, wait=72.0)]
+        r = rnd(t + [root] + waiters, added=60.0, over=True)
+        return r, A.freeze_of(r)
+
+    def test_client_process_waiting_for_cpu_is_a_p5_proof_when_handoff_dominates(self):
+        r, fr = self.handoff_round(rq_wait=45.0)
+        self.assertIsNotNone(fr)
+        self.assertGreaterEqual(fr["handoff_ms"], 0.5 * (fr["handoff_ms"] + fr["hold_ms"]))
+        ev = E.evidence(r, fr, None, None)
+        self.assertIn("P5_client_waited_cpu", ev["proofs"])
+        self.assertEqual(ev["cause"], "client_cpu_scheduling")
+        self.assertEqual(ev["root_client_rq_wait_ms"], 45.0)
+
+    def test_small_client_run_delay_is_not_a_p5_proof(self):
+        r, fr = self.handoff_round(rq_wait=5.0)
+        self.assertNotIn("P5_client_waited_cpu", E.evidence(r, fr, None, None)["proofs"])
+        self.assertEqual(E.evidence(r, fr, None, None)["cause"], "unproven")
+
     def test_psi_alone_is_only_supporting_never_a_proof(self):
         s = sched(self.w, psi=(int(self.fr["freeze_ms"] * 1000), 0), busy=(95, 5))
         ev = E.evidence(self.rnd, self.fr, s, None)

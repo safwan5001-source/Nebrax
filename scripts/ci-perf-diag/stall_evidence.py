@@ -11,6 +11,8 @@
     P2 root_backend_waited_cpu: run_delay لباكند الماسك الجذري (مطابَق بـNSpid) داخل W ≥ 50% من hold ⇒ الماسك كان قابلاً للتشغيل ولم يُجدوَل.
     P3 pg_commit_slow_in_pg   : سجل PostgreSQL نفسه يُظهر COMMIT للماسك مدّته ≥ 50% من hold ⇒ التأخر داخل الخادم لا في العميل.
     P4 client_side            : لا COMMIT بطيء في سجل PostgreSQL للماسك بينما COMMIT المقيس عند العميل ≥ 50% من hold ⇒ التأخر خارج الباكند.
+    P5 client_waited_cpu      : النافذة يغلب عليها «التسليم» (handoff ≥ 50% من hold+handoff) وrun_delay لعملية PHP الماسكة نفسها (schedstat الذاتي) ≥ 50% من انتظارها
+                                ⇒ العميل (مولّد الحمل) كان قابلاً للتشغيل ولم يُجدوَل. يخص جولات التجمّد الكبيرة؛ في الصغيرة يظهر في معظم الجولات (انظر الضابط).
   داعم فقط (supporting — لا يثبت وحده)
     S1 psi_cpu_some           : ضغط المعالج الكلي (PSI some) داخل W ≥ 50% من hold (يقول إن مهمةً ما انتظرت معالجاً، لا أنها الماسك).
     S2 busy_ge_90pct          : /proc/stat busy ≥ 90% داخل W.
@@ -110,6 +112,15 @@ def evidence(rnd: dict[str, Any], fr: dict[str, Any], sched: dict[str, Any] | No
     else:
         ev["sched"] = "missing"
 
+    # عميل (PHP) الماسك: schedstat الذاتي لانتظاره (rq_wait) مقابل انتظاره الكلي؛ والتسليم مقابل الإمساك داخل النافذة
+    root = fr["root"]
+    ev["root_client_wait_ms"] = round(root["wait_ms"], 1)
+    ev["root_client_rq_wait_ms"] = round(root.get("rq_wait_ms", 0.0), 1)
+    ev["handoff_ms"], ev["hold_in_window_ms"] = fr["handoff_ms"], fr["hold_ms"]
+    handoff_dominated = fr["handoff_ms"] >= SHARE * (fr["handoff_ms"] + fr["hold_ms"]) if (fr["handoff_ms"] + fr["hold_ms"]) > 0 else False
+    if handoff_dominated and root["wait_ms"] > 0 and root.get("rq_wait_ms", 0.0) >= SHARE * root["wait_ms"]:
+        proofs.append("P5_client_waited_cpu")
+
     if pglog is not None:
         near = [e for e in pglog if e["kind"] == "duration" and pg_pid and e["pid"] == pg_pid and t0 - 0.2 <= e["t"] <= t1 + 0.2]
         commits = [e for e in near if e["stmt"].upper().startswith("COMMIT")]
@@ -122,6 +133,10 @@ def evidence(rnd: dict[str, Any], fr: dict[str, Any], sched: dict[str, Any] | No
             ev["pg_log_alive_near_window"] = alive
             if alive:
                 proofs.append("P4_client_side")
+        lock_stmts = [e for e in near if "commerce_order_feed_heads" in e["stmt"]]
+        if lock_stmts:
+            srv_end = max(e["t"] for e in lock_stmts)
+            ev["server_lock_end_to_client_acquired_ms"] = round((A.acquired_at(root) - srv_end) * 1000.0, 1)
         bg = [e for e in pglog if e["kind"] in ("checkpoint", "autovacuum") and t0 - 0.5 <= e["t"] <= t1 + 0.5]
         ev["background_events"] = [e["msg"][:60] for e in bg][:3]
         if bg:
@@ -132,6 +147,8 @@ def evidence(rnd: dict[str, Any], fr: dict[str, Any], sched: dict[str, Any] | No
     ev["proofs"], ev["supporting"] = proofs, support
     if any(p.startswith(("P1", "P2")) for p in proofs):
         ev["cause"] = "cpu_scheduling"
+    elif any(p.startswith("P5") for p in proofs):
+        ev["cause"] = "client_cpu_scheduling"
     elif any(p.startswith("P3") for p in proofs):
         ev["cause"] = "postgres_internal"
     elif any(p.startswith("P4") for p in proofs):
@@ -243,8 +260,35 @@ def build_report(jobs: list[dict[str, Any]]) -> str:
         for k, v in sorted(pc.items()):
             kind = "مثبِت" if k.startswith("P") else "داعم"
             out.append(f"- {k} ({kind}): {v}/{len(clean)} ({A.pct(v / len(clean))}) من النظيفة")
+        big_clean = [r for r in clean if r["freeze"] >= 15]
+        if big_clean:
+            out.append(f"- **نظيفة بتجمّد ≥ 15ms (مقياس مماثل للتجاوزات): {len(big_clean)}** — " + ", ".join(
+                f"{k}={sum(1 for r in big_clean if k in r['ev']['proofs'] or k in r['ev']['supporting'])}" for k in
+                ("P1_sampler_starved", "P3_pg_commit_slow_in_pg", "P4_client_side", "P5_client_waited_cpu", "S1_psi_cpu_some", "S2_busy_ge_90pct")))
         fr_med = sorted(r["freeze"] for r in clean)[len(clean) // 2]
         out.append(f"- وسيط تجمّد النظيفة: {fr_med}ms · أقصاه {max(r['freeze'] for r in clean)}ms")
+    out.append("")
+    out.append("### 3b) بنية كل التجمّدات: إمساك أم تسليم؟ (كل الجولات ذات تجمّد قابل للقياس)")
+    out.append("")
+    meas = [r for r in allr if r["freeze"] and r["freeze"] > 0]
+    if meas:
+        def sh(r, k):
+            tot = r["ev"]["handoff_ms"] + r["ev"]["hold_in_window_ms"]
+            return r["ev"][k] / tot if tot > 0 else 0.0
+        hs = sorted(sh(r, "handoff_ms") for r in meas)
+        out.append(f"- حصة «التسليم» من (تسليم+إمساك): وسيط {hs[len(hs) // 2]:.2f} · «الإمساك» (COMMIT+فجوة الماسك) {1 - hs[len(hs) // 2]:.2f} — أي الجزء الأكبر ليس قبض الماسك على القفل بل زمن بلوغ الماسك التالي له.")
+        out.append("")
+        out.append("| حجم التجمّد | عدد الجولات | وسيط run_delay لعملية PHP الماسكة (ms) | أقصاه | وسيط حصة التسليم |")
+        out.append("|---|---|---|---|---|")
+        for lo_, hi_ in ((0, 10), (10, 20), (20, 30), (30, 10 ** 6)):
+            sel = [r for r in meas if lo_ <= r["freeze"] < hi_ and "root_client_rq_wait_ms" in r["ev"]]
+            if sel:
+                rq = sorted(r["ev"]["root_client_rq_wait_ms"] for r in sel)
+                h = sorted(sh(r, "handoff_ms") for r in sel)
+                lab = f"{lo_}–{hi_}ms" if hi_ < 10 ** 6 else f"≥{lo_}ms"
+                out.append(f"| {lab} | {len(sel)} | {rq[len(rq) // 2]:.1f} | {rq[-1]:.1f} | {h[len(h) // 2]:.2f} |")
+        out.append("")
+        out.append("(ارتباط لا سببية: ازدياد انتظار العميل للمعالج مع حجم التجمّد يتسق مع أن تأخر جدولة مولّد الحمل هو ما يتّسع، لكنه وحده لا يُثبت أنه السبب.)")
     out.append("")
     out.append("### 4) حدود هذا الدليل")
     out.append("")
