@@ -30,11 +30,12 @@ describe('settings hub sections (COPS-H4-1)', () => {
     expect(hrefs({ role: 'viewer', permissions: [] })).toEqual(['/commerce/appearance', '/commerce/integrations']);
   });
 
-  it('commerce.manage unlocks domains, delivery and gifting but not customer accounts', () => {
+  it('commerce.manage unlocks domains, delivery, shipping zones and gifting but not customer accounts', () => {
     expect(hrefs({ role: 'viewer', permissions: ['commerce.manage'] })).toEqual([
       '/commerce/appearance',
       '/commerce/domains',
       '/commerce/delivery',
+      '/commerce/shipping-zones',
       '/commerce/gifting',
       '/commerce/integrations',
     ]);

@@ -41,11 +41,11 @@ const writes = (requests: string[]) => requests.filter((r) => /^(POST|PUT|PATCH|
 test.describe('H4-1 store settings hub', () => {
   for (const locale of ['ar', 'en'] as const) {
     for (const theme of ['light', 'dark'] as const) {
-      test(`renders all six sections (${locale}/${theme}), correct direction, no overflow, read-only`, async ({ page }, info) => {
+      test(`renders all seven sections (${locale}/${theme}), correct direction, no overflow, read-only`, async ({ page }, info) => {
         const requests = await open(page, { locale, theme });
         await expect(page.getByRole('heading', { name: locale === 'ar' ? 'إعدادات المتجر' : 'Store settings' }).locator('visible=true').first()).toBeVisible();
         await expect(page.locator('a[href^="/commerce/appearance"]').locator('visible=true').first()).toBeVisible();
-        for (const href of ['/commerce/domains', '/commerce/delivery', '/commerce/customer-accounts', '/commerce/gifting', '/commerce/integrations']) {
+        for (const href of ['/commerce/domains', '/commerce/delivery', '/commerce/shipping-zones', '/commerce/customer-accounts', '/commerce/gifting', '/commerce/integrations']) {
           await expect(page.locator(`main a[href^="${href}"]`).first()).toBeVisible();
         }
         expect(await page.evaluate(() => document.documentElement.dir)).toBe(locale === 'ar' ? 'rtl' : 'ltr');
@@ -61,7 +61,7 @@ test.describe('H4-1 store settings hub', () => {
     await open(page, { permissions: ['orders.view'] });
     await expect(page.locator('main a[href^="/commerce/appearance"]').first()).toBeVisible();
     await expect(page.locator('main a[href^="/commerce/integrations"]').first()).toBeVisible();
-    for (const href of ['/commerce/domains', '/commerce/delivery', '/commerce/customer-accounts', '/commerce/gifting']) {
+    for (const href of ['/commerce/domains', '/commerce/delivery', '/commerce/shipping-zones', '/commerce/customer-accounts', '/commerce/gifting']) {
       await expect(page.locator(`main a[href^="${href}"]`)).toHaveCount(0);
     }
   });
