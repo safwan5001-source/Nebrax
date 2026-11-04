@@ -168,14 +168,6 @@
 - **التحقق:** `paused_until` يتطلب `accepting_orders=false` وأن يكون مستقبلياً عند تغييره (القيمة المخزَّنة التي مضى وقتها لا تمنع تعديلاً آخر)؛ القيم خارج النطاق 422 برمز؛ قيود CHECK في PostgreSQL.
 - **بوابة D-H4-03** `commerce.channel_intake_controls_enabled` (`COMMERCE_CHANNEL_INTAKE_CONTROLS_ENABLED`، **مغلقة**): تُخزَّن الإعدادات لكن يُرفض (409 `intake_controls_deployment_disabled`) **الانتقال إلى** حالة حجب (إيقاف الطلبات، `block`، حدّ أدنى)؛ الإبقاء على المخزَّن والرجوع للافتراضي مسموحان. D-H4-08: إغلاق البوابة بعد استعمال لا يُخفي الإعدادات من القراءة. لا `alert_contacts` (D-H4-02) ولا `auto_reject` (D-OPS-3).
 - **لا إنفاذ في H4-3:** Checkout لا يقرأ هذه القيم (يحرسه اختبار)؛ الإنفاذ وكتلة `ordering` العامة في H4-4 خلف البوابة المغلقة.
-
-#### 2.5.3 إنفاذ H4-4 (Checkout + كتلة `ordering` — خلف البوابة المغلقة)
-
-`CommerceChannelIntakeGuard` (+ `CommerceIntakeCheck` + الصنف النقي `App\Support\CommerceChannelIntake`) يُنفِّذ D-OPS-7/8 عند **إنشاء الطلب فقط** (D-OPS-7c). القارئ الوحيد للجدولين هو `CommerceChannelOperationsSettingsService::intakeSnapshot()`.
-- **البوابة مغلقة ⇒ لا أثر ولا استعلام** (`forCompletion()` ⇒ `null`): الإتمام حرفياً كما كان حتى مع قيم حجب مخزَّنة. مفتوحة ⇒ داخل معاملة `CommerceCheckoutService::complete()` **بعد** قفل السلة وCheckout وإفلات الإعادة (replay) وقبل أي كتابة: قفل **مشترك** على صف القناة (كاتب الإعدادات يقفله `FOR UPDATE` أولاً ⇒ سباق إيقاف↔إتمام يُحسم بالتسلسل) ثم قراءة اللقطة. لا قفل جديد ولا تغيير في ترتيب الأقفال.
-- **الرفض** 409 `review_required` بـ`item_id: "store"` ورمز ثابت قبل أي كتابة (لا طلب/حجز/نية): `store_paused` (رسالة التاجر القصيرة في `message`) · `outside_opening_hours` (سياسة `block` وخارج الفترات بتوقيت القناة: إعداد جدولة القناة ← المستأجر ← `Asia/Riyadh`) · `below_minimum_order` (مجموع السطور بعد الخصم وقبل الشحن؛ `min_order_minor` و`shortfall_minor`؛ `delivery_only` يعفي الاستلام). الأولوية: الإيقاف ثم الساعات ثم الحد الأدنى. `paused_until` الذي مضى يعني استئنافاً تلقائياً.
-- **كتلة `ordering` العامة** (D-H4-05) في `GET store/v1/storefront` `data.ordering`: `accepting`، `reason` (`paused`|`outside_hours`)، `message` (للإيقاف فقط)، `resumes_at`، `min_order_minor`، `min_order_scope` — **غائبة** ما دامت البوابة مغلقة (الاستجابة حرفياً كما كانت). لا حقول داخلية.
-- لا يمسّ طلباً قائماً ولا الدفع/عودة المزوّد/التتبع/المكنسة/الحجز.
 ### 2.6 التنبيه (D-OPS-6) وعقد الموثوقية
 
 V1: إشعار داخلي عبر `NotificationService` القائم (لا جدول ثانٍ) + مركز تنبيه في غلاف التجارة (استطلاع التغذية + المصالحة، قائد تبويب واحد لكل جهاز، صوت متكرر حتى الإقرار بمحرّك مستخرج من `PosSoundManager` دون تغيير POS). **حدود الموثوقية** وفق Revision 1 §3: الوضع المدعوم وحده له هدف (≤15ث p95)؛ الخلفية/الجوال/الإغلاق أفضل جهد ولا يُوعد به. السلوكيات المعلّمة ⚠ هناك تُتحقق في H3-0 قبل اعتماد R-11. Web Push خارج V1.
