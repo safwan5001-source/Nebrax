@@ -17,7 +17,7 @@ import { useUnsavedGuard } from '../flowers-admin/use-unsaved-guard';
 import type { CommerceStoreOption } from '../stores';
 import { classifyError, errorReason, useResource } from '../wholesale/use-resource';
 import { fetchOperations, saveOperations, type MinOrderScope, type OperationsView, type OutsideHoursPolicy } from './api';
-import { addPeriod, draftFromView, MAX_PAUSE_MESSAGE, MAX_PERIODS_PER_DAY, removePeriodAt, updatePeriodAt, validateDraft, type Draft, type DraftErrors } from './form';
+import { addPeriod, draftFromView, MAX_PAUSE_MESSAGE, MAX_PERIODS_PER_DAY, rebaseDraft, removePeriodAt, updatePeriodAt, validateDraft, type Draft, type DraftErrors } from './form';
 import { storeOperationsMessages, type StoreOperationsMessageKey } from './messages';
 
 /** رفض الخادم → مفتاح رسالة (`reason` من `SalesChannelSettingsException`). */
@@ -109,9 +109,13 @@ function OperationsForm({ channelId, initial }: { channelId: string; initial: Op
       const key = saveErrorKey(error);
       setServerError(key);
       if (key === 'error.conflict') {
-        // نسخة قديمة: نجلب الأحدث ونُبقي مسودة المستخدم ليراجعها (لا كتابة فوق).
+        // نسخة قديمة: نجلب الأحدث ونُبقي ما حرّره المستخدم وحده؛ الحقول التي لم يلمسها تُحدَّث من الخادم
+        // (فلا يُبطل «حفظ» لاحق تغيير مسؤول آخر).
         try {
-          setView(await fetchOperations(channelId));
+          const fresh = await fetchOperations(channelId);
+          const staleBase = draftFromView(view);
+          setDraft((current) => rebaseDraft(current, staleBase, draftFromView(fresh)));
+          setView(fresh);
         } catch {
           /* يبقى الخطأ ظاهراً */
         }
@@ -126,7 +130,9 @@ function OperationsForm({ channelId, initial }: { channelId: string; initial: Op
   const err = (key: keyof DraftErrors) => (errors[key] ? <p role="alert" className="text-xs text-negative">{t(errors[key] as StoreOperationsMessageKey)}</p> : null);
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4">
+    <form onSubmit={submit} noValidate>
+      {/* أثناء الحفظ تُقفل الحقول كي لا تضيع تعديلات تُكتب والطلب معلَّق (الردّ يستبدل المسودة). */}
+      <fieldset disabled={saving} className="m-0 min-w-0 space-y-4 border-0 p-0">
       {gateClosed ? (
         <div role="note" className="flex items-start gap-2 rounded border border-warning/40 bg-warning/5 p-3 text-sm">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -257,6 +263,7 @@ function OperationsForm({ channelId, initial }: { channelId: string; initial: Op
         <Button type="button" variant="outline" disabled={!dirty || saving} onClick={() => { setDraft(draftFromView(view)); setErrors({}); setServerError(null); }}>{t('discard')}</Button>
         {dirty ? <span className="text-xs text-warning">{t('unsaved')}</span> : null}
       </div>
+      </fieldset>
     </form>
   );
 }

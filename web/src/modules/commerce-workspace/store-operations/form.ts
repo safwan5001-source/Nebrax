@@ -78,6 +78,20 @@ export function draftFromView(view: OperationsView): Draft {
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const END = /^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$/;
 
+/**
+ * بعد تعارض نسخة: تُحمَل إلى المسودة قيمُ الخادم الأحدث لكل حقل **لم يلمسه المستخدم**،
+ * ويبقى ما حرّره بنفسه. وإلا بقيت قيمة قديمة في حقل غير مُحرَّر وأُعيد إرسالها عند «حفظ» فتُبطل
+ * تغيير مسؤول آخر (مثلاً إيقاف مؤقت) دون أن يراه المستخدم.
+ */
+export function rebaseDraft(draft: Draft, oldBase: Draft, newBase: Draft): Draft {
+  const out = { ...newBase } as Record<keyof Draft, unknown>;
+  for (const key of Object.keys(draft) as (keyof Draft)[]) {
+    if (JSON.stringify(draft[key]) !== JSON.stringify(oldBase[key])) out[key] = draft[key];
+  }
+
+  return out as Draft;
+}
+
 export function sortPeriods(periods: Period[]): Period[] {
   return [...periods].sort((a, b) => a.weekday - b.weekday || a.opens_at.localeCompare(b.opens_at));
 }

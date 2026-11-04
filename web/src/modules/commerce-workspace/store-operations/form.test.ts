@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OperationsView } from './api';
-import { addPeriod, draftFromView, isoToLocal, localToIso, minorToRiyalText, removePeriodAt, updatePeriodAt, validateDraft, validateHours, type Draft } from './form';
+import { addPeriod, draftFromView, isoToLocal, localToIso, minorToRiyalText, rebaseDraft, removePeriodAt, updatePeriodAt, validateDraft, validateHours, type Draft } from './form';
 
 const view = (over: Partial<OperationsView> = {}): OperationsView => ({
   version: 3, acceptingOrders: true, pausedUntil: null, pauseMessage: null, outsideHoursPolicy: 'accept', openingHours: [], minOrderMinor: null, minOrderScope: 'all', deploymentEnabled: true, ...over,
@@ -138,5 +138,23 @@ describe('period helpers and datetime conversion', () => {
     expect(localToIso('')).toBeNull();
     expect(localToIso('garbage')).toBeNull();
     expect(isoToLocal(null)).toBe('');
+  });
+});
+
+describe('rebaseDraft (conflict refresh)', () => {
+  const oldBase = draftFromView(view());
+  it('takes the server value for fields the user did not touch and keeps the ones they edited', () => {
+    const mine = { ...oldBase, pauseMessage: 'mine' };
+    const fresh = draftFromView(view({ version: 5, acceptingOrders: false, minOrderMinor: 2500 }));
+    const out = rebaseDraft(mine, oldBase, fresh);
+    expect(out.pauseMessage).toBe('mine');
+    expect(out.accepting).toBe(false);
+    expect(out.minOrder).toBe(fresh.minOrder);
+  });
+  it('keeps an edited list field whole and is the identity when nothing was edited', () => {
+    const edited = { ...oldBase, hours: [{ weekday: 1, opens_at: '09:00', closes_at: '17:00' }] };
+    const fresh = draftFromView(view({ outsideHoursPolicy: 'block' }));
+    expect(rebaseDraft(edited, oldBase, fresh).hours).toEqual(edited.hours);
+    expect(rebaseDraft(oldBase, oldBase, fresh)).toEqual(fresh);
   });
 });

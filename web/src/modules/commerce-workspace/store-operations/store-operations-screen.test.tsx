@@ -130,6 +130,39 @@ describe('StoreOperationsScreen (COPS-H4-3 UI)', () => {
     expect(apiMock.mock.calls.filter((c) => c[0] === '/commerce/channels/ch1/operations-settings' && !(c[1] as object | undefined)).length).toBeGreaterThanOrEqual(2);
   });
 
+  it('after a conflict, fields the user did not touch take the server values and a retry does not undo another admin\'s pause', async () => {
+    mount();
+    await screen.findByText('Temporary pause');
+    fireEvent.change(screen.getByLabelText('Message to shoppers (optional)'), { target: { value: 'mine' } });
+    apiMock.mockRejectedValueOnce(apiError(409, { reason: 'settings_version_conflict', current_version: 5 }));
+    apiMock.mockResolvedValueOnce(body({ version: 5, accepting_orders: false, pause_message: null }));
+    fireEvent.click(saveBtn());
+    expect(await screen.findByText(/The settings changed since you opened them/)).toBeTruthy();
+    // مسؤول آخر أوقف المتجر: يظهر مُوقَفاً في المسودة، ورسالة المستخدم باقية.
+    await waitFor(() => expect((screen.getByRole('switch') as HTMLButtonElement).getAttribute('aria-checked')).toBe('true'));
+    expect((screen.getByLabelText('Message to shoppers (optional)') as HTMLTextAreaElement).value).toBe('mine');
+    apiMock.mockResolvedValueOnce(body({ version: 6, accepting_orders: false, pause_message: 'mine' }));
+    fireEvent.click(saveBtn());
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    const sent = (puts()[1][1] as { body: Record<string, unknown> }).body;
+    expect(sent.expected_version).toBe(5);
+    expect(sent.pause_message).toBe('mine');
+    expect('accepting_orders' in sent).toBe(false);
+  });
+
+  it('locks every field while a save is pending so later edits are not lost', async () => {
+    mount();
+    await screen.findByText('Temporary pause');
+    fireEvent.change(screen.getByLabelText('Message to shoppers (optional)'), { target: { value: 'y' } });
+    let release!: (v: unknown) => void;
+    apiMock.mockReturnValueOnce(new Promise((resolve) => (release = resolve)));
+    fireEvent.click(saveBtn());
+    await waitFor(() => expect((screen.getByLabelText('Message to shoppers (optional)') as HTMLTextAreaElement).closest('fieldset')!.disabled).toBe(true));
+    release(body({ version: 2, pause_message: 'y' }));
+    await waitFor(() => expect(screen.queryByText('Unsaved changes')).toBeNull());
+    expect((screen.getByLabelText('Message to shoppers (optional)') as HTMLTextAreaElement).closest('fieldset')!.disabled).toBe(false);
+  });
+
   it('locks a double submit and discards back to the saved values', async () => {
     mount();
     await screen.findByText('Temporary pause');
