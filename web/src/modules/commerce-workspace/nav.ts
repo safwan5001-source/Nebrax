@@ -44,6 +44,8 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
       { href: '/commerce/settings', labelKey: 'settingsHub' },
       { href: '/commerce/domains', labelKey: 'domains' },
       { href: '/commerce/delivery', labelKey: 'delivery' },
+      // COPS-H4-2 — محرر مناطق الشحن (الخادم يشترط commerce.manage؛ المناطق على مستوى المؤسسة).
+      { href: '/commerce/shipping-zones', labelKey: 'shippingZones', permission: 'commerce.manage' },
       // حسابات عملاء التجزئة لقناة الويب — الخادم يشترط commerce.channel_settings.manage (مالك/مدير) وقدرة المتجر.
       { href: '/commerce/customer-accounts', labelKey: 'customerAccounts', appKey: 'commerce.storefront', permission: 'commerce.channel_settings.manage' },
       { href: '/commerce/gifting', labelKey: 'gifting', permission: 'commerce.manage' },
