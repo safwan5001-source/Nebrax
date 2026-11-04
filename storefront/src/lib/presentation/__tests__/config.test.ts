@@ -60,11 +60,20 @@ describe("normalizePresentationConfig", () => {
   });
 
   it("normalizes Luxe Motion without losing merchant primary color", () => {
-    expect(normalizePresentationConfig({ themePreset: "awj-luxe-motion" })).toMatchObject({
-      themePreset: "awj-luxe-motion", primaryColor: "#71243f",
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-luxe-motion" }),
+    ).toMatchObject({
+      themePreset: "awj-luxe-motion",
+      primaryColor: "#71243f",
     });
-    expect(normalizePresentationConfig({ themePreset: "awj-luxe-motion", primaryColor: "#334455" })).toMatchObject({
-      themePreset: "awj-luxe-motion", primaryColor: "#334455",
+    expect(
+      normalizePresentationConfig({
+        themePreset: "awj-luxe-motion",
+        primaryColor: "#334455",
+      }),
+    ).toMatchObject({
+      themePreset: "awj-luxe-motion",
+      primaryColor: "#334455",
     });
   });
 
