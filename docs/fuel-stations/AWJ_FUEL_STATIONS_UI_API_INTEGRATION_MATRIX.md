@@ -39,7 +39,7 @@ The new **محطات أَوْج | AWJ Fuel Stations** screens must consume exist
 All names above are literal route paths; prefix with current AWJ API base path per existing shared client. Route existence **does not imply deployment verification or end-to-end readiness**.
 
 ## Confirmed implementation gaps / decisions before V2 writes
-1. **Shift state mismatch:** design proposes `open → submitted → returned/approved`, but current model/controller support `open → closed → approved`. A real return-for-correction workflow must be specified/implemented; never fake a status in production.
+1. **Shift state contract:** current routes/models implement `open → closed → approved`. The UI V2 must follow these states initially. A future `returned for correction` workflow requires explicit backend transition design, role authorization, audit evidence and tests; it must not appear as a working production action before implementation.
 2. **Per-operator vs per-station shifts:** current shift service and open-shift unique index may enforce *one open shift per station*. Determine how multiple attendants are assigned and hand over within one station shift; do not assume each attendant can open their own station-wide shift.
 3. **Manual collection vs legal sales:** meter totals alone are not posted sales. Define a verified controlled summary-sale process (if required) that does not duplicate FuelSale/POS/forecourt transactions; do not post based solely on a UI KPI.
 4. **Station product eligibility:** product registry is tenant-level; filter by actual nozzle/pump/station mapping and effective price, rather than presenting all registry fuel products as sellable.
@@ -53,7 +53,7 @@ All names above are literal route paths; prefix with current AWJ API base path p
 - **UI-0:** Read-only typed data adapters and station/product/pump/tank/nozzle selection; make screen states robust for empty/error/permission/loading.
 - **UI-1:** Operator current-shift and actual product/meter display (read-only) with dynamic values and drill-down.
 - **UI-2:** Opening/closing meter and cash workflow on controlled test tenant; reconcile with explicit backend contracts, implement safe feedback and confirm boundaries.
-- **UI-3:** Supervisor queue with existing closed/approved states, then separately design return/correction state changes after backend approval.
+- **UI-3:** Supervisor queue with existing closed/approved states and current approval permissions. Treat return-for-correction as a separately approved backend feature, not a present action.
 - **UI-4:** Fuel receiving staged interface, validated against delivery request/service and real tank readings.
 - **UI-5:** Reports, Settings/Profile, iPhone RTL/LTR accessibility and live production verification after gated rollout.
 
