@@ -60,6 +60,7 @@ const RESUME_ROUTES: Partial<Record<ImportJobDomain, string>> = {
   price_list_items: '/sales-settings/pricelists/import',
   unit_templates: '/inventory-settings/units/import',
   inventory_opening: '/inventory-openings/import',
+  partner_statement: '/partner-statements/import',
   stock_permit_import: '/stock-permits/import',
   purchase_import: '/purchases/import',
   expense_import: '/expenses/import',

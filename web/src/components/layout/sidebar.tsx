@@ -50,6 +50,7 @@ import {
   Plug,
   Receipt,
   ReceiptText,
+  Scale,
   ScrollText,
   Send,
   Settings,
@@ -222,6 +223,8 @@ const GROUPS: NavGroup[] = [
       { href: '/journal-entries', icon: ScrollText, key: 'manualJournals', built: true },
       { href: '/assets', icon: Building2, key: 'assets', built: true },
       { href: '/cost-centers', icon: Network, key: 'costCenters', built: true },
+      // IMP-PS-A4a: مطابقة كشوف الأطراف. القدرة `explicit_enable_only` فتغيب عن الشريط حتى يفعّلها المالك؛ والصلاحية مستقلة عن `partners.*`.
+      { href: '/partner-statements', icon: Scale, key: 'partnerStatements', built: true, appKey: 'accounting.partner_statements', permission: 'partner_statements.view' },
       { href: '/cheques', icon: ScrollText, key: 'cheques' },
       { href: '/accounting-settings', icon: SlidersHorizontal, key: 'accountingSettings', built: true, permission: 'accounting_settings.view' },
       // ACC-6: صلاحية مستقلة عمداً عن `accounting_settings.view` — قفلُ فترة
