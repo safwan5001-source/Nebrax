@@ -1,12 +1,12 @@
-# NEBRAS STATION — Design System V2
+# محطات أَوْج | AWJ Fuel Stations — Design System V2
 **Status:** Approved design direction; implementation tokens/specs proposed pending accessibility and iPhone validation  
 **Date:** 2026-11-04  
-**Product:** NEBRAS STATION — operator/supervisor mobile workspaces for AWJ ERP  
-**Related functional plan:** [NEBRAS_STATION_OPERATOR_SUPERVISOR_PLAN.md](./NEBRAS_STATION_OPERATOR_SUPERVISOR_PLAN.md)
+**Product:** AWJ Fuel Stations — multi-tenant operator/supervisor mobile workspaces within AWJ ERP  
+**Related functional plan:** [AWJ_STATION_OPERATOR_SUPERVISOR_PLAN.md](./AWJ_STATION_OPERATOR_SUPERVISOR_PLAN.md)
 
 ## 1. Product identity and boundaries
 - Visual concept: **Premium Industrial Operations** / «تشغيل صناعي راقٍ»: restrained, practical, mature and production-grade. Avoid generic AI-generated dashboard looks.
-- NEBRAS STATION is a **distinct visual experience** from AWJ ERP, not a new backend, authentication, RBAC, inventory ledger or accounting system.
+- AWJ Fuel Stations is a **distinct visual experience** from AWJ ERP, not a new backend, authentication, RBAC, inventory ledger or accounting system.
 - AWJ provides the source of truth: users, roles, permissions, station/branch scope, products, pumps, nozzles, tanks, transactions, prices, payment methods, stock and accounting.
 - Primary target: iPhone mobile-first PWA-ready web workspace; responsive for tablets/desktop. Arabic RTL first with English LTR parity.
 - No decorative 3D, glowing gradients, glassmorphism, generic fuel-station stock imagery on daily work screens, artificially perfect figures, redundant KPI tiles, or unusable interactions.
@@ -125,6 +125,16 @@ Use AWJ existing management workspace/report permissions; do not rebuild general
 - No production deployment or change to AWJ's global design tokens implied by this documentation.
 
 ## 12. Governance
-- This is a separate NEBRAS STATION design layer. The existing AWJ ERP design system is unchanged.
-- This document is the **design baseline for NEBRAS STATION V2**. Actual UI code, token implementation, mocks, motion and components must be checked against these principles.
+- This is a separate AWJ Fuel Stations design layer. The existing AWJ ERP design system is unchanged.
+- This document is the **design baseline for AWJ Fuel Stations V2**. Actual UI code, token implementation, mocks, motion and components must be checked against these principles.
 - Proposals and dimensions remain subject to implementation and usability verification; approval of design direction is **not** approval of accounting behaviors, permissions changes, or deployment.
+
+## 13. Multi-tenant product identity (approved)
+- Product name: **محطات أَوْج | AWJ Fuel Stations**. Internal operations experience may be labeled **تشغيل المحطات | Station Operations**.
+- Interface belongs to the AWJ product family while retaining a distinct premium industrial visual design from the main AWJ ERP console.
+- Tenant station name, logo and any *permitted* brand accent are resolved from tenant/station settings, never hard-coded to a particular operator.
+- A safe AWJ-branded fallback appears when a tenant has not supplied a valid station identity.
+- All examples drawn from محطة نبراس الطموح are explicitly labeled **pilot fixture only**, never global defaults.
+- Do not hard-code the number of shifts, product catalog, fuel prices, pumps, nozzles, tanks, payment methods, station list or locale per tenant; load these from authorized AWJ services.
+- Tenant isolation and server-side role/scope checks are mandatory. Tenant branding must never affect the authentication boundary, records, accounting ledger or audit trail.
+- Test two distinct tenants with different catalogs/roles/logos and confirm isolation, role-dependent screen content, correct fallback and no cross-tenant cache/data leakage.
