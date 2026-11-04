@@ -59,6 +59,15 @@ describe("normalizePresentationConfig", () => {
     ).toMatchObject({ themePreset: "awj-bloom", primaryColor: "#123456" });
   });
 
+  it("normalizes Luxe Motion without losing merchant primary color", () => {
+    expect(normalizePresentationConfig({ themePreset: "awj-luxe-motion" })).toMatchObject({
+      themePreset: "awj-luxe-motion", primaryColor: "#71243f",
+    });
+    expect(normalizePresentationConfig({ themePreset: "awj-luxe-motion", primaryColor: "#334455" })).toMatchObject({
+      themePreset: "awj-luxe-motion", primaryColor: "#334455",
+    });
+  });
+
   it("a merchant-chosen color survives on awj-market like any other preset", () => {
     expect(
       normalizePresentationConfig({
