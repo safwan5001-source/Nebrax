@@ -14092,6 +14092,8 @@
       "branch_hint": "“Whole organization” compares across all your branches, or pick a single branch. The scope is frozen with the statement.",
       "branch_restricted_hint": "Your account is limited to specific branches; choose one.",
       "branch_required": "Choose the branch.",
+      "branch_unnamed": "Branch ({code})",
+      "branch_names_unavailable": "Branch names couldn't be loaded (viewing branches needs a separate permission); your branches are shown by short codes.",
       "policies_title": "Matching policies",
       "policies_frozen": "These policies are frozen with the statement at import and can't change afterwards. To change them, import the statement again.",
       "policies_frozen_short": "Policies frozen with this statement",

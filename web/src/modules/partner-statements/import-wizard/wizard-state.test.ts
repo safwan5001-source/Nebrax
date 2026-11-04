@@ -3,6 +3,7 @@ import type { InspectColumn, PreviewResult } from '../contract';
 import {
   WIZARD_STEPS,
   applyOptionsFrom,
+  branchChoices,
   canConfirmImport,
   mappingGaps,
   mappingReady,
@@ -150,5 +151,25 @@ describe('import outcome', () => {
   it('links to the list with a highlight (no detail route exists before A4b)', () => {
     expect(reconciliationHref('abc-1')).toBe('/partner-statements?highlight=abc-1');
     expect(reconciliationHref(null)).toBe('/partner-statements');
+  });
+});
+
+describe('branch choices', () => {
+  const fetched = [{ id: 'b1', name: 'فرع الدمام' }, { id: 'b2', name: 'فرع جدة' }];
+
+  it('offers unrestricted actors whatever /branches returned', () => {
+    expect(branchChoices({ restricted: false, scopeIds: [], fetched, failed: false })).toEqual([{ id: 'b1', name: 'فرع الدمام' }, { id: 'b2', name: 'فرع جدة' }]);
+  });
+
+  it('limits restricted actors to their own branches, named when the lookup worked', () => {
+    expect(branchChoices({ restricted: true, scopeIds: ['b2'], fetched, failed: false })).toEqual([{ id: 'b2', name: 'فرع جدة' }]);
+  });
+
+  it('falls back to the actor scope from /me (unnamed) when /branches is denied, so the required field is never impossible', () => {
+    expect(branchChoices({ restricted: true, scopeIds: ['b1', 'b9'], fetched: [], failed: true })).toEqual([{ id: 'b1', name: null }, { id: 'b9', name: null }]);
+  });
+
+  it('shows nothing while the lookup is still pending', () => {
+    expect(branchChoices({ restricted: true, scopeIds: ['b1'], fetched: [], failed: false })).toEqual([]);
   });
 });

@@ -186,3 +186,20 @@ export function resultOutcome(applyResult: Record<string, unknown> | null | unde
 export function reconciliationHref(id: string | null): string {
   return id ? `/partner-statements?highlight=${encodeURIComponent(id)}` : '/partner-statements';
 }
+
+export interface BranchChoice {
+  id: string;
+  /** `null` = الاسم غير متاح (لا `branches.view`) فيُعرض رمز قصير. */
+  name: string | null;
+}
+
+/**
+ * خيارات الفرع في المعالج. المقيَّد: فروع نطاقه فقط (من `/me`)، بأسماء من `/branches` إن قُرئت وإلا بلا اسم. غير المقيَّد: ما قرأه `/branches`.
+ * **للعرض فقط** — الخادم يعيد فحص نطاق الفرع عند المعاينة والتنفيذ.
+ */
+export function branchChoices(input: { restricted: boolean; scopeIds: readonly string[]; fetched: readonly { id: string; name: string }[]; failed: boolean }): BranchChoice[] {
+  const byId = new Map(input.fetched.map((branch) => [branch.id, branch.name]));
+  if (!input.restricted) return input.fetched.map((branch) => ({ id: branch.id, name: branch.name }));
+  if (input.fetched.length === 0 && !input.failed) return [];
+  return input.scopeIds.filter((id) => input.failed || byId.has(id)).map((id) => ({ id, name: byId.get(id) ?? null }));
+}

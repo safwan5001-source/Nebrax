@@ -194,6 +194,70 @@ describe('file step', () => {
   });
 });
 
+describe('inspection race and branch fallback (review findings)', () => {
+  it('ignores the inspection of a superseded file so the newer file keeps its own mapping', async () => {
+    const swapped: InspectResult = {
+      total_rows: 2,
+      columns: [
+        { index: 0, header: 'التاريخ', samples: [], suggested_field: 'line_date' },
+        { index: 1, header: 'دائن', samples: [], suggested_field: 'credit' },
+        { index: 2, header: 'مدين', samples: [], suggested_field: 'debit' },
+      ],
+      fields: inspection.fields,
+    };
+    let releaseA: (value: InspectResult) => void = () => {};
+    h.inspectStatement
+      .mockImplementationOnce(() => new Promise<InspectResult>((resolve) => { releaseA = resolve; }))
+      .mockResolvedValueOnce(swapped);
+    const user = userEvent.setup();
+    render(<PartnerStatementImportWizard />);
+    const input = screen.getByLabelText('wizard.choose_file');
+
+    await user.upload(input, new File(['a'], 'a.csv', { type: 'text/csv' }));
+    await user.upload(input, new File(['b'], 'b.csv', { type: 'text/csv' }));
+    await waitFor(() => expect((screen.getByText('wizard.next').closest('button') as HTMLButtonElement).disabled).toBe(false));
+
+    // الملف A يردّ متأخراً بعد B: يجب تجاهله
+    releaseA(inspection);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await user.click(screen.getByText('wizard.next'));
+    await fillSetup(user);
+    await user.click(screen.getByText('wizard.next'));
+    await user.click(await screen.findByText('wizard.run_preview'));
+
+    await waitFor(() => expect(h.previewStatement).toHaveBeenCalledTimes(1));
+    const [sentFile, options] = h.previewStatement.mock.calls[0];
+    expect(sentFile.name).toBe('b.csv');
+    expect(options.mapping).toEqual({ 0: 'line_date', 1: 'credit', 2: 'debit' });
+  });
+
+  it('lets a branch-restricted actor without branches.view still pick an assigned branch (shown by short code)', async () => {
+    h.scope = { branches: [BRANCH_ID, '33333333-3333-4333-8333-333333333333'], warehouses: [] };
+    h.fetchBranches.mockRejectedValue(new ApiError(403, 'ليست لديك الصلاحية', {}));
+    const user = userEvent.setup();
+    render(<PartnerStatementImportWizard />);
+    await uploadFile(user);
+    await user.click(screen.getByText('wizard.next'));
+
+    const branch = screen.getByLabelText('wizard.branch') as HTMLSelectElement;
+    await waitFor(() => expect(within(branch).getAllByRole('option').length).toBe(3));
+    expect(within(branch).getByRole('option', { name: `wizard.branch_unnamed:${BRANCH_ID.slice(0, 8)}` })).toBeTruthy();
+    expect(screen.getByText('wizard.branch_names_unavailable')).toBeTruthy();
+    expect(within(branch).queryByRole('option', { name: 'scope.organization' })).toBeNull();
+  });
+
+  it('auto-selects the only assigned branch of a restricted actor', async () => {
+    h.scope = { branches: [BRANCH_ID], warehouses: [] };
+    h.fetchBranches.mockRejectedValue(new ApiError(403, 'x', {}));
+    const user = userEvent.setup();
+    render(<PartnerStatementImportWizard />);
+    await uploadFile(user);
+    await user.click(screen.getByText('wizard.next'));
+    const branch = screen.getByLabelText('wizard.branch') as HTMLSelectElement;
+    await waitFor(() => expect(branch.value).toBe(BRANCH_ID));
+  });
+});
+
 describe('setup step', () => {
   it('validates required fields before moving on and discloses the frozen policies', async () => {
     const user = userEvent.setup();
@@ -223,13 +287,19 @@ describe('setup step', () => {
   });
 
   it('hides the organization-wide option and offers only own branches to a branch-restricted actor', async () => {
-    h.scope = { branches: [BRANCH_ID], warehouses: [] };
+    const KHOBAR = '44444444-4444-4444-8444-444444444444';
+    h.scope = { branches: [BRANCH_ID, KHOBAR], warehouses: [] };
+    h.fetchBranches.mockResolvedValue([
+      { id: BRANCH_ID, name: 'فرع الدمام', is_active: true },
+      { id: '33333333-3333-4333-8333-333333333333', name: 'فرع جدة', is_active: true },
+      { id: KHOBAR, name: 'فرع الخبر', is_active: true },
+    ]);
     const user = userEvent.setup();
     render(<PartnerStatementImportWizard />);
     await uploadFile(user);
     await user.click(screen.getByText('wizard.next'));
     const branch = screen.getByLabelText('wizard.branch') as HTMLSelectElement;
-    await waitFor(() => expect(within(branch).getAllByRole('option').length).toBe(2));
+    await waitFor(() => expect(within(branch).getAllByRole('option').length).toBe(3));
     expect(within(branch).queryByRole('option', { name: 'scope.organization' })).toBeNull();
     expect(within(branch).queryByRole('option', { name: 'فرع جدة' })).toBeNull();
 

@@ -48,6 +48,7 @@ import { PartnerPicker } from '../PartnerPicker';
 import {
   WIZARD_STEPS,
   applyOptionsFrom,
+  branchChoices,
   canConfirmImport,
   mappingGaps,
   mappingReady,
@@ -76,6 +77,8 @@ export function PartnerStatementImportWizard() {
   const scope = useActorScope();
   const { setParam } = useImportJobUrlParam();
   const fileInput = useRef<HTMLInputElement | null>(null);
+  // «جيل» الفحص: ردّ فحص ملف سابق لا يجوز أن يستبدل فحص/مطابقة الملف الحالي (وإلا انعكست أعمدة المدين/الدائن عند الاستيراد).
+  const inspectSeq = useRef(0);
   const engine = useImportJobEngine(DOMAIN);
 
   const [step, setStep] = useState<WizardStep>('file');
@@ -100,6 +103,7 @@ export function PartnerStatementImportWizard() {
   const [touched, setTouched] = useState(false);
   const [resumedWithoutFile, setResumedWithoutFile] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [branchesFailed, setBranchesFailed] = useState(false);
 
   useResumeFromUrl((jobId) => {
     setResumedWithoutFile(true);
@@ -118,14 +122,28 @@ export function PartnerStatementImportWizard() {
   useEffect(() => {
     if (!capability.settled || !capability.canImport) return;
     let live = true;
-    fetchBranches().then((list) => live && setBranches(list)).catch(() => {});
+    fetchBranches()
+      .then((list) => {
+        if (live) {
+          setBranches(list);
+          setBranchesFailed(false);
+        }
+      })
+      .catch(() => live && setBranchesFailed(true));
     return () => {
       live = false;
     };
   }, [capability.settled, capability.canImport]);
 
   const restricted = Boolean(scope && scope.branches.length > 0);
-  const branchOptions = restricted ? branches.filter((branch) => scope?.branches.includes(branch.id)) : branches;
+  // دور بلا `branches.view` لا يستطيع قراءة `/branches` (403) مع أن الخادم يسمح له بالاستيراد إلى فروعه: نسقط إلى معرّفات نطاقه من `/me` بدل حقل إلزامي مستحيل.
+  const branchOptions = branchChoices({ restricted, scopeIds: scope?.branches ?? [], fetched: branches, failed: branchesFailed });
+  const namesUnavailable = restricted && branchOptions.some((option) => option.name === null);
+
+  useEffect(() => {
+    if (restricted && branchId === '' && branchOptions.length === 1) setBranchId(branchOptions[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restricted, branchOptions.length]);
 
   const dateToleranceValue = /^\d{1,3}$/.test(dateTolerance) ? Number(dateTolerance) : null;
   const amountToleranceValue = riyalToMinor(amountTolerance);
@@ -153,6 +171,7 @@ export function PartnerStatementImportWizard() {
   }
 
   function reset() {
+    inspectSeq.current += 1;
     setStep('file');
     setFile(null);
     setInspection(null);
@@ -169,7 +188,9 @@ export function PartnerStatementImportWizard() {
   }
 
   async function acceptFile(next: File | null) {
+    const seq = ++inspectSeq.current;
     setFile(next);
+    setInspecting(false);
     setInspection(null);
     setMapping({});
     invalidate();
@@ -192,6 +213,7 @@ export function PartnerStatementImportWizard() {
     setInspecting(true);
     try {
       const result = await inspectStatement(next);
+      if (seq !== inspectSeq.current) return;
       if (result.total_rows > MAX_IMPORT_ROWS) {
         setErrorKey('file_too_many_rows');
         setFile(null);
@@ -200,10 +222,11 @@ export function PartnerStatementImportWizard() {
       setInspection(result);
       setMapping(suggestedMapping(result.columns));
     } catch (err) {
+      if (seq !== inspectSeq.current) return;
       capability.observe(err);
       setErrorKey(describeError(err).key);
     } finally {
-      setInspecting(false);
+      if (seq === inspectSeq.current) setInspecting(false);
     }
   }
 
@@ -429,9 +452,10 @@ export function PartnerStatementImportWizard() {
                 <Label htmlFor="ps-branch">{t('wizard.branch')}</Label>
                 <Select id="ps-branch" value={branchId} aria-invalid={touched && issues.branch ? true : undefined} onChange={(event) => { setBranchId(event.target.value); invalidate(); }}>
                   {restricted ? <option value="">{t('wizard.branch_choose')}</option> : <option value="">{t('scope.organization')}</option>}
-                  {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                  {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name ?? t('wizard.branch_unnamed', { code: branch.id.slice(0, 8) })}</option>)}
                 </Select>
                 <p className="text-xs leading-relaxed text-muted">{restricted ? t('wizard.branch_restricted_hint') : t('wizard.branch_hint')}</p>
+                {namesUnavailable ? <p className="text-xs leading-relaxed text-warning">{t('wizard.branch_names_unavailable')}</p> : null}
                 {touched && issues.branch ? <p role="alert" className="text-xs text-negative">{t('wizard.branch_required')}</p> : null}
               </div>
             </CardContent>
