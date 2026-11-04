@@ -149,6 +149,38 @@ describe('ShippingZonesScreen (COPS-H4-2)', () => {
     expect((calls('PUT')[0][1] as { body: { is_active: boolean } }).body.is_active).toBe(false);
   });
 
+  it('turning an active zone off from the edit dialog goes through the same confirmation (no PUT until confirmed)', async () => {
+    mount();
+    await screen.findByText('Dammam zone');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByRole('alertdialog');
+    expect(within(alert).getByText(/hidden temporarily, not deleted/)).toBeTruthy();
+    expect(calls('PUT')).toHaveLength(0);
+    // back out: the form returns, nothing sent
+    fireEvent.click(within(alert).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(calls('PUT')).toHaveLength(0);
+    // confirm: exactly one PUT with is_active=false
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    apiMock.mockResolvedValueOnce({ data: zone({ is_active: false }) });
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Disable zone' }));
+    await waitFor(() => expect(calls('PUT')).toHaveLength(1));
+    expect((calls('PUT')[0][1] as { body: { is_active: boolean } }).body.is_active).toBe(false);
+  });
+
+  it('editing other fields of an active zone, or re-enabling an inactive one, asks for no confirmation', async () => {
+    mount();
+    await screen.findByText('Dammam zone');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.change(screen.getByLabelText('Shipping fee (SAR)'), { target: { value: '16' } });
+    apiMock.mockResolvedValueOnce({ data: zone({ rate_amount_minor: 1600 }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls('PUT')).toHaveLength(1));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
   it('enabling a disabled zone needs no confirmation', async () => {
     mount();
     await screen.findByText('Eastern zone');

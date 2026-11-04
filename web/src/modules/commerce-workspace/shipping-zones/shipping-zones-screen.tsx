@@ -203,6 +203,7 @@ function ZoneDialog({ zone, onClose, onSaved }: { zone: ShippingZone | null; onC
   const [errors, setErrors] = useState<ZoneFormErrors>({});
   const [serverError, setServerError] = useState<ShippingZonesMessageKey | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const submitting = useRef(false);
 
   const set = <K extends keyof ZoneFormValues>(key: K, value: ZoneFormValues[K]) => {
@@ -210,7 +211,7 @@ function ZoneDialog({ zone, onClose, onSaved }: { zone: ShippingZone | null; onC
     setServerError(null);
   };
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent, confirmed = false) {
     event.preventDefault();
     if (submitting.current) return;
     const result = validateZoneForm(values);
@@ -219,6 +220,12 @@ function ZoneDialog({ zone, onClose, onSaved }: { zone: ShippingZone | null; onC
       return;
     }
     setErrors({});
+    // تعطيل منطقة نشطة من نموذج التعديل يمرّ بالتأكيد نفسه الذي في إجراء الصف (أثره على نوافذ التوصيل المقيَّدة).
+    if (zone?.isActive && !result.payload.is_active && !confirmed) {
+      setConfirmingDeactivate(true);
+      return;
+    }
+    setConfirmingDeactivate(false);
     submitting.current = true;
     setSaving(true);
     setServerError(null);
@@ -236,7 +243,7 @@ function ZoneDialog({ zone, onClose, onSaved }: { zone: ShippingZone | null; onC
 
   return (
     <Dialog open onClose={() => (saving ? undefined : onClose())} title={t(zone ? 'editTitle' : 'createTitle')}>
-      <form onSubmit={submit} noValidate className="space-y-4">
+      <form onSubmit={(event) => void submit(event)} noValidate className="space-y-4">
         <Field id="sz-name" label={t('fieldName')} error={errors.name ? t(errors.name) : null}>
           <Input id="sz-name" value={values.name} maxLength={300} onChange={(e) => set('name', e.target.value)} aria-invalid={!!errors.name} />
         </Field>
@@ -276,14 +283,29 @@ function ZoneDialog({ zone, onClose, onSaved }: { zone: ShippingZone | null; onC
           </p>
         ) : null}
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-            {t('cancel')}
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? t('saving') : t('save')}
-          </Button>
-        </div>
+        {confirmingDeactivate ? (
+          <div role="alertdialog" aria-label={t('deactivateTitle')} className="space-y-3 rounded border border-negative/40 bg-negative/5 p-3">
+            <p className="text-sm font-medium text-text">{t('deactivateTitle')}</p>
+            <p className="text-sm text-muted">{t('deactivateBody')}</p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setConfirmingDeactivate(false)} disabled={saving}>
+                {t('cancel')}
+              </Button>
+              <Button type="button" variant="danger" onClick={(event) => void submit(event as unknown as React.FormEvent, true)} disabled={saving}>
+                {saving ? t('saving') : t('deactivateConfirm')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? t('saving') : t('save')}
+            </Button>
+          </div>
+        )}
       </form>
     </Dialog>
   );
