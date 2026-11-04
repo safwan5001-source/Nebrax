@@ -897,4 +897,214 @@ class PartnerStatementVoidSupersedeApiTest extends TestCase
         $this->assertLessThan(strpos($close, 'overlappingFinals('), strpos($close, 'supersedeFinals('));
         $this->assertLessThan(strpos($close, 'claims->conflicts('), strpos($close, 'supersedeFinals('));
     }
+    // ═══════════════════════════════ SEC #1978 — replaces[] لا يكشف وجود/حالة أهداف خارج نطاق القراءة ═══════════════════════════════
+
+    /** نهائي مغلق بنطاق فرع (بند واحد مطالَب بفاتورة الفرع). */
+    private function branchFinal(Branch $branch, Invoice $invoice): string
+    {
+        [$id, $run] = $this->ready([['date' => '2026-09-03', 'ref' => 'F'.uniqid(), 'our' => $invoice->number, 'credit' => 57500]], ['branch_id' => $branch->id]);
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+
+        return $id;
+    }
+
+    /** نهائي مغلق (بند «تجاهل» بلا مطالبات) لطرف آخر، بنطاق مؤسسة أو فرع. */
+    private function otherPartnerFinal(?Branch $branch): string
+    {
+        \Illuminate\Support\Facades\Cache::flush();   // سقوف المعدل (20/د) تخصّ المسار لا موضوع الاختبار: لا تُنتج 429 كاذباً في الإعداد.
+        $other = Partner::create(['type' => 'both', 'entity_type' => 'commercial', 'name' => 'طرف آخر '.uniqid(), 'is_active' => true]);
+        $id = $this->statement([['date' => '2026-09-01', 'ref' => 'O'.uniqid(), 'credit' => 1000]], ['partner_id' => $other->id] + ($branch === null ? [] : ['branch_id' => $branch->id]));
+        $run = $this->match($this->auth['token'], $id);
+        $this->decide($this->auth['token'], $id, ['run_id' => $run['id'], 'line_id' => $this->lineId($id, 2), 'action' => 'dismiss', 'reason' => 'لا مطابقة'])->assertCreated();
+        $this->review($this->auth['token'], $id, $run['id'])->assertCreated();
+        $this->close($this->closer, $id, $run['id'])->assertCreated();
+
+        return $id;
+    }
+
+    /**
+     * سيناريو مشترك: فاعل `close`+`void` مقيَّد بفرع B1، وبديلة مراجَعة بنطاق B1. الأهداف:
+     * مقروءة = نهائي B1 لطرف آخر (mismatch) ومرشّح B1 مراجَع (not_closed)؛ غير مقروءة = نهائي مؤسسة لطرف آخر (mismatch) ومرشّح مؤسسة مراجَع (not_closed) ونهائي مؤسسة لنفس الطرف.
+     *
+     * @return array{token: string, branch: Branch, replacement: string, run: string, unreadable: array<string, string>, readable: array<string, string>}
+     */
+    private function oracleScenario(): array
+    {
+        config(['app.debug' => false]);   // الإنتاج: بلا تتبّع في الجسم؛ المقارنة على الجسم الذي يراه العميل فعلاً.
+        $branch = Branch::create(['code' => 'OR1', 'name' => 'فرع 1978']);
+        // أرقام الفواتير تسلسل لكل فرع: نرفع تسلسل المؤسسة فوق تسلسل الفرع كي لا يلتبس «مرجعنا» في مطابقة نطاق المؤسسة.
+        foreach ([1, 2, 3] as $i) {
+            $this->invoice('2026-08-0'.$i, 10000);
+        }
+        $inBranch = $this->invoice('2026-09-03', 50000, $branch->id);
+
+        [$orgFinal, , $orgInvoice] = $this->finalized('2026-09-01', 100000);
+        $unreadable = [
+            'org_other_partner_closed' => $this->otherPartnerFinal(null),
+            'org_same_partner_closed' => $orgFinal,
+            'org_same_partner_not_closed' => $this->candidate($orgInvoice)[0],
+        ];
+        $readable = [
+            'branch_other_partner_closed' => $this->otherPartnerFinal($branch),
+            'branch_same_partner_not_closed' => $this->ready([['date' => '2026-09-03', 'ref' => 'N'.uniqid(), 'our' => $inBranch->number, 'credit' => 57500]], ['branch_id' => $branch->id])[0],
+        ];
+        [$replacement, $run] = $this->ready([['date' => '2026-09-03', 'ref' => 'B'.uniqid(), 'our' => $inBranch->number, 'credit' => 57500]], ['branch_id' => $branch->id]);
+
+        $token = $this->role('ps-oracle-br', ['partner_statements.view', 'partner_statements.close', 'partner_statements.void', 'partners.view'], 'oracle@ps-a3e.test');
+        User::query()->where('email', 'oracle@ps-a3e.test')->firstOrFail()->branches()->sync([$branch->id]);
+
+        \Illuminate\Support\Facades\Cache::flush();
+
+        return ['token' => $token, 'branch' => $branch, 'replacement' => $replacement, 'run' => $run['id'], 'unreadable' => $unreadable, 'readable' => $readable];
+    }
+
+    /** @test */
+    public function a_replace_target_outside_the_actors_scope_is_indistinguishable_from_an_unknown_id_by_status_and_body(): void
+    {
+        $s = $this->oracleScenario();
+        $baseline = $this->replace($s['token'], $s['replacement'], $s['run'], [(string) Str::uuid()]);
+        $baseline->assertStatus(422);
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $baseline->json('message'));
+
+        foreach ($s['unreadable'] as $label => $id) {
+            $response = $this->replace($s['token'], $s['replacement'], $s['run'], [$id]);
+            $this->assertSame($baseline->getStatusCode(), $response->getStatusCode(), $label);
+            $this->assertSame($baseline->json(), $response->json(), "{$label}: الجسم الكامل مطابق للمعرّف المجهول");
+        }
+        // ولا شيء تغيّر.
+        $this->assertSame('reviewed', $this->reconciliation($s['replacement'])->status);
+    }
+
+    /** @test */
+    public function a_mix_of_a_readable_and_an_unreadable_target_cannot_reveal_the_unreadable_one_by_the_error_it_returns(): void
+    {
+        $s = $this->oracleScenario();
+        $readable = $s['readable']['branch_other_partner_closed'];   // لو سُمح له بالفحص أولاً لظهر mismatch مهما كان ترتيب المعرّفات
+        // الفحوص تجري بترتيب المعرّف: نضمن حتماً أن المقروء يسبق غير المقروء (وإلا لم يكشف تمريرٌ واحد الخلل) بتوليد غير مقروء جديد حتى يتحقق (احتمال الإخفاق 2^-12).
+        $unreadable = $s['unreadable']['org_other_partner_closed'];
+        for ($i = 0; strcmp($unreadable, $readable) <= 0 && $i < 12; $i++) {
+            $unreadable = $this->otherPartnerFinal(null);
+        }
+        $this->assertGreaterThan(0, strcmp($unreadable, $readable), 'المقروء يسبق غير المقروء في ترتيب المعرّف');
+        $withUnknown = $this->replace($s['token'], $s['replacement'], $s['run'], [$readable, (string) Str::uuid()]);
+        $withUnreadable = $this->replace($s['token'], $s['replacement'], $s['run'], [$readable, $unreadable]);
+        $withUnreadableState = $this->replace($s['token'], $s['replacement'], $s['run'], [$readable, $s['unreadable']['org_same_partner_not_closed']]);
+
+        $this->assertSame(422, $withUnknown->getStatusCode());
+        $this->assertSame(PartnerStatementImportService::PARTNER_UNAVAILABLE, $withUnknown->json('message'));
+        foreach ([$withUnreadable, $withUnreadableState] as $response) {
+            $this->assertSame($withUnknown->getStatusCode(), $response->getStatusCode());
+            $this->assertSame($withUnknown->json(), $response->json());
+        }
+    }
+
+    /** @test */
+    public function a_readable_target_keeps_its_precise_mismatch_and_not_closed_errors(): void
+    {
+        $s = $this->oracleScenario();
+        $mismatch = $this->replace($s['token'], $s['replacement'], $s['run'], [$s['readable']['branch_other_partner_closed']]);
+        $this->assertSame([422, 'replace_target_mismatch'], [$mismatch->getStatusCode(), $mismatch->json('reason')]);
+
+        $notClosed = $this->replace($s['token'], $s['replacement'], $s['run'], [$s['readable']['branch_same_partner_not_closed']]);
+        $this->assertSame([409, 'replace_target_not_closed'], [$notClosed->getStatusCode(), $notClosed->json('reason')]);
+
+        // المالك غير المقيَّد يرى الأهداف كلها فيحتفظ بالتفصيل نفسه (لا تغيير عقد لمن يحق له).
+        $owner = $this->replace($this->retirer, $s['replacement'], $s['run'], [$s['unreadable']['org_other_partner_closed']]);
+        $this->assertSame([422, 'replace_target_mismatch'], [$owner->getStatusCode(), $owner->json('reason')]);
+        $ownerState = $this->replace($this->retirer, $s['replacement'], $s['run'], [$s['unreadable']['org_same_partner_not_closed']]);
+        $this->assertSame([409, 'replace_target_not_closed'], [$ownerState->getStatusCode(), $ownerState->json('reason')]);
+    }
+
+    /** @test */
+    public function a_readable_closed_target_in_the_actors_branch_is_still_replaced_atomically_with_no_financial_effect(): void
+    {
+        $branch = Branch::create(['code' => 'OR2', 'name' => 'فرع 1978-ب']);
+        $inBranch = $this->invoice('2026-09-03', 50000, $branch->id);
+        $target = $this->branchFinal($branch, $inBranch);
+        [$replacement, $run] = $this->ready([['date' => '2026-09-03', 'ref' => 'B'.uniqid(), 'our' => $inBranch->number, 'credit' => 57500]], ['branch_id' => $branch->id]);
+        $token = $this->role('ps-oracle-ok', ['partner_statements.view', 'partner_statements.close', 'partner_statements.void', 'partners.view'], 'oracle-ok@ps-a3e.test');
+        User::query()->where('email', 'oracle-ok@ps-a3e.test')->firstOrFail()->branches()->sync([$branch->id]);
+
+        $before = $this->counts();
+        $this->replace($token, $replacement, $run['id'], [$target])->assertCreated();
+        $this->assertSame(['superseded', 'closed'], [$this->reconciliation($target)->status, $this->reconciliation($replacement)->status]);
+        $this->assertSame(0, $this->activeClaims($target));
+        $this->assertSame(1, $this->activeClaims($replacement));
+        $after = $this->counts();
+        foreach (['journal_entries', 'journal_lines', 'account_balances'] as $table) {
+            if (isset($before[$table])) {
+                $this->assertSame($before[$table], $after[$table], $table);
+            }
+        }
+    }
+
+    /** @test */
+    public function a_refused_replacement_by_a_restricted_actor_rolls_back_without_any_trace(): void
+    {
+        $s = $this->oracleScenario();
+        $before = $this->counts();
+        $events = DB::table('partner_statement_reconciliation_events')->count();
+        $claimsBefore = $this->claimCount();
+
+        foreach ($s['unreadable'] as $id) {
+            $this->replace($s['token'], $s['replacement'], $s['run'], [$id])->assertStatus(422);
+        }
+        $this->assertSame($before, $this->counts());
+        $this->assertSame($events, DB::table('partner_statement_reconciliation_events')->count());
+        $this->assertSame($claimsBefore, $this->claimCount());
+        foreach ($s['unreadable'] as $id) {
+            $this->assertNotSame('superseded', $this->reconciliation($id)->status);
+        }
+        $this->assertSame('reviewed', $this->reconciliation($s['replacement'])->status);
+    }
+
+    /** @test */
+    public function the_privilege_reviewer_and_tenant_boundaries_are_unchanged_for_replace_targets(): void
+    {
+        $s = $this->oracleScenario();
+        $target = $s['unreadable']['org_other_partner_closed'];
+
+        // بلا void أو بلا close ⇒ 403 قبل أي نظر في الأهداف (لا فرق بين موجود ومجهول).
+        $closeOnly = $this->role('ps-oracle-c', ['partner_statements.view', 'partner_statements.close', 'partners.view'], 'oc@ps-a3e.test');
+        User::query()->where('email', 'oc@ps-a3e.test')->firstOrFail()->branches()->sync([$s['branch']->id]);
+        foreach ([$target, (string) Str::uuid()] as $id) {
+            $this->replace($closeOnly, $s['replacement'], $s['run'], [$id])->assertStatus(403);
+            $this->replace($this->voider, $s['replacement'], $s['run'], [$id])->assertStatus(403);
+        }
+
+        // من راجع البديلة (المالك) لا يُغلقها (D-PS-17) مهما كانت الأهداف: 403 بسبب فصل المهام، ولا أثر لقراءة الأهداف.
+        foreach ([$s['readable']['branch_other_partner_closed'], (string) Str::uuid()] as $id) {
+            $reviewerAlso = $this->replace($this->auth['token'], $s['replacement'], $s['run'], [$id]);
+            $this->assertSame([403, 'closer_must_differ_from_reviewer'], [$reviewerAlso->getStatusCode(), $reviewerAlso->json('reason')]);
+        }
+
+        // معرّف من مستأجر آخر ⇒ الرفض الموحَّد نفسه.
+        $foreign = $this->registerTenant('ps-1978-other', 'owner@ps-1978-other.test');
+        app(TenantContext::class)->set($foreign['tenant_id']);
+        $foreignOwner = User::query()->where('email', 'owner@ps-1978-other.test')->firstOrFail();
+        $foreignPartner = Partner::create(['type' => 'both', 'entity_type' => 'commercial', 'name' => 'طرف أجنبي', 'is_active' => true]);
+        $this->actingAs($foreignOwner);
+        $file = UploadedFile::fake()->createWithContent('f.csv', SpreadsheetWriter::csv(['التاريخ', 'رقم المستند', 'مرجعنا', 'مدين', 'دائن'], [['2026-09-01', '', '', '', '10.00']]));
+        $foreignId = app(PartnerStatementImportService::class)->apply($file, ['partner_id' => $foreignPartner->id, 'role' => 'customer', 'period_from' => '2026-09-01', 'period_to' => '2026-09-30'], (string) $foreignOwner->id)['reconciliation_id'];
+        app(TenantContext::class)->set($this->auth['tenant_id']);
+        $unknown = $this->replace($s['token'], $s['replacement'], $s['run'], [(string) Str::uuid()]);
+        $cross = $this->replace($s['token'], $s['replacement'], $s['run'], [$foreignId]);
+        $this->assertSame($unknown->getStatusCode(), $cross->getStatusCode());
+        $this->assertSame($unknown->json(), $cross->json());
+    }
+
+    /** @test */
+    public function the_readability_gate_runs_for_every_replace_target_before_any_target_state_is_examined(): void
+    {
+        $life = (string) file_get_contents(base_path('app/Services/PartnerStatementLifecycleService.php'));
+        $body = substr($life, (int) strpos($life, 'private function supersedeFinals('), (int) strpos($life, 'private function assertCloseRunReadable(') - (int) strpos($life, 'private function supersedeFinals('));
+        $gate = strpos($body, 'assertTargetReadable(');
+        $this->assertNotFalse($gate, 'بوابة قابلية القراءة موجودة');
+        foreach (['replace_target_mismatch', 'replace_target_not_closed', '->status', '->partner_id'] as $needle) {
+            $this->assertLessThan(strpos($body, $needle), $gate, "البوابة تسبق {$needle}");
+        }
+        // البوابة في تمريرة مستقلة تغطي كل الأهداف قبل أول فحص تفصيلي (وإلا كشف هدفٌ مقروء ترتيبياً هدفاً غير مقروء بجواره).
+        $this->assertLessThan(strpos($body, 'foreach ($finals as $final) {', $gate + 1), strpos($body, 'foreach ($finals as $final) {'), 'تمريرة البوابة أولاً');
+        $this->assertSame(2, substr_count($body, 'foreach ($finals as $final) {'), 'تمريرتان: بوابة ثم تفصيل');
+    }
 }

@@ -418,6 +418,10 @@ final class PartnerStatementLifecycleService
         if ($finals->count() !== count($ids)) {
             throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);   // معرّف غير موجود/من مؤسسة أخرى: الرفض الموحَّد
         }
+        // SEC #1978: قابلية القراءة لكل الأهداف **أولاً وفي تمريرة مستقلة** — قبل أن يُنظر في طرف/دور/حالة أي هدف؛ فلا يُفضي رفضٌ تفصيلي لهدف مقروء إلى كشف هدف غير مقروء بجواره، ولا هدفٌ غير مقروء يُظهر طرفه أو حالته.
+        foreach ($finals as $final) {
+            $this->assertTargetReadable($actor, $final);
+        }
         $done = [];
         foreach ($finals as $final) {
             if ((string) $final->partner_id !== (string) $replacement->partner_id || $final->role !== $replacement->role) {
@@ -431,6 +435,21 @@ final class PartnerStatementLifecycleService
         }
 
         return $done;
+    }
+
+    /**
+     * SEC #1978: هل يحق للفاعل قراءة هذا الهدف؟ وإلا الرفض الموحَّد نفسه لغير الموجود. القاعدة = قاعدة `authorize` لأي مقارنة (الطرف/الدور/فرع السياسة المجمَّدة) **و**
+     * تشغيلة المراجعة/الإغلاق إن وُجدت مقروءة له (نطاق الفروع). تُستدعى قبل أي إفشاء لطرف الهدف أو دوره أو حالته.
+     */
+    private function assertTargetReadable(User $actor, PartnerStatementReconciliation $final): void
+    {
+        $this->matching->assertReconciliationReadable($actor, $final);
+        if ($final->reviewed_run_id !== null) {
+            $run = PartnerStatementMatchRun::query()->whereKey($final->reviewed_run_id)->first();
+            if ($run === null || ! $this->matching->readable($actor, $run)) {
+                throw new RuntimeException(PartnerStatementImportService::PARTNER_UNAVAILABLE);
+            }
+        }
     }
 
     /** مقيَّد بفرع لا يُخرج من الخدمة نهائياً بنطاق أوسع: تشغيلة إغلاقه يجب أن تكون مقروءة للفاعل (الرفض الموحَّد وإلا). */
