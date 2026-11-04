@@ -408,6 +408,61 @@ class ProductImageReplacementImportTest extends TestCase
         $this->assertSame(101, ProductMedia::count());
     }
 
+    /** @test */
+    public function removal_consent_and_gallery_drift_are_rechecked_against_the_locked_gallery(): void
+    {
+        $this->scene();
+        $product = $this->product('SKU-A');
+        [$previewed] = $this->attach($product, [$this->png('previewed.png', 200)]);
+        // صورة رُفعت بعد المعاينة وقبل أخذ القفل (مثلاً عبر مسار رفع المعرض العادي).
+        [$late] = $this->attach($product, [$this->png('late.png', 150)]);
+        $service = app(ProductMediaService::class);
+
+        try {
+            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, [$previewed->id]);
+            $this->fail('انجراف المعرض بعد المعاينة يجب أن يُرفض.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('تغيّر معرض', $exception->getMessage());
+        }
+        try {
+            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, false, [$previewed->id, $late->id]);
+            $this->fail('الإزالة بلا تأكيد يجب أن تُرفض تحت القفل.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('لم يُؤكَّد', $exception->getMessage());
+        }
+
+        $this->assertEqualsCanonicalizing([$previewed->id, $late->id], ProductMedia::query()->where('product_id', $product->id)->pluck('id')->all());
+        $this->assertTrue($this->onDisk($previewed) && $this->onDisk($late));
+
+        // المعرض كما عُوين + موافقة ⇒ يمضي.
+        $outcome = $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, [$previewed->id, $late->id]);
+        $this->assertSame(['added' => 1, 'kept' => 0, 'removed' => 2], $outcome);
+    }
+
+    /** @test */
+    public function a_duplicate_sku_across_chunk_windows_is_caught_before_any_gallery_is_written(): void
+    {
+        $auth = $this->scene();
+        $product = $this->product('DUP-1');
+        [$old] = $this->attach($product, [$this->png('old.png', 200)]);
+        $skus = ['DUP-1'];
+        for ($i = 1; $i <= 99; $i++) {
+            $skus[] = "NOPE-{$i}";
+        }
+        $skus[] = 'DUP-1'; // الصف 101: النافذة الثانية
+
+        $created = $this->withToken($auth['token'])->post('/api/import-jobs', [
+            'domain' => 'product_catalog', 'file' => $this->sheet($skus),
+            'media_archive' => $this->zip(['DUP-1.png' => $this->pngBytes(10)]),
+            'options' => ['mapping' => [0 => 'sku'], 'media_mode' => 'replace', 'confirm_media_replacement' => '1'],
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $this->withToken($auth['token'])->postJson('/api/import-jobs/'.$created->json('data.id').'/apply', [])->assertStatus(422);
+
+        $this->assertSame([$old->id], ProductMedia::query()->where('product_id', $product->id)->pluck('id')->all(), 'لا استبدال جزئي قبل اكتشاف التكرار.');
+        $this->assertTrue($this->onDisk($old));
+    }
+
     // ── العزل والمطابقة ─────────────────────────────────────────────────────
 
     /** @test */

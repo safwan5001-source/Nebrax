@@ -199,6 +199,21 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
         $confirmed = (bool) ($chunkOptions['confirm_media_replacement'] ?? false);
         $service = app(ProductImportMediaService::class);
 
+        // قبل أول قطعة (ولا كتابة بعد): الملف كله يُفحص بلا نافذة، فتكرار SKU أو مطابقة أرشيف تتجاوز حدود القطع يُكتشف قبل أي استبدال
+        // (النافذة وحدها لا ترى ما خارجها). القطع اللاحقة تفحص نافذتها ضد الحالة الراهنة.
+        if ($chunk->offset === 0) {
+            $whole = $service->preview(
+                $chunk->file, array_diff_key($chunkOptions, ['batch_offset' => 1, 'batch_size' => 1]), $archive,
+                ProductImportService::DURABLE_MAX_ROWS, false, ProductImportMediaService::MODE_REPLACE, $confirmed,
+            );
+            if ($whole['error_rows'] > 0) {
+                throw new RuntimeException('معاينة استبدال الصور تحتوي أخطاء في الملف؛ صحّح الملف أو الأرشيف وأعد المعاينة.');
+            }
+            if ($whole['needs_approval_rows'] > 0) {
+                throw new RuntimeException('استبدال الصور الموجودة لم يُؤكَّد صراحةً.');
+            }
+        }
+
         $preflight = $service->preview(
             $chunk->file, $chunkOptions, $archive, ProductImportService::DURABLE_MAX_ROWS, false,
             ProductImportMediaService::MODE_REPLACE, $confirmed,

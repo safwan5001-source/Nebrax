@@ -314,7 +314,7 @@ final class ProductImportMediaService
                 foreach ($row['sources'] as $source) {
                     $files[] = $this->archives->materialize($archive, (int) $source['index'], (string) $source['name']);
                 }
-                $outcome = $this->media->replaceProductGallery($product, $files, $userId);
+                $outcome = $this->media->replaceProductGallery($product, $files, $userId, $confirmReplacement, $row['existing_ids'] ?? []);
                 $replaced++;
                 $added += $outcome['added'];
                 $kept += $outcome['kept'];
@@ -332,6 +332,7 @@ final class ProductImportMediaService
                     }
                 }
             }
+            unset($row['existing_ids']);
             $rows[] = $row;
         }
 
@@ -489,6 +490,8 @@ final class ProductImportMediaService
                         'remove_count' => $removeCount,
                         'existing_names' => $existing->pluck('original_name')->values()->all(),
                     ],
+                    // داخلي: معرض المعاينة لفحص الانجراف تحت القفل — لا يُعرض خارج الخدمة (يُجرَّد في summarize/applyReplacement).
+                    'existing_ids' => $existing->pluck('id')->values()->all(),
                     'messages' => array_values(array_unique($messages)),
                 ];
             }
@@ -642,7 +645,11 @@ final class ProductImportMediaService
             'ready_rows' => $ready,
             'needs_approval_rows' => $review,
             'error_rows' => $errors,
-            'rows' => $planned['rows'],
+            'rows' => array_map(static function (array $row): array {
+                unset($row['existing_ids']);
+
+                return $row;
+            }, $planned['rows']),
             'unmatched_archive' => $planned['unmatched_archive'],
             'missing_rows' => $planned['missing_rows'],
         ];

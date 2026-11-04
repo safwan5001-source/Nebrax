@@ -187,12 +187,15 @@ class ProductMediaService
      *  5. **idempotent:** صورة موجودة بالبصمة نفسها تُبقى ولا يُعاد رفعها؛ فإعادة التشغيل بعد نجاح أو انقطاع جزئي لا تكرّر
      *     صورة ولا تحذف شيئاً زائداً (انقطاع بين الإضافة والإزالة يُستكمل في المحاولة التالية).
      *
-     * يقفل صف المنتج (`FOR UPDATE`) فيتسلسل استبدالان متزامنان لمنتجٍ واحد.
+     * يقفل صف المنتج (`FOR UPDATE`) فيتسلسل استبدالان متزامنان لمنتجٍ واحد. **موافقة الإزالة تُفحص على المعرض المقفول لا على لقطة
+     * المعاينة:** `$allowRemoval=false` يمنع حذف أي صف، و`$expectedExistingIds` (معرّفات معرض المعاينة) يرفض الاستبدال إن ظهر تحت
+     * القفل صفٌّ لم تعاينه (رُفعت صورة بعد المعاينة) — فلا تُحذف صورة لم يرها المستخدم ولم يوافق عليها.
      *
      * @param  list<UploadedFile>  $files  الصور الجديدة بالترتيب النهائي.
+     * @param  list<string>|null  $expectedExistingIds  معرّفات الصور القائمة كما عُوينت؛ null = بلا فحص انجراف.
      * @return array{added:int,kept:int,removed:int}
      */
-    public function replaceProductGallery(Product $product, array $files, ?string $uploadedBy): array
+    public function replaceProductGallery(Product $product, array $files, ?string $uploadedBy, bool $allowRemoval = true, ?array $expectedExistingIds = null): array
     {
         $files = array_values($files);
         if ($files === []) {
@@ -215,7 +218,7 @@ class ProductMediaService
         }
 
         $removedFiles = [];
-        $summary = DB::transaction(function () use ($product, $desired, $uploadedBy, &$removedFiles): array {
+        $summary = DB::transaction(function () use ($product, $desired, $uploadedBy, $allowRemoval, $expectedExistingIds, &$removedFiles): array {
             $locked = Product::query()->whereKey($product->id)->lockForUpdate()->first();
             if ($locked === null) {
                 throw new RuntimeException('تعذّر العثور على المنتج عند استبدال الصور.');
@@ -226,6 +229,9 @@ class ProductMediaService
                 ->whereNull('product_option_value_id')->whereNull('product_variant_id');
 
             $current = $productLevel()->orderBy('sort_order')->orderBy('id')->get();
+            if ($expectedExistingIds !== null && $current->pluck('id')->diff($expectedExistingIds)->isNotEmpty()) {
+                throw new RuntimeException('تغيّر معرض صور المنتج بعد المعاينة؛ أعد المعاينة قبل الاستبدال.');
+            }
             $keepBySha = [];
             foreach ($current as $row) {
                 if ($row->content_sha256 !== null && ! isset($keepBySha[$row->content_sha256])) {
@@ -238,6 +244,9 @@ class ProductMediaService
                 if (isset($keepBySha[$item['sha256']])) {
                     $liveIds[] = $keepBySha[$item['sha256']]->id;
                 }
+            }
+            if (! $allowRemoval && $current->pluck('id')->diff($liveIds)->isNotEmpty()) {
+                throw new RuntimeException('الاستبدال سيزيل صوراً قائمة ولم يُؤكَّد صراحةً؛ أعد المعاينة وأكّد.');
             }
 
             // ٢) إضافة البدائل غير الموجودة. العدّ يشمل المُبقاة والمُضافة فقط (القديمة المراد إزالتها لا تُحتسب).
