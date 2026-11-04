@@ -61,6 +61,8 @@ jobs:
     timeout-minutes: 2
     outputs:
       matrix: ${{ steps.m.outputs.matrix }}
+      repeats: ${{ steps.m.outputs.repeats }}
+      variants: ${{ steps.m.outputs.variants }}
     steps:
       - id: m
         env:
@@ -70,6 +72,8 @@ jobs:
           case "$n" in 2|4|6|8|10) ;; *) n=6 ;; esac
           list=$(seq -s, 1 "$n")
           echo "matrix={\"variant\":[\"main\",\"pr1972\"],\"repeat\":[${list}]}" >> "$GITHUB_OUTPUT"
+          echo "repeats=${n}" >> "$GITHUB_OUTPUT"
+          echo "variants=main,pr1972" >> "$GITHUB_OUTPUT"
 
   measure:
     name: Diag (${{ matrix.variant }} #${{ matrix.repeat }})
@@ -301,8 +305,8 @@ jobs:
       - name: تقرير المقارنة الموحّدة
         shell: bash
         env:
-          EXPECT_PER_VARIANT: ${{ length(fromJSON(needs.plan.outputs.matrix).repeat) }}
-          EXPECT_VARIANTS: ${{ join(fromJSON(needs.plan.outputs.matrix).variant, ',') }}
+          EXPECT_PER_VARIANT: ${{ needs.plan.outputs.repeats }}
+          EXPECT_VARIANTS: ${{ needs.plan.outputs.variants }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts/ci-perf-diag
