@@ -27,6 +27,7 @@ describe('commerce workspace navigation', () => {
       '/commerce/themes',
       '/commerce/appearance',
       '/app-builder',
+      '/commerce/settings',
       '/commerce/domains',
       '/commerce/delivery',
       '/commerce/customer-accounts',
