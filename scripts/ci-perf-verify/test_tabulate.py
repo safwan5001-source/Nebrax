@@ -17,6 +17,16 @@ def make_run(root: Path, name: str, passed=True, rounds=(14.2, 15.1, 13.0), fs="
 
 
 class Tabulate(unittest.TestCase):
+    def test_ok_with_issues_counts_as_pass_and_failures_as_fail(self):
+        with tempfile.TemporaryDirectory() as r:
+            root = Path(r)
+            make_run(root, "feed-perf-metrics-1")
+            (root / "feed-perf-metrics-1" / "test-output-pgsql-perf.txt").write_text("Time: 00:20.6\n\nOK, but there were issues!\nTests: 2, Assertions: 27, PHPUnit Deprecations: 8473.\n")
+            make_run(root, "feed-perf-metrics-2", passed=False)
+            runs = [T.read_run(p) for p in sorted(root.iterdir())]
+        self.assertTrue(runs[0]["passed"])
+        self.assertFalse(runs[1]["passed"])
+
     def test_counts_and_stats(self):
         with tempfile.TemporaryDirectory() as r:
             root = Path(r)

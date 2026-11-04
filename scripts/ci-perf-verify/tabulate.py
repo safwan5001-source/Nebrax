@@ -30,7 +30,8 @@ def read_run(d: Path) -> dict:
         out["missing"].append("test-output")
     else:
         text = t.read_text(encoding="utf-8", errors="replace")
-        out["passed"] = bool(re.search(r"^OK \(", text, re.M)) and "FAILURES!" not in text
+        # PHPUnit يطبع «OK, but there were issues!» (تنبيهات deprecation) والاختبار ناجح؛ الفشل فقط FAILURES!/ERRORS!.
+        out["passed"] = bool(re.search(r"^OK(,| \()", text, re.M)) and not re.search(r"^(FAILURES!|ERRORS!)", text, re.M)
         m = re.search(r"^Time: ([0-9:.]+)", text, re.M)
         out["phpunit_time"] = m.group(1) if m else "—"
     g = find(d, GATE)
