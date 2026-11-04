@@ -111,7 +111,7 @@ function ThemeCard({
     <article data-theme-card={theme.id} className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
       <div className="grid min-h-[320px] md:grid-cols-[minmax(0,1.12fr)_minmax(260px,0.88fr)]">
         <div className="border-b border-border bg-background p-4 md:border-b-0 md:border-e">
-          <ThemePreview variant={theme.vertical} muted={false} primary={theme.primaryColor} />
+          <ThemePreview variant={theme.vertical} muted={false} primary={theme.primaryColor} themeId={theme.id} accent={theme.accentColor ?? null} />
         </div>
 
         <div className="flex flex-col p-5">
@@ -172,12 +172,75 @@ function ThemePreview({
   variant,
   muted,
   primary,
+  themeId,
+  accent,
 }: {
   variant: ThemeDefinition['vertical'];
   muted: boolean;
   /** The preset's real primary color, so each card previews its own identity (not the admin app's). */
   primary: string | null;
+  themeId: string;
+  accent: string | null;
 }) {
+  // A media-free gallery illustration, not a promise of sample products or an active tenant store.
+  // Only theme-owned colours and structural tokens are represented here.
+  if (themeId === 'awj-luxe-motion') {
+    const wine = primary ?? '#71243F';
+    const gold = accent ?? '#B88A43';
+    return (
+      <div
+        data-theme-preview="luxe-motion"
+        aria-hidden
+        className={`mx-auto min-h-[286px] max-w-2xl overflow-hidden rounded-lg border border-[#e8dfd4] bg-[#fbf7f0] ${muted ? 'opacity-70' : ''}`}
+      >
+        <div className="flex h-8 items-center justify-between border-b border-[#e8dfd4] px-4">
+          <span className="h-1 w-16 rounded-full" style={{ backgroundColor: gold }} />
+          <div className="flex gap-2">
+            <span className="h-1 w-6 rounded-full bg-[#cbbfaf]" />
+            <span className="h-1 w-6 rounded-full bg-[#cbbfaf]" />
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="h-4 w-16 rounded-sm" style={{ backgroundColor: wine }} />
+          <div className="flex gap-2">
+            <span className="size-4 rounded-full border border-[#e1d5c8]" />
+            <span className="size-4 rounded-full border border-[#e1d5c8]" />
+          </div>
+        </div>
+        <div className="mx-3 grid min-h-28 grid-cols-[1.2fr_1fr] overflow-hidden rounded-xl bg-[#f3e9dd]">
+          <div className="flex flex-col justify-center gap-2 px-4 py-3">
+            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: gold }} />
+            <div className="h-3 w-full max-w-28 rounded-sm" style={{ backgroundColor: wine }} />
+            <div className="h-2 w-3/4 rounded-sm bg-[#bdab9d]" />
+            <div className="h-5 w-16 rounded-sm" style={{ backgroundColor: wine }} />
+          </div>
+          <div className="relative overflow-hidden bg-[#e5d3c6]">
+            <span className="absolute start-[15%] top-[12%] size-12 rounded-full bg-[#a86a75]/70" />
+            <span className="absolute end-[8%] top-[30%] size-14 rounded-full bg-[#c493a0]/80" />
+            <span className="absolute bottom-[10%] start-[30%] size-12 rounded-full bg-[#8b4558]/60" />
+            <span className="absolute bottom-0 start-1/2 h-16 w-1 -rotate-12 bg-[#85846a]" />
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-2 py-3">
+          <span className="h-px w-7" style={{ backgroundColor: gold }} />
+          <span className="h-2 w-24 rounded-sm" style={{ backgroundColor: wine }} />
+          <span className="h-px w-7" style={{ backgroundColor: gold }} />
+        </div>
+        <div className="grid grid-cols-3 gap-2 px-3 pb-4">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="overflow-hidden rounded-lg border border-[#e5d9cb] bg-white p-1.5">
+              <div className={`aspect-[3/4] rounded-md ${item === 1 ? 'bg-[#e8cfd0]' : 'bg-[#e9ded1]'}`}>
+                <div className="m-auto translate-y-3 size-7 rounded-full bg-[#a97683]/70" />
+              </div>
+              <div className="mt-2 h-1.5 w-4/5 rounded-sm bg-[#b9a9a0]" />
+              <div className="mt-1.5 h-1.5 w-2/5 rounded-sm" style={{ backgroundColor: gold }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const tint = (percent: number) =>
     primary ? { backgroundColor: `color-mix(in srgb, ${primary} ${percent}%, transparent)` } : undefined;
   const cls = (fallback: string) => (primary ? '' : fallback);
