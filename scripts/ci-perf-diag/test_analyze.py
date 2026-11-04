@@ -104,6 +104,20 @@ class Classification(unittest.TestCase):
         short_only = A.freeze_of(rnd(steady() + t[20:]))
         self.assertTrue(short_only is None or short_only["freeze_ms"] < 30.0)
 
+    def test_phase_durations_are_clipped_to_the_freeze_window(self):
+        # سيناريو Codex: gap=100 ثم commit=80 للجذر؛ الطابور يتكوّن عند 110–113ms، أي أن نافذة التجمّد كلها داخل COMMIT.
+        base = 100.0
+        root = txn(2, base, wait=1.0, gap=100.0, commit=80.0)
+        t = [root]
+        for i in range(4):
+            at = base + 0.110 + i * 0.001
+            t.append(txn(3, at, wait=(A.txn_end(root) + 0.001 + i * 0.002 - at) * 1000.0, gap=0.05, commit=1.0))
+        fr = A.freeze_of(rnd(t))
+        self.assertAlmostEqual(fr["freeze_ms"], 69.0, delta=1.0)
+        self.assertAlmostEqual(fr["gap_win_ms"], 0.0, delta=0.5)
+        self.assertAlmostEqual(fr["commit_win_ms"], 69.0, delta=1.0)
+        self.assertEqual(A.classify(fr), "commit_stall")
+
     def test_explicit_end_timestamp_exposes_a_pause_the_components_do_not_cover(self):
         # توقف بين مكوّنين مسجَّلين (القفل ممسوك) لا تلتقطه مجموع المكوّنات؛ الطابع الفعلي `end` يكشفه ولا يُصنَّف «بلا تجمّد».
         t = stalled_queue(commit=1.0)

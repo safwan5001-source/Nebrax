@@ -14,8 +14,10 @@
     hold_ms    = من اكتمال الحيازة حتى انتهاء التزامه (gap + commit)                           ← إمساك القفل: العميل (gap) أو الالتزام (commit)
   التصنيف (الأول المنطبق):
     commit_stall       hold_ms ≥ 50% من التجمّد وcommit_ms ≥ gap_ms
-    client_gap_cpu     hold_ms ≥ 50% وgap_ms > commit_ms وrq_gap_ms ≥ 50% من gap_ms   (عملية PHP جاهزة ولم تحصل على معالج وهي ممسكة بالقفل؛ rq_gap_ms
-                       يقيس تأخر الطابور داخل نافذة gap_ms نفسها، لا COMMIT وما بعده)
+    client_gap_cpu     hold_ms ≥ 50% وgap > commit وrq_gap ≥ 50% من gap   (عملية PHP جاهزة ولم تحصل على معالج وهي ممسكة بالقفل؛ rq_gap
+                       يقيس تأخر الطابور داخل نافذة gap نفسها، لا COMMIT وما بعده)
+  كل الأرقام أعلاه **مقطوعة على نافذة التجمّد** [بدء تكوّن الطابور، التزام الجذر]: طورٌ وقع قبل تكوّن الطابور لا يُنسب إليه التوقف.
+  (rq_gap داخل النافذة تقريب بالتناسب مع الجزء المقطوع من الفجوة.)
     client_gap_other   hold_ms ≥ 50% وgap_ms > commit_ms بلا تأخر طابور   (عميل متوقف لسبب آخر: GC/تبديل/انتظار نظام)
     handoff_latency    handoff_ms ≥ 50% من التجمّد   (تأخر بين تحرير القفل وإتمام الحيازة التالية: جدولة الخادم/الإدراج)
     mixed              غير ذلك
@@ -135,10 +137,24 @@ def freeze_of(rnd: dict[str, Any]) -> dict[str, Any] | None:
         start = max(prev_end, waiting_since[QUEUE_MIN - 1])
         freeze_ms = (cur_end - start) * 1000.0
         if best is None or freeze_ms > best["freeze_ms"]:
+            # أطوار الجذر مقطوعة على نافذة التجمّد [start, cur_end]: ما وقع قبل تكوّن الطابور لا يُنسب إليه التوقف.
+            commit_s = cur_end - cur["commit_ms"] / 1000.0
+            gap_s = commit_s - cur["gap_ms"] / 1000.0
+
+            def clip(a: float, b: float) -> float:
+                return max(0.0, min(b, cur_end) - max(a, start)) * 1000.0
+
+            gap_win = clip(gap_s, commit_s)
+            commit_win = clip(commit_s, cur_end)
+            # rq_gap مقيس على الفجوة كلها؛ يُوزَّع على الجزء داخل النافذة بالتناسب (تقريب معلن: افتراض توزيع منتظم).
+            rq_gap_win = cur["rq_gap_ms"] * (gap_win / cur["gap_ms"]) if cur["gap_ms"] > 0 else 0.0
             best = {
                 "freeze_ms": round(freeze_ms, 1),
-                "handoff_ms": round(max(0.0, (acquired_at(cur) - start) * 1000.0), 1),
-                "hold_ms": round(cur["gap_ms"] + cur["commit_ms"], 1),
+                "handoff_ms": round(max(0.0, (min(acquired_at(cur), cur_end) - start) * 1000.0), 1),
+                "hold_ms": round(gap_win + commit_win, 1),
+                "gap_win_ms": round(gap_win, 1),
+                "commit_win_ms": round(commit_win, 1),
+                "rq_gap_win_ms": round(rq_gap_win, 1),
                 "queued": len(waiting_since),
                 "root": cur,
                 "t_start": start,
@@ -150,11 +166,10 @@ def freeze_of(rnd: dict[str, Any]) -> dict[str, Any] | None:
 def classify(fr: dict[str, Any] | None) -> str:
     if fr is None or fr["freeze_ms"] < FREEZE_MIN_MS:
         return "no_freeze"
-    root = fr["root"]
     if fr["hold_ms"] >= SHARE * fr["freeze_ms"]:
-        if root["commit_ms"] >= root["gap_ms"]:
+        if fr["commit_win_ms"] >= fr["gap_win_ms"]:
             return "commit_stall"
-        if root["rq_gap_ms"] >= SHARE * root["gap_ms"]:
+        if fr["rq_gap_win_ms"] >= SHARE * fr["gap_win_ms"]:
             return "client_gap_cpu"
         return "client_gap_other"
     if fr["handoff_ms"] >= SHARE * fr["freeze_ms"]:
@@ -308,12 +323,12 @@ def build_report(runs: list[dict[str, Any]], expect: int = 0, expected_variants:
     if not over:
         out.append("لا جولة متجاوزة في هذه العيّنة.")
     else:
-        out.append("| تشغيل | جولة | نوع | p95 إضافي | بطيئة | تجمّد ms | handoff ms | hold ms (gap/commit/rq_gap) | تصنيف | ماسك مرصود | PSI cpu/io ms | WAL sync ms | nivcsw (جذر/أعلى) |")
+        out.append("| تشغيل | جولة | نوع | p95 إضافي | بطيئة | تجمّد ms | handoff ms | hold ms في النافذة (gap/commit/rq_gap) | تصنيف | ماسك مرصود | PSI cpu/io ms | WAL sync ms | nivcsw (جذر/أعلى) |")
         out.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         for r in over:
             fr = r["freeze"]
             root = fr["root"] if fr else None
-            hold = f"{fr['hold_ms']} ({root['gap_ms']}/{root['commit_ms']}/{root['rq_gap_ms']})" if fr else "—"
+            hold = f"{fr['hold_ms']} ({fr['gap_win_ms']}/{fr['commit_win_ms']}/{fr['rq_gap_win_ms']})" if fr else "—"
             holders = ", ".join(f"{k}×{v}" for k, v in sorted(r["holders"].items(), key=lambda kv: -kv[1])[:3]) or "—"
             out.append(
                 f"| {r['variant']}#{r['repeat']} | {r['round']} | {r['kind']} | {r['added_p95_ms']} | {r['slow_count']} | "
