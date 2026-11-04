@@ -198,6 +198,13 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
         );
         $confirmed = (bool) ($chunkOptions['confirm_media_replacement'] ?? false);
         $service = app(ProductImportMediaService::class);
+        // معرض كل منتج كما اعتمده المستخدم في المعاينة المربوطة (بصمات)؛ يرفض التنفيذ انجراف المعرض بعدها قبل أي حذف.
+        $approvedGalleries = ImportPreviewService::decodePlan(
+            $job->preview_id === null ? null : ImportPreview::query()->whereKey($job->preview_id)->value('plan')
+        );
+        if ($approvedGalleries !== null) {
+            $chunkOptions['expected_plan'] = $approvedGalleries;
+        }
 
         // قبل أول قطعة (ولا كتابة بعد): الملف كله يُفحص بلا نافذة، فتكرار SKU أو مطابقة أرشيف تتجاوز حدود القطع يُكتشف قبل أي استبدال
         // (النافذة وحدها لا ترى ما خارجها). القطع اللاحقة تفحص نافذتها ضد الحالة الراهنة.

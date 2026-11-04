@@ -280,6 +280,21 @@ final class ProductImportMediaService
         bool $confirmReplacement,
     ): array {
         $planned = $this->plan($spreadsheet, $options, $archive, $maxRows, false, [], self::MODE_REPLACE, $confirmReplacement);
+        // المعرض الذي اعتمده المستخدم في المعاينة (بصمة لكل صف) — إن وُجدت تُفرض قبل أي كتابة ثم تحت قفل كل منتج؛ فصورة رُفعت بعد
+        // المعاينة لا تُحذف. تشغيلة بلا معاينة مربوطة تحمي نافذة القفل فقط (بصمة الخطة الحالية).
+        $approved = is_array($options['expected_plan'] ?? null) ? $options['expected_plan'] : null;
+        $expectedPlan = [];
+        foreach ($planned['rows'] as $row) {
+            if ($row['status'] !== 'ready' || $row['product_id'] === null) {
+                continue;
+            }
+            if ($approved !== null) {
+                if (($approved[$row['row']] ?? null) !== $row['gallery_plan']) {
+                    throw new RuntimeException('تغيّر معرض صور أحد المنتجات بعد المعاينة؛ أعد المعاينة قبل الاستبدال.');
+                }
+                $expectedPlan[$row['row']] = substr((string) $row['gallery_plan'], (int) strrpos((string) $row['gallery_plan'], ':') + 1);
+            }
+        }
         $replaced = 0;
         $added = 0;
         $kept = 0;
@@ -314,7 +329,7 @@ final class ProductImportMediaService
                 foreach ($row['sources'] as $source) {
                     $files[] = $this->archives->materialize($archive, (int) $source['index'], (string) $source['name']);
                 }
-                $outcome = $this->media->replaceProductGallery($product, $files, $userId, $confirmReplacement, $row['existing_ids'] ?? []);
+                $outcome = $this->media->replaceProductGallery($product, $files, $userId, $confirmReplacement, $expectedPlan[$row['row']] ?? $row['gallery_fingerprint']);
                 $replaced++;
                 $added += $outcome['added'];
                 $kept += $outcome['kept'];
@@ -332,7 +347,7 @@ final class ProductImportMediaService
                     }
                 }
             }
-            unset($row['existing_ids']);
+            unset($row['gallery_fingerprint'], $row['gallery_plan']);
             $rows[] = $row;
         }
 
@@ -490,8 +505,9 @@ final class ProductImportMediaService
                         'remove_count' => $removeCount,
                         'existing_names' => $existing->pluck('original_name')->values()->all(),
                     ],
-                    // داخلي: معرض المعاينة لفحص الانجراف تحت القفل — لا يُعرض خارج الخدمة (يُجرَّد في summarize/applyReplacement).
-                    'existing_ids' => $existing->pluck('id')->values()->all(),
+                    // داخلي: بصمة معرض المعاينة لفحص الانجراف — لا تُعرض خارج الخدمة (تُجرَّد في summarize/applyReplacement).
+                    'gallery_fingerprint' => ProductMediaService::galleryFingerprint($existing->pluck('id')->all()),
+                    'gallery_plan' => $product === null ? null : 'g:'.$product->id.':'.ProductMediaService::galleryFingerprint($existing->pluck('id')->all()),
                     'messages' => array_values(array_unique($messages)),
                 ];
             }
@@ -626,12 +642,16 @@ final class ProductImportMediaService
         $toRemove = 0;
         $toKeep = 0;
         $affected = 0;
+        $galleryPlan = [];
         foreach ($planned['rows'] as $row) {
             $ready += $row['status'] === 'ready' ? 1 : 0;
             $review += $row['status'] === 'needs_approval' ? 1 : 0;
             $errors += $row['status'] === 'error' ? 1 : 0;
             $unchanged += $row['status'] === 'unchanged' ? 1 : 0;
             $replacement = $row['replacement'] ?? null;
+            if (($row['gallery_plan'] ?? null) !== null) {
+                $galleryPlan[$row['row']] = $row['gallery_plan'];
+            }
             if ($replacement !== null && in_array($row['status'], ['ready', 'needs_approval'], true)) {
                 $affected++;
                 $toAdd += $replacement['add_count'];
@@ -646,7 +666,7 @@ final class ProductImportMediaService
             'needs_approval_rows' => $review,
             'error_rows' => $errors,
             'rows' => array_map(static function (array $row): array {
-                unset($row['existing_ids']);
+                unset($row['gallery_fingerprint'], $row['gallery_plan']);
 
                 return $row;
             }, $planned['rows']),
@@ -662,6 +682,8 @@ final class ProductImportMediaService
                 'images_to_remove' => $toRemove,
                 'images_kept' => $toKeep,
                 'window_rows' => $planned['window_rows'],
+                // يُسحب في المتحكّم ويُخزَّن مع المعاينة (لا يظهر في الاستجابة): رقم الصف ← بصمة معرضه المعتمد.
+                'gallery_plan' => $galleryPlan,
             ];
         }
 

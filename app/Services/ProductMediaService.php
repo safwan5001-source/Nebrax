@@ -192,10 +192,10 @@ class ProductMediaService
      * القفل صفٌّ لم تعاينه (رُفعت صورة بعد المعاينة) — فلا تُحذف صورة لم يرها المستخدم ولم يوافق عليها.
      *
      * @param  list<UploadedFile>  $files  الصور الجديدة بالترتيب النهائي.
-     * @param  list<string>|null  $expectedExistingIds  معرّفات الصور القائمة كما عُوينت؛ null = بلا فحص انجراف.
+     * @param  string|null  $expectedGalleryFingerprint  بصمة معرض المنتج كما اعتمدته المعاينة (`galleryFingerprint`)؛ null = بلا فحص انجراف.
      * @return array{added:int,kept:int,removed:int}
      */
-    public function replaceProductGallery(Product $product, array $files, ?string $uploadedBy, bool $allowRemoval = true, ?array $expectedExistingIds = null): array
+    public function replaceProductGallery(Product $product, array $files, ?string $uploadedBy, bool $allowRemoval = true, ?string $expectedGalleryFingerprint = null): array
     {
         $files = array_values($files);
         if ($files === []) {
@@ -218,7 +218,7 @@ class ProductMediaService
         }
 
         $removedFiles = [];
-        $summary = DB::transaction(function () use ($product, $desired, $uploadedBy, $allowRemoval, $expectedExistingIds, &$removedFiles): array {
+        $summary = DB::transaction(function () use ($product, $desired, $uploadedBy, $allowRemoval, $expectedGalleryFingerprint, &$removedFiles): array {
             $locked = Product::query()->whereKey($product->id)->lockForUpdate()->first();
             if ($locked === null) {
                 throw new RuntimeException('تعذّر العثور على المنتج عند استبدال الصور.');
@@ -229,7 +229,7 @@ class ProductMediaService
                 ->whereNull('product_option_value_id')->whereNull('product_variant_id');
 
             $current = $productLevel()->orderBy('sort_order')->orderBy('id')->get();
-            if ($expectedExistingIds !== null && $current->pluck('id')->diff($expectedExistingIds)->isNotEmpty()) {
+            if ($expectedGalleryFingerprint !== null && ! hash_equals($expectedGalleryFingerprint, self::galleryFingerprint($current->pluck('id')->all()))) {
                 throw new RuntimeException('تغيّر معرض صور المنتج بعد المعاينة؛ أعد المعاينة قبل الاستبدال.');
             }
             $keepBySha = [];
@@ -294,6 +294,15 @@ class ProductMediaService
         }
 
         return $summary;
+    }
+
+    /** بصمة مجموعة معرّفات صور المعرض المشترك (مستقلة عن الترتيب) — تُخزَّن مع المعاينة وتُقارَن تحت القفل. */
+    public static function galleryFingerprint(array $ids): string
+    {
+        $ids = array_map('strval', $ids);
+        sort($ids);
+
+        return substr(hash('sha256', implode(',', $ids)), 0, 16);
     }
 
     /**

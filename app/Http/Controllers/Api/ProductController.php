@@ -215,6 +215,9 @@ class ProductController extends ApiController
             $request->file('file'), $options, $request->file('media_archive'), $request->maxRows(), false,
             ProductImportMediaService::MODE_REPLACE, $mediaOptions['confirm_replacement'],
         );
+        // بصمة معرض كل منتج كما عُوين: تُحفظ مع المعاينة فيرفض التنفيذ أي انجراف (صورة رُفعت بعدها) قبل الحذف.
+        $galleryPlan = $media['gallery_plan'];
+        unset($media['gallery_plan']);
 
         return [
             'mode' => ProductImportService::MODE_UPDATE,
@@ -239,7 +242,7 @@ class ProductController extends ApiController
                     'confirm_media_replacement' => $mediaOptions['confirm_replacement'],
                 ],
                 $request->user()?->id,
-                null,
+                $galleryPlan,
             ),
         ];
     }

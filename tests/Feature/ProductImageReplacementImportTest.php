@@ -419,13 +419,13 @@ class ProductImageReplacementImportTest extends TestCase
         $service = app(ProductMediaService::class);
 
         try {
-            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, [$previewed->id]);
+            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, ProductMediaService::galleryFingerprint([$previewed->id]));
             $this->fail('انجراف المعرض بعد المعاينة يجب أن يُرفض.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('تغيّر معرض', $exception->getMessage());
         }
         try {
-            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, false, [$previewed->id, $late->id]);
+            $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, false, ProductMediaService::galleryFingerprint([$previewed->id, $late->id]));
             $this->fail('الإزالة بلا تأكيد يجب أن تُرفض تحت القفل.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('لم يُؤكَّد', $exception->getMessage());
@@ -435,8 +435,29 @@ class ProductImageReplacementImportTest extends TestCase
         $this->assertTrue($this->onDisk($previewed) && $this->onDisk($late));
 
         // المعرض كما عُوين + موافقة ⇒ يمضي.
-        $outcome = $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, [$previewed->id, $late->id]);
+        $outcome = $service->replaceProductGallery($product, [$this->png('SKU-A.png', 10)], null, true, ProductMediaService::galleryFingerprint([$previewed->id, $late->id]));
         $this->assertSame(['added' => 1, 'kept' => 0, 'removed' => 2], $outcome);
+    }
+
+    /** @test */
+    public function an_image_added_after_the_confirmed_preview_is_never_deleted_by_the_bound_job(): void
+    {
+        $auth = $this->scene();
+        $product = $this->product('SKU-A');
+        [$previewed] = $this->attach($product, [$this->png('previewed.png', 200)]);
+
+        $sheet = fn () => $this->sheet(['SKU-A']);
+        $zip = fn () => $this->zip(['SKU-A.png' => $this->pngBytes(10)]);
+        $preview = $this->preview($auth['token'], $sheet(), $zip(), true);
+        $this->assertArrayNotHasKey('gallery_plan', $preview['media'], 'البصمات داخلية ولا تظهر في الاستجابة.');
+
+        // بعد أن أكّد المستخدم المعاينة وقبل التنفيذ: صورة تُرفع عبر مسار المعرض العادي.
+        [$late] = $this->attach($product, [$this->png('late.png', 150)]);
+
+        $this->runJob($auth['token'], $sheet(), $zip(), $preview, true)->assertStatus(422);
+
+        $this->assertEqualsCanonicalizing([$previewed->id, $late->id], ProductMedia::query()->where('product_id', $product->id)->pluck('id')->all());
+        $this->assertTrue($this->onDisk($previewed) && $this->onDisk($late));
     }
 
     /** @test */
