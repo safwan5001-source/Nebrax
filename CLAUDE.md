@@ -253,6 +253,7 @@ php artisan serve
 
 قرارات المالك (2026-11-04) مسجَّلة في ADR-29 §0؛ الخطة: `docs/audits/AWJ_COPS_H4_0_DECISION_AND_EXECUTION_PLAN.md`.
 - **H4-3 (تخزين فقط):** أعمدة إضافية على `commerce_channel_operation_settings` (`accepting_orders`، `paused_until`، `pause_message`، `outside_hours_policy` `accept|block`، `min_order_minor`، `min_order_scope` `all|delivery_only`) وجدول `commerce_channel_opening_hours` (`CompanyWide`، 0=الأحد..6=السبت، «HH:MM» حتى «24:00»، بلا فترات عابرة لمنتصف الليل)، **غيابها = مفتوح دائماً بلا حدّ أدنى (السلوك الحالي)**. الكاتب الوحيد `CommerceChannelOperationsSettingsService` (الساعات تُستبدل كمجموعة داخل معاملة الإعداد نفسها وبنسختها). **بوابة** `COMMERCE_CHANNEL_INTAKE_CONTROLS_ENABLED` (`commerce.channel_intake_controls_enabled`، **مغلقة**): مغلقةً يُرفض الانتقال إلى حجب (409 `intake_controls_deployment_disabled`) ولا Checkout يقرأ شيئاً. لا `alert_contacts` ولا `auto_reject`. **لا تُفتح البوابة إلا بقرار تفعيل منسَّق مستقل.**
+- **H4-4 (إنفاذ، خلف البوابة نفسها):** `CommerceChannelIntakeGuard` داخل `CommerceCheckoutService::complete()` بعد قفل السلة وCheckout وقبل أي كتابة، بقفل القناة **المشترك** (سباق إيقاف↔إتمام يُحسم بالتسلسل)؛ رفض 409 `review_required` (`item_id:"store"`) برموز `store_paused` · `outside_opening_hours` · `below_minimum_order`؛ الإنشاء فقط (لا طلب قائم ولا دفع ولا تتبع). البوابة مغلقة ⇒ لا استعلام ولا كتلة `data.ordering` في `GET store/v1/storefront`. القارئ الوحيد للجدولين `intakeSnapshot()` في الخدمة.
 
 ## نظام الأفق — قاعدة تنفيذ دائمة
 

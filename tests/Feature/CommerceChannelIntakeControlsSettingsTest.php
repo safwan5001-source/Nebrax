@@ -374,11 +374,13 @@ class CommerceChannelIntakeControlsSettingsTest extends TestCase
     // ═════════════════════════ 7) لا إنفاذ ═════════════════════════
 
     #[Test]
-    public function stored_blocking_values_change_nothing_in_checkout_in_this_slice_even_with_the_gate_open(): void
+    public function stored_blocking_values_change_nothing_in_checkout_while_the_deployment_gate_is_closed(): void
     {
+        // (H4-4) الإنفاذ مع البوابة المفتوحة مغطّى في `CommerceChannelIntakeEnforcementTest`؛ هنا: قيم حجب مخزَّنة (حين كانت مفتوحة) ثم أُغلقت ⇒ لا أثر.
         $this->openGate();
         $this->save(['expected_version' => 0, 'accepting_orders' => false, 'outside_hours_policy' => 'block', 'min_order_minor' => 99999999,
             'opening_hours' => [['weekday' => (int) CarbonImmutable::now('Asia/Riyadh')->addDay()->dayOfWeek, 'opens_at' => '00:00', 'closes_at' => '01:00']]])->assertOk();
+        config(['commerce.channel_intake_controls_enabled' => false]);
 
         $token = $this->readyCheckout($this->product($this->tenant, $this->channel), null);
         $orderId = (string) $this->complete($token, 'idem-intake-no-enforcement')->assertCreated()->json('data.order.id');

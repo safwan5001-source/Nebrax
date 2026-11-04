@@ -6,6 +6,8 @@ use App\Models\SalesChannel;
 use App\Models\SalesChannelSettingEvent;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Commerce\CheckoutReviewRequiredException;
+use App\Services\Commerce\CommerceChannelIntakeGuard;
 use App\Services\Commerce\CommerceChannelOperationsSettingsService;
 use App\Services\Commerce\SalesChannelSettingsException;
 use App\Tenancy\TenantContext;
@@ -410,6 +412,93 @@ class CommerceChannelOperationsSettingsPostgresTest extends TestCase
             $this->assertTrue($stored === $a || $stored === $b, 'مجموعة ساعات كاملة لأحد الكاتبين فقط');
             $this->assertSame(1, SalesChannelSettingEvent::query()->where('sales_channel_id', $channel)->count());
         }
+    }
+
+    // ───────────────────────── 5) COPS-H4-4: سباق إيقاف ↔ إتمام ─────────────────────────
+
+    #[Test]
+    public function a_pause_written_while_a_completion_holds_the_shared_channel_lock_waits_for_it_and_later_completions_see_the_pause(): void
+    {
+        config(['commerce.channel_intake_controls_enabled' => true]);
+        $tenant = $this->tenantId;
+        $user = $this->userId;
+        $channel = $this->channel();
+
+        // إتمام جارٍ: قفل مشترك على القناة + قراءة اللقطة (مفتوح) ثم يتأخر قبل الالتزام.
+        $completion = function () use ($tenant, $channel) {
+            $passed = false;
+            DB::transaction(function () use ($tenant, $channel, &$passed) {
+                app(TenantContext::class)->set($tenant);
+                $check = app(CommerceChannelIntakeGuard::class)->forCompletion($channel);
+                $check->assertAcceptingOrders();
+                $passed = true;
+                usleep(1_000_000);
+            });
+
+            return ['passed' => $passed];
+        };
+        $pause = function () use ($tenant, $user, $channel) {
+            usleep(300_000); // بعد أن يمسك الإتمام القفل المشترك
+            $t0 = microtime(true);
+            $result = self::attempt($tenant, $user, $channel, 0, ['accepting_orders' => false]);
+
+            return $result + ['waited_s' => microtime(true) - $t0];
+        };
+
+        $results = $this->runConcurrently([$completion, $pause]);
+        $this->assertNoDeadlock($results);
+        $this->assertTrue($results[0]['value']['passed'], 'الإتمام الذي سبق الإيقاف يكتمل');
+        $this->assertTrue($results[1]['value']['ok'], json_encode($results[1]['value']));
+        $this->assertGreaterThan(0.4, $results[1]['value']['waited_s'], 'الإيقاف انتظر الإتمام (FOR UPDATE ضد قفل مشترك)');
+
+        // إتمام لاحق يرى الإيقاف ويُرفض.
+        app(TenantContext::class)->set($tenant);
+        $this->expectException(CheckoutReviewRequiredException::class);
+        DB::transaction(fn () => app(CommerceChannelIntakeGuard::class)->forCompletion($channel)->assertAcceptingOrders());
+    }
+
+    #[Test]
+    public function a_completion_that_arrives_while_a_pause_is_being_written_waits_and_then_is_refused_without_deadlock(): void
+    {
+        config(['commerce.channel_intake_controls_enabled' => true]);
+        $tenant = $this->tenantId;
+        $channel = $this->channel();
+
+        // كاتب إعدادات يمسك القناة `FOR UPDATE` ويكتب الإيقاف ثم يتأخر قبل الالتزام.
+        $writer = function () use ($tenant, $channel) {
+            DB::transaction(function () use ($tenant, $channel) {
+                app(TenantContext::class)->set($tenant);
+                SalesChannel::query()->whereKey($channel)->lockForUpdate()->first();
+                DB::table('commerce_channel_operation_settings')->insert([
+                    'id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'sales_channel_id' => $channel, 'acceptance_mode' => 'auto', 'version' => 1,
+                    'accepting_orders' => false, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                usleep(1_000_000);
+            });
+
+            return ['done' => true];
+        };
+        $completion = function () use ($tenant, $channel) {
+            usleep(300_000);
+            $t0 = microtime(true);
+            try {
+                DB::transaction(function () use ($tenant, $channel) {
+                    app(TenantContext::class)->set($tenant);
+                    app(CommerceChannelIntakeGuard::class)->forCompletion($channel)->assertAcceptingOrders();
+                });
+
+                return ['refused' => false, 'waited_s' => microtime(true) - $t0];
+            } catch (CheckoutReviewRequiredException $e) {
+                return ['refused' => true, 'reason' => $e->details()[0]['reason'], 'waited_s' => microtime(true) - $t0];
+            }
+        };
+
+        $results = $this->runConcurrently([$writer, $completion]);
+        $this->assertNoDeadlock($results);
+        $c = $results[1]['value'];
+        $this->assertTrue($c['refused'], 'الإتمام الذي وصل بعد الإيقاف يراه ويُرفض');
+        $this->assertSame('store_paused', $c['reason']);
+        $this->assertGreaterThan(0.4, $c['waited_s'], 'الإتمام انتظر التزام الكاتب (قفل مشترك ضد FOR UPDATE)');
     }
 
     // ───────────────────────── تشغيل متزامن ─────────────────────────

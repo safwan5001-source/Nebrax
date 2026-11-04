@@ -549,6 +549,11 @@ final class CommerceCheckoutService
 
             $this->assertOwnedByCurrentBearer($cart);
 
+            // COPS-H4-4 (D-OPS-7/8) — إنفاذ تحكّمات استقبال القناة عند **الإنشاء** فقط، بقفل القناة المشترك داخل هذه المعاملة. البوابة مغلقة ⇒ `null` بلا أي استعلام (الإتمام حرفياً
+            // كما كان). الإيقاف/خارج الساعات هنا قبل أي كتابة؛ الحد الأدنى بعد تسعير السطور أدناه. الإعادة (replay) خرجت أعلاه فلا تتأثر.
+            $intake = app(CommerceChannelIntakeGuard::class)->forCompletion($context->salesChannelId());
+            $intake?->assertAcceptingOrders();
+
             if ($checkout->contact_name === null || trim($checkout->contact_name) === '') {
                 throw new CheckoutReviewRequiredException(
                     'بيانات التواصل غير مكتملة.',
@@ -579,6 +584,9 @@ final class CommerceCheckoutService
             }
 
             $lines = $this->revalidateAndPrice($items, $context);
+
+            // الحد الأدنى للطلب: مجموع السطور بعد الخصم وقبل الشحن (D-OPS-8).
+            $intake?->assertMinimumOrder((int) array_sum(array_column($lines, 'line_total')), $checkout->delivery_method);
 
             $order = $this->orders->createFromCheckout([
                 'sales_channel_id' => $context->salesChannelId(),

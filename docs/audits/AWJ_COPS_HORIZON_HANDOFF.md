@@ -65,6 +65,7 @@
 | H4-1 | **Merged** (2026-11-04) — مركز إعدادات المتجر `/commerce/settings` (تنقّل فقط)؛ CI كامل أخضر؛ Codex بلا ملاحظات؛ فشل حارس `capabilities.guard` على أول رأس عُولج بـcommit | #1986 | `aba6d8829c0aed8d43da5edc4265132087e29a9b` | `AWJ-COPS-H4-1-IMPLEMENTATION-REPORT.md`؛ Head `bced89bca73a0a2f4139ef195e98c292fb5f1f4c`؛ واجهة فقط |
 | H4-2 | **Merged** (2026-11-04) — محرر مناطق الشحن `/commerce/shipping-zones` (واجهة فقط؛ تفعيل/تعطيل بتأكيد في الصف **وفي حوار التعديل** (Codex P2)؛ **بلا حذف نهائي** D-H4-09)؛ vitest كامل 848 ملفاً أخضر؛ CI Gate أُعيد مرة واحدة بعد انقطاع شبكة في سكربت polling | #1989 | `eabfba6bcead98d99259443c9b6f7970d5efc2c1` | `AWJ-COPS-H4-2-IMPLEMENTATION-REPORT.md`؛ Head `90ce4da7411ceddbe738e98fb3a14d31df0de967`؛ واجهة فقط |
 | H4-3 | **PR مفتوح** — تحكّمات استقبال القناة (تخزين فقط): إيقاف/رسالة/استئناف مجدول، سياسة خارج الساعات، حدّ أدنى، ساعات أسبوعية؛ هجرة `2027_01_05_010000`؛ بوابة `COMMERCE_CHANNEL_INTAKE_CONTROLS_ENABLED` **مغلقة**؛ لا إنفاذ | (PR H4-3) | (يُسجَّل عند الدمج) | `AWJ-COPS-H4-3-IMPLEMENTATION-REPORT.md` |
+| H4-4 | **PR مفتوح** — إنفاذ الإيقاف/خارج الساعات/الحد الأدنى عند إنشاء الطلب + كتلة `data.ordering` العامة + رسائل المتجر (6 لغات)؛ خلف البوابة المغلقة؛ سباق إيقاف↔إتمام على PostgreSQL | (PR H4-4) | (يُسجَّل عند الدمج) | `AWJ-COPS-H4-4-IMPLEMENTATION-REPORT.md` |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 
