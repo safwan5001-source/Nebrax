@@ -4,7 +4,7 @@
  * منتقي وحدات الدفتر لقرار `override` (IMP-PS-A4b): مرشّحو المحرّك + اقتراحاته + وحدات الدفتر غير المطابَقة. **التحقق إلزامي قبل التجاوز**: `verify-set` (قراءة فقط) لنفس المجموعة المختارة حرفياً؛
  * أي تغيير في الاختيار يُبطل نتيجته. المجموعة غير المتساوية ضمن التسامح لا تُعتمد إلا بإقرار صريح (`accept_difference`) في النموذج — والمشاكل (`problems`) تمنع دائماً.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import type { MatchRow, Suggestion, UnitSnapshot, VerifySetResponse } from './ty
 
 /** نتيجة تحقق مربوطة بتوقيع المجموعة التي أُجري عليها (أي تغيير في الاختيار يُبطلها). */
 export interface VerifiedSet {
+  /** السطر الذي أُجري التحقق له: نتيجة سطر لا تُقبل لسطر آخر ولو تطابقت الوحدات. */
+  lineId: string;
   signature: string;
   result: VerifySetResponse;
 }
@@ -63,7 +65,15 @@ export function CandidatePicker({
   }, [ledgerUnits, engineKeys, search]);
 
   const signature = selectionSignature(selected);
-  const verified = verify !== null && verify.signature === signature ? verify.result : null;
+  const verified = verify !== null && verify.lineId === lineId && verify.signature === signature ? verify.result : null;
+
+  // تحقق معلّق لسطر سابق لا يُكتب بعد تغيير السطر أو إلغاء التركيب (وإلا اتُّخذ فرق سطر آخر لهذا السطر).
+  useEffect(
+    () => () => {
+      seq.current += 1;
+    },
+    [lineId],
+  );
 
   const toggle = (key: string) => {
     setErrorKey(null);
@@ -77,7 +87,8 @@ export function CandidatePicker({
     setErrorKey(null);
     try {
       const result = await verifySet(reconciliationId, lineId, selected);
-      if (mine === seq.current) onVerified({ signature: selectionSignature(selected), result });
+      // لا نقبل ردّاً لسطر غير المطلوب (دفاعي: الخادم يعيد معرّف السطر نفسه).
+      if (mine === seq.current && result.line.id === lineId) onVerified({ lineId, signature: selectionSignature(selected), result });
     } catch (error) {
       if (mine === seq.current) setErrorKey(describeError(error).key);
     } finally {

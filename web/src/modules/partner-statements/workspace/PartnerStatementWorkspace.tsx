@@ -181,17 +181,49 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
     setNotice({ tone: 'info', text: t('workspace.no_more_undecided') });
   };
 
-  const goToOrdinal = (ordinal: number) => {
-    setTab('review');
-    advance.current = { kind: 'ordinal', ordinal, visited: 0 };
-    const target = Math.floor((ordinal - 1) / PER_PAGE) + 1;
-    if (outcomes.length > 0) setOutcomes([]);
-    if (target !== page || outcomes.length > 0) setPage(target);
-    else {
-      const found = rows.find((row) => row.line.ordinal === ordinal);
-      advance.current = null;
-      if (found) pick(found.line.id);
+  /**
+   * `ordinal` = رقم صف الملف الأصلي (يشمل ترويسة وفجوات الصفوف الفارغة) **لا موضعاً متصلاً**: الصفحة التي تحمله تُحدَّد ببحث ثنائي على صفحات الخادم
+   * (مرتّبة تصاعدياً بالـordinal، ≤ 7 نداءات لـ2000 سطر) بدل الحساب الحسابي.
+   */
+  const locateOrdinal = async (ordinal: number): Promise<number | null> => {
+    const pages = Math.max(1, Math.ceil((status?.readiness.lines_total ?? 1) / PER_PAGE));
+    let low = 1;
+    let high = pages;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const ordinals = runId
+        ? (await fetchMatches(id, { runId, side: 'statement', page: mid, perPage: PER_PAGE })).data.map((row) => row.ordinal ?? row.line?.ordinal ?? 0)
+        : (await fetchLines(id, mid, PER_PAGE)).data.map((line) => line.ordinal);
+      if (ordinals.length === 0) return null;
+      if (ordinal < Math.min(...ordinals)) high = mid - 1;
+      else if (ordinal > Math.max(...ordinals)) low = mid + 1;
+      else return ordinals.includes(ordinal) ? mid : null;
     }
+    return null;
+  };
+
+  const goToOrdinal = async (ordinal: number) => {
+    setTab('review');
+    let target: number | null = null;
+    try {
+      target = await locateOrdinal(ordinal);
+    } catch (err) {
+      capability.observe(err);
+      setNotice({ tone: 'error', text: t(`errors.${describeError(err).key}`) });
+      return;
+    }
+    if (target === null) {
+      setNotice({ tone: 'info', text: t('workspace.line_not_found') });
+      return;
+    }
+    if (target === page && outcomes.length === 0) {
+      const found = rows.find((row) => row.line.ordinal === ordinal);
+      if (found) pick(found.line.id);
+      return;
+    }
+    advance.current = { kind: 'ordinal', ordinal, visited: 0 };
+    if (outcomes.length > 0) setOutcomes([]);
+    setPage(target);
   };
 
   const reloadAfterChange = useCallback(() => {
@@ -386,7 +418,7 @@ export function PartnerStatementWorkspace({ id }: { id: string }) {
               runId={runId}
               canWrite={canWrite}
               pendingDecisions={queue.pendingCount}
-              onGoToOrdinal={goToOrdinal}
+              onGoToOrdinal={(ordinal) => void goToOrdinal(ordinal)}
               onReview={async (note) => {
                 if (!runId) return;
                 try {

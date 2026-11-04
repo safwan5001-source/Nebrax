@@ -14212,6 +14212,7 @@
       "credit": "Credit",
       "next_undecided": "Next undecided",
       "no_more_undecided": "No undecided lines in the loaded pages.",
+      "line_not_found": "That line could not be found in the current pages.",
       "empty": "No lines.",
       "empty_filtered": "No lines with this outcome.",
       "ledger_changed": "The ledger changed since the last matching run. New decisions will be rejected until you run a fresh match.",

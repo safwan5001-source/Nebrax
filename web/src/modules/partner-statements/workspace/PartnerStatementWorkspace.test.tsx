@@ -514,6 +514,68 @@ describe('PartnerStatementWorkspace — readiness, review and reopen', () => {
     await waitFor(() => expect(document.querySelector('tr[aria-selected="true"]')?.getAttribute('data-line-id')).toBe('line-3'));
   });
 
+  it('go-to-line finds the page of a NON-contiguous source-row ordinal by searching the server pages', async () => {
+    // أرقام الصفوف الأصلية: ترويسة + فجوات؛ الصفحة 1 = 2..5، الثانية = 26..27، الثالثة = 51..52 (لا علاقة حسابية بين الرقم والصفحة)
+    const pages: Record<number, number[]> = { 1: [2, 3, 4, 5], 2: [26, 27], 3: [51, 52] };
+    h.fetchStatus.mockResolvedValue(status({ blockers: [{ code: 'unresolved_lines', count: 1, sample_ordinals: [51] }] }, { lines_total: 60, unresolved: 1, resolved: 59 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse((pages[q.page] ?? []).map((n) => match(n)), { meta: { current_page: q.page, last_page: 3, per_page: 25, total: 8 } })));
+    render(<PartnerStatementWorkspace id={ID} />);
+    await screen.findAllByText('INV-2');
+    await userEvent.click(within(await screen.findByTestId('blockers')).getByText('#51'));
+    await waitFor(() => expect(document.querySelector('tr[aria-selected="true"]')?.getAttribute('data-line-id')).toBe('line-51'));
+    expect(h.fetchMatches.mock.calls.some(([, q]) => q.side === 'statement' && q.page === 2)).toBe(true);
+  });
+
+  it('go-to-line: an ordinal that the arithmetic guess would send to the wrong page is still found', async () => {
+    // الترتيب 26 على الصفحة 1 (لا على 2 كما يخمّن ⌊(26−1)/25⌋+1)
+    const pages: Record<number, number[]> = { 1: [2, 3, 26], 2: [40, 41] };
+    h.fetchStatus.mockResolvedValue(status({ blockers: [{ code: 'unresolved_lines', count: 1, sample_ordinals: [26] }] }, { lines_total: 30, unresolved: 1, resolved: 29 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse((pages[q.page] ?? []).map((n) => match(n)), { meta: { current_page: q.page, last_page: 2, per_page: 25, total: 5 } })));
+    render(<PartnerStatementWorkspace id={ID} />);
+    await screen.findAllByText('INV-2');
+    await userEvent.click(within(await screen.findByTestId('blockers')).getByText('#26'));
+    await waitFor(() => expect(document.querySelector('tr[aria-selected="true"]')?.getAttribute('data-line-id')).toBe('line-26'));
+  });
+
+  it('go-to-line tells the user when the ordinal is not found instead of failing silently', async () => {
+    const pages: Record<number, number[]> = { 1: [2, 3, 4] };
+    h.fetchStatus.mockResolvedValue(status({ blockers: [{ code: 'unresolved_lines', count: 1, sample_ordinals: [99] }] }, { lines_total: 3, unresolved: 1, resolved: 2 }));
+    h.fetchMatches.mockImplementation(async (_i: string, q: { side: string; page: number }) => (q.side === 'ledger'
+      ? matchesResponse([])
+      : matchesResponse((pages[q.page] ?? []).map((n) => match(n)))));
+    render(<PartnerStatementWorkspace id={ID} />);
+    await screen.findAllByText('INV-2');
+    await userEvent.click(within(await screen.findByTestId('blockers')).getByText('#99'));
+    expect((await screen.findByTestId('workspace-notice')).textContent).toContain('workspace.line_not_found');
+  });
+
+  it('discards a pending verification when the reviewer moves to another line (no cross-line acknowledgement)', async () => {
+    let release: (value: unknown) => void = () => {};
+    h.verifySet.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    await open();
+    await selectLine(4);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.override'));
+    let picker = await screen.findByTestId('candidate-picker');
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-free-1'));
+    await userEvent.click(within(picker).getByText('workspace.picker.verify'));
+    // انتقل إلى سطر آخر واختر الوحدة نفسها قبل وصول ردّ السطر الأول
+    await selectLine(3);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.override'));
+    picker = await screen.findByTestId('candidate-picker');
+    await userEvent.click(within(picker).getByLabelText('workspace.picker.select_unit:D-free-1'));
+    release({
+      applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 400000, credit_minor: 0 }, units: [], expected_net_minor: -400000, set_net_minor: -5000,
+      difference_minor: -395000, tolerance_minor: 100, equal_within_tolerance: false, problems: [],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId('verify-result')).toBeNull();
+    expect(screen.getByTestId('verify-required')).toBeTruthy();
+  });
+
   it('a reviewed comparison offers reopen with a mandatory reason and warns about a changed ledger', async () => {
     h.fetchHeader.mockResolvedValue(header({ status: 'reviewed' }));
     h.fetchStatus.mockResolvedValue(status({
