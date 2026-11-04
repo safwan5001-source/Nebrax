@@ -39,15 +39,17 @@ describe('import hub catalog', () => {
     expect(resumeHref(job({ domain: 'product_taxonomy' }))).toBeNull();
   });
 
-  it('a partner statement run has no resume link until its wizard exists (PS-A4)', () => {
-    expect(resumeHref(job({ domain: 'partner_statement', status: 'ready' }))).toBeNull();
+  it('a partner statement run resumes in its own wizard (PS-A4a)', () => {
+    expect(resumeHref(job({ id: 'job-ps', domain: 'partner_statement', status: 'ready' }))).toBe('/partner-statements/import?job=job-ps');
+    expect(resumeHref(job({ id: 'job-ps', domain: 'partner_statement', status: 'processing' }))).toBe('/partner-statements/import?job=job-ps');
+    // الحالات النهائية لا تُستأنف (كبقية المجالات).
+    expect(resumeHref(job({ id: 'job-ps', domain: 'partner_statement', status: 'completed' }))).toBeNull();
   });
 
   it('every filterable domain has either a resume route or a documented reason not to', () => {
     const ambiguous = ['partner_master', 'product_taxonomy', 'stocktake_count'];
-    // IMP-PS-A1: كشوف الأطراف بلا معالج واجهة بعد (الواجهة PS-A4)؛ تظهر تشغيلاتها في السجلّ بلا زر استئناف إلى أن يوجد المعالج.
-    const noWizardYet = ['partner_statement'];
-    for (const domain of HUB_JOB_DOMAINS.filter((value) => ![...ambiguous, ...noWizardYet].includes(value))) {
+    // IMP-PS-A4a: لمجال كشوف الأطراف معالجه الآن، فلم يعد استثناءً (حُذف `noWizardYet`).
+    for (const domain of HUB_JOB_DOMAINS.filter((value) => !ambiguous.includes(value))) {
       expect(resumeHref(job({ domain, status: 'ready' })), domain).not.toBeNull();
     }
   });
