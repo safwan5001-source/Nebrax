@@ -18,6 +18,20 @@ class CommerceChannelOperationSetting extends BaseModel implements CompanyWide
 
     public const MODES = [self::MODE_AUTO, self::MODE_MANUAL];
 
+    /** COPS-H4-3 (D-OPS-7): سلوك ما خارج ساعات العمل — `accept` (الافتراضي، مفتوح) | `block` (يمنع إنشاء الطلبات الجديدة). */
+    public const OUTSIDE_HOURS_ACCEPT = 'accept';
+
+    public const OUTSIDE_HOURS_BLOCK = 'block';
+
+    public const OUTSIDE_HOURS_POLICIES = [self::OUTSIDE_HOURS_ACCEPT, self::OUTSIDE_HOURS_BLOCK];
+
+    /** COPS-H4-3 (D-OPS-8): نطاق الحد الأدنى — `all` (الافتراضي) | `delivery_only` (يُستثنى الاستلام من المتجر). */
+    public const MIN_SCOPE_ALL = 'all';
+
+    public const MIN_SCOPE_DELIVERY_ONLY = 'delivery_only';
+
+    public const MIN_SCOPES = [self::MIN_SCOPE_ALL, self::MIN_SCOPE_DELIVERY_ONLY];
+
     protected $table = 'commerce_channel_operation_settings';
 
     /** عمداً فارغ: الكتابة عبر الخدمة بـforceFill فقط. */
@@ -28,6 +42,9 @@ class CommerceChannelOperationSetting extends BaseModel implements CompanyWide
         return [
             'acceptance_reminder_minutes' => 'integer',
             'acceptance_escalation_minutes' => 'integer',
+            'accepting_orders' => 'boolean',
+            'paused_until' => 'immutable_datetime',
+            'min_order_minor' => 'integer',
             'version' => 'integer',
         ];
     }

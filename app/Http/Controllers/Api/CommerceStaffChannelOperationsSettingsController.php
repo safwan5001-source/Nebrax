@@ -40,6 +40,14 @@ class CommerceStaffChannelOperationsSettingsController extends ApiController
             CommerceChannelOperationsSettingsService::KEY_MODE => ['sometimes', 'string', 'in:auto,manual'],
             CommerceChannelOperationsSettingsService::KEY_REMINDER => ['sometimes', 'nullable', $notBoolean, 'integer', 'min:1', 'max:'.CommerceChannelOperationsSettingsService::MAX_MINUTES],
             CommerceChannelOperationsSettingsService::KEY_ESCALATION => ['sometimes', 'nullable', $notBoolean, 'integer', 'min:1', 'max:'.CommerceChannelOperationsSettingsService::MAX_MINUTES],
+            // COPS-H4-3 — تحكّمات الاستقبال (التحقق الدلالي النهائي في الخدمة).
+            CommerceChannelOperationsSettingsService::KEY_ACCEPTING => ['sometimes', 'boolean'],
+            CommerceChannelOperationsSettingsService::KEY_PAUSED_UNTIL => ['sometimes', 'nullable', 'string', 'max:40'],
+            CommerceChannelOperationsSettingsService::KEY_PAUSE_MESSAGE => ['sometimes', 'nullable', 'string', 'max:'.(CommerceChannelOperationsSettingsService::MAX_PAUSE_MESSAGE * 2)],
+            CommerceChannelOperationsSettingsService::KEY_OUTSIDE_POLICY => ['sometimes', 'string', 'in:accept,block'],
+            CommerceChannelOperationsSettingsService::KEY_MIN_ORDER => ['sometimes', 'nullable', $notBoolean, 'integer', 'min:1', 'max:'.CommerceChannelOperationsSettingsService::MAX_MIN_ORDER_MINOR],
+            CommerceChannelOperationsSettingsService::KEY_MIN_SCOPE => ['sometimes', 'string', 'in:all,delivery_only'],
+            CommerceChannelOperationsSettingsService::KEY_HOURS => ['sometimes', 'nullable', 'array', 'max:'.CommerceChannelOperationsSettingsService::MAX_PERIODS],
         ]);
 
         // نسخة الإعدادات التي حمّلها المحرّر إلزامية (428 كنمط AD-01): بلا نسخة لا نعرف ما الذي يستبدله، فلا كتابة.
@@ -55,8 +63,12 @@ class CommerceStaffChannelOperationsSettingsController extends ApiController
         }
         $expected = (int) $data['expected_version'];
         $changes = array_intersect_key($data, array_flip(CommerceChannelOperationsSettingsService::KEYS));
+        // `boolean` في Laravel يقبل 0/1/"0"/"1"؛ الخدمة صارمة النوع.
+        if (array_key_exists(CommerceChannelOperationsSettingsService::KEY_ACCEPTING, $changes)) {
+            $changes[CommerceChannelOperationsSettingsService::KEY_ACCEPTING] = filter_var($changes[CommerceChannelOperationsSettingsService::KEY_ACCEPTING], FILTER_VALIDATE_BOOLEAN);
+        }
         // `integer` يقبل أرقاماً نصية ("30")؛ الخدمة صارمة النوع فنحوّلها هنا.
-        foreach ([CommerceChannelOperationsSettingsService::KEY_REMINDER, CommerceChannelOperationsSettingsService::KEY_ESCALATION] as $minutesKey) {
+        foreach ([CommerceChannelOperationsSettingsService::KEY_REMINDER, CommerceChannelOperationsSettingsService::KEY_ESCALATION, CommerceChannelOperationsSettingsService::KEY_MIN_ORDER] as $minutesKey) {
             if (array_key_exists($minutesKey, $changes) && $changes[$minutesKey] !== null) {
                 $changes[$minutesKey] = (int) $changes[$minutesKey];
             }
