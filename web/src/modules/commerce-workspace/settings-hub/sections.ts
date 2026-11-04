@@ -1,4 +1,3 @@
-import { hasPermission } from '@/lib/permissions';
 import { isNavEntryVisible, type NavViewer } from '@/components/layout/nav-visibility';
 import { COMMERCE_WORKSPACE_NAV_GROUPS } from '../nav';
 import type { CommerceWorkspaceMessageKey } from '../messages';
@@ -41,7 +40,8 @@ export function isSettingsSectionVisible(
   const navItem = navItemForSection(section.href);
   if (!navItem) return false;
   if (!isNavEntryVisible(navItem, hiddenAppKeys, viewer)) return false;
-  if (section.requires && !hasPermission(viewer?.permissions, viewer?.role, section.requires)) return false;
+  // الشرط الإضافي يمرّ بالمساعد المشترك نفسه (لا استيراد مباشر لـ`hasPermission`، انظر `capabilities.guard.test.ts`).
+  if (section.requires && !isNavEntryVisible({ permission: section.requires }, hiddenAppKeys, viewer)) return false;
 
   return true;
 }
