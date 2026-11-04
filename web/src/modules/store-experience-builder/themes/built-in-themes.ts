@@ -92,8 +92,8 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
     },
     vertical: "general",
     // Reuse a runtime-backed preset; the theme ID itself is not a new themePreset contract value.
-    themePreset: "awj-bloom",
-    primaryColor: "#71243F",
+    themePreset: "awj-luxe-motion",
+    primaryColor: "#71243f",
     accentColor: "#B88A43",
     fontPreset: "cairo-geist",
     density: "comfortable",
