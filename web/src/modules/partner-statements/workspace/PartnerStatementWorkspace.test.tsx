@@ -474,6 +474,26 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(h.postDecision).toHaveBeenCalledTimes(1);
   });
 
+  it('closes an open decision form (no submit) when the workspace becomes read-only underneath it', async () => {
+    await open();
+    await selectLine(2);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.confirm'));
+    const form = await screen.findByTestId('decision-form-confirm');
+    await userEvent.type(within(form).getByRole('textbox'), 'about to submit');
+    expect((within(form).getByText('workspace.action.confirm').closest('button') as HTMLButtonElement).disabled).toBe(false);
+
+    // مراجِع آخر نقل المقارنة إلى «مراجَعة»؛ تحديث يلتقط ذلك
+    h.fetchHeader.mockResolvedValue(header({ status: 'reviewed' }));
+    h.fetchStatus.mockResolvedValue(status({
+      reconciliation: { id: ID, status: 'reviewed', reviewed_at: null, reviewed_by: 'other', reviewed_run_id: RUN }, blockers: [],
+      reviewed_state: { run_id: RUN, ledger_changed_since_review: false, statement_changed_since_review: false },
+    }, { can_mark_reviewed: false, resolved: 4, unresolved: 0 }));
+    await userEvent.click(screen.getAllByRole('button', { name: /workspace\.outcome\.date_difference/, pressed: false })[0]);
+    await waitFor(() => expect(screen.queryByTestId('decision-form-confirm')).toBeNull());
+    expect(screen.queryByTestId('action-bar')).toBeNull();
+    expect(h.postDecision).not.toHaveBeenCalled();
+  });
+
   it('blocks an override whose verification reports problems', async () => {
     h.verifySet.mockResolvedValue({
       applied: false, line: { id: 'line-4', ordinal: 4, date: 'd', debit_minor: 1, credit_minor: 0 }, units: [], expected_net_minor: -1, set_net_minor: 0, difference_minor: -1, tolerance_minor: 0,

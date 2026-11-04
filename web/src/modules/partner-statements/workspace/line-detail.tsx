@@ -53,7 +53,9 @@ export function LineDetail(props: LineDetailProps) {
   const t = useTranslations('partnerStatements');
   const { row, bareLine, runId, editable, job } = props;
   const line = row?.line ?? bareLine;
-  const { mode, pair } = props.work;
+  // نماذج الكتابة المفتوحة تُغلق حين تصير المساحة للقراءة فقط (مراجَعة/إغلاق/صلاحية أو قدرة تغيّرت): لا إرسال بعد فقدان الأهلية.
+  const mode = props.editable ? props.work.mode : null;
+  const { pair } = props.work;
   const setMode = (next: Mode) => props.onWork({ mode: next });
   const setPair = (next: LineWork['pair']) => props.onWork({ pair: next });
   const signature = selectionSignature(props.work.unitKeys);
