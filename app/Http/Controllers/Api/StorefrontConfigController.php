@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Storefront;
 use App\Models\StorefrontBusinessProfile;
 use App\Models\Tenant;
+use App\Services\Commerce\CommerceChannelIntakeGuard;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Services\Commerce\StorefrontPublishedMediaResolver;
 use App\Services\Commerce\RetailAccountGate;
@@ -112,8 +113,11 @@ class StorefrontConfigController extends PublicApiController
             ? $mediaResolver->resolve($presentation)
             : [];
 
+        // COPS-H4-4 (D-H4-05) — كتلة `ordering` العامة الإضافية: غائبة ما دامت بوابة H4 مغلقة (الاستجابة حرفياً كما كانت).
+        $ordering = app(CommerceChannelIntakeGuard::class)->publicBlock($context->salesChannelId());
+
         return new JsonResponse([
-            'data' => [
+            'data' => ($ordering === null ? [] : ['ordering' => $ordering]) + [
                 'name' => $name,
                 'default_locale' => $defaultLocale,
                 'business_vertical' => $businessVertical->value,
