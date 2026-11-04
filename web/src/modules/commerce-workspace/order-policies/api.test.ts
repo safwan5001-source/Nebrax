@@ -22,8 +22,16 @@ describe('order policies api (COPS-H4-5)', () => {
 
   it('rejects a payload without an integer hold time', () => {
     expect(mapOrderPolicies({})).toBeNull();
-    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: '60' }))).toBeNull();
     expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: 60.5 }))).toBeNull();
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: '6x' }))).toBeNull();
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: '' }))).toBeNull();
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: null }))).toBeNull();
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: '99999999999999999999' }))).toBeNull();
+  });
+
+  it('accepts a numeric-string hold time (a tenant saved as "90") and normalizes it to a number', () => {
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: '90' }))?.holdMinutes).toBe(90);
+    expect(mapOrderPolicies(payload({ commerce_payment_hold_minutes: ' 45 ' }))?.holdMinutes).toBe(45);
   });
 
   it('reads GET /sales-settings and throws on an unrecognised response', async () => {

@@ -12,12 +12,28 @@ export type OrderPolicies = {
   partnerPolicy: string;
 };
 
+/**
+ * الخادم يقبل مدة الحجز كعدد صحيح أو **نصّ رقمي** (`UpdateSalesSettingsRequest` بقاعدة `integer`، و`Settings::put` يحفظ النوع كما أُرسل، و`CommercePaymentHold::minutes()`
+ * يدعم النص الرقمي صراحةً) — فمستأجر حُفظت مدته نصاً (`"90"`) يجب أن يرى الشاشة ويحرّرها لا أن يرى خطأ تحميل دائماً.
+ */
+export function normalizeHoldMinutes(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isInteger(value) ? value : null;
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const minutes = Number(value.trim());
+
+    return Number.isSafeInteger(minutes) ? minutes : null;
+  }
+
+  return null;
+}
+
 export function mapOrderPolicies(payload: unknown): OrderPolicies | null {
   const data = (payload as { data?: Record<string, unknown> } | null)?.data;
-  if (!data || typeof data.commerce_payment_hold_minutes !== 'number' || !Number.isInteger(data.commerce_payment_hold_minutes)) return null;
+  const holdMinutes = data ? normalizeHoldMinutes(data.commerce_payment_hold_minutes) : null;
+  if (!data || holdMinutes === null) return null;
 
   return {
-    holdMinutes: data.commerce_payment_hold_minutes,
+    holdMinutes,
     invoiceTrigger: typeof data.commerce_invoice_trigger === 'string' ? data.commerce_invoice_trigger : 'none',
     priceTaxMode: typeof data.commerce_price_tax_mode === 'string' ? data.commerce_price_tax_mode : null,
     partnerPolicy: typeof data.commerce_partner_policy === 'string' ? data.commerce_partner_policy : 'link_verified_else_create',
