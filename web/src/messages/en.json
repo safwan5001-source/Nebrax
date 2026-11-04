@@ -14387,6 +14387,7 @@
         "member_original": "Original",
         "member_reversal": "Reversal",
         "claimed": "Reserved by another decision",
+        "claimed_by_this_line": "Reserved by this line’s decision; it can be renewed",
         "link": "Link",
         "truncated": "Only the first 200 pairs are shown.",
         "blocked_pair_not_proven": "The reversal is not proven from the ledger; it cannot be linked.",

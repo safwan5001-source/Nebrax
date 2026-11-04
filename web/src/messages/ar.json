@@ -14387,6 +14387,7 @@
         "member_original": "الأصل",
         "member_reversal": "العكس",
         "claimed": "محجوز بقرار آخر",
+        "claimed_by_this_line": "محجوز بقرار هذا السطر؛ يمكن تجديده",
         "link": "اربط",
         "truncated": "عُرضت أول 200 زوج فقط.",
         "blocked_pair_not_proven": "العكس غير مثبت من الأستاذ؛ لا يمكن الربط.",

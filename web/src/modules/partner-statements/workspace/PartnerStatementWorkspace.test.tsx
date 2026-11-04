@@ -615,6 +615,25 @@ describe('PartnerStatementWorkspace — individual decisions', () => {
     expect(h.postDecision.mock.calls[0][1]).toMatchObject({ action: 'link_pair', unit_keys: ['pair-1'], pair_member: 'original', reason: 'proven reversal' });
   });
 
+  it('link-pair: a member reserved by THIS line stays selectable (renewal after a new run); one reserved by another line is disabled', async () => {
+    h.fetchReversedPairs.mockResolvedValue({
+      pairs: [{ unit_key: 'pair-1', kind: 'invoice', state: 'neutralised', reasons: [], entry_numbers: ['A', 'B'], reviewable: true, blocked_reason: null,
+        original: { entry_id: 'e1', number: 'A', date: '2026-01-01', net_minor: -100000, claimed: true, line_id: 'line-3' },
+        reversal: { entry_id: 'e2', number: 'B', date: '2026-01-02', net_minor: 100000, claimed: true, line_id: 'line-9' } }],
+      truncated: false,
+    });
+    await open();
+    await selectLine(3);
+    await userEvent.click(within(screen.getByTestId('action-bar')).getByText('workspace.action.link_pair'));
+    const pair = await screen.findByTestId('reversed-pair');
+    const links = within(pair).getAllByText('workspace.pairs.link').map((node) => node.closest('button') as HTMLButtonElement);
+    expect(links[0].disabled).toBe(false);          // الأصل محجوز بقرار هذا السطر نفسه
+    expect(links[1].disabled).toBe(true);           // العكس محجوز لسطر آخر
+    expect(within(pair).getByTestId('pair-own-claim')).toBeTruthy();
+    await userEvent.click(links[0]);
+    expect(await screen.findByTestId('decision-form-link_pair')).toBeTruthy();
+  });
+
   it('keeps only the typed reason as a session draft and restores it after an interruption', async () => {
     await open();
     await selectLine(2);

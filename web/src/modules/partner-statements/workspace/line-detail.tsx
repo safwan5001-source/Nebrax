@@ -232,7 +232,7 @@ export function LineDetail(props: LineDetailProps) {
                 onCancel={() => setPair(null)}
               />
             ) : (
-              <ReversedPairsPanel reconciliationId={props.reconciliationId} onLink={(p: ReversedPair, member) => setPair({ unitKey: p.unit_key, member })} />
+              <ReversedPairsPanel reconciliationId={props.reconciliationId} activeLineId={line.id} onLink={(p: ReversedPair, member) => setPair({ unitKey: p.unit_key, member })} />
             )}
           </section>
         ) : null}

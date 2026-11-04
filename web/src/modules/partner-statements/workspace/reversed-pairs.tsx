@@ -21,8 +21,11 @@ export function ReversedPairsPanel({
   reconciliationId,
   onLink,
   linkLabel,
+  activeLineId = null,
 }: {
   reconciliationId: string;
+  /** السطر الجاري ربطه: عضو محجوز **بقرار هذا السطر** يبقى قابلاً للاختيار (تجديد قراره على تشغيلة جديدة)؛ المحجوز لسطر آخر أو لسطر غير مقروء يُعطَّل. */
+  activeLineId?: string | null;
   /** يظهر زر الربط فقط حين يُمرَّر (داخل تفاصيل سطر قابل للكتابة). */
   onLink?: (pair: ReversedPair, member: PairMember) => void;
   linkLabel?: (member: PairMember) => string;
@@ -64,15 +67,18 @@ export function ReversedPairsPanel({
                 {(['original', 'reversal'] as const).map((member) => {
                   const view = pair[member];
                   if (!view) return null;
+                  const ownClaim = view.claimed && activeLineId !== null && view.line_id === activeLineId;
+                  const blocked = view.claimed && !ownClaim;
                   return (
                     <div key={member} className="flex items-center justify-between gap-2 rounded border border-border p-2 text-sm">
                       <div className="min-w-0">
                         <p className="font-medium text-text">{t(`workspace.pairs.member_${member}`)} <span className="num" dir="ltr">{view.number ?? ''}</span></p>
                         <p className="text-xs text-muted"><span className="num" dir="ltr">{view.date ?? '—'}</span> · <Money minor={view.net_minor} signed /></p>
-                        {view.claimed ? <p className="text-xs text-warning">{t('workspace.pairs.claimed')}</p> : null}
+                        {blocked ? <p className="text-xs text-warning">{t('workspace.pairs.claimed')}</p> : null}
+                        {ownClaim ? <p className="text-xs text-muted" data-testid="pair-own-claim">{t('workspace.pairs.claimed_by_this_line')}</p> : null}
                       </div>
                       {onLink ? (
-                        <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 md:min-h-8" disabled={view.claimed} onClick={() => onLink(pair, member)}>
+                        <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 md:min-h-8" disabled={blocked} onClick={() => onLink(pair, member)}>
                           <Link2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
                           {linkLabel ? linkLabel(member) : t('workspace.pairs.link')}
                         </Button>
