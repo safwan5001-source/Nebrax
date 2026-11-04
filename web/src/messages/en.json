@@ -14193,5 +14193,274 @@
       "amount_tolerance_invalid": "The amount difference is in riyals, from 0.00 to 100.00, with at most two decimals.",
       "rows_have_errors": "The import can't run until the errors shown in the preview are fixed."
     }
+  },
+  "stationOps": {
+    "productName": "AWJ Fuel Stations",
+    "workspaceName": "Station Operations",
+    "skipToContent": "Skip to content",
+    "navLabel": "Station Operations main navigation",
+    "navHome": "Home",
+    "navProducts": "Products",
+    "navShifts": "Shifts",
+    "navProfile": "Profile",
+    "navSettings": "Settings",
+    "offlineBanner": "You are offline. What you see may be out of date, and nothing will be saved.",
+    "stationLabel": "Station",
+    "stationInactive": "Inactive",
+    "loading": "Loading…",
+    "loadingStations": "Loading stations…",
+    "retry": "Try again",
+    "notSet": "Not set",
+    "soonBadge": "Soon",
+    "mode": {
+      "supervisor": "Station supervisor",
+      "operator": "Station attendant",
+      "viewer": "View only"
+    },
+    "error": {
+      "unauthorized": {
+        "title": "Session expired",
+        "body": "Sign in again with your AWJ account to continue."
+      },
+      "forbidden": {
+        "title": "You don't have permission to view this",
+        "body": "Your account is not allowed to view this section in AWJ. Ask your administrator to review your permissions."
+      },
+      "not_found": {
+        "title": "Not found",
+        "body": "This record does not exist or is outside your permissions."
+      },
+      "offline": {
+        "title": "Can't connect",
+        "body": "Check your internet connection and try again."
+      },
+      "server": {
+        "title": "Couldn't load data",
+        "body": "The server hit an error. Try again in a moment."
+      },
+      "invalid_shape": {
+        "title": "Unexpected response",
+        "body": "We received data in a format we don't recognize and did not display it, to stay accurate. Try again or contact support."
+      },
+      "demo": {
+        "title": "Preview mode",
+        "body": "Preview mode doesn't show real station data. Sign in with your actual AWJ account."
+      }
+    },
+    "noStations": {
+      "title": "No stations assigned to you",
+      "body": "No station is linked to your account. If you expect one, ask your AWJ administrator to add it or grant you its scope."
+    },
+    "home": {
+      "greeting": "Welcome, {name}",
+      "currentShift": "Current shift",
+      "products": "Fuel & prices",
+      "allProducts": "All products & pumps",
+      "pumpsNozzles": "Pumps: {pumps} · Nozzles: {nozzles}",
+      "unmapped": "Fuel products registered without an active nozzle at this station: {count}. They are not shown as dispensable until linked to a pump and nozzle in AWJ settings.",
+      "comingSoon": "Coming soon to this workspace",
+      "summary": "Shift summary",
+      "summaryLiters": "Operational liters from meters",
+      "cellProducts": "Dispensable products",
+      "cellPumps": "Active pumps",
+      "actions": "Shift actions",
+      "cta": "Manage the shift in AWJ",
+      "ctaNote": "Recording readings and handing over the shift from this screen is coming soon; for now use the full shifts screen in AWJ.",
+      "shortcuts": {
+        "products": "Products & pumps",
+        "shifts": "Shifts",
+        "settings": "Settings"
+      }
+    },
+    "soon": {
+      "readings": "Record shift meter readings",
+      "collection": "Shift collection and handover",
+      "approval": "Approve closed shifts",
+      "receiving": "Fuel delivery receiving",
+      "reports": "Station reports"
+    },
+    "shift": {
+      "openedAt": "Opened",
+      "closedAt": "Closed",
+      "approvedAt": "Approved",
+      "operationalLiters": "Operational liters (from meters)",
+      "multipleOpen": "Notice: more than one open shift appeared for this station; the most recent is shown. Review shifts in AWJ.",
+      "noPermission": {
+        "title": "Shifts aren't available for your permissions",
+        "body": "Your account can't view shifts, so their status isn't shown."
+      },
+      "none": {
+        "title": "No open shift",
+        "body": "There is no open shift at this station right now. Opening a shift will be done from this workspace later; for now use the shifts screen in AWJ."
+      },
+      "startedAt": "Started"
+    },
+    "shiftStatus": {
+      "open": "Open",
+      "closed": "Closed",
+      "approved": "Approved"
+    },
+    "price": {
+      "noPermission": "Not available for your permissions",
+      "error": "Couldn't load price",
+      "perLiter": "/ L",
+      "tenantDefault": "Organization default price",
+      "notConfigured": "Price not set",
+      "incomplete": "Couldn't confirm the current price"
+    },
+    "unit": {
+      "liter": "L"
+    },
+    "products": {
+      "title": "Products & pumps",
+      "dispensable": "Dispensable products",
+      "none": {
+        "title": "No dispensable products",
+        "body": "No active nozzle is linked to a pump, tank and product at this station. This is configured in AWJ station settings."
+      },
+      "pumps": "Pumps & nozzles",
+      "noPumps": {
+        "title": "No pumps",
+        "body": "No pumps are registered for this station in AWJ."
+      },
+      "tanks": "Tanks",
+      "noTanks": {
+        "title": "No tanks",
+        "body": "No tanks are registered for this station in AWJ."
+      },
+      "noNozzles": "No nozzles registered for this pump.",
+      "nozzle": "Nozzle",
+      "pump": "Pump",
+      "unknownProduct": "Unknown product",
+      "tankProduct": "Product",
+      "tankCapacity": "Capacity",
+      "tankNozzles": "Linked nozzles",
+      "tankLevelNote": "Current tank levels aren't shown here yet; they will appear once tank readings are connected in a later slice.",
+      "subtitle": "From AWJ · view only"
+    },
+    "assetStatus": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "maintenance": "Maintenance"
+    },
+    "blocked": {
+      "station_inactive": "Station is inactive",
+      "nozzle_inactive": "Nozzle is inactive",
+      "pump_missing": "Nozzle's pump isn't in this station",
+      "pump_inactive": "Pump is inactive",
+      "tank_missing": "Nozzle's tank isn't in this station",
+      "tank_inactive": "Tank is inactive",
+      "product_missing": "Nozzle's product isn't in the registry",
+      "product_inactive": "Fuel product is inactive",
+      "product_tank_mismatch": "Nozzle product doesn't match its tank product — review configuration"
+    },
+    "shifts": {
+      "title": "Shifts",
+      "filterLabel": "Filter shifts",
+      "filter": {
+        "all": "All",
+        "open": "Open",
+        "closed": "Awaiting approval",
+        "approved": "Approved"
+      },
+      "closedHint": "Closed shifts are waiting for someone with approval permission.",
+      "empty": {
+        "title": "No shifts",
+        "body": "No shifts match this filter at the selected station."
+      },
+      "loadMore": "Load more",
+      "loadMoreFailed": "Couldn't load more. Try again.",
+      "endOfList": "You've reached the end of the list",
+      "readOnlyNote": "This screen is read-only. Opening shifts, recording readings, closing and approving are not done from here yet.",
+      "desktopLink": "Open the full shifts screen in AWJ",
+      "subtitle": "Station shift history · view only"
+    },
+    "settings": {
+      "title": "Settings",
+      "personal": {
+        "title": "My preferences on this device",
+        "hint": "These apply to this browser only and don't change station or organization settings."
+      },
+      "language": "Language",
+      "lang": {
+        "ar": "العربية",
+        "en": "English"
+      },
+      "theme": "Appearance",
+      "themeOption": {
+        "system": "Match device",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "station": {
+        "title": "Current station",
+        "hint": "Values from AWJ, display only.",
+        "name": "Name",
+        "code": "Code",
+        "status": "Status",
+        "place": "Location",
+        "timezone": "Time zone",
+        "license": "License number",
+        "licenseExpiry": "License expiry",
+        "manageLink": "Manage station settings in AWJ",
+        "readOnly": "Station settings are changed in AWJ administration with the right permission, not from this screen."
+      },
+      "subtitle": "Your preferences and station information"
+    },
+    "profile": {
+      "title": "My profile",
+      "identity": "Identity",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role in AWJ",
+      "mode": "Workspace type",
+      "fromAwj": "Your details, role and permissions come from your AWJ account and are read-only here.",
+      "scope": "Authorized scope",
+      "branches": "Branches",
+      "allBranches": "All branches",
+      "scopeUnknown": "Not determined yet",
+      "branchCount": "Authorized branches: {count}",
+      "stations": "Stations",
+      "stationsUnavailable": "Couldn't load stations",
+      "access": "What your permissions allow",
+      "accessRow": {
+        "stations": "View stations, pumps and tanks",
+        "shifts": "View shifts",
+        "prices": "View fuel prices",
+        "open": "Open a shift and record readings",
+        "approve": "Approve shifts"
+      },
+      "granted": "Allowed",
+      "notGranted": "Not allowed",
+      "accessHint": "The server enforces your permissions on every request; hiding an item here is not the protection.",
+      "security": "Security & session",
+      "securityLink": "Password and security settings in AWJ",
+      "logout": "Sign out",
+      "subtitle": "Your identity and permissions in AWJ"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Administrator",
+      "accountant": "Accountant",
+      "cashier": "Cashier",
+      "viewer": "Viewer",
+      "employee": "Employee"
+    },
+    "backHome": "Back to Home",
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}"
+    },
+    "workspace": {
+      "supervisor": "Supervisor workspace",
+      "operator": "Attendant workspace",
+      "viewer": "View-only workspace"
+    },
+    "metric": {
+      "cash": "Cash",
+      "card": "Card",
+      "unavailable": "Not available yet"
+    }
   }
 }

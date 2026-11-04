@@ -1,0 +1,107 @@
+/*
+ * AWJ Fuel Stations — Design System V2 (طبقة بصرية مستقلة عن أَوْج ERP).
+ *
+ * كل القواعد محصورة تحت [data-fuel-ops]: لا تغيير لرموز التصميم العامة ولا لأي شاشة أخرى (قرار الحوكمة في
+ * AWJ_FUEL_STATIONS_DESIGN_SYSTEM_V2.md §12). نعيد تعريف المتغيرات الدلالية نفسها التي تستهلكها مكوّنات
+ * Tailwind (`bg-surface` و`text-muted`…) داخل الغلاف فقط، فتتبنّى المكوّنات المشتركة المظهر الصناعي الهادئ
+ * دون نسخها. القيم الفاتحة من V2 §3؛ الداكنة مشتقة دلالياً لا بقلب القيم، والتباين محروس باختبار
+ * `fuel-ops-tokens.test.ts` (WCAG AA). البرتقالي #E87722 تعبئة/زينة فقط؛ لون النص التفاعلي برتقالي أغمق ليجتاز التباين.
+ * انحراف موثَّق عن قيم V2 المقترحة: positive/warning أُغمقا قليلاً لتجتاز الشارات المظلَّلة 4.5:1، و`--fo-control` حدّ عناصر
+ * التحكم (≥ 3:1، WCAG 1.4.11) لأن حدّ الفاصل الهادئ #E3E7EC لا يكفي لتعريف الأزرار والحقول.
+ */
+[data-fuel-ops] {
+  --fo-navy: #142238;
+  --fo-accent: #e87722;
+  --fo-on-navy: #ffffff;
+  --fo-on-navy-muted: #b9c7d6;
+  --fo-header-line: #2a3b56;
+  --fo-header-hover: #25354f;
+  --fo-logo-bg: #ffffff;
+  --fo-navy2: #20344c;
+  --fo-outline: #4b5b6d;
+  --fo-cta-bg: #e87722;
+  --fo-cta-fg: #142238;
+  --fo-shadow: 0 5px 18px rgb(20 34 56 / 0.09);
+  --background: #f7f8fa;
+  --surface: #ffffff;
+  --text: #142238;
+  --muted: #586576;
+  --border: #e3e7ec;
+  --primary: #b3500a;
+  --primary-hover: #973f07;
+  --primary-soft: #fff3e8;
+  --primary-foreground: #ffffff;
+  --positive: #0b6e5a;
+  --negative: #b42332;
+  --warning: #8f4d08;
+  --danger-fg: #ffffff;
+  --fo-control: #7a8aa0;
+  --fo-positive-tint: #e8f5f0;
+  --fo-warning-tint: #fdf1e3;
+  --fo-negative-tint: #fbe9eb;
+  font-feature-settings: 'tnum' 1;
+}
+
+.dark [data-fuel-ops] {
+  --fo-navy: #0a121e;
+  --fo-accent: #f08a3c;
+  --fo-on-navy: #ffffff;
+  --fo-on-navy-muted: #b9c7d6;
+  --fo-header-line: #22324a;
+  --fo-header-hover: #1b2b43;
+  --fo-logo-bg: #ffffff;
+  --fo-navy2: #17273d;
+  --fo-outline: #3c4d63;
+  --fo-cta-bg: #f08a3c;
+  --fo-cta-fg: #142238;
+  --fo-shadow: 0 5px 18px rgb(0 0 0 / 0.35);
+  --background: #0d1624;
+  --surface: #142238;
+  --text: #eef2f7;
+  --muted: #a6b3c5;
+  --border: #2a3b56;
+  --primary: #f4a15a;
+  --primary-hover: #f7b57b;
+  --primary-soft: #3a2a1c;
+  --primary-foreground: #142238;
+  --positive: #4cc9a8;
+  --negative: #ff8a94;
+  --warning: #f2b068;
+  --danger-fg: #142238;
+  --fo-control: #7388a6;
+  --fo-positive-tint: #12372f;
+  --fo-warning-tint: #3a2a1c;
+  --fo-negative-tint: #3d1f26;
+}
+
+/* أزرار أدوات الرأس (لغة/سمة) على خلفية الهيدر الكحلية: نص أبيض، تحويم شفاف. */
+[data-fuel-ops] .fo-header-actions button,
+[data-fuel-ops] .fo-header-actions a {
+  color: var(--fo-on-navy);
+}
+[data-fuel-ops] .fo-header-actions button:hover {
+  background: var(--fo-header-hover);
+}
+[data-fuel-ops] .fo-header-actions button:focus-visible {
+  outline: 2px solid var(--fo-on-navy);
+  outline-offset: 2px;
+}
+
+/* الأرقام والكميات: خط الواجهة نفسه بأرقام جدولية 0–9 (كالنموذج المعتمد) لا Mono — فلا تتباعد الفواصل ولا تُرسم الوحدات بخط مختلف. */
+[data-fuel-ops] .num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* نصوص حجم iOS: لا تكبير تلقائي عند التركيز على الحقول (≥16px). */
+[data-fuel-ops] select,
+[data-fuel-ops] input {
+  font-size: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fuel-ops] * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
