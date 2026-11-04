@@ -228,7 +228,11 @@ function pagePresentationFor(scenario: Scenario): PagePresentation | undefined {
 export default async function ProductVisualPage({
   searchParams,
 }: {
-  searchParams: Promise<{ locale?: string; scenario?: string; preset?: string }>;
+  searchParams: Promise<{
+    locale?: string;
+    scenario?: string;
+    preset?: string;
+  }>;
 }) {
   if (process.env.NODE_ENV === "production") {
     notFound();
@@ -237,7 +241,8 @@ export default async function ProductVisualPage({
   const params = await searchParams;
   const locale = params.locale === "en" ? "en" : "ar";
   const scenario = scenarioOf(params.scenario);
-  const themePreset = params.preset === "awj-luxe-motion" ? "awj-luxe-motion" : "awj-modern";
+  const themePreset =
+    params.preset === "awj-luxe-motion" ? "awj-luxe-motion" : "awj-modern";
   setRequestLocale(locale);
   const messages = locale === "ar" ? ar : en;
 
