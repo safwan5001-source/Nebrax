@@ -148,8 +148,8 @@ describe('import outcome', () => {
     expect(resultOutcome({ reconciliation_id: 42 })).toEqual({ kind: 'created', reconciliationId: null, lines: null });
   });
 
-  it('links to the list with a highlight (no detail route exists before A4b)', () => {
-    expect(reconciliationHref('abc-1')).toBe('/partner-statements?highlight=abc-1');
+  it('links to the reconciliation workspace, or to the list when there is no id', () => {
+    expect(reconciliationHref('abc-1')).toBe('/partner-statements/abc-1');
     expect(reconciliationHref(null)).toBe('/partner-statements');
   });
 });

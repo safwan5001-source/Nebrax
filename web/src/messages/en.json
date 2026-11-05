@@ -13994,6 +13994,7 @@
     "title": "Partner statement reconciliation",
     "subtitle": "Compare the account statement a customer or supplier sent you against your books. Review only: no journal entry or balance changes.",
     "import_action": "Import statement",
+    "open_workspace": "Open reconciliation",
     "retry": "Retry",
     "disclaimer": "Comparison only — no entry, document or balance changes from this screen.",
     "empty": "No reconciliations yet",
@@ -14216,7 +14217,252 @@
       "tolerance_percent": "Enter the amount difference in riyals, not as a percentage.",
       "date_tolerance_invalid": "The date difference is a whole number from 0 to 30 days.",
       "amount_tolerance_invalid": "The amount difference is in riyals, from 0.00 to 100.00, with at most two decimals.",
-      "rows_have_errors": "The import can't run until the errors shown in the preview are fixed."
+      "rows_have_errors": "The import can't run until the errors shown in the preview are fixed.",
+      "statement_changed": "The statement lines changed since import (edited outside the app). Matching and review are blocked for this statement; import it again.",
+      "reason_required": "A reason (at least 3 characters) is required for this decision.",
+      "reason_too_long": "The reason is longer than 500 characters.",
+      "difference_exceeds_tolerance": "The difference exceeds the frozen tolerance; explicitly accept it and submit again.",
+      "unit_already_decided": "A ledger unit (or pair member) is already assigned to another statement line by an active decision. Clear that decision first.",
+      "dismiss_requires_missing_in_books": "Dismiss applies only to lines the engine judged “missing in books”.",
+      "nothing_to_confirm": "There is no engine proposal to confirm for this line; use “Override” to select units.",
+      "line_unavailable": "The line is not part of this run. Refresh the page.",
+      "units_invalid": "The selected units are not valid for this decision. Choose available ledger units and verify them.",
+      "pair_invalid": "The reversed pair is not proven or cannot be linked. Choose a reviewable pair."
+    },
+    "workspace": {
+      "title": "Statement matching and review",
+      "subtitle": "Compare the partner statement lines with our books and decide each line.",
+      "back": "Statements list",
+      "comparison_only": "Comparison only — no entry and no balance changes",
+      "table_label": "Statement lines",
+      "debit": "Debit",
+      "credit": "Credit",
+      "next_undecided": "Next undecided",
+      "no_more_undecided": "No undecided lines in the loaded pages.",
+      "line_not_found": "That line could not be found in the current pages.",
+      "empty": "No lines.",
+      "empty_filtered": "No lines with this outcome.",
+      "ledger_changed": "The ledger changed since the last matching run. New decisions will be rejected until you run a fresh match.",
+      "tabs": {
+        "review": "Statement lines",
+        "ledger": "Our books, not in statement",
+        "pairs": "Reversed pairs",
+        "events": "History"
+      },
+      "col": {
+        "date": "Date",
+        "reference": "Reference",
+        "our_reference": "Our reference",
+        "description": "Description",
+        "amount": "Amount",
+        "outcome": "Engine outcome",
+        "decision": "Your decision"
+      },
+      "outcome": {
+        "matched": "Matched",
+        "amount_difference": "Amount difference",
+        "date_difference": "Date difference",
+        "ambiguous": "Ambiguous",
+        "missing_in_books": "Missing in our books",
+        "missing_in_statement": "Missing in statement",
+        "needs_review": "Needs review",
+        "neutralised": "Reversed and neutralised",
+        "incomplete": "Incomplete reversal chain",
+        "unknown": "Unknown outcome"
+      },
+      "action": {
+        "confirm": "Confirm",
+        "override": "Override",
+        "dismiss": "Dismiss",
+        "link_pair": "Link reversed pair",
+        "clear": "Clear decision"
+      },
+      "decision": {
+        "none": "No decision",
+        "other_run": "Needs re-approval"
+      },
+      "filters": {
+        "outcome": "Filter by engine outcome"
+      },
+      "direction": {
+        "debit": "Debit",
+        "credit": "Credit"
+      },
+      "unit_kind": {
+        "invoice": "Invoice",
+        "credit_note": "Credit note",
+        "payment": "Payment",
+        "purchase": "Purchase",
+        "debit_note": "Debit note",
+        "return": "Return",
+        "other": "Document"
+      },
+      "summary": {
+        "title": "Comparison summary",
+        "lines": "Lines",
+        "totals": "Total debit / credit",
+        "currency": "Currency",
+        "policy": "Frozen tolerance",
+        "policy_value": "Date {days} days · Amount {amount}"
+      },
+      "progress": {
+        "label": "Lines decided",
+        "other_runs": "{count} decision(s) were made on another run and must be re-approved."
+      },
+      "match": {
+        "run": "Run matching",
+        "run_again": "Run a new match",
+        "no_run": "No matching run yet. The lines below are the statement as imported; run matching to compare them with the books.",
+        "created": "A new matching run completed.",
+        "replayed": "Nothing changed in the ledger or the statement; this is the same latest run."
+      },
+      "detail": {
+        "title": "Line details",
+        "close": "Close",
+        "select_line": "Select a line to see its details.",
+        "statement_line": "Statement line",
+        "line_title": "Line #{ordinal}",
+        "engine": "Engine verdict",
+        "rule": "Rule {rule}",
+        "difference": "Difference",
+        "days": "Date difference {days} days",
+        "proposed_unit": "Proposed unit:",
+        "decision": "Effective decision",
+        "other_run_hint": "This decision was made on another run; re-approve it on the current run.",
+        "accepted": "accepted difference",
+        "history": "Line decision history",
+        "actions": "Line actions",
+        "override_title": "Choose ledger units",
+        "link_title": "Choose a reversed pair and member",
+        "replayed": "The same decision was already recorded; nothing was added."
+      },
+      "explanation": {
+        "matched_by_our_reference": "The reference matched our document number, with amount and date within tolerance.",
+        "matched_by_reference": "The reference matched the partner document number, with amount and date within tolerance.",
+        "matched_by_amount_date_unique": "Amount and date matched exactly one free document with no reference.",
+        "amount_differs": "The reference matches but the amount differs from the ledger document.",
+        "date_differs": "Reference and amount match but the date exceeds the tolerance.",
+        "direction_mismatch": "The reference matches but the amount direction is opposite to the ledger.",
+        "reversed_in_books": "The counterpart document is reversed in the books.",
+        "ambiguous_multiple_documents_for_reference": "The reference matches more than one ledger document.",
+        "ambiguous_multiple_candidates": "More than one candidate document has the same amount and date.",
+        "unit_claimed_by_several_lines": "The candidate document is claimed by more than one statement line.",
+        "candidate_not_matchable": "The candidate document cannot be matched right now.",
+        "candidate_reversal_incomplete": "The candidate's reversal chain is incomplete.",
+        "no_candidate_in_books": "No counterpart document for this line exists in our books.",
+        "reversed_pair_excluded": "An original/reversal pair was excluded from automatic matching.",
+        "reversal_chain_incomplete": "The reversal chain is incomplete and needs review.",
+        "matched_to_statement_line": "Matched to a statement line.",
+        "linked_with_difference": "Linked to a statement line with a difference.",
+        "claimed_by_several_lines": "Claimed by several statement lines.",
+        "candidate_of_ambiguous_line": "Candidate of an ambiguous line.",
+        "no_statement_line": "No statement line corresponds to it.",
+        "unknown": "No explanation is available for this outcome."
+      },
+      "warning": {
+        "kind_side_mismatch": "The line type does not match its usual side (debit/credit).",
+        "unit_proposed_for_another_line": "The engine proposed this unit for another line (#{ordinal}).",
+        "unknown": "Unknown warning."
+      },
+      "form": {
+        "reason_label_confirm": "Confirmation reason",
+        "reason_label_override": "Override reason",
+        "reason_label_dismiss": "Dismissal reason",
+        "reason_label_link_pair": "Pair-link reason",
+        "reason_placeholder": "Write the reason…",
+        "reason_hint": "At least 3 characters.",
+        "optional": "optional",
+        "cancel": "Cancel",
+        "accept_difference": "Accept the financial difference {difference} outside the tolerance ({tolerance}).",
+        "block_reason_required": "Write a reason of at least 3 characters.",
+        "block_accept_required": "Accept the financial difference to continue."
+      },
+      "queue": {
+        "sending": "Sending…",
+        "retrying": "Retrying in {seconds}s",
+        "failed": "Send failed"
+      },
+      "picker": {
+        "suggestions": "Suggested sets",
+        "use_suggestion": "Set {index} ({count} units)",
+        "engine_units": "Engine candidates",
+        "ledger_units": "Unmatched ledger units",
+        "search": "Search by document number or date",
+        "no_units": "No units available.",
+        "select_unit": "Select {unit}",
+        "not_active": "inactive",
+        "selected": "Selected: {count}",
+        "verify": "Verify the set",
+        "verify_required": "Verify the selected set before overriding.",
+        "has_problems": "The set contains invalid units; adjust it.",
+        "expected": "Expected for the line",
+        "set_net": "Set net",
+        "difference": "Difference",
+        "tolerance": "Tolerance",
+        "equal": "The set equals the line within tolerance.",
+        "not_equal": "The set does not equal the line; the difference is accepted only with an explicit acknowledgement and a reason."
+      },
+      "verify_problem": {
+        "unit_not_in_candidates": "Unit {unit_key} is not among this partner and period's candidates.",
+        "unit_not_matchable": "Unit {unit_key} cannot be matched ({state}).",
+        "unknown": "Unknown unit problem."
+      },
+      "pairs": {
+        "intro": "Original/reversal pairs proven from the ledger. A statement line is linked to one member, manually only; never automatically.",
+        "empty": "No reversed pairs.",
+        "empty_hint": "There are no reversed units within this comparison's scope.",
+        "member_original": "Original",
+        "member_reversal": "Reversal",
+        "claimed": "Reserved by another decision",
+        "claimed_by_this_line": "Reserved by this line’s decision; it can be renewed",
+        "link": "Link",
+        "truncated": "Only the first 200 pairs are shown.",
+        "blocked_pair_not_proven": "The reversal is not proven from the ledger; it cannot be linked.",
+        "blocked_pair_not_simple": "The chain is longer than a simple pair; it cannot be linked.",
+        "blocked_pair_incomplete": "The pair is incomplete; it cannot be linked.",
+        "blocked_unit_not_a_reversed_pair": "The unit is not a reversed pair.",
+        "blocked_other": "Not reviewable."
+      },
+      "ledger": {
+        "intro": "Documents in our books with no matching statement line. For information only; they do not block review.",
+        "empty": "No documents are missing from the statement.",
+        "no_run": "Run matching to see this list."
+      },
+      "readiness": {
+        "title": "Review readiness",
+        "ready": "Every line is decided; the comparison is ready to move to “reviewed”.",
+        "go_to": "Go to:",
+        "note": "Review note",
+        "review": "Move to reviewed",
+        "pending_decisions": "{count} decision(s) are still being sent; wait for them to finish.",
+        "reviewed": "The comparison is “reviewed”. Reopen it to edit decisions.",
+        "ledger_changed_since_review": "The ledger changed since the review. Reopen the comparison and run a fresh match.",
+        "statement_changed_since_review": "The statement lines changed since the review.",
+        "reopen": "Reopen to edit",
+        "reopen_reason": "Reopen reason",
+        "reopen_confirm": "Reopen",
+        "final_closed": "The comparison is final (closed): read only.",
+        "final_voided": "The comparison is voided: read only.",
+        "final_superseded": "The comparison is superseded: read only."
+      },
+      "blocker": {
+        "statement_changed": "The statement lines changed outside the app; review is blocked.",
+        "no_run": "There is no matching run; run matching first.",
+        "run_stale": "The ledger or statement changed since the run; run a fresh match.",
+        "unresolved_lines": "{count} line(s) without an explicit decision.",
+        "decisions_without_entry_identity": "{count} earlier decision(s) must re-record their entry identity; re-approve them.",
+        "decisions_on_other_runs": "{count} decision(s) were made on another run; re-approve them.",
+        "other": "Another review blocker."
+      },
+      "events": {
+        "empty": "No events yet.",
+        "action_mark_reviewed": "Moved to reviewed",
+        "action_reopen": "Reopened",
+        "action_close": "Closed",
+        "action_void": "Voided",
+        "action_supersede": "Superseded",
+        "action_other": "Event"
+      }
     }
   },
   "stationOps": {

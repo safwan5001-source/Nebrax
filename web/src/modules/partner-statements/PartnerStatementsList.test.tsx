@@ -186,11 +186,14 @@ describe('PartnerStatementsList', () => {
     expect(await screen.findByText('import_action')).toBeTruthy();
   });
 
-  it('does not offer a detail link (the review workspace ships in A4b)', async () => {
+  it('links every row to its reconciliation workspace (A4b), from the table and from the mobile card', async () => {
     render(<PartnerStatementsList />);
     await screen.findAllByText('شركة النور');
-    const links = screen.queryAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(links.some((href) => href?.startsWith('/partner-statements/') && href !== '/partner-statements/import')).toBe(false);
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+    expect(hrefs.filter((href) => href === `/partner-statements/${id}`).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByTestId('open-workspace')[0].getAttribute('href')).toBe(`/partner-statements/${id}`);
+    expect(screen.getAllByTestId('open-workspace-mobile')[0].getAttribute('href')).toBe(`/partner-statements/${id}`);
   });
 
   it('shows the freshly imported reconciliation from the highlight parameter via the header endpoint', async () => {
