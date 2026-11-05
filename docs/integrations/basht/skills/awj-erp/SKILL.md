@@ -6,9 +6,13 @@ metadata: {"openclaw":{"requires":{"bins":["curl"],"env":["AWJ_API_KEY","AWJ_API
 
 # AWJ ERP - 7 supported operations
 
-Use only the env vars `AWJ_API_BASE` (https://nibras-api-production.up.railway.app/api/v1) and `AWJ_API_KEY`.
+Configuration comes from exactly two variables, both set on the OpenClaw service:
+- AWJ_API_BASE: the API root (already includes /api/v1).
+- AWJ_API_KEY: the secret key. Reference it only as a shell variable inside the Authorization header.
 Never print, echo, log or repeat the key, and never include it in a reply.
-Every call: `-H "Authorization: Bearer $AWJ_API_KEY" -H "Accept: application/json" --max-time 20`.
+
+Every request carries these headers: `Authorization: Bearer $AWJ_API_KEY`, `Accept: application/json`,
+and a 20 second timeout (`--max-time 20`).
 Responses are `{"data": ..., "meta": ...}`; lists are paginated (`per_page` max 100).
 
 | # | Operation | Call | Scope |

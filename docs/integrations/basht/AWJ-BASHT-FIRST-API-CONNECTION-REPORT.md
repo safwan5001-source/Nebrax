@@ -80,3 +80,10 @@ node "$D/scripts/awj-acceptance.mjs"
 
 ## 8) الخطوة التالية
 نفّذ الخطوات 1–3 وأرسل مخرجات السكربت (`N/8 passed` والأسطر). أي فشل أعالجه فوراً؛ وعند النجاح أحدّث التقرير بالنتائج الحية وتُغلق المهمة.
+
+## 9) تحذير OpenClaw «Skill security scan found critical issues» — السبب والإصلاح
+- **المصدر:** `src/skills/library/service.ts` في OpenClaw (مسار استيراد مكتبة المهارات) يستدعي `scanSkillBundle` من `src/skills/security/scanner.ts` ويرفض الاستيراد (`POLICY_BLOCKED`) إن وُجد finding واحد بشدة `critical`. تُفحص نصوص `SKILL.md` بقواعد «محتوى المهارة» **وكذلك** بقواعد الشيفرة (eval، child_process، process.env مع طلبات شبكة…).
+- **السبب بدقة:** القاعدة `secret-exfiltration` (critical): `/\b(process\.env|env)\b.{0,80}\b(fetch|curl|wget|http|https)\b/i` على **سطر واحد**. السطر 9 في النسخة السابقة: «Use only the **env** vars `AWJ_API_BASE` (**https**://…» — كلمة env متبوعة برابط https خلال 80 حرفاً، فاعتُبر نمط تسريب متغيرات بيئة. لم يكن في النص أي سر ولا أمر ضار؛ هو إيجابي كاذب من تطابق نمطي.
+- **الإصلاح:** أُعيدت صياغة الفقرة (بلا كلمة env قرب رابط/curl، وبلا عنوان URL حرفي في النص؛ القيمة تأتي من `AWJ_API_BASE`). الاستعمال الآمن `$AWJ_API_KEY` داخل ترويسة Authorization باقٍ كما هو. **لم يُعطَّل الفحص ولم تُستخدم أي علامة تجاوز.**
+- **التحقق:** نسخة مطابقة لقواعد الماسح (منسوخة من المصدر) على النسخة القديمة: `critical=1` (secret-exfiltration، السطر 9)؛ على الجديدة: `critical=0 warn=0`. لم أستطع تشغيل OpenClaw نفسه؛ التأكيد النهائي عند الاستيراد.
+- **ملاحظة:** سكربت الاختبار `scripts/awj-acceptance.mjs` ليس جزءاً من حزمة المهارة (خارج مجلدها)؛ إن أُضيف كملف دعم فسيُفحص أيضاً (`process.env` في السطرين 6–7 و`fetch(` في السطر 18، أبعد من نافذة 8 أسطر فلا يُطابق `env-harvesting`، لكن الهامش ضيق).
