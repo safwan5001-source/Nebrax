@@ -45,6 +45,11 @@ const gridProducts = [
   { id: "p-2", name: "Walking Shoe", thumbnailUrl: null },
 ];
 
+/** Class tokens of an element (the web suite has no jest-dom matchers). */
+function classesOf(el: Element | null | undefined): string[] {
+  return Array.from(el?.classList ?? []);
+}
+
 describe("web customizer preview — CUST-H3-3 density on Product/Category page shells", () => {
   afterEach(() => {
     cleanup();
@@ -218,8 +223,8 @@ describe("AWJ Luxe Motion — Product Customizer preview parity", () => {
       />,
     );
     const shell = container.querySelector('[data-product-preview="ready"]');
-    expect(shell).toHaveAttribute("data-luxe-motion");
-    expect(shell?.querySelector("h1")).toHaveClass("text-2xl");
+    expect(shell?.hasAttribute("data-luxe-motion")).toBe(true);
+    expect(classesOf(shell?.querySelector("h1"))).toContain("text-2xl");
     expect(shell?.querySelector(".border-store-border.bg-store-surface-muted")).not.toBeNull();
     expect(shell?.querySelector(".h-12")).not.toBeNull();
     expect(container.textContent).toContain("Luxury Gift Box");
@@ -238,9 +243,9 @@ describe("AWJ Luxe Motion — Product Customizer preview parity", () => {
       />,
     );
     const shell = container.querySelector('[data-product-preview="ready"]');
-    expect(shell).not.toHaveAttribute("data-luxe-motion");
-    expect(shell?.querySelector("h1")).toHaveClass("text-lg");
-    expect(shell?.querySelector("h1")).not.toHaveClass("text-2xl");
+    expect(shell?.hasAttribute("data-luxe-motion")).toBe(false);
+    expect(classesOf(shell?.querySelector("h1"))).toContain("text-lg");
+    expect(classesOf(shell?.querySelector("h1"))).not.toContain("text-2xl");
   });
 });
 
@@ -266,11 +271,13 @@ describe("AWJ Luxe Motion — Category product-card preview parity", () => {
       />,
     );
     let shell = container.querySelector('[data-category-preview="ready"]');
-    expect(shell).toHaveAttribute("data-luxe-motion");
+    expect(shell?.hasAttribute("data-luxe-motion")).toBe(true);
     const card = shell?.querySelector('[data-card]');
-    expect(card).toHaveClass("border-store-border");
-    expect(card?.querySelector('[data-card-image]')).toHaveClass("aspect-[3/4]");
-    expect(card?.querySelector("p")).toHaveClass("line-clamp-2", "text-sm", "px-3.5");
+    expect(classesOf(card)).toContain("border-store-border");
+    expect(classesOf(card?.querySelector('[data-card-image]'))).toContain("aspect-[3/4]");
+    expect(classesOf(card?.querySelector("p"))).toContain("line-clamp-2");
+    expect(classesOf(card?.querySelector("p"))).toContain("text-sm");
+    expect(classesOf(card?.querySelector("p"))).toContain("px-3.5");
 
     rerender(
       <StorefrontPreviewCanvas
@@ -287,8 +294,8 @@ describe("AWJ Luxe Motion — Category product-card preview parity", () => {
       />,
     );
     shell = container.querySelector('[data-category-preview="ready"]');
-    expect(shell).not.toHaveAttribute("data-luxe-motion");
-    expect(shell?.querySelector('[data-card-image]')).toHaveClass("aspect-square");
-    expect(shell?.querySelector('[data-card-image]')).not.toHaveClass("aspect-[3/4]");
+    expect(shell?.hasAttribute("data-luxe-motion")).toBe(false);
+    expect(classesOf(shell?.querySelector('[data-card-image]'))).toContain("aspect-square");
+    expect(classesOf(shell?.querySelector('[data-card-image]'))).not.toContain("aspect-[3/4]");
   });
 });
