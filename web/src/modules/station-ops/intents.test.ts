@@ -46,6 +46,20 @@ describe('intent store', () => {
     t = INTENT_TTL_MS + 1;
     expect(createIntentStore('A', { storage, now: () => t, generate: () => 'x3' }).keyFor('open', 1)).toBe('awj-ops-x3');
   });
+  it('an UNCERTAIN intent keeps its key past the TTL and across a reload (elapsed time is not evidence the write never happened)', () => {
+    const storage = fakeStorage();
+    let t = 0;
+    const first = createIntentStore('S', { storage, now: () => t, generate: () => 'u1' });
+    const key = first.keyFor('cash', { a: 1 });
+    first.markUncertain('cash');
+    t = INTENT_TTL_MS * 10;
+    const reloaded = createIntentStore('S', { storage, now: () => t, generate: () => 'u2' });
+    expect(reloaded.isUncertain('cash')).toBe(true);
+    expect(reloaded.keyFor('cash', { a: 1 })).toBe(key);
+    expect(reloaded.keyFor('cash', { a: 2 })).not.toBe(key); // حمولة مختلفة = نية جديدة صريحة
+    reloaded.clear('cash');
+    expect(reloaded.isUncertain('cash')).toBe(false);
+  });
   it('works with blocked storage (falls back to memory)', () => {
     const store = createIntentStore('s', { storage: null, generate: () => 'm' });
     expect(store.keyFor('open', 1)).toBe(store.keyFor('open', 1));

@@ -14,11 +14,14 @@
 export const INTENT_TTL_MS = 30 * 60_000;
 const PREFIX = 'awj:fuel-ops:intent:';
 
-interface StoredIntent { key: string; fingerprint: string; at: number }
+interface StoredIntent { key: string; fingerprint: string; at: number; /** محاولة سابقة انتهت غير مؤكدة: المفتاح يبقى ثابتاً (لا TTL) حتى تُحسم النية. */ uncertain?: boolean }
 
 export interface IntentStore {
   /** المفتاح الحالي للنية `name` إن بقيت الحمولة نفسها وصالحة زمنياً، وإلا مفتاح جديد. */
   keyFor(name: string, payload: unknown): string;
+  /** يُعلِّم النية «غير مؤكدة» (قد تكون التزمت في الخادم): يبقى مفتاحها ثابتاً مهما طال الزمن وعبر إعادة التحميل، ولا يمسحه إلا `clear` بعد الحسم. */
+  markUncertain(name: string): void;
+  isUncertain(name: string): boolean;
   /** يُستدعى عند حسم الناتج (نجاح مؤكد أو رفض نهائي). لا يُستدعى عند «غير مؤكد» — فالإعادة تحتاج المفتاح نفسه. */
   clear(name: string): void;
 }
@@ -57,7 +60,8 @@ export function createIntentStore(scope: string, options: { storage?: Storage | 
     keyFor(name, payload) {
       const fingerprint = JSON.stringify(payload);
       const current = read(name);
-      if (current && current.fingerprint === fingerprint && now() - current.at < INTENT_TTL_MS) return current.key;
+      // TTL للنية المحسومة/غير المستخدمة فقط؛ غير المؤكدة لا ينتهي مفتاحها بمرور الوقت (الزمن ليس دليلاً على أن الكتابة لم تحدث).
+      if (current && current.fingerprint === fingerprint && (current.uncertain === true || now() - current.at < INTENT_TTL_MS)) return current.key;
       const next: StoredIntent = { key: `awj-ops-${generate()}`, fingerprint, at: now() };
       memory.set(name, next);
       try {
@@ -66,6 +70,20 @@ export function createIntentStore(scope: string, options: { storage?: Storage | 
         // لا مساحة/محجوب: يبقى المفتاح في الذاكرة لهذه الصفحة.
       }
       return next.key;
+    },
+    markUncertain(name) {
+      const current = read(name);
+      if (!current) return;
+      const next = { ...current, uncertain: true };
+      memory.set(name, next);
+      try {
+        storage?.setItem(slot(name), JSON.stringify(next));
+      } catch {
+        // يبقى في الذاكرة
+      }
+    },
+    isUncertain(name) {
+      return read(name)?.uncertain === true;
     },
     clear(name) {
       memory.delete(name);

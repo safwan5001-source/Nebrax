@@ -107,7 +107,6 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<WriteResult | null>(null);
   const sending = useRef(false);
-  const uncertain = useRef(false);
 
   const totals = cashTotals(detail);
   const parsed = amountRaw.trim() === '' ? null : parseMoney(amountRaw, { min: 1 });
@@ -128,13 +127,12 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
       const confirmed = result.kind === 'ok' && (result.shift.cash_movements ?? []).some((m) => m.type === type && m.amount_minor === amount && m.reason === cleanReason);
       if (confirmed) {
         intents.clear('cash');
-        uncertain.current = false;
         setAmountRaw(''); setReason(''); setType('cash_in');
         onSaved();
         return;
       }
-      if (mayHaveApplied(result) || result.kind === 'ok') uncertain.current = true;
-      if (shouldClearIntentKey(result, uncertain.current)) intents.clear('cash');
+      if (mayHaveApplied(result) || result.kind === 'ok') intents.markUncertain('cash');
+      if (shouldClearIntentKey(result, intents.isUncertain('cash'))) intents.clear('cash');
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
     } finally {
       sending.current = false;
