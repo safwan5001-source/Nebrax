@@ -55,4 +55,23 @@ describe('useLoader — one key at a time', () => {
     renderHook(() => useLoader(null, async () => { called = true; return 1; }));
     expect(called).toBe(false);
   });
+
+  it('refresh() updates silently: never goes back to loading, keeps data when the refresh fails', async () => {
+    let n = 0;
+    let failNext = false;
+    const seen: string[] = [];
+    const { result } = renderHook(() => {
+      const loader = useLoader('k', async () => { n += 1; if (failNext) throw new PricesError('offline'); return `v${n}`; });
+      seen.push(loader.state.status === 'success' ? loader.state.data : loader.state.status);
+      return loader;
+    });
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'success', data: 'v1' }));
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'success', data: 'v2' }));
+    failNext = true;
+    act(() => result.current.refresh());
+    await waitFor(() => expect(n).toBe(3));
+    expect(result.current.state).toEqual({ status: 'success', data: 'v2' }); // فشل التحديث لا يمسح بياناً صالحاً
+    expect(seen.slice(seen.indexOf('v1'))).not.toContain('loading'); // ولا وميض تحميل بعد أول نجاح
+  });
 });

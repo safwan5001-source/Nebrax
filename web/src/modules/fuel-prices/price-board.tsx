@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { AlertTriangle, Building2, Fuel, History, Lightbulb, Lock, RefreshCw, Store } from 'lucide-react';
 import { formatDate } from '@/lib/formatting';
@@ -13,6 +13,8 @@ import { PriceSheet } from './price-sheet';
 import { describeRow, describeSuggestion } from './row-view';
 import { useLoader, type LoaderState } from './use-loader';
 
+/** فاصل التحديث الصامت للوحة (ms). */
+export const BOARD_REFRESH_MS = 60_000;
 const READ = 'fuel.sale.view';
 const MANAGE = 'fuel.sale.price.manage';
 
@@ -74,6 +76,19 @@ export function PriceBoard() {
 
   const reloadBoard = () => { effective.reload(); suggestions.reload(); };
   const retryAll = () => { stations.reload(); products.reload(); nozzles.reload(); effective.reload(); suggestions.reload(); };
+
+  // سعر مجدول يبدأ سريانه (أو ينتهي سعر) بمرور الوقت: تحديث صامت عند العودة للتبويب وكل دقيقة، ومتوقف أثناء فتح ورقة.
+  const { refresh: refreshEffective } = effective;
+  const { refresh: refreshSuggestions } = suggestions;
+  const sheetOpen = target !== null;
+  useEffect(() => {
+    if (sheetOpen || sKey === null) return undefined;
+    const tick = () => { if (document.visibilityState === 'visible') { refreshEffective(); refreshSuggestions(); } };
+    const timer = window.setInterval(tick, BOARD_REFRESH_MS);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick); };
+  }, [sheetOpen, sKey, refreshEffective, refreshSuggestions]);
 
   const rows = useMemo(() => new Map<string, EffectiveRow>(effective.state.status === 'success' ? effective.state.data.map((r) => [r.fuel_product_id, r]) : []), [effective.state]);
   const suggestionRows = useMemo(() => new Map<string, SuggestionRow>(suggestions.state.status === 'success' ? suggestions.state.data.map((r) => [r.fuel_product_id, r]) : []), [suggestions.state]);

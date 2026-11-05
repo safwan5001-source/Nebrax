@@ -120,6 +120,34 @@ describe('the board shows the server-resolved price, never a guess', () => {
   });
 });
 
+describe('time passes: scheduled changes become visible without a reload', () => {
+  it('silently refreshes on focus (no skeleton) and shows the price that took effect meanwhile', async () => {
+    seedUser();
+    const world = makeWorld();
+    connect(world);
+    renderBoard();
+    await screen.findByText(/2\.18/);
+    world.effective['station:a'] = [effective('a', 'p1', 230, { effective_from: '2026-11-05T09:00:00+00:00' }), unset('a', 'p2'), unset('a', 'p3')];
+    window.dispatchEvent(new Event('focus'));
+    await screen.findByText(/2\.30/);
+    expect(screen.queryByText(/2\.18/)).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+  });
+
+  it('does not refresh underneath an open price sheet', async () => {
+    seedUser();
+    connect();
+    renderBoard();
+    await screen.findByRole('heading', { name: 'Beta' });
+    await userEvent.click(within(card('Beta')).getByRole('button', { name: 'Set price' }));
+    await screen.findByRole('dialog');
+    const reads = backend.callsTo('/prices/effective').length;
+    window.dispatchEvent(new Event('focus'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(backend.callsTo('/prices/effective').length).toBe(reads);
+  });
+});
+
 describe('permissions and honest failure states', () => {
   it('without fuel.sale.view shows the permission state and requests no prices', async () => {
     seedUser({ permissions: ['fuel_stations.view'] });

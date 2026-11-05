@@ -22,7 +22,7 @@ function reducer<T>(held: Held<T>, action: Action<T>): Held<T> {
  * قراءة مرتبطة بمفتاح واحد: تغيّر المفتاح (مستأجر/مستخدم/نطاق) يعرض `loading` فوراً — لا بيانات نطاق سابق ولا cache عابر —
  * ويُلغي الطلب السابق ويتجاهل ردّه المتأخر. `key = null` ⇒ لا طلب (يبقى `loading`؛ على المستدعي ألّا يعرضه).
  */
-export function useLoader<T>(key: string | null, load: (signal: AbortSignal) => Promise<T>): { state: LoaderState<T>; reload: () => void } {
+export function useLoader<T>(key: string | null, load: (signal: AbortSignal) => Promise<T>): { state: LoaderState<T>; reload: () => void; refresh: () => void } {
   const [held, dispatch] = useReducer(reducer<T>, { key, state: { status: 'loading' } } as Held<T>);
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -44,7 +44,19 @@ export function useLoader<T>(key: string | null, load: (signal: AbortSignal) => 
 
   useEffect(() => run(key), [key, run]);
 
+  /**
+   * تحديث صامت: لا ينقل إلى `loading` (بلا وميض هيكل) ويُبقي القيمة الحالية، ويستبدلها عند النجاح فقط؛ فشله يُتجاهل ولا يمسح
+   * بياناً صالحاً. لمراجعة تغيّرات تسري بمرور الوقت (سعر مجدول بدأ سريانه) دون تدخل المستخدم.
+   */
+  const refresh = useCallback(() => {
+    if (key === null) return;
+    const mine = ++generation.current;
+    loadRef.current(new AbortController().signal)
+      .then((data) => { if (generation.current === mine) dispatch({ type: 'done', key, state: { status: 'success', data } }); })
+      .catch(() => {});
+  }, [key]);
+
   // مفتاح تغيّر ولم يصل effect بعد: لا نعرض حالة المفتاح السابق ولو لإطار واحد.
   const state: LoaderState<T> = held.key === key ? held.state : { status: 'loading' };
-  return { state, reload: () => { run(key); } };
+  return { state, reload: () => { run(key); }, refresh };
 }
