@@ -22,7 +22,7 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 import { ApiError, api } from '@/lib/api';
 import { AUTH_SESSION_CHANGED_EVENT, type AuthUser } from '@/lib/auth';
 import { BRANCH_CHANGED_EVENT, setActiveBranchId } from '@/lib/branch';
-import { meter, shift as makeShift, shiftDetail, nozzle, price, product, pump, station, tank } from './__fixtures__';
+import { effectivePrice, meter, shift as makeShift, shiftDetail, nozzle, product, pump, station, tank, unpriced } from './__fixtures__';
 import { createBackend, type Backend, type TenantData } from './__test-harness';
 import { HomeScreen } from './home-screen';
 import { ProductsScreen } from './products-screen';
@@ -56,7 +56,11 @@ function tenantData(prefix = ''): TenantData {
       nozzle(p('n2'), p('a'), p('pump2'), p('t2'), p('p2')),
       nozzle(p('n3'), p('b'), p('pump3'), p('t3'), p('p4')),
     ],
-    prices: [price(p('pr1'), p('a'), p('p1'), 950), price(p('pr4'), null, p('p4'), 1200)],
+    prices: [
+      effectivePrice(p('a'), p('p1'), 950),
+      unpriced(p('a'), p('p2')),
+      effectivePrice(p('b'), p('p4'), 1200, { source: 'tenant_default' }),
+    ],
     shifts: [],
   };
 }
@@ -137,11 +141,55 @@ describe('products, prices and dispensability', () => {
   it('uses the organization default price when the station has no override, and labels it', async () => {
     seedUser();
     const data = tenantData();
-    data.prices = [price('pr', null, 'p1', 1150)];
+    data.prices = [effectivePrice('a', 'p1', 1150, { source: 'tenant_default' }), unpriced('a', 'p2')];
     connect(data);
     renderOps(<HomeScreen />);
     expect(await screen.findByText(/11\.50/)).toBeTruthy();
     expect(screen.getAllByText('Organization default price').length).toBeGreaterThan(0);
+  });
+
+  it('shows the source, the validity date and the VAT mode next to the server-resolved price', async () => {
+    seedUser();
+    const data = tenantData();
+    data.prices = [effectivePrice('a', 'p1', 1150, { source: 'station_override', tax_mode: 'tax_exclusive', effective_from: '2026-03-04T08:00:00+00:00' }), unpriced('a', 'p2')];
+    connect(data);
+    renderOps(<HomeScreen />);
+    expect(await screen.findByText(/11\.50/)).toBeTruthy();
+    expect(screen.getByText('Station price')).toBeTruthy();
+    expect(screen.getByText('Before VAT')).toBeTruthy();
+    expect(screen.getByText(/Effective since/)).toBeTruthy();
+  });
+
+  it('shows the price but flags a sale blocker when the VAT mode is unset (never hides it, never guesses)', async () => {
+    seedUser();
+    const data = tenantData();
+    data.prices = [effectivePrice('a', 'p1', 950, { tax_mode: null, sellable: false, blockers: ['tax_mode_unset'] }), unpriced('a', 'p2')];
+    connect(data);
+    renderOps(<HomeScreen />);
+    expect(await screen.findByText(/9\.50/)).toBeTruthy();
+    expect(screen.getByText('VAT mode not set')).toBeTruthy();
+    expect(screen.getByText('Official sale not ready: VAT mode is not set')).toBeTruthy();
+  });
+
+  it('never presents a non-liter or unknown server row as a price', async () => {
+    seedUser();
+    const data = tenantData();
+    data.prices = [effectivePrice('a', 'p1', 950, { unit: 'pcs' }), unpriced('a', 'p2')];
+    connect(data);
+    const { container } = renderOps(<HomeScreen />);
+    await screen.findByText('Alpha');
+    await waitFor(() => expect(screen.getByText("Couldn't load price")).toBeTruthy());
+    expect(container.textContent).not.toMatch(/9\.50/);
+  });
+
+  it('asks the server for the effective price once per station and never reads the price history', async () => {
+    seedUser();
+    connect(tenantData());
+    renderOps(<HomeScreen />);
+    await screen.findByText(/9\.50/);
+    const priceCalls = backend.callsTo('/prices');
+    expect(priceCalls).toHaveLength(1);
+    expect(priceCalls[0]).toMatch(/^\/fuel-stations\/prices\/effective\?station_id=a$/);
   });
 
   it('keeps the products visible when the prices endpoint answers 403 and says "not available"', async () => {

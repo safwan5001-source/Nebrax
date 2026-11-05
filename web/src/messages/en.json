@@ -14564,7 +14564,20 @@
       "perLiter": "/ L",
       "tenantDefault": "Organization default price",
       "notConfigured": "Price not set",
-      "incomplete": "Couldn't confirm the current price"
+      "notConfiguredHint": "There is no approved fuel price for this station right now. Ask your supervisor to set it.",
+      "productInactive": "Product inactive",
+      "stationPrice": "Station price",
+      "since": "Effective since {date}",
+      "until": "until {date}",
+      "taxInclusive": "VAT included",
+      "taxExclusive": "Before VAT",
+      "taxUnset": "VAT mode not set",
+      "blocked": {
+        "tax_mode_unset": "Official sale not ready: VAT mode is not set",
+        "unit_mapping_invalid": "Official sale not ready: product unit is not set up in liters",
+        "product_inactive": "Official sale not ready: product is inactive",
+        "price_not_configured": "Official sale not ready: no approved price"
+      }
     },
     "unit": {
       "liter": "L"

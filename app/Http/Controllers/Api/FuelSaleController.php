@@ -8,10 +8,12 @@ use App\Http\Requests\StoreFuelStationProductPriceRequest;
 use App\Http\Resources\FuelSalePaymentMethodResource;
 use App\Http\Resources\FuelSaleResource;
 use App\Http\Resources\FuelStationProductPriceResource;
+use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\FuelStation;
 use App\Models\FuelStationProductPrice;
 use App\Models\PaymentMethod;
+use App\Services\FuelEffectivePriceReadService;
 use App\Services\FuelSaleService;
 use App\Services\FuelStationProductPriceService;
 use App\Services\FuelStationSettingsService;
@@ -20,10 +22,13 @@ use Illuminate\Http\Request;
 
 class FuelSaleController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(
         private FuelSaleService $sales,
         private FuelStationProductPriceService $prices,
         private FuelStationSettingsService $settings,
+        private FuelEffectivePriceReadService $effectivePrices,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -85,17 +90,65 @@ class FuelSaleController extends ApiController
         return FuelSalePaymentMethodResource::collection($methods)->response();
     }
 
+    /**
+     * سجل أسعار الوقود (تاريخي). نطاق المحطة يُفرض خادمياً (#1998): صفوف محطات خارج نطاق المستخدم لا تُعاد،
+     * وسعر المؤسسة الافتراضي (`fuel_station_id IS NULL`) يبقى مرئياً. لا تحسم هذه القراءة السعر الفعّال —
+     * استعمل `effectiveIndex` فهو المصدر نفسه الذي يستعمله البيع.
+     */
     public function priceIndex(Request $request): JsonResponse
     {
-        $query = FuelStationProductPrice::query()->orderByDesc('effective_from');
-        if ($request->filled('station_id')) {
-            $query->where('fuel_station_id', $request->query('station_id'));
+        $data = $request->validate([
+            'station_id' => ['nullable', 'uuid'],
+            'fuel_product_id' => ['nullable', 'uuid'],
+            'scope' => ['nullable', 'in:station,tenant_default'],
+        ]);
+        if (($data['scope'] ?? null) === 'tenant_default' && ! empty($data['station_id'])) {
+            abort(422, 'لا يجمع scope=tenant_default مع station_id.');
         }
-        if ($request->filled('fuel_product_id')) {
-            $query->where('fuel_product_id', $request->query('fuel_product_id'));
+
+        $query = FuelStationProductPrice::query()->orderByDesc('effective_from');
+        if (! empty($data['station_id'])) {
+            // 404 موحّد لمحطة غير موجودة أو خارج فروع/مخازن المستخدم (عقد assertRecordAccessible).
+            $this->accessibleStation($data['station_id']);
+            $query->where('fuel_station_id', $data['station_id']);
+        } else {
+            $accessible = $this->accessibleStationsQuery();
+            if ($accessible !== null) {
+                $query->where(fn ($q) => $q->whereNull('fuel_station_id')->orWhereIn('fuel_station_id', $accessible));
+            }
+        }
+        if (($data['scope'] ?? null) === 'tenant_default') {
+            $query->whereNull('fuel_station_id');
+        } elseif (($data['scope'] ?? null) === 'station') {
+            $query->whereNotNull('fuel_station_id');
+        }
+        if (! empty($data['fuel_product_id'])) {
+            $query->where('fuel_product_id', $data['fuel_product_id']);
         }
 
         return FuelStationProductPriceResource::collection($query->paginate(50))->response();
+    }
+
+    /**
+     * السعر الفعّال الآن لمنتجات وقود محطة — الخادم يحسم الزمن والأولوية والضريبة (لا المتصفح).
+     * نفس `FuelStationProductPriceService::resolve` الذي يعتمده إنهاء البيع. قراءة فقط.
+     */
+    public function effectiveIndex(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'station_id' => ['required', 'uuid'],
+            'fuel_product_id' => ['nullable', 'uuid'],
+        ]);
+        $station = $this->accessibleStation($data['station_id']);
+
+        $products = isset($data['fuel_product_id'])
+            ? FuelProduct::query()->with('product')->whereKey($data['fuel_product_id'])->get()
+            : FuelProduct::query()->with('product')->where('is_active', true)->orderBy('code')->get();
+        if (isset($data['fuel_product_id']) && $products->isEmpty()) {
+            abort(404);
+        }
+
+        return response()->json(['data' => $this->effectivePrices->forStation($station, $products, now())]);
     }
 
     public function storePrice(StoreFuelStationProductPriceRequest $request): JsonResponse

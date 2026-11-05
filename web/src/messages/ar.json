@@ -14564,7 +14564,20 @@
       "perLiter": "/ لتر",
       "tenantDefault": "سعر المؤسسة الافتراضي",
       "notConfigured": "السعر غير مضبوط",
-      "incomplete": "تعذّر تأكيد السعر الحالي"
+      "notConfiguredHint": "لا يوجد سعر وقود معتمد لهذه المحطة الآن. اطلب من المسؤول ضبطه.",
+      "productInactive": "المنتج غير نشط",
+      "stationPrice": "سعر المحطة",
+      "since": "ساري منذ {date}",
+      "until": "حتى {date}",
+      "taxInclusive": "شامل الضريبة",
+      "taxExclusive": "قبل الضريبة",
+      "taxUnset": "نمط الضريبة غير معيَّن",
+      "blocked": {
+        "tax_mode_unset": "البيع الرسمي غير جاهز: نمط الضريبة غير معيَّن",
+        "unit_mapping_invalid": "البيع الرسمي غير جاهز: وحدة المنتج غير مهيّأة باللتر",
+        "product_inactive": "البيع الرسمي غير جاهز: المنتج غير نشط",
+        "price_not_configured": "البيع الرسمي غير جاهز: لا سعر معتمد"
+      }
     },
     "unit": {
       "liter": "لتر"
