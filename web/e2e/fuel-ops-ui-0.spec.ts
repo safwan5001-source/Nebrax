@@ -64,6 +64,16 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     if (p === '/fuel-stations/pumps') return json(route, { data: pumps });
     if (p === '/fuel-stations/tanks') return json(route, { data: tanks });
     if (p === '/fuel-stations/nozzles') return json(route, { data: nozzles });
+    if (p === '/fuel-stations/prices/effective') {
+      // مصدر السعر الفعّال الوحيد منذ #2010: الخادم يحسم محطة ← افتراضي المؤسسة ← غير مضبوط.
+      const rows = products.map((product) => {
+        const hit = prices.find((r) => r.fuel_product_id === product.id && (r.fuel_station_id === station || r.fuel_station_id === null));
+        return hit
+          ? { fuel_product_id: product.id, fuel_station_id: station, status: 'effective', source: hit.fuel_station_id ? 'station_override' : 'tenant_default', price_per_liter_minor: hit.price_per_liter_minor, unit: 'L', tax_mode: 'tax_inclusive', effective_from: hit.effective_from, effective_until: null, sellable: true, blockers: [] }
+          : { fuel_product_id: product.id, fuel_station_id: station, status: 'not_configured', source: null, price_per_liter_minor: null, unit: 'L', tax_mode: 'tax_inclusive', effective_from: null, effective_until: null, sellable: false, blockers: ['price_not_configured'] };
+      });
+      return json(route, { data: rows });
+    }
     if (p === '/fuel-stations/prices') {
       const product = url.searchParams.get('fuel_product_id');
       return json(route, { data: prices.filter((r) => (!product || r.fuel_product_id === product) && (!station || r.fuel_station_id === station)), meta: { current_page: 1, last_page: 1 } });
