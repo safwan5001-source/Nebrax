@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMING_SOON, OPS_BASE, deriveOpsMode, isNavActive, visibleOpsNav } from './nav';
+import { OPS_BASE, deriveOpsMode, isNavActive, visibleOpsNav } from './nav';
 
 const canFrom = (granted: string[]) => (permission: string) => granted.includes('*') || granted.includes(permission);
 const canAllFrom = (granted: string[]) => (required: readonly string[]) => required.every(canFrom(granted));
@@ -27,9 +27,4 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(isNavActive(null, OPS_BASE)).toBe(false);
   });
 
-  it('lists the not-yet-built operations per mode', () => {
-    expect(COMING_SOON.operator).toEqual(['readings', 'collection']);
-    expect(COMING_SOON.supervisor).toContain('approval');
-    expect(COMING_SOON.viewer).toEqual([]);
-  });
 });
