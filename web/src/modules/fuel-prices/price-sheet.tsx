@@ -306,11 +306,11 @@ export function PriceSheet(props: PriceSheetProps) {
             </button>
           ) : null}
           {step === 'form' ? (
-            <button type="button" disabled={!formValid} data-primary-action onClick={() => setStep('review')} className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40">
+            <button type="button" disabled={!formValid} data-primary-action onClick={() => setStep('review')} className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40">
               {t('sheet.continue')}
             </button>
           ) : (
-            <button type="button" disabled={!reviewReady || saving} aria-busy={saving} data-primary-action onClick={() => void save()} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-base font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40">
+            <button type="button" disabled={!reviewReady || saving} aria-busy={saving} data-primary-action onClick={() => void save()} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40">
               {saving ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />}
               {saving ? t('sheet.saving') : t(fromSuggestion ? 'sheet.confirmSuggestion' : 'sheet.confirm')}
             </button>

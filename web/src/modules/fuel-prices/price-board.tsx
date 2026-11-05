@@ -243,7 +243,7 @@ export function PriceBoard() {
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   {writable ? (
-                    <button type="button" data-primary-action={view.kind === 'not_configured' ? '' : undefined} onClick={() => setTarget({ kind: 'edit', product })} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                    <button type="button" data-primary-action={view.kind === 'not_configured' ? '' : undefined} onClick={() => setTarget({ kind: 'edit', product })} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
                       {view.kind === 'known' && view.scope === (scope.kind === 'station' ? 'station' : 'tenant') ? t('card.edit') : t('card.set')}
                     </button>
                   ) : (
