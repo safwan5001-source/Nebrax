@@ -26,7 +26,7 @@ const ALLOWED_READ_PATHS: RegExp[] = [
   /^\/fuel-stations\/pumps$/,
   /^\/fuel-stations\/nozzles$/,
   /^\/fuel-stations\/tanks$/,
-  /^\/fuel-stations\/prices$/,
+  /^\/fuel-stations\/prices\/effective$/,
   /^\/fuel-stations\/shifts$/,
 ];
 

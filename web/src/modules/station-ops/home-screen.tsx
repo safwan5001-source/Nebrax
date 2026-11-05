@@ -171,7 +171,7 @@ function ProductsSection({ station, assets }: { station: Station; assets: Return
                     {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
                   </p>
                 </div>
-                <PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} />
+                <PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} timeZone={station.timezone} />
               </li>
             ))}
           </ul>

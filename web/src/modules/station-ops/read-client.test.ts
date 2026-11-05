@@ -16,12 +16,12 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('opsGet — read-only client', () => {
   it('only allows the documented GET endpoints', () => {
-    for (const ok of ['stations', 'products', 'pumps', 'nozzles', 'tanks', 'prices', 'shifts']) {
+    for (const ok of ['stations', 'products', 'pumps', 'nozzles', 'tanks', 'prices/effective', 'shifts']) {
       expect(isAllowedReadPath(`/fuel-stations/${ok}`)).toBe(true);
     }
     // قراءة وردية بمعرّفها (UI-1) مسموحة؛ أما `open` (مسار POST) وما يتجاوز المعرّف إلى مسار فرعي أو `../` فلا.
     for (const good of ['/fuel-stations/shifts/9f1c2d3e-0000-4000-8000-000000000001', '/fuel-stations/shifts/s1']) expect(isAllowedReadPath(good), good).toBe(true);
-    for (const bad of ['/fuel-stations/shifts/open', '/fuel-stations/shifts/abc/close', '/fuel-stations/shifts/abc/meter-readings', '/fuel-stations/shifts/../sales', '/fuel-stations/shifts/%2e%2e', '/fuel-stations/shifts/a b', '/fuel-stations/shifts/', '/fuel-stations/sales', '/fuel-stations/stations/1/settings', '/login', '/fuel-stations/deliveries', '/fuel-stations/stations/abc']) {
+    for (const bad of ['/fuel-stations/shifts/open', '/fuel-stations/shifts/abc/close', '/fuel-stations/shifts/abc/meter-readings', '/fuel-stations/shifts/../sales', '/fuel-stations/shifts/%2e%2e', '/fuel-stations/shifts/a b', '/fuel-stations/shifts/', '/fuel-stations/sales', '/fuel-stations/prices', '/fuel-stations/prices/effective/x', '/fuel-stations/stations/1/settings', '/login', '/fuel-stations/deliveries', '/fuel-stations/stations/abc']) {
       expect(isAllowedReadPath(bad), bad).toBe(false);
     }
   });

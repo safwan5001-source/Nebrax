@@ -14,6 +14,9 @@ use RuntimeException;
 /** مصدر السعر الوحيد لبيع الوقود: override المحطة ثم default المستأجر ثم رفض صريح. */
 class FuelStationProductPriceService
 {
+    public const SOURCE_STATION_OVERRIDE = 'station_override';
+    public const SOURCE_TENANT_DEFAULT = 'tenant_default';
+
     /** @param array<string,mixed> $attributes */
     public function create(array $attributes, User $actor): FuelStationProductPrice
     {
@@ -78,19 +81,36 @@ class FuelStationProductPriceService
         });
     }
 
-    public function effective(FuelStation $station, FuelProduct $fuelProduct, CarbonInterface $at): FuelStationProductPrice
+    /**
+     * السعر الفعّال وقت `$at` — **القرار الوحيد** لسعر لتر الوقود: سعر المحطة ثم افتراضي المستأجر.
+     * يستعمله البيع (`effective()` الرافضة) وقراءة التطبيق (`GET /fuel-stations/prices/effective`)
+     * معاً، فلا يمكن أن يختلف المعروض عن المستعمل وقت الإنهاء. يعيد null عند الغياب (لا يخمّن ولا يرمي).
+     *
+     * @return array{price: FuelStationProductPrice, source: string}|null  source: station_override|tenant_default
+     */
+    public function resolve(FuelStation $station, FuelProduct $fuelProduct, CarbonInterface $at): ?array
     {
         $stationPrice = $this->effectiveForScope($fuelProduct->id, $station->id, $at);
         if ($stationPrice !== null) {
-            return $stationPrice;
+            return ['price' => $stationPrice, 'source' => self::SOURCE_STATION_OVERRIDE];
         }
 
         $tenantDefault = $this->effectiveForScope($fuelProduct->id, null, $at);
         if ($tenantDefault !== null) {
-            return $tenantDefault;
+            return ['price' => $tenantDefault, 'source' => self::SOURCE_TENANT_DEFAULT];
         }
 
-        throw new RuntimeException('FUEL_PRICE_NOT_CONFIGURED: لا يوجد سعر وقود فعال للمحطة أو للمستأجر في وقت البيع.');
+        return null;
+    }
+
+    public function effective(FuelStation $station, FuelProduct $fuelProduct, CarbonInterface $at): FuelStationProductPrice
+    {
+        $resolved = $this->resolve($station, $fuelProduct, $at);
+        if ($resolved === null) {
+            throw new RuntimeException('FUEL_PRICE_NOT_CONFIGURED: لا يوجد سعر وقود فعال للمحطة أو للمستأجر في وقت البيع.');
+        }
+
+        return $resolved['price'];
     }
 
     private function effectiveForScope(string $fuelProductId, ?string $stationId, CarbonInterface $at): ?FuelStationProductPrice

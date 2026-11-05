@@ -80,7 +80,7 @@ function Content({ station }: { station: Station }) {
                         {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
                       </span>
                     </span>
-                    <PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} />
+                    <PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} timeZone={station.timezone} />
                   </summary>
                   <ul className="divide-y divide-border border-t border-border px-4">
                     {entry.nozzles.map((view) => <NozzleRow key={view.nozzle.id} view={view} />)}
