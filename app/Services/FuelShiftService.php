@@ -313,6 +313,8 @@ class FuelShiftService
             $station = FuelStation::findOrFail($shift->fuel_station_id);
             $policy = $this->settings->forStation($station);
             $this->assertCloseReadiness($shift, $station, $policy);
+            // Q1/Q3: إقرار التحصيل المحفوظ المكتمل شرط الإغلاق (والبوابة مفتوحة فقط) + سبب موثَّق لفرق ظاهر لصاحبه. البوابة مغلقة ⇒ لا شيء.
+            app(FuelShiftCollectionService::class)->assertClosable($shift, $closingNote, $actor);
 
             // D2: صورة المتوقع تُحسب مرة واحدة تحت قفل الوردية بالحساب المشترك ثم تُجمَّد في لقطة الفرق.
             $basis = $this->expectation->effectiveBasis($station);
@@ -382,6 +384,8 @@ class FuelShiftService
                 'official_cash_basis' => $basis,
                 'expectation_complete' => $live['complete'],
             ]);
+            // إقرار تحصيل الوردية (إن وُجد): يُجمَّد مع لقطة الدرج داخل معاملة الإغلاق نفسها ولو أُغلقت بوابته بعد الحفظ. الحل الكسول عبر app() يكسر الدورة مع خدمة الإقرار.
+            app(FuelShiftCollectionService::class)->freezeAtClose($shift, $countedCashMinor, $live, $actor, $closingNote);
             if ($variance !== 0) {
                 $this->event($shift, FuelShiftEvent::TYPE_CASH_VARIANCE_PENDING, $actor, [
                     'cash_variance_id' => $cashVariance->id, 'variance_minor' => $variance, 'direction' => $direction,
@@ -408,6 +412,8 @@ class FuelShiftService
             if ($policy['shift_supervisor_approval_required'] && $shift->opened_by === $actor->id) {
                 throw new RuntimeException('سياسة المحطة تتطلب اعتماد الشفت من مشرف مختلف عن فاتح الشفت.');
             }
+            // Q3: فرق مطابقة التحصيل غير الصفري يحتاج مراجعة مشرف مسجَّلة قبل الاعتماد (والبوابة مفتوحة فقط).
+            app(FuelShiftCollectionService::class)->assertApprovable($shift);
 
             $shift->update([
                 'status' => FuelShift::STATUS_APPROVED,
@@ -497,7 +503,8 @@ class FuelShiftService
         });
     }
 
-    private function lockOpenShift(FuelShift $shift, User $actor): FuelShift
+    /** يقفل الوردية `FOR UPDATE` ويتحقق من نطاق الفاعل والمحطة وأنها مفتوحة (يستعمله إقرار تحصيل الوردية أيضاً). */
+    public function lockOpenShift(FuelShift $shift, User $actor): FuelShift
     {
         $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
         $station = FuelStation::findOrFail($shift->fuel_station_id);

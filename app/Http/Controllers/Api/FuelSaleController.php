@@ -12,7 +12,6 @@ use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\FuelStation;
 use App\Models\FuelStationProductPrice;
-use App\Models\PaymentMethod;
 use App\Services\FuelEffectivePriceReadService;
 use App\Services\FuelPriceSuggestionService;
 use App\Services\FuelSaleService;
@@ -93,13 +92,7 @@ class FuelSaleController extends ApiController
     {
         $station = $this->scopeToActiveBranch(FuelStation::query(), $request)->findOrFail($stationId);
         $this->assertRecordAccessible($station->branch_id, [$station->warehouse_id]); // #2016
-        $ids = $this->settings->forStation($station)['fuel_sales_allowed_payment_method_ids'] ?? [];
-        $methods = PaymentMethod::query()
-            ->whereIn('id', is_array($ids) ? $ids : [])
-            ->where('is_active', true)
-            ->whereIn('settlement_type', ['cash', 'bank'])
-            ->orderBy('name')
-            ->get();
+        $methods = app(\App\Services\FuelStationPaymentMethods::class)->allowedFor($station);
 
         return FuelSalePaymentMethodResource::collection($methods)->response();
     }

@@ -15078,6 +15078,105 @@
       "complete": "This shift is complete",
       "soon": "This step will arrive inside the app soon"
     },
+    "collection": {
+      "title": "Sales and collection",
+      "subtitle": "Compare meter sales with what you collected by payment method before handover.",
+      "loadFailed": "Could not load collection data. You can still hand the shift over without it.",
+      "frozen": "Frozen at shift handover",
+      "live": "Live calculation — frozen at handover",
+      "none": "No collection breakdown was recorded for this shift.",
+      "nozzle": "Nozzle {number}",
+      "nozzleStatus": {
+        "missing_opening": "Opening reading missing",
+        "missing_closing": "Closing reading missing",
+        "missing_both": "No readings",
+        "closing_below_opening": "Closing is below opening (abnormal, not counted)",
+        "unknown": "Unknown status"
+      },
+      "sales": {
+        "title": "Meter sales",
+        "liters": "Volume from meter difference",
+        "amount": "Sales value (litres × effective price)",
+        "partial": "(partial)",
+        "unavailable": "Unavailable — no unreliable amount is used",
+        "unavailableShort": "Unavailable",
+        "hidden": "Shown to the supervisor",
+        "perLiter": "/ litre"
+      },
+      "gap": {
+        "missing_reading": "Some nozzles have a missing opening or closing reading, so no sales amount is calculated.",
+        "closing_below_opening": "A closing reading is below its opening. It was excluded and no sales amount is calculated — ask your supervisor.",
+        "price_unavailable": "A product has no effective price, so no sales amount is calculated.",
+        "price_changed_during_shift": "A product price changed during the shift, so the amount is not split by guesswork — your supervisor reviews it.",
+        "tax_mode_unset": "The fuel price tax mode is not set for the station, so no sales amount is calculated.",
+        "product_unavailable": "A fuel product is unavailable or not configured, so no sales amount is calculated.",
+        "no_nozzles": "The station has no nozzles, so there are no meter sales.",
+        "unknown": "An unknown reason prevents calculating the sales amount."
+      },
+      "entry": {
+        "title": "Collection by payment method",
+        "hint": "Enter what you collected with each method, in riyals. Enter 0 if you collected nothing with it.",
+        "type": {
+          "cash": "Cash",
+          "bank": "Card / bank"
+        },
+        "invalid": "Enter a valid amount in riyals, such as 1250 or 1250.50. Enter 0 if none.",
+        "required": "Enter an amount for every method (0 if none) to see the reconciliation and enable saving.",
+        "total": "Total collection entered",
+        "noMethods": "No payment methods are enabled for this station. Enable them in the station settings, then come back.",
+        "methodsUpdated": "The station's enabled payment methods changed and the list was updated. Review the amounts.",
+        "methodsChangedSaved": "Payment methods changed since the last save. Enter the amounts and save again."
+      },
+      "recon": {
+        "title": "Operational reconciliation",
+        "hidden": "Reviewed by the supervisor.",
+        "needInputs": "Fill in every method's amount to see the reconciliation.",
+        "notFinal": "Reconciliation is not final: sales are incomplete.",
+        "previewUnsaved": "Preview — not saved yet.",
+        "saved": "Calculated from the saved declaration.",
+        "direction": {
+          "overage": "Overage",
+          "shortage": "Shortage",
+          "none": "Matches"
+        }
+      },
+      "drawer": {
+        "title": "Cash in the drawer",
+        "opening": "Opening float",
+        "handover": "Handed to the treasury",
+        "counted": "Cash in the drawer (counted)",
+        "countedMissing": "Enter the actual cash in the handover step.",
+        "implied": "Sales cash the drawer implies",
+        "impliedPreview": "Sales cash the drawer implies (preview)",
+        "cross": "Entered cash vs drawer difference",
+        "note": "= counted − float − cash additions + withdrawals (including treasury handover) + expenses."
+      },
+      "save": "Save collection breakdown",
+      "saving": "Saving…",
+      "saved": "Collection breakdown saved (version {revision}).",
+      "unchanged": "No change from what is saved.",
+      "dirty": "The amounts changed since the last save. Save to refresh the reconciliation.",
+      "gate": {
+        "no_methods": "No payment methods are enabled for this station, so the required collection breakdown cannot be saved before handover. Ask the administrator to enable one.",
+        "required": "Save the collection breakdown by payment method first — the shift cannot be handed over without it.",
+        "incomplete": "The enabled payment methods changed since the last save. Enter the amounts and save the collection breakdown again before handover.",
+        "unsaved": "The amounts changed and were not saved. Save the collection breakdown before handover."
+      },
+      "reasonLabel": "Reason for the difference (required)",
+      "reasonRequired": "There is a difference between the collection and the meter sales. Write its reason in the note field for the supervisor to review.",
+      "review": {
+        "title": "Supervisor review",
+        "pending": "Waiting for the supervisor to review before approval.",
+        "reviewed": "The difference was reviewed by the supervisor.",
+        "reason": "Reason for the difference",
+        "note": "Supervisor note"
+      },
+      "disclaimer": {
+        "operational_not_financial_proof": "An operational check for you and your supervisor, not proof of an officially recorded collection. Saving it creates no payment receipt and records nothing in the books.",
+        "credit_sales_excluded": "Sales on account are not part of this check.",
+        "unrecorded_settlements_excluded": "Unrecorded settlements are not part of this check."
+      }
+    },
     "write": {
       "reject": {
         "shift_already_open": "This station already has an open shift. Open it instead of creating a second one.",
@@ -15097,6 +15196,14 @@
         "close_blocked_cash_variance": "Station policy blocks handover while there is a cash difference. Ask your supervisor.",
         "close_blocked_tank_variance": "Station policy blocks handover because the tank difference is outside the allowed limit. Ask your supervisor.",
         "tank_type_mismatch": "The tank reading type at the end differs from the start. Ask your supervisor.",
+        "collection_method_not_allowed": "A payment method in the declaration is now disabled or not allowed for this station. The list was refreshed — review the amounts.",
+        "collection_methods_changed": "A new payment method was enabled for this station. The list was refreshed — enter its amount and save.",
+        "collection_invalid": "The collection data is invalid. Make sure every method has a valid non-negative amount.",
+        "collection_stale_revision": "The collection breakdown was changed from another device. It was refreshed — review it and save again.",
+        "collection_required": "Save the collection breakdown by payment method first — the shift cannot be handed over without it.",
+        "collection_incomplete": "The enabled payment methods changed since the last save. Update and save the collection breakdown before handover.",
+        "collection_no_methods": "No payment methods are enabled for this station. Ask the administrator to enable one.",
+        "collection_reason_required": "There is a collection difference. Write its reason in the handover note and try again.",
         "unauthorized": "Your session has ended. Sign in again.",
         "forbidden": "You don't have permission to do this.",
         "not_found": "We couldn't find this shift or station within your work scope.",

@@ -5,7 +5,7 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 
 import { api, ApiError } from '@/lib/api';
 import { shiftDetail } from './__fixtures__';
-import { classifyRejection, opsWrite, type WriteRequest } from './write-client';
+import { classifyRejection, opsWrite, opsWriteCollection, type WriteRequest } from './write-client';
 import { shouldClearIntentKey } from './write-outcome';
 
 const apiMock = vi.mocked(api);
@@ -117,5 +117,64 @@ describe('shouldClearIntentKey', () => {
     expect(shouldClearIntentKey({ kind: 'not_sent', reason: 'offline' }, true)).toBe(false);
     expect(shouldClearIntentKey({ kind: 'unknown', reason: 'timeout' }, false)).toBe(false);
     expect(shouldClearIntentKey({ kind: 'unverified' }, false)).toBe(false);
+  });
+});
+
+describe('opsWriteCollection — shift collection declaration (operational, gated server-side)', () => {
+  const body = { idempotency_key: 'k1', base_revision: 0, lines: [{ payment_method_id: 'm-cash', amount_minor: 100 }] };
+  const view = {
+    enabled: true, state: 'declared', revision: 1,
+    methods: [{ id: 'm-cash', name: 'Cash', name_en: null, settlement_type: 'cash', saved_amount_minor: 100 }], methods_changed: false,
+    declaration: { id: 'd', revision: 1, status: 'declared', lines: [{ payment_method_id: 'm-cash', name: 'Cash', settlement_type: 'cash', amount_minor: 100, still_allowed: true }], collected_total_minor: 100, cash_declared_minor: 100, network_declared_minor: 0 },
+    close_readiness: { ready: true, blockers: [], reason_required: false }, review: { visible: false },
+    sales: { visible: false, complete: false, milliliters: 0, milliliters_complete: false, amount_minor: null, products: [], nozzles: [], gaps: [] },
+    reconciliation: { visible: false },
+    drawer: { frozen: false, opening_float_minor: 0, counted_cash_minor: null, treasury_handover_minor: 0, cash_in_minor: 0, cash_out_minor: 0, expenses_minor: 0, implied_sales_cash: { visible: false } },
+    disclaimers: [],
+  };
+
+  it('POSTs to …/collection with ids + halalas + base revision + key and the branch header', async () => {
+    apiMock.mockResolvedValue({ data: view, meta: { replayed: false, unchanged: false } });
+    const result = await opsWriteCollection(SHIFT, body, { branchId: 'b1' });
+    expect(result).toMatchObject({ kind: 'ok', replayed: false, unchanged: false });
+    const [url, options] = apiMock.mock.calls[0];
+    expect(url).toBe(`/fuel-stations/shifts/${SHIFT}/collection`);
+    expect(options).toMatchObject({ method: 'POST', body, headers: { 'X-Branch-Id': 'b1' } });
+  });
+
+  it('refuses a bad shift id and non-integer / negative amounts before any request', async () => {
+    await expect(opsWriteCollection('../x', body)).rejects.toThrow(/invalid shift id/);
+    await expect(opsWriteCollection(SHIFT, { ...body, lines: [{ payment_method_id: 'm', amount_minor: 1.5 }] })).rejects.toThrow(/integers/);
+    await expect(opsWriteCollection(SHIFT, { ...body, lines: [{ payment_method_id: 'm', amount_minor: -1 }] })).rejects.toThrow(/integers/);
+    await expect(opsWriteCollection(SHIFT, { ...body, base_revision: -1 })).rejects.toThrow(/integers/);
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('an unreadable 2xx is unverified; 5xx/network are unknown; offline sends nothing', async () => {
+    apiMock.mockResolvedValue({ data: { weird: true } });
+    expect(await opsWriteCollection(SHIFT, body)).toEqual({ kind: 'unverified' });
+    apiMock.mockRejectedValue(new ApiError(500, 'x', {}));
+    expect(await opsWriteCollection(SHIFT, body)).toEqual({ kind: 'unknown', reason: 'server' });
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    expect(await opsWriteCollection(SHIFT, body)).toEqual({ kind: 'not_sent', reason: 'offline' });
+  });
+
+  it('classifies the structured 409 reason and the FUEL_COLLECTION_* messages', async () => {
+    apiMock.mockRejectedValue(new ApiError(409, 'x', { reason: 'stale_revision', current_revision: 2 }));
+    expect(await opsWriteCollection(SHIFT, body)).toMatchObject({ kind: 'rejected', status: 409, code: 'collection_stale_revision' });
+    apiMock.mockRejectedValue(new ApiError(409, 'x', { reason: 'idempotency_conflict' }));
+    expect(await opsWriteCollection(SHIFT, body)).toMatchObject({ code: 'idempotency_conflict' });
+    expect(classifyRejection(409, 'x', {})).toBe('conflict');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_METHOD_NOT_ALLOWED: x')).toBe('collection_method_not_allowed');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_METHODS_CHANGED: x')).toBe('collection_methods_changed');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_INVALID: x')).toBe('collection_invalid');
+    expect(classifyRejection(404, undefined)).toBe('not_found');
+  });
+
+  it('classifies the close-gate refusals (Q1/Q3) so the screen shows the exact reason', () => {
+    expect(classifyRejection(422, 'FUEL_COLLECTION_REQUIRED: x')).toBe('collection_required');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_INCOMPLETE: x')).toBe('collection_incomplete');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_NO_METHODS: x')).toBe('collection_no_methods');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_REASON_REQUIRED: x')).toBe('collection_reason_required');
   });
 });
