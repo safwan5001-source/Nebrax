@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
-import { FUEL_ICONS, FUEL_ICON_IDS, FuelIcon, detectFuelGrade, fuelIconLabel, fuelIconSources, isFuelIconId, resolveFuelIcon } from './index';
+import { FUEL_ICONS, FUEL_ICON_IDS, FuelIcon, detectFuelGrade, fuelIconLabel, fuelIconSources, isFuelIconId, resolveFuelIcon, resolvePumpIcon } from './index';
 
 afterEach(cleanup);
 
@@ -73,6 +73,21 @@ describe('resolveFuelIcon (display-only, no hard-coded catalog)', () => {
     expect(resolveFuelIcon('product', undefined)).toBe('fuel-product');
     expect(resolveFuelIcon('tank', null)).toBe('storage-tanks');
     expect(resolveFuelIcon('pump', null)).toBe('fuel-pump');
+  });
+});
+
+describe('resolvePumpIcon (connected nozzle products)', () => {
+  it('selects the correct pump icon for one known grade', () => {
+    expect(resolvePumpIcon([{ name: 'بنزين 91' }])).toBe('pump-91');
+    expect(resolvePumpIcon([{ name: 'Gasoline 95' }, { name: 'بنزين ٩٥' }])).toBe('pump-95');
+    expect(resolvePumpIcon([{ name: 'ديزل' }])).toBe('pump-diesel');
+  });
+
+  it('uses a neutral pump for mixed grades, missing or unknown product and empty nozzle list', () => {
+    expect(resolvePumpIcon([{ name: 'بنزين 91' }, { name: 'بنزين 95' }])).toBe('fuel-pump');
+    expect(resolvePumpIcon([{ name: 'بنزين 91' }, null])).toBe('fuel-pump');
+    expect(resolvePumpIcon([{ name: 'بنزين 98' }])).toBe('fuel-pump');
+    expect(resolvePumpIcon([])).toBe('fuel-pump');
   });
 });
 
