@@ -52,12 +52,12 @@ B1 what counts in "counted cash" / sales↔drawer reconciliation (**owner decisi
 ## 5. Real test results
 | Suite | Result |
 |---|---|
-| Vitest `src/modules/station-ops` | **19 files / 666 tests passed** (new: `entry`, `cash`, `intents`, `write-client` units; `write-flows.integration` = 37 tests incl. axe a11y in AR/RTL; `write-boundary` guard; updated next-step/read-client/home tests) |
+| Vitest `src/modules/station-ops` | **21 files / 730 tests passed** (بعد دمج #2023؛ كان 19/666) (new: `entry`, `cash`, `intents`, `write-client` units; `write-flows.integration` = 37 tests incl. axe a11y in AR/RTL; `write-boundary` guard; updated next-step/read-client/home tests) |
 | PHPUnit `FuelShiftSellerContractTest` | **7 passed / 89 assertions** (RBAC per write, defaults, R2/R3/R4, no journal/stock/payment/invoice rows) |
-| PHPUnit **full suite** (sandbox, SQLite) | 10,942 passed · 382 skipped (PostgreSQL-only) · **50 failed — all in 8 `Fuel*` classes with `Call to undefined function App\Services\bcmul()`** (the sandbox PHP lacks `ext-bcmath`; the session hook warns about it and CI loads it). No production PHP changed in this PR; the failing classes are the pre-existing fuel-costing paths. **To be confirmed by CI on SQLite + PostgreSQL.** |
+| PHPUnit `--filter=Fuel` (sandbox SQLite, `ext-bcmath` installed) | **224 passed · 7 skipped (PostgreSQL-only)** — includes `FuelShiftSellerContractTest` (7) and #2023's `FuelShiftCashReconciliationTest`. The earlier 50 `bcmul` failures were purely the missing extension. No production PHP is changed by this PR. Full suite + PostgreSQL: CI. |
 | `next build` (production, 10 GB heap — the default heap OOMs on this repo) | ✅ compiled, lint + types, 232 pages |
-| Playwright on the production build — UI-0/1/2 functional | **72 passed** (desktop 1440 + iPhone-size 390; EN + AR): full journey open→readings→handover, lost reply ×2, forbidden/refusal, offline, missing readings, no-permission |
-| Playwright visual-QA matrix (UI-2) | **129 passed**; 128 captures, **0 flagged** by probes (overflow, <44 px targets, clipped text, <16 px fields, action-bar/nav overlap, Arabic-Indic digits, off-app links, non-whitelisted POST, console errors) |
+| Playwright on the production build — UI-0/1/2 functional | **72 passed** (re-run after merging #2023) · cash-summary spec (#2023) **16 passed** (desktop 1440 + iPhone-size 390; EN + AR): full journey open→readings→handover, lost reply ×2, forbidden/refusal, offline, missing readings, no-permission |
+| Playwright visual-QA matrix (UI-2) | **129 passed** (re-run after the merge); 128 captures, **0 flagged** by probes (overflow, <44 px targets, clipped text, <16 px fields, action-bar/nav overlap, Arabic-Indic digits, off-app links, non-whitelisted POST, console errors) |
 
 Two defects were found **by looking/probing, not by unit tests**, and fixed: (1) names truncated with "…" at 320 px (user/station on the open form, review rows, product on home) → now wrap; (2) the home's primary button sat below the fold on 390×844 → next step + button moved above the liters card. Also the redundant nozzle name in each field label was shortened (full name kept as `aria-label`).
 
@@ -70,3 +70,8 @@ Two defects were found **by looking/probing, not by unit tests**, and fixed: (1)
 
 ## 7. Files
 `write-client.ts` · `write-outcome.ts` · `intents.ts` · `drafts.ts` · `entry.ts` · `cash.ts` · `policy.ts` · `write-ui.tsx` · `open-shift-screen.tsx` · `readings-entry-screen.tsx` · `handover-screen.tsx` · routes under `app/(fuel-ops)/fuel-stations/ops/shifts/…` · `next-step*`/`home`/`shift-detail` wiring · `data.ts` (policy + previous-closing hooks) · `schemas.ts`/`read-client.ts` (cash movements, settings read path) · ar/en messages · tests (`__write-backend.ts` fake, units, integration, boundary) · `tests/Feature/FuelShiftSellerContractTest.php` · Playwright specs + support mock · docs.
+
+## 8. Post-merge note — integration with #2023 (cash summary, D1/D2/D5)
+- Merged `main` @ `83208677` into this branch with no textual conflicts; UI-2 write flows, the new `cash_summary` section on shift details and the permission gating are all kept.
+- **One compatibility fix:** the handover screen previews expected cash/variance locally with the movements-only formula. That equals the server only while the server basis is `movements_only` (the default). If the server reports `receiving_shift_receipts`, `cashTotals()` now returns `null` — no local expected/variance and no client-side block on it; the server alone decides, and the shift details page shows its summary. Older servers (no `cash_summary`) behave exactly as before. Unit + integration tests added.
+- `FUEL_SHIFT_CASH_RECEIPTS_ENABLED` stays **off by default** (`config/fuel_stations.php` → `false`; not set in any CI/deploy file). This PR does not change it.
