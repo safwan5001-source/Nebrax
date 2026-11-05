@@ -681,6 +681,23 @@ describe('handover — cash count and closing', () => {
     expect(document.querySelector('[data-movements]')?.textContent).toContain('Change for the drawer');
   });
 
+  it('a confirmed cash entry is shown from the write reply even if the follow-up shift read fails (no stale balance next to a "saved" banner)', async () => {
+    const user = userEvent.setup();
+    connect(withShift(allReadings()));
+    openScreen();
+    await screen.findByText('No cash entries in this shift.');
+    backend.base.fail((url) => url === '/fuel-stations/shifts/s1', new ApiError(500, 'x', {}));
+    await user.click(await screen.findByRole('button', { name: 'Record a cash entry' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByLabelText('Take cash out'));
+    await user.type(within(dialog).getByTestId('movement-amount'), '10');
+    await user.type(within(dialog).getByLabelText('Reason'), 'Change for the drawer');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and record' }));
+    expect(await screen.findByText('Cash entry recorded.')).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('[data-expected]')?.textContent).toContain('490.00'));
+    expect(document.querySelector('[data-movements]')?.textContent).toContain('Change for the drawer');
+  });
+
   it('blocks a withdrawal above the expected cash before any request, and a too-short reason', async () => {
     const user = userEvent.setup();
     connect(withShift(allReadings()));

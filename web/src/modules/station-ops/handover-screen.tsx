@@ -98,7 +98,8 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
   detail: ShiftDetail;
   station: Station;
   intents: ReturnType<typeof createIntentStore>;
-  onSaved: () => void;
+  /** يمرّر الوردية التي أكّدها الخادم في ردّ الكتابة لتُعرض فوراً (GET التالي للمراجعة فقط، وقد يفشل). */
+  onSaved: (shift: ShiftDetail) => void;
 }) {
   const t = useTranslations('stationOps');
   const [type, setType] = useState<MovementType>('cash_in');
@@ -131,7 +132,7 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
       if (confirmed) {
         intents.clear('cash');
         setAmountRaw(''); setReason(''); setType('cash_in');
-        onSaved();
+        onSaved((result as Extract<WriteResult, { kind: 'ok' }>).shift);
         return;
       }
       if (shouldClearIntentKey(result, priorUncertain)) intents.clear('cash');
@@ -204,12 +205,15 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<WriteResult | null>(null);
   const [closedShift, setClosedShift] = useState<ShiftDetail | null>(null);
+  /** وردية أكّدها ردّ كتابة (حركة نقد) مع نسخة GET التي كانت معروضة وقتها: تُعرض حتى تصل بيانات GET أحدث (هوية كائن مختلفة). */
+  const [confirmed, setConfirmed] = useState<{ shift: ShiftDetail; base: ShiftDetail | null } | null>(null);
   const [checking, setChecking] = useState(false);
   const [staffResult, setStaffResult] = useState<WriteResult | null>(null);
   const [saved, setSaved] = useState(false);
   const submitting = useRef(false);
 
-  const detail: ShiftDetail | null = query.state.status === 'success' ? query.state.data : query.retained?.data ?? null;
+  const queried: ShiftDetail | null = query.state.status === 'success' ? query.state.data : query.retained?.data ?? null;
+  const detail: ShiftDetail | null = confirmed && (query.state.status !== 'success' || query.state.data === confirmed.base) ? confirmed.shift : queried;
   const catalog = assets.catalog;
 
   const check = useCallback(() => {
@@ -382,7 +386,7 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
         </div>
       </ActionBar>
 
-      <MovementDialog open={movementOpen} onClose={() => setMovementOpen(false)} detail={detail} station={station} intents={intents} onSaved={() => { setMovementOpen(false); setSaved(true); query.reload(); }} />
+      <MovementDialog open={movementOpen} onClose={() => setMovementOpen(false)} detail={detail} station={station} intents={intents} onSaved={(shift) => { setConfirmed({ shift, base: queried }); setMovementOpen(false); setSaved(true); query.reload(); }} />
 
       <ConfirmDialog open={confirmOpen} title={t('handover.confirm.title')} onClose={() => setConfirmOpen(false)} busy={sending}>
         <div className="space-y-4">
