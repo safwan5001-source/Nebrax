@@ -54,6 +54,20 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
     expect(screen.queryByRole('button', { name: 'استخدام الثيم' })).toBeNull();
   });
 
+  it('shows Luxe Motion as a distinct theme and routes its preview through the existing builder', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [] });
+    render(<CommerceThemesPage />);
+    expect(screen.getByText('أَوْج لوكس موشن')).toBeTruthy();
+    const card = document.querySelector('[data-theme-card="awj-luxe-motion"]');
+    expect(card).not.toBeNull();
+    expect(card?.querySelector('[data-theme-preview="luxe-motion"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(card?.querySelector('[data-theme-preview-link="awj-luxe-motion"]')?.getAttribute('href')).toBe(
+        '/commerce/appearance?previewTheme=awj-luxe-motion&store=store-1',
+      );
+    });
+  });
+
   it('previews over the Published Version when there is one', async () => {
     listMock.mockResolvedValue({
       ok: true,

@@ -40,9 +40,15 @@ describe("presentation tokens", () => {
       "slate",
       "awj-market",
       "awj-bloom",
+      "awj-luxe-motion",
     ]);
     expect(presetPrimary("awj-market")).toBe("#0f766e");
     expect(primaryForeground("#0f766e")).toBe("#ffffff");
+  });
+
+  it("supports an independent Luxe Motion preset with readable foreground", () => {
+    expect(presetPrimary("awj-luxe-motion")).toBe("#71243f");
+    expect(primaryForeground("#71243f")).toBe("#ffffff");
   });
 
   it("FLOWERS-H15: awj-bloom has its own primary with white foreground", () => {
