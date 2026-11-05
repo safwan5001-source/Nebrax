@@ -8,8 +8,8 @@ import { mockOpsApi, type Locale, type Scenario } from './support/fuel-ops-ui1-m
  */
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 
-async function go(page: Page, path: string, opts: { locale?: Locale; theme?: 'light' | 'dark'; scenario?: Scenario } = {}) {
-  const mock = await mockOpsApi(page, { baseUrl, locale: opts.locale ?? 'en', theme: opts.theme ?? 'light', scenario: opts.scenario });
+async function go(page: Page, path: string, opts: { locale?: Locale; theme?: 'light' | 'dark'; scenario?: Scenario; permissions?: string[] } = {}) {
+  const mock = await mockOpsApi(page, { baseUrl, locale: opts.locale ?? 'en', theme: opts.theme ?? 'light', scenario: opts.scenario, permissions: opts.permissions });
   await page.goto(`${baseUrl}/fuel-stations/ops${path}`, { waitUntil: 'domcontentloaded' });
   return mock;
 }
@@ -84,12 +84,13 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page).toHaveURL(/\/fuel-stations\/ops\/shifts$/);
     });
 
-    test('UX: the next step is visible without scrolling, is inert text, and every link stays in the app', async ({ page }, info) => {
+    test('UX: the next step is visible without scrolling; it carries an in-app action only where UI-2 implements one, and every link stays in the app', async ({ page }, info) => {
       for (const path of ['', '/shifts/h1', '/shifts/h2']) {
         await go(page, path, { locale });
         const next = page.locator('[data-next-step]');
         await expect(next).toBeVisible();
-        expect(await next.evaluate((el) => !!el.querySelector('a, button'))).toBe(false);
+        // الرئيسية: زرّها الأساسي منفصل عن البطاقة. تفاصيل وردية مفتوحة: الإجراء (قراءات) داخل البطاقة. مغلقة: اعتماد المشرف نص بلا زر.
+        expect(await next.evaluate((el) => el.querySelectorAll('a, button').length), path || 'home').toBe(path === '/shifts/h1' ? 1 : 0);
         if (info.project.name === 'mobile') {
           const box = await next.boundingBox();
           const nav = await page.locator('nav[aria-label]').first().boundingBox();
@@ -105,10 +106,13 @@ for (const locale of ['en', 'ar'] as const) {
     });
 
     test('home links to the open shift and shows liters computed from the completed nozzles', async ({ page }) => {
+      // UI-2: لمن يملك صلاحية الخطوة التالية يصير الزر الأساسي هو الخطوة نفسها (داخل التطبيق)، ولمن لا يملكها يبقى «عرض الوردية الحالية».
       await go(page, '', { locale });
       await expect(page.getByText('SH-1001').first()).toBeVisible();
-      await expect(page.getByRole('link', { name: locale === 'ar' ? 'عرض الوردية الحالية' : 'View the current shift' })).toBeVisible();
+      await expect(page.locator('[data-primary-action]')).toHaveAttribute('href', /^\/fuel-stations\/ops\/shifts\/h1\/readings\/(opening|closing)$/);
       await expect(page.getByText(locale === 'ar' ? 'لترات العدادات حتى الآن' : 'Meter liters so far')).toBeVisible();
+      await go(page, '', { locale, permissions: ['fuel_stations.view', 'fuel.shift.view', 'fuel.sale.view'] });
+      await expect(page.getByRole('link', { name: locale === 'ar' ? 'عرض الوردية الحالية' : 'View the current shift' })).toHaveAttribute('href', '/fuel-stations/ops/shifts/h1');
     });
   });
 }
