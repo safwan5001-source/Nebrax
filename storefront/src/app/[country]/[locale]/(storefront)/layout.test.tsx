@@ -46,6 +46,8 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
+import { OrderingBanner } from "@/components/ordering/OrderingBanner";
+import { OrderingProvider } from "@/contexts/OrderingContext";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { DEFAULT_PRESENTATION_CONFIG } from "@/lib/presentation/config";
 import StorefrontLayout from "./layout";
@@ -466,5 +468,89 @@ describe("StorefrontLayout", () => {
     expect(mobileNavigation.props.children.props.extraLinks).toEqual(
       desktopLinks,
     );
+  });
+});
+
+describe("StorefrontLayout ordering notice (COPS-H4 Buyer Ordering UX)", () => {
+  const identity = (ordering: unknown) =>
+    ({
+      name: "متجر الاختبار",
+      default_locale: "ar",
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
+      presentation: null,
+      ordering,
+    }) as never;
+
+  const block = (over: Record<string, unknown> = {}) => ({
+    accepting: true,
+    reason: null,
+    message: null,
+    resumesAt: null,
+    minOrderMinor: null,
+    minOrderScope: "all",
+    ...over,
+  });
+
+  const pageSlot = (main: ReactElement<LayoutElementProps>) => {
+    const marker = main.props.children as ReactElement<LayoutElementProps>;
+    const cardStyle = marker.props.children as ReactElement<LayoutElementProps>;
+    return cardStyle.props.children as ReactNode;
+  };
+
+  it("adds nothing at all while the gate is closed: no banner, no provider around the page", async () => {
+    const content = <section>Storefront content</section>;
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(identity(null));
+    const elements = await renderLayout(content);
+
+    expect(elements.some((e) => e.type === OrderingBanner)).toBe(false);
+    const main = elements.find(
+      (e) => e.type === "main",
+    ) as ReactElement<LayoutElementProps>;
+    expect(pageSlot(main)).toBe(content);
+  });
+
+  it("shows the banner right under the header, before the page, when the store is not accepting orders", async () => {
+    const ordering = block({
+      accepting: false,
+      reason: "paused",
+      message: "Back at 5",
+    });
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(identity(ordering));
+    const elements = await renderLayout(<section>Storefront content</section>);
+
+    const types = elements.map((e) => e.type);
+    expect(types.indexOf(OrderingBanner)).toBe(types.indexOf(Header) + 1);
+    expect(types.indexOf(OrderingBanner)).toBeLessThan(types.indexOf("main"));
+    const banner = elements.find((e) => e.type === OrderingBanner);
+    expect((banner?.props as { ordering: unknown }).ordering).toEqual(ordering);
+  });
+
+  it("does not show a banner while accepting, but still hands the block (e.g. a minimum) to the page", async () => {
+    const content = <section>Storefront content</section>;
+    const ordering = block({ minOrderMinor: 15000 });
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(identity(ordering));
+    const elements = await renderLayout(content);
+
+    expect(elements.some((e) => e.type === OrderingBanner)).toBe(false);
+    const main = elements.find(
+      (e) => e.type === "main",
+    ) as ReactElement<LayoutElementProps>;
+    const slot = pageSlot(main) as ReactElement<{
+      ordering: unknown;
+      children: ReactNode;
+    }>;
+    expect(slot.type).toBe(OrderingProvider);
+    expect(slot.props.ordering).toEqual(ordering);
+    expect(slot.props.children).toBe(content);
+  });
+
+  it("falls back to the plain shell when the config fetch fails (no notice is better than a wrong one)", async () => {
+    vi.mocked(fetchStorefrontConfig).mockRejectedValueOnce(new Error("down"));
+    const elements = await renderLayout(<section>Storefront content</section>);
+    expect(elements.some((e) => e.type === OrderingBanner)).toBe(false);
   });
 });
