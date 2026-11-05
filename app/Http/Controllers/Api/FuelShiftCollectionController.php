@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\ReviewFuelShiftCollectionRequest;
 use App\Http\Requests\StoreFuelShiftCollectionRequest;
 use App\Models\FuelShift;
 use App\Services\FuelShiftCollectionConflictException;
@@ -43,6 +44,16 @@ class FuelShiftCollectionController extends ApiController
             ['data' => $result['view'], 'meta' => ['replayed' => $result['replayed'], 'unchanged' => $result['unchanged']]],
             $result['replayed'] || $result['unchanged'] ? 200 : 201,
         );
+    }
+
+    /** مراجعة المشرف لفرق المطابقة (`fuel.shift.cash_variance_review`): تسجيل واحد لا يعدّل المجمَّد، ويُشترط قبل الاعتماد. */
+    public function review(ReviewFuelShiftCollectionRequest $request, string $id): JsonResponse
+    {
+        abort_unless(FuelShiftCollectionService::enabled(), 404);
+        $shift = $this->visibleShift($id, $request);
+        $this->domain(fn () => $this->service->reviewDifference($shift, $request->validated('note'), $request->user()));
+
+        return response()->json(['data' => $this->service->view($shift->fresh(), $request->user())]);
     }
 
     /** الوردية في فروع المستخدم **و** محطتها ضمن فرعه/مخزنه — وإلا 404 قبل أي قراءة أو كتابة. */

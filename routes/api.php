@@ -1656,6 +1656,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/shifts/{id}/close', [FuelShiftController::class, 'close'])->middleware([$perm('fuel.shift.close'), $perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'show'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'store'])->middleware([$perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/collection/review', [FuelShiftCollectionController::class, 'review'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/approve', [FuelShiftController::class, 'approve'])->middleware([$perm('fuel.shift.approve'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/cash-variance/review', [FuelShiftController::class, 'reviewCashVariance'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/corrections', [FuelShiftController::class, 'requestCorrection'])->middleware([$perm('fuel.shift.correct'), $commercialApp('fuel_stations.core', 'write')]);

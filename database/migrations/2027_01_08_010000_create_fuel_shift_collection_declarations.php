@@ -53,6 +53,13 @@ return new class extends Migration
             $table->bigInteger('drawer_implied_sales_cash_minor')->nullable();
             $table->bigInteger('cash_cross_difference_minor')->nullable();
 
+            // مراجعة المشرف لفرق المطابقة (Q3): السبب يُوثَّق عند الإغلاق (ملاحظة الإغلاق) والمراجعة مرة واحدة بلا تعديل لما جُمِّد.
+            $table->boolean('review_required')->default(false);
+            $table->text('difference_reason')->nullable();
+            $table->foreignUuid('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('reviewed_at')->nullable();
+            $table->text('review_note')->nullable();
+
             $table->foreignUuid('declared_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('declared_at');
             $table->timestamp('frozen_at')->nullable();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  collectionResponse, directionOf, intentPayload, isDirty, parseInputs, previewDifference, previewDrawer, savedMatches, seedInputs,
+  closeGate, collectionResponse, directionOf, intentPayload, isDirty, parseInputs, previewDifference, previewDrawer, savedMatches, seedInputs,
   type CollectionView,
 } from './collection';
 
@@ -11,6 +11,8 @@ function view(over: Partial<CollectionView> = {}): CollectionView {
     enabled: true, state: 'none', revision: 0,
     methods: [method('m-cash', 'cash'), method('m-bank', 'bank')],
     methods_changed: false, declaration: null,
+    close_readiness: { ready: false, blockers: ['required'], reason_required: false },
+    review: { visible: false },
     sales: { visible: true, complete: true, milliliters: 100_000, milliliters_complete: true, amount_minor: 23_000, tax_mode: 'tax_inclusive', evaluated_at: null, products: [], nozzles: [], gaps: [] },
     reconciliation: { visible: true, final: false, reason: 'not_declared', collected_total_minor: null, difference_minor: null, direction: null },
     drawer: { frozen: false, opening_float_minor: 20_000, counted_cash_minor: null, treasury_handover_minor: 10_000, cash_in_minor: 500, cash_out_minor: 10_000, expenses_minor: 0, implied_sales_cash: { visible: true, amount_minor: null, declared_difference_minor: null } },
@@ -126,5 +128,39 @@ describe('collectionResponse schema', () => {
   it('accepts the hidden-reconciliation shape for viewers without sales visibility', () => {
     const hidden = view({ reconciliation: { visible: false }, sales: { ...view().sales, visible: false, amount_minor: null } });
     expect(collectionResponse.safeParse({ data: hidden }).success).toBe(true);
+  });
+});
+
+describe('closeGate — Q1: a saved, complete declaration is required to hand the shift over', () => {
+  const ready = (over: Partial<CollectionView['close_readiness']> = {}) => view({ close_readiness: { ready: true, blockers: [], reason_required: false, ...over } });
+
+  it('blocks with the server reason: required / incomplete / no methods', () => {
+    expect(closeGate(view(), true)).toEqual({ blocked: true, reason: 'required', reasonRequired: false });
+    expect(closeGate(view({ close_readiness: { ready: false, blockers: ['incomplete'], reason_required: false } }), false).reason).toBe('incomplete');
+    expect(closeGate(view({ close_readiness: { ready: false, blockers: ['no_methods'], reason_required: false } }), false).reason).toBe('no_methods');
+    expect(closeGate(view({ methods: [], close_readiness: { ready: true, blockers: [], reason_required: false } }), false).reason).toBe('no_methods');
+  });
+
+  it('an unknown server blocker fails closed as "required"', () => {
+    expect(closeGate(view({ close_readiness: { ready: false, blockers: ['something_new'], reason_required: false } }), false).reason).toBe('required');
+  });
+
+  it('ready on the server but edited locally ⇒ unsaved (save first)', () => {
+    expect(closeGate(ready(), true)).toEqual({ blocked: true, reason: 'unsaved', reasonRequired: false });
+  });
+
+  it('open only when saved, complete and unchanged; the difference reason is required only if the server says so', () => {
+    expect(closeGate(ready(), false)).toEqual({ blocked: false, reason: null, reasonRequired: false });
+    expect(closeGate(ready({ reason_required: true }), false)).toEqual({ blocked: false, reason: null, reasonRequired: true });
+    // لا يُعلَن إلزام السبب أثناء حجب الإغلاق لسبب آخر
+    expect(closeGate(ready({ reason_required: true }), true).reasonRequired).toBe(false);
+  });
+});
+
+describe('review visibility (Q2/Q3)', () => {
+  it('accepts both the hidden and the visible review shapes', () => {
+    expect(collectionResponse.safeParse({ data: view({ review: { visible: false } }) }).success).toBe(true);
+    expect(collectionResponse.safeParse({ data: view({ review: { visible: true, state: 'pending', reason: 'r', note: null, reviewed_by: null, reviewed_at: null } }) }).success).toBe(true);
+    expect(collectionResponse.safeParse({ data: { ...view(), close_readiness: undefined } }).success).toBe(false);
   });
 });

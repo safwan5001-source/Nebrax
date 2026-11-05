@@ -61,7 +61,7 @@ class FuelShiftResource extends JsonResource
     }
 
     /** مفاتيح حمولة أحداث إقرار التحصيل المشتقة من الأسعار. */
-    private const COLLECTION_SALE_KEYS = ['sales_minor', 'difference_minor', 'cash_cross_difference_minor'];
+    private const COLLECTION_SALE_KEYS = ['sales_minor', 'difference_minor', 'cash_cross_difference_minor', 'review_required'];
 
     /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
     private function redactCollectionKeys(?array $payload, string $type, bool $hide): ?array
@@ -156,7 +156,7 @@ class FuelShiftResource extends JsonResource
             ])->values()),
             'events' => $this->whenLoaded('events', fn () => $this->events
                 // D8: تحصيل المبيعات (مبلغ + بيع + سند) لا يظهر بلا fuel.sale.view.
-                ->reject(fn ($event) => ! $canViewSales && in_array($event->type, [FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED, FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT], true))
+                ->reject(fn ($event) => ! $canViewSales && in_array($event->type, [FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED, FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT, FuelShiftEvent::TYPE_COLLECTION_REVIEWED], true))
                 ->map(fn ($event) => [
                     'id' => $event->id,
                     'type' => $event->type,

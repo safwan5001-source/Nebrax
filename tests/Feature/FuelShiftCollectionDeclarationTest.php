@@ -6,6 +6,7 @@ use App\Models\FuelSale;
 use App\Models\FuelSalePaymentReceipt;
 use App\Models\FuelShift;
 use App\Models\FuelShiftCollectionDeclaration;
+use App\Models\FuelShiftCashVariance;
 use App\Models\FuelShiftCollectionRevision;
 use App\Models\FuelShiftEvent;
 use App\Models\JournalEntry;
@@ -369,13 +370,184 @@ class FuelShiftCollectionDeclarationTest extends TestCase
         $this->assertSame('frozen', FuelShiftCollectionDeclaration::sole()->status);
     }
 
+    // ───────── Q1: الإقرار المحفوظ المكتمل شرط الإغلاق (والبوابة مفتوحة فقط) ─────────
+
     /** @test */
-    public function closing_without_a_declaration_is_unchanged_and_creates_nothing(): void
+    public function with_the_gate_open_closing_requires_a_saved_declaration_and_changes_nothing_when_refused(): void
     {
-        $shift = $this->open('c2');
-        app(FuelShiftService::class)->close($shift, self::FLOAT, null, $this->f['actor']);
+        $shift = $this->open('q1a');
+
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']));
+
+        $this->assertStringContainsString('FUEL_COLLECTION_REQUIRED', $e->getMessage());
+        $this->assertSame('open', $shift->fresh()->status);
+        $this->assertSame(0, FuelShiftCashVariance::count());
+        $this->assertSame(0, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_CLOSED)->count());
+        $this->assertSame(['required'], $this->collectionView($shift)['close_readiness']['blockers']);
+    }
+
+    /** @test */
+    public function the_rollback_path_gate_off_closes_without_any_declaration_exactly_as_before(): void
+    {
+        config(['fuel_stations.shift_collection_declaration_enabled' => false]);
+        $shift = $this->open('q1b');
+
+        $closed = app(FuelShiftService::class)->close($shift, self::FLOAT, null, $this->f['actor']);
+
+        $this->assertSame('closed', $closed->status);
         $this->assertSame(0, FuelShiftCollectionDeclaration::count());
         $this->assertSame(0, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_COLLECTION_FROZEN)->count());
+    }
+
+    /** @test */
+    public function a_declaration_that_no_longer_covers_the_enabled_methods_is_incomplete_and_blocks_closing(): void
+    {
+        $shift = $this->open('q1c');
+        $this->saveCollection($shift, 0, $this->fullLines(100, 0), 'q1c-a');
+        // فُعِّلت طريقة جديدة (بعد الحفظ): المحفوظ لم يعد يغطي المفعّل.
+        $extra = PaymentMethod::create(['name' => 'تحويل اختبار', 'type' => 'bank_transfer', 'settlement_type' => 'bank', 'is_active' => true]);
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['fuel_sales_allowed_payment_method_ids' => [$this->f['cash']->id, $this->f['bank']->id, $extra->id]], $this->f['actor'], 'تفعيل');
+
+        $this->assertSame(['incomplete'], $this->collectionView($shift)['close_readiness']['blockers']);
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']));
+        $this->assertStringContainsString('FUEL_COLLECTION_INCOMPLETE', $e->getMessage());
+        $this->assertSame('open', $shift->fresh()->status);
+    }
+
+    /** @test */
+    public function a_station_with_no_enabled_methods_cannot_close_while_the_gate_is_open_and_says_why(): void
+    {
+        $shift = $this->open('q1d');
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['fuel_sales_allowed_payment_method_ids' => []], $this->f['actor'], 'إيقاف');
+
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']));
+
+        $this->assertStringContainsString('FUEL_COLLECTION_NO_METHODS', $e->getMessage());
+        $this->assertSame(['no_methods'], $this->collectionView($shift)['close_readiness']['blockers']);
+    }
+
+    // ───────── Q3: فرق غير صفري لا يمنع الإغلاق لكنه يوجب سبباً ومراجعة مشرف قبل الاعتماد ─────────
+
+    /** @test */
+    public function a_non_zero_difference_does_not_block_closing_but_requires_a_documented_reason_for_a_viewer_of_sales(): void
+    {
+        $shift = $this->shortShift('q3a');
+        $view = $this->collectionView($shift);
+        $this->assertTrue($view['close_readiness']['ready']);
+        $this->assertTrue($view['close_readiness']['reason_required']);
+
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, '   ', $this->f['actor']));
+        $this->assertStringContainsString('FUEL_COLLECTION_REASON_REQUIRED', $e->getMessage());
+        $this->assertSame('open', $shift->fresh()->status);
+
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, 'نقص ناتج عن خطأ في الفكة', $this->f['actor']);
+
+        $this->assertSame('closed', $closed->status, 'الفرق لا يمنع الإغلاق.');
+        $d = FuelShiftCollectionDeclaration::sole();
+        $this->assertTrue($d->review_required);
+        $this->assertSame('نقص ناتج عن خطأ في الفكة', $d->difference_reason);
+        $this->assertSame(-3000, $d->difference_minor);
+        $this->assertNull($d->reviewed_at);
+    }
+
+    /** @test */
+    public function a_zero_difference_needs_no_reason_and_no_review(): void
+    {
+        $shift = $this->open('q3b');
+        $this->meter($shift, 'opening', 1_000_000);
+        $this->meter($shift, 'closing', 1_100_000);
+        $this->saveCollection($shift, 0, $this->fullLines(20000, 3000), 'q3b-a');
+
+        $this->assertFalse($this->collectionView($shift)['close_readiness']['reason_required']);
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']);
+
+        $d = FuelShiftCollectionDeclaration::sole();
+        $this->assertFalse($d->review_required);
+        $this->assertSame('not_required', $this->collectionView($shift)['review']['state']);
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $this->f['supervisor']);
+        $this->assertSame('approved', $shift->fresh()->status);
+    }
+
+    /** @test */
+    public function approval_waits_for_a_recorded_supervisor_review_and_the_review_never_alters_the_frozen_record(): void
+    {
+        $shift = $this->closedWithDifference('q3c');
+        $reviewer = $this->roleUser($this->f['tenant_id'], 'collection-reviewer', 'reviewer@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.cash_variance_review', 'fuel.sale.view']);
+        $approver = $this->roleUser($this->f['tenant_id'], 'collection-approver', 'approver@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.approve']);
+        $frozenState = fn () => json_encode(FuelShiftCollectionDeclaration::sole()->only(['collected_total_minor', 'sales_minor', 'difference_minor', 'frozen_at', 'revision', 'lines']));
+        $before = $frozenState();
+
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->approve($shift->fresh(), null, $approver));
+        $this->assertStringContainsString('FUEL_COLLECTION_REVIEW_REQUIRED', $e->getMessage());
+        $this->assertSame('closed', $shift->fresh()->status);
+        $this->assertSame('pending', $this->collectionView($shift)['review']['state']);
+
+        // التسجيل بصلاحيتها فقط (البائع ممنوع) وبملاحظة إلزامية.
+        $this->withToken($this->token('seller'))->postJson(self::BASE . "/{$shift->id}/collection/review", ['note' => 'تمت المراجعة'])->assertForbidden();
+        $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/collection/review", ['note' => 'x'])->assertStatus(422);
+        $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/collection/review", ['note' => 'راجعت السبب وهو مقبول'])
+            ->assertOk()->assertJsonPath('data.review.state', 'reviewed')->assertJsonPath('data.review.note', 'راجعت السبب وهو مقبول');
+
+        // مرة واحدة فقط، ولا تعديل لما جُمِّد.
+        $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/collection/review", ['note' => 'مراجعة ثانية'])->assertStatus(422);
+        $d = FuelShiftCollectionDeclaration::sole();
+        $this->assertSame($before, $frozenState());
+        $this->assertThrows(fn () => $d->forceFill(['collected_total_minor' => 1])->save(), \LogicException::class);
+        $this->assertThrows(fn () => $d->forceFill(['review_note' => 'تعديل'])->save(), \LogicException::class);
+        $this->assertSame(1, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_COLLECTION_REVIEWED)->count());
+
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $approver);
+        $this->assertSame('approved', $shift->fresh()->status);
+    }
+
+    /** @test */
+    public function a_zero_difference_shift_has_nothing_to_review(): void
+    {
+        $shift = $this->open('q3d');
+        $this->meter($shift, 'opening', 1_000_000);
+        $this->meter($shift, 'closing', 1_100_000);
+        $this->saveCollection($shift, 0, $this->fullLines(20000, 3000), 'q3d-a');
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']);
+        $reviewer = $this->roleUser($this->f['tenant_id'], 'collection-reviewer2', 'reviewer2@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.cash_variance_review']);
+
+        $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/collection/review", ['note' => 'لا شيء للمراجعة'])->assertStatus(422);
+    }
+
+    /** @test */
+    public function the_rollback_path_with_the_gate_off_does_not_enforce_the_review_on_approval(): void
+    {
+        $shift = $this->closedWithDifference('q3e');
+        config(['fuel_stations.shift_collection_declaration_enabled' => false]);
+
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $this->f['supervisor']);
+
+        $this->assertSame('approved', $shift->fresh()->status);
+    }
+
+    // ───────── Q2: لا كشف لقيم المبيعات/الفرق/وجود المراجعة لغير المخوَّل ─────────
+
+    /** @test */
+    public function a_seller_without_sale_view_is_never_told_about_a_difference_in_the_api_the_close_errors_or_the_timeline(): void
+    {
+        $shift = $this->shortShift('q2a', $this->token('seller'));
+        $seller = $this->token('seller');
+
+        $view = $this->withToken($seller)->getJson(self::BASE . "/{$shift->id}/collection")->assertOk()->json('data');
+        $this->assertSame(['visible' => false], $view['review']);
+        $this->assertFalse($view['close_readiness']['reason_required'], 'لا يُلزَم البائع بسبب فرق لا يراه.');
+        $this->assertSame(['visible' => false], $view['reconciliation']);
+
+        // يُغلق دون سبب (لا يعرف بالفرق)، والخادم يضع علامة المراجعة للمشرف.
+        $this->withToken($seller)->postJson(self::BASE . "/{$shift->id}/close", ['counted_cash_minor' => self::FLOAT])->assertOk();
+        $this->assertTrue(FuelShiftCollectionDeclaration::sole()->review_required);
+        $this->assertSame(['visible' => false], $this->withToken($seller)->getJson(self::BASE . "/{$shift->id}/collection")->json('data.review'));
+
+        $events = collect($this->withToken($seller)->getJson(self::BASE . "/{$shift->id}")->assertOk()->json('data.events'));
+        $frozen = $events->firstWhere('type', 'collection_frozen')['payload'];
+        foreach (['sales_minor', 'difference_minor', 'cash_cross_difference_minor', 'review_required'] as $key) {
+            $this->assertArrayNotHasKey($key, $frozen);
+        }
+        $this->assertNull($events->firstWhere('type', 'collection_reviewed'));
     }
 
     // ───────── الصلاحيات والعزل ─────────
@@ -456,6 +628,25 @@ class FuelShiftCollectionDeclarationTest extends TestCase
     private function collectionView(FuelShift $shift): array
     {
         return app(FuelShiftCollectionService::class)->view($shift->fresh(), $this->f['actor']);
+    }
+
+    /** وردية مفتوحة مبيعاتها 23000 والمحصَّل 20000 (عجز 3000) بإقرار محفوظ. */
+    private function shortShift(string $key, ?string $actorToken = null): FuelShift
+    {
+        $shift = $this->open($key);
+        $this->meter($shift, 'opening', 1_000_000);
+        $this->meter($shift, 'closing', 1_100_000);
+        $this->saveCollection($shift, 0, $this->fullLines(17000, 3000), $key . '-d');
+
+        return $shift;
+    }
+
+    private function closedWithDifference(string $key): FuelShift
+    {
+        $shift = $this->shortShift($key);
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, 'سبب الفرق', $this->f['actor']);
+
+        return $shift;
     }
 
     private function meter(FuelShift $shift, string $stage, int $ml): void

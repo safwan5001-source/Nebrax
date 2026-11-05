@@ -126,6 +126,7 @@ describe('opsWriteCollection — shift collection declaration (operational, gate
     enabled: true, state: 'declared', revision: 1,
     methods: [{ id: 'm-cash', name: 'Cash', name_en: null, settlement_type: 'cash', saved_amount_minor: 100 }], methods_changed: false,
     declaration: { id: 'd', revision: 1, status: 'declared', lines: [{ payment_method_id: 'm-cash', name: 'Cash', settlement_type: 'cash', amount_minor: 100, still_allowed: true }], collected_total_minor: 100, cash_declared_minor: 100, network_declared_minor: 0 },
+    close_readiness: { ready: true, blockers: [], reason_required: false }, review: { visible: false },
     sales: { visible: false, complete: false, milliliters: 0, milliliters_complete: false, amount_minor: null, products: [], nozzles: [], gaps: [] },
     reconciliation: { visible: false },
     drawer: { frozen: false, opening_float_minor: 0, counted_cash_minor: null, treasury_handover_minor: 0, cash_in_minor: 0, cash_out_minor: 0, expenses_minor: 0, implied_sales_cash: { visible: false } },
@@ -168,5 +169,12 @@ describe('opsWriteCollection — shift collection declaration (operational, gate
     expect(classifyRejection(422, 'FUEL_COLLECTION_METHODS_CHANGED: x')).toBe('collection_methods_changed');
     expect(classifyRejection(422, 'FUEL_COLLECTION_INVALID: x')).toBe('collection_invalid');
     expect(classifyRejection(404, undefined)).toBe('not_found');
+  });
+
+  it('classifies the close-gate refusals (Q1/Q3) so the screen shows the exact reason', () => {
+    expect(classifyRejection(422, 'FUEL_COLLECTION_REQUIRED: x')).toBe('collection_required');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_INCOMPLETE: x')).toBe('collection_incomplete');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_NO_METHODS: x')).toBe('collection_no_methods');
+    expect(classifyRejection(422, 'FUEL_COLLECTION_REASON_REQUIRED: x')).toBe('collection_reason_required');
   });
 });

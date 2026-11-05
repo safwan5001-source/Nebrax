@@ -60,12 +60,12 @@ function data(): TenantData {
 
 /* ───────── خادم الإقرار الوهمي بحالة: يحاكي قواعد FuelShiftCollectionService (النصوص/الرموز الحرفية) ───────── */
 interface Method { id: string; name: string; settlement_type: 'cash' | 'bank' }
-interface ServerState { methods: Method[]; revision: number; lines: Array<{ payment_method_id: string; amount_minor: number }> | null; salesVisible: boolean; salesComplete: boolean; enabled: boolean; keys: Map<string, string> }
+interface ServerState { reasonRequired: boolean; methods: Method[]; revision: number; lines: Array<{ payment_method_id: string; amount_minor: number }> | null; salesVisible: boolean; salesComplete: boolean; enabled: boolean; keys: Map<string, string> }
 
 function collectionServer(initial: Partial<ServerState> = {}) {
   const state: ServerState = {
     methods: [{ id: 'm-cash', name: 'Cash', settlement_type: 'cash' }, { id: 'm-bank', name: 'Card', settlement_type: 'bank' }],
-    revision: 0, lines: null, salesVisible: true, salesComplete: true, enabled: true, keys: new Map(), ...initial,
+    reasonRequired: false, revision: 0, lines: null, salesVisible: true, salesComplete: true, enabled: true, keys: new Map(), ...initial,
   };
   const posts: Array<{ path: string; body: { idempotency_key: string; base_revision: number; lines: Array<{ payment_method_id: string; amount_minor: number }> } }> = [];
   const view = (): CollectionView => {
@@ -77,6 +77,12 @@ function collectionServer(initial: Partial<ServerState> = {}) {
       enabled: true, state: declared ? 'declared' : 'none', revision: state.revision,
       methods: state.methods.map((m) => ({ ...m, name_en: null, saved_amount_minor: state.lines?.find((l) => l.payment_method_id === m.id)?.amount_minor ?? null })),
       methods_changed: declared && JSON.stringify(state.lines!.map((l) => l.payment_method_id).sort()) !== JSON.stringify(state.methods.map((m) => m.id).sort()),
+      close_readiness: {
+        ready: declared && !(JSON.stringify(state.lines!.map((l) => l.payment_method_id).sort()) !== JSON.stringify(state.methods.map((m) => m.id).sort())) && state.methods.length > 0,
+        blockers: state.methods.length === 0 ? ['no_methods'] : !declared ? ['required'] : JSON.stringify(state.lines!.map((l) => l.payment_method_id).sort()) !== JSON.stringify(state.methods.map((m) => m.id).sort()) ? ['incomplete'] : [],
+        reason_required: state.reasonRequired && declared,
+      },
+      review: { visible: false },
       declaration: declared ? {
         id: 'd1', revision: state.revision, status: 'declared',
         lines: state.lines!.map((l) => ({ ...l, name: state.methods.find((m) => m.id === l.payment_method_id)?.name ?? '?', settlement_type: state.methods.find((m) => m.id === l.payment_method_id)?.settlement_type ?? 'cash', still_allowed: true })),
@@ -286,16 +292,81 @@ describe('collection section on the handover screen', () => {
     expect(drawer.querySelector('[data-collection-direction]')?.getAttribute('data-collection-direction')).toBe('none');
   });
 
-  it('warns at the confirmation dialog when the breakdown is unsaved, without blocking the handover', async () => {
+  const reviewButton = () => screen.getByRole('button', { name: 'Review and hand over the shift' }) as HTMLButtonElement;
+
+  it('Q1: with the feature on, the handover is blocked until a complete declaration is saved — then it opens', async () => {
     const user = userEvent.setup();
     connect({ permissions: SUPERVISOR_SALES });
     renderOps(<HandoverScreen shiftId="s1" />);
-    await amountInput('m-cash');
     await user.type(await screen.findByTestId('counted-cash'), '300');
-    await user.click(screen.getByRole('button', { name: 'Review and hand over the shift' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/collection breakdown is not saved/i)).toBeTruthy();
-    expect((within(dialog).getByRole('checkbox') as HTMLInputElement).disabled).toBe(false);
+    await screen.findByTestId('collection-amount-m-cash');
+    expect(reviewButton().disabled).toBe(true);
+    expect(document.querySelector('[data-handover-collection-blocked]')?.textContent).toContain('Save the collection breakdown');
+
+    await user.type(await amountInput('m-cash'), '200');
+    await user.type(await amountInput('m-bank'), '30');
+    expect(reviewButton().disabled).toBe(true); // مدخلات غير محفوظة
+    await user.click(saveButton());
+    await waitFor(() => expect(reviewButton().disabled).toBe(false));
+    expect(document.querySelector('[data-handover-collection-blocked]')).toBeNull();
+
+    // تعديل بعد الحفظ يُغلق الباب من جديد حتى يُحفظ.
+    await user.type(await amountInput('m-bank'), '1');
+    await waitFor(() => expect(reviewButton().disabled).toBe(true));
+    expect(document.querySelector('[data-handover-collection-blocked]')?.textContent).toContain('not saved');
+  });
+
+  it('Q1: a method enabled after the save makes the saved breakdown incomplete and blocks the handover', async () => {
+    const user = userEvent.setup();
+    connect({ permissions: SUPERVISOR_SALES });
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await user.type(await screen.findByTestId('counted-cash'), '300');
+    await user.type(await amountInput('m-cash'), '200');
+    await user.type(await amountInput('m-bank'), '30');
+    await user.click(saveButton());
+    await waitFor(() => expect(reviewButton().disabled).toBe(false));
+    server.state.methods = [...server.state.methods, { id: 'm-transfer', name: 'Transfer', settlement_type: 'bank' }];
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10 * 60_000);
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    spy.mockRestore();
+    await waitFor(() => expect(reviewButton().disabled).toBe(true));
+    expect(document.querySelector('[data-handover-collection-blocked]')?.textContent).toContain('Enter the amounts and save');
+  });
+
+  it('Q1: no enabled methods ⇒ blocked with a clear reason (feature on)', async () => {
+    connect({ permissions: SUPERVISOR_SALES, server: { methods: [] } });
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await screen.findByText('Sales and collection');
+    await waitFor(() => expect(document.querySelector('[data-handover-collection-blocked]')?.textContent).toContain('No payment methods are enabled'));
+    expect(reviewButton().disabled).toBe(true);
+  });
+
+  it('Q3: a difference reason becomes mandatory (only when the server says the viewer sees a difference)', async () => {
+    const user = userEvent.setup();
+    connect({ permissions: SUPERVISOR_SALES, server: { reasonRequired: true } });
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await user.type(await screen.findByTestId('counted-cash'), '300');
+    await user.type(await amountInput('m-cash'), '200');
+    await user.type(await amountInput('m-bank'), '20');
+    await user.click(saveButton());
+    await waitFor(() => expect(document.querySelector('[data-handover-reason-missing]')).toBeTruthy());
+    expect(reviewButton().disabled).toBe(true);
+    expect(screen.getByLabelText('Reason for the difference (required)')).toBeTruthy();
+    await user.type(screen.getByLabelText('Reason for the difference (required)'), 'Short change given');
+    await waitFor(() => expect(reviewButton().disabled).toBe(false));
+  });
+
+  it('Q2: a seller without sales visibility is never asked for a difference reason', async () => {
+    const user = userEvent.setup();
+    connect({ permissions: SELLER, server: { salesVisible: false } }); // الخادم لا يعلن reason_required لمن لا يرى الفرق
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await user.type(await screen.findByTestId('counted-cash'), '300');
+    await user.type(await amountInput('m-cash'), '100');
+    await user.type(await amountInput('m-bank'), '0');
+    await user.click(saveButton());
+    await waitFor(() => expect(reviewButton().disabled).toBe(false));
+    expect(document.querySelector('[data-handover-reason-missing]')).toBeNull();
+    expect(screen.queryByLabelText('Reason for the difference (required)')).toBeNull();
   });
 
   it('renders in Arabic (RTL) with the same structure and no accessibility violations', async () => {

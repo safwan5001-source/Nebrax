@@ -93,6 +93,8 @@ class FuelShiftCollectionService
                 'declared_at' => $declaration->declared_at?->toIso8601String(),
                 'frozen_at' => $declaration->frozen_at?->toIso8601String(),
             ],
+            'close_readiness' => $open ? $this->closeReadiness($station, $declaration, $salesVisible, $sales) : ['ready' => true, 'blockers' => [], 'reason_required' => false],
+            'review' => $this->presentReview($declaration, $salesVisible),
             'sales' => $this->presentSales($sales, $salesVisible),
             'reconciliation' => $this->presentReconciliation($declaration, $sales, $difference, $salesVisible),
             'drawer' => $this->drawer($shift, $declaration, $salesVisible),
@@ -213,6 +215,139 @@ class FuelShiftCollectionService
     }
 
     /**
+     * شرط الإغلاق (Q1) — والبوابة مفتوحة فقط: إقرار تحصيل **محفوظ ومكتمل** (يغطي كل طرق الدفع المفعّلة الآن)، وإلا يُرفض الإغلاق بسبب صريح.
+     * البوابة مغلقة ⇒ لا شرط (مسار التراجع: الإغلاق كما كان حرفياً). الفرق غير الصفري **لا يمنع** الإغلاق (Q3) لكنه يوجب سبباً موثَّقاً
+     * (ملاحظة الإغلاق) — **لمن يرى الفرق فقط** (`fuel.sale.view`، Q2): غيره لا يُخبَر بوجوده ولا يُلزَم بسببه، وتبقى المراجعة مطلوبة خادمياً.
+     * يُستدعى داخل معاملة الإغلاق تحت قفل الوردية.
+     */
+    public function assertClosable(FuelShift $shift, ?string $closingNote, User $actor): void
+    {
+        if (! self::enabled()) {
+            return;
+        }
+        $station = FuelStation::findOrFail($shift->fuel_station_id);
+        $declaration = FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->first();
+        $viewsSales = $actor->hasPermission('fuel.sale.view');
+        $readiness = $this->closeReadiness($station, $declaration, $viewsSales, $viewsSales && $declaration !== null ? $this->sales->compute($shift, now()) : null);
+
+        if (in_array('no_methods', $readiness['blockers'], true)) {
+            throw new RuntimeException('FUEL_COLLECTION_NO_METHODS: لا توجد طرق دفع مفعّلة لهذه المحطة، فلا يمكن حفظ توزيع التحصيل المطلوب قبل التسليم. اطلب من المسؤول تفعيل طريقة دفع للمحطة.');
+        }
+        if (in_array('required', $readiness['blockers'], true)) {
+            throw new RuntimeException('FUEL_COLLECTION_REQUIRED: احفظ توزيع التحصيل حسب طرق الدفع قبل تسليم الوردية.');
+        }
+        if (in_array('incomplete', $readiness['blockers'], true)) {
+            throw new RuntimeException('FUEL_COLLECTION_INCOMPLETE: تغيّرت طرق الدفع المفعّلة للمحطة بعد آخر حفظ. حدّث توزيع التحصيل واحفظه قبل التسليم.');
+        }
+        if ($readiness['reason_required'] && trim((string) $closingNote) === '') {
+            throw new RuntimeException('FUEL_COLLECTION_REASON_REQUIRED: يوجد فرق بين التحصيل ومبيعات العدادات. اكتب سببه في ملاحظة التسليم؛ يراجعه المشرف قبل الاعتماد.');
+        }
+    }
+
+    /**
+     * مراجعة المشرف لفرق المطابقة (Q3): تسجيل واحد لا يعدّل ما جُمِّد (الإقرار المجمَّد يقبل حقول المراجعة وحدها، والحدث `collection_reviewed` يوثّقها).
+     * الصلاحية الموجودة `fuel.shift.cash_variance_review` (لا صلاحية جديدة). لا قيد ولا تسوية.
+     */
+    public function reviewDifference(FuelShift $shift, string $note, User $actor): FuelShiftCollectionDeclaration
+    {
+        if (! $actor->hasPermission('fuel.shift.cash_variance_review')) {
+            throw new RuntimeException('لا تملك صلاحية تنفيذ عملية الشفت المطلوبة.');
+        }
+        $note = trim($note);
+        if (mb_strlen($note) < 3) {
+            throw new RuntimeException('FUEL_COLLECTION_INVALID: اكتب ملاحظة المراجعة (3 أحرف على الأقل).');
+        }
+
+        return DB::transaction(function () use ($shift, $note, $actor) {
+            $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
+                || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+                throw new RuntimeException('محطة الشفت خارج نطاق صلاحياتك.');
+            }
+            if (! $shift->isClosed()) {
+                throw new RuntimeException('لا تراجَع مطابقة التحصيل إلا لوردية مغلقة وقبل اعتمادها.');
+            }
+            $declaration = FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->lockForUpdate()->first();
+            if ($declaration === null || $declaration->status !== FuelShiftCollectionDeclaration::STATUS_FROZEN) {
+                throw new RuntimeException('لا يوجد إقرار تحصيل مجمَّد لهذه الوردية.');
+            }
+            if (! $declaration->review_required) {
+                throw new RuntimeException('لا يوجد فرق تحصيل يحتاج مراجعة في هذه الوردية.');
+            }
+            if ($declaration->reviewed_at !== null) {
+                throw new RuntimeException('روجع فرق التحصيل لهذه الوردية بالفعل؛ يبقى الإقرار محفوظاً دون تعديل.');
+            }
+
+            $declaration->forceFill(['reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_note' => $note])->save();
+            $this->event($shift, FuelShiftEvent::TYPE_COLLECTION_REVIEWED, $actor, [
+                'declaration_id' => $declaration->id, 'revision' => $declaration->revision, 'note' => $note,
+                'difference_minor' => $declaration->difference_minor,
+            ]);
+
+            return $declaration->fresh();
+        });
+    }
+
+    /** الاعتماد يتطلب مراجعة المشرف لأي فرق تحصيل (Q3) — والبوابة مفتوحة فقط. لا يكشف قيماً (رمز ورسالة فقط). */
+    public function assertApprovable(FuelShift $shift): void
+    {
+        if (! self::enabled()) {
+            return;
+        }
+        $declaration = FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->first();
+        if ($declaration !== null && $declaration->status === FuelShiftCollectionDeclaration::STATUS_FROZEN
+            && $declaration->review_required && $declaration->reviewed_at === null) {
+            throw new RuntimeException('FUEL_COLLECTION_REVIEW_REQUIRED: يوجد فرق في مطابقة التحصيل يحتاج مراجعة مشرف مسجَّلة قبل اعتماد الوردية.');
+        }
+    }
+
+    /**
+     * جاهزية الإغلاق من حالة الإقرار (الخادم هو الحَكَم): `no_methods` (لا طريقة مفعّلة) · `required` (لا إقرار) · `incomplete` (مجموعة الطرق المحفوظة
+     * لا تطابق المفعّلة الآن). `reason_required` لمن يرى الفرق فقط، حين يكون الفرق نهائياً وغير صفري.
+     *
+     * @param  array<string,mixed>|null  $sales
+     * @return array{ready:bool,blockers:list<string>,reason_required:bool}
+     */
+    private function closeReadiness(FuelStation $station, ?FuelShiftCollectionDeclaration $declaration, bool $salesVisible, ?array $sales): array
+    {
+        $allowed = $this->methods->allowedFor($station)->pluck('id')->sort()->values()->all();
+        $blockers = [];
+        if ($allowed === []) {
+            $blockers[] = 'no_methods';
+        } elseif ($declaration === null) {
+            $blockers[] = 'required';
+        } elseif (collect($declaration->lines)->pluck('payment_method_id')->sort()->values()->all() !== $allowed) {
+            $blockers[] = 'incomplete';
+        }
+        $reasonRequired = $blockers === [] && $salesVisible && $declaration !== null && $sales !== null
+            && $sales['complete'] && $declaration->collected_total_minor !== (int) $sales['amount_minor'];
+
+        return ['ready' => $blockers === [], 'blockers' => $blockers, 'reason_required' => $reasonRequired];
+    }
+
+    /** @return array<string,mixed> */
+    private function presentReview(?FuelShiftCollectionDeclaration $declaration, bool $visible): array
+    {
+        // وجود فرق يحتاج مراجعة يكشف أن الفرق غير صفري: لا يُعرض لمن لا يملك fuel.sale.view (Q2/D8).
+        if (! $visible) {
+            return ['visible' => false];
+        }
+        if ($declaration === null || $declaration->status !== FuelShiftCollectionDeclaration::STATUS_FROZEN) {
+            return ['visible' => true, 'state' => 'none', 'reason' => null, 'note' => null, 'reviewed_by' => null, 'reviewed_at' => null];
+        }
+
+        return [
+            'visible' => true,
+            'state' => ! $declaration->review_required ? 'not_required' : ($declaration->reviewed_at === null ? 'pending' : 'reviewed'),
+            'reason' => $declaration->difference_reason,
+            'note' => $declaration->review_note,
+            'reviewed_by' => $declaration->reviewed_by,
+            'reviewed_at' => $declaration->reviewed_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * يُستدعى من `FuelShiftService::close` داخل معاملة الإغلاق وتحت قفل الوردية: يعيد حساب المبيعات ويُجمّد الإقرار مع لقطة الدرج.
      * لا إقرار ⇒ لا شيء (الإغلاق لا يشترطه). لا يرمي لأسباب بيانات؛ الثغرات تُسجَّل في اللقطة.
      * **لا يعتمد على البوابة عمداً:** البوابة تحكم الكتابة والعرض فقط؛ إقرارٌ حُفظ وهي مفتوحة يجب أن يُجمَّد عند الإغلاق ولو أُغلقت بعدها،
@@ -220,7 +355,7 @@ class FuelShiftCollectionService
      *
      * @param  array<string,mixed>  $live  ناتج `FuelShiftCashExpectationService::live`
      */
-    public function freezeAtClose(FuelShift $shift, int $countedCashMinor, array $live, User $actor): ?FuelShiftCollectionDeclaration
+    public function freezeAtClose(FuelShift $shift, int $countedCashMinor, array $live, User $actor, ?string $closingNote = null): ?FuelShiftCollectionDeclaration
     {
         $declaration = FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->lockForUpdate()->first();
         if ($declaration === null) {
@@ -242,6 +377,9 @@ class FuelShiftCollectionService
             'expenses_minor' => (int) $live['expenses'],
             'drawer_implied_sales_cash_minor' => $drawer,
             'cash_cross_difference_minor' => $declaration->cash_declared_minor - $drawer,
+            // Q3: فرق غير صفري (أو غير نهائي لنقص المبيعات) ⇒ مراجعة مشرف قبل الاعتماد؛ السبب = ملاحظة الإغلاق إن وُجدت.
+            'review_required' => $difference !== 0,
+            'difference_reason' => $difference !== 0 && trim((string) $closingNote) !== '' ? trim((string) $closingNote) : null,
             'frozen_at' => $now,
         ])->save();
 
@@ -250,6 +388,7 @@ class FuelShiftCollectionService
             'collected_total_minor' => $declaration->collected_total_minor, 'sales_complete' => $sales['complete'],
             'sales_minor' => $sales['amount_minor'], 'difference_minor' => $difference,
             'cash_cross_difference_minor' => $declaration->cash_cross_difference_minor,
+            'review_required' => $difference !== 0,
         ]);
 
         return $declaration;

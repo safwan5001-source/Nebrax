@@ -5,8 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ArrowDownRight, ArrowUpRight, CircleAlert, CircleCheck, Equal, Info, Lock, TriangleAlert } from 'lucide-react';
 import { SAUDI_RIYAL_SYMBOL, formatMinorRiyal } from '@/lib/money';
 import {
-  directionOf, intentPayload, isDirty, isKnownGap, isKnownNozzleStatus, parseInputs, previewDifference, previewDrawer, savedMatches, seedInputs,
-  type CollectionMethod, type CollectionView, type Direction,
+  closeGate, directionOf, intentPayload, isDirty, isKnownGap, isKnownNozzleStatus, parseInputs, previewDifference, previewDrawer, savedMatches, seedInputs,
+  type CloseGate, type CollectionMethod, type CollectionView, type Direction,
 } from './collection';
 import { useShiftCollection } from './data';
 import { formatLitersFixedFromMl } from './format';
@@ -32,10 +32,8 @@ type Translate = ReturnType<typeof useTranslations>;
 
 export interface CollectionStatus {
   enabled: boolean;
-  /** يوجد إقرار محفوظ للوردية. */
-  saved: boolean;
-  /** المدخلات الحالية تختلف عن المحفوظ (أو لا إقرار بعد). */
-  dirty: boolean;
+  /** شرط الإغلاق (Q1): `null` ⇒ الميزة غير مفعّلة (البوابة مغلقة) فلا شرط ولا تغيير في الشاشة. */
+  gate: CloseGate | null;
 }
 
 function DirectionBadge({ difference }: { difference: number }) {
@@ -208,6 +206,14 @@ export function CollectionReadOnly({ view }: { view: CollectionView }) {
         </div>
       ) : null}
       {declaration !== null ? <DrawerBlock view={view} countedMinor={null} cashDeclaredMinor={null} /> : null}
+      {view.review.visible && (view.review.state === 'pending' || view.review.state === 'reviewed') ? (
+        <div data-collection-review={view.review.state}>
+          <h3 className="text-sm font-semibold text-text">{t('collection.review.title')}</h3>
+          <p className={`mt-1 text-sm ${view.review.state === 'pending' ? 'text-warning' : 'text-positive'}`}>{view.review.state === 'pending' ? t('collection.review.pending') : t('collection.review.reviewed')}</p>
+          {view.review.reason ? <p className="mt-1 break-words text-sm text-muted"><span className="font-medium text-text">{t('collection.review.reason')}: </span>{view.review.reason}</p> : null}
+          {view.review.note ? <p className="mt-1 break-words text-sm text-muted"><span className="font-medium text-text">{t('collection.review.note')}: </span>{view.review.note}</p> : null}
+        </div>
+      ) : null}
       <Disclaimers view={view} />
     </section>
   );
@@ -254,10 +260,11 @@ export function CollectionEntrySection({ station, shiftId, countedMinor, intents
   const parsed = useMemo(() => parseInputs(methods, raw ?? {}), [methods, raw]);
   const dirty = view ? isDirty(view, parsed) : false;
 
+  const gate = useMemo(() => (view ? closeGate(view, dirty) : null), [view, dirty]);
   useEffect(() => {
     if (!onStatus) return;
-    onStatus({ enabled: view !== null, saved: view?.declaration != null, dirty: view !== null && dirty });
-  }, [onStatus, view, dirty]);
+    onStatus({ enabled: view !== null, gate });
+  }, [onStatus, view, gate]);
 
   // 404 (البوابة مغلقة) أو لا صلاحية قراءة: لا قسم، والشاشة كما كانت.
   if (view === null) {
@@ -370,6 +377,7 @@ export function CollectionEntrySection({ station, shiftId, countedMinor, intents
           <p role="status" data-collection-saved={savedNote} className="flex items-center gap-2 text-sm font-medium text-positive"><CircleCheck aria-hidden="true" className="h-4 w-4" strokeWidth={2} />{savedNote === 'saved' ? t('collection.saved', { revision: String(view.revision) }) : t('collection.unchanged')}</p>
         ) : null}
         {dirty && !savedNote && view.declaration !== null ? <p className="flex items-start gap-2 text-sm text-warning" data-collection-dirty=""><CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.9} />{t('collection.dirty')}</p> : null}
+        {gate?.blocked ? <p role="status" data-close-gate={gate.reason ?? ''} className="flex items-start gap-2 text-sm leading-6 text-warning"><CircleAlert aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" strokeWidth={2} />{t(`collection.gate.${gate.reason}`)}</p> : null}
         <SecondaryButton disabled={!parsed.lines || busy || methods.length === 0 || !dirty} onClick={() => void submit()} data-save-collection="">{busy ? t('collection.saving') : t('collection.save')}</SecondaryButton>
         <Disclaimers view={view} />
       </div>

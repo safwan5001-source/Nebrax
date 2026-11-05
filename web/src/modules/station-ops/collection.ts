@@ -49,6 +49,20 @@ export const collectionViewSchema = z.object({
     saved_amount_minor: nullableInt,
   })),
   methods_changed: z.boolean(),
+  /** جاهزية الإغلاق من حالة الإقرار (الخادم الحَكَم). `reason_required` لمن يرى الفرق فقط. */
+  close_readiness: z.object({ ready: z.boolean(), blockers: z.array(z.string()), reason_required: z.boolean() }),
+  /** مراجعة المشرف لفرق المطابقة: `visible:false` لمن لا يملك `fuel.sale.view` (لا كشف لوجود فرق). */
+  review: z.union([
+    z.object({ visible: z.literal(false) }),
+    z.object({
+      visible: z.literal(true),
+      state: z.enum(['none', 'not_required', 'pending', 'reviewed']),
+      reason: z.string().nullable(),
+      note: z.string().nullable(),
+      reviewed_by: z.string().nullable(),
+      reviewed_at: z.string().nullable(),
+    }),
+  ]),
   declaration: z.object({
     id: z.string(),
     revision: int,
@@ -166,6 +180,27 @@ export function isDirty(view: CollectionView, parsed: ParsedInputs): boolean {
 /** هل مجموعة الطرق المحفوظة تختلف عن المسموحة الآن؟ (تفعيل/تعطيل من إعدادات المحطة بعد الحفظ). */
 export function methodSetChanged(view: CollectionView): boolean {
   return view.methods_changed;
+}
+
+/* ───────────── شرط الإغلاق (Q1) ───────────── */
+
+export type GateReason = 'no_methods' | 'required' | 'incomplete' | 'unsaved';
+export interface CloseGate {
+  /** الإغلاق محجوب حتى يُحفظ إقرار مكتمل (الخادم يرفض أيضاً — هذا للإرشاد قبل الإرسال لا للقرار). */
+  blocked: boolean;
+  reason: GateReason | null;
+  /** سبب الفرق إلزامي في ملاحظة التسليم (لمن يرى الفرق فقط؛ الخادم يحسمه). */
+  reasonRequired: boolean;
+}
+
+/** يجمع جاهزية الخادم مع «تغييرات لم تُحفظ» محلياً. غير المعروف يُعامل «مطلوب» (فشل مغلق). */
+export function closeGate(view: CollectionView, dirty: boolean): CloseGate {
+  const server = view.close_readiness;
+  let reason: GateReason | null = null;
+  if (view.methods.length === 0 || server.blockers.includes('no_methods')) reason = 'no_methods';
+  else if (!server.ready) reason = server.blockers.includes('incomplete') ? 'incomplete' : 'required';
+  else if (dirty) reason = 'unsaved';
+  return { blocked: reason !== null, reason, reasonRequired: reason === null && server.reason_required };
 }
 
 /* ───────────── المعاينة المحلية (الخادم يعيد الحساب عند الحفظ والإغلاق) ───────────── */

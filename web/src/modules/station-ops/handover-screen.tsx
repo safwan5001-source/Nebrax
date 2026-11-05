@@ -213,7 +213,7 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
   const [staffResult, setStaffResult] = useState<WriteResult | null>(null);
   const [saved, setSaved] = useState(false);
   const submitting = useRef(false);
-  const [collection, setCollection] = useState<CollectionStatus>({ enabled: false, saved: false, dirty: false });
+  const [collection, setCollection] = useState<CollectionStatus>({ enabled: false, gate: null });
 
   const queried: ShiftDetail | null = query.state.status === 'success' ? query.state.data : query.retained?.data ?? null;
   const detail: ShiftDetail | null = confirmed && (query.state.status !== 'success' || query.state.data === confirmed.base) ? confirmed.shift : queried;
@@ -274,7 +274,10 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
   const totals = cashTotals(detail);
   const preview = totals && countedMinor !== null ? closePreview(totals, countedMinor) : null;
   const varianceBlocked = preview !== null && preview.variance !== 0 && policy.allowCloseWithCashVariance === false;
-  const canReview = countedMinor !== null && !hardBlock && !varianceBlocked;
+  // Q1/Q3: والبوابة مفتوحة، التسليم يتطلب إقرار تحصيل محفوظاً مكتملاً، وسبب الفرق (لمن يراه) في ملاحظة التسليم.
+  const collectionBlocked = collection.gate?.blocked === true;
+  const reasonMissing = collection.gate?.reasonRequired === true && note.trim() === '';
+  const canReview = countedMinor !== null && !hardBlock && !varianceBlocked && !collectionBlocked && !reasonMissing;
   const staffMissing = blockers.some((b) => b.kind === 'staff_missing');
   const invalidOrder = blockers.find((b) => b.kind === 'invalid_order');
   const mismatch = blockers.find((b) => b.kind === 'tank_type_mismatch');
@@ -372,8 +375,8 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
         </div>
 
         <div className="mt-4">
-          <label htmlFor="closing-note" className="block text-sm font-medium text-text">{t('handover.summary.noteLabel')}</label>
-          <textarea id="closing-note" value={note} onChange={(event) => setNote(event.target.value)} rows={2} maxLength={2000} disabled={sending} className="mt-1.5 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 py-2.5 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+          <label htmlFor="closing-note" className="block text-sm font-medium text-text">{collection.gate?.reasonRequired ? t('collection.reasonLabel') : t('handover.summary.noteLabel')}</label>
+          <textarea id="closing-note" aria-required={collection.gate?.reasonRequired ? true : undefined} value={note} onChange={(event) => setNote(event.target.value)} rows={2} maxLength={2000} disabled={sending} className="mt-1.5 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 py-2.5 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
         </div>
 
         <div className="mt-4 rounded-[12px] border border-dashed border-border p-3.5" data-network-blocked="">
@@ -387,6 +390,8 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
       <ActionBar>
         <div className="mx-auto max-w-3xl space-y-2">
           {hardBlock ? <p role="status" className="text-xs text-warning">{t('handover.blocked')}</p> : null}
+          {!hardBlock && collectionBlocked ? <p role="status" data-handover-collection-blocked="" className="text-xs text-warning">{t(`collection.gate.${collection.gate?.reason}`)}</p> : null}
+          {!hardBlock && !collectionBlocked && reasonMissing ? <p role="status" data-handover-reason-missing="" className="text-xs text-warning">{t('collection.reasonRequired')}</p> : null}
           <PrimaryButton disabled={!canReview || sending} onClick={() => { setAcked(false); setConfirmOpen(true); }}>{t('handover.review')}</PrimaryButton>
         </div>
       </ActionBar>
@@ -396,9 +401,6 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
       <ConfirmDialog open={confirmOpen} title={t('handover.confirm.title')} onClose={() => setConfirmOpen(false)} busy={sending}>
         <div className="space-y-4">
           <p className="text-sm leading-6 text-muted">{t('handover.confirm.body')}</p>
-          {collection.enabled && (!collection.saved || collection.dirty) ? (
-            <p role="status" data-confirm-collection-warning="" className="flex items-start gap-2 text-sm leading-6 text-warning"><CircleAlert aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" strokeWidth={2} />{t('collection.unsavedWarning')}</p>
-          ) : null}
           {preview ? (
             <dl className="space-y-2 rounded-[12px] border border-border p-3 text-sm">
               <div className="flex items-baseline justify-between gap-3"><dt className="text-muted">{t('handover.liters')}</dt><dd className="font-semibold text-text">{view.summary.recordedComplete > 0 ? <Quantity value={formatLitersFixedFromMl(view.summary.computedMl, locale)} unit={t('unit.liter')} /> : '—'}</dd></div>

@@ -874,6 +874,7 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **المصادر الوحيدة:** السعر `FuelEffectivePriceReadService` (بلا fallback إلى `Product.sale_price`)، طرق الدفع `FuelStationPaymentMethods` (إعداد المحطة، بمعرّفات الطرق لا الأسماء، بلا إنشاء طرق/حسابات)، نقد الدرج `FuelShiftCashExpectationService::live`. الكاتب الوحيد `FuelShiftCollectionService` (لا `$fillable`)؛ الحساب `FuelShiftSalesCalculator`.
 - **لا مبلغ غير موثوق:** قراءة ناقصة/شاذة (إغلاق < افتتاح) أو سعر غير متاح/تغيّر أثناء الوردية أو نمط ضريبة غير معيَّن ⇒ `amount_minor = null` وفرق غير نهائي.
 - **الكتابة:** `idempotency_key` فريد للمؤسسة + `base_revision` (409 `stale_revision`) + بصمة الحمولة؛ كل طريقة مفعّلة الآن مطلوبة (ولو 0) وإلا 422؛ تحت قفل الوردية `FOR UPDATE` ثم يُجمَّد عند `close` (لقطة الدرج). D8: قيم المبيعات/الفرق تتطلب `fuel.sale.view`.
+- **قرارات المالك (Q1–Q5):** والبوابة مفتوحة، `close` يشترط إقرار تحصيل **محفوظاً مكتملاً** (`FUEL_COLLECTION_REQUIRED|INCOMPLETE|NO_METHODS`)؛ الفرق غير الصفري لا يمنع الإغلاق لكنه يوجب سبباً (ملاحظة التسليم، لمن يملك `fuel.sale.view` وحده) ومراجعة مشرف مسجَّلة (`POST …/collection/review`، `fuel.shift.cash_variance_review`، مرة واحدة، لا تعدّل المجمَّد) قبل `approve`؛ البوابة OFF ⇒ لا شرط ولا مراجعة (التراجع). لا كشف لقيم/وجود فرق لغير المخوَّل.
 - **الواجهة (`web/src/modules/station-ops/collection*.ts*`):** قسم «المبيعات والتحصيل» في شاشة التسليم والقراءة فقط في تفاصيل الوردية؛ الكتابة السابعة الوحيدة الجديدة في `write-client.ts` (`opsWriteCollection`)؛ القائمة تتحدث تلقائياً (تركيز/دقيقة)؛ 404 ⇒ لا قسم.
 
 ## الترقيم التسلسلي

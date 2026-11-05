@@ -30,6 +30,8 @@ async function mockCollection(page: Page, opts: { salesVisible: boolean; enabled
       enabled: true, state: lines ? 'declared' : 'none', revision,
       methods: methods.map((m) => ({ ...m, saved_amount_minor: lines?.find((l) => l.payment_method_id === m.id)?.amount_minor ?? null })),
       methods_changed: false,
+      close_readiness: { ready: !!lines, blockers: lines ? [] : ['required'], reason_required: false },
+      review: { visible: false },
       declaration: lines ? { id: 'd1', revision, status: 'declared', lines: lines.map((l) => ({ ...l, name: methods.find((m) => m.id === l.payment_method_id)!.name, settlement_type: methods.find((m) => m.id === l.payment_method_id)!.settlement_type, still_allowed: true })), collected_total_minor: total, cash_declared_minor: lines.filter((l) => l.payment_method_id === 'm-cash').reduce((s, l) => s + l.amount_minor, 0), network_declared_minor: lines.filter((l) => l.payment_method_id === 'm-card').reduce((s, l) => s + l.amount_minor, 0) } : null,
       sales: {
         visible: opts.salesVisible, complete: true, milliliters: 100_000, milliliters_complete: true, amount_minor: opts.salesVisible ? amount : null, tax_mode: 'tax_inclusive', evaluated_at: '2026-11-05T10:00:00+00:00',
@@ -92,9 +94,13 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(section).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.dir)).toBe(ar ? 'rtl' : 'ltr');
       await expect(page.locator('#collection-h')).toHaveText(ar ? 'المبيعات والتحصيل' : 'Sales and collection');
+      // Q1: بلا إقرار محفوظ لا يُفتح التسليم (البوابة مفتوحة) ويظهر السبب.
+      await page.getByTestId('counted-cash').fill('1000');
+      await expect(page.locator('[data-handover-collection-blocked]')).toBeVisible();
+      await expect(page.locator('[data-action-bar] button')).toBeDisabled();
       await section.getByTestId('collection-amount-m-cash').fill('200');
       await section.getByTestId('collection-amount-m-card').fill('20');
-      await expect(section.locator('[data-collection-direction]')).toHaveAttribute('data-collection-direction', 'shortage');
+      await expect(section.locator('[data-collection-recon] [data-collection-direction]')).toHaveAttribute('data-collection-direction', 'shortage');
       const text = await section.innerText();
       expect(text).not.toMatch(/[٠-٩]/);
       expect(await layoutProblems(page)).toEqual([]);
@@ -106,6 +112,8 @@ for (const locale of ['en', 'ar'] as const) {
       expect(posts).toHaveLength(1);
       expect(posts[0].body).toMatchObject({ base_revision: 0, lines: [{ payment_method_id: 'm-cash', amount_minor: 20_000 }, { payment_method_id: 'm-card', amount_minor: 2_000 }] });
       await expect(section.locator('[data-save-collection]')).toBeDisabled(); // لا شيء جديد للحفظ
+      await expect(page.locator('[data-handover-collection-blocked]')).toHaveCount(0);
+      await expect(page.locator('[data-action-bar] button')).toBeEnabled(); // الإقرار محفوظ ومكتمل ⇒ يُفتح التسليم
       if (SHOTS) await section.screenshot({ path: `${shotDir}/saved-${locale}-${info.project.name}.png` });
     });
 

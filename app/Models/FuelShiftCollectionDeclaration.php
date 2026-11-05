@@ -45,13 +45,20 @@ class FuelShiftCollectionDeclaration extends BaseModel
         'cash_cross_difference_minor' => 'integer',
         'declared_at' => 'datetime',
         'frozen_at' => 'datetime',
+        'review_required' => 'boolean',
+        'reviewed_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
         static::updating(function (self $declaration): void {
-            if ($declaration->getOriginal('status') === self::STATUS_FROZEN) {
-                throw new LogicException('إقرار تحصيل الوردية المجمَّد لا يعدّل.');
+            if ($declaration->getOriginal('status') !== self::STATUS_FROZEN) {
+                return;
+            }
+            // المجمَّد لا يعدّل إلا بتسجيل مراجعة المشرف مرة واحدة (مسار تدقيق صريح: حدث collection_reviewed)، لا أي حقل آخر.
+            $allowed = ['reviewed_by', 'reviewed_at', 'review_note', 'updated_at'];
+            if (array_diff(array_keys($declaration->getDirty()), $allowed) !== [] || $declaration->getOriginal('reviewed_at') !== null) {
+                throw new LogicException('إقرار تحصيل الوردية المجمَّد لا يعدّل؛ يسمح فقط بتسجيل مراجعة مشرف واحدة.');
             }
         });
         static::deleting(fn () => throw new LogicException('إقرار تحصيل الوردية لا يحذف مباشرة.'));

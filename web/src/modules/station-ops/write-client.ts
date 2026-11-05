@@ -37,6 +37,8 @@ export type RejectionCode =
   | 'close_needs_readings' | 'close_needs_staff' | 'close_blocked_cash_variance' | 'close_blocked_tank_variance' | 'tank_type_mismatch'
   // إقرار التحصيل: رموز مسبوقة بـFUEL_COLLECTION_ (رسالة) أو `reason` في جسم 409
   | 'collection_method_not_allowed' | 'collection_methods_changed' | 'collection_invalid' | 'collection_stale_revision'
+  // شرط الإغلاق (Q1/Q3) عند رفض `close`
+  | 'collection_required' | 'collection_incomplete' | 'collection_no_methods' | 'collection_reason_required'
   // حالات HTTP
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
 
@@ -44,6 +46,10 @@ const KNOWN_MESSAGES: ReadonlyArray<[RegExp, RejectionCode]> = [
   [/FUEL_COLLECTION_METHOD_NOT_ALLOWED/, 'collection_method_not_allowed'],
   [/FUEL_COLLECTION_METHODS_CHANGED/, 'collection_methods_changed'],
   [/FUEL_COLLECTION_INVALID/, 'collection_invalid'],
+  [/FUEL_COLLECTION_REQUIRED/, 'collection_required'],
+  [/FUEL_COLLECTION_INCOMPLETE/, 'collection_incomplete'],
+  [/FUEL_COLLECTION_NO_METHODS/, 'collection_no_methods'],
+  [/FUEL_COLLECTION_REASON_REQUIRED/, 'collection_reason_required'],
   [/FUEL_COLLECTION_STALE_REVISION/, 'collection_stale_revision'],
   [/FUEL_COLLECTION_IDEMPOTENCY_CONFLICT/, 'idempotency_conflict'],
   [/توجد وردية وقود مفتوحة/, 'shift_already_open'],
