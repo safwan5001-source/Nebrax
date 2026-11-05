@@ -9,9 +9,10 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   // Need the throwaway Laravel stack (scripts/e2e/wholesale-stack.sh | retail-accounts-stack.sh) — run only under
-  // playwright.wholesale-e2e.config.ts / playwright.retail-accounts-e2e.config.ts.
+  // playwright.wholesale-e2e.config.ts / playwright.retail-accounts-e2e.config.ts. The Luxe Motion QA specs need the mock
+  // `store/v1` fixture and run only under playwright.luxe-qa.config.ts.
   testIgnore:
-    /(wholesale-buyer-journey|retail-accounts-journey|retail-signed-identity)\.spec\.ts/,
+    /(wholesale-buyer-journey|retail-accounts-journey|retail-signed-identity|luxe-motion-qa|luxe-motion-preview-parity)\.spec\.ts/,
   // Dev-mode Next.js compiles each route on first hit, which blows past Playwright's 30s default on CI runners.
   timeout: 120_000,
   fullyParallel: true,

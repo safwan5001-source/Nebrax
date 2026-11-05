@@ -66,6 +66,20 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function luxe_motion_preset_is_accepted_and_keeps_a_merchant_primary_color(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-luxe-motion']);
+        $this->assertSame('awj-luxe-motion', $normalized['themePreset']);
+        $this->assertSame('#71243f', $normalized['primaryColor']);
+
+        $custom = $this->normalizer->normalize(['themePreset' => 'awj-luxe-motion', 'primaryColor' => '#334455']);
+        $this->assertSame('awj-luxe-motion', $custom['themePreset']);
+        $this->assertSame('#334455', $custom['primaryColor']);
+
+        $this->assertSame('awj-modern', $this->normalizer->normalize(['themePreset' => 'awj-luxe-motion-v0'])['themePreset']);
+    }
+
+    /** @test */
     public function a_stale_awj_market_typo_still_fails_closed_to_awj_modern(): void
     {
         $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market-v0']);

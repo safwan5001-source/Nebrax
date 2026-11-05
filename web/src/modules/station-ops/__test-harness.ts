@@ -1,4 +1,4 @@
-import type { FuelPrice, FuelProduct, Nozzle, Pump, Shift, ShiftDetail, Station, Tank } from './schemas';
+import type { EffectivePrice, FuelProduct, Nozzle, Pump, Shift, ShiftDetail, Station, Tank } from './schemas';
 import { ApiError } from '@/lib/api';
 
 /**
@@ -11,7 +11,8 @@ export interface TenantData {
   pumps: Pump[];
   nozzles: Nozzle[];
   tanks: Tank[];
-  prices: FuelPrice[];
+  /** صفوف `GET /fuel-stations/prices/effective` كما يحسمها الخادم (لا سجل تاريخي ولا ساعة عميل). */
+  prices: EffectivePrice[];
   shifts: Shift[];
   /** تفاصيل ورديات بمعرّفاتها (`GET /fuel-stations/shifts/{id}`)؛ غياب المعرّف = 404 كما يفعل الخادم لوردية خارج النطاق. */
   details?: Record<string, ShiftDetail>;
@@ -59,11 +60,10 @@ export function createBackend(data: TenantData, options: { pageSize?: number } =
       case '/fuel-stations/pumps': return { data: data.pumps };
       case '/fuel-stations/nozzles': return { data: data.nozzles };
       case '/fuel-stations/tanks': return { data: data.tanks };
-      case '/fuel-stations/prices': {
-        const rows = data.prices
-          .filter((row) => !query.get('fuel_product_id') || row.fuel_product_id === query.get('fuel_product_id'))
-          .filter((row) => !query.get('station_id') || row.fuel_station_id === query.get('station_id'));
-        return paginate(rows, query);
+      case '/fuel-stations/prices/effective': {
+        const stationId = query.get('station_id');
+        if (!stationId) throw new ApiError(422, 'station_id required', {});
+        return { data: data.prices.filter((row) => row.fuel_station_id === stationId) };
       }
       case '/fuel-stations/shifts': {
         const rows = data.shifts

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import type { StoreProduct as Product } from "@/lib/commerce/types";
 
@@ -37,6 +38,35 @@ describe("ProductCarousel", () => {
     expect(screen.getByText("منتج 3")).toBeInTheDocument();
     expect(screen.getByLabelText("carouselPrev")).toBeInTheDocument();
     expect(screen.getByLabelText("carouselNext")).toBeInTheDocument();
+  });
+
+  it("an arrow with nowhere to go is invisible AND click-through, so it cannot swallow taps meant for the first card's controls", () => {
+    render(<ProductCarousel products={products} basePath="/sa/ar" />);
+    // At the start of the rail the previous arrow is disabled and hidden …
+    const prev = screen.getByLabelText("carouselPrev");
+    expect(prev).toBeDisabled();
+    expect(prev.className).toContain("opacity-0");
+    // … and must not intercept pointer input (it sits over the first card's Quick View on phones).
+    expect(prev.className).toContain("pointer-events-none");
+  });
+
+  it("Luxe Motion anchors the arrows to the card image (not the whole slide); other themes keep the centred default", () => {
+    // jsdom has no layout, so every measured box is 0 — enough to prove the measured anchor is applied (inline `top`)
+    // for Luxe and absent for AWJ Modern, where the arrows keep their `top-1/2` class.
+    const luxe = render(
+      <PublishedThemeMarkerProvider themePreset="awj-luxe-motion">
+        <ProductCarousel products={products} basePath="/sa/ar" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(screen.getByLabelText("carouselPrev").style.top).toBe("0px");
+    expect(screen.getByLabelText("carouselNext").style.top).toBe("0px");
+    luxe.unmount();
+
+    render(<ProductCarousel products={products} basePath="/sa/ar" />);
+    expect(screen.getByLabelText("carouselPrev").style.top).toBe("");
+    expect(screen.getByLabelText("carouselPrev").className).toContain(
+      "top-1/2",
+    );
   });
 
   it("shows an honest empty state instead of an empty rail", () => {

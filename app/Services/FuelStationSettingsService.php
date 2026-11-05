@@ -79,12 +79,16 @@ class FuelStationSettingsService
      */
     public function fuelPriceTaxMode(FuelStation $station): string
     {
-        $mode = $this->get($station, 'fuel_price_tax_mode');
-        if (! in_array($mode, ['tax_inclusive', 'tax_exclusive'], true)) {
-            throw new RuntimeException('يلزم تعيين نمط ضريبة سعر الوقود للمستأجر أو المحطة قبل إنهاء البيع الرسمي.');
-        }
+        return $this->fuelPriceTaxModeOrNull($station)
+            ?? throw new RuntimeException('يلزم تعيين نمط ضريبة سعر الوقود للمستأجر أو المحطة قبل إنهاء البيع الرسمي.');
+    }
 
-        return $mode;
+    /** القرار نفسه دون رمي: null = غير معيَّن (البيع الرسمي سيُرفض). للقراءة/العرض فقط. */
+    public function fuelPriceTaxModeOrNull(FuelStation $station): ?string
+    {
+        $mode = $this->get($station, 'fuel_price_tax_mode');
+
+        return in_array($mode, ['tax_inclusive', 'tax_exclusive'], true) ? $mode : null;
     }
 
     public const FALLBACK_TIMEZONE = 'Asia/Riyadh';

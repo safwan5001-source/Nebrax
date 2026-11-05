@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildStationCatalog, type StationCatalog } from './catalog';
 import { useStationOps } from './context';
-import { resolveProductPrice, type PriceResult } from './prices';
+import { resolveStationPrices, type PriceResult } from './prices';
 import { previousClosingMap } from './entry';
 import { STRICT_POLICY, toShiftPolicy, type ShiftPolicy } from './policy';
 import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftDetailPath, stationSettingsPath } from './read-client';
 import {
   fuelProductsResponse,
   nozzlesResponse,
-  pricesResponse,
+  effectivePricesResponse,
   pumpsResponse,
   shiftDetailResponse,
   shiftsResponse,
@@ -80,20 +80,15 @@ export function useStationPrices(station: Station | null, productIds: readonly s
   const allowed = can('fuel.sale.view');
   const ids = useMemo(() => [...new Set(productIds)].sort(), [productIds]);
   const stationId = station?.id ?? null;
-  const key = allowed && stationId && ids.length > 0 ? `${scopeKey}|${stationId}|prices|${ids.join(',')}` : null;
+  const key = allowed && stationId && ids.length > 0 ? `${scopeKey}|${stationId}|effective-prices|${ids.join(',')}` : null;
 
-  const query = useScopedQuery<Record<string, PriceResult>>(key, async (signal) => {
-    const results = await Promise.all(
-      ids.map((productId) =>
-        resolveProductPrice(
-          (q) => opsGet('/fuel-stations/prices', pricesResponse, { signal, query: q }),
-          stationId as string,
-          productId,
-        ),
-      ),
-    );
-    return Object.fromEntries(ids.map((productId, index) => [productId, results[index]]));
-  });
+  const query = useScopedQuery<Record<string, PriceResult>>(key, async (signal) =>
+    resolveStationPrices(
+      async () => (await opsGet('/fuel-stations/prices/effective', effectivePricesResponse, { signal, query: { station_id: stationId as string } })).data,
+      stationId as string,
+      ids,
+    ),
+  );
 
   // مرجع الحالة محفوظ: لا استعلام ولا صلاحية = حالة `success` فارغة صريحة بدل «جارٍ التحميل» دائم.
   const idle: QueryState<Record<string, PriceResult>> = useMemo(() => ({ status: 'success', data: {} }), []);

@@ -17,8 +17,16 @@ use App\Services\FuelShiftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * #2014 — كل مسار وردية يمرّ بحارس نطاق المحطة (فرع + مخزن) على الخادم قبل أي أثر جانبي:
+ * `FuelShift` BranchScoped (فرع فقط) و`FuelStation` CompanyWide، فبلا `AuthorizesFuelStationScope` كان
+ * مستخدم مقيَّد بمخزن/محطة يفتح ويقرأ ويكتب على وردية محطة أخرى من الفرع نفسه بمجرد معرفة المعرّف.
+ * الرفض 404 موحّد (لا يُميَّز «ممنوع» عن «غير موجود»)، وغير المقيَّد لا يتأثر إطلاقاً.
+ */
 class FuelShiftController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(private FuelShiftService $service) {}
 
     public function index(Request $request): JsonResponse
@@ -34,6 +42,8 @@ class FuelShiftController extends ApiController
             $query->where('opened_by', $request->user()?->id);
         }
 
+        $this->restrictToAccessibleStations($query);
+
         return FuelShiftResource::collection($this->scopeToActiveBranch($query, $request)->paginate(50))->response();
     }
 
@@ -44,6 +54,8 @@ class FuelShiftController extends ApiController
 
     public function open(OpenFuelShiftRequest $request): JsonResponse
     {
+        // قبل الخدمة: محطة خارج فرع/مخزن المستخدم = 404 (حتى لو مرّر معرّفاً صحيحاً أو X-Branch-Id).
+        $this->accessibleStation($request->validated()['fuel_station_id']);
         $shift = $this->domain(fn () => $this->service->open($request->validated(), $request->user()));
 
         return (new FuelShiftResource($this->present($shift)))->response()->setStatusCode(201);
@@ -120,9 +132,13 @@ class FuelShiftController extends ApiController
         return (new FuelShiftResource($this->present($shift->fresh())))->response()->setStatusCode(201);
     }
 
+    /** الوردية في فروع المستخدم **و** محطتها ضمن فرعه/مخزنه — وإلا 404 قبل أي قراءة أو كتابة. */
     private function visibleShift(string $id, Request $request): FuelShift
     {
-        return $this->scopeToActiveBranch(FuelShift::query(), $request)->findOrFail($id);
+        $shift = $this->scopeToActiveBranch(FuelShift::query(), $request)->findOrFail($id);
+        $this->accessibleStation($shift->fuel_station_id);
+
+        return $shift;
     }
 
     private function present(FuelShift $shift): FuelShift

@@ -63,14 +63,22 @@ export const tankSchema = z.object({
   status: text,
 });
 
-export const priceSchema = z.object({
-  id: text.min(1),
-  fuel_station_id: z.string().nullable(),
+/**
+ * السعر الفعّال لمنتج في محطة — صف `GET /fuel-stations/prices/effective` (الخادم يحسم الزمن والأولوية والضريبة).
+ * `status`/`source`/`tax_mode` نصوص متسامحة؛ القيم غير المعروفة تُعامل «تعذّر» في `prices.ts` لا سعراً.
+ */
+export const effectivePriceSchema = z.object({
   fuel_product_id: text.min(1),
-  price_per_liter_minor: z.number().int().nonnegative(),
-  effective_from: text,
-  effective_until: z.string().nullable(),
+  fuel_station_id: text.min(1),
   status: text,
+  source: z.string().nullable(),
+  price_per_liter_minor: z.number().int().nonnegative().nullable(),
+  unit: text,
+  tax_mode: z.string().nullable(),
+  effective_from: z.string().nullable(),
+  effective_until: z.string().nullable(),
+  sellable: z.boolean(),
+  blockers: z.array(text),
 });
 
 export const shiftSchema = z.object({
@@ -171,7 +179,7 @@ export const fuelProductsResponse = collection(fuelProductSchema);
 export const pumpsResponse = collection(pumpSchema);
 export const nozzlesResponse = collection(nozzleSchema);
 export const tanksResponse = collection(tankSchema);
-export const pricesResponse = paginated(priceSchema);
+export const effectivePricesResponse = collection(effectivePriceSchema);
 export const shiftsResponse = paginated(shiftSchema);
 export const shiftDetailResponse = z.object({ data: shiftDetailSchema });
 
@@ -180,7 +188,7 @@ export type FuelProduct = z.infer<typeof fuelProductSchema>;
 export type Pump = z.infer<typeof pumpSchema>;
 export type Nozzle = z.infer<typeof nozzleSchema>;
 export type Tank = z.infer<typeof tankSchema>;
-export type FuelPrice = z.infer<typeof priceSchema>;
+export type EffectivePrice = z.infer<typeof effectivePriceSchema>;
 export type Shift = z.infer<typeof shiftSchema>;
 export type ShiftsPage = z.infer<typeof shiftsResponse>;
 export type MeterReading = z.infer<typeof meterReadingSchema>;

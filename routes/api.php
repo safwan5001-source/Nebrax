@@ -1664,6 +1664,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/sales/{id}/finalize', [FuelSaleController::class, 'finalize'])->middleware([$perm('fuel.sale.finalize'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/stations/{stationId}/sale-payment-methods', [FuelSaleController::class, 'paymentMethods'])->middleware([$perm('fuel.sale.collect'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/sales/{id}/payments', [FuelSaleController::class, 'collectPayment'])->middleware([$perm('fuel.sale.collect'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/prices/suggestions', [FuelSaleController::class, 'suggestionIndex'])->middleware([$perm('fuel.sale.price.manage'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/prices/effective', [FuelSaleController::class, 'effectiveIndex'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/prices', [FuelSaleController::class, 'priceIndex'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/prices', [FuelSaleController::class, 'storePrice'])->middleware([$perm('fuel.sale.price.manage'), $commercialApp('fuel_stations.core', 'write')]);
 

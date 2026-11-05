@@ -30,6 +30,8 @@ Shell: navy header with tenant identity (company name/logo from AWJ settings, ne
 | Data cache | None across keys by design (see §4). Going back to a station refetches. |
 | PWA / offline writes | Not in UI-0 (read-only; only an offline banner). |
 
+> **Superseded for prices (#2008):** the app no longer rebuilds the effective price from `GET /fuel-stations/prices`; it reads the server-resolved `GET /fuel-stations/prices/effective`, and #1998 is fixed. See [`AWJ_FUEL_PRICE_SOURCE_AUDIT.md`](./AWJ_FUEL_PRICE_SOURCE_AUDIT.md). The price rows in §3/§6 below describe the original UI-0 workaround.
+
 ## 3. API mapping (verified against `routes/api.php` and `app/Http/Resources/Fuel*Resource.php`)
 
 | UI | Endpoint | Route permission | Notes |

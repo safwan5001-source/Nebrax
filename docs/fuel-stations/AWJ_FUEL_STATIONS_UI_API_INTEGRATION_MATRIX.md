@@ -16,7 +16,8 @@ The new **محطات أَوْج | AWJ Fuel Stations** screens must consume exist
 | Pumps | `GET /fuel-stations/pumps` | `fuel_stations.view` | Filter by selected accessible station |
 | Nozzles | `GET /fuel-stations/nozzles` | `fuel_stations.view` | Product and pump mapping determines actual per-product readings |
 | Fuel station settings | `GET /fuel-stations/settings`, `GET /fuel-stations/stations/{id}/settings` | `fuel_stations.view` | Do not copy settings; write with `fuel_stations.manage` only |
-| Station prices | `GET /fuel-stations/prices` | `fuel.sale.view` | Price history and effective times require validation |
+| Effective price (app) | `GET /fuel-stations/prices/effective?station_id=` | `fuel.sale.view` | **Server-resolved** (same `FuelStationProductPriceService::resolve` as the sale); source, VAT mode, validity, blockers. See `AWJ_FUEL_PRICE_SOURCE_AUDIT.md` |
+| Price history (desktop only) | `GET /fuel-stations/prices` | `fuel.sale.view` | Not read by the app. Scoped to accessible stations (#1998); `scope=station\|tenant_default` |
 | Shift list/detail | `GET /fuel-stations/shifts`, `GET /fuel-stations/shifts/{id}` | `fuel.shift.view` | Supports `station_id`, `status`, `mine` filters, paginates |
 | Open shift | `POST /fuel-stations/shifts/open` | `fuel.shift.open` | Use idempotency; staffing assigned via separate endpoint |
 | Assign staff | `POST /fuel-stations/shifts/{id}/staff` | `fuel.shift.open` | Existing client currently handles partial open/assign failure |

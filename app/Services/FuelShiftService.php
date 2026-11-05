@@ -47,6 +47,7 @@ class FuelShiftService
             return DB::transaction(function () use ($stationId, $idempotencyKey, $openingFloat, $activeTerminalKeys, $attributes, $actor) {
                 $station = FuelStation::lockForUpdate()->findOrFail($stationId);
                 $this->assertStationBranch($station);
+                $this->assertActorStationScope($actor, $station);
                 $policy = $this->settings->forStation($station);
                 if ($policy['shift_opening_cash_float_required'] && ! array_key_exists('opening_float_minor', $attributes)) {
                     throw new RuntimeException('سياسة المحطة تتطلب تسجيل float نقدي افتتاحي صريح، ولو كانت قيمته صفراً.');
@@ -97,10 +98,18 @@ class FuelShiftService
         }
 
         return DB::transaction(function () use ($shift, $userId, $role, $actor) {
-            $shift = $this->lockOpenShift($shift);
-            $staff = User::findOrFail($userId);
+            $shift = $this->lockOpenShift($shift, $actor);
+            // `User` بلا TenantScope عالمي: التقييد بالمستأجر صريح كي لا يُسنَد مستخدم مؤسسة أخرى (ولا يُكشف وجوده).
+            $staff = User::where('tenant_id', $shift->tenant_id)->whereKey($userId)->first();
+            if ($staff === null) {
+                throw new RuntimeException('العامل المحدد غير موجود في المؤسسة.');
+            }
             if (! $staff->canAccessBranch($shift->branch_id)) {
                 throw new RuntimeException('العامل لا يملك نطاق الوصول لفرع الشفت.');
+            }
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            if ($station->warehouse_id !== null && ! $staff->canAccessWarehouse($station->warehouse_id)) {
+                throw new RuntimeException('العامل لا يملك نطاق الوصول لمخزن محطة الشفت.');
             }
             if (FuelShiftStaffAssignment::where('fuel_shift_id', $shift->id)->where('user_id', $staff->id)->exists()) {
                 throw new RuntimeException('العامل مسند بالفعل إلى هذا الشفت.');
@@ -134,7 +143,7 @@ class FuelShiftService
         }
 
         return DB::transaction(function () use ($shift, $attributes, $actor, $stage, $evidenceKey, $meter) {
-            $shift = $this->lockOpenShift($shift);
+            $shift = $this->lockOpenShift($shift, $actor);
             $nozzle = FuelNozzle::findOrFail($this->requiredString($attributes, 'fuel_nozzle_id'));
             $this->assertNozzleForShift($nozzle, $shift);
             $existingEvidence = FuelShiftMeterReading::where('evidence_key', $evidenceKey)->first();
@@ -183,7 +192,7 @@ class FuelShiftService
         $quantity = $this->tankQuantity($attributes);
 
         return DB::transaction(function () use ($shift, $attributes, $actor, $stage, $type, $evidenceKey, $quantity) {
-            $shift = $this->lockOpenShift($shift);
+            $shift = $this->lockOpenShift($shift, $actor);
             $tank = FuelTank::findOrFail($this->requiredString($attributes, 'fuel_tank_id'));
             $this->assertTankForShift($tank, $shift);
             $existingEvidence = FuelShiftTankReading::where('evidence_key', $evidenceKey)->first();
@@ -235,7 +244,7 @@ class FuelShiftService
         $idempotencyKey = $this->requiredString($attributes, 'idempotency_key');
 
         return DB::transaction(function () use ($shift, $attributes, $actor, $type, $amount, $reason, $idempotencyKey) {
-            $shift = $this->lockOpenShift($shift);
+            $shift = $this->lockOpenShift($shift, $actor);
             $existing = FuelShiftCashMovement::where('idempotency_key', $idempotencyKey)->first();
             if ($existing !== null) {
                 if ($existing->fuel_shift_id !== $shift->id) {
@@ -277,7 +286,7 @@ class FuelShiftService
         }
 
         return DB::transaction(function () use ($shift, $countedCashMinor, $closingNote, $actor) {
-            $shift = $this->lockOpenShift($shift);
+            $shift = $this->lockOpenShift($shift, $actor);
             $station = FuelStation::findOrFail($shift->fuel_station_id);
             $policy = $this->settings->forStation($station);
             $this->assertCloseReadiness($shift, $station, $policy);
@@ -360,6 +369,7 @@ class FuelShiftService
             }
             $station = FuelStation::findOrFail($shift->fuel_station_id);
             $this->assertStationBranch($station);
+            $this->assertActorStationScope($actor, $station);
             $policy = $this->settings->forStation($station);
             if ($policy['shift_supervisor_approval_required'] && $shift->opened_by === $actor->id) {
                 throw new RuntimeException('سياسة المحطة تتطلب اعتماد الشفت من مشرف مختلف عن فاتح الشفت.');
@@ -384,7 +394,9 @@ class FuelShiftService
 
         return DB::transaction(function () use ($shift, $note, $actor) {
             $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
-            $this->assertStationBranch(FuelStation::findOrFail($shift->fuel_station_id));
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            $this->assertStationBranch($station);
+            $this->assertActorStationScope($actor, $station);
             if (! $shift->isClosed() && ! $shift->isApproved()) {
                 throw new RuntimeException('لا تراجع فرق النقد إلا بعد إغلاق الشفت.');
             }
@@ -424,7 +436,9 @@ class FuelShiftService
 
         return DB::transaction(function () use ($shift, $attributes, $actor, $target, $reason, $proposed) {
             $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
-            $this->assertStationBranch(FuelStation::findOrFail($shift->fuel_station_id));
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            $this->assertStationBranch($station);
+            $this->assertActorStationScope($actor, $station);
             if (! $shift->isApproved()) {
                 throw new RuntimeException('طلبات correction مخصصة للشفت المعتمد والمقفل فقط.');
             }
@@ -449,10 +463,12 @@ class FuelShiftService
         });
     }
 
-    private function lockOpenShift(FuelShift $shift): FuelShift
+    private function lockOpenShift(FuelShift $shift, User $actor): FuelShift
     {
         $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
-        $this->assertStationBranch(FuelStation::findOrFail($shift->fuel_station_id));
+        $station = FuelStation::findOrFail($shift->fuel_station_id);
+        $this->assertStationBranch($station);
+        $this->assertActorStationScope($actor, $station);
         if (! $shift->isOpen()) {
             throw new RuntimeException('الشفت ليس مفتوحاً ولا يقبل حركة تشغيلية جديدة.');
         }
@@ -586,6 +602,19 @@ class FuelShiftService
         }
         if ($station->status !== FuelStation::STATUS_ACTIVE) {
             throw new RuntimeException('لا يمكن تشغيل شفت على محطة غير نشطة.');
+        }
+    }
+
+    /**
+     * #2014 — دفاع في العمق داخل القفل: نطاق **الفاعل** (فرع + مخزن) على المحطة، حتى لو تغيّر نطاقه بين
+     * حارس HTTP (404 الموحّد في المتحكم) وبدء المعاملة. غير المقيَّد (لا إسناد فروع/مخازن) لا يتأثر.
+     * المحطة بلا فرع/مخزن تبقى متاحة (عقد `AuthorizesFuelStationScope` القائم).
+     */
+    private function assertActorStationScope(User $actor, FuelStation $station): void
+    {
+        if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
+            || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+            throw new RuntimeException('محطة الشفت خارج نطاق صلاحياتك.');
         }
     }
 

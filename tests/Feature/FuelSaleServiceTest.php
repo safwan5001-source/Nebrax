@@ -47,6 +47,54 @@ class FuelSaleServiceTest extends TestCase
     use InteractsWithApi;
     use CapturesThrowable;
 
+    /**
+     * AWJ-FUEL-PRICE-SOURCE (#2008): ما يعرضه تطبيق المحطة (FuelEffectivePriceReadService) هو نفسه ما يُسعَّر به
+     * إنهاء البيع — السعر والنمط والمصدر — في كل من حالتَي محطة/مؤسسة، وغيابه يرفض الإنهاء ويُعرض «غير مضبوط».
+     */
+    #[Test]
+    public function the_displayed_effective_price_is_exactly_the_price_and_tax_mode_finalization_uses(): void
+    {
+        $fixture = $this->fixture('parity');
+        $reader = app(\App\Services\FuelEffectivePriceReadService::class);
+        $prices = app(FuelStationProductPriceService::class);
+        $products = collect([$fixture['fuelProduct']->load('product')]);
+        $shift = app(FuelShiftService::class)->open(['fuel_station_id' => $fixture['station']->id, 'opening_float_minor' => 0, 'idempotency_key' => 'parity-shift'], $fixture['actor']);
+        $service = app(FuelSaleService::class);
+        $draft = fn (string $key, int $start) => $service->createDraft([
+            'fuel_station_id' => $fixture['station']->id, 'fuel_nozzle_id' => $fixture['nozzle']->id, 'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'], 'quantity_milliliters' => 1000, 'meter_start_milliliters' => $start,
+            'meter_end_milliliters' => $start + 1000, 'idempotency_key' => $key,
+        ], $fixture['actor']);
+
+        // 1) لا سعر: المعروض not_configured والإنهاء يرفض — ولو كانت بطاقة المنتج تحمل سعراً.
+        \App\Models\Product::whereKey($fixture['product']->id)->update(['sale_price' => 1000]);
+        $row = $reader->forStation($fixture['station'], $products, now())[0];
+        $this->assertSame('not_configured', $row['status']);
+        $this->assertFalse($row['sellable']);
+        $blocked = $this->thrown(fn () => $service->finalize($draft('parity-1', 100000), $fixture['actor']), 'الإنهاء بلا سعر يجب أن يُرفض.');
+        $this->assertStringContainsString('FUEL_PRICE_NOT_CONFIGURED', $blocked->getMessage());
+
+        // 2) سعر المؤسسة الافتراضي.
+        $prices->create(['fuel_station_id' => null, 'fuel_product_id' => $fixture['fuelProduct']->id, 'price_per_liter_minor' => 205, 'effective_from' => now()->subMinute()->toIso8601String(), 'reason' => 'افتراضي'], $fixture['actor']);
+        $row = $reader->forStation($fixture['station'], $products, now())[0];
+        $sale = $service->finalize($draft('parity-2', 200000), $fixture['actor']);
+        $this->assertSame('tenant_default', $row['source']);
+        $this->assertSame($row['price_per_liter_minor'], $sale->price_per_liter_minor);
+        $this->assertSame($row['tax_mode'], $sale->fuel_price_tax_mode);
+
+        // 3) override المحطة يتقدّم، مع نمط ضريبة محطة مختلف.
+        $prices->create(['fuel_station_id' => $fixture['station']->id, 'fuel_product_id' => $fixture['fuelProduct']->id, 'price_per_liter_minor' => 218, 'effective_from' => now()->subSecond()->toIso8601String(), 'reason' => 'محطة'], $fixture['actor']);
+        app(FuelStationSettingsService::class)->putStationValues($fixture['station'], ['fuel_price_tax_mode' => 'tax_exclusive'], $fixture['actor'], 'قبل الضريبة');
+        $row = $reader->forStation($fixture['station'], $products, now())[0];
+        $sale = $service->finalize($draft('parity-3', 300000), $fixture['actor']);
+        $this->assertSame('station_override', $row['source']);
+        $this->assertSame(218, $row['price_per_liter_minor']);
+        $this->assertSame('tax_exclusive', $row['tax_mode']);
+        $this->assertSame($row['price_per_liter_minor'], $sale->price_per_liter_minor);
+        $this->assertSame($row['tax_mode'], $sale->fuel_price_tax_mode);
+        $this->assertTrue($row['sellable']);
+    }
+
     /** @test */
     public function it_finalizes_a_fractional_fuel_sale_once_to_a_credit_invoice_and_exact_fuel_cogs(): void
     {

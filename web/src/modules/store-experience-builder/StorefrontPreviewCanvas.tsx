@@ -611,6 +611,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const isMarket = config.themePreset === "awj-market";
+  const isLuxe = config.themePreset === "awj-luxe-motion";
   const shownHomeCategories = homeCategories.slice(0, isMarket ? 18 : 12);
   // The exact fixed heights ProductCard.tsx itself resolves to at each
   // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
@@ -928,6 +929,7 @@ export function StorefrontPreviewCanvas({
         <ProductPagePreview
           locale={locale}
           density={density}
+          isLuxe={isLuxe}
           state={productPreviewState}
           product={previewProduct}
           regions={productRegions ?? []}
@@ -939,6 +941,7 @@ export function StorefrontPreviewCanvas({
           locale={locale}
           density={density}
           productCard={config.productCard}
+          isLuxe={isLuxe}
           state={categoryPreviewState}
           category={previewCategory}
           regions={categoryRegions ?? []}
@@ -2097,6 +2100,7 @@ function PreviewProductMeta({
 function ProductPagePreview({
   locale,
   density,
+  isLuxe,
   state,
   product,
   regions,
@@ -2105,6 +2109,7 @@ function ProductPagePreview({
 }: {
   locale: CustomizerLocale;
   density: "compact" | "comfortable";
+  isLuxe: boolean;
   state: "idle" | "loading" | "error" | "empty" | "ready";
   product: WorkspaceProductDetail | null;
   regions: PageRegionInstance<ProductPageRegionKey>[];
@@ -2159,18 +2164,19 @@ function ProductPagePreview({
   return (
     <div
       data-product-preview="ready"
+      data-luxe-motion={isLuxe ? "" : undefined}
       className={cn(
         storeContainerClassName,
         pageContainerPaddingClass(density),
       )}
     >
-      <div className="grid grid-cols-1 gap-6">
+      <div className={cn("grid grid-cols-1 gap-6", isLuxe && "gap-7")}>
         {visibleRegions
           .filter((r) => r.key === "media_gallery")
           .map((region) =>
             wrap(
               region,
-              <div className="w-full">
+              <div className={cn("w-full", isLuxe && "overflow-hidden rounded-store border border-store-border bg-store-surface-muted")}>
                 {product.media.length > 0 ? (
                   <div className="grid gap-2">
                     <div className="aspect-square overflow-hidden rounded-store bg-store-surface-muted">
@@ -2204,11 +2210,11 @@ function ProductPagePreview({
               case "identity":
                 return wrap(
                   region,
-                  <div>
+                  <div className={cn(isLuxe && "border-b border-store-border pb-5")}>
                     {product.categoryName && (
                       <p className="mb-1 text-xs font-medium text-store-muted-foreground">{product.categoryName}</p>
                     )}
-                    <h1 className="text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+                    <h1 className={cn("text-lg font-extrabold leading-snug text-store-foreground md:text-xl", isLuxe && "text-2xl font-bold leading-relaxed")}>
                       <bdi>{product.name}</bdi>
                     </h1>
                   </div>,
@@ -2216,14 +2222,14 @@ function ProductPagePreview({
               case "price":
                 return wrap(
                   region,
-                  <div className="mt-3">
+                  <div className={cn("mt-3", isLuxe && "mt-5")}>
                     {product.priceAmountMinor === null ? (
                       // Wholesale preview: the API sent no price (unavailable for wholesale). Never 0, never a retail price.
                       <span className="text-sm font-semibold text-store-muted-foreground">
                         {locale === "ar" ? "غير متاح للجملة" : "Unavailable for wholesale"}
                       </span>
                     ) : (
-                      <span className="text-xl font-black text-store-primary md:text-2xl">
+                      <span className={cn("text-xl font-black text-store-primary md:text-2xl", isLuxe && "text-2xl")}>
                         <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency, locale)}</bdi>
                       </span>
                     )}
@@ -2273,7 +2279,7 @@ function ProductPagePreview({
                       <span className="flex h-11 w-24 items-center justify-center rounded-store border border-store-border text-sm text-store-foreground">
                         1
                       </span>
-                      <span className="flex h-11 min-w-40 flex-1 items-center justify-center rounded-store bg-store-primary text-sm font-bold text-store-primary-foreground">
+                      <span className={cn("flex h-11 min-w-40 flex-1 items-center justify-center rounded-store bg-store-primary text-sm font-bold text-store-primary-foreground", isLuxe && "h-12 text-base shadow-sm")}>
                         {product.inStock === false ? t("productPreviewOutOfStock") : t("productPreviewAddToCart")}
                       </span>
                     </div>
@@ -2395,6 +2401,7 @@ function CategoryPagePreview({
   locale,
   density,
   productCard,
+  isLuxe,
   state,
   category,
   regions,
@@ -2407,6 +2414,7 @@ function CategoryPagePreview({
   locale: CustomizerLocale;
   density: "compact" | "comfortable";
   productCard: ProductCardStyleId;
+  isLuxe: boolean;
   state: "idle" | "loading" | "error" | "empty" | "ready";
   category: WorkspaceCategoryDetail | null;
   regions: PageRegionInstance<CategoryPageRegionKey>[];
@@ -2461,6 +2469,7 @@ function CategoryPagePreview({
   return (
     <div
       data-category-preview="ready"
+      data-luxe-motion={isLuxe ? "" : undefined}
       className={cn(
         storeContainerClassName,
         density === "compact" ? "space-y-3" : "space-y-4",
@@ -2555,8 +2564,8 @@ function CategoryPagePreview({
               ) : (
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                   {(gridProducts ?? []).map((product) => (
-                    <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
-                      <div className="aspect-square">
+                    <div key={product.id} data-card="" className={cn("overflow-hidden rounded-store bg-store-surface-muted", isLuxe && "flex flex-col border border-store-border bg-store-surface shadow-sm")}>
+                      <div data-card-image="" className={cn("aspect-square", isLuxe && "aspect-[3/4] bg-store-surface-muted")}>
                         {product.thumbnailUrl ? (
                           <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
@@ -2565,11 +2574,12 @@ function CategoryPagePreview({
                         className={cn(
                           "truncate text-[11px] text-store-foreground",
                           productCard === "compact" ? "px-1.5 py-1" : "px-2 py-1.5",
+                          isLuxe && "line-clamp-2 whitespace-normal px-3.5 pt-3 pb-1 text-sm font-bold leading-relaxed",
                         )}
                       >
                         <bdi>{product.name}</bdi>
                       </p>
-                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                      <div data-card-price="" className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5", isLuxe && "px-3.5 pb-3")}>
                         <PreviewProductMeta product={product} locale={locale} />
                       </div>
                     </div>
