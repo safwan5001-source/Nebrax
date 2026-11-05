@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowDownRight, ArrowUpRight, ChevronDown, Equal, Info, RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatMinorRiyal } from '@/lib/money';
+import { CashSummarySection } from './cash-summary-section';
 import { useStationOps } from './context';
 import { useShiftDetail, useStationAssets, useStationPolicy, type ShiftDetailResult, type StationAssetsResult } from './data';
 import { pendingReadings } from './entry';
@@ -279,6 +280,7 @@ function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query
 
       {assets.state.status === 'loading' ? <LoadingBlock rows={2} /> : null}
       {view ? <LitersCard detail={detail} view={view} /> : null}
+      {detail.cash_summary ? <CashSummarySection summary={detail.cash_summary} /> : null}
       {view ? (
         <ReadingsSection view={view} shiftOpen={detail.status === 'open'} timeZone={station.timezone} />
       ) : assets.state.status === 'error' ? (
@@ -292,7 +294,7 @@ function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query
       <div className="space-y-3">
         {steps ? <MoreSection title={t('shiftDetail.progress.title')}><ProgressSection steps={steps} timeZone={station.timezone} /></MoreSection> : null}
         <MoreSection title={t('shiftDetail.tanks.title')}><TanksSection detail={detail} catalog={assets.catalog} timeZone={station.timezone} /></MoreSection>
-        <MoreSection title={t('shiftDetail.cash.title')}><CashSection detail={detail} /></MoreSection>
+        {detail.cash_summary ? null : <MoreSection title={t('shiftDetail.cash.title')}><CashSection detail={detail} /></MoreSection>}
       </div>
     </div>
   );

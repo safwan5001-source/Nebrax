@@ -25,6 +25,9 @@ class FuelShiftCashVariance extends BaseModel
         'documented_cash_in_minor', 'documented_cash_out_minor', 'documented_expenses_minor',
         'expected_operational_cash_minor', 'counted_cash_minor', 'variance_minor', 'variance_direction',
         'status', 'note', 'counted_by', 'reviewed_by', 'counted_at', 'reviewed_at',
+        // #2021 (D2): مكوّنات الصورة المجمَّدة عند الإغلاق.
+        'documented_official_cash_receipts_minor', 'documented_treasury_handover_minor', 'registered_network_receipts_minor',
+        'official_cash_basis', 'expectation_complete', 'incompleteness',
     ];
 
     protected $casts = [
@@ -37,6 +40,11 @@ class FuelShiftCashVariance extends BaseModel
         'variance_minor' => 'integer',
         'counted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'documented_official_cash_receipts_minor' => 'integer',
+        'documented_treasury_handover_minor' => 'integer',
+        'registered_network_receipts_minor' => 'integer',
+        'expectation_complete' => 'boolean',
+        'incompleteness' => 'array',
     ];
 
     protected static function booted(): void

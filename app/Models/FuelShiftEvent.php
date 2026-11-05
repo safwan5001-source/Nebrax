@@ -18,6 +18,8 @@ class FuelShiftEvent extends BaseModel
     public const TYPE_CASH_MOVEMENT_RECORDED = 'cash_movement_recorded';
     // Cycle 5: دليل مقارنة فقط؛ لا يغير cash movement أو فرق نقد Cycle 4.
     public const TYPE_OFFICIAL_CASH_PAYMENT_RECORDED = 'official_cash_payment_recorded';
+    // #2021 (D2): أثر تدقيقي لعكس سند نقدي مختوم بعد إغلاق وردية استلامه؛ لا يغيّر الفرق المجمَّد.
+    public const TYPE_POST_CLOSE_CASH_ADJUSTMENT = 'post_close_cash_adjustment';
     public const TYPE_CLOSED = 'closed';
     public const TYPE_CASH_VARIANCE_PENDING = 'cash_variance_pending_review';
     public const TYPE_CASH_VARIANCE_REVIEWED = 'cash_variance_reviewed';

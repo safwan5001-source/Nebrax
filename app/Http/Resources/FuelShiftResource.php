@@ -20,6 +20,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class FuelShiftResource extends JsonResource
 {
+    /** @var array<string,mixed>|null #2021: ملخص النقد المتوقع/المعدود/الفرق من `FuelShiftCashExpectationService` (للعرض فرداً فقط). */
+    private ?array $cashSummary = null;
+
+    /** @param array<string,mixed> $summary */
+    public function withCashSummary(array $summary): static
+    {
+        $this->cashSummary = $summary;
+
+        return $this;
+    }
+
     /** حمولة حدث/تصحيح تحمل الفرق أو المتوقع (تُحذف مفاتيحها عند إخفاء المشتق من المبيعات). */
     private const SALE_DERIVED_CASH_KEYS = ['expected_operational_cash_minor', 'cash_variance_minor', 'variance_minor', 'direction', 'variance_direction'];
 
@@ -31,7 +42,16 @@ class FuelShiftResource extends JsonResource
     /** هل تُحجب الحقول المالية القديمة (المتوقع/الفرق) عن هذا العارض؟ */
     private function hidesSaleDerivedCash(Request $request): bool
     {
-        return (bool) config('fuel_stations.shift_cash_receipts_enabled', false) && ! $this->canViewSales($request);
+        if ($this->canViewSales($request)) {
+            return false;
+        }
+        if ((bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
+            return true;
+        }
+
+        // البوابة مغلقة الآن لكن الوردية أُغلقت تحت أساس يشمل نقد المبيعات: لقطتها المجمَّدة تحمله فتبقى محجوبة (لا تعتمد على
+        // قيمة البوابة الحالية وحدها). الأساس المخزَّن في لقطة الفرق هو المرجع.
+        return $this->resource->cashVariance?->official_cash_basis === 'receiving_shift_receipts';
     }
 
     /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
@@ -70,6 +90,7 @@ class FuelShiftResource extends JsonResource
             'closed_at' => $this->closed_at?->toISOString(),
             'approved_at' => $this->approved_at?->toISOString(),
             'locked_at' => $this->locked_at?->toISOString(),
+            'cash_summary' => $this->when($this->cashSummary !== null, fn () => $this->cashSummary),
             'cash_variance' => $this->whenLoaded('cashVariance', fn () => $this->cashVariance === null ? null : [
                 'id' => $this->cashVariance->id,
                 'status' => $this->cashVariance->status,
@@ -124,7 +145,7 @@ class FuelShiftResource extends JsonResource
             ])->values()),
             'events' => $this->whenLoaded('events', fn () => $this->events
                 // D8: تحصيل المبيعات (مبلغ + بيع + سند) لا يظهر بلا fuel.sale.view.
-                ->reject(fn ($event) => ! $canViewSales && $event->type === FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED)
+                ->reject(fn ($event) => ! $canViewSales && in_array($event->type, [FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED, FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT], true))
                 ->map(fn ($event) => [
                     'id' => $event->id,
                     'type' => $event->type,

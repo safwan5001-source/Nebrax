@@ -32,6 +32,7 @@ class FuelShiftService
     public function __construct(
         private FuelStationSettingsService $settings,
         private FuelQuantity $quantity,
+        private FuelShiftCashExpectationService $expectation,
     ) {}
 
     /** @param array<string,mixed> $attributes */
@@ -242,20 +243,39 @@ class FuelShiftService
         $amount = $this->positiveInteger($attributes['amount_minor'] ?? null, 'amount_minor');
         $reason = $this->requiredString($attributes, 'reason');
         $idempotencyKey = $this->requiredString($attributes, 'idempotency_key');
+        [$purpose, $receiverId, $proof] = $this->handoverIntent($type, $attributes);
 
-        return DB::transaction(function () use ($shift, $attributes, $actor, $type, $amount, $reason, $idempotencyKey) {
+        return DB::transaction(function () use ($shift, $attributes, $actor, $type, $amount, $reason, $idempotencyKey, $purpose, $receiverId, $proof) {
             $shift = $this->lockOpenShift($shift, $actor);
             $existing = FuelShiftCashMovement::where('idempotency_key', $idempotencyKey)->first();
             if ($existing !== null) {
                 if ($existing->fuel_shift_id !== $shift->id) {
                     throw new RuntimeException('مفتاح منع التكرار استُخدم لحركة شفت أخرى.');
                 }
+                // D5: تسليم الخزنة يقارن الحمولة؛ اختلافها لا يعيد أثراً سابقاً صامتاً. بقية الأنواع على سلوكها القديم.
+                if ($purpose !== null || $existing->purpose !== null) {
+                    $same = $existing->purpose === $purpose && $existing->type === $type
+                        && (int) $existing->amount_minor === $amount
+                        && $existing->received_by_user_id === $receiverId
+                        && ($existing->evidence['proof_reference'] ?? null) === $proof;
+                    if (! $same) {
+                        throw new RuntimeException('مفتاح منع التكرار استُخدم سابقاً لتسليم خزنة مختلف.');
+                    }
+                }
                 return $existing;
             }
-            $cash = $this->cashTotals($shift);
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            if ($purpose !== null) {
+                $this->assertHandoverReceiver($receiverId, $actor, $shift, $station);
+            }
+            // نقطة الحساب الوحيدة: السحب/المصروف/التسليم لا يتجاوز النقد المتاح تحت قفل الوردية (يشمل نقد المبيعات المؤكَّد
+            // فقط حين يكون الأساس receiving_shift_receipts؛ وإلا فالسلوك القديم حرفياً).
+            $live = $this->expectation->live($shift, $this->expectation->effectiveBasis($station));
             if (in_array($type, [FuelShiftCashMovement::TYPE_CASH_OUT, FuelShiftCashMovement::TYPE_EXPENSE], true)
-                && $amount > $shift->opening_float_minor + $cash['cash_in'] - $cash['cash_out'] - $cash['expenses']) {
-                throw new RuntimeException('لا يمكن إخراج أو تسجيل مصروف نقدي يتجاوز الرصيد التشغيلي المتوقع للشفت.');
+                && $amount > $live['expected']) {
+                throw new RuntimeException($purpose !== null
+                    ? 'لا يمكن تسليم نقد يتجاوز النقد المتاح في الوردية.'
+                    : 'لا يمكن إخراج أو تسجيل مصروف نقدي يتجاوز الرصيد التشغيلي المتوقع للشفت.');
             }
 
             $movement = FuelShiftCashMovement::create([
@@ -268,10 +288,13 @@ class FuelShiftService
                 'idempotency_key' => $idempotencyKey,
                 'recorded_by' => $actor->id,
                 'recorded_at' => $attributes['recorded_at'] ?? now(),
+                'purpose' => $purpose,
+                'received_by_user_id' => $receiverId,
             ]);
-            $this->event($shift, FuelShiftEvent::TYPE_CASH_MOVEMENT_RECORDED, $actor, [
+            $this->event($shift, FuelShiftEvent::TYPE_CASH_MOVEMENT_RECORDED, $actor, array_filter([
                 'cash_movement_id' => $movement->id, 'type' => $type, 'amount_minor' => $amount, 'reason' => $reason,
-            ]);
+                'purpose' => $purpose, 'received_by_user_id' => $receiverId,
+            ], fn ($v) => $v !== null));
 
             return $movement;
         });
@@ -291,8 +314,11 @@ class FuelShiftService
             $policy = $this->settings->forStation($station);
             $this->assertCloseReadiness($shift, $station, $policy);
 
-            $cash = $this->cashTotals($shift);
-            $expectedCash = (int) $shift->opening_float_minor + $cash['cash_in'] - $cash['cash_out'] - $cash['expenses'];
+            // D2: صورة المتوقع تُحسب مرة واحدة تحت قفل الوردية بالحساب المشترك ثم تُجمَّد في لقطة الفرق.
+            $basis = $this->expectation->effectiveBasis($station);
+            $live = $this->expectation->live($shift, $basis);
+            $cash = ['cash_in' => $live['cash_in'], 'cash_out' => $live['cash_out'], 'expenses' => $live['expenses']];
+            $expectedCash = $live['expected'];
             $variance = $countedCashMinor - $expectedCash;
             if ($variance !== 0 && ! $policy['shift_allow_close_with_pending_cash_variance']) {
                 throw new RuntimeException('سياسة المحطة تمنع إغلاق الشفت قبل حل فرق النقد التشغيلي.');
@@ -324,6 +350,12 @@ class FuelShiftService
                 'note' => $this->nullableText($closingNote),
                 'counted_by' => $actor->id,
                 'counted_at' => now(),
+                'documented_official_cash_receipts_minor' => $basis === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT ? $live['receipts'] : null,
+                'documented_treasury_handover_minor' => $live['handover'],
+                'registered_network_receipts_minor' => $basis === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT ? $live['network'] : null,
+                'official_cash_basis' => $basis,
+                'expectation_complete' => $live['complete'],
+                'incompleteness' => $live['gaps'],
             ]);
             $shift->update([
                 'status' => FuelShift::STATUS_CLOSED,
@@ -347,6 +379,8 @@ class FuelShiftService
                 'operational_tank_variance_status' => $tankVarianceStatus,
                 'operational_tank_tolerance_milliliters' => $policy['shift_tank_tolerance_milliliters'],
                 'cash_variance_id' => $cashVariance->id,
+                'official_cash_basis' => $basis,
+                'expectation_complete' => $live['complete'],
             ]);
             if ($variance !== 0) {
                 $this->event($shift, FuelShiftEvent::TYPE_CASH_VARIANCE_PENDING, $actor, [
@@ -510,14 +544,59 @@ class FuelShiftService
         }
     }
 
-    /** @return array{cash_in:int,cash_out:int,expenses:int} */
-    private function cashTotals(FuelShift $shift): array
+    /**
+     * D5: نية تسليم الخزنة من الحمولة. التسليم حركة cash_out فقط بمستلم مسمّى وإثبات نصي؛ والعكس (مستلم بلا تسليم) مرفوض.
+     *
+     * @param array<string,mixed> $attributes
+     * @return array{0:?string,1:?string,2:?string}
+     */
+    private function handoverIntent(string $type, array $attributes): array
     {
-        return [
-            'cash_in' => (int) FuelShiftCashMovement::where('fuel_shift_id', $shift->id)->where('type', FuelShiftCashMovement::TYPE_CASH_IN)->sum('amount_minor'),
-            'cash_out' => (int) FuelShiftCashMovement::where('fuel_shift_id', $shift->id)->where('type', FuelShiftCashMovement::TYPE_CASH_OUT)->sum('amount_minor'),
-            'expenses' => (int) FuelShiftCashMovement::where('fuel_shift_id', $shift->id)->where('type', FuelShiftCashMovement::TYPE_EXPENSE)->sum('amount_minor'),
-        ];
+        $purpose = $attributes['purpose'] ?? null;
+        $receiver = $attributes['received_by_user_id'] ?? null;
+        if ($purpose === null) {
+            if ($receiver !== null) {
+                throw new RuntimeException('المستلم يخص التسليم للخزنة فقط.');
+            }
+
+            return [null, null, null];
+        }
+        if (! in_array($purpose, FuelShiftCashMovement::PURPOSES, true)) {
+            throw new RuntimeException('غرض حركة النقد غير صالح.');
+        }
+        if ($type !== FuelShiftCashMovement::TYPE_CASH_OUT) {
+            throw new RuntimeException('التسليم للخزنة حركة نقد صادر فقط.');
+        }
+        $receiverId = is_string($receiver) && trim($receiver) !== '' ? trim($receiver) : null;
+        if ($receiverId === null) {
+            throw new RuntimeException('التسليم للخزنة يتطلب مستلماً مسمّى.');
+        }
+        $proof = $attributes['evidence']['proof_reference'] ?? null;
+        $proof = is_string($proof) ? trim($proof) : '';
+        if ($proof === '') {
+            throw new RuntimeException('التسليم للخزنة يتطلب مرجع إثبات (evidence.proof_reference).');
+        }
+
+        return [$purpose, $receiverId, $proof];
+    }
+
+    /** D5: المستلم مشرف/خزنة نشط ضمن المستأجر والفرع والمخزن، وليس المسلِّم نفسه. */
+    private function assertHandoverReceiver(string $receiverId, User $actor, FuelShift $shift, FuelStation $station): void
+    {
+        $receiver = User::where('tenant_id', $shift->tenant_id)->whereKey($receiverId)->first();
+        if ($receiver === null || ! $receiver->is_active) {
+            throw new RuntimeException('مستلم التسليم غير موجود أو غير نشط.');
+        }
+        if ($receiver->id === $actor->id) {
+            throw new RuntimeException('لا يجوز أن يسلّم المستخدم النقد لنفسه.');
+        }
+        if (! $receiver->hasPermission('fuel.shift.approve') && ! $receiver->hasPermission('fuel.shift.cash_variance_review')) {
+            throw new RuntimeException('مستلم التسليم يجب أن يكون مشرفاً مخوّلاً باعتماد الوردية أو مراجعة فرق النقد.');
+        }
+        if (! $receiver->canAccessBranch($shift->branch_id)
+            || ($station->warehouse_id !== null && ! $receiver->canAccessWarehouse($station->warehouse_id))) {
+            throw new RuntimeException('مستلم التسليم خارج نطاق فرع/مخزن المحطة.');
+        }
     }
 
     private function meterDelta(FuelShift $shift): int

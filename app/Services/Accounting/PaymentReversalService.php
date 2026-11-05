@@ -37,6 +37,8 @@ class PaymentReversalService
             if (! $payment->isPosted()) {
                 throw new RuntimeException('لا يمكن عكس سند غير مرحّل.');
             }
+            // #2021: قفل وردية الإيصال النقدي المختوم (إن وُجدت) أولاً — قبل قفل الفاتورة والمِرساة — لتفادي جمود مع close.
+            app(\App\Services\FuelShiftCashAdjustmentRecorder::class)->lockShiftBeforeReversal($payment);
             if (! $payment->journal_entry_id) {
                 throw new RuntimeException('لا يمكن عكس سند بلا قيد أصلي.');
             }
@@ -94,6 +96,9 @@ class PaymentReversalService
                 'reversal_entry_id' => $reversal->id,
                 'reversed_at' => now(),
             ]);
+
+            // #2021 (D2): عكس سند نقد وقود مختوم بوردية مغلقة ⇒ أثر تدقيقي مستقل (لا يمسّ الفرق المجمَّد). لا أثر لأي سند آخر.
+            app(\App\Services\FuelShiftCashAdjustmentRecorder::class)->onPaymentReversed($payment);
 
             foreach ($targets as $key => $target) {
                 [$class, $id] = explode('|', $key, 2);
