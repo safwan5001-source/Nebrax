@@ -22,7 +22,18 @@ class FuelStationProductPrice extends BaseModel implements CompanyWide
     protected $fillable = [
         'tenant_id', 'fuel_station_id', 'fuel_product_id', 'price_per_liter_minor',
         'effective_from', 'effective_until', 'status', 'created_by', 'approved_by', 'reason',
+        'idempotency_key', 'entry_source',
     ];
+
+    public const SOURCE_MANUAL = 'manual';
+    public const SOURCE_PRODUCT_CARD = 'product_card';
+    public const ENTRY_SOURCES = [self::SOURCE_MANUAL, self::SOURCE_PRODUCT_CARD];
+
+    /** حالة عابرة للاستجابة فقط (ليست عموداً): هل أُعيد سجل قائم بمفتاح التكرار نفسه؟ */
+    public bool $replayed = false;
+
+    /** @var list<string> معرّفات الأسعار التي أُغلقت بهذا الإنشاء (استبدال صريح). عابرة. */
+    public array $supersededIds = [];
 
     protected $casts = [
         'price_per_liter_minor' => 'integer',

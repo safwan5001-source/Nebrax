@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  BadgeDollarSign,
   BellRing,
   Database,
   Fingerprint,
@@ -27,6 +28,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations': Gauge,
   '/fuel-stations/shifts': Wrench,
   '/fuel-stations/sales': ReceiptText,
+  '/fuel-stations/prices': BadgeDollarSign,
   '/fuel-stations/receiving': Truck,
   '/fuel-stations/master-data': Database,
   '/fuel-stations/corporate-contracts': Handshake,

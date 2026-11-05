@@ -207,7 +207,7 @@ class FuelEffectivePriceApiTest extends TestCase
 
         // المالك غير المقيَّد يرى الكل كما كان (لا تغيير للشاشة المكتبية).
         $this->assertCount(3, $this->withToken($f['owner_token'])->getJson(self::BASE . '/prices')->json('data'));
-        $this->assertSame(['id', 'fuel_station_id', 'fuel_product_id', 'price_per_liter_minor', 'effective_from', 'effective_until', 'status', 'reason', 'created_at'], array_keys($rows[0]));
+        $this->assertSame(['id', 'fuel_station_id', 'fuel_product_id', 'price_per_liter_minor', 'effective_from', 'effective_until', 'status', 'reason', 'entry_source', 'created_at'], array_keys($rows[0]));
     }
 
     /** @return list<array<string,mixed>> */

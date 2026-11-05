@@ -49,8 +49,23 @@ class FuelEffectivePriceReadService
         return $products->map(fn (FuelProduct $product) => $this->row($station, $product, $taxMode, $at))->values()->all();
     }
 
+    /**
+     * السعر الفعّال على مستوى المؤسسة (الافتراضي) فقط — لصفحة إدارة أسعار المؤسسة. نمط الضريبة هنا نمط المؤسسة؛
+     * وقد تُخالفه محطات بإعداد خاص (يُعرض نمط كل محطة حين تُختار).
+     *
+     * @param  Collection<int, FuelProduct>  $products
+     * @return list<array<string, mixed>>
+     */
+    public function forTenant(Collection $products, CarbonInterface $at): array
+    {
+        $mode = $this->settings->forTenant()['fuel_price_tax_mode'] ?? '';
+        $taxMode = in_array($mode, ['tax_inclusive', 'tax_exclusive'], true) ? $mode : null;
+
+        return $products->map(fn (FuelProduct $product) => $this->row(null, $product, $taxMode, $at))->values()->all();
+    }
+
     /** @return array<string, mixed> */
-    private function row(FuelStation $station, FuelProduct $product, ?string $taxMode, CarbonInterface $at): array
+    private function row(?FuelStation $station, FuelProduct $product, ?string $taxMode, CarbonInterface $at): array
     {
         $blockers = [];
         $resolved = null;
@@ -58,7 +73,9 @@ class FuelEffectivePriceReadService
             $status = self::STATUS_PRODUCT_INACTIVE;
             $blockers[] = self::BLOCKER_PRODUCT_INACTIVE;
         } else {
-            $resolved = $this->prices->resolve($station, $product, $at);
+            $resolved = $station === null
+                ? $this->tenantDefault($product, $at)
+                : $this->prices->resolve($station, $product, $at);
             $status = $resolved === null ? self::STATUS_NOT_CONFIGURED : self::STATUS_EFFECTIVE;
             if ($resolved === null) {
                 $blockers[] = self::BLOCKER_PRICE_NOT_CONFIGURED;
@@ -75,7 +92,7 @@ class FuelEffectivePriceReadService
 
         return [
             'fuel_product_id' => $product->id,
-            'fuel_station_id' => $station->id,
+            'fuel_station_id' => $station?->id,
             'status' => $status,
             'source' => $resolved['source'] ?? null,
             'price_id' => $price?->id,
@@ -88,6 +105,14 @@ class FuelEffectivePriceReadService
             'sellable' => $blockers === [],
             'blockers' => $blockers,
         ];
+    }
+
+    /** @return array{price: \App\Models\FuelStationProductPrice, source: string}|null */
+    private function tenantDefault(FuelProduct $product, CarbonInterface $at): ?array
+    {
+        $price = $this->prices->effectiveInScope($product->id, null, $at);
+
+        return $price === null ? null : ['price' => $price, 'source' => FuelStationProductPriceService::SOURCE_TENANT_DEFAULT];
     }
 
     /** نفس فحص الإنهاء: mL مخزناً وL عرضاً على FuelProduct، وmL على Product المرتبط. */
