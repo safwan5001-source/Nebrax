@@ -39,7 +39,14 @@ describe('evaluateMeterRow', () => {
   it('a closing reading needs the opening one first', () => {
     expect(evaluateMeterRow({ stage: 'closing', raw: '5', saved: null, opening: null, previousClosingMl: null })).toEqual({ kind: 'blocked', issue: 'needs_opening' });
   });
-  it('opening vs the previous closing is a WARNING only (rollover/reset has no server policy)', () => {
+  it('with a KNOWN policy that makes opening readings optional, an unpaired ending reading is allowed (no invented delta, no ordering check)', () => {
+    const base = { stage: 'closing' as const, saved: null, opening: null, previousClosingMl: null };
+    expect(evaluateMeterRow({ ...base, raw: '5', openingRequired: false })).toEqual({ kind: 'ready', ml: 5000, deltaMl: null, warnings: [] });
+    expect(evaluateMeterRow({ ...base, raw: '5', openingRequired: true })).toEqual({ kind: 'blocked', issue: 'needs_opening' });
+    expect(evaluateMeterRow({ ...base, raw: '5' })).toEqual({ kind: 'blocked', issue: 'needs_opening' }); // غير معلومة ⇒ صارمة
+    expect(evaluateMeterRow({ ...base, raw: '', openingRequired: false })).toEqual({ kind: 'empty' });
+  });
+    it('opening vs the previous closing is a WARNING only (rollover/reset has no server policy)', () => {
     const base = { stage: 'opening' as const, saved: null, opening: null };
     expect(evaluateMeterRow({ ...base, raw: '10', previousClosingMl: 10_000 })).toEqual({ kind: 'ready', ml: 10_000, deltaMl: null, warnings: [] });
     expect(evaluateMeterRow({ ...base, raw: '9', previousClosingMl: 10_000 })).toMatchObject({ kind: 'ready', warnings: ['below_previous_closing'] });

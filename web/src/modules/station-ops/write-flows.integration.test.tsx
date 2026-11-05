@@ -408,6 +408,20 @@ describe('meter and tank readings entry', () => {
     expect(await field('entry-m:n1')).toBeTruthy();
   });
 
+  it('opening readings optional by policy: ending readings can be entered and saved without them', async () => {
+    const user = userEvent.setup();
+    const data = withShift();
+    data.settings = { a: { shift_opening_meter_reading_required: false, shift_closing_meter_reading_required: true, shift_opening_tank_reading_required: false, shift_closing_tank_reading_required: false, shift_opening_cash_float_required: true, shift_mandatory_staff_assignment: false } };
+    connect(data);
+    openScreen('closing');
+    await user.type(await field('entry-m:n1'), '150');
+    expect(screen.queryByText("Record this nozzle's starting reading first.")).toBeNull();
+    await user.click(await screen.findByRole('button', { name: 'Review and save (1)' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and save' }));
+    await waitFor(() => expect(backend.postsTo('/meter-readings')).toHaveLength(1));
+    expect(backend.postsTo('/meter-readings')[0].body).toMatchObject({ reading_stage: 'closing', meter_milliliters: 150_000 });
+  });
+
   it('keeps going after one rejection: saved rows lock, the failed row stays editable with the server\'s reason', async () => {
     const user = userEvent.setup();
     connect(withShift());

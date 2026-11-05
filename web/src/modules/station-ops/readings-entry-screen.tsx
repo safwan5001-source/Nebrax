@@ -162,7 +162,7 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
         key: meterKey(id), kind: 'meter', assetId: id,
         title: `${t('products.pump')} ${view.pump?.pump_number ?? '?'} · ${t('products.nozzle')} ${view.nozzle.nozzle_number}`,
         subtitle: [view.product?.name, view.tank?.name].filter(Boolean).join(' · ') || null,
-        state: evaluateMeterRow({ stage, raw: values[meterKey(id)] ?? '', saved: meterAt(id, stage), opening, previousClosingMl: prev }),
+        state: evaluateMeterRow({ stage, raw: values[meterKey(id)] ?? '', saved: meterAt(id, stage), opening, previousClosingMl: prev, openingRequired: policy.openingMeterRequired }),
         openingMl: opening?.meter_milliliters ?? null,
         previous: prev,
       };
@@ -175,7 +175,7 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
       openingMl: null, previous: null,
     }));
     return { meters, tanks };
-  }, [detail, catalog, previousData, stage, values, t]);
+  }, [detail, catalog, previousData, stage, values, t, policy.openingMeterRequired]);
 
   const all = useMemo(() => [...rows.meters, ...rows.tanks], [rows]);
   const ready = all.filter((row) => row.state.kind === 'ready' && results[row.key]?.status !== 'saved');

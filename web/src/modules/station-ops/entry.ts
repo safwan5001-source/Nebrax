@@ -40,15 +40,22 @@ export interface MeterRowInput {
   opening: MeterReading | null;
   /** آخر قراءة إغلاق مسجّلة في وردية سابقة (مرجع إرشادي للافتتاح فقط). */
   previousClosingMl: number | null;
+  /**
+   * قراءة الافتتاح مطلوبة؟ الافتراضي `true` (سياسة غير معلومة ⇒ صارمة). حين تُعلن السياسة أنها اختيارية تُقبل قراءة نهاية بلا افتتاح:
+   * الخادم يفحص الشرطين باستقلال و`meterDelta` يتخطى الأزواج الناقصة — بلا فرق مخترع ولا فحص ترتيب.
+   */
+  openingRequired?: boolean;
 }
 
 export function evaluateMeterRow(input: MeterRowInput): RowState {
   if (input.saved) return { kind: 'saved', ml: input.saved.meter_milliliters };
-  if (input.stage === 'closing' && input.opening === null) return { kind: 'blocked', issue: 'needs_opening' };
+  const unpaired = input.stage === 'closing' && input.opening === null;
+  if (unpaired && input.openingRequired !== false) return { kind: 'blocked', issue: 'needs_opening' };
   const parsed = parseLiters(input.raw);
   if (!parsed.ok) return parsed.reason === 'empty' ? { kind: 'empty' } : { kind: 'invalid', issue: 'invalid_number' };
 
   const warnings: RowWarning[] = [];
+  if (unpaired) return { kind: 'ready', ml: parsed.ml, deltaMl: null, warnings };
   if (input.stage === 'closing') {
     const opening = (input.opening as MeterReading).meter_milliliters;
     if (parsed.ml < opening) return { kind: 'invalid', issue: 'closing_below_opening' };
