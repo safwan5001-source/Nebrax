@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { FuelIcon, resolveFuelIcon } from '@/lib/fuel-icons';
 import type { StationCatalog } from './catalog';
 import { useStationOps } from './context';
 import { useCurrentShift, useShiftDetail, useStationAssets, useStationPrices } from './data';
@@ -165,7 +166,8 @@ function ProductsSection({ station, assets }: { station: Station; assets: Return
           <ul className="space-y-2.5">
             {assets.catalog.products.map((entry) => (
               <li key={entry.product.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-border bg-surface p-3.5">
-                <div className="min-w-0">
+                <FuelIcon id={resolveFuelIcon('product', entry.product)} size={48} />
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-semibold text-text">{entry.product.name}</p>
                   <p className="mt-0.5 text-[13px] text-muted">
                     {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
