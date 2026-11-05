@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import ar from '@/messages/ar.json';
 import en from '@/messages/en.json';
-import { COMING_SOON, OPS_NAV } from './nav';
+import { OPS_NAV } from './nav';
 
 type Tree = { [key: string]: string | Tree };
 
@@ -54,7 +54,7 @@ describe('stationOps messages', () => {
       ['shiftDetail.tanks.type', ['physical', 'atg']],
       ['shiftDetail.cash.direction', ['overage', 'shortage', 'none']],
       ['shiftDetail.cash.review', ['pending_review', 'reviewed', 'not_required']],
-      ['shiftDetail.soon', ['readings', 'close', 'approval']],
+      ['next.kind', ['open_shift', 'opening_readings', 'closing_readings', 'close_shift', 'approve_shift']],
     ];
     const missing: string[] = [];
     for (const [family, members] of families) {
@@ -63,7 +63,6 @@ describe('stationOps messages', () => {
         for (const key of keys) if (!known.has(key)) missing.push(key);
       }
     }
-    for (const key of Object.values(COMING_SOON).flat()) if (!known.has(`soon.${key}`)) missing.push(`soon.${key}`);
     for (const item of OPS_NAV) if (!known.has(item.labelKey)) missing.push(item.labelKey);
     expect(missing).toEqual([]);
   });

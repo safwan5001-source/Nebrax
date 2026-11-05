@@ -1,10 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ExternalLink } from 'lucide-react';
-import { useStationOps } from './context';
 import { useShiftHistory, type ShiftFilter } from './data';
 import { ShiftCard } from './shift-card';
 import { PageMasthead, ScreenBody } from './masthead';
@@ -17,7 +14,6 @@ const FILTERS: readonly ShiftFilter[] = ['all', 'open', 'closed', 'approved'];
 
 function Content({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
-  const { can } = useStationOps();
   const [filter, setFilter] = useState<ShiftFilter>('all');
   const history = useShiftHistory(station, filter);
 
@@ -75,15 +71,7 @@ function Content({ station }: { station: Station }) {
         </>
       )}
 
-      <aside className="rounded-[14px] border border-dashed border-border p-4 text-sm leading-6 text-muted">
-        <p>{t('shifts.readOnlyNote')}</p>
-        {can('fuel.shift.approve') || can('fuel.shift.open') ? (
-          <Link href="/fuel-stations/shifts" className="mt-2 inline-flex min-h-11 items-center gap-1.5 font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            {t('shifts.desktopLink')}
-            <ExternalLink aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />
-          </Link>
-        ) : null}
-      </aside>
+      <p className="rounded-[14px] border border-dashed border-border p-4 text-sm leading-6 text-muted">{t('shifts.readOnlyNote')}</p>
     </>
   );
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
@@ -8,7 +7,6 @@ import { useLocale, useTranslations } from 'next-intl';
 import { switchLocale } from '@/components/layout/lang-toggle';
 import { formatDate } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
-import { useStationOps } from './context';
 import { PageMasthead, ScreenBody } from './masthead';
 import { StationGate } from './station-gate';
 import type { Station } from './schemas';
@@ -83,7 +81,6 @@ function PersonalPreferences() {
 function StationInfo({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
-  const { can } = useStationOps();
   const place = [station.city, station.region].filter((part): part is string => !!part).join(' · ');
 
   return (
@@ -101,13 +98,7 @@ function StationInfo({ station }: { station: Station }) {
         <Row label={t('settings.station.license')} value={station.license_number} />
         <Row label={t('settings.station.licenseExpiry')} value={station.license_expires_at ? formatDate(station.license_expires_at, locale) : null} />
       </dl>
-      {can('fuel_stations.manage') ? (
-        <Link href="/fuel-stations/settings" className="inline-flex min-h-11 items-center text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          {t('settings.station.manageLink')}
-        </Link>
-      ) : (
-        <p className="text-sm text-muted">{t('settings.station.readOnly')}</p>
-      )}
+      <p className="text-sm text-muted">{t('settings.station.readOnly')}</p>
     </section>
   );
 }

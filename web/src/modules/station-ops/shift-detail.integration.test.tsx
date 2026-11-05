@@ -94,6 +94,8 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** قسم مطوي بعنوان ملخصه (التفاصيل الثانوية مطوية افتراضياً). */
+const more = (title: string) => (screen.getByText(title, { selector: 'summary' }).closest('details') as HTMLElement);
 const pumpCard = (name: RegExp) => screen.getByRole('heading', { level: 3, name }).closest('li') as HTMLElement;
 /** صف فوهة داخل بطاقة مضخة (نصّه مقسَّم على عناصر فلا يصلح getByText). */
 const nozzleRow = (card: HTMLElement, number: string) => {
@@ -145,15 +147,16 @@ describe('shift details — readings from the real contract', () => {
     expect(await screen.findByText('1,190.500')).toBeTruthy();
     expect(screen.getByText('Shift liters from the meters')).toBeTruthy();
     expect(screen.getByText('Duration: 8 h 0 m')).toBeTruthy();
-    expect(screen.getByText("Times shown in the station's time zone (Asia/Riyadh)")).toBeTruthy();
+    expect(screen.queryByText(/has no time zone set/)).toBeNull(); // المنطقة معروفة: لا ضجيج
+    expect(screen.getByText('Step 5 of 5: Shift approved')).toBeTruthy();
     // 05:00 UTC = 08:00 AM الرياض
     expect(screen.getAllByText(/3 Nov 2026, 08:00\sAM/).length).toBeGreaterThan(0);
   });
 
-  it('states plainly that meter liters are not POS sales, collections or stock', async () => {
+  it('states plainly that meter liters are not sales, collections or stock', async () => {
     open();
     await screen.findByText('SH-100');
-    expect(screen.getByText(/not POS sales, not collections and not a stock movement/)).toBeTruthy();
+    expect(screen.getByText(/pump meters only — not sales, not collections and not stock/)).toBeTruthy();
   });
 
   it('warns when the server total disagrees with the nozzle differences shown', async () => {
@@ -185,13 +188,14 @@ describe('shift details — readings from the real contract', () => {
 
   it('shows the tank measurements with their type, and says they do not change stock', async () => {
     open({ ...CLOSED, tank_readings: [tankReading('r1', 't1', 'opening', 9_000_000), tankReading('r2', 't1', 'closing', 8_250_000, { reading_type: 'atg' })] });
-    const section = (await screen.findByRole('heading', { name: 'Tank readings' })).closest('section') as HTMLElement;
+    await screen.findByText('SH-100');
+    const section = more('Tank readings');
     expect(within(section).getByText('Tank t1')).toBeTruthy();
     expect(within(section).getByText('9,000.000')).toBeTruthy();
     expect(within(section).getByText('8,250.000')).toBeTruthy();
     expect(within(section).getByText('Physical measurement')).toBeTruthy();
     expect(within(section).getByText('Automatic gauge (ATG)')).toBeTruthy();
-    expect(within(section).getByText(/don't change stock balances/)).toBeTruthy();
+    expect(within(section).getByText(/don't change stock/)).toBeTruthy();
   });
 });
 
@@ -212,7 +216,7 @@ describe('open shift — the stored total is not a real zero', () => {
     const figure = screen.getByText('Meter liters so far').nextElementSibling as HTMLElement;
     expect(figure.textContent).toContain('400.000');
     expect(screen.getByText('Partial total: only nozzles with both opening and closing readings are counted (1 of 3).')).toBeTruthy();
-    const progress = (screen.getByRole('heading', { name: 'Shift progress' }).closest('section') as HTMLElement);
+    const progress = more('Shift progress');
     expect(within(progress).getByText('Opening readings').closest('li')?.textContent).toMatch(/2 of 3 nozzles/);
     // كل فوهة فعّالة تظهر، ومن لم تُسجَّل لها قراءة صريحة
     expect(screen.getAllByText('Not recorded').length).toBeGreaterThan(0);
@@ -222,28 +226,30 @@ describe('open shift — the stored total is not a real zero', () => {
   it('marks the next progress step and keeps only the three AWJ states (no invented ones)', async () => {
     open({ ...OPEN });
     await screen.findByText('SH-200');
-    const progress = screen.getByRole('heading', { name: 'Shift progress' }).closest('section') as HTMLElement;
+    const progress = more('Shift progress');
     const current = progress.querySelector('[aria-current="step"]') as HTMLElement;
     expect(current.textContent).toContain('Opening readings');
     expect(current.textContent).toContain('Next');
-    expect(progress.textContent).toContain('AWJ shift states: open → closed → approved.');
+    expect(screen.getByText('Step 2 of 5: Opening readings')).toBeTruthy(); // الملخص المضغوط في البطاقة العليا
     expect(progress.textContent).not.toMatch(/returned|submitted|rejected/i);
+    expect(progress.querySelectorAll('li')).toHaveLength(5); // حالات أَوْج الثلاث + قراءات الافتتاح/الإغلاق فقط
   });
 
   it('cash that has not been counted is "Not counted yet", not zero', async () => {
     open({ ...OPEN, counted_cash_minor: null, expected_operational_cash_minor: null, cash_variance_minor: null });
-    const section = (await screen.findByRole('heading', { name: 'Operational shift cash' })).closest('section') as HTMLElement;
-    expect(within(section).getAllByText('Not counted yet')).toHaveLength(3);
+    await screen.findByText('SH-200');
+    expect(within(more('Cash in this shift')).getAllByText('Not counted yet')).toHaveLength(3);
   });
 });
 
 describe('cash', () => {
   it('names the direction of a variance with text, not colour alone', async () => {
     open({ ...CLOSED, opening_float_minor: 10_000, counted_cash_minor: 9_500, expected_operational_cash_minor: 10_000, cash_variance_minor: -500, cash_variance: { status: 'pending_review', variance_direction: 'shortage' } });
-    const section = (await screen.findByRole('heading', { name: 'Operational shift cash' })).closest('section') as HTMLElement;
+    await screen.findByText('SH-100');
+    const section = more('Cash in this shift');
     expect(within(section).getByText('Shortage')).toBeTruthy();
     expect(within(section).getByText('Pending review')).toBeTruthy();
-    expect(within(section).getByText(/not sales revenue, not card\/network collections and not an accounting entry/)).toBeTruthy();
+    expect(within(section).getByText(/not sales and not card\/network collections/)).toBeTruthy();
   });
 
   it('a counted, matching shift is "Matches" (a real zero), an overage is "Overage"', async () => {
@@ -373,7 +379,7 @@ describe('honest states', () => {
     backend.fail((url) => url.includes('/fuel-stations/nozzles'), new ApiError(500, 'x', {}));
     expect(await screen.findByText('SH-100')).toBeTruthy();
     expect(await screen.findByText("Couldn't load the pumps and nozzles needed to show the readings.")).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Operational shift cash' })).toBeTruthy();
+    expect(more('Cash in this shift')).toBeTruthy();
     expect(screen.queryByText('125,430.000')).toBeNull();
   });
 
@@ -383,29 +389,56 @@ describe('honest states', () => {
   });
 });
 
-describe('read-only', () => {
-  it('has no control that records, closes, approves or opens anything; upcoming actions are inert text with a Soon badge', async () => {
+describe('read-only and app-only', () => {
+  it('has no control that records, closes, approves or opens anything: the only button is Refresh', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open', 'fuel.shift.approve'] });
     open();
     await screen.findByText('SH-100');
-    const buttons = screen.getAllByRole('button').map((button) => button.textContent?.trim());
-    expect(buttons).toEqual(['Refresh']);
-    const soon = (screen.getByRole('heading', { name: 'Coming next' }).closest('section') as HTMLElement);
-    for (const label of ['Record meter readings', 'Close and hand over the shift', 'Approve the shift']) {
-      const row = within(soon).getByText(label).closest('li') as HTMLElement;
-      expect(row.querySelector('a, button')).toBeNull();
-      expect(row.textContent).toContain('Soon');
-    }
-    expect(soon.textContent).toContain('This screen is view-only and records nothing in AWJ');
+    expect(screen.getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Refresh']);
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
 
-  it('a viewer without open/approve permissions sees no upcoming-action list', async () => {
+  it('every link stays inside the app — no hop to ERP shift/settings pages (product decision 2026-11-05)', async () => {
+    seedUser({ permissions: [...VIEW, 'fuel.shift.open', 'fuel.shift.approve', 'fuel_stations.manage'] });
     open();
     await screen.findByText('SH-100');
-    expect(screen.queryByText('Record meter readings')).toBeNull();
-    expect(screen.queryByText('Approve the shift')).toBeNull();
+    const links = screen.getAllByRole('link').filter((link) => !(link.getAttribute('href') ?? '').startsWith('#'));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link.getAttribute('href'), link.textContent ?? '').toMatch(/^\/fuel-stations\/ops(\/|$)/);
+    expect(document.body.textContent).not.toMatch(/full shifts screen|in AWJ/i);
+  });
+
+  it('shows the NEXT STEP in the employee\'s language before the readings, as inert text with a Soon note', async () => {
+    seedUser({ permissions: [...VIEW, 'fuel.shift.approve'] });
+    open();
+    const card = (await screen.findByText('Approve the shift')).closest('section') as HTMLElement;
+    expect(card.textContent).toContain('Next step');
+    expect(card.textContent).toContain('This step will arrive inside the app soon');
+    expect(card.querySelector('a, button')).toBeNull();
+    const readings = screen.getByRole('heading', { name: 'Meter readings' });
+    expect(card.compareDocumentPosition(readings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // الخطوة التالية تسبق القراءات
+  });
+
+  it('an approved shift says it is complete (no action, no missing-message errors)', async () => {
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(' ')); });
+    open({ ...CLOSED, status: 'approved', approved_at: '2026-11-03T14:00:00+00:00' });
+    expect(await screen.findByText('This shift is complete')).toBeTruthy();
+    expect(screen.getByText('Shift complete')).toBeTruthy();
+    expect(errors.filter((line) => /MISSING_MESSAGE/.test(line))).toEqual([]);
+    spy.mockRestore();
+  });
+
+  it('secondary sections (progress, tanks, cash) are collapsed by default so the readings come first', async () => {
+    open();
+    await screen.findByText('SH-100');
+    for (const title of ['Shift progress', 'Tank readings', 'Cash in this shift']) expect((more(title) as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it('a viewer without the approve permission is told who the shift is waiting for', async () => {
+    open();
+    expect(await screen.findByText('Waiting for: Approve the shift')).toBeTruthy();
   });
 });
 

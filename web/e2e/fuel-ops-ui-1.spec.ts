@@ -40,7 +40,9 @@ for (const locale of ['en', 'ar'] as const) {
       const text = await page.locator('#fo-main').innerText();
       expect(text).toContain('125,430.000'); // قراءة افتتاح الفوهة الأولى بثلاث منازل
       expect(text).not.toMatch(/[٠-٩]/);
-      await expect(page.getByRole('heading', { name: locale === 'ar' ? 'النقد التشغيلي للوردية' : 'Operational shift cash' })).toBeVisible();
+      // الأقسام الثانوية مطوية افتراضياً: النقد لا يزاحم القراءات، ويظهر بعد النقر.
+      await expect(page.getByText(locale === 'ar' ? 'عجز' : 'Shortage')).toBeHidden();
+      await page.locator('summary', { hasText: locale === 'ar' ? 'النقد في الوردية' : 'Cash in this shift' }).click();
       await expect(page.getByText(locale === 'ar' ? 'عجز' : 'Shortage')).toBeVisible();
       expect(await noOverflow(page)).toBe(true);
     });
@@ -62,7 +64,7 @@ for (const locale of ['en', 'ar'] as const) {
           window.scrollTo(0, document.documentElement.scrollHeight);
           const main = document.querySelector('#fo-main') as HTMLElement;
           const nav = document.querySelector('nav[aria-label]') as HTMLElement;
-          const last = Math.max(...[...main.querySelectorAll('*')].map((e) => (e as HTMLElement).getBoundingClientRect().bottom));
+          const last = Math.max(...[...main.querySelectorAll('*')].filter((e) => !e.closest('details:not([open])') || e.tagName === 'SUMMARY').map((e) => (e as HTMLElement).getBoundingClientRect().bottom));
           return nav.getBoundingClientRect().top - last;
         });
         expect(clearance).toBeGreaterThanOrEqual(0);
@@ -82,10 +84,30 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page).toHaveURL(/\/fuel-stations\/ops\/shifts$/);
     });
 
+    test('UX: the next step is visible without scrolling, is inert text, and every link stays in the app', async ({ page }, info) => {
+      for (const path of ['', '/shifts/h1', '/shifts/h2']) {
+        await go(page, path, { locale });
+        const next = page.locator('[data-next-step]');
+        await expect(next).toBeVisible();
+        expect(await next.evaluate((el) => !!el.querySelector('a, button'))).toBe(false);
+        if (info.project.name === 'mobile') {
+          const box = await next.boundingBox();
+          const nav = await page.locator('nav[aria-label]').first().boundingBox();
+          // «الخطوة التالية» تبدأ ضمن أول شاشة آيفون وفوق التنقل السفلي (الرئيسية: ضمن أول شاشتين كحدٍّ أقصى).
+          expect(box!.y, `${path || 'home'} next step top`).toBeLessThan(path === '' ? 844 * 1.4 : 844);
+          expect(nav!.y).toBeGreaterThan(0);
+        }
+        const hrefs = await page.locator('a').evaluateAll((anchors) => anchors.map((a) => a.getAttribute('href') ?? ''));
+        expect(hrefs.filter((href) => !href.startsWith('#') && !href.startsWith('/fuel-stations/ops')), path).toEqual([]);
+      }
+      await go(page, '', { locale });
+      await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+    });
+
     test('home links to the open shift and shows liters computed from the completed nozzles', async ({ page }) => {
       await go(page, '', { locale });
       await expect(page.getByText('SH-1001').first()).toBeVisible();
-      await expect(page.getByRole('link', { name: locale === 'ar' ? 'تفاصيل الوردية وقراءات العدادات' : 'Shift details and meter readings' })).toBeVisible();
+      await expect(page.getByRole('link', { name: locale === 'ar' ? 'عرض الوردية الحالية' : 'View the current shift' })).toBeVisible();
       await expect(page.getByText(locale === 'ar' ? 'لترات العدادات حتى الآن' : 'Meter liters so far')).toBeVisible();
     });
   });

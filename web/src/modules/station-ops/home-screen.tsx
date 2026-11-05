@@ -2,114 +2,140 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, ChevronRight, Clock, CreditCard, Droplets, Gauge, Settings, Wallet } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
+import type { StationCatalog } from './catalog';
 import { useStationOps } from './context';
 import { useCurrentShift, useShiftDetail, useStationAssets, useStationPrices } from './data';
 import { formatLitersFixedFromMl } from './format';
 import { HomeMasthead, ScreenBody } from './masthead';
-import { COMING_SOON, OPS_BASE, deriveOpsMode } from './nav';
+import { OPS_BASE } from './nav';
+import { deriveNextStep } from './next-step';
+import { NextStepCard } from './next-step-card';
 import { PriceLabel } from './price-label';
-import { buildShiftReadings } from './readings';
-import { CurrentShiftBanner, FinancialSummary, MetricCard } from './shift-card';
+import { buildShiftReadings, deriveProgress } from './readings';
+import type { Shift, Station } from './schemas';
+import { CurrentShiftBanner, FinancialSummary } from './shift-card';
+import { ProgressSummary } from './shift-progress';
 import { StationGate } from './station-gate';
 import { ErrorState, InlineNote, LoadingBlock } from './state-views';
-import type { Shift, Station } from './schemas';
-import type { StationCatalog } from './catalog';
 
 /**
- * الرقم الرئيسي للوردية الحالية (دائماً مفتوحة: الاستعلام `status=open` ويُعاد التحقق منه). الخادم لا يثبّت إجمالي اللترات إلا
- * عند الإغلاق (يبقى 0 قبله) فلا يُعرض؛ يُحسب من قراءات الفوهات المكتملة في تفاصيل الوردية، ويُوسَم جزئياً،
- * و«—» إن لم تكتمل فوهة أو تعذّر الحساب.
+ * الرئيسية — قرار المنتج 2026-11-05 (APP-ONLY / SIMPLE UX): تجيب ثلاثة أسئلة فقط، بلا خروج من التطبيق:
+ *   أين أنا؟ (الرأس: المحطة)  ·  ما حالة ورديتي؟ (بطاقة الوردية + التقدم + اللترات)  ·  ما الخطوة التالية؟ («الخطوة التالية»).
+ * زر أساسي **واحد** (برتقالي) ينقل إلى تفاصيل الوردية داخل التطبيق. لا رابط إلى ERP ولا إلى إدارة المحطات؛ ما لم يُنفَّذ بعد
+ * (تسجيل القراءات/التسليم/الاعتماد) يظهر نصاً بشارة «قريباً»، لا زراً.
  */
-function ShiftLiters({ station, shift, catalog, productCount, pumpCount }: { station: Station; shift: Shift; catalog: StationCatalog | null; productCount: number | null; pumpCount: number | null }) {
+
+function PrimaryAction({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      data-primary-action=""
+      className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-[13px] bg-[color:var(--fo-cta-bg)] px-4 text-[15px] font-bold text-[color:var(--fo-cta-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      {label}
+      <ArrowLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-0 ltr:rotate-180" strokeWidth={2} />
+    </Link>
+  );
+}
+
+function summaryCells(t: ReturnType<typeof useTranslations>, catalog: StationCatalog | null) {
+  const products = catalog ? String(catalog.products.length) : '—';
+  const pumps = catalog ? String(catalog.pumps.filter(({ nozzles }) => nozzles.some((view) => view.blockedBy === null)).length) : '—';
+  return [
+    { label: t('home.cellProducts'), value: products },
+    { label: t('home.cellPumps'), value: pumps },
+  ];
+}
+
+/** وردية مفتوحة: بطاقة (حالة + تقدم) ← لترات العدادات ← الخطوة التالية ← الزر الأساسي. */
+function OpenShift({ station, shift, catalog, multiple }: { station: Station; shift: Shift; catalog: StationCatalog | null; multiple: boolean }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
+  const { can } = useStationOps();
   const detail = useShiftDetail(station, shift.id);
-  const count = (value: number | null) => (value === null ? '—' : String(value));
-  const cells = [
-    { label: t('home.cellProducts'), value: count(productCount) },
-    { label: t('home.cellPumps'), value: count(pumpCount) },
-  ];
+  const loaded = detail.state.status === 'success' && catalog !== null ? detail.state.data : null;
+  const view = loaded && catalog ? buildShiftReadings(loaded, catalog) : null;
+  const steps = loaded && view ? deriveProgress(loaded, view.summary) : null;
+  const next = loaded && view ? deriveNextStep(loaded, view.summary, can) : null;
 
   let value: string | null = null;
   let note: string | undefined;
-  if (detail.state.status === 'loading' || !catalog) {
-    note = detail.state.status === 'error' ? t('shiftDetail.home.liveUnavailable') : t('loading');
-  } else if (detail.state.status === 'error') {
-    note = t('shiftDetail.home.liveUnavailable');
-  } else {
-    const { summary } = buildShiftReadings(detail.state.data, catalog);
+  if (view) {
+    const { summary } = view;
     if (summary.complete > 0) {
       value = formatLitersFixedFromMl(summary.computedMl, locale);
       if (summary.partial && summary.expected !== null) note = t('shiftDetail.liters.partial', { complete: String(summary.complete), expected: String(summary.expected) });
     } else {
       note = t('shiftDetail.liters.noneYet');
     }
-  }
-  return <FinancialSummary caption={t('shiftDetail.home.litersOpen')} value={value} unit={t('unit.liter')} note={note} cells={cells} />;
-}
-
-function ShiftAndSummary({ station, catalog, productCount, pumpCount }: { station: Station; catalog: StationCatalog | null; productCount: number | null; pumpCount: number | null }) {
-  const t = useTranslations('stationOps');
-  const current = useCurrentShift(station);
-  const shift = current.state.status === 'success' ? current.state.data.shift : null;
-
-  let banner: React.ReactNode = null;
-  if (!current.allowed) {
-    banner = (
-      <div className="mt-2">
-        <p className="text-base font-semibold text-text">{t('shift.noPermission.title')}</p>
-        <p className="mt-0.5 text-sm leading-6 text-muted">{t('shift.noPermission.body')}</p>
-      </div>
-    );
-  } else if (current.state.status === 'loading') {
-    banner = <div role="status" aria-busy="true" className="mt-3 space-y-2"><span className="sr-only">{t('loading')}</span><div className="h-6 w-32 animate-pulse rounded bg-border/60" /><div className="h-4 w-48 animate-pulse rounded bg-border/60" /></div>;
-  } else if (current.state.status === 'error') {
-    banner = <div className="mt-3"><ErrorState error={current.state.error} onRetry={current.reload} /></div>;
-  } else if (!shift) {
-    banner = (
-      <div className="mt-2">
-        <p className="text-base font-semibold text-text">{t('shift.none.title')}</p>
-        <p className="mt-0.5 text-sm leading-6 text-muted">{t('shift.none.body')}</p>
-      </div>
-    );
+  } else {
+    note = detail.state.status === 'error' ? t('shiftDetail.home.liveUnavailable') : t('loading');
   }
 
   return (
     <>
       <CurrentShiftBanner shift={shift} timeZone={station.timezone}>
-        {banner}
-        {current.state.status === 'success' && current.state.data.multiple ? <div className="mt-3"><InlineNote tone="warning">{t('shift.multipleOpen')}</InlineNote></div> : null}
-        {shift ? (
-          <Link
-            href={`${OPS_BASE}/shifts/${encodeURIComponent(shift.id)}`}
-            className="mt-3 flex min-h-11 items-center justify-between gap-2 border-t border-border pt-3 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            {t('shiftDetail.home.details')}
-            <ChevronRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.8} />
-          </Link>
-        ) : null}
+        {steps ? <div className="mt-3 border-t border-border pt-3"><ProgressSummary steps={steps} /></div> : null}
+        {multiple ? <div className="mt-3"><InlineNote tone="warning">{t('shift.multipleOpen')}</InlineNote></div> : null}
       </CurrentShiftBanner>
-
       <div className="space-y-3 pt-1">
-        <h2 className="text-base font-semibold text-text">{t('home.summary')}</h2>
-        {shift ? (
-          <ShiftLiters key={shift.id} station={station} shift={shift} catalog={catalog} productCount={productCount} pumpCount={pumpCount} />
-        ) : (
-          <FinancialSummary
-            caption={t('home.summaryLiters')}
-            value={null}
-            unit={t('unit.liter')}
-            cells={[
-              { label: t('home.cellProducts'), value: productCount === null ? '—' : String(productCount) },
-              { label: t('home.cellPumps'), value: pumpCount === null ? '—' : String(pumpCount) },
-            ]}
-          />
-        )}
-        <div className="grid grid-cols-2 gap-2.5 !mt-2.5">
-          <MetricCard label={t('metric.cash')} value={null} note={t('metric.unavailable')} icon={<Wallet aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />} />
-          <MetricCard label={t('metric.card')} value={null} note={t('metric.unavailable')} icon={<CreditCard aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />} />
+        <FinancialSummary caption={t('shiftDetail.home.litersOpen')} value={value} unit={t('unit.liter')} note={note} cells={summaryCells(t, catalog)} />
+        {next ? <NextStepCard step={next} /> : null}
+        <PrimaryAction href={`${OPS_BASE}/shifts/${encodeURIComponent(shift.id)}`} label={t('home.ctaCurrent')} />
+      </div>
+    </>
+  );
+}
+
+function ShiftArea({ station, catalog }: { station: Station; catalog: StationCatalog | null }) {
+  const t = useTranslations('stationOps');
+  const { can } = useStationOps();
+  const current = useCurrentShift(station);
+
+  if (!current.allowed) {
+    return (
+      <>
+        <CurrentShiftBanner shift={null} timeZone={station.timezone}>
+          <div className="mt-2">
+            <p className="text-base font-semibold text-text">{t('shift.noPermission.title')}</p>
+            <p className="mt-0.5 text-sm leading-6 text-muted">{t('shift.noPermission.body')}</p>
+          </div>
+        </CurrentShiftBanner>
+      </>
+    );
+  }
+  if (current.state.status === 'loading') {
+    return (
+      <>
+        <CurrentShiftBanner shift={null} timeZone={station.timezone}>
+          <div role="status" aria-busy="true" className="mt-3 space-y-2"><span className="sr-only">{t('loading')}</span><div className="h-6 w-32 animate-pulse rounded bg-border/60" /><div className="h-4 w-48 animate-pulse rounded bg-border/60" /></div>
+        </CurrentShiftBanner>
+      </>
+    );
+  }
+  if (current.state.status === 'error') {
+    return (
+      <CurrentShiftBanner shift={null} timeZone={station.timezone}>
+        <div className="mt-3"><ErrorState error={current.state.error} onRetry={current.reload} /></div>
+      </CurrentShiftBanner>
+    );
+  }
+  const { shift, multiple } = current.state.data;
+  if (shift) return <OpenShift key={shift.id} station={station} shift={shift} catalog={catalog} multiple={multiple} />;
+
+  const next = deriveNextStep(null, null, can);
+  return (
+    <>
+      <CurrentShiftBanner shift={null} timeZone={station.timezone}>
+        <div className="mt-2">
+          <p className="text-base font-semibold text-text">{t('shift.none.title')}</p>
+          <p className="mt-0.5 text-sm leading-6 text-muted">{t('shift.none.body')}</p>
         </div>
+      </CurrentShiftBanner>
+      <div className="space-y-3 pt-1">
+        {next ? <NextStepCard step={next} /> : null}
+        {can('fuel.shift.view') ? <PrimaryAction href={`${OPS_BASE}/shifts`} label={t('home.ctaHistory')} /> : null}
       </div>
     </>
   );
@@ -163,84 +189,12 @@ function ProductsSection({ station, assets }: { station: Station; assets: Return
   );
 }
 
-function Shortcuts() {
-  const t = useTranslations('stationOps');
-  const { can } = useStationOps();
-  const items = [
-    { href: `${OPS_BASE}/products`, label: t('home.shortcuts.products'), Icon: Droplets, show: true },
-    { href: `${OPS_BASE}/shifts`, label: t('home.shortcuts.shifts'), Icon: Gauge, show: can('fuel.shift.view') },
-    { href: `${OPS_BASE}/settings`, label: t('home.shortcuts.settings'), Icon: Settings, show: true },
-  ].filter((item) => item.show);
-  return (
-    <ul className="grid grid-cols-3 gap-2.5">
-      {items.map(({ href, label, Icon }) => (
-        <li key={href}>
-          <Link href={href} className="flex min-h-[84px] flex-col items-center justify-center gap-2 rounded-[13px] border border-border bg-surface px-1.5 py-3 text-center text-xs font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            <Icon aria-hidden="true" className="h-6 w-6" strokeWidth={1.6} />
-            {label}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** الإجراء التالي المسموح: إكمال الوردية في شاشة أَوْج الكاملة (الفعلية) — لا زر يدّعي ما لم يُنفَّذ بعد. */
-function NextAction() {
-  const t = useTranslations('stationOps');
-  const { can } = useStationOps();
-  const allowed = can('fuel.shift.view') && can('fuel_stations.view');
-  return (
-    <section aria-labelledby="fo-actions-h" className="space-y-3">
-      <h2 id="fo-actions-h" className="text-base font-semibold text-text">{t('home.actions')}</h2>
-      {allowed ? (
-        <Link
-          href="/fuel-stations/shifts"
-          className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-[13px] bg-[color:var(--fo-cta-bg)] px-4 text-[15px] font-bold text-[color:var(--fo-cta-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          {t('home.cta')}
-          <ArrowLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-0 ltr:rotate-180" strokeWidth={2} />
-        </Link>
-      ) : null}
-      <p className="text-xs leading-6 text-muted">{t('home.ctaNote')}</p>
-      <Shortcuts />
-    </section>
-  );
-}
-
-function ComingSoon() {
-  const t = useTranslations('stationOps');
-  const { can } = useStationOps();
-  const keys = COMING_SOON[deriveOpsMode(can)];
-  if (keys.length === 0) return null;
-  return (
-    <section aria-labelledby="fo-soon-h" className="space-y-3">
-      <h2 id="fo-soon-h" className="text-base font-semibold text-text">{t('home.comingSoon')}</h2>
-      <ul className="divide-y divide-border rounded-[14px] border border-border bg-surface">
-        {keys.map((key) => (
-          <li key={key} className="flex items-center justify-between gap-3 px-4 py-3 text-muted">
-            <span className="text-sm">{t(`soon.${key}`)}</span>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs">
-              <Clock aria-hidden="true" className="h-3 w-3" strokeWidth={1.8} />
-              {t('soonBadge')}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function Body({ station }: { station: Station }) {
   const assets = useStationAssets(station);
-  const catalog = assets.catalog;
-  const pumpCount = catalog ? catalog.pumps.filter(({ nozzles }) => nozzles.some((view) => view.blockedBy === null)).length : null;
   return (
     <div className="space-y-5">
-      <ShiftAndSummary station={station} catalog={catalog} productCount={catalog ? catalog.products.length : null} pumpCount={pumpCount} />
-      <NextAction />
+      <ShiftArea station={station} catalog={assets.catalog} />
       <ProductsSection station={station} assets={assets} />
-      <ComingSoon />
     </div>
   );
 }

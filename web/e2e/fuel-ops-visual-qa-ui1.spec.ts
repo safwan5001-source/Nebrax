@@ -18,7 +18,7 @@ const REFERENCE = process.env.VQA_REFERENCE_HTML;
 test.skip(!OUT, 'VQA_OUT is required');
 
 const VIEWPORTS = [{ w: 320, h: 568 }, { w: 375, h: 812 }, { w: 390, h: 844 }, { w: 414, h: 896 }, { w: 430, h: 932 }] as const;
-const SCREENS: Array<[string, string]> = [['home', ''], ['list', '/shifts'], ['detail-open', '/shifts/h1'], ['detail-closed', '/shifts/h2'], ['detail-approved', '/shifts/h3']];
+const SCREENS: Array<[string, string]> = [['home', ''], ['list', '/shifts'], ['detail-open', '/shifts/h1'], ['detail-closed', '/shifts/h2'], ['detail-closed-expanded', '/shifts/h2'], ['detail-approved', '/shifts/h3']];
 
 const findings: Array<Record<string, unknown>> = [];
 
@@ -44,6 +44,7 @@ test.describe('matrix: screens × viewports × theme × locale', () => {
       const mock = await mockOpsApi(page, { baseUrl, locale, theme });
       await page.goto(`${baseUrl}/fuel-stations/ops${path}`, { waitUntil: 'domcontentloaded' });
       await settle(page);
+      if (name.endsWith('-expanded')) { await page.evaluate(() => document.querySelectorAll('main details').forEach((d) => d.setAttribute('open', ''))); await page.waitForTimeout(200); }
       await shot(page, `matrix/${name}-${locale}-${theme}-${vp.w}x${vp.h}`);
 
       const m = await page.evaluate(() => {
@@ -51,7 +52,7 @@ test.describe('matrix: screens × viewports × theme × locale', () => {
         const main = document.querySelector('#fo-main') as HTMLElement;
         const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
         const small: string[] = [];
-        for (const el of document.querySelectorAll('nav a, header a, header select, main a, main button, main select')) {
+        for (const el of document.querySelectorAll('nav a, header a, header select, main a, main button, main select, main summary')) {
           const r = (el as HTMLElement).getBoundingClientRect();
           if (r.width > 0 && (r.height < 43.5 || r.width < 43.5)) small.push(`${el.tagName.toLowerCase()}:${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 24)}:${Math.round(r.width)}x${Math.round(r.height)}`);
         }
@@ -65,7 +66,7 @@ test.describe('matrix: screens × viewports × theme × locale', () => {
           if (own && parseFloat(style.fontSize) < 11.5) tiny.add(`${parseFloat(style.fontSize)}px`);
         }
         window.scrollTo(0, document.documentElement.scrollHeight);
-        const lastBottom = Math.max(...[...main.querySelectorAll('*')].map((e) => (e as HTMLElement).getBoundingClientRect().bottom));
+        const lastBottom = Math.max(...[...main.querySelectorAll('*')].filter((e) => !e.closest('details:not([open])') || e.tagName === 'SUMMARY').map((e) => (e as HTMLElement).getBoundingClientRect().bottom));
         const field = document.querySelector('select');
         return {
           overflow, small, clipped, tiny: [...tiny], clearance: Math.round(nav.getBoundingClientRect().top - lastBottom), pageHeight: document.documentElement.scrollHeight,
@@ -86,6 +87,8 @@ test.describe('matrix: screens × viewports × theme × locale', () => {
       expect(m.clearance, 'last content must clear the bottom navigation').toBeGreaterThanOrEqual(0);
       expect(mock.requests.filter((r) => r.method !== 'GET')).toEqual([]);
       expect(mock.issues).toEqual([]);
+      const hrefs = await page.locator('a').evaluateAll((anchors) => anchors.map((a) => a.getAttribute('href') ?? ''));
+      expect(hrefs.filter((href) => !href.startsWith('#') && !href.startsWith('/fuel-stations/ops')), 'links leaving the app').toEqual([]);
       await context.close();
     });
   }

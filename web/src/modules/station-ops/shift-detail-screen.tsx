@@ -3,16 +3,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowDownRight, ArrowUpRight, Clock, Equal, ExternalLink, Info, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronDown, Equal, Info, RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatMinorRiyal } from '@/lib/money';
 import { useStationOps } from './context';
 import { useShiftDetail, useStationAssets, type ShiftDetailResult, type StationAssetsResult } from './data';
 import { elapsedBetween, formatLitersFixedFromMl, formatStampInZone } from './format';
 import { PageMasthead, ScreenBody } from './masthead';
 import { OPS_BASE } from './nav';
-import { buildShiftReadings, deriveProgress } from './readings';
+import { deriveNextStep } from './next-step';
+import { NextStepCard } from './next-step-card';
+import { buildShiftReadings, deriveProgress, type ProgressStep, type ShiftReadingsView } from './readings';
 import type { ShiftDetail, Station } from './schemas';
-import { ProgressSection } from './shift-progress';
+import { ProgressSection, ProgressSummary } from './shift-progress';
 import { ReadingsSection, TanksSection } from './shift-readings-section';
 import { FinancialSummary, ShiftStatusBadge } from './shift-card';
 import { StationGate } from './station-gate';
@@ -20,7 +22,9 @@ import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views'
 
 /**
  * UI-1 — شاشة «تفاصيل الوردية»: قراءة فقط من `GET /fuel-stations/shifts/{id}` (+ أصول المحطة لأسماء الفوهات).
- * لا زر يسجّل أو يفتح أو يغلق أو يعتمد؛ الإجراءات القادمة نص غير تفاعلي بشارة «قريباً». اللترات هنا من فرق العدادات
+ * قرار المنتج (2026-11-05): الموظف يبقى داخل التطبيق — لا رابط إلى ERP/إدارة المحطات. الترتيب: ملخص + التقدم ← «الخطوة التالية» ←
+ * اللترات ← قراءات الفوهات (الأهم)، وما سواها (مراحل/خزانات/نقد) في أقسام مطوية. لا زر يسجّل أو يفتح أو يغلق أو يعتمد؛ الخطوة
+ * القادمة نص بشارة «قريباً». اللترات هنا من فرق العدادات
  * ولا تُقدَّم كمبيعات أو تحصيل أو مخزون. الوردية المفتوحة بلا إجمالي مخزَّن (الخادم يحسبه عند الإغلاق) فيُحسب هنا من القراءات
  * المكتملة ويُوسَم جزئياً.
  */
@@ -65,8 +69,9 @@ function NotFoundPanel() {
   );
 }
 
-function SummaryCard({ detail, station, fetchedAt, now, stale, refreshing, failed, onRefresh }: {
+function SummaryCard({ detail, station, progress, fetchedAt, now, stale, refreshing, failed, onRefresh }: {
   detail: ShiftDetail;
+  progress: ProgressStep[] | null;
   station: Station;
   fetchedAt: number | null;
   now: number;
@@ -112,9 +117,8 @@ function SummaryCard({ detail, station, fetchedAt, now, stale, refreshing, faile
           </li>
         </ul>
 
-        <p className="mt-2 text-xs leading-5 text-muted">
-          {zone ? t('shiftDetail.zoneStation', { zone }) : t('shiftDetail.zoneDevice')}
-        </p>
+        {progress ? <div className="mt-3 border-t border-border pt-3"><ProgressSummary steps={progress} /></div> : null}
+        {!zone ? <p className="mt-2 text-xs leading-5 text-warning">{t('shiftDetail.zoneDevice')}</p> : null}
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
           <p role="status" className={`min-w-0 text-xs leading-5 ${stale || failed ? 'text-warning' : 'text-muted'}`}>
@@ -203,16 +207,15 @@ function CashSection({ detail }: { detail: ShiftDetail }) {
   ];
 
   return (
-    <section aria-labelledby="fo-cash-h" className="space-y-3">
-      <h2 id="fo-cash-h" className="text-base font-semibold text-text">{t('shiftDetail.cash.title')}</h2>
-      <dl className="divide-y divide-border rounded-[14px] border border-border bg-surface px-4">
+    <div className="space-y-3">
+      <dl className="divide-y divide-border">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-baseline justify-between gap-3 py-3">
+          <div key={row.label} className="flex items-baseline justify-between gap-3 py-2.5">
             <dt className="text-sm text-muted">{row.label}</dt>
             <dd className="num text-base font-semibold text-text">{row.value ?? <span className="text-sm font-normal text-muted">{t('shiftDetail.cash.notCounted')}</span>}</dd>
           </div>
         ))}
-        <div className="flex items-baseline justify-between gap-3 py-3">
+        <div className="flex items-baseline justify-between gap-3 py-2.5">
           <dt className="text-sm text-muted">{t('shiftDetail.cash.variance')}</dt>
           <dd className="text-base font-bold text-text">
             {variance === null || direction === null ? (
@@ -227,78 +230,33 @@ function CashSection({ detail }: { detail: ShiftDetail }) {
           </dd>
         </div>
         {review && reviewKnown ? (
-          <div className="flex items-baseline justify-between gap-3 py-3">
+          <div className="flex items-baseline justify-between gap-3 py-2.5">
             <dt className="text-sm text-muted">{t('shiftDetail.cash.review.label')}</dt>
             <dd className="text-sm font-medium text-text">{t(`shiftDetail.cash.review.${review}`)}</dd>
           </div>
         ) : null}
       </dl>
       <InlineNote>{t('shiftDetail.cash.note')}</InlineNote>
-    </section>
+    </div>
   );
 }
 
-/** إجراءات مخطّطة لشرائح لاحقة: نص غير تفاعلي بشارة «قريباً» — لا زر يزعم الحفظ. */
-function SoonSection() {
-  const t = useTranslations('stationOps');
-  const { can } = useStationOps();
-  const items = [
-    ...(can('fuel.shift.open') ? ['readings', 'close'] : []),
-    ...(can('fuel.shift.approve') ? ['approval'] : []),
-  ];
-  const full = can('fuel.shift.open') || can('fuel.shift.approve');
+/** قسم مطوي (افتراضياً مغلق): التفاصيل الثانوية لا تزاحم قراءات الفوهات. هدف اللمس ≥ 56px. */
+function MoreSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section aria-labelledby="fo-detail-soon-h" className="space-y-3">
-      <h2 id="fo-detail-soon-h" className="text-base font-semibold text-text">{t('shiftDetail.soon.title')}</h2>
-      {items.length > 0 ? (
-        <ul className="divide-y divide-border rounded-[14px] border border-border bg-surface">
-          {items.map((key) => (
-            <li key={key} className="flex items-center justify-between gap-3 px-4 py-3 text-muted">
-              <span className="text-sm">{t(`shiftDetail.soon.${key}`)}</span>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs">
-                <Clock aria-hidden="true" className="h-3 w-3" strokeWidth={1.8} />
-                {t('soonBadge')}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <aside className="rounded-[14px] border border-dashed border-border p-4 text-sm leading-6 text-muted">
-        <p>{t('shiftDetail.soon.note')}</p>
-        {full ? (
-          <Link href="/fuel-stations/shifts" className="mt-2 inline-flex min-h-11 items-center gap-1.5 font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            {t('shifts.desktopLink')}
-            <ExternalLink aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />
-          </Link>
-        ) : null}
-      </aside>
-    </section>
-  );
-}
-
-function ReadingsArea({ detail, assets, station }: { detail: ShiftDetail; assets: StationAssetsResult; station: Station }) {
-  const t = useTranslations('stationOps');
-  if (assets.state.status === 'loading') return <LoadingBlock rows={2} />;
-  if (assets.state.status === 'error' || !assets.catalog) {
-    return (
-      <section aria-labelledby="fo-readings-h" className="space-y-3">
-        <h2 id="fo-readings-h" className="text-base font-semibold text-text">{t('shiftDetail.readings.title')}</h2>
-        {assets.state.status === 'error' ? <ErrorState error={assets.state.error} onRetry={assets.reload} /> : null}
-        <InlineNote tone="warning">{t('shiftDetail.readings.assetsFailed')}</InlineNote>
-      </section>
-    );
-  }
-  const view = buildShiftReadings(detail, assets.catalog);
-  return (
-    <>
-      <LitersCard detail={detail} view={view} />
-      <ProgressSection steps={deriveProgress(detail, view.summary)} timeZone={station.timezone} />
-      <ReadingsSection view={view} shiftOpen={detail.status === 'open'} timeZone={station.timezone} />
-    </>
+    <details className="group rounded-[14px] border border-border bg-surface">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-base font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted transition-transform group-open:rotate-180" strokeWidth={1.8} />
+      </summary>
+      <div className="border-t border-border p-4">{children}</div>
+    </details>
   );
 }
 
 function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query: ShiftDetailResult; assets: StationAssetsResult; station: Station }) {
+  const t = useTranslations('stationOps');
+  const { can } = useStationOps();
   const now = useNow(30_000);
   const fetchedAt = query.retained?.fetchedAt ?? null;
   const live = query.state.status === 'success';
@@ -307,13 +265,32 @@ function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query
   const stale = live && fetchedAt !== null && now - fetchedAt > STALE_AFTER_MS;
   useRefreshOnReturn(live, fetchedAt, query.reload);
 
+  const view: ShiftReadingsView | null = assets.catalog ? buildShiftReadings(detail, assets.catalog) : null;
+  const steps = view ? deriveProgress(detail, view.summary) : null;
+  const next = view ? deriveNextStep(detail, view.summary, can) : null;
+
   return (
     <div className="space-y-5">
-      <SummaryCard detail={detail} station={station} fetchedAt={fetchedAt} now={now} stale={stale} refreshing={refreshing} failed={failed} onRefresh={query.reload} />
-      <ReadingsArea detail={detail} assets={assets} station={station} />
-      <TanksSection detail={detail} catalog={assets.catalog} timeZone={station.timezone} />
-      <CashSection detail={detail} />
-      <SoonSection />
+      <SummaryCard detail={detail} station={station} progress={steps} fetchedAt={fetchedAt} now={now} stale={stale} refreshing={refreshing} failed={failed} onRefresh={query.reload} />
+      {next ? <NextStepCard step={next} /> : null}
+
+      {assets.state.status === 'loading' ? <LoadingBlock rows={2} /> : null}
+      {view ? <LitersCard detail={detail} view={view} /> : null}
+      {view ? (
+        <ReadingsSection view={view} shiftOpen={detail.status === 'open'} timeZone={station.timezone} />
+      ) : assets.state.status === 'error' ? (
+        <section aria-labelledby="fo-readings-h" className="space-y-3">
+          <h2 id="fo-readings-h" className="text-base font-semibold text-text">{t('shiftDetail.readings.title')}</h2>
+          <ErrorState error={assets.state.error} onRetry={assets.reload} />
+          <InlineNote tone="warning">{t('shiftDetail.readings.assetsFailed')}</InlineNote>
+        </section>
+      ) : null}
+
+      <div className="space-y-3">
+        {steps ? <MoreSection title={t('shiftDetail.progress.title')}><ProgressSection steps={steps} timeZone={station.timezone} /></MoreSection> : null}
+        <MoreSection title={t('shiftDetail.tanks.title')}><TanksSection detail={detail} catalog={assets.catalog} timeZone={station.timezone} /></MoreSection>
+        <MoreSection title={t('shiftDetail.cash.title')}><CashSection detail={detail} /></MoreSection>
+      </div>
     </div>
   );
 }

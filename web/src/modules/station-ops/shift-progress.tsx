@@ -4,7 +4,6 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Check, Circle, Minus, type LucideIcon } from 'lucide-react';
 import { formatStampInZone } from './format';
 import type { ProgressStep, StepState } from './readings';
-import { InlineNote } from './state-views';
 
 /** UI-1 — التقدم في الوردية: خمس خطوات تتبع حالات الخادم (مفتوحة ← مغلقة ← معتمدة) وقراءات العدادات. الحالة نص + أيقونة. */
 
@@ -19,8 +18,7 @@ export function ProgressSection({ steps, timeZone }: { steps: ProgressStep[]; ti
   const t = useTranslations('stationOps');
   const locale = useLocale();
   return (
-    <section aria-labelledby="fo-progress-h" className="space-y-3">
-      <h2 id="fo-progress-h" className="text-base font-semibold text-text">{t('shiftDetail.progress.title')}</h2>
+    <div>
       <ol className="divide-y divide-border rounded-[14px] border border-border bg-surface px-4">
         {steps.map((step) => {
           const { Icon, ring } = STATE_VIEW[step.state];
@@ -47,7 +45,29 @@ export function ProgressSection({ steps, timeZone }: { steps: ProgressStep[]; ti
           );
         })}
       </ol>
-      <InlineNote>{t('shiftDetail.progress.note')}</InlineNote>
-    </section>
+    </div>
+  );
+}
+
+/** ملخص مضغوط للتقدم: «الخطوة 2 من 5: قراءات الإغلاق» + خمسة مقاطع. الحالة نص أولاً، واللون مساند. */
+export function ProgressSummary({ steps }: { steps: ProgressStep[] }) {
+  const t = useTranslations('stationOps');
+  const currentIndex = steps.findIndex((step) => step.state === 'current');
+  const finished = steps.every((step) => step.state === 'done' || step.state === 'none');
+  const label = finished
+    ? t('shiftDetail.allDone')
+    : currentIndex >= 0
+      ? t('shiftDetail.stepOf', { n: String(currentIndex + 1), total: String(steps.length), label: t(`shiftDetail.progress.step.${steps[currentIndex].key}`) })
+      : null;
+  if (label === null) return null;
+  return (
+    <div data-progress-summary="">
+      <p className="text-sm font-medium text-text tabular-nums">{label}</p>
+      <div aria-hidden="true" className="mt-2 flex gap-1">
+        {steps.map((step) => (
+          <span key={step.key} className={`h-1.5 flex-1 rounded-full ${step.state === 'done' ? 'bg-positive' : step.state === 'current' ? 'bg-primary' : 'bg-border'}`} />
+        ))}
+      </div>
+    </div>
   );
 }

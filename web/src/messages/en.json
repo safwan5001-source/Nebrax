@@ -14211,7 +14211,6 @@
     "loadingStations": "Loading stations…",
     "retry": "Try again",
     "notSet": "Not set",
-    "soonBadge": "Soon",
     "mode": {
       "supervisor": "Station supervisor",
       "operator": "Station attendant",
@@ -14220,11 +14219,11 @@
     "error": {
       "unauthorized": {
         "title": "Session expired",
-        "body": "Sign in again with your AWJ account to continue."
+        "body": "Sign in again to continue."
       },
       "forbidden": {
         "title": "You don't have permission to view this",
-        "body": "Your account is not allowed to view this section in AWJ. Ask your administrator to review your permissions."
+        "body": "Your account can't view this section. Ask your administrator to review your permissions."
       },
       "not_found": {
         "title": "Not found",
@@ -14244,12 +14243,12 @@
       },
       "demo": {
         "title": "Preview mode",
-        "body": "Preview mode doesn't show real station data. Sign in with your actual AWJ account."
+        "body": "Preview mode doesn't show real station data. Sign in with your actual account."
       }
     },
     "noStations": {
       "title": "No stations assigned to you",
-      "body": "No station is linked to your account. If you expect one, ask your AWJ administrator to add it or grant you its scope."
+      "body": "No station is linked to your account. If you expect one, ask your administrator to add it for you."
     },
     "home": {
       "greeting": "Welcome, {name}",
@@ -14257,27 +14256,14 @@
       "products": "Fuel & prices",
       "allProducts": "All products & pumps",
       "pumpsNozzles": "Pumps: {pumps} · Nozzles: {nozzles}",
-      "unmapped": "Fuel products registered without an active nozzle at this station: {count}. They are not shown as dispensable until linked to a pump and nozzle in AWJ settings.",
-      "comingSoon": "Coming soon to this workspace",
+      "unmapped": "Fuel products not linked to an active nozzle at this station: {count}. They are not shown for dispensing until an administrator links them to a pump and nozzle.",
       "summary": "Shift summary",
       "summaryLiters": "Operational liters from meters",
       "cellProducts": "Dispensable products",
       "cellPumps": "Active pumps",
       "actions": "Shift actions",
-      "cta": "Manage the shift in AWJ",
-      "ctaNote": "Recording readings and handing over the shift from this screen is coming soon; for now use the full shifts screen in AWJ.",
-      "shortcuts": {
-        "products": "Products & pumps",
-        "shifts": "Shifts",
-        "settings": "Settings"
-      }
-    },
-    "soon": {
-      "readings": "Record shift meter readings",
-      "collection": "Shift collection and handover",
-      "approval": "Approve closed shifts",
-      "receiving": "Fuel delivery receiving",
-      "reports": "Station reports"
+      "ctaCurrent": "View the current shift",
+      "ctaHistory": "Shift history"
     },
     "shift": {
       "openedAt": "Opened",
@@ -14285,14 +14271,14 @@
       "approvedAt": "Approved",
       "operationalLiters": "Operational liters (from meters)",
       "operationalLitersShort": "Meter liters",
-      "multipleOpen": "Notice: more than one open shift appeared for this station; the most recent is shown. Review shifts in AWJ.",
+      "multipleOpen": "Notice: more than one open shift appeared for this station; the most recent is shown. Tell your supervisor.",
       "noPermission": {
         "title": "Shifts aren't available for your permissions",
         "body": "Your account can't view shifts, so their status isn't shown."
       },
       "none": {
         "title": "No open shift",
-        "body": "There is no open shift at this station right now. Opening a shift will be done from this workspace later; for now use the shifts screen in AWJ."
+        "body": "There is no open shift at this station right now."
       },
       "startedAt": "Started"
     },
@@ -14317,17 +14303,17 @@
       "dispensable": "Dispensable products",
       "none": {
         "title": "No dispensable products",
-        "body": "No active nozzle is linked to a pump, tank and product at this station. This is configured in AWJ station settings."
+        "body": "No active nozzle is linked to a pump, tank and product at this station. An administrator sets this up."
       },
       "pumps": "Pumps & nozzles",
       "noPumps": {
         "title": "No pumps",
-        "body": "No pumps are registered for this station in AWJ."
+        "body": "No pumps are registered for this station."
       },
       "tanks": "Tanks",
       "noTanks": {
         "title": "No tanks",
-        "body": "No tanks are registered for this station in AWJ."
+        "body": "No tanks are registered for this station."
       },
       "noNozzles": "No nozzles registered for this pump.",
       "nozzle": "Nozzle",
@@ -14337,7 +14323,7 @@
       "tankCapacity": "Capacity",
       "tankNozzles": "Linked nozzles",
       "tankLevelNote": "Current tank levels aren't shown here yet; they will appear once tank readings are connected in a later slice.",
-      "subtitle": "From AWJ · view only"
+      "subtitle": "View only"
     },
     "assetStatus": {
       "active": "Active",
@@ -14372,8 +14358,7 @@
       "loadMore": "Load more",
       "loadMoreFailed": "Couldn't load more. Try again.",
       "endOfList": "You've reached the end of the list",
-      "readOnlyNote": "This screen is read-only. Opening shifts, recording readings, closing and approving are not done from here yet.",
-      "desktopLink": "Open the full shifts screen in AWJ",
+      "readOnlyNote": "This screen is view-only for now. Opening a shift, recording readings, handing over and approving will arrive soon inside this app.",
       "subtitle": "Station shift history · view only"
     },
     "settings": {
@@ -14395,7 +14380,7 @@
       },
       "station": {
         "title": "Current station",
-        "hint": "Values from AWJ, display only.",
+        "hint": "Station details are display only.",
         "name": "Name",
         "code": "Code",
         "status": "Status",
@@ -14403,8 +14388,7 @@
         "timezone": "Time zone",
         "license": "License number",
         "licenseExpiry": "License expiry",
-        "manageLink": "Manage station settings in AWJ",
-        "readOnly": "Station settings are changed in AWJ administration with the right permission, not from this screen."
+        "readOnly": "An administrator changes station settings; they can't be edited from this app."
       },
       "subtitle": "Your preferences and station information"
     },
@@ -14413,9 +14397,9 @@
       "identity": "Identity",
       "name": "Name",
       "email": "Email",
-      "role": "Role in AWJ",
+      "role": "Your role",
       "mode": "Workspace type",
-      "fromAwj": "Your details, role and permissions come from your AWJ account and are read-only here.",
+      "fromAwj": "Your details, role and permissions come from your account and are shown here read-only.",
       "scope": "Authorized scope",
       "branches": "Branches",
       "allBranches": "All branches",
@@ -14435,9 +14419,8 @@
       "notGranted": "Not allowed",
       "accessHint": "The server enforces your permissions on every request; hiding an item here is not the protection.",
       "security": "Security & session",
-      "securityLink": "Password and security settings in AWJ",
       "logout": "Sign out",
-      "subtitle": "Your identity and permissions in AWJ"
+      "subtitle": "Your identity and permissions"
     },
     "roles": {
       "owner": "Owner",
@@ -14458,19 +14441,13 @@
       "operator": "Attendant workspace",
       "viewer": "View-only workspace"
     },
-    "metric": {
-      "cash": "Cash",
-      "card": "Card",
-      "unavailable": "Not available yet"
-    },
     "shiftDetail": {
       "title": "Shift details",
-      "subtitle": "View only · from AWJ",
+      "subtitle": "View only",
       "back": "All shifts",
       "openedAtLabel": "Opened",
       "duration": "Duration: {hours} h {minutes} m",
       "durationRunning": "Running for {hours} h {minutes} m",
-      "zoneStation": "Times shown in the station's time zone ({zone})",
       "zoneDevice": "This station has no time zone set; times use your device's time zone.",
       "staff": "Assigned to the shift: {count}",
       "staffYou": "You are assigned",
@@ -14495,13 +14472,12 @@
         "cellInvalid": "Need review",
         "partial": "Partial total: only nozzles with both opening and closing readings are counted ({complete} of {expected}).",
         "noneYet": "No nozzle has both readings yet, so no liters are computed (this is not zero).",
-        "meterNote": "Liters here are the difference between operational meter readings — not POS sales, not collections and not a stock movement.",
-        "mismatch": "Warning: the server total ({server}) doesn't match the sum of the nozzle differences shown ({computed}). Review the shift in AWJ.",
+        "meterNote": "Quantities come from the pump meters only — not sales, not collections and not stock.",
+        "mismatch": "Notice: the shift total ({server}) doesn't match the sum of the nozzles shown ({computed}). Tell your supervisor.",
         "invalid": "Nozzles whose closing reading is lower than the opening reading: {count}. They are excluded from the total and need review."
       },
       "progress": {
         "title": "Shift progress",
-        "note": "AWJ shift states: open → closed → approved.",
         "step": {
           "opened": "Shift opened",
           "opening_readings": "Opening readings",
@@ -14520,7 +14496,7 @@
       },
       "readings": {
         "title": "Meter readings",
-        "setupNote": "Nozzle, pump and product names come from the station's current setup, which may differ from its setup when this shift ran.",
+        "setupNote": "Nozzle, pump and product names follow the station's current setup, which may differ from when this shift ran.",
         "opening": "Opening",
         "closing": "Closing",
         "computed": "Computed quantity",
@@ -14549,7 +14525,7 @@
       },
       "tanks": {
         "title": "Tank readings",
-        "note": "Tank measurements are operational evidence for the shift; they don't change stock balances and aren't a stocktake variance.",
+        "note": "Tank measurements are for follow-up only and don't change stock.",
         "type": {
           "physical": "Physical measurement",
           "atg": "Automatic gauge (ATG)"
@@ -14561,11 +14537,11 @@
         "notRecorded": "Not recorded"
       },
       "cash": {
-        "title": "Operational shift cash",
-        "openingFloat": "Opening float",
+        "title": "Cash in this shift",
+        "openingFloat": "Starting cash",
         "counted": "Counted cash",
-        "expected": "Operationally expected",
-        "variance": "Cash variance",
+        "expected": "Expected cash",
+        "variance": "Difference",
         "notCounted": "Not counted yet",
         "direction": {
           "overage": "Overage",
@@ -14573,19 +14549,12 @@
           "none": "Matches"
         },
         "review": {
-          "label": "Variance review",
+          "label": "Difference status",
           "pending_review": "Pending review",
           "reviewed": "Reviewed",
           "not_required": "Not required"
         },
-        "note": "Operational cash for the shift — not sales revenue, not card/network collections and not an accounting entry."
-      },
-      "soon": {
-        "title": "Coming next",
-        "note": "This screen is view-only and records nothing in AWJ. To perform operations use the full shifts screen in AWJ.",
-        "readings": "Record meter readings",
-        "close": "Close and hand over the shift",
-        "approval": "Approve the shift"
+        "note": "This shift's cash only — not sales and not card/network collections."
       },
       "list": {
         "viewDetails": "View details",
@@ -14595,7 +14564,23 @@
         "litersOpen": "Meter liters so far",
         "details": "Shift details and meter readings",
         "liveUnavailable": "Couldn't compute liters right now"
-      }
+      },
+      "stepOf": "Step {n} of {total}: {label}",
+      "allDone": "Shift complete"
+    },
+    "next": {
+      "title": "Next step",
+      "kind": {
+        "open_shift": "Open a new shift",
+        "opening_readings": "Record the starting meter readings",
+        "closing_readings": "Record the ending meter readings",
+        "close_shift": "Close and hand over the shift",
+        "approve_shift": "Approve the shift"
+      },
+      "remaining": "Nozzles remaining: {count}",
+      "waiting": "Waiting for: {step}",
+      "complete": "This shift is complete",
+      "soon": "This step will arrive inside the app soon"
     }
   }
 }

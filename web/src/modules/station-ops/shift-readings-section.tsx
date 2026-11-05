@@ -153,8 +153,7 @@ export function TanksSection({ detail, catalog, timeZone }: { detail: ShiftDetai
   const rows = buildTankRows(detail);
   const names = new Map((catalog?.tanks ?? []).map(({ tank, product }) => [tank.id, { name: tank.name, product: product?.name ?? null }]));
   return (
-    <section aria-labelledby="fo-tanks-readings-h" className="space-y-3">
-      <h2 id="fo-tanks-readings-h" className="text-base font-semibold text-text">{t('shiftDetail.tanks.title')}</h2>
+    <div className="space-y-3">
       {rows.length === 0 ? (
         <InlineNote>{t('shiftDetail.tanks.empty')}</InlineNote>
       ) : (
@@ -162,7 +161,7 @@ export function TanksSection({ detail, catalog, timeZone }: { detail: ShiftDetai
           {rows.map((row) => {
             const known = names.get(row.tankId);
             return (
-              <li key={row.tankId} className="rounded-[14px] border border-border bg-surface p-4">
+              <li key={row.tankId} className="rounded-[12px] border border-border p-3.5">
                 <p className="text-base font-semibold text-text">{known?.name ?? t('shiftDetail.tanks.unknownTank')}</p>
                 {known?.product ? <p className="mt-0.5 text-xs text-muted">{known.product}</p> : null}
                 <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -175,6 +174,6 @@ export function TanksSection({ detail, catalog, timeZone }: { detail: ShiftDetai
         </ul>
       )}
       <InlineNote>{t('shiftDetail.tanks.note')}</InlineNote>
-    </section>
+    </div>
   );
 }

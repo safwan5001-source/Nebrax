@@ -40,13 +40,3 @@ export function isNavActive(pathname: string | null, href: string): boolean {
   if (href === OPS_BASE) return pathname === OPS_BASE;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
-
-/**
- * وظائف مخطّطة لشرائح لاحقة (UI-1..UI-5). تُعرض نصاً غير تفاعلي بشارة «قريباً» — لا زر ولا رابط —
- * كي لا يوحي أي عنصر بإتمام عملية مالية أو تشغيلية غير منفَّذة.
- */
-export const COMING_SOON: Record<OpsMode, readonly string[]> = {
-  operator: ['readings', 'collection'],
-  supervisor: ['approval', 'receiving', 'reports'],
-  viewer: [],
-};

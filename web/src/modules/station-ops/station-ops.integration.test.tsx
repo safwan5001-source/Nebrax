@@ -121,7 +121,7 @@ describe('products, prices and dispensability', () => {
     expect(screen.getByText('Beta')).toBeTruthy();
     expect(screen.queryByText('Gamma')).toBeNull(); // سجل بلا فوهة
     expect(screen.queryByText('Delta')).toBeNull(); // فوهته في محطة أخرى
-    expect(screen.getByText(/registered without an active nozzle at this station: 2/)).toBeTruthy();
+    expect(screen.getByText(/not linked to an active nozzle at this station: 2/)).toBeTruthy();
   });
 
   it('shows the station price, and "not set" — never zero — when there is none', async () => {
@@ -180,7 +180,7 @@ describe('products, prices and dispensability', () => {
     connect(data);
     renderOps(<ProductsScreen />);
     expect(await screen.findByText('Nozzle is inactive')).toBeTruthy();
-    expect(screen.getByText(/registered without an active nozzle at this station: 3/)).toBeTruthy();
+    expect(screen.getByText(/not linked to an active nozzle at this station: 3/)).toBeTruthy();
   });
 });
 
@@ -493,34 +493,51 @@ describe('role-aware navigation and honest "coming soon"', () => {
     expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Products', 'Profile']);
   });
 
-  it('supervisors see approval/receiving/reports as non-interactive "Soon" items — no buttons, no links', async () => {
-    seedUser({ permissions: [...VIEW, 'fuel.shift.approve'] });
-    connect(tenantData());
-    renderOps(<HomeScreen />);
-    const item = await screen.findByText('Approve closed shifts');
-    expect(item.closest('a, button')).toBeNull();
-    expect(screen.getByText('Fuel delivery receiving').closest('a, button')).toBeNull();
-    expect(screen.getAllByText('Soon').length).toBe(3);
-  });
+  const withOpenShift = (readings: Parameters<typeof shiftDetail>[2] = {}) => {
+    const data = tenantData();
+    data.shifts = [makeShift('s1', 'a', { number: 'SH-001', status: 'open' })];
+    data.details = { s1: shiftDetail('s1', 'a', { number: 'SH-001', ...readings }) };
+    return data;
+  };
 
-  it('operators see their own pending operations, not the supervisor\'s', async () => {
+  it('an operator sees THEIR next step — as inert text with a Soon badge, never a button or a link', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open'] });
-    connect(tenantData());
+    connect(withOpenShift());
     renderOps(<HomeScreen />);
-    expect(await screen.findByText('Record shift meter readings')).toBeTruthy();
-    expect(screen.queryByText('Approve closed shifts')).toBeNull();
+    const card = (await screen.findByText('Record the starting meter readings')).closest('section') as HTMLElement;
+    expect(within(card).getByText('Next step')).toBeTruthy();
+    expect(within(card).getByText('This step will arrive inside the app soon')).toBeTruthy();
+    expect(card.querySelector('a, button')).toBeNull();
+    expect(screen.queryByText('Approve the shift')).toBeNull();
   });
 
-  it('a permission change from AWJ is reflected without trusting stale privileges', async () => {
-    seedUser({ permissions: [...VIEW, 'fuel.shift.approve'], role: 'cashier' });
-    connect(tenantData());
+  it('a user without the permission sees who the shift is waiting for, not an action', async () => {
+    seedUser({ permissions: VIEW });
+    connect(withOpenShift());
     renderOps(<HomeScreen />);
-    await screen.findByText('Approve closed shifts');
+    const card = (await screen.findByText(/Waiting for: Record the starting meter readings/)).closest('section') as HTMLElement;
+    expect(card.textContent).not.toContain('This step will arrive inside the app soon');
+  });
+
+  it('the next step moves with the real shift state (closing readings after every opening is recorded)', async () => {
+    seedUser({ permissions: [...VIEW, 'fuel.shift.open'] });
+    connect(withOpenShift({ meter_readings: ['n1', 'n2'].map((id, i) => meter(`o${i}`, id, 'opening', 100)) }));
+    renderOps(<HomeScreen />);
+    expect(await screen.findByText('Record the ending meter readings')).toBeTruthy();
+    expect(screen.getByText('Nozzles remaining: 2')).toBeTruthy();
+  });
+
+  it('a permission change is reflected without trusting stale privileges', async () => {
+    seedUser({ permissions: [...VIEW, 'fuel.shift.open'], role: 'cashier' });
+    connect(withOpenShift());
+    renderOps(<HomeScreen />);
+    await screen.findByText('Record the starting meter readings');
     act(() => {
       localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user') as string), permissions: VIEW }));
       window.dispatchEvent(new Event('nibras:user-changed'));
     });
-    await waitFor(() => expect(screen.queryByText('Approve closed shifts')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Record the starting meter readings')).toBeNull());
+    expect(await screen.findByText(/Waiting for: Record the starting meter readings/)).toBeTruthy();
   });
 });
 
@@ -538,7 +555,8 @@ describe('settings and profile come from AWJ', () => {
     // لا حقل تحرير للدور أو الصلاحيات.
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('combobox', { name: /role/i })).toBeNull();
-    expect(screen.getByRole('link', { name: /Password and security settings in AWJ/ }).getAttribute('href')).toBe('/settings');
+    // القرار 2026-11-05: لا روابط خروج إلى صفحات ERP من تطبيق الموظف (لا «إعدادات الأمان في AWJ»).
+    expectAllLinksInApp();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/login'));
@@ -563,16 +581,18 @@ describe('settings and profile come from AWJ', () => {
     expect(await screen.findByText('My preferences on this device')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'English' }).getAttribute('aria-pressed')).toBe('true');
     expect(await screen.findByText('Current station')).toBeTruthy();
-    expect(screen.getByText(/not from this screen/)).toBeTruthy();
+    expect(screen.getByText(/can't be edited from this app/)).toBeTruthy();
     expect(screen.queryByRole('link', { name: /Manage station settings/ })).toBeNull();
   });
 
-  it('settings: managers get a link to AWJ administration, not an inline editor', async () => {
+  it('settings: even managers get no link out to ERP administration', async () => {
     seedUser({ permissions: [...VIEW, 'fuel_stations.manage'] });
     connect(tenantData());
     nav.pathname = '/fuel-stations/ops/settings';
     renderOps(<SettingsScreen />);
-    expect((await screen.findByRole('link', { name: /Manage station settings in AWJ/ })).getAttribute('href')).toBe('/fuel-stations/settings');
+    await screen.findByText('Current station');
+    expect(screen.queryByRole('link', { name: /Manage station settings/ })).toBeNull();
+    expectAllLinksInApp();
   });
 });
 
@@ -636,7 +656,7 @@ describe('V2 composition (visual contract, PR #1990)', () => {
     expect(container.querySelectorAll('h1').length).toBe(1);
   });
 
-  it('the raised current-shift card shows the real shift; the big figure is liters, the cash/card cards say "not available yet" (never zero)', async () => {
+  it('the raised current-shift card shows the real shift; the big figure is liters computed from the meters (never a stored zero)', async () => {
     seedUser();
     const data = tenantData();
     data.shifts = [makeShift('s1', 'a', { number: 'SH-777', operational_liters: '0' })];
@@ -647,34 +667,47 @@ describe('V2 composition (visual contract, PR #1990)', () => {
     expect(await screen.findByText('SH-777')).toBeTruthy();
     expect(await screen.findByText('5,740.000')).toBeTruthy();
     expect(screen.queryByText(/Partial total/)).toBeNull(); // الفوهتان الفعّالتان مكتملتان
-    expect(screen.getAllByText('Not available yet')).toHaveLength(2);
-    expect(screen.getByText('Cash')).toBeTruthy();
-    expect(screen.getByText('Card')).toBeTruthy();
+    // قرار 2026-11-05 (بساطة): لا بطاقتا «النقد/الشبكة» الدائمتا «غير متاح» — ضجيج بلا معلومة.
+    expect(screen.queryByText('Not available yet')).toBeNull();
     expect(container.textContent).not.toMatch(/\b0\.00\b/);
   });
 
-  it('without an open shift the big figure is "—", not 0', async () => {
+  it('without an open shift there is no liters figure at all (not a zero), and the card says so plainly', async () => {
     seedUser();
     connect(tenantData());
     renderOps(<HomeScreen />);
     await screen.findByText('No open shift');
-    const figure = screen.getByText('Operational liters from meters').nextElementSibling as HTMLElement;
-    expect(figure.textContent).toBe('—');
+    expect(screen.queryByText('Operational liters from meters')).toBeNull();
+    expect(screen.queryByText(/Meter liters so far/)).toBeNull();
+    expect(screen.getByText('There is no open shift at this station right now.')).toBeTruthy();
   });
 
-  it('the orange CTA is a real link into the AWJ shifts screen, and only with shift permission', async () => {
+  it('exactly ONE primary action on the home screen, and it stays inside the app', async () => {
+    seedUser();
+    const data = tenantData();
+    data.shifts = [makeShift('s1', 'a', { number: 'SH-001', status: 'open' })];
+    data.details = { s1: shiftDetail('s1', 'a', { number: 'SH-001' }) };
+    connect(data);
+    const { container } = renderOps(<HomeScreen />);
+    const cta = await screen.findByRole('link', { name: /View the current shift/ });
+    expect(cta.getAttribute('href')).toBe('/fuel-stations/ops/shifts/s1');
+    expect(container.querySelectorAll('[data-primary-action]')).toHaveLength(1);
+    expectAllLinksInApp();
+  });
+
+  it('without an open shift the primary action is the shift history (in-app), and only with shift permission', async () => {
     seedUser();
     connect(tenantData());
     renderOps(<HomeScreen />);
-    const cta = await screen.findByRole('link', { name: /Manage the shift in AWJ/ });
-    expect(cta.getAttribute('href')).toBe('/fuel-stations/shifts');
+    const cta = await screen.findByRole('link', { name: 'Shift history' });
+    expect(cta.getAttribute('href')).toBe('/fuel-stations/ops/shifts');
     cleanup();
     localStorage.clear();
     seedUser({ permissions: ['fuel_stations.view'] });
     connect(tenantData());
     renderOps(<HomeScreen />);
     await screen.findByText('Alpha');
-    expect(screen.queryByRole('link', { name: /Manage the shift in AWJ/ })).toBeNull();
+    expect(container_primary()).toBe(0);
   });
 
   it('greets by time of day', async () => {
@@ -692,4 +725,11 @@ describe('V2 composition (visual contract, PR #1990)', () => {
   });
 });
 
+/** قرار 2026-11-05: كل رابط في تطبيق الموظف داخل `/fuel-stations/ops` (عدا مرساة تخطّي المحتوى). */
+const expectAllLinksInApp = () => {
+  const links = screen.getAllByRole('link').filter((link) => !(link.getAttribute('href') ?? '').startsWith('#'));
+  expect(links.length).toBeGreaterThan(0);
+  for (const link of links) expect(link.getAttribute('href'), link.textContent ?? '').toMatch(/^\/fuel-stations\/ops(\/|$)/);
+};
+const container_primary = () => document.querySelectorAll('[data-primary-action]').length;
 void fireEvent;
