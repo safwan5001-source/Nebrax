@@ -8,16 +8,19 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * AWJ-AIA G-S10 — اختبار إعادة إنتاج (Characterization)، لا إصلاح.
+ * AWJ-AIA G-S10 — اختبار إعادة إنتاج (Repro) لا يثبّت العيب.
  *
- * يوثّق أن `SpreadsheetWriter::csv()` يسبق **أي** خلية تبدأ بـ`= + - @ \t \r` بعلامة `'`
+ * `SpreadsheetWriter::csv()` يسبق **أي** خلية تبدأ بـ`= + - @ \t \r` بعلامة `'`
  * (حماية حقن الصيغ للنصوص)، فتصير المبالغ السالبة — كرصيد مورد `-65000` هللة — نصاً
- * `'-65000` لا عدداً. هذا مقبول لمستهلكي التصدير الحاليين (منتجات/مخزون: لا أعداد
- * سالبة مقصودة) لكنه عيب دقة لأي تصدير مالي عبر CSV.
+ * `'-65000` لا عدداً. عيب دقة لأي تصدير مالي عبر CSV.
  *
- * يصف السلوك الحالي وينجح عليه. عند إضافة وضع الأعمدة العددية (AIA-2.2) تُضاف
- * اختبارات الوضع الجديد، ويبقى هذا الاختبار حارساً لسلوك الوضع الافتراضي القائم
- * (لا تغيير لمستهلكيه الحاليين).
+ * **يقبل الاختبار حالتين ولا يفرض بقاء العيب:**
+ *   - **معيب (الحالي):** الناتج `'-65000` ⇒ يُعلَّم `incomplete` برسالة صريحة (إنذار لا فشل).
+ *   - **مُصلَح:** الناتج `-65000` عدداً ⇒ يمرّ صارماً بلا تعديل.
+ *
+ * ثوابت تنجح قبل أي إصلاح وبعده وتحرس الحماية نفسها من أن يضيّعها الإصلاح:
+ * النص الحرّ المبدوء بمشغّل صيغة يبقى مُحيَّداً (بما فيه ما يبدأ بـ`-`)، الأعداد غير السالبة
+ * سليمة، وXLSX المضبوط النوع يحفظ السالب.
  *
  * تشغيل: php artisan test --filter=SpreadsheetWriterNegativeAmountReproTest
  */
@@ -32,13 +35,29 @@ class SpreadsheetWriterNegativeAmountReproTest extends TestCase
     }
 
     #[Test]
-    public function csv_prefixes_a_negative_integer_amount_with_an_apostrophe(): void
+    public function csv_negative_integer_amount_is_either_a_number_or_the_documented_open_defect(): void
     {
         $line = $this->firstDataLine(SpreadsheetWriter::csv(['balance_minor'], [[-65000]]));
 
-        // الواقع الحالي: نص مسبوق بـ' (ليس عدداً). الرصيد المورّد السالب يُفسد في أي أداة تقرأ العمود عدداً.
-        $this->assertSame("'-65000", $line);
-        $this->assertNotSame('-65000', $line);
+        // أي ناتج آخر (مثلاً -65000 مقتطعاً أو بصيغة مختلفة) فشل حقيقي.
+        $this->assertContains($line, ["'-65000", '-65000']);
+
+        if ($line === "'-65000") {
+            $this->markTestIncomplete(
+                'G-S10 مفتوح (معروف): الرصيد السالب يُكتب نصاً \'-65000 في CSV. يُعالَج في AIA-2.2 بوضع أعمدة عددية؛ عندها يمرّ هذا الاختبار صارماً.'
+            );
+        }
+
+        $this->assertSame('-65000', $line);
+    }
+
+    #[Test]
+    public function invariant_csv_neutralises_dash_prefixed_non_numeric_text(): void
+    {
+        // حماية يجب ألّا يفقدها أي إصلاح لعيب الأرقام السالبة.
+        $line = $this->firstDataLine(SpreadsheetWriter::csv(['d'], [["-cmd|' /C calc'!A0"]]));
+
+        $this->assertStringStartsWith("'-cmd", $line);
     }
 
     #[Test]
