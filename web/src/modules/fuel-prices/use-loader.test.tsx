@@ -74,4 +74,26 @@ describe('useLoader — one key at a time', () => {
     expect(result.current.state).toEqual({ status: 'success', data: 'v2' }); // فشل التحديث لا يمسح بياناً صالحاً
     expect(seen.slice(seen.indexOf('v1'))).not.toContain('loading'); // ولا وميض تحميل بعد أول نجاح
   });
+
+  it('refresh() never supersedes a pending foreground load: the initial result still lands even if a refresh was attempted meanwhile', async () => {
+    const first = deferred<string>();
+    let calls = 0;
+    const { result } = renderHook(() => useLoader('k', () => { calls += 1; return first.promise; }));
+    expect(result.current.state.status).toBe('loading');
+    act(() => result.current.refresh()); // التركيز أثناء أول تحميل
+    expect(calls).toBe(1); // لم يُطلق طلباً ثانياً
+    await act(async () => { first.resolve('initial'); await first.promise; });
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'success', data: 'initial' }));
+  });
+
+  it('a failing refresh after a reload started does not leave the board stuck on loading', async () => {
+    let n = 0;
+    const { result } = renderHook(() => useLoader('k', async () => { n += 1; if (n === 2) throw new PricesError('offline'); return `v${n}`; }));
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'success', data: 'v1' }));
+    act(() => result.current.refresh()); // يفشل (n=2)
+    await waitFor(() => expect(n).toBe(2));
+    expect(result.current.state).toEqual({ status: 'success', data: 'v1' });
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'success', data: 'v3' }));
+  });
 });

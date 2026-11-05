@@ -27,16 +27,21 @@ export function useLoader<T>(key: string | null, load: (signal: AbortSignal) => 
   const loadRef = useRef(load);
   loadRef.current = load;
   const generation = useRef(0);
+  /** طلب أمامي (أول تحميل/إعادة محاولة) قيد الطيران: التحديث الصامت لا يزاحمه ولا يبدّل ترتيبه. */
+  const foregroundBusy = useRef(false);
+  const refreshGeneration = useRef(0);
 
   const run = useCallback((k: string | null) => {
     if (k === null) return () => {};
     const controller = new AbortController();
     const mine = ++generation.current;
+    foregroundBusy.current = true;
     dispatch({ type: 'start', key: k });
     loadRef.current(controller.signal)
-      .then((data) => { if (generation.current === mine) dispatch({ type: 'done', key: k, state: { status: 'success', data } }); })
+      .then((data) => { if (generation.current === mine) { foregroundBusy.current = false; dispatch({ type: 'done', key: k, state: { status: 'success', data } }); } })
       .catch((error: unknown) => {
         if (controller.signal.aborted || generation.current !== mine) return;
+        foregroundBusy.current = false;
         dispatch({ type: 'done', key: k, state: { status: 'error', error: error instanceof PricesError ? error : new PricesError('offline') } });
       });
     return () => controller.abort();
@@ -49,10 +54,12 @@ export function useLoader<T>(key: string | null, load: (signal: AbortSignal) => 
    * بياناً صالحاً. لمراجعة تغيّرات تسري بمرور الوقت (سعر مجدول بدأ سريانه) دون تدخل المستخدم.
    */
   const refresh = useCallback(() => {
-    if (key === null) return;
-    const mine = ++generation.current;
+    if (key === null || foregroundBusy.current) return; // لا يزاحم طلباً أمامياً قيد الطيران (ولا يتركه معلّقاً إن فشل)
+    const foreground = generation.current;
+    const mine = ++refreshGeneration.current;
     loadRef.current(new AbortController().signal)
-      .then((data) => { if (generation.current === mine) dispatch({ type: 'done', key, state: { status: 'success', data } }); })
+      // يُطبَّق فقط إن لم يبدأ طلب أمامي جديد ولا تحديث أحدث منه منذ انطلاقه.
+      .then((data) => { if (generation.current === foreground && refreshGeneration.current === mine) dispatch({ type: 'done', key, state: { status: 'success', data } }); })
       .catch(() => {});
   }, [key]);
 
