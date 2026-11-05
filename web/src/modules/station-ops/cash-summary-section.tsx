@@ -93,7 +93,7 @@ export function CashSummarySection({ summary }: { summary: CashSummary }) {
           <dt className="text-sm text-muted">{variance?.kind === 'provisional' ? t('shiftDetail.cashSummary.varianceProvisional') : t('shiftDetail.cashSummary.variance')}</dt>
           <dd className="text-base font-bold text-text">
             {variance === null ? (
-              <span className="text-sm font-normal text-muted">{t('shiftDetail.cashSummary.notCounted')}</span>
+              <span className="text-sm font-normal text-muted">{view.varianceHidden ? t('shiftDetail.cashSummary.unavailable.permission') : t('shiftDetail.cashSummary.notCounted')}</span>
             ) : variance.kind === 'final' ? (
               <span className="inline-flex items-center gap-1.5">
                 <DirectionIcon aria-hidden="true" className="h-4 w-4" strokeWidth={2} />

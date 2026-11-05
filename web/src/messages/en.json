@@ -9628,6 +9628,7 @@
     "navigationTitle": "Fuel Stations navigation"
   },
   "fuelWorkspaceNav": {
+    "prices": "Fuel prices",
     "ariaLabel": "Fuel Stations workspace navigation",
     "workspaceNavigation": "Fuel Stations navigation",
     "expand": "Show sections",
@@ -14465,6 +14466,170 @@
         "action_other": "Event"
       }
     }
+  },
+  "fuelPrices": {
+    "title": "Fuel prices",
+    "subtitle": "The effective price per liter for each product, with its source, VAT basis and start date — the same one fuel-sale finalization uses.",
+    "close": "Close",
+    "retry": "Try again",
+    "loading": "Loading",
+    "scope": {
+      "label": "Price scope",
+      "station": "Station",
+      "tenant": "Organization",
+      "pickStation": "Choose station",
+      "stationLabel": "{name} station price",
+      "organizationLabel": "Organization default price",
+      "organizationNote": "The organization price applies to every station without its own price.",
+      "organizationReadOnly": "The organization price is read-only for your account; only users without a branch or warehouse restriction and with price management can change it."
+    },
+    "state": {
+      "noStations": "No stations are available to your account.",
+      "hiddenProducts": "{count} registered product(s) with no active nozzle at this station are not shown.",
+      "empty": {
+        "title": "No products to price",
+        "stationBody": "No fuel products are linked to active nozzles at this station.",
+        "organizationBody": "There are no active fuel products in the organization."
+      },
+      "forbidden": {
+        "title": "Not available for your permissions",
+        "body": "You do not have permission to view fuel prices."
+      },
+      "offline": {
+        "title": "Can't connect",
+        "body": "Check your connection and try again. No unconfirmed price is shown."
+      },
+      "error": {
+        "title": "Couldn't load prices",
+        "body": "Something went wrong while loading. Try again shortly."
+      },
+      "invalid": {
+        "title": "Unexpected response",
+        "body": "No price is shown because the response did not match the expected contract."
+      }
+    },
+    "card": {
+      "perLiter": "/ L",
+      "sourceStation": "Station price",
+      "sourceTenant": "Organization price",
+      "taxInclusive": "VAT included",
+      "taxExclusive": "Before VAT",
+      "taxUnset": "VAT mode not set",
+      "since": "Effective since {date}",
+      "until": "until {date}",
+      "notSet": "Price not set",
+      "notSetHint": "There is no effective fuel price for this scope right now, and the product-card price is never used automatically.",
+      "productInactive": "Product inactive",
+      "invalid": "Couldn't display the price",
+      "edit": "Change price",
+      "set": "Set price",
+      "history": "Price history",
+      "readOnly": "View only",
+      "blocked": {
+        "tax_mode_unset": "Official sale not ready: VAT mode is not set",
+        "unit_mapping_invalid": "Official sale not ready: product unit is not set up in liters",
+        "product_inactive": "Official sale not ready: product is inactive",
+        "price_not_configured": "Official sale not ready: no approved price"
+      }
+    },
+    "suggestion": {
+      "available": "The product card suggests {price} per liter",
+      "review": "Review suggestion",
+      "requiresLiter": "A per-liter price must be set",
+      "blocked": {
+        "requires_liter_price": "The product card has no explicit per-liter unit price (the base-unit mL price is never converted)",
+        "ambiguous_liter_price": "More than one liter price on the card",
+        "price_not_positive": "The card's liter price is not positive",
+        "tax_mode_unset": "Fuel VAT mode is not set",
+        "tax_rate_mismatch": "The card's tax rate differs from the default",
+        "unit_mapping_invalid": "Product unit is not set up in mL/L",
+        "product_inactive": "Product is inactive",
+        "product_link_missing": "No linked product card"
+      }
+    },
+    "sheet": {
+      "title": "{product} price",
+      "titleSuggestion": "{product} suggested price",
+      "currentPrice": "Current price",
+      "priceLabel": "Price per liter",
+      "priceUnit": "SAR / L",
+      "priceHint": "In riyals per liter, up to two decimals. Example: 2.18",
+      "priceFromCard": "This price comes from the product card and can't be edited here.",
+      "priceError": {
+        "empty": "Enter the price per liter.",
+        "format": "Enter a valid number with at most two decimals.",
+        "zero": "The price must be greater than zero.",
+        "too_large": "The price is above the allowed per-liter limit."
+      },
+      "taxTitle": "VAT basis",
+      "taxExplain": "The entered price is interpreted by the fuel VAT mode set for this scope in station settings. It isn't changed here.",
+      "taxUnsetBlock": "The fuel price VAT mode is not set for this scope; set it in station settings before saving a price.",
+      "startLabel": "Start",
+      "startNow": "Now",
+      "startScheduled": "Later",
+      "startNowHint": "The server stamps the start time when you save.",
+      "startNowValue": "Now (server time when saved)",
+      "scheduledAt": "Price start time",
+      "scheduleError": {
+        "empty": "Choose a start time.",
+        "format": "Invalid time.",
+        "past": "The start time must be at least a minute from now."
+      },
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Reason for the change or decision reference",
+      "continue": "Review",
+      "back": "Back",
+      "confirm": "Confirm and save price",
+      "confirmSuggestion": "Approve price",
+      "saving": "Saving…",
+      "reviewTitle": "Review before saving",
+      "rvProduct": "Product",
+      "rvScope": "Scope",
+      "rvPrice": "Price",
+      "rvTax": "VAT",
+      "rvStart": "Start",
+      "rvSource": "Source",
+      "rvSourceCard": "Suggested from the product card",
+      "replaceTitle": "The current price will be closed",
+      "replaceBody": "The effective price {price} per liter will be closed when the new price starts ({when}). Nothing recorded before is deleted or changed.",
+      "replaceAck": "I understand the current price closes when the new price starts",
+      "overrideNote": "A station-specific price will be created that takes precedence over the organization price ({price}).",
+      "ackUnit": "I confirm this price is per liter, not per mL or per piece",
+      "ackTax": "I confirm the product-card price has the same basis: {tax}",
+      "noRetroNote": "No past sale or invoice is changed; the new price applies only to finalizations after its start.",
+      "saved": "Price saved",
+      "savedReplay": "Price was already saved (not duplicated)",
+      "suggestionLost": "The suggestion is no longer available or changed after your review. Close this sheet and review the suggestion again from the card, or set the price manually with “Change/Set price”."
+    },
+    "errors": {
+      "generic": "Couldn't save the price. Check the details and try again.",
+      "forbidden": "You don't have permission to manage prices for this scope.",
+      "timeout": "The request timed out and we can't confirm it saved. Tap confirm again — the price won't be duplicated. The board is refreshing.",
+      "offline": "The connection dropped and we can't confirm it saved. Try again when it's back — the price won't be duplicated.",
+      "overlap": "An effective or scheduled price conflicts with this period. The board is refreshing; check the price history.",
+      "supersedeOpenEnded": "Replacing isn't allowed for a price with an end date.",
+      "supersedeBackdated": "A price can't be replaced retroactively.",
+      "supersedeLater": "A later scheduled price blocks the replacement. Check the price history.",
+      "idempotencyConflict": "The attempt details changed; review and save again.",
+      "suggestionUnavailable": "The product-card suggestion is no longer available; set the per-liter price manually.",
+      "suggestionStale": "The product-card price changed after you reviewed it. Review again.",
+      "suggestionTaxMismatch": "Your VAT confirmation no longer matches the current mode. Review again.",
+      "suggestionUnitUnconfirmed": "Confirming the price is per liter is required."
+    },
+    "history": {
+      "title": "{product} price history",
+      "empty": "No price history in this scope.",
+      "loadMore": "Show more",
+      "moreError": "Couldn't load more.",
+      "open": "open-ended",
+      "manual": "Entered manually",
+      "fromCard": "From product card",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "from": "From",
+      "to": "To"
+    },
+    "settingsLink": "Manage prices"
   },
   "stationOps": {
     "productName": "AWJ Fuel Stations",

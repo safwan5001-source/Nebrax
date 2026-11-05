@@ -59,7 +59,7 @@ function NozzleRow({ row, shiftOpen, locale, timeZone }: { row: NozzleReadingRow
   return (
     <li className="py-3">
       <div className="flex items-start justify-between gap-3">
-        <FuelIcon id={resolveFuelIcon('nozzle', view?.product)} size={40} />
+        <FuelIcon id={resolveFuelIcon('nozzle', view?.product)} size={48} plate="always" />
         <div className="min-w-0 flex-1 text-sm">
           <p className="font-semibold text-text">
             {view ? <>{t('products.nozzle')} <span className="num">{view.nozzle.nozzle_number}</span></> : t('shiftDetail.readings.unknownNozzle')}

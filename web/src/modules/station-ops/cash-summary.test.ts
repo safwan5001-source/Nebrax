@@ -61,6 +61,13 @@ describe('buildCashSummaryView', () => {
     expect(provisional).toEqual({ kind: 'provisional', amountMinor: 500 });
   });
 
+  it('a counted shift whose variance the viewer may not see is "hidden", not "not counted"', () => {
+    const view = buildCashSummaryView(base({ counted_cash_minor: 5_000, variance_minor: null, variance_final: false }));
+    expect(view.variance).toBeNull();
+    expect(view.varianceHidden).toBe(true);
+    expect(buildCashSummaryView(base()).varianceHidden).toBe(false);
+  });
+
   it('an uncounted shift has no variance at all (not zero)', () => {
     expect(buildCashSummaryView(base()).variance).toBeNull();
     expect(buildCashSummaryView(base()).countedMinor).toBeNull();

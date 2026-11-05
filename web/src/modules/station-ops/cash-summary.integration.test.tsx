@@ -134,6 +134,17 @@ describe('cash summary on the shift screen', () => {
     expect(within(row('sales')).queryByText(/0\.00/)).toBeNull();
   });
 
+  it('a hidden variance says "Not available for your role" instead of "Not counted yet"', async () => {
+    open(summary({
+      state: 'frozen', counted_cash_minor: 20_000, variance_minor: null, variance_final: false,
+      components: { ...summary().components, official_cash_receipts: { available: false, amount_minor: null, count: null, reason: 'permission' } },
+      expected_complete: false, expected_cash_minor: null, expected_cash_partial_minor: 20_000, incompleteness: ['permission_sales_view'],
+    }), { status: 'closed', closed_at: '2026-11-03T13:00:00+00:00' });
+    await screen.findByText('SH-500');
+    expect(within(row('variance')).getByText('Not available for your role')).toBeTruthy();
+    expect(within(row('variance')).queryByText('Not counted yet')).toBeNull();
+  });
+
   it('warns about cash collections reversed after the shift closed, without touching the closed difference', async () => {
     open(summary({
       state: 'frozen', counted_cash_minor: 110_000, variance_minor: 0, variance_final: true,

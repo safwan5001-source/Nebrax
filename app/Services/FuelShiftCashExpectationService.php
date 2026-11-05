@@ -222,7 +222,8 @@ class FuelShiftCashExpectationService
             'expected_complete' => $complete,
             'incompleteness' => array_values(array_unique($visibleGaps)),
             'counted_cash_minor' => $counted,
-            'variance_minor' => $variance,
+            // الفرق = المعدود − المتوقع الكامل؛ يُخفى عمّن لا يرى مكوّن المبيعات وإلا كشف المتوقع (المعدود − الفرق) — D8.
+            'variance_minor' => $receiptsKnown && ! $salesVisible ? null : $variance,
             'variance_final' => $complete && $counted !== null,
             'network_receipts' => [
                 'available' => $networkKnown && $salesVisible,

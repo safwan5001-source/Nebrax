@@ -19,6 +19,7 @@ class FuelStationProductPriceResource extends JsonResource
             'effective_until' => $this->effective_until?->toIso8601String(),
             'status' => $this->status,
             'reason' => $this->reason,
+            'entry_source' => $this->entry_source ?? 'manual',
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

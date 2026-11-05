@@ -15,6 +15,7 @@ describe('Fuel Workspace navigation presentation', () => {
     expect(visible).toContain('/fuel-stations/receiving');
     expect(visible).toContain('/fuel-stations/shifts');
     expect(visible).not.toContain('/fuel-stations/sales');
+    expect(visible).not.toContain('/fuel-stations/prices'); // يتطلب fuel.sale.view كالمبيعات
     expect(visible).not.toContain('/fuel-stations/devices');
     expect(visible).not.toContain('/fuel-stations/maintenance');
     expect(visible).not.toContain('/fuel-stations/safety');
@@ -39,6 +40,12 @@ describe('Fuel Workspace navigation presentation', () => {
   });
 
   it('allows the server-authorized wildcard role to see every built workspace route', () => {
-    expect(routes(['*'])).toHaveLength(13);
+    expect(routes(['*'])).toHaveLength(14);
+  });
+
+  it('shows the price management route only with the sale-view permission', () => {
+    expect(routes(['fuel_stations.view', 'fuel.sale.view'])).toContain('/fuel-stations/prices');
+    expect(routes(['fuel_stations.view'])).not.toContain('/fuel-stations/prices');
+    expect(routes(['*'])).toContain('/fuel-stations/prices');
   });
 });

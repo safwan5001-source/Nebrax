@@ -567,6 +567,28 @@ class FuelShiftCashReconciliationTest extends TestCase
     }
 
     /** @test */
+    public function with_the_gate_open_a_viewer_without_sales_view_gets_neither_the_legacy_totals_nor_the_sales_cash(): void
+    {
+        $shift = $this->open('d8');
+        $sale = $this->sale('d8-sale', $shift);
+        $total = (int) $sale->invoice->total;
+        $this->collect($sale, 'cash', null, 'd8-pay');
+        app(FuelShiftService::class)->close($shift, self::FLOAT + $total, null, $this->f['actor']);
+        $token = $this->f['seller']->createToken('api')->plainTextToken;
+
+        $response = $this->withToken($token)->getJson('/api/fuel-stations/shifts/' . $shift->id)->assertOk();
+
+        $response->assertJsonPath('data.expected_operational_cash_minor', null)
+            ->assertJsonPath('data.cash_variance_minor', null)
+            ->assertJsonPath('data.cash_summary.components.official_cash_receipts.available', false)
+            ->assertJsonPath('data.cash_summary.expected_cash_minor', null)
+            ->assertJsonPath('data.cash_summary.expected_cash_partial_minor', self::FLOAT)
+            // المعدود − الفرق = المتوقع الكامل؛ فيُخفى الفرق أيضاً (المعدود يبقى لأنه إدخال العارض نفسه).
+            ->assertJsonPath('data.cash_summary.variance_minor', null)
+            ->assertJsonPath('data.cash_variance.variance_minor', null);
+    }
+
+    /** @test */
     public function the_show_endpoint_exposes_the_summary_and_the_cash_movement_route_accepts_a_handover(): void
     {
         $shift = $this->open('api');

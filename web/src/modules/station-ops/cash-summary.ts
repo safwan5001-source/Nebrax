@@ -65,6 +65,8 @@ export interface CashSummaryView {
   expected: { kind: 'total' | 'partial'; amountMinor: number };
   countedMinor: number | null;
   variance: VarianceView | null;
+  /** معدود موجود لكن الفرق محجوب عن العارض (لا صلاحية مبيعات) ⇒ «غير متاح» لا «لم يُعدّ». */
+  varianceHidden: boolean;
   network: { amountMinor: number | null; unavailable: UnavailableReason | null };
   gaps: string[];
   unattributed: { count: number; amountMinor: number } | null;
@@ -110,6 +112,7 @@ export function buildCashSummaryView(summary: CashSummary): CashSummaryView {
     expected,
     countedMinor: summary.counted_cash_minor,
     variance,
+    varianceHidden: summary.counted_cash_minor !== null && summary.variance_minor === null,
     network: { amountMinor: net.available ? net.amount_minor : null, unavailable: net.available ? null : normalizeReason(net.reason) },
     gaps: summary.incompleteness,
     unattributed: summary.unattributed_cash_receipts && summary.unattributed_cash_receipts.count > 0
