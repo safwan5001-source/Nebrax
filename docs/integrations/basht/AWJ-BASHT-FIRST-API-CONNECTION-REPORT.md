@@ -1,87 +1,82 @@
-# AWJ × BASHT — أول ربط API (تقرير + دليل تنفيذ)
+# AWJ × BASHT — تفعيل الـ API لشركة نبراس الطموح
 
-**الفرع:** `claude/awj-basht-api-connection-cuabmx` · **Base SHA:** `ac8798eaf4d69144796a9f21b239fefc0bfd1af6` (main بعد دمج #2026)
-**الحالة: الفحص مكتمل · التجهيز مكتمل · الاتصال الفعلي لم يُنفَّذ ولم يُختبر.**
-لا يوجد ادعاء نجاح اتصال: لم يُصدَر مفتاح، ولم تُعدَّل خدمة باشت، ولم تُشغَّل أي استدعاءات مصادَقة.
+**الفرع:** `claude/awj-basht-api-connection-cuabmx` · **PR:** #2027 · **Base SHA:** `ac8798eaf4d69144796a9f21b239fefc0bfd1af6` · **Head SHA:** يُذكر في رسالة التسليم (آخر commit في الفرع)
+**الحالة: التجهيز مكتمل 100% · التشغيل الحي لم يُنفَّذ — محجوب بخطوتين منك من الآيفون (≈5 دقائق). لا نجاح اتصال مُدّعى.**
 
-## 1) نتائج الفحص (قراءة فقط)
+## 1) ما تحقق فعلاً (مُثبَت)
+| البند | الدليل |
+|---|---|
+| Public API v1 حيّة على الإنتاج | `GET /api/v1/health` ⇒ 200؛ المسارات الستة تردّ 401 بلا مفتاح (منشورة) |
+| باشت = `OpenClaw` في `sweet-courtesy` | Railway: خدمة live، آخر نشر SUCCESS، قرص `/data` |
+| مهارة `awj-erp` تغطي العمليات السبع | `docs/integrations/basht/skills/awj-erp/SKILL.md` |
+| سكربت قبول ذاتي (8 خطوات، قابل للإعادة بلا تكرار) | `scripts/awj-acceptance.mjs`؛ جُرِّب بمفتاح خاطئ ⇒ 8/8 فشل نظيف (401) بلا طباعة أسرار |
+| `AWJ_API_BASE` على OpenClaw | **مُجهَّز (staged)** — لا نشر حتى تضغط Deploy في Railway |
 
-| البند | النتيجة | الدليل |
-|---|---|---|
-| Public API على الإنتاج | **متاحة** | `GET https://nibras-api-production.up.railway.app/api/v1/health` ⇒ 200 `awj-public-api v1` |
-| المسارات المطلوبة | **منشورة** وتطلب مصادقة | `products` و`partners` و`partners/{id}/statement` ⇒ 401 `unauthenticated` (وليس 404) |
-| آخر نشر لـ `nibras-api` | SUCCESS، فرع `main`، 2026-11-05 19:09Z | Railway: `nibras-api` في مشروع «أَوْج AWJ» |
-| طريقة إصدار المفاتيح | CLI فقط: `php artisan public-api:create-client <tenant> <name> --scopes=… --expires-days=…` أو واجهة المطوّر في الإعدادات | `PublicApiCreateClientCommand`؛ النص الصريح يُعرض **مرة واحدة** |
-| Scopes المتاحة | `partners:read/write` · `products:read/write` · `invoices:read/write` · `statements:read` · `webhooks:read/write` | `PublicApiScope` |
-| باشت | خدمة **`OpenClaw`** في مشروع Railway **«sweet-courtesy»** (منفصل عن مشروع أَوْج)، آخر نشر SUCCESS، نطاق `openclaw-production-ac97.up.railway.app`، قرص `/data` | Railway `describe-service` |
-| إعداد OpenClaw | مصدره `safwan5001-source/openclaw-railway-template` (ليس في مستودع أَوْج). متغيراته (أسماء فقط): `GH_TOKEN`، `OPENCLAW_GATEWAY_TOKEN`، `SETUP_PASSWORD`، `OPENCLAW_STATE_DIR`، `OPENCLAW_WORKSPACE_DIR`، `BROWSERBASE_API_KEY`… **لا متغير لأَوْج بعد** | Railway (لم تُقرأ القيم) |
-| ملاحظة | مشروع «Safwan Smart Assistant» (`safwan-api`…) خدمة أخرى؛ لم يتأكد أنها ليست باشت — المعتمد هنا `OpenClaw` ويلزم تأكيد المالك | — |
+## 2) ما تعذّر ولماذا
+| المطلوب | السبب |
+|---|---|
+| تحديد Tenant UUID/slug لـ«نبراس الطموح» | لا وصول تنفيذي لقاعدة الإنتاج من الجلسة (وكيل Railway نفسه أكّد: لا shell ولا SQL، قراءة ملفات فقط) |
+| إصدار مفتاح API | يتطلب هوية مالك المستأجر أو Artisan على الإنتاج؛ والمفتاح يظهر مرة واحدة ولا أريد استلامه أصلاً |
+| تركيب المهارة وتشغيل الاختبار الحي | لا وصول لقرص/Console باشت |
+| تعديل Railway المسبب لإعادة نشر | محظور بقيدك — لذلك أُجهّز المتغير فقط |
 
-**ما لم يُتحقَّق منه (حدود الوصول):** من هذه الجلسة لا أستطيع تنفيذ أوامر داخل حاويتي `nibras-api` أو `OpenClaw`، ولا قراءة `openclaw.json` أو مجلد `skills` على القرص. لذلك لم أُصدر مفتاحاً (يلزم تشغيل Artisan على قاعدة الإنتاج) ولم أركّب المهارة في باشت. وفق وثائق OpenClaw (تم تأكيدها من docs.openclaw.ai): المهارة مجلد فيه `SKILL.md`، والأسرار تُضبط في `skills.entries.<name>.env`، وتُحقن للمضيف فقط. **لم يُتحقَّق** من: قيود `exec`، وهل تورث عملية `curl` المتغيرات المحقونة، ودعم `web_fetch` لترويسة `Authorization`.
+> لذلك لا توجد نتائج «قراءة/كتابة حيّة» في هذا التقرير. معيار النجاح النهائي لم يتحقق بعد.
 
-## 2) ما جُهِّز في هذا الفرع (وثائق فقط، بلا كود تطبيق)
+## 3) الجزء المحجوب — أقصر تنفيذ من الآيفون
 
-- `docs/integrations/basht/skills/awj-erp/SKILL.md` — مهارة OpenClaw للقراءة فقط (`GET products` / `GET partners`)، تعتمد `AWJ_API_KEY` و`AWJ_API_BASE` ولا تحمل أي سر، وتمنع اختراع البيانات.
-- هذا التقرير. لا تغيير في المحاسبة أو قاعدة البيانات أو الصلاحيات أو الواجهة.
+**لا حاجة لمعرفة Tenant UUID ولا لـ shell.** صفحة المطوّر في أَوْج تُصدر المفتاح للمستأجر المسجَّل دخوله، فتطابق الهوية مضمونة بالتصميم.
 
-## 3) خطوات التنفيذ (بالترتيب — تتطلب المالك)
+**الخطوة 1 — إصدار المفتاح (دقيقتان)**
+1. سجّل الدخول إلى أَوْج بحساب **مالك شركة نبراس الطموح** ← تأكد من اسم المؤسسة ظاهراً في الواجهة.
+2. المطوّر ← **المفاتيح** (`/developer/keys`) ← إنشاء عميل: الاسم `BASHT`، الصلاحية بالضبط:
+   `partners:read` · `partners:write` · `products:read` · `products:write` · `invoices:read` · `invoices:write` · `statements:read`، الانتهاء **30 يوماً**.
+3. انسخ المفتاح (يظهر مرة واحدة) — **لا تلصقه في أي محادثة**.
 
-### الخطوة A — إصدار مفتاح باشت (قراءة فقط)
-قرار مطلوب منك: **أي مستأجر (tenant) يقرأ منه باشت؟** الاختبار الحقيقي يلزمه مستأجر فيه منتجات فعلية.
+**الخطوة 2 — تخزينه في OpenClaw (دقيقتان)**
+Railway ← `sweet-courtesy` ← `OpenClaw` ← Variables:
+- ستجد `AWJ_API_BASE` جاهزاً في التغييرات المعلّقة.
+- أضف `AWJ_API_KEY` = المفتاح، واجعله **Sealed**. ثم **Deploy** (يعيد تشغيل باشت مرة واحدة).
 
-تشغيله على خدمة `nibras-api` (Railway ← أَوْج AWJ ← nibras-api ← Shell، يعمل من الآيفون):
+**الخطوة 3 — تركيب المهارة والسكربت (دقيقة، من `/setup` ← Console)**
 ```bash
-php artisan public-api:create-client <tenant-slug-or-uuid> "BASHT (read-only)" \
-  --scopes=partners:read,products:read --expires-days=30
+D="$OPENCLAW_WORKSPACE_DIR"; R="https://api.github.com/repos/safwan5001-source/Nebrax/contents/docs/integrations/basht"; B="ref=claude/awj-basht-api-connection-cuabmx"
+mkdir -p "$D/skills/awj-erp" "$D/scripts"
+curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw" "$R/skills/awj-erp/SKILL.md?$B" -o "$D/skills/awj-erp/SKILL.md"
+curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw" "$R/scripts/awj-acceptance.mjs?$B" -o "$D/scripts/awj-acceptance.mjs"
+node "$D/scripts/awj-acceptance.mjs"
 ```
-- انسخ المفتاح فور ظهوره (لا يظهر مرة ثانية) إلى مخزن الأسرار مباشرة؛ لا تلصقه في دردشة أو تذكرة.
-- لا تضف `statements:read` (يكشف أرصدة العملاء) ولا أي write الآن.
-- الإلغاء/التدوير: من واجهة المطوّر في أَوْج أو بإصدار مفتاح جديد وحذف القديم.
+(إن رفض `GH_TOKEN` الوصول للمستودع: افتح الملفين على GitHub من الآيفون وألصقهما بـ `cat > file <<'EOF'`.)
+إن لم يرث الـ Console المتغيرات: `openclaw config` ← Skills ← `awj-erp` ← env، أو شغّل السكربت بعد `export` مؤقت داخل الجلسة.
 
-### الخطوة B — إضافة الأسرار لخدمة OpenClaw
-في Railway ← sweet-courtesy ← OpenClaw ← Variables أضف (**Sealed** إن أمكن):
-- `AWJ_API_KEY` = المفتاح من الخطوة A
-- `AWJ_API_BASE` = `https://nibras-api-production.up.railway.app/api/v1`
+**المخرجات المتوقعة:** `8/8 passed`. السكربت: يقرأ 5 منتجات حقيقية، يبحث عن عميل، ينشئ منتج `BASHT-TEST-001` وعميل `BASHT TEST CUSTOMER` وفاتورة **مسودة** واحدة بمفاتيح Idempotency ثابتة، يعيد الطلب ويتأكد من عدم التكرار، ويستخرج كشف الحساب. أرسل لي المخرجات (لا تحتوي أسراراً) وسأوثّقها هنا.
 
-> تعديل متغيرات OpenClaw يعيد نشر الخدمة — لم أفعله لأن القيد يشترط موافقتك الصريحة. أخبرني «نفّذ» وأضيف المتغير غير السري `AWJ_API_BASE` فقط؛ المفتاح تضعه أنت (أنا لا أستلم قيمته).
+**ثم اختبار باشت نفسه:** «ابحث عن المنتجات الموجودة في أَوْج وأعطني أول خمسة منتجات» وقارنها بشاشة المنتجات في أَوْج.
 
-### الخطوة C — تركيب المهارة
-`/setup` في OpenClaw (محمي بـ `SETUP_PASSWORD`) ← **Console**:
-```bash
-mkdir -p "$OPENCLAW_WORKSPACE_DIR/skills/awj-erp"
-# الصق محتوى SKILL.md من docs/integrations/basht/skills/awj-erp/SKILL.md
-```
-أو `openclaw skills install git:safwan5001-source/Nebrax@<ref>` إن دعمت المسار الفرعي (غير مؤكد — يُجرَّب). ثم تأكد أن المتغيرين ظاهران للمهارة (إن لم يرثهما `curl`، اضبطهما في `skills.entries.awj-erp.env` عبر Control UI ← Config).
+## 4) الخطوة 8 — لا قيد محاسبي من المسودة (دليلان)
+1. **من الـ API:** كشف حساب العميل التجريبي بعد إنشاء الفاتورة المسودة يجب أن يكون `rows=0` و`closing=0` (السكربت يتحقق).
+2. **من الواجهة:** في أَوْج افتح الفاتورة التجريبية ← الحالة «مسودة» وبلا قيد يومية مرتبط؛ ودفتر الأستاذ لا يحتوي حركة بمصدرها. (المسودة تمر عبر `InvoiceService::create` فقط بلا `LedgerService::post`، ومغطّى باختبار `PublicApiPartnerStatementTest`.)
 
-### الخطوة D — اختبار القراءة (معيار النجاح)
-أرسل لباشت: «ابحث عن المنتجات الموجودة في أَوْج وأعطني أول خمسة منتجات».
-قبول النتيجة فقط إذا:
-1. مطابقة الأسماء/الـSKU لخمسة منتجات تراها في أَوْج لنفس المستأجر.
-2. سجل الطلبات في لوحة المطوّر (تدقيق Public API) يُظهر `GET /products` من مفتاح باشت.
-3. اختبار سلبي: فتح الرابط بدون المفتاح ⇒ 401؛ ومحاولة `POST` ⇒ 403 (scope).
+**الأثر المحاسبي لكل عملية جديدة:** لا يوجد. المنتج والعميل والمسودة لا تُنتج أي قيد؛ لا ترحيل ولا سداد ولا تحصيل (لا endpoint لها في Public API أصلاً).
 
-### الخطوة E — اختبار الكتابة (بعد موافقتك فقط)
-أصدر مفتاحاً **منفصلاً أو مدوَّراً** بإضافة `products:write` ثم:
-```bash
-curl -sS -X POST "$AWJ_API_BASE/products" \
-  -H "Authorization: Bearer $AWJ_API_KEY" -H "Idempotency-Key: basht-test-001" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"BASHT TEST — احذف","sku":"BASHT-TEST-001","sale_price_minor":10000,"tax_rate":15}'
-```
-أعد **نفس** الطلب بنفس المفتاح: يجب أن يعيد نفس الاستجابة (replay) ويظهر المنتج **مرة واحدة** في `GET /products?search=BASHT-TEST-001`. المنتج لا يولّد مخزوناً ولا قيداً. الحذف يدوي من أَوْج (لا DELETE في Public API).
+## 5) الملفات المتغيرة
+- `docs/integrations/basht/skills/awj-erp/SKILL.md` (محدَّث: 7 عمليات)
+- `docs/integrations/basht/scripts/awj-acceptance.mjs` (جديد)
+- `docs/integrations/basht/AWJ-BASHT-FIRST-API-CONNECTION-REPORT.md` (هذا التقرير)
+- لا تغيير في `app/` `routes/` `web/` قاعدة البيانات الصلاحيات المحاسبة.
+- Railway: متغير `AWJ_API_BASE` مُجهَّز staged على OpenClaw، بلا نشر.
 
-## 4) نتائج الاختبارات والـ CI
-- لا تغيير في `app/` أو `routes/` أو `web/` أو الهجرات، فلا يلزم تشغيل `php artisan test` (آخر تشغيل كامل أخضر على #2026 وفق `AWJ-AI-API-FIRST-INTEGRATION-REPORT.md`).
-- CI لهذا الفرع: يُرفق بعد فتح الـ PR.
-- اختبارات الاتصال الحي (قراءة/كتابة): **غير منفَّذة** — محجوبة بالخطوة A–C.
+## 6) الاختبارات وBuild/CI
+- `node --check` للسكربت ✅ · تشغيل بمفتاح خاطئ ⇒ فشل نظيف ✅.
+- لا تغيير في كود التطبيق فلا حاجة لـ `php artisan test` (آخر حزمة كاملة خضراء على #2026).
+- CI على #2027: ينتظر نتائج GitHub؛ مراجعة Codex فشلت بسبب نفاد حصتها لا لوجود ملاحظات.
+- الاتصال الحي: **غير منفَّذ**.
 
-## 5) المخاطر
-1. **Gateway باشت عام الاتجاه** (تحذير README القالب): تأكد من `SETUP_PASSWORD` قوي و`OPENCLAW_GATEWAY_TOKEN`، فمن يتحكم بباشت يتحكم بالمفتاح.
-2. **حقن الأسرار:** مفتاح القراءة يكشف كل المنتجات/العملاء في المستأجر (نطاق المستأجر لا الفرع). صلاحية 30 يوماً وتدوير.
-3. **عدم تأكيد** وراثة المتغيرات لعملية `curl` وقيود `exec` في OpenClaw — يُحسم بالتجربة في الخطوة D.
-4. موجّه بالنص (Prompt): احتمال أن يضع الوكيل المفتاح في ردّه؛ المهارة تمنعه لكنها ليست حاجزاً تقنياً.
-5. حدود المعدّل: قراءة/كتابة لكل عميل API (429 عند التجاوز).
-6. أي مفتاح يُلصق في دردشة يُعدّ مكشوفاً — يُلغى فوراً.
+## 7) المخاطر
+1. المفتاح يحمل كتابة + `statements:read` (أرصدة العملاء) على كامل المستأجر وكل الفروع — لذا 30 يوماً؛ ألغِه من `/developer/keys` عند أي شك.
+2. بوابة OpenClaw عامة الاتجاه: تأكد من قوة `SETUP_PASSWORD` و`OPENCLAW_GATEWAY_TOKEN`؛ من يتحكم بباشت يتحكم بالمفتاح.
+3. منع الوكيل من كشف المفتاح قائم على تعليمات المهارة لا على حاجز تقني؛ وراثة المتغيرات لعملية `curl` وقيود `exec` غير مؤكدة في وثائق OpenClaw — يحسمها السكربت.
+4. بيانات الاختبار (منتج/عميل/مسودة) تبقى في بيانات نبراس الحقيقية؛ تُحذف يدوياً بعد الفحص (لا DELETE في Public API).
+5. حدود المعدّل للكتابة (429).
 
-## 6) الخطوة التالية
-قرارك الآن: (1) اسم/UUID المستأجر الذي يقرأ منه باشت، (2) تأكيد أن الخدمة المقصودة هي `OpenClaw` في «sweet-courtesy»، (3) هل أضيف `AWJ_API_BASE` إلى OpenClaw. بعد تنفيذك الخطوة A والمفتاح في `AWJ_API_KEY` أعود لأشغّل اختبار القراءة وأوثّق النتيجة.
+## 8) الخطوة التالية
+نفّذ الخطوات 1–3 وأرسل مخرجات السكربت (`N/8 passed` والأسطر). أي فشل أعالجه فوراً؛ وعند النجاح أحدّث التقرير بالنتائج الحية وتُغلق المهمة.
