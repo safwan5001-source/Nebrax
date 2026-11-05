@@ -218,6 +218,51 @@ describe('open shift', () => {
     expect(backend.openKeysUsed()).toHaveLength(1);
   });
 
+  it('"Check status" finding the shift reconciles the uncertain intent: after that shift is closed, a new open uses a NEW key and works', async () => {
+    const user = userEvent.setup();
+    const data = baseData();
+    connect(data);
+    backend.fail({ match: (c) => c.path.endsWith('/open'), mode: 'server_error_after_apply' });
+    const view = renderOps(<OpenShiftScreen />);
+    await user.type(await field('open-float'), '500');
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    await screen.findByText(/The server hit an error after sending\./);
+    await user.click(buttonNamed('Check status'));
+    await screen.findByText('A shift is already open');
+    await waitFor(() => expect(Object.keys(sessionStorage).filter((k) => k.startsWith('awj:fuel-ops:intent:'))).toEqual([]));
+
+    backend.detail('new-1').status = 'closed'; // أُغلقت لاحقاً
+    for (const row of data.shifts) if (row.id === 'new-1') row.status = 'closed';
+    view.unmount();
+    renderOps(<OpenShiftScreen />);
+    await user.type(await field('open-float'), '500');
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    expect(await screen.findByText('Shift SH-NEW-2 is open')).toBeTruthy();
+    const keys = backend.postsTo('/open').map((c) => c.body.idempotency_key);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it('a replay that returns an old CLOSED shift is not success and frees the key, so the next confirmation is a fresh intent', async () => {
+    const user = userEvent.setup();
+    connect(baseData());
+    backend.fail({ match: (c) => c.path.endsWith('/open'), mode: 'network_after_apply' });
+    renderOps(<OpenShiftScreen />);
+    await user.type(await field('open-float'), '500');
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    await screen.findByText(/The connection dropped after sending\./);
+    backend.detail('new-1').status = 'closed'; // التزمت ثم أُغلقت قبل إعادة المحاولة
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    await screen.findByText(/we can't confirm the action went through/);
+    expect(screen.queryByText(/is open$/)).toBeNull();
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    expect(await screen.findByText('Shift SH-NEW-2 is open')).toBeTruthy();
+  });
+
   it('a different amount is a NEW intent ⇒ a NEW key (the server would otherwise replay the first effect)', async () => {
     const user = userEvent.setup();
     connect(baseData());

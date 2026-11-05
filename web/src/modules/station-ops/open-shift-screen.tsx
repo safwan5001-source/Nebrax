@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { CircleCheck, Info } from 'lucide-react';
@@ -54,6 +54,13 @@ function Form({ station }: { station: Station }) {
   const [failure, setFailure] = useState<WriteResult | null>(null);
   const [checking, setChecking] = useState(false);
 
+  // تسوية: وجود وردية مفتوحة بعد «تحقق من الحالة» يحسم نيّة الفتح غير المؤكدة (إمّا أنها هي، أو فتحها غيرنا) — لا تبقى مفتاحاً معلّقاً
+  // يعيد وردية قديمة مُغلقة لاحقاً. النيات غير المحسومة فعلاً (لا وردية) تحتفظ بمفتاحها.
+  const foundOpenShift = current.state.status === 'success' && current.state.data.shift !== null;
+  useEffect(() => {
+    if (foundOpenShift) intents.clear('open');
+  }, [foundOpenShift, intents]);
+
   const parsed = raw.trim() === '' ? null : parseMoney(raw);
   const floatMinor = parsed && parsed.ok ? parsed.minor : null;
   const floatError = parsed && !parsed.ok ? t('openShift.floatInvalid') : null;
@@ -85,7 +92,9 @@ function Form({ station }: { station: Station }) {
         void assign(shift);
         return;
       }
-      if (mayHaveApplied(result) || result.kind === 'ok') intents.markUncertain('open');
+      // الخادم أعاد وردية **قديمة غير مفتوحة** لهذا المفتاح (نيّة سابقة التزمت ثم أُغلقت): لا يصلح المفتاح لوردية جديدة — نمسحه ليكون التأكيد التالي نيّة جديدة صريحة.
+      if (result.kind === 'ok' && result.shift.status !== 'open') intents.clear('open');
+      else if (mayHaveApplied(result) || result.kind === 'ok') intents.markUncertain('open');
       if (shouldClearIntentKey(result, intents.isUncertain('open'))) intents.clear('open');
       // ردّ 2xx لا يطابق ما أرسلناه (أو غير مفهوم) ⇒ «غير مؤكد» ولا نعلن نجاحاً؛ المفتاح يبقى لإعادة آمنة.
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
