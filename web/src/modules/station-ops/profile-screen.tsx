@@ -98,9 +98,6 @@ export function ProfileScreen() {
         <Link href={`${OPS_BASE}/settings`} className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           {t('navSettings')}
         </Link>
-        <Link href="/settings" className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          {t('profile.securityLink')}
-        </Link>
         <button
           type="button"
           onClick={signOut}

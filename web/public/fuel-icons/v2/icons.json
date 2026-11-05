@@ -1,0 +1,142 @@
+[
+  {
+    "id": "gasoline-91",
+    "ar": "بنزين 91",
+    "en": "Gasoline 91",
+    "png": "reference-png/gasoline-91.png",
+    "svg": "svg/gasoline-91.svg"
+  },
+  {
+    "id": "gasoline-95",
+    "ar": "بنزين 95",
+    "en": "Gasoline 95",
+    "png": "reference-png/gasoline-95.png",
+    "svg": "svg/gasoline-95.svg"
+  },
+  {
+    "id": "diesel",
+    "ar": "ديزل",
+    "en": "Diesel",
+    "png": "reference-png/diesel.png",
+    "svg": "svg/diesel.svg"
+  },
+  {
+    "id": "fuel-product",
+    "ar": "منتج وقود",
+    "en": "Fuel product",
+    "png": "reference-png/fuel-product.png",
+    "svg": "svg/fuel-product.svg"
+  },
+  {
+    "id": "fuel-derivatives",
+    "ar": "مشتقات وقود",
+    "en": "Fuel derivatives",
+    "png": "reference-png/fuel-derivatives.png",
+    "svg": "svg/fuel-derivatives.svg"
+  },
+  {
+    "id": "pump-91",
+    "ar": "مضخة بنزين 91",
+    "en": "Gasoline 91 pump",
+    "png": "reference-png/pump-91.png",
+    "svg": "svg/pump-91.svg"
+  },
+  {
+    "id": "pump-95",
+    "ar": "مضخة بنزين 95",
+    "en": "Gasoline 95 pump",
+    "png": "reference-png/pump-95.png",
+    "svg": "svg/pump-95.svg"
+  },
+  {
+    "id": "pump-diesel",
+    "ar": "مضخة ديزل",
+    "en": "Diesel pump",
+    "png": "reference-png/pump-diesel.png",
+    "svg": "svg/pump-diesel.svg"
+  },
+  {
+    "id": "fuel-pump",
+    "ar": "مضخة",
+    "en": "Fuel pump",
+    "png": "reference-png/fuel-pump.png",
+    "svg": "svg/fuel-pump.svg"
+  },
+  {
+    "id": "nozzle-91",
+    "ar": "فوهة بنزين 91",
+    "en": "Gasoline 91 nozzle",
+    "png": "reference-png/nozzle-91.png",
+    "svg": "svg/nozzle-91.svg"
+  },
+  {
+    "id": "nozzle-95",
+    "ar": "فوهة بنزين 95",
+    "en": "Gasoline 95 nozzle",
+    "png": "reference-png/nozzle-95.png",
+    "svg": "svg/nozzle-95.svg"
+  },
+  {
+    "id": "nozzle-diesel",
+    "ar": "فوهة ديزل",
+    "en": "Diesel nozzle",
+    "png": "reference-png/nozzle-diesel.png",
+    "svg": "svg/nozzle-diesel.svg"
+  },
+  {
+    "id": "tank-91",
+    "ar": "خزان بنزين 91",
+    "en": "Gasoline 91 tank",
+    "png": "reference-png/tank-91.png",
+    "svg": "svg/tank-91.svg"
+  },
+  {
+    "id": "tank-95",
+    "ar": "خزان بنزين 95",
+    "en": "Gasoline 95 tank",
+    "png": "reference-png/tank-95.png",
+    "svg": "svg/tank-95.svg"
+  },
+  {
+    "id": "tank-diesel",
+    "ar": "خزان ديزل",
+    "en": "Diesel tank",
+    "png": "reference-png/tank-diesel.png",
+    "svg": "svg/tank-diesel.svg"
+  },
+  {
+    "id": "fuel-station",
+    "ar": "محطة وقود",
+    "en": "Fuel station",
+    "png": "reference-png/fuel-station.png",
+    "svg": "svg/fuel-station.svg"
+  },
+  {
+    "id": "storage-tanks",
+    "ar": "خزانات الوقود",
+    "en": "Fuel storage tanks",
+    "png": "reference-png/storage-tanks.png",
+    "svg": "svg/storage-tanks.svg"
+  },
+  {
+    "id": "control-valve",
+    "ar": "صمام تحكم",
+    "en": "Control valve",
+    "png": "reference-png/control-valve.png",
+    "svg": "svg/control-valve.svg"
+  },
+  {
+    "id": "fuel-meter",
+    "ar": "عداد وقود",
+    "en": "Fuel meter",
+    "png": "reference-png/fuel-meter.png",
+    "svg": "svg/fuel-meter.svg"
+  },
+  {
+    "id": "fuel-transport",
+    "ar": "نقل وقود",
+    "en": "Fuel transport",
+    "png": "reference-png/fuel-transport.png",
+    "svg": "svg/fuel-transport.svg"
+  }
+]

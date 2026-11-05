@@ -11,6 +11,8 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
+import { OrderingBanner } from "@/components/ordering/OrderingBanner";
+import { OrderingProvider } from "@/contexts/OrderingContext";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
 import { getCategories } from "@/lib/data/categories";
@@ -186,6 +188,9 @@ export default async function StorefrontLayout({
   const policyAvailability =
     identity?.policyAvailability ?? readPolicyAvailability(null);
   const nativeWholesale = identity?.capabilities?.wholesaleBuyer === true;
+  // COPS-H4 Buyer Ordering UX — the store's order-intake state. `null` (gate closed, block absent/malformed, or the config
+  // fetch failed) renders nothing and adds nothing to the tree; Checkout on the server stays the only authority.
+  const ordering = identity?.ordering ?? null;
   const liveName = identity?.name?.trim() ? identity.name : null;
   const footerMessages = await getTranslations({
     locale: locale as Locale,
@@ -319,6 +324,9 @@ export default async function StorefrontLayout({
           ) : null
         }
       />
+      {ordering && !ordering.accepting ? (
+        <OrderingBanner ordering={ordering} />
+      ) : null}
       {/*
         `scroll-margin-top` keeps the skip link's landing point clear of the
         sticky banner; a bare `#main-content` jump would put the first content
@@ -336,7 +344,13 @@ export default async function StorefrontLayout({
               presentation?.productCard === "compact" ? "compact" : "standard"
             }
           >
-            {children}
+            {ordering ? (
+              <OrderingProvider ordering={ordering}>
+                {children}
+              </OrderingProvider>
+            ) : (
+              children
+            )}
           </PublishedCardStyleProvider>
         </PublishedThemeMarkerProvider>
       </main>

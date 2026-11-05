@@ -4,18 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildStationCatalog, type StationCatalog } from './catalog';
 import { useStationOps } from './context';
 import { resolveProductPrice, type PriceResult } from './prices';
-import { isAbort, opsGet } from './read-client';
+import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftDetailPath } from './read-client';
 import {
   fuelProductsResponse,
   nozzlesResponse,
   pricesResponse,
   pumpsResponse,
+  shiftDetailResponse,
   shiftsResponse,
   tanksResponse,
   type FuelProduct,
   type Nozzle,
   type Pump,
   type Shift,
+  type ShiftDetail,
   type Station,
   type Tank,
 } from './schemas';
@@ -124,6 +126,44 @@ export function useCurrentShift(station: Station | null): CurrentShiftResult {
     [],
   );
   return { allowed, state: key === null ? idle : query.state, reload: query.reload };
+}
+
+export interface ShiftDetailResult {
+  allowed: boolean;
+  state: QueryState<ShiftDetail>;
+  /** آخر نتيجة ناجحة **لهذا المفتاح نفسه** (نطاق + محطة + وردية). تُعرض مع تنبيه «قديمة» أثناء التحديث/الفشل، ولا تعبر المفاتيح أبداً. */
+  retained: { data: ShiftDetail; fetchedAt: number } | null;
+  reload: () => void;
+}
+
+const INVALID_SHIFT: QueryState<ShiftDetail> = { status: 'error', error: new StationOpsError('not_found', 404) };
+
+/**
+ * UI-1 — تفاصيل وردية واحدة (قراءة فقط). الاستعلام يحمل فرع المحطة المختارة (`X-Branch-Id`) كالقائمة، ويتحقق العميل من أن
+ * الوردية المعادة تخص المحطة المختارة فعلاً — وإلا تُعامل «غير موجودة» (لا نعرض وردية محطة أخرى بمجرد وصول معرّفها، حتى لو
+ * سمح بها الخادم: انظر فجوة نطاق المحطة في تقرير UI-1).
+ */
+export function useShiftDetail(station: Station | null, shiftId: string): ShiftDetailResult {
+  const { scopeKey, can } = useStationOps();
+  const allowed = can('fuel.shift.view');
+  const stationId = station?.id ?? null;
+  const valid = isValidShiftId(shiftId);
+  const key = allowed && stationId && valid ? `${scopeKey}|${stationId}|shift|${shiftId}` : null;
+
+  const query = useScopedQuery<ShiftDetail>(key, async (signal) => {
+    const response = await opsGet(shiftDetailPath(shiftId), shiftDetailResponse, { signal, branchId: station?.branch_id });
+    if (response.data.station_id !== stationId) throw new StationOpsError('not_found', 404);
+    return response.data;
+  });
+
+  // آخر نجاح لهذا المفتاح: يُسجَّل أثناء العرض نفسه (مرتبطاً بهوية كائن البيانات، فهو idempotent) كي لا يظهر إطارٌ بلا «آخر تحديث».
+  const last = useRef<{ key: string; data: ShiftDetail; fetchedAt: number } | null>(null);
+  if (key !== null && query.state.status === 'success' && (last.current?.key !== key || last.current.data !== query.state.data)) {
+    last.current = { key, data: query.state.data, fetchedAt: Date.now() };
+  }
+  const retained = key !== null && last.current !== null && last.current.key === key ? { data: last.current.data, fetchedAt: last.current.fetchedAt } : null;
+
+  return { allowed, state: !valid ? INVALID_SHIFT : query.state, retained, reload: query.reload };
 }
 
 export type ShiftFilter = 'all' | 'open' | 'closed' | 'approved';

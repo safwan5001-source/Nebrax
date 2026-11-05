@@ -8,6 +8,7 @@ import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import { readPublishedPresentation } from "@/lib/presentation/public";
 import { readResolvedMedia } from "@/lib/presentation/resolved-media";
 import { storefrontFetch } from "./config";
+import { type AwjOrdering, readOrdering } from "./ordering";
 
 export interface AwjStorefrontConfig {
   name: string | null;
@@ -35,6 +36,11 @@ export interface AwjStorefrontConfig {
    * buying is open here (deployment flag AND a wholesale channel); absent/malformed ⇒ false (fail closed).
    */
   capabilities?: { wholesaleBuyer: boolean; customerAccounts?: boolean };
+  /**
+   * COPS-H4 Buyer Ordering UX — the store's order-intake state (`data.ordering`). Present only while the deployment
+   * gate is open; absent/malformed ⇒ `null` ⇒ no notice. Informational only: Checkout on the server decides.
+   */
+  ordering?: AwjOrdering | null;
 }
 
 export interface AwjBusinessIdentity {
@@ -52,6 +58,7 @@ interface AwjStorefrontConfigResponse {
     presentation_media?: unknown;
     policy_availability?: unknown;
     capabilities?: unknown;
+    ordering?: unknown;
   };
 }
 
@@ -165,6 +172,7 @@ export const fetchStorefrontConfig = cache(
         response.data.policy_availability,
       ),
       capabilities: readCapabilities(response.data.capabilities),
+      ordering: readOrdering(response.data.ordering),
     };
   },
 );

@@ -103,15 +103,16 @@ export function HomeMasthead() {
   );
 }
 
-export function PageMasthead({ title, subtitle }: { title: string; subtitle?: string }) {
+/** `raised` = بطاقة تعلو حافته السفلية (مواصفة #1990 §1)؛ `backHref` الافتراضي الرئيسية، وشاشات التفاصيل تعيد إلى قائمتها. */
+export function PageMasthead({ title, subtitle, raised = false, backHref = OPS_BASE, backLabel }: { title: string; subtitle?: string; raised?: boolean; backHref?: string; backLabel?: string }) {
   const t = useTranslations('stationOps');
   return (
-    <header className={`${MASTHEAD} px-5 pb-6`}>
+    <header className={`${MASTHEAD} px-5 ${raised ? 'pb-9' : 'pb-6'}`}>
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-3">
           <Link
-            href={OPS_BASE}
-            aria-label={t('backHome')}
+            href={backHref}
+            aria-label={backLabel ?? t('backHome')}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-[11px] border border-[color:var(--fo-outline)] text-[color:var(--fo-on-navy)] hover:bg-[color:var(--fo-header-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fo-on-navy)]"
           >
             <ChevronRight aria-hidden="true" className="h-5 w-5 ltr:rotate-180" strokeWidth={1.8} />

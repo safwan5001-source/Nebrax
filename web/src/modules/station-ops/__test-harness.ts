@@ -1,4 +1,4 @@
-import type { FuelPrice, FuelProduct, Nozzle, Pump, Shift, Station, Tank } from './schemas';
+import type { FuelPrice, FuelProduct, Nozzle, Pump, Shift, ShiftDetail, Station, Tank } from './schemas';
 import { ApiError } from '@/lib/api';
 
 /**
@@ -13,6 +13,8 @@ export interface TenantData {
   tanks: Tank[];
   prices: FuelPrice[];
   shifts: Shift[];
+  /** تفاصيل ورديات بمعرّفاتها (`GET /fuel-stations/shifts/{id}`)؛ غياب المعرّف = 404 كما يفعل الخادم لوردية خارج النطاق. */
+  details?: Record<string, ShiftDetail>;
 }
 
 export interface Hold { release: () => void }
@@ -67,7 +69,12 @@ export function createBackend(data: TenantData, options: { pageSize?: number } =
           .filter((row) => !query.get('status') || row.status === query.get('status'));
         return paginate(rows, query);
       }
-      default: throw new ApiError(404, 'not found', {});
+      default: {
+        const match = /^\/fuel-stations\/shifts\/([\w-]+)$/.exec(path);
+        const detail = match ? data.details?.[match[1]] : undefined;
+        if (detail) return { data: detail };
+        throw new ApiError(404, 'not found', {});
+      }
     }
   }
 

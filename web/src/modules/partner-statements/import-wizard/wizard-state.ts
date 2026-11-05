@@ -182,9 +182,12 @@ export function resultOutcome(applyResult: Record<string, unknown> | null | unde
   return result.replayed === true ? { kind: 'replayed', reconciliationId: id, lines } : { kind: 'created', reconciliationId: id, lines };
 }
 
-/** رابط المقارنة: صفحة المساحة (A4b) غير مبنية بعد، فالرابط لقائمة الكشوف مع تمييز المقارنة بـ`highlight`، لا مسار مكسور. */
+/**
+ * رابط المقارنة: مساحة المطابقة والمراجعة `/partner-statements/[id]` (A4b). بلا معرّف ⇒ القائمة.
+ * (قبل A4b كان الرابط `?highlight=` للقائمة؛ القائمة ما زالت تدعمه لروابط محفوظة.)
+ */
 export function reconciliationHref(id: string | null): string {
-  return id ? `/partner-statements?highlight=${encodeURIComponent(id)}` : '/partner-statements';
+  return id ? `/partner-statements/${encodeURIComponent(id)}` : '/partner-statements';
 }
 
 export interface BranchChoice {

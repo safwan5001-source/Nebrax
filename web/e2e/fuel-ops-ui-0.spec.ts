@@ -71,6 +71,7 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     if (p === '/fuel-stations/shifts') {
       return json(route, { data: shifts.filter((s) => (!station || s.station_id === station) && (!url.searchParams.get('status') || s.status === url.searchParams.get('status'))), meta: { current_page: 1, last_page: 1 } });
     }
+    if (/^\/fuel-stations\/shifts\/[\w-]+$/.test(p)) return json(route, { data: { ...shifts[0], branch_id: null, operational_meter_milliliters: 0, locked_at: null, meter_readings: [], tank_readings: [], staff_assignments: [] } });
     if (p === '/branches') return json(route, { data: [], main_branch_id: null });
     return json(route, { data: [] });
   });
@@ -166,9 +167,12 @@ test('a user without station permission is blocked and nothing fuel-related is r
   expect(requests.filter((r) => r.path.startsWith('/fuel-stations'))).toEqual([]);
 });
 
-test('supervisor sees upcoming operations as inert items, not buttons', async ({ page }) => {
+test('home: the next step is inert text, there is ONE primary action, and every link stays inside the app', async ({ page }) => {
   await open(page, '/fuel-stations/ops', { locale: 'en' });
-  const item = page.getByText('Approve closed shifts');
-  await expect(item).toBeVisible();
-  expect(await item.evaluate((el) => !!el.closest('a, button'))).toBe(false);
+  const next = page.locator('[data-next-step]');
+  await expect(next).toContainText('Record the starting meter readings');
+  expect(await next.evaluate((el) => !!el.querySelector('a, button'))).toBe(false);
+  await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+  const hrefs = await page.locator('a').evaluateAll((anchors) => anchors.map((a) => a.getAttribute('href') ?? ''));
+  expect(hrefs.filter((href) => !href.startsWith('#') && !href.startsWith('/fuel-stations/ops'))).toEqual([]);
 });

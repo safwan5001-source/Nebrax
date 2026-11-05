@@ -859,8 +859,8 @@
         "contact_incomplete": "Your contact information is incomplete",
         "delivery_method_missing": "Please select a delivery method",
         "empty_cart": "Your cart is empty",
-        "store_paused": "The store is not taking new orders right now",
-        "outside_opening_hours": "The store is outside its opening hours and is not taking new orders",
+        "store_paused": "The store is not taking new orders right now. Your order was not placed.",
+        "outside_opening_hours": "The store is outside its opening hours and is not taking new orders. Your order was not placed.",
         "below_minimum_order": "Your order has not reached this store's minimum order amount",
         "unknown": "This item needs your attention",
         "gift_incomplete": "Dane prezentu są niekompletne",
@@ -868,7 +868,8 @@
         "schedule_required": "Wybierz datę i godzinę dostawy",
         "schedule_unavailable": "Wybrany termin nie jest już dostępny — wybierz ponownie",
         "addon_unavailable": "Dodatek do tego produktu nie jest już dostępny"
-      }
+      },
+      "belowMinimumWithAmounts": "Your order has not reached the minimum order amount ({minimum}). Add at least {shortfall} more."
     },
     "success": {
       "heading": "Order placed",
@@ -1335,5 +1336,25 @@
     "linkOpen": "Otwórz stronę śledzenia",
     "linkCopy": "Kopiuj link",
     "linkCopied": "Skopiowano link"
+  },
+  "ordering": {
+    "banner": {
+      "pausedTitle": "The store is not taking new orders right now",
+      "outsideHoursTitle": "The store is outside its opening hours",
+      "merchantNote": "Note from the store",
+      "resumesAt": "Orders resume automatically on <time></time>.",
+      "pausedBrowse": "You can keep browsing and fill your cart, then place your order once the store is taking orders again.",
+      "outsideHoursBrowse": "You can keep browsing and fill your cart, then place your order during opening hours.",
+      "existingOrders": "This does not affect orders you have already placed — pausing new orders does not cancel or change them."
+    },
+    "cart": {
+      "notAccepting": "The store is not taking new orders right now. You can keep your items in the cart, but your order cannot be placed until the store resumes.",
+      "minimum": "Minimum order: {amount}",
+      "minimumDeliveryOnly": "Minimum order for delivery: {amount}",
+      "pickupExempt": "Store pickup is not subject to the minimum.",
+      "shortfall": "Add at least {amount} more to reach the minimum order.",
+      "reached": "Your order has reached the minimum.",
+      "confirmedAtCheckout": "The store confirms the minimum when you place the order."
+    }
   }
 }

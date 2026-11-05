@@ -16,6 +16,7 @@ vi.mock("@/lib/commerce/storefront", () => ({
 
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreBrand } from "@/components/layout/StoreBrand";
+import { OrderingProvider } from "@/contexts/OrderingContext";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import StoreCheckoutLayout from "./layout";
 
@@ -152,5 +153,52 @@ describe("StoreCheckoutLayout published theme", () => {
       headerRow.props.children,
     )[0] as ReactElement<TestElementProps>;
     expect(brand.props.headerBrand).toBe(true);
+  });
+});
+
+describe("StoreCheckoutLayout ordering context (COPS-H4 Buyer Ordering UX)", () => {
+  const identity = (ordering: unknown) =>
+    ({
+      name: "Live name",
+      default_locale: "en",
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
+      presentation: null,
+      ordering,
+    }) as never;
+
+  const pageSlot = async () => {
+    const root = await checkout("en");
+    const [, main] = Children.toArray(
+      root.props.children,
+    ) as ReactElement<TestElementProps>[];
+    const marker = main.props.children as ReactElement<TestElementProps>;
+    return marker.props.children as ReactElement<TestElementProps>;
+  };
+
+  it("adds nothing around the checkout while the gate is closed", async () => {
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(identity(null));
+    const slot = await pageSlot();
+    expect(slot.type).toBe("section");
+  });
+
+  it("hands the intake block to the checkout flow (which renders the notice itself, so /track and payment-return stay clean)", async () => {
+    const ordering = {
+      accepting: false,
+      reason: "paused",
+      message: null,
+      resumesAt: null,
+      minOrderMinor: 15000,
+      minOrderScope: "all",
+    };
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(identity(ordering));
+    const slot = await pageSlot();
+    expect(slot.type).toBe(OrderingProvider);
+    expect((slot.props as unknown as { ordering: unknown }).ordering).toEqual(
+      ordering,
+    );
   });
 });
