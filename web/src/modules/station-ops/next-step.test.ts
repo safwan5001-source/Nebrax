@@ -66,6 +66,14 @@ describe('deriveNextStep', () => {
     expect(deriveNextStep(withTankOpening, buildShiftReadings(withTankOpening, catalog).summary, can('fuel.shift.open'), e2)).toMatchObject({ kind: 'closing_readings', remaining: 1 });
   });
 
+  it('UI-2: when the policy makes meter readings optional and every required tank reading is saved, the stage is complete and handover is exposed', () => {
+    const tanksOnly = shiftDetail('s', 'a', { tank_readings: [tankReading('to', 't1', 'opening', 100), tankReading('tc', 't1', 'closing', 90)] });
+    const policy = { ...STRICT_POLICY, known: true, openingMeterRequired: false, closingMeterRequired: false };
+    const extra = pendingReadings(tanksOnly, catalog, policy);
+    expect(extra).toEqual({ openingRemaining: 0, closingRemaining: 0 });
+    expect(deriveNextStep(tanksOnly, buildShiftReadings(tanksOnly, catalog).summary, can('fuel.shift.close', 'fuel.shift.cash_count'), extra)).toMatchObject({ kind: 'close_shift', href: '/fuel-stations/ops/shifts/s/handover' });
+  });
+
   it('never invents a step for a status the server does not have (no "returned"/"submitted")', () => {
     expect(step(shiftDetail('s', 'a', { status: 'returned' }), 'fuel.shift.approve')).toBeNull();
   });

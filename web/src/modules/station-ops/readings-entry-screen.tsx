@@ -266,7 +266,8 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
 
   const unitTank = (flag: boolean) => (flag ? t('entry.tankRequired') : t('entry.tankOptional'));
   const savedNow = Object.values(results).filter((r) => r.status === 'saved').length;
-  const unknownResult = Object.values(results).find((r) => r.status === 'unknown')?.result ?? null;
+  // الحالتان اللتان توقفان الدفعة: غير مؤكد (قد يكون حُفظ) و«لم يُرسل» (دون اتصال) — كلتاهما تُعرض صراحةً، لا عودة صامتة للنموذج.
+  const unknownResult = Object.values(results).find((r) => r.status === 'unknown' || r.result?.kind === 'not_sent')?.result ?? null;
   let inputIndex = -1;
   const registerInput = (index: number) => (element: HTMLInputElement | null) => { inputs.current[index] = element; };
   const nextHref = stage === 'opening' ? `${OPS_BASE}/shifts/${encodeURIComponent(shiftId)}` : `${OPS_BASE}/shifts/${encodeURIComponent(shiftId)}/handover`;

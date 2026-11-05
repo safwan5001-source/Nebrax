@@ -178,7 +178,9 @@ export function deriveProgress(detail: ShiftDetail, summary: ReadingsSummary, ex
     return done >= total ? 'done' : 'pending';
   };
 
-  const gate = (state: StepState, remaining: number | undefined): StepState => (state === 'done' && !closed && remaining !== undefined && remaining > 0 ? 'pending' : state);
+  // مع قراءات متبقية محسوبة بالسياسة (UI-2) هي **الحكم في الاتجاهين** لوردية مفتوحة: متبقٍ > 0 ⇒ معلّقة، و0 ⇒ مكتملة حتى لو بقيت قراءات
+  // عدادات اختيارية بلا تسجيل (وإلا لا يصل المستخدم إلى التسليم أبداً). بدونها (UI-1) يبقى الاشتقاق من العدادات كما كان.
+  const gate = (state: StepState, remaining: number | undefined): StepState => (closed || remaining === undefined ? state : remaining > 0 ? 'pending' : 'done');
 
   const steps: ProgressStep[] = [
     { key: 'opened', state: 'done', at: detail.opened_at, count: null },

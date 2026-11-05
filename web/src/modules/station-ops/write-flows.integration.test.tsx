@@ -443,6 +443,20 @@ describe('meter and tank readings entry', () => {
     expect(backend.postsTo('/meter-readings').map((c) => c.body.fuel_nozzle_id)).toEqual(['n1', 'n2']);
   });
 
+  it('an offline save says nothing was sent (no silent return to the unchanged form)', async () => {
+    const user = userEvent.setup();
+    connect(withShift());
+    openScreen();
+    await user.type(await field('entry-m:n1'), '10');
+    await user.click(buttonNamed('Review and save (1)'));
+    const dialog = await screen.findByRole('dialog');
+    setOnline(false);
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and save' }));
+    expect(await screen.findByText(/No internet connection\. Nothing was sent/)).toBeTruthy();
+    expect(backend.postsTo('/meter-readings')).toHaveLength(0);
+    expect(((await field('entry-m:n1')) as HTMLInputElement).value).toBe('10'); // ما كتبه المستخدم باقٍ
+  });
+
   it('an opening reading that differs from the last recorded ending is a WARNING that needs an acknowledgement, never a block', async () => {
     const user = userEvent.setup();
     const data = withShift();
