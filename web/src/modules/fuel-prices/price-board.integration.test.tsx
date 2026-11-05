@@ -148,6 +148,29 @@ describe('time passes: scheduled changes become visible without a reload', () =>
   });
 });
 
+describe('the actor scope is part of every read identity', () => {
+  it('a branch/warehouse change arriving from another tab invalidates stations, nozzles and prices and re-selects an authorized station', async () => {
+    seedUser();
+    const world = makeWorld();
+    connect(world);
+    renderBoard();
+    await screen.findByText(/2\.18/);
+    expect(within(screen.getByRole('combobox', { name: 'Choose station' })).getAllByRole('option').map((o) => o.textContent)).toEqual(['Station A', 'Station B']);
+    const stationReads = backend.callsTo('/fuel-stations/stations').length;
+
+    // `/me` في تبويب آخر قلّص نطاق المستخدم إلى محطة B فقط.
+    world.stations = [station('b', 'Station B')];
+    seedUser({ branch_ids: ['br-b'] });
+    window.dispatchEvent(new Event('storage'));
+
+    await waitFor(() => expect(backend.callsTo('/fuel-stations/stations').length).toBeGreaterThan(stationReads));
+    await waitFor(() => expect(within(screen.getByRole('combobox', { name: 'Choose station' })).getAllByRole('option').map((o) => o.textContent)).toEqual(['Station B']));
+    await screen.findByText(/2\.05/); // سعر محطة B الموروث
+    expect(screen.queryByText(/2\.18/)).toBeNull(); // لا بقايا من محطة A
+    expect(backend.callsTo('/prices/effective').at(-1)?.search.get('station_id')).toBe('b');
+  });
+});
+
 describe('permissions and honest failure states', () => {
   it('without fuel.sale.view shows the permission state and requests no prices', async () => {
     seedUser({ permissions: ['fuel_stations.view'] });

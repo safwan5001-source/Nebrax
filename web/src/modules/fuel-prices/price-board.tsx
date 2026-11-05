@@ -56,7 +56,9 @@ export function PriceBoard() {
   const canManage = can(MANAGE);
   // سعر المؤسسة يؤثر على كل المحطات: لا يملكه المقيَّد بفرع/مخزن (الخادم يرفض 403 أيضاً؛ هذا إخفاء عرض فقط).
   const restricted = (user?.branch_ids?.length ?? 0) > 0 || (user?.warehouse_ids?.length ?? 0) > 0;
-  const userKey = `${user?.tenant_id ?? '-'}|${user?.id ?? '-'}`;
+  // هوية القراءات تشمل **نطاق الفرع/المخزن**: تغيّره (تحديث `/me` من تبويب آخر) يُبطل المحطات والفوهات والأسعار فلا تبقى بيانات نطاق سابق.
+  const scopeIds = (ids: string[] | undefined) => (ids === undefined ? 'u' : [...ids].sort().join(','));
+  const userKey = `${user?.tenant_id ?? '-'}|${user?.id ?? '-'}|b:${scopeIds(user?.branch_ids)}|w:${scopeIds(user?.warehouse_ids)}`;
 
   const stations = useLoader(hydrated && canRead ? `${userKey}|stations` : null, (signal) => listStations(signal).then((r) => r.data));
   const [scopeKind, setScopeKind] = useState<'station' | 'tenant'>('station');
