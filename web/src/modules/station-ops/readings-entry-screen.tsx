@@ -45,6 +45,7 @@ interface Row {
   subtitle: string | null;
   state: RowState;
   openingMl: number | null;
+  closingMl: number | null;
   previous: number | null;
 }
 
@@ -91,7 +92,9 @@ function RowView({ row, value, onChange, result, stage, locale, previousShift, o
   }
 
   const error = state.kind === 'invalid'
-    ? state.issue === 'closing_below_opening' ? t('entry.error.closing_below_opening', { opening: row.openingMl === null ? '—' : fmt(row.openingMl) }) : t(`entry.error.${state.issue}`)
+    ? state.issue === 'closing_below_opening' ? t('entry.error.closing_below_opening', { opening: row.openingMl === null ? '—' : fmt(row.openingMl) })
+      : state.issue === 'opening_above_closing' ? t('entry.error.opening_above_closing', { closing: row.closingMl === null ? '—' : fmt(row.closingMl) })
+      : t(`entry.error.${state.issue}`)
     : null;
   const warning = state.kind === 'ready' && state.warnings.length > 0
     ? t(`entry.warning.${state.warnings[0]}`, { value: row.previous === null ? '—' : fmt(row.previous) })
@@ -162,8 +165,9 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
         key: meterKey(id), kind: 'meter', assetId: id,
         title: `${t('products.pump')} ${view.pump?.pump_number ?? '?'} · ${t('products.nozzle')} ${view.nozzle.nozzle_number}`,
         subtitle: [view.product?.name, view.tank?.name].filter(Boolean).join(' · ') || null,
-        state: evaluateMeterRow({ stage, raw: values[meterKey(id)] ?? '', saved: meterAt(id, stage), opening, previousClosingMl: prev, openingRequired: policy.openingMeterRequired }),
+        state: evaluateMeterRow({ stage, raw: values[meterKey(id)] ?? '', saved: meterAt(id, stage), opening, closing: meterAt(id, 'closing'), previousClosingMl: prev, openingRequired: policy.openingMeterRequired }),
         openingMl: opening?.meter_milliliters ?? null,
+        closingMl: meterAt(id, 'closing')?.meter_milliliters ?? null,
         previous: prev,
       };
     }).sort((a, b) => a.title.localeCompare(b.title, 'en', { numeric: true }));
@@ -172,7 +176,7 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
       key: tankKey(view.tank.id), kind: 'tank', assetId: view.tank.id,
       title: view.tank.name, subtitle: view.product?.name ?? null,
       state: evaluateTankRow(values[tankKey(view.tank.id)] ?? '', tankAt(view.tank.id, stage)),
-      openingMl: null, previous: null,
+      openingMl: null, closingMl: null, previous: null,
     }));
     return { meters, tanks };
   }, [detail, catalog, previousData, stage, values, t, policy.openingMeterRequired]);

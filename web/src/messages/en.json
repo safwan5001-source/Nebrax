@@ -14965,6 +14965,7 @@
       "needsOpening": "Record this nozzle's starting reading first.",
       "goOpening": "Go to starting readings",
       "error": {
+        "opening_above_closing": "The starting reading is higher than the ending reading already recorded ({closing}). It can't be saved because it would block handing over the shift — check the number or ask your supervisor.",
         "invalid_number": "Enter a valid number (up to 3 decimals).",
         "closing_below_opening": "The ending reading is lower than the starting reading ({opening}). It can't be saved because it would block handing over the shift — check the number or ask your supervisor."
       },

@@ -422,6 +422,18 @@ describe('meter and tank readings entry', () => {
     expect(backend.postsTo('/meter-readings')[0].body).toMatchObject({ reading_stage: 'closing', meter_milliliters: 150_000 });
   });
 
+  it('opening optional by policy: a starting reading above an already-saved ending reading is blocked before any request', async () => {
+    const user = userEvent.setup();
+    const data = withShift({ meter_readings: [meter('c1', 'n1', 'closing', 100_000)] });
+    data.settings = { a: { shift_opening_meter_reading_required: false, shift_closing_meter_reading_required: true, shift_opening_tank_reading_required: false, shift_closing_tank_reading_required: false, shift_opening_cash_float_required: true, shift_mandatory_staff_assignment: false } };
+    connect(data);
+    openScreen('opening');
+    await user.type(await field('entry-m:n1'), '150');
+    expect(await screen.findByText(/higher than the ending reading already recorded \(100\.000\)/)).toBeTruthy();
+    expect((buttonNamed(/Review and save/) as HTMLButtonElement).disabled).toBe(true);
+    expect(backend.posts).toHaveLength(0);
+  });
+
   it('keeps going after one rejection: saved rows lock, the failed row stays editable with the server\'s reason', async () => {
     const user = userEvent.setup();
     connect(withShift());

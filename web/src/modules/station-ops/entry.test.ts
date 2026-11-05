@@ -46,6 +46,13 @@ describe('evaluateMeterRow', () => {
     expect(evaluateMeterRow({ ...base, raw: '5' })).toEqual({ kind: 'blocked', issue: 'needs_opening' }); // غير معلومة ⇒ صارمة
     expect(evaluateMeterRow({ ...base, raw: '', openingRequired: false })).toEqual({ kind: 'empty' });
   });
+    it('an opening reading above an ALREADY-SAVED ending reading is hard-blocked (the server would accept it, then refuse to close the shift)', () => {
+    const closing = meter('c', 'n1', 'closing', 100_000);
+    const base = { stage: 'opening' as const, saved: null, opening: null, previousClosingMl: null, closing };
+    expect(evaluateMeterRow({ ...base, raw: '100.001', openingRequired: false })).toEqual({ kind: 'invalid', issue: 'opening_above_closing' });
+    expect(evaluateMeterRow({ ...base, raw: '100', openingRequired: false })).toMatchObject({ kind: 'ready', ml: 100_000 });
+    expect(evaluateMeterRow({ ...base, raw: '50' })).toMatchObject({ kind: 'ready', ml: 50_000 });
+  });
     it('opening vs the previous closing is a WARNING only (rollover/reset has no server policy)', () => {
     const base = { stage: 'opening' as const, saved: null, opening: null };
     expect(evaluateMeterRow({ ...base, raw: '10', previousClosingMl: 10_000 })).toEqual({ kind: 'ready', ml: 10_000, deltaMl: null, warnings: [] });

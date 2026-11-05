@@ -22,14 +22,14 @@ export function parseLiters(raw: string): NumberParse {
   return ml === null ? { ok: false, reason: 'invalid' } : { ok: true, ml };
 }
 
-export type RowIssue = 'invalid_number' | 'closing_below_opening' | 'needs_opening';
+export type RowIssue = 'invalid_number' | 'closing_below_opening' | 'opening_above_closing' | 'needs_opening';
 export type RowWarning = 'below_previous_closing' | 'differs_from_previous_closing' | 'zero_delta';
 
 export type RowState =
   | { kind: 'saved'; ml: number }
   | { kind: 'empty' }
   | { kind: 'blocked'; issue: 'needs_opening' }
-  | { kind: 'invalid'; issue: 'invalid_number' | 'closing_below_opening' }
+  | { kind: 'invalid'; issue: 'invalid_number' | 'closing_below_opening' | 'opening_above_closing' }
   | { kind: 'ready'; ml: number; deltaMl: number | null; warnings: RowWarning[] };
 
 export interface MeterRowInput {
@@ -38,6 +38,8 @@ export interface MeterRowInput {
   saved: MeterReading | null;
   /** قراءة الافتتاح المحفوظة لهذه الفوهة (للإغلاق فقط). */
   opening: MeterReading | null;
+  /** قراءة النهاية المحفوظة لهذه الفوهة (للبداية فقط): تُحجب بداية أعلى منها — الخادم يقبلها ثم يرفض إغلاق الوردية ولا تعديل. */
+  closing?: MeterReading | null;
   /** آخر قراءة إغلاق مسجّلة في وردية سابقة (مرجع إرشادي للافتتاح فقط). */
   previousClosingMl: number | null;
   /**
@@ -55,6 +57,7 @@ export function evaluateMeterRow(input: MeterRowInput): RowState {
   if (!parsed.ok) return parsed.reason === 'empty' ? { kind: 'empty' } : { kind: 'invalid', issue: 'invalid_number' };
 
   const warnings: RowWarning[] = [];
+  if (input.stage === 'opening' && input.closing && parsed.ml > input.closing.meter_milliliters) return { kind: 'invalid', issue: 'opening_above_closing' };
   if (unpaired) return { kind: 'ready', ml: parsed.ml, deltaMl: null, warnings };
   if (input.stage === 'closing') {
     const opening = (input.opening as MeterReading).meter_milliliters;

@@ -63,7 +63,7 @@ describe('stationOps messages', () => {
       ['entry.subtitle', ['opening', 'closing']],
       ['entry.label', ['opening', 'closing']],
       ['entry.fieldLabel', ['opening', 'closing']],
-      ['entry.error', ['invalid_number', 'closing_below_opening']],
+      ['entry.error', ['invalid_number', 'closing_below_opening', 'opening_above_closing']],
       ['entry.warning', ['below_previous_closing', 'differs_from_previous_closing', 'zero_delta']],
       ['entry.done.title', ['opening', 'closing']],
       ['entry.done.next', ['opening', 'closing']],
