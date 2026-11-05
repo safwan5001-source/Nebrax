@@ -19,7 +19,7 @@ import type { ShiftDetail, Station } from './schemas';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import { opsWrite, type WriteResult } from './write-client';
-import { mayHaveApplied, shouldClearIntentKey } from './write-outcome';
+import { shouldClearIntentKey } from './write-outcome';
 import { ActionBar, ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard, WriteNotice } from './write-ui';
 
 /**
@@ -123,6 +123,9 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
     try {
       const cleanReason = reason.trim();
       const key = intents.keyFor('cash', { shift: detail.id, type, amount, reason: cleanReason });
+      // قبل الإرسال: الطلب الجاري قد يلتزم والصفحة تُغلق — النية غير مؤكدة (ومحفوظة) حتى تُحسم.
+      const priorUncertain = intents.isUncertain('cash');
+      intents.markUncertain('cash');
       const result = await opsWrite({ action: 'cash_movement', shiftId: detail.id, body: { type, amount_minor: amount, reason: cleanReason, idempotency_key: key } }, { branchId: station.branch_id });
       const confirmed = result.kind === 'ok' && (result.shift.cash_movements ?? []).some((m) => m.type === type && m.amount_minor === amount && m.reason === cleanReason);
       if (confirmed) {
@@ -131,8 +134,7 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
         onSaved();
         return;
       }
-      if (mayHaveApplied(result) || result.kind === 'ok') intents.markUncertain('cash');
-      if (shouldClearIntentKey(result, intents.isUncertain('cash'))) intents.clear('cash');
+      if (shouldClearIntentKey(result, priorUncertain)) intents.clear('cash');
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
     } finally {
       sending.current = false;

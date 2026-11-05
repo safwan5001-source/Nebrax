@@ -15,7 +15,7 @@ import type { Shift, ShiftDetail, Station } from './schemas';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import { opsWrite, type WriteResult } from './write-client';
-import { mayHaveApplied, shouldClearIntentKey } from './write-outcome';
+import { shouldClearIntentKey } from './write-outcome';
 import { ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard, WriteNotice } from './write-ui';
 
 /**
@@ -82,6 +82,9 @@ function Form({ station }: { station: Station }) {
     setPhase({ name: 'sending' });
     try {
       const key = intents.keyFor('open', { station: station.id, float: floatMinor });
+      // الطلب الجاري قد يلتزم قبل أن تُغلق الصفحة: تُعلَّم النية غير مؤكدة (ومحفوظة) **قبل** الإرسال، وتُسوّى بعد النتيجة الحاسمة.
+      const priorUncertain = intents.isUncertain('open');
+      intents.markUncertain('open');
       const result = await opsWrite(
         { action: 'open', body: { fuel_station_id: station.id, idempotency_key: key, ...(floatMinor !== null ? { opening_float_minor: floatMinor } : {}) } },
         { branchId: station.branch_id },
@@ -94,8 +97,7 @@ function Form({ station }: { station: Station }) {
       }
       // الخادم أعاد وردية **قديمة غير مفتوحة** لهذا المفتاح (نيّة سابقة التزمت ثم أُغلقت): لا يصلح المفتاح لوردية جديدة — نمسحه ليكون التأكيد التالي نيّة جديدة صريحة.
       if (result.kind === 'ok' && result.shift.status !== 'open') intents.clear('open');
-      else if (mayHaveApplied(result) || result.kind === 'ok') intents.markUncertain('open');
-      if (shouldClearIntentKey(result, intents.isUncertain('open'))) intents.clear('open');
+      else if (shouldClearIntentKey(result, priorUncertain)) intents.clear('open');
       // ردّ 2xx لا يطابق ما أرسلناه (أو غير مفهوم) ⇒ «غير مؤكد» ولا نعلن نجاحاً؛ المفتاح يبقى لإعادة آمنة.
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
       setPhase({ name: 'form' });

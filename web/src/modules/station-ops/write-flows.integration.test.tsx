@@ -695,6 +695,23 @@ describe('handover — cash count and closing', () => {
     expect(backend.posts).toHaveLength(0);
   });
 
+  it('the cash intent is persisted as UNCERTAIN before the request is dispatched (a tab closed mid-flight must not lose the key to the TTL)', async () => {
+    const user = userEvent.setup();
+    connect(withShift(allReadings()));
+    const real = apiMock.getMockImplementation() as (path: string, init?: unknown) => Promise<unknown>;
+    apiMock.mockImplementation(async (path: string, init?: unknown) => (path.endsWith('/cash-movements') ? new Promise(() => {}) : real(path, init)) as never);
+    openScreen();
+    await user.click(await screen.findByRole('button', { name: 'Record a cash entry' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByTestId('movement-amount'), '25');
+    await user.type(within(dialog).getByLabelText('Reason'), 'Float top-up');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and record' }));
+    await waitFor(() => {
+      const raw = Object.entries(sessionStorage).find(([k]) => k.startsWith('awj:fuel-ops:intent:') && k.endsWith(':cash'))?.[1];
+      expect(raw && JSON.parse(raw).uncertain).toBe(true);
+    });
+  });
+
   it('a lost reply on a cash entry is retried with the SAME key — exactly one entry exists', async () => {
     const user = userEvent.setup();
     connect(withShift(allReadings()));

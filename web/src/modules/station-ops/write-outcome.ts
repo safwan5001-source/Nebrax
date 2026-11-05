@@ -40,10 +40,10 @@ export function mayHaveApplied(result: WriteResult): boolean {
 }
 
 /**
- * هل يُمسح مفتاح النية بعد هذه النتيجة؟ فقط **رفض نهائي** وبشرط ألا تسبقه محاولة غير مؤكدة لنفس النية (`uncertain`): محاولة سابقة قد تكون
- * التزمت في الخادم، ورفضٌ أو «لم يُرسل» لاحق لا يثبت العكس — فيبقى المفتاح نفسه لتعيد المحاولة التالية الأثر الأول بدل أثر ثانٍ.
- * `not_sent` (دون اتصال) لا يمسح أبداً.
+ * هل يُمسح مفتاح النية بعد هذه النتيجة؟ النية تُعلَّم «غير مؤكدة» **قبل الإرسال** (طلب جارٍ قد يلتزم والصفحة تُغلق)، ولذلك نمرّر
+ * `priorUncertain` = هل كانت غير مؤكدة قبل هذه المحاولة. يُمسح المفتاح فقط عند رفض نهائي أو «لم يُرسل» **ولم تسبقه محاولة غير مؤكدة**:
+ * محاولة سابقة قد تكون التزمت، ونتيجة لاحقة غير حاسمة لا تثبت العكس — فيبقى المفتاح نفسه لتعيد المحاولة التالية الأثر الأول.
  */
-export function shouldClearIntentKey(result: WriteResult, uncertain: boolean): boolean {
-  return result.kind === 'rejected' && !uncertain;
+export function shouldClearIntentKey(result: WriteResult, priorUncertain: boolean): boolean {
+  return (result.kind === 'rejected' || result.kind === 'not_sent') && !priorUncertain;
 }

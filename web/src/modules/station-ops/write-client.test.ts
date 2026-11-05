@@ -6,6 +6,7 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 import { api, ApiError } from '@/lib/api';
 import { shiftDetail } from './__fixtures__';
 import { classifyRejection, opsWrite, type WriteRequest } from './write-client';
+import { shouldClearIntentKey } from './write-outcome';
 
 const apiMock = vi.mocked(api);
 beforeEach(() => { apiMock.mockReset(); localStorage.clear(); Object.defineProperty(navigator, 'onLine', { value: true, configurable: true }); });
@@ -104,5 +105,17 @@ describe('classifyRejection — real server messages (FuelShiftService)', () => 
     [401, undefined, 'unauthorized'], [403, undefined, 'forbidden'], [404, undefined, 'not_found'], [409, undefined, 'conflict'], [429, undefined, 'rate_limited'],
   ])('%i %s → %s', (status, message, code) => {
     expect(classifyRejection(status, message)).toBe(code);
+  });
+});
+
+describe('shouldClearIntentKey', () => {
+  const rejected = { kind: 'rejected', status: 422, code: 'validation', serverMessage: null } as const;
+  it('frees the key only for a definitive rejection or an unsent request that was NOT preceded by an uncertain attempt', () => {
+    expect(shouldClearIntentKey(rejected, false)).toBe(true);
+    expect(shouldClearIntentKey({ kind: 'not_sent', reason: 'offline' }, false)).toBe(true);
+    expect(shouldClearIntentKey(rejected, true)).toBe(false);
+    expect(shouldClearIntentKey({ kind: 'not_sent', reason: 'offline' }, true)).toBe(false);
+    expect(shouldClearIntentKey({ kind: 'unknown', reason: 'timeout' }, false)).toBe(false);
+    expect(shouldClearIntentKey({ kind: 'unverified' }, false)).toBe(false);
   });
 });
