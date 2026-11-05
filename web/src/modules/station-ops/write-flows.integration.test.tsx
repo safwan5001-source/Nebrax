@@ -434,6 +434,17 @@ describe('meter and tank readings entry', () => {
     expect(backend.posts).toHaveLength(0);
   });
 
+  it('a starting tank reading inherits the type of an already-saved ending reading (atg), so the pair never mismatches', async () => {
+    const user = userEvent.setup();
+    connect(withShift({ tank_readings: [tankReading('tc', 't1', 'closing', 500_000, { reading_type: 'atg' })] }));
+    openScreen('opening');
+    await user.type(await field('entry-t:t1'), '600');
+    await user.click(await screen.findByRole('button', { name: 'Review and save (1)' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and save' }));
+    await waitFor(() => expect(backend.postsTo('/tank-readings')).toHaveLength(1));
+    expect(backend.postsTo('/tank-readings')[0].body).toMatchObject({ reading_stage: 'opening', reading_type: 'atg' });
+  });
+
   it('keeps going after one rejection: saved rows lock, the failed row stays editable with the server\'s reason', async () => {
     const user = userEvent.setup();
     connect(withShift());

@@ -203,12 +203,14 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
 
   const buildItems = useCallback((): SaveItem[] => {
     if (!detail) return [];
-    const openingTypes = new Map(detail.tank_readings.filter((r) => r.reading_stage === 'opening').map((r) => [r.tank_id, r.reading_type]));
+    // نوع القراءة يرث نوع قراءة المرحلة المقابلة إن وُجدت (في الاتجاهين): الخادم يقبل زوجاً مختلف النوع ثم يرفض إغلاق الوردية.
+    const otherStage: ReadingStage = stage === 'opening' ? 'closing' : 'opening';
+    const otherTypes = new Map(detail.tank_readings.filter((r) => r.reading_stage === otherStage).map((r) => [r.tank_id, r.reading_type]));
     return ready.flatMap((row) => {
       if (row.state.kind !== 'ready') return [];
       return row.kind === 'meter'
         ? [meterSaveItem(shiftId, stage, row.assetId, row.state.ml)]
-        : [tankSaveItem(shiftId, stage, row.assetId, row.state.ml, stage === 'closing' ? openingTypes.get(row.assetId) ?? null : null)];
+        : [tankSaveItem(shiftId, stage, row.assetId, row.state.ml, otherTypes.get(row.assetId) ?? null)];
     });
   }, [detail, ready, shiftId, stage]);
 

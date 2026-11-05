@@ -86,6 +86,7 @@ describe('save items', () => {
     expect(tankSaveItem('s1', 'opening', 't1', 5, null).body).toMatchObject({ reading_type: 'physical', evidence_key: 'awj-ops:t:s1:t1:opening' });
     expect(tankSaveItem('s1', 'closing', 't1', 5, 'atg').body).toMatchObject({ reading_type: 'atg' });
     expect(tankSaveItem('s1', 'closing', 't1', 5, 'physical').body).toMatchObject({ reading_type: 'physical' });
+    expect(tankSaveItem('s1', 'opening', 't1', 5, 'atg').body).toMatchObject({ reading_type: 'atg' }); // البداية ترث نوع نهاية محفوظة
   });
 });
 

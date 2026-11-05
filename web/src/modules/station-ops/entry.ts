@@ -103,9 +103,9 @@ export function meterSaveItem(shiftId: string, stage: ReadingStage, nozzleId: st
   return { kind: 'meter', assetId: nozzleId, ml, body: { fuel_nozzle_id: nozzleId, reading_stage: stage, meter_milliliters: ml, evidence_key: evidenceKey('meter', shiftId, nozzleId, stage) } };
 }
 
-/** الإغلاق يرث نوع قراءة الافتتاح الموجودة (الخادم يفشل الإغلاق إن اختلف النوعان)؛ وإلا قياس يدوي `physical`. */
-export function tankSaveItem(shiftId: string, stage: ReadingStage, tankId: string, ml: number, openingType: string | null): SaveItem {
-  const type = openingType === 'atg' ? 'atg' : 'physical';
+/** القراءة ترث نوع قراءة **المرحلة المقابلة** الموجودة (الخادم يفشل الإغلاق إن اختلف النوعان)؛ وإلا قياس يدوي `physical`. */
+export function tankSaveItem(shiftId: string, stage: ReadingStage, tankId: string, ml: number, otherStageType: string | null): SaveItem {
+  const type = otherStageType === 'atg' ? 'atg' : 'physical';
   return { kind: 'tank', assetId: tankId, ml, body: { fuel_tank_id: tankId, reading_stage: stage, reading_type: type, quantity_milliliters: ml, evidence_key: evidenceKey('tank', shiftId, tankId, stage) } };
 }
 
