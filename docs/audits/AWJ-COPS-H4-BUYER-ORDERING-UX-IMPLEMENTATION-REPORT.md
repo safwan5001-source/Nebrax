@@ -6,7 +6,7 @@
 | الاعتماد | H4-3 (#1992) · H4-4 (#1999) · إغلاق H4 (#2003) |
 | Base | `main` @ `03318a36328e831155ae89e6900c209047400066` |
 | الفرع | `claude/cops-h4-buyer-ordering-ux` |
-| PR / Head / Merge SHA | تُسجَّل في الـHandoff عند الدمج (PR وثائق صغير لاحق) |
+| PR / Head / Merge SHA | **#2005** · Head `b210d02d22564bff5b152c8e3de522c65f38ef65` · Merge `4cc1bd0578c65ed0af48c62a1615bea97796a4dd` (squash، دمجه المالك 2026-11-05) |
 | **البوابة** | `COMMERCE_CHANNEL_INTAKE_CONTROLS_ENABLED` **مغلقة — لم تُمَس** |
 | الطبيعة | **واجهة المتجر فقط** — لا خادم، لا هجرة، لا API، لا صلاحية، لا بوابة جديدة |
 
@@ -56,7 +56,8 @@
 
 ## 6. مراجعة Codex وCI
 
-تُسجَّل في PR الوثائق اللاحق مع Head/Merge SHA (لا ملاحظات مفتوحة قبل الدمج).
+- **CI:** أخضر بالكامل على Head `b210d02` (11 فحصاً: CI Gate، php sqlite/pgsql، feed-lock perf، storefront lint+typecheck+test، web build، docker-context، visual QA).
+- **Codex:** **لم تتم المراجعة** — فشلت بسبب بلوغ حد استخدام Codex ("You have reached your Codex usage limits for code reviews"). لا ملاحظات مفتوحة لكن لا مراجعة فعلية؛ دمج المالك للـPR تم بعد CI الأخضر وبدونها. لا مراجعة بديلة من المنفِّذ سُجّلت كأنها Codex.
 
 ## 7. ما لا تفعله الشريحة (حدود)
 
