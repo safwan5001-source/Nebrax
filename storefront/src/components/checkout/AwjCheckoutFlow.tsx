@@ -59,7 +59,10 @@ import {
   type ScheduleDraft,
 } from "@/components/checkout/awj/types";
 import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
+import { OrderingBanner } from "@/components/ordering/OrderingBanner";
+import { OrderingCartNotice } from "@/components/ordering/OrderingCartNotice";
 import { Button } from "@/components/ui/button";
+import { useOrdering } from "@/contexts/OrderingContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import { scheduleMethodFor } from "@/lib/commerce/checkout-gifting";
@@ -75,6 +78,7 @@ import {
   type StorefrontCheckout,
   type StorefrontOrder,
 } from "@/lib/commerce/checkout-types";
+import { isolateBidi } from "@/lib/commerce/ordering";
 import { savePendingOnlinePayment } from "@/lib/commerce/pending-online-payment";
 import type { PurchaseIssue } from "@/lib/commerce/wholesale-buyer";
 import {
@@ -196,6 +200,8 @@ export function AwjCheckoutFlow() {
   const [completing, setCompleting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [reviewIssues, setReviewIssues] = useState<AwjReviewIssue[]>([]);
+  // COPS-H4 Buyer Ordering UX — informational only; `null` while the gate is closed. Checkout's server answer decides.
+  const ordering = useOrdering();
   // FLOWERS-H12b — gift details and delivery date/window (both optional stages).
   const [gift, setGift] = useState<GiftForm>(EMPTY_GIFT);
   const [scheduleDraft, setScheduleDraft] =
@@ -583,9 +589,35 @@ export function AwjCheckoutFlow() {
       reviewIssues.map((issue) => {
         const item = checkout?.cart.items.find((i) => i.id === issue.item_id);
         const reasonKey = `reviewRequired.reasons.${issue.reason}` as const;
-        const reasonText = t.has(reasonKey)
-          ? t(reasonKey)
-          : t("reviewRequired.reasons.unknown");
+        // COPS-H4: the server's refusal for a minimum carries the exact amounts (`min_order_minor`, `shortfall_minor`);
+        // print them rather than the generic line. Anything else (or non-integer amounts) falls back to the coded reason.
+        const shortfall = issue.shortfall_minor;
+        const minimum = issue.min_order_minor;
+        const reasonText =
+          issue.reason === "below_minimum_order" &&
+          typeof shortfall === "number" &&
+          Number.isSafeInteger(shortfall) &&
+          shortfall > 0 &&
+          typeof minimum === "number" &&
+          Number.isSafeInteger(minimum) &&
+          checkout
+            ? t("reviewRequired.belowMinimumWithAmounts", {
+                minimum: isolateBidi(
+                  formatMinorAmount({
+                    amount_minor: minimum,
+                    currency: checkout.cart.subtotal.currency,
+                  }),
+                ),
+                shortfall: isolateBidi(
+                  formatMinorAmount({
+                    amount_minor: shortfall,
+                    currency: checkout.cart.subtotal.currency,
+                  }),
+                ),
+              })
+            : t.has(reasonKey)
+              ? t(reasonKey)
+              : t("reviewRequired.reasons.unknown");
         return item
           ? t("reviewRequired.itemIssue", {
               name: item.name,
@@ -695,6 +727,10 @@ export function AwjCheckoutFlow() {
   return (
     <div className="mx-auto w-full max-w-store px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <h1 className="sr-only">{t("title")}</h1>
+
+      {ordering && !ordering.accepting ? (
+        <OrderingBanner ordering={ordering} variant="card" className="mb-5" />
+      ) : null}
 
       <CheckoutProgress
         steps={steps}
@@ -830,6 +866,11 @@ export function AwjCheckoutFlow() {
                 : null
           }
         >
+          <OrderingCartNotice
+            subtotal={checkout.cart.subtotal}
+            deliveryMethod={deliveryMethod}
+            className="mb-3"
+          />
           <ul className="divide-y divide-store-border">
             {lineGroups(checkout.cart.items, {
               id: (line) => line.id,

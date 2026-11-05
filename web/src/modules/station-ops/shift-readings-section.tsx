@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { CircleCheck, CircleDashed, Clock, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { FuelIcon, resolveFuelIcon } from '@/lib/fuel-icons';
 import type { StationCatalog } from './catalog';
 import { formatLitersFixedFromMl, formatStampInZone } from './format';
 import { Quantity } from './quantity';
@@ -58,7 +59,8 @@ function NozzleRow({ row, shiftOpen, locale, timeZone }: { row: NozzleReadingRow
   return (
     <li className="py-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 text-sm">
+        <FuelIcon id={resolveFuelIcon('nozzle', view?.product)} size={40} />
+        <div className="min-w-0 flex-1 text-sm">
           <p className="font-semibold text-text">
             {view ? <>{t('products.nozzle')} <span className="num">{view.nozzle.nozzle_number}</span></> : t('shiftDetail.readings.unknownNozzle')}
             {view ? <span className="font-normal text-muted"> · {view.product?.name ?? t('products.unknownProduct')}</span> : null}

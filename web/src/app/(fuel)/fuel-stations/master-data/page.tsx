@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatMillilitersAsLiters, litersToMilliliters, millilitersToLiters } from '@/lib/fuel-quantity';
 import { nozzleSelectionForTank, tanksForPump, tanksForStation } from '@/lib/fuel-master-data';
+import { FuelIcon, resolveFuelIcon, type FuelIconId } from '@/lib/fuel-icons';
 
 type Kind = 'stations' | 'products' | 'tanks' | 'pumps' | 'nozzles';
 type Status = 'active' | 'inactive' | 'maintenance';
@@ -299,16 +300,27 @@ function EntityList({ kind, rows, locale, t, onEdit, onRetire }: { kind: Kind; r
 
   return <Card><CardHeader><CardTitle>{labelForKind(kind, t)}</CardTitle></CardHeader><CardContent>
     <div className="hidden overflow-x-auto lg:block"><table className="w-full min-w-[54rem] text-sm"><thead className="border-b border-border text-start text-xs text-muted"><tr>{tableHeaders(kind, t).map((header) => <th key={header} className="px-3 py-3 font-medium">{header}</th>)}<th className="px-3 py-3 text-end font-medium">{t('actions')}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-b border-border/70 last:border-0"><EntityCells kind={kind} row={row} locale={locale} t={t} /><td className="px-3 py-3"><RowActions row={row} t={t} onEdit={onEdit} onRetire={onRetire} /></td></tr>)}</tbody></table></div>
-    <div className="space-y-3 lg:hidden">{rows.map((row) => <article key={row.id} className="rounded-md border border-border p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-medium text-text">{displayName(row)}</h2><p className="mt-1 text-sm text-muted">{entitySummary(kind, row, locale, t)}</p></div><StatusBadge row={row} t={t} /></div><div className="mt-3 border-t border-border pt-3"><RowActions row={row} t={t} onEdit={onEdit} onRetire={onRetire} /></div></article>)}</div>
+    <div className="space-y-3 lg:hidden">{rows.map((row) => <article key={row.id} className="rounded-md border border-border p-3"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><EntityIcon kind={kind} row={row} /><div className="min-w-0"><h2 className="truncate font-medium text-text">{displayName(row)}</h2><p className="mt-1 text-sm text-muted">{entitySummary(kind, row, locale, t)}</p></div></div><StatusBadge row={row} t={t} /></div><div className="mt-3 border-t border-border pt-3"><RowActions row={row} t={t} onEdit={onEdit} onRetire={onRetire} /></div></article>)}</div>
   </CardContent></Card>;
 }
 
+/** أيقونة الكيان (أصول Fuel Icons V2 المشتركة) — عرض فقط؛ الرتبة من رمز/اسم منتج الوقود الفعلي أو أيقونة عامة محايدة. */
+function EntityIcon({ kind, row }: { kind: Kind; row: Station | FuelProduct | Tank | Pump | Nozzle }) {
+  let id: FuelIconId;
+  if (kind === 'stations') id = 'fuel-station';
+  else if (kind === 'products') id = resolveFuelIcon('product', row as FuelProduct);
+  else if (kind === 'tanks') id = resolveFuelIcon('tank', (row as Tank).fuel_product);
+  else if (kind === 'nozzles') id = resolveFuelIcon('nozzle', (row as Nozzle).fuel_product);
+  else id = 'fuel-pump';
+  return <FuelIcon id={id} size={40} />;
+}
+
 function EntityCells({ kind, row, locale, t }: { kind: Kind; row: Station | FuelProduct | Tank | Pump | Nozzle; locale: string; t: ReturnType<typeof useTranslations> }) {
-  if (kind === 'stations') { const station = row as Station; return <><td className="px-3 py-3 font-medium text-text">{station.name}</td><td className="num px-3 py-3 text-muted">{station.code}</td><td className="px-3 py-3 text-muted">{station.branch?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={station} t={t} /></td></>; }
-  if (kind === 'products') { const product = row as FuelProduct; return <><td className="px-3 py-3 font-medium text-text">{product.name}</td><td className="num px-3 py-3 text-muted">{product.code}</td><td className="px-3 py-3 text-muted">{product.product?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={product} t={t} /></td></>; }
-  if (kind === 'tanks') { const tank = row as Tank; return <><td className="px-3 py-3 font-medium text-text">{tank.name}</td><td className="num px-3 py-3 text-muted">{tank.code}</td><td className="px-3 py-3 text-muted">{tank.station?.name ?? '—'}</td><td className="px-3 py-3 text-end num text-text">{formatMillilitersAsLiters(tank.capacity_milliliters, locale)}</td><td className="px-3 py-3"><StatusBadge row={tank} t={t} /></td></>; }
-  if (kind === 'pumps') { const pump = row as Pump; return <><td className="px-3 py-3 font-medium text-text">{pump.name || `${t('pump')} ${pump.pump_number}`}</td><td className="num px-3 py-3 text-muted">{pump.pump_number}</td><td className="px-3 py-3 text-muted">{pump.station?.name ?? '—'}</td><td className="num px-3 py-3 text-muted">{pump.nozzles_count ?? 0}</td><td className="px-3 py-3"><StatusBadge row={pump} t={t} /></td></>; }
-  const nozzle = row as Nozzle; return <><td className="px-3 py-3 font-medium text-text">{nozzle.nozzle_number}</td><td className="px-3 py-3 text-muted">{nozzle.pump?.pump_number ?? '—'}</td><td className="px-3 py-3 text-muted">{nozzle.tank?.name ?? '—'}</td><td className="px-3 py-3 text-muted">{nozzle.fuel_product?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={nozzle} t={t} /></td></>;
+  if (kind === 'stations') { const station = row as Station; return <><td className="px-3 py-3 font-medium text-text"><span className="flex items-center gap-2.5"><EntityIcon kind={kind} row={station} />{station.name}</span></td><td className="num px-3 py-3 text-muted">{station.code}</td><td className="px-3 py-3 text-muted">{station.branch?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={station} t={t} /></td></>; }
+  if (kind === 'products') { const product = row as FuelProduct; return <><td className="px-3 py-3 font-medium text-text"><span className="flex items-center gap-2.5"><EntityIcon kind={kind} row={product} />{product.name}</span></td><td className="num px-3 py-3 text-muted">{product.code}</td><td className="px-3 py-3 text-muted">{product.product?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={product} t={t} /></td></>; }
+  if (kind === 'tanks') { const tank = row as Tank; return <><td className="px-3 py-3 font-medium text-text"><span className="flex items-center gap-2.5"><EntityIcon kind={kind} row={tank} />{tank.name}</span></td><td className="num px-3 py-3 text-muted">{tank.code}</td><td className="px-3 py-3 text-muted">{tank.station?.name ?? '—'}</td><td className="px-3 py-3 text-end num text-text">{formatMillilitersAsLiters(tank.capacity_milliliters, locale)}</td><td className="px-3 py-3"><StatusBadge row={tank} t={t} /></td></>; }
+  if (kind === 'pumps') { const pump = row as Pump; return <><td className="px-3 py-3 font-medium text-text"><span className="flex items-center gap-2.5"><EntityIcon kind={kind} row={pump} />{pump.name || `${t('pump')} ${pump.pump_number}`}</span></td><td className="num px-3 py-3 text-muted">{pump.pump_number}</td><td className="px-3 py-3 text-muted">{pump.station?.name ?? '—'}</td><td className="num px-3 py-3 text-muted">{pump.nozzles_count ?? 0}</td><td className="px-3 py-3"><StatusBadge row={pump} t={t} /></td></>; }
+  const nozzle = row as Nozzle; return <><td className="px-3 py-3 font-medium text-text"><span className="flex items-center gap-2.5"><EntityIcon kind={kind} row={nozzle} />{nozzle.nozzle_number}</span></td><td className="px-3 py-3 text-muted">{nozzle.pump?.pump_number ?? '—'}</td><td className="px-3 py-3 text-muted">{nozzle.tank?.name ?? '—'}</td><td className="px-3 py-3 text-muted">{nozzle.fuel_product?.name ?? '—'}</td><td className="px-3 py-3"><StatusBadge row={nozzle} t={t} /></td></>;
 }
 
 function RowActions({ row, t, onEdit, onRetire }: { row: Station | FuelProduct | Tank | Pump | Nozzle; t: ReturnType<typeof useTranslations>; onEdit: (row: Station | FuelProduct | Tank | Pump | Nozzle) => void; onRetire: (row: Station | FuelProduct | Tank | Pump | Nozzle) => void }) {

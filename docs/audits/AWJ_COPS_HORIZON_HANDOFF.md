@@ -71,6 +71,7 @@
 | H4-6 | **Merged** (2026-11-05) — إتاحة وسيلة الدفع لكل قناة: `payment-methods/{id}/channel-availability` بصلاحيتي المدفوعات والتجارة معاً + قسم في شاشة الوسيلة (D-H4-06)؛ Codex بلا ملاحظات | #1996 | `0b08ea07a9f4f58c251063ccd124cc802d3ba6c1` | `AWJ-COPS-H4-6-IMPLEMENTATION-REPORT.md`؛ Head `57223be1119ad359703f144e88b04bb3b729fc86` |
 | H4-7 | **Merged** (2026-11-04) — وسم صفحتي `sales-settings/orders\|shipping` «غير مُطبَّق» (R-12 ب)؛ واجهة فقط | #1994 | `67ca31e5f67099443ca8bd389043e36b929fd42e` | `AWJ-COPS-H4-7-IMPLEMENTATION-REPORT.md`؛ Head `83210f0ca2a8b592f537d32e7344766a41f68572` |
 | H4-إغلاق | **وثائق** (2026-11-05) — تقرير الإغلاق + أقسام CLAUDE.md وADR-29 §2.5.3 المؤجَّلة من PRs الشرائح لتفادي تعارضات وثائق مشتركة | (PR الإغلاق) | (يُسجَّل عند الدمج) | `AWJ_COPS_H4_CLOSURE_REPORT.md` |
+| H4-UX | **مدموج** — تجربة المشتري عند تطبيق إعدادات الاستقبال: لافتة متوقف/خارج الساعات، الحد الأدنى والنقص المتبقي في السلة والإتمام، «لا يلغي الطلبات القائمة»؛ فوق كتلة `data.ordering` القائمة (بلا API موازٍ)؛ **إرشادي — إنفاذ Checkout في الخادم هو الحَكَم**؛ البوابة مغلقة ⇒ لا أثر؛ vitest الكامل + Playwright 28/28 | #2005 | Head `b210d02` · Merge `4cc1bd0` (Codex لم يُراجع: حد الاستخدام؛ CI أخضر) | `AWJ-COPS-H4-BUYER-ORDERING-UX-IMPLEMENTATION-REPORT.md` |
 
 > **Implemented ≠ Merged ≠ Deployed ≠ Activated ≠ Env-Verified.** لا شيء من COPS منشور أو مُفعَّل.
 

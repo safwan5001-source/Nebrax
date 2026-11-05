@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { FuelIcon, resolveFuelIcon } from '@/lib/fuel-icons';
 import { useStationOps } from './context';
 import { useStationAssets, useStationPrices } from './data';
 import type { NozzleView } from './catalog';
@@ -32,7 +33,8 @@ function NozzleRow({ view, showPump = true }: { view: NozzleView; showPump?: boo
   const t = useTranslations('stationOps');
   return (
     <li className="flex items-start justify-between gap-3 py-2.5">
-      <div className="min-w-0 text-sm">
+      <FuelIcon id={resolveFuelIcon('nozzle', view.product)} size={40} />
+      <div className="min-w-0 flex-1 text-sm">
         <p className="font-medium text-text">
           {t('products.nozzle')} <span className="num">{view.nozzle.nozzle_number}</span>
           {showPump && view.pump ? <span className="text-muted"> · {t('products.pump')} <span className="num">{view.pump.pump_number}</span></span> : null}
@@ -74,7 +76,8 @@ function Content({ station }: { station: Station }) {
               <li key={entry.product.id}>
                 <details className="group rounded-[14px] border border-border bg-surface open:shadow-sm">
                   <summary className="flex min-h-[64px] cursor-pointer list-none items-center justify-between gap-3 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0">
+                    <FuelIcon id={resolveFuelIcon('product', entry.product)} size={48} />
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-base font-semibold text-text">{entry.product.name}</span>
                       <span className="mt-0.5 block text-sm text-muted">
                         {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
@@ -111,7 +114,8 @@ function Content({ station }: { station: Station }) {
             {catalog.pumps.map(({ pump, nozzles }) => (
               <li key={pump.id} className="rounded-[14px] border border-border bg-surface p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-base font-semibold text-text">{t('products.pump')} <span className="num">{pump.pump_number}</span>{pump.name ? ` · ${pump.name}` : ''}</p>
+                  <FuelIcon id="fuel-pump" size={40} />
+                  <p className="min-w-0 flex-1 text-base font-semibold text-text">{t('products.pump')} <span className="num">{pump.pump_number}</span>{pump.name ? ` · ${pump.name}` : ''}</p>
                   <AssetStatus status={pump.status} />
                 </div>
                 {nozzles.length === 0 ? (
@@ -136,7 +140,8 @@ function Content({ station }: { station: Station }) {
             {catalog.tanks.map(({ tank, product, nozzleCount }) => (
               <li key={tank.id} className="rounded-[14px] border border-border bg-surface p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-base font-semibold text-text">{tank.name} <span className="num text-sm font-normal text-muted">({tank.code})</span></p>
+                  <FuelIcon id={resolveFuelIcon('tank', product)} size={48} />
+                  <p className="min-w-0 flex-1 truncate text-base font-semibold text-text">{tank.name} <span className="num text-sm font-normal text-muted">({tank.code})</span></p>
                   <AssetStatus status={tank.status} />
                 </div>
                 <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
