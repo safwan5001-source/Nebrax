@@ -444,6 +444,9 @@ class Settings
             // القائمة الفارغة تمنع التحصيل حتى يختار المستأجر طرقه النشطة صراحةً.
             'fuel_sales_allowed_payment_method_ids' => [],
             'fuel_sales_allow_deferred_payment' => false,
+            // #2021 (D1): أساس «النقد المتوقع» للوردية. movements_only (الافتراضي = السلوك الحالي) |
+            // receiving_shift_receipts (يضيف نقد المبيعات المحصَّل فعلاً في هذه الوردية). خلف بوابة نشر مغلقة.
+            'shift_expected_cash_basis' => 'movements_only',
             // Cycle 9: الصيانة والسلامة والتقارير تبقى سياسات قابلة للوراثة
             // ولا تخلق قيداً أو أمراً لجهاز أو إجراءً خلفياً تلقائياً.
             'maintenance_default_calendar_interval_days' => 30,

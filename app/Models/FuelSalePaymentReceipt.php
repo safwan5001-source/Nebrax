@@ -15,9 +15,11 @@ class FuelSalePaymentReceipt extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'fuel_sale_id', 'payment_id', 'idempotency_key', 'recorded_at',
+        // #2021 (D1): لقطة وردية الاستلام الفعلية؛ NULL للصفوف السابقة (لا نسبة تلقائية).
+        'fuel_shift_id', 'settlement_type', 'amount_minor', 'cash_account_id', 'received_by_user_id',
     ];
 
-    protected $casts = ['recorded_at' => 'datetime'];
+    protected $casts = ['recorded_at' => 'datetime', 'amount_minor' => 'integer'];
 
     protected static function booted(): void
     {
@@ -26,5 +28,6 @@ class FuelSalePaymentReceipt extends BaseModel
     }
 
     public function sale(): BelongsTo { return $this->referenceBelongsTo(FuelSale::class, 'fuel_sale_id'); }
+    public function shift(): BelongsTo { return $this->referenceBelongsTo(FuelShift::class, 'fuel_shift_id'); }
     public function payment(): BelongsTo { return $this->referenceBelongsTo(Payment::class); }
 }

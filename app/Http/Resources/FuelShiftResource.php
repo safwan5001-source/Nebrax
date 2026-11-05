@@ -12,6 +12,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class FuelShiftResource extends JsonResource
 {
+    /** @var array<string,mixed>|null #2021: ملخص النقد المتوقع/المعدود/الفرق من `FuelShiftCashExpectationService` (للعرض فرداً فقط). */
+    private ?array $cashSummary = null;
+
+    /** @param array<string,mixed> $summary */
+    public function withCashSummary(array $summary): static
+    {
+        $this->cashSummary = $summary;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
@@ -40,6 +51,7 @@ class FuelShiftResource extends JsonResource
             'closed_at' => $this->closed_at?->toISOString(),
             'approved_at' => $this->approved_at?->toISOString(),
             'locked_at' => $this->locked_at?->toISOString(),
+            'cash_summary' => $this->when($this->cashSummary !== null, fn () => $this->cashSummary),
             'cash_variance' => $this->whenLoaded('cashVariance', fn () => $this->cashVariance === null ? null : [
                 'id' => $this->cashVariance->id,
                 'status' => $this->cashVariance->status,

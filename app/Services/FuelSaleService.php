@@ -48,6 +48,7 @@ class FuelSaleService
         private FuelAviAuthorizationService $aviAuthorizations,
         private FuelFleetService $fleet,
         private AccountRoleResolver $roles,
+        private FuelShiftCashExpectationService $cashExpectation,
     ) {}
 
     /** @param array<string,mixed> $attributes */
@@ -332,6 +333,11 @@ class FuelSaleService
                 throw new RuntimeException('البيع المؤجل أو الجزئي غير مفعّل لمحطة الوقود؛ يجب تحصيل كامل متبقي الفاتورة.');
             }
 
+            // #2021 (D1): تحت الأساس receiving_shift_receipts يُختم الإيصال بالوردية المفتوحة وقت التحصيل (لا وردية إنشاء البيع).
+            // مغلقاً (الافتراضي) $receivingShift = false فيعمل المسار القديم حرفياً. ترتيب الأقفال: البيع ← الفاتورة ← الوردية.
+            $stampReceipt = $this->cashExpectation->effectiveBasis($station) === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
+            $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor) : null;
+
             $payment = $this->payments->post($this->payments->create([
                 'partner_id' => $sale->partner_id,
                 'invoice_id' => $invoice->id,
@@ -344,13 +350,19 @@ class FuelSaleService
                 'notes' => "تحصيل بيع وقود {$sale->number}",
                 'created_by' => $actor->id,
             ]), $actor);
-            FuelSalePaymentReceipt::create([
+            $receipt = FuelSalePaymentReceipt::create([
                 'branch_id' => $sale->branch_id,
                 'fuel_sale_id' => $sale->id,
                 'payment_id' => $payment->id,
                 'idempotency_key' => $idempotencyKey,
                 'recorded_at' => now(),
-            ]);
+            ] + ($stampReceipt ? [
+                'fuel_shift_id' => $receivingShift?->id,
+                'settlement_type' => $method->settlement_type,
+                'amount_minor' => $amount,
+                'cash_account_id' => $payment->cash_account_id,
+                'received_by_user_id' => $actor->id,
+            ] : []));
 
             $invoice = $invoice->fresh();
             $paid = (int) $invoice->paid_amount;
@@ -358,7 +370,28 @@ class FuelSaleService
                 'paid_minor' => $paid,
                 'payment_status' => $this->fuelPaymentStatus($paid, (int) $invoice->total),
             ]);
-            if ($sale->fuel_shift_id !== null && $method->settlement_type === 'cash') {
+            if ($stampReceipt) {
+                // D1: الحدث على الوردية التي استلمت النقد فعلاً، ويُحتسب في المتوقع (لا مقارنة فقط).
+                if ($receivingShift !== null && $method->settlement_type === 'cash') {
+                    FuelShiftEvent::create([
+                        'branch_id' => $receivingShift->branch_id,
+                        'fuel_shift_id' => $receivingShift->id,
+                        'type' => FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED,
+                        'payload' => [
+                            'fuel_sale_id' => $sale->id,
+                            'payment_id' => $payment->id,
+                            'receipt_id' => $receipt->id,
+                            'amount_minor' => $amount,
+                            'sale_shift_id' => $sale->fuel_shift_id,
+                            'comparison_only' => false,
+                            'counted_in_expected_cash' => true,
+                            'affects_operational_cash_movements' => false,
+                        ],
+                        'actor_id' => $actor->id,
+                        'occurred_at' => now(),
+                    ]);
+                }
+            } elseif ($sale->fuel_shift_id !== null && $method->settlement_type === 'cash') {
                 FuelShiftEvent::create([
                     'branch_id' => $sale->branch_id,
                     'fuel_shift_id' => $sale->fuel_shift_id,
@@ -377,6 +410,38 @@ class FuelSaleService
 
             return $payment->fresh();
         });
+    }
+
+    /**
+     * D1: الوردية المفتوحة للمحطة وقت التحصيل تحت قفل مشترك (يتسلسل مع close ذي FOR UPDATE فلا يُختم إيصال بوردية تُغلق).
+     * نقدي بلا وردية مفتوحة، أو بيع بعقد شركة (سداد آجل = D4 غير معتمد) ⇒ BLOCKED برفض كامل قبل أي سند.
+     * الشبكة تُختم بالوردية إن وُجدت (للعرض) ولا تُرفض بغيابها ولا تدخل المتوقع.
+     */
+    private function resolveReceivingShift(FuelSale $sale, FuelStation $station, PaymentMethod $method, User $actor): ?FuelShift
+    {
+        $this->assertActorStationScope($actor, $station);
+        $isCash = $method->settlement_type === 'cash';
+        if ($isCash && $sale->corporate_fuel_contract_id !== null) {
+            throw new RuntimeException('FUEL_CASH_CORPORATE_SETTLEMENT_UNDECIDED: تحصيل نقدي لبيع بعقد شركة/أسطول غير معتمد بعد (سداد الآجل نقداً)؛ لا يُنسب لدرج الوردية.');
+        }
+        $shift = FuelShift::where('fuel_station_id', $station->id)
+            ->where('status', FuelShift::STATUS_OPEN)
+            ->sharedLock()
+            ->first();
+        if ($isCash && $shift === null) {
+            throw new RuntimeException('FUEL_CASH_RECEIPT_NO_OPEN_SHIFT: لا توجد وردية مفتوحة للمحطة لاستلام التحصيل النقدي؛ افتح وردية أولاً.');
+        }
+
+        return $shift;
+    }
+
+    /** دفاع في العمق تحت التفعيل: نطاق الفاعل (فرع + مخزن) على المحطة، كحارس الوردية (#2014). */
+    private function assertActorStationScope(User $actor, FuelStation $station): void
+    {
+        if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
+            || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+            throw new RuntimeException('محطة التحصيل خارج نطاق صلاحياتك.');
+        }
     }
 
     private function fuelPaymentStatus(int $paid, int $total): string
