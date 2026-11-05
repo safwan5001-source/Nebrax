@@ -46,7 +46,7 @@
 | القدرة | الحالة | الواقع | الفجوة | شريحة |
 |---|---|---|---|---|
 | قراءة فواتير المبيعات | ✅ | `GET /invoices[/{id}]` · `invoices:read` | — | — |
-| مسودة فاتورة مبيعات | ✅ | `POST /invoices` · `InvoiceService::create` (الخادم يحسب الإجماليات؛ `created_by=null`) | ختم المصدر (G-S6) | AIA-0.6 |
+| مسودة فاتورة مبيعات | ✅ | `POST /invoices` · `InvoiceService::create` (الخادم يحسب الإجماليات؛ `created_by=null`) | ختم المصدر (G-S6) | AIA-0.6a→0.6b |
 | تعديل مسودة فاتورة | 🟦 | `invoices/{id}` PUT داخلي | اختياري | AIA-3.x |
 | ترحيل فاتورة مبيعات | 🟦🟪 | `InvoiceService::post` (قيد + ICV + ZATCA) | T3: طلب موافقة بشري فقط | AIA-4.x |
 | قراءة فواتير الشراء | 🟦 | `GET purchases[/{id}]` خلف `purchases.cycle` | scope `purchases:read` + `EnsureApplicationActive` | AIA-1.3 |
@@ -122,7 +122,7 @@
 | بيانات مستند كاملة JSON + مراجعة القالب | 🟨 | فواتير فقط؛ مراجعات القالب مخزّنة (`print_template_revision_id`) | `documents:read` | AIA-1.3 |
 | XML ZATCA للفاتورة المرحَّلة | 🟦 | أعمدة `zatca_xml`/`zatca_qr` | قراءة بscope أضيق `zatca:read` (اختياري) | AIA-1.6 |
 | PDF رسمي للمستندات | 🟥🟪 | **متصفح فقط** (jsPDF/html2canvas)؛ لا محرك خادمي | قرار معماري D-03 + سبايك مطابقة | AIA-5.x |
-| تصدير بحجم كبير (async) | 🟥 | الإنتاج `QUEUE_CONNECTION=sync` (لا عامل خلفي) + خدمة `awj-scheduler` كل 5 دقائق | توليد متزامن بسقف زمن/حجم أولاً؛ async حقيقي بعد عامل | AIA-2.1 |
+| تصدير بحجم كبير (async) | 🟥 | الإنتاج `QUEUE_CONNECTION=sync` (لا عامل خلفي) + خدمة `awj-scheduler` كل 5 دقائق | توليد متزامن بسقف زمن/حجم أولاً؛ async حقيقي بعد عامل | AIA-2.1a→2.1b |
 | سلامة CSV المالي (سالب/حقن صيغ) | 🟨 | `csvLine` يسبق `-` بـ`'` فيفسد الأرصدة السالبة | وضع أعمدة عددية في المصدّر المالي (انظر G-S10) | AIA-2.2 |
 
 ## 11) مشاركة الملفات عبر قنوات الوكيل
@@ -142,7 +142,7 @@
 | Scopes دقيقة | 🟨 | تسعة scopes فقط | scopes الموارد المقترحة (§13) | AIA-1/3 |
 | إسقاط scope → RBAC | 🟥 | `permission()` معرَّفة وغير مستدعاة | سقف عند الإصدار (G-S2) | AIA-0.4 |
 | نطاق الفرع للمفتاح | 🟥🟪 | المفتاح CompanyWide؛ `invoices` يقبل `branch_id` من أي فرع للمستأجر | D-09 | لاحق |
-| تدقيق الطلبات | ✅🟨 | `PublicApiRequestLog` (تشغيلي، بلا جسم) | ربط المستند بالمصدر + هوية الوكيل/الجلسة (سجل عمليات) | AIA-0.6 |
+| تدقيق الطلبات | ✅🟨 | `PublicApiRequestLog` (تشغيلي، بلا جسم) | ربط المستند بالمصدر + هوية الوكيل/الجلسة (سجل عمليات) | AIA-0.6a→0.6b |
 | Webhooks | ✅ | `webhooks:read/write` | حدث `export.completed` لاحقاً | AIA-2.3 |
 | اكتشاف القدرات | 🟥 | لا | `GET /api/v1/capabilities` من الكتالوج | AIA-0.5 |
 | سلامة مالية للتقارير | 🟥 | لا إجماليات/عدد/اتجاه | غلاف متحقَّق | AIA-0.1 |
