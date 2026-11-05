@@ -76,6 +76,31 @@ describe('buildShiftReadings — open shift', () => {
   });
 });
 
+describe('buildShiftReadings — coverage is measured against the ACTIVE nozzles (Codex P2)', () => {
+  // n4 معطّلة وفي مضختها قراءات مكتملة؛ n1..n3 نشطة بلا قراءات.
+  const detail = shiftDetail('s', 'a', { status: 'open', meter_readings: [meter('1', 'n4', 'opening', 0), meter('2', 'n4', 'closing', 800_000)] });
+
+  it('a complete pair on a disabled nozzle does not make the active nozzles look covered', () => {
+    const { summary } = buildShiftReadings(detail, catalog());
+    expect(summary).toMatchObject({ expected: 3, complete: 0, withOpening: 0, withClosing: 0, partial: true });
+  });
+
+  it('…yet its liters are still counted (nothing recorded is dropped)', () => {
+    const { summary } = buildShiftReadings(detail, catalog());
+    expect(summary).toMatchObject({ recordedComplete: 1, computedMl: 800_000 });
+  });
+
+  it('progress and next step still ask for the missing active nozzles', () => {
+    const view = buildShiftReadings(detail, catalog());
+    expect(deriveProgress(detail, view.summary).find((step) => step.state === 'current')?.key).toBe('opening_readings');
+  });
+
+  it('only recorded pairs on active nozzles reduce the remaining count', () => {
+    const mixed = shiftDetail('s', 'a', { status: 'open', meter_readings: [meter('1', 'n4', 'opening', 0), meter('2', 'n4', 'closing', 5), meter('3', 'n1', 'opening', 0), meter('4', 'n1', 'closing', 9)] });
+    expect(buildShiftReadings(mixed, catalog()).summary).toMatchObject({ complete: 1, recordedComplete: 2, computedMl: 14, partial: true });
+  });
+});
+
 describe('buildShiftReadings — closed / approved', () => {
   it('shows only what was recorded (the current setup is not assumed to match the past) and uses the server total', () => {
     const detail = shiftDetail('s', 'a', {

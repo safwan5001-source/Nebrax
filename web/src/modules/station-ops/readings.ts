@@ -34,10 +34,19 @@ export interface PumpReadingGroup {
 export interface ReadingsSummary {
   /** عدد الفوهات المتوقعة (نشطة حالياً) — لوردية مفتوحة فقط، وإلا `null` (لا مقام مخترع). */
   expected: number | null;
+  /**
+   * التغطية (للتقدم و«جزئي» و«المتبقي»): في الوردية المفتوحة تُحسب **على الفوهات المتوقعة (النشطة حالياً) وحدها** حتى لا تُخفي قراءةُ
+   * فوهة معطّلة نقصَ فوهة نشطة؛ وفي المغلقة/المعتمدة (لا متوقَّع) على كل ما سُجِّل.
+   */
   withOpening: number;
   withClosing: number;
   complete: number;
+  /** أزواج غير صالحة (إغلاق < افتتاح) في كل الفوهات — للتحذير. */
   invalid: number;
+  /** غير الصالحة ضمن الفوهات المتوقعة فقط (لحساب «المتبقي»). */
+  invalidExpected: number;
+  /** كل الأزواج الصالحة المسجَّلة (أي فوهة) — هي مصدر `computedMl`؛ `0` ⇒ لا لترات محسوبة بعد. */
+  recordedComplete: number;
   /** مجموع فروق الصفوف المكتملة الصالحة فقط (mL). */
   computedMl: number;
   /** إجمالي الخادم المثبَّت عند الإغلاق، أو `null` لوردية مفتوحة (لم يُحسب بعد — ليس صفراً). */
@@ -114,6 +123,9 @@ export function buildShiftReadings(detail: ShiftDetail, catalog: StationCatalog)
 
   const complete = rows.filter((row) => row.status === 'complete');
   const computedMl = complete.reduce((sum, row) => sum + (row.deltaMl ?? 0), 0);
+  // نطاق التغطية: وردية مفتوحة ⇒ الفوهات النشطة حالياً فقط؛ وإلا كل الصفوف.
+  const scope = isOpen ? rows.filter((row) => row.view !== null && row.view.blockedBy === null) : rows;
+  const scopeComplete = scope.filter((row) => row.status === 'complete').length;
   const expected = isOpen ? [...views.values()].filter((view) => view.blockedBy === null).length : null;
   const serverMl = isOpen ? null : detail.operational_meter_milliliters;
 
@@ -122,14 +134,16 @@ export function buildShiftReadings(detail: ShiftDetail, catalog: StationCatalog)
     outsideSetup,
     summary: {
       expected,
-      withOpening: rows.filter((row) => row.opening).length,
-      withClosing: rows.filter((row) => row.closing).length,
-      complete: complete.length,
+      withOpening: scope.filter((row) => row.opening).length,
+      withClosing: scope.filter((row) => row.closing).length,
+      complete: scopeComplete,
       invalid: rows.filter((row) => row.status === 'invalid_order').length,
+      invalidExpected: scope.filter((row) => row.status === 'invalid_order').length,
+      recordedComplete: complete.length,
       computedMl,
       serverMl,
       mismatch: serverMl !== null && serverMl !== computedMl,
-      partial: isOpen && (expected === null || complete.length < expected),
+      partial: isOpen && (expected === null || scopeComplete < expected),
     },
   };
 }

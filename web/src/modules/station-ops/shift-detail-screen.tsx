@@ -152,8 +152,8 @@ function LitersCard({ detail, view }: { detail: ShiftDetail; view: ReturnType<ty
   const caption = isOpen ? t('shiftDetail.liters.captionOpen') : t('shiftDetail.liters.captionClosed');
 
   // مفتوحة: لا إجمالي مخزَّن ⇒ نعرض المحسوب من القراءات المكتملة فقط، و«—» (لا 0) إن لم تكتمل أي فوهة.
-  const value = isOpen ? (summary.complete > 0 ? fmt(summary.computedMl) : null) : fmt(detail.operational_meter_milliliters);
-  const pending = isOpen && summary.expected !== null ? Math.max(0, summary.expected - summary.complete - summary.invalid) : null;
+  const value = isOpen ? (summary.recordedComplete > 0 ? fmt(summary.computedMl) : null) : fmt(detail.operational_meter_milliliters);
+  const pending = isOpen && summary.expected !== null ? Math.max(0, summary.expected - summary.complete - summary.invalidExpected) : null;
   const cells = isOpen
     ? [
         { label: t('shiftDetail.liters.cellComplete'), value: summary.expected === null ? String(summary.complete) : `${summary.complete}/${summary.expected}` },
@@ -172,8 +172,8 @@ function LitersCard({ detail, view }: { detail: ShiftDetail; view: ReturnType<ty
         unit={t('unit.liter')}
         cells={cells}
       />
-      {isOpen && summary.complete === 0 ? <InlineNote>{t('shiftDetail.liters.noneYet')}</InlineNote> : null}
-      {summary.partial && summary.complete > 0 && summary.expected !== null ? (
+      {isOpen && summary.recordedComplete === 0 ? <InlineNote>{t('shiftDetail.liters.noneYet')}</InlineNote> : null}
+      {summary.partial && summary.recordedComplete > 0 && summary.expected !== null ? (
         <InlineNote tone="warning">{t('shiftDetail.liters.partial', { complete: String(summary.complete), expected: String(summary.expected) })}</InlineNote>
       ) : null}
       {summary.invalid > 0 ? <InlineNote tone="warning">{t('shiftDetail.liters.invalid', { count: String(summary.invalid) })}</InlineNote> : null}

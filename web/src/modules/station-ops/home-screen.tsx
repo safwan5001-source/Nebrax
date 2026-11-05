@@ -63,7 +63,7 @@ function OpenShift({ station, shift, catalog, multiple }: { station: Station; sh
   let note: string | undefined;
   if (view) {
     const { summary } = view;
-    if (summary.complete > 0) {
+    if (summary.recordedComplete > 0) {
       value = formatLitersFixedFromMl(summary.computedMl, locale);
       if (summary.partial && summary.expected !== null) note = t('shiftDetail.liters.partial', { complete: String(summary.complete), expected: String(summary.expected) });
     } else {
