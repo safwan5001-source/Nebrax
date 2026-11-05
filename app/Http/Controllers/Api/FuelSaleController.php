@@ -14,6 +14,7 @@ use App\Models\FuelStation;
 use App\Models\FuelStationProductPrice;
 use App\Models\PaymentMethod;
 use App\Services\FuelEffectivePriceReadService;
+use App\Services\FuelPriceSuggestionService;
 use App\Services\FuelSaleService;
 use App\Services\FuelStationProductPriceService;
 use App\Services\FuelStationSettingsService;
@@ -29,6 +30,7 @@ class FuelSaleController extends ApiController
         private FuelStationProductPriceService $prices,
         private FuelStationSettingsService $settings,
         private FuelEffectivePriceReadService $effectivePrices,
+        private FuelPriceSuggestionService $suggestions,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -136,26 +138,90 @@ class FuelSaleController extends ApiController
     public function effectiveIndex(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'station_id' => ['required', 'uuid'],
+            'station_id' => ['nullable', 'uuid'],
+            'scope' => ['nullable', 'in:tenant_default'],
             'fuel_product_id' => ['nullable', 'uuid'],
         ]);
-        $station = $this->accessibleStation($data['station_id']);
+        $tenantScope = ($data['scope'] ?? null) === 'tenant_default';
+        if ($tenantScope === ! empty($data['station_id'])) { // الاثنان معاً أو لا واحد منهما
+            abort(422, 'حدّد station_id أو scope=tenant_default (واحداً منهما).');
+        }
+        $station = $tenantScope ? null : $this->accessibleStation($data['station_id']);
 
-        $products = isset($data['fuel_product_id'])
-            ? FuelProduct::query()->with('product')->whereKey($data['fuel_product_id'])->get()
+        $products = $this->fuelProductsFor($data['fuel_product_id'] ?? null);
+        $rows = $station === null
+            ? $this->effectivePrices->forTenant($products, now())
+            : $this->effectivePrices->forStation($station, $products, now());
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * اقتراح أسعار لتر من بطاقة المنتج — قراءة فقط، لمن يملك `fuel.sale.price.manage`. لا ينقل شيئاً؛ الحفظ بـ`storePrice` مع `source` وإقرار صريح.
+     */
+    public function suggestionIndex(Request $request): JsonResponse
+    {
+        $data = $request->validate(['station_id' => ['nullable', 'uuid'], 'fuel_product_id' => ['nullable', 'uuid']]);
+        $station = empty($data['station_id']) ? $this->organizationScopeOrFail() : $this->accessibleStation($data['station_id']);
+
+        return response()->json(['data' => $this->suggestions->forScope($station, $this->fuelProductsFor($data['fuel_product_id'] ?? null), now())]);
+    }
+
+    /**
+     * إضافة فترة سعر رسمية. النطاق يُفرض خادمياً: محطة ضمن نطاق المستخدم (404 وإلا)، أو المؤسسة لغير المقيَّد بفرع/مخزن فقط (403).
+     * `source` (اقتراح بطاقة المنتج) يُعاد التحقق منه داخل المعاملة؛ `supersede` صريح؛ `idempotency_key` يمنع التكرار.
+     */
+    public function storePrice(StoreFuelStationProductPriceRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        if (! empty($data['fuel_station_id'])) {
+            $this->accessibleStation($data['fuel_station_id']);
+        } else {
+            $this->organizationScopeOrFail();
+        }
+
+        $source = $data['source'] ?? null;
+        unset($data['source']);
+        $beforeWrite = null;
+        if ($source !== null) {
+            $data['entry_source'] = FuelStationProductPrice::SOURCE_PRODUCT_CARD;
+            $data['reason'] = trim('اقتراح من بطاقة المنتج (سعر وحدة اللتر) اعتمده المستخدم بإقرار أساس الضريبة. ' . ($data['reason'] ?? ''));
+            $price = (int) $data['price_per_liter_minor'];
+            $beforeWrite = fn (FuelProduct $fuelProduct, ?FuelStation $station) => $this->suggestions->assertConfirmed(
+                $station, $fuelProduct->loadMissing('product'), $price, $source['confirm_tax_mode'] ?? null, $source['confirm_unit'] ?? null,
+            );
+        }
+
+        $row = $this->domain(fn () => $this->prices->create($data, $request->user(), $beforeWrite));
+
+        return response()->json([
+            'data' => (new FuelStationProductPriceResource($row))->resolve($request),
+            'meta' => ['replayed' => $row->replayed, 'superseded_price_ids' => $row->supersededIds],
+        ], $row->replayed ? 200 : 201);
+    }
+
+    /** سعر المؤسسة يؤثر على كل المحطات، فلا يملكه مستخدم مقيَّد بفرع/مخزن. null = نطاق المؤسسة المسموح. */
+    private function organizationScopeOrFail(): ?FuelStation
+    {
+        $user = request()->user();
+        if ($user?->allowedBranchIds() !== null || $user?->allowedWarehouseIds() !== null) {
+            abort(403, 'سعر المؤسسة لا يملكه مستخدم مقيَّد بفرع أو مخزن.');
+        }
+
+        return null;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, FuelProduct> */
+    private function fuelProductsFor(?string $fuelProductId)
+    {
+        $products = $fuelProductId !== null
+            ? FuelProduct::query()->with('product')->whereKey($fuelProductId)->get()
             : FuelProduct::query()->with('product')->where('is_active', true)->orderBy('code')->get();
-        if (isset($data['fuel_product_id']) && $products->isEmpty()) {
+        if ($fuelProductId !== null && $products->isEmpty()) {
             abort(404);
         }
 
-        return response()->json(['data' => $this->effectivePrices->forStation($station, $products, now())]);
-    }
-
-    public function storePrice(StoreFuelStationProductPriceRequest $request): JsonResponse
-    {
-        $price = $this->domain(fn () => $this->prices->create($request->validated(), $request->user()));
-
-        return (new FuelStationProductPriceResource($price))->response()->setStatusCode(201);
+        return $products;
     }
 
     private function visibleSale(string $id, Request $request): FuelSale

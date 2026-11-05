@@ -54,6 +54,7 @@ const DEVICE_TONES: Record<string, Tone> = { active: 'positive', inactive: 'mute
 export default function FuelStationsSettingsPage() {
   const t = useTranslations('fuelStationsSettings');
   const tc = useTranslations('common');
+  const tPrices = useTranslations('fuelPrices');
   const locale = useLocale();
   const { success } = useToast();
   const [tenant, setTenant] = useState<Settings | null>(null);
@@ -238,6 +239,7 @@ export default function FuelStationsSettingsPage() {
     <SettingsSection id="pricing" icon={<BadgeDollarSign />} title={t('groups.pricing')} description={t('groups.pricingDescription')} saving={saving === 'pricing'} canSave={canManageScope && hasChanges(['fuel_price_tax_mode'])} onSave={() => void saveSettings('pricing', ['fuel_price_tax_mode'])} saveLabel={t('save')}>
       <div className="grid gap-4 md:grid-cols-2"><FieldSelect label={t('fuelPriceTaxMode')} value={String(value('fuel_price_tax_mode') ?? '')} onChange={(next) => patchValue('fuel_price_tax_mode', next)} options={[{ value: 'tax_inclusive', label: t('taxInclusive') }, { value: 'tax_exclusive', label: t('taxExclusive') }]} disabled={!canManageScope} /><ReadOnlyRow label={t('priceRecords')} value={isStationScope ? t('priceRecordsCount', { count: prices.length }) : t('selectStation')} description={t('priceRecordsDescription')} /></div>
       {isStationScope && <PriceList prices={prices} products={products} locale={locale} t={t} />}
+      <a href="/fuel-stations/prices" className="mt-4 inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm font-medium text-primary hover:bg-primary-soft">{tPrices('settingsLink')}</a>
     </SettingsSection>
 
     <SettingsSection id="shifts" icon={<Timer />} title={t('groups.shifts')} description={t('groups.shiftsDescription')} saving={saving === 'shifts'} canSave={canManageScope && hasChanges([...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters'])} onSave={() => void saveSettings('shifts', [...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters'])} saveLabel={t('save')}>

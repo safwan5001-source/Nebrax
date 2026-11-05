@@ -23,6 +23,7 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
     items: [
       { href: '/fuel-stations/shifts', labelKey: 'shifts', permissions: ['fuel_stations.view', 'fuel.shift.view'] },
       { href: '/fuel-stations/sales', labelKey: 'sales', permissions: ['fuel_stations.view', 'fuel.sale.view'] },
+      { href: '/fuel-stations/prices', labelKey: 'prices', permissions: ['fuel_stations.view', 'fuel.sale.view'] },
       { href: '/fuel-stations/receiving', labelKey: 'receiving', permissions: ['fuel_stations.view'] },
     ],
   },
