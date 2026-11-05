@@ -123,7 +123,7 @@ class FuelShiftCashExpectationService
                 state: 'live', basis: $live['basis'],
                 opening: $live['opening'], cashIn: $live['cash_in'], cashOut: $live['cash_out'], handover: $live['handover'], expenses: $live['expenses'],
                 receipts: $live['receipts'], receiptsCount: $live['receipts_count'], receiptsKnown: $live['basis'] === self::BASIS_RECEIVING_SHIFT,
-                network: $live['network'], networkKnown: true, gaps: $live['gaps'], salesVisible: $salesVisible,
+                network: $live['network'], networkKnown: $live['basis'] === self::BASIS_RECEIVING_SHIFT, gaps: $live['gaps'], salesVisible: $salesVisible,
                 counted: null, variance: null, unattributed: [$live['unattributed_count'], $live['unattributed_amount']],
                 shift: $shift,
             );
@@ -194,7 +194,9 @@ class FuelShiftCashExpectationService
         if ($receiptsKnown && ! $salesVisible) {
             $visibleGaps[] = self::GAP_PERMISSION_SALES_VIEW;
         }
-        $partial = $opening + ($receiptsKnown ? $receipts : 0) + $cashIn - $cashOut - $expenses;
+        // المجموع الجزئي المعروض يُبنى من المكوّنات المسموح للعارض برؤيتها فقط: وإلا كشف طرحُ المكوّنات الظاهرة منه
+        // مبلغ نقد المبيعات المحجوب. الحساب الداخلي (live()['expected']) لا يتأثر.
+        $partial = $opening + ($receiptsAvailable ? $receipts : 0) + $cashIn - $cashOut - $expenses;
         $complete = $visibleGaps === [];
         $reason = static fn (bool $known, bool $visible, string $state): ?string => $known && $visible ? null
             : (! $visible && $known ? 'permission' : ($state === 'legacy_frozen' ? 'not_recorded_legacy' : 'basis_not_enabled'));

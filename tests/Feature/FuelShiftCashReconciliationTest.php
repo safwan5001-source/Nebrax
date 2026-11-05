@@ -512,6 +512,7 @@ class FuelShiftCashReconciliationTest extends TestCase
         $this->assertNull($summary['components']['official_cash_receipts']['amount_minor']);
         $this->assertSame('permission', $summary['components']['official_cash_receipts']['reason']);
         $this->assertNull($summary['expected_cash_minor']);
+        $this->assertSame(self::FLOAT, $summary['expected_cash_partial_minor'], 'المجموع الجزئي لا يكشف نقد المبيعات المحجوب بالطرح.');
         $this->assertContains('permission_sales_view', $summary['incompleteness']);
         $this->assertFalse($summary['network_receipts']['available']);
         $this->assertNull($summary['unattributed_cash_receipts']);
@@ -529,6 +530,24 @@ class FuelShiftCashReconciliationTest extends TestCase
         $this->assertSame(self::FLOAT, $summary['expected_cash_partial_minor']);
         $this->assertSame(['sales_cash_not_included'], $summary['incompleteness']);
         $this->assertSame('basis_not_enabled', $summary['components']['official_cash_receipts']['reason']);
+    }
+
+    /** @test */
+    public function network_receipts_are_unavailable_not_zero_when_stamping_is_disabled(): void
+    {
+        config(['fuel_stations.shift_cash_receipts_enabled' => false]);
+        $shift = $this->open('netoff');
+        $sale = $this->sale('netoff-sale', $shift);
+        $this->collect($sale, 'bank', null, 'netoff-pay');
+
+        $live = app(FuelShiftCashExpectationService::class)->summary($shift->fresh(), $this->f['actor']);
+        $this->assertFalse($live['network_receipts']['available']);
+        $this->assertNull($live['network_receipts']['amount_minor']);
+        $this->assertSame('basis_not_enabled', $live['network_receipts']['reason']);
+
+        app(FuelShiftService::class)->close($shift, self::FLOAT, null, $this->f['actor']);
+        $closed = app(FuelShiftCashExpectationService::class)->summary($shift->fresh(), $this->f['actor']);
+        $this->assertSame($live['network_receipts'], $closed['network_receipts'], 'الحيّ والمجمَّد يتفقان: غير متاح.');
     }
 
     /** @test */
