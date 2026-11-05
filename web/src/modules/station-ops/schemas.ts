@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cashSummarySchema } from './cash-summary';
 
 /**
  * UI-0 — مخططات التحقق من استجابات GET الفعلية لوحدة محطات الوقود في أَوْج.
@@ -130,6 +131,8 @@ export const shiftDetailSchema = shiftSchema.extend({
   tank_readings: z.array(tankReadingSchema),
   staff_assignments: z.array(z.object({ user_id: text.min(1) })).optional(),
   cash_variance: z.object({ status: text, variance_direction: nullableText }).nullable().optional(),
+  /** #2021: ملخص النقد من الخادم (D1/D2/D5)؛ غيابه = خادم أقدم ⇒ يبقى قسم النقد القديم. */
+  cash_summary: cashSummarySchema.nullish(),
 });
 
 const collection = <T extends z.ZodTypeAny>(item: T) => z.object({ data: z.array(item) });

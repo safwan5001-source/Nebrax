@@ -15,10 +15,13 @@ class FuelShiftCashMovement extends BaseModel
     public const TYPE_CASH_OUT = 'cash_out';
     public const TYPE_EXPENSE = 'expense';
     public const TYPES = [self::TYPE_CASH_IN, self::TYPE_CASH_OUT, self::TYPE_EXPENSE];
+    /** #2021 (D5): تسليم نقد الوردية للخزنة/المشرف — حركة cash_out موثّقة بمستلم مسمّى وإثبات. */
+    public const PURPOSE_TREASURY_HANDOVER = 'treasury_handover';
+    public const PURPOSES = [self::PURPOSE_TREASURY_HANDOVER];
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'fuel_shift_id', 'type', 'amount_minor', 'reason', 'evidence',
-        'idempotency_key', 'recorded_by', 'recorded_at',
+        'idempotency_key', 'recorded_by', 'recorded_at', 'purpose', 'received_by_user_id',
     ];
 
     protected $casts = [

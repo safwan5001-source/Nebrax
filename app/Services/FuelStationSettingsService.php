@@ -341,6 +341,17 @@ class FuelStationSettingsService
             return;
         }
 
+        if ($key === 'shift_expected_cash_basis') {
+            if (! is_string($value) || ! in_array($value, ['movements_only', 'receiving_shift_receipts'], true)) {
+                throw new RuntimeException('أساس النقد المتوقع يجب أن يكون movements_only أو receiving_shift_receipts.');
+            }
+            if ($value === 'receiving_shift_receipts' && ! (bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
+                throw new RuntimeException('ربط نقد المبيعات بوردية الاستلام غير مفعّل في هذا النشر؛ يبقى الأساس movements_only.');
+            }
+
+            return;
+        }
+
         if ($key === 'fuel_price_tax_mode') {
             if (! is_string($value) || ! in_array($value, ['tax_inclusive', 'tax_exclusive'], true)) {
                 throw new RuntimeException('نمط ضريبة سعر الوقود يجب أن يكون tax_inclusive أو tax_exclusive.');
