@@ -55,6 +55,21 @@ describe('stationOps messages', () => {
       ['shiftDetail.cash.direction', ['overage', 'shortage', 'none']],
       ['shiftDetail.cash.review', ['pending_review', 'reviewed', 'not_required']],
       ['next.kind', ['open_shift', 'opening_readings', 'closing_readings', 'close_shift', 'approve_shift']],
+      // UI-2 — الكتابة (مفاتيح تُبنى ديناميكياً من رموز write-client وحالات الشاشات)
+      ['write.reject', ['shift_already_open', 'idempotency_conflict', 'float_required', 'station_branch', 'station_inactive', 'shift_not_open', 'reading_exists', 'evidence_conflict', 'asset_unavailable', 'staff_already_assigned', 'cash_exceeds_balance', 'closing_below_opening', 'close_needs_readings', 'close_needs_staff', 'close_blocked_cash_variance', 'close_blocked_tank_variance', 'tank_type_mismatch', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'rate_limited', 'validation', 'demo']],
+      ['write.unknown', ['timeout', 'network', 'server']],
+      ['write.notSent', ['offline', 'demo']],
+      ['entry.title', ['opening', 'closing']],
+      ['entry.subtitle', ['opening', 'closing']],
+      ['entry.label', ['opening', 'closing']],
+      ['entry.fieldLabel', ['opening', 'closing']],
+      ['entry.error', ['invalid_number', 'closing_below_opening', 'opening_above_closing']],
+      ['entry.warning', ['below_previous_closing', 'differs_from_previous_closing', 'zero_delta']],
+      ['entry.done.title', ['opening', 'closing']],
+      ['entry.done.next', ['opening', 'closing']],
+      ['entry.result', ['saving', 'saved', 'failed', 'unknown', 'pending']],
+      ['handover.movement.types', ['cash_in', 'cash_out', 'expense']],
+      ['handover.summary.direction', ['overage', 'shortage', 'none']],
     ];
     const missing: string[] = [];
     for (const [family, members] of families) {

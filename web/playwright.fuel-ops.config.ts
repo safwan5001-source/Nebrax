@@ -1,5 +1,5 @@
 /**
- * FUEL-OPS — مواصفات المتصفح الوظيفية (UI-0/UI-1) على نسخة إنتاج قيد التشغيل (بلا خادم تطوير ولا ودجت Next):
+ * FUEL-OPS — مواصفات المتصفح الوظيفية (UI-0/UI-1/UI-2) على نسخة إنتاج قيد التشغيل (بلا خادم تطوير ولا ودجت Next):
  *   npx next build && npx next start -p 3012 &
  *   PLAYWRIGHT_BASE_URL=http://127.0.0.1:3012 npx playwright test -c playwright.fuel-ops.config.ts
  * الخادم مُعترَض بالكامل داخل المواصفات؛ لا CI يشغّلها تلقائياً (Chromium بمقاس آيفون ≠ Safari الحقيقي).
@@ -12,7 +12,7 @@ const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /fuel-ops-ui-[01]\.spec\.ts/,
+  testMatch: /fuel-ops-ui-[012]\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

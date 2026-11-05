@@ -1,3 +1,5 @@
+import type { ReadingsExtra } from './entry';
+import { OPS_BASE } from './nav';
 import { deriveProgress, type ReadingsSummary } from './readings';
 import type { ShiftDetail } from './schemas';
 
@@ -14,8 +16,10 @@ export interface NextStep {
   kind: NextStepKind;
   /** المستخدم الحالي هو من تُسند إليه الخطوة (يملك صلاحيتها). */
   mine: boolean;
-  /** فوهات متبقية لخطوات القراءات؛ `null` حين لا مقام معروف. */
+  /** قراءات متبقية (فوهات + خزانات مطلوبة) لخطوات القراءات؛ `null` حين لا مقام معروف. */
   remaining: number | null;
+  /** UI-2: وجهة الإجراء **داخل التطبيق** للخطوة التي تُنفَّذ فعلاً (فتح/قراءات/تسليم)؛ `null` = لا إجراء (اعتماد المشرف، الاكتمال). */
+  href: string | null;
 }
 
 const PERMISSION: Record<Exclude<NextStepKind, 'complete'>, string> = {
@@ -27,23 +31,31 @@ const PERMISSION: Record<Exclude<NextStepKind, 'complete'>, string> = {
 };
 
 /** `detail = null` ⇒ لا وردية مفتوحة. لمن لا صلاحية له ولا شيء ينتظره يعيد `null` (لا بطاقة فارغة). */
-export function deriveNextStep(detail: ShiftDetail | null, summary: ReadingsSummary | null, can: (permission: string) => boolean): NextStep | null {
+export function deriveNextStep(
+  detail: ShiftDetail | null,
+  summary: ReadingsSummary | null,
+  can: (permission: string) => boolean,
+  extra?: ReadingsExtra | null,
+): NextStep | null {
   if (detail === null) {
-    return can(PERMISSION.open_shift) ? { kind: 'open_shift', mine: true, remaining: null } : null;
+    return can(PERMISSION.open_shift) ? { kind: 'open_shift', mine: true, remaining: null, href: `${OPS_BASE}/shifts/open` } : null;
   }
-  if (detail.status === 'approved') return { kind: 'complete', mine: false, remaining: null };
-  if (detail.status === 'closed') return { kind: 'approve_shift', mine: can(PERMISSION.approve_shift), remaining: null };
+  if (detail.status === 'approved') return { kind: 'complete', mine: false, remaining: null, href: null };
+  if (detail.status === 'closed') return { kind: 'approve_shift', mine: can(PERMISSION.approve_shift), remaining: null, href: null };
   if (detail.status !== 'open' || summary === null) return null;
 
-  const current = deriveProgress(detail, summary).find((step) => step.state === 'current');
+  const base = `${OPS_BASE}/shifts/${encodeURIComponent(detail.id)}`;
+  const current = deriveProgress(detail, summary, extra).find((step) => step.state === 'current');
   const total = summary.expected;
+  // مع `extra` (UI-2) تُحسب المتبقيات من العدادات والخزانات معاً؛ بدونه (UI-1) من الفوهات فقط كما كان.
+  const left = (done: number, fromExtra: number | undefined) => (fromExtra !== undefined ? fromExtra : total === null || total === 0 ? null : Math.max(0, total - done));
   switch (current?.key) {
     case 'opening_readings':
-      return { kind: 'opening_readings', mine: can(PERMISSION.opening_readings), remaining: total === null || total === 0 ? null : Math.max(0, total - summary.withOpening) };
+      return { kind: 'opening_readings', mine: can(PERMISSION.opening_readings), remaining: left(summary.withOpening, extra?.openingRemaining), href: `${base}/readings/opening` };
     case 'closing_readings':
-      return { kind: 'closing_readings', mine: can(PERMISSION.closing_readings), remaining: total === null || total === 0 ? null : Math.max(0, total - summary.withClosing) };
+      return { kind: 'closing_readings', mine: can(PERMISSION.closing_readings), remaining: left(summary.withClosing, extra?.closingRemaining), href: `${base}/readings/closing` };
     case 'closed':
-      return { kind: 'close_shift', mine: can(PERMISSION.close_shift), remaining: null };
+      return { kind: 'close_shift', mine: can(PERMISSION.close_shift) && can('fuel.shift.cash_count'), remaining: null, href: `${base}/handover` };
     default:
       return null;
   }

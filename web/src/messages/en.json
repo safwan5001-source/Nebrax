@@ -15073,10 +15073,271 @@
         "close_shift": "Close and hand over the shift",
         "approve_shift": "Approve the shift"
       },
-      "remaining": "Nozzles remaining: {count}",
+      "remaining": "Readings remaining: {count}",
       "waiting": "Waiting for: {step}",
       "complete": "This shift is complete",
       "soon": "This step will arrive inside the app soon"
+    },
+    "write": {
+      "reject": {
+        "shift_already_open": "This station already has an open shift. Open it instead of creating a second one.",
+        "idempotency_conflict": "This action clashed with an earlier one. Refresh and check the shift's status.",
+        "float_required": "This station requires the starting cash to be entered, even if it is zero.",
+        "station_branch": "This station isn't in the branch currently selected. Switch branch and try again.",
+        "station_inactive": "The station is inactive, so a shift can't run on it.",
+        "shift_not_open": "The shift is no longer open. Refresh to see its status.",
+        "reading_exists": "This reading is already recorded and can't be changed. Refresh the page.",
+        "evidence_conflict": "It conflicts with a reading already recorded with a different value. Refresh and review the saved reading.",
+        "asset_unavailable": "This nozzle or tank isn't available in the station right now.",
+        "staff_already_assigned": "You're already on this shift.",
+        "cash_exceeds_balance": "The amount is more than the expected cash in the shift.",
+        "closing_below_opening": "An ending reading is lower than its starting reading, so the shift can't be handed over. Ask your supervisor.",
+        "close_needs_readings": "You can't hand over before every reading this station requires is recorded.",
+        "close_needs_staff": "You can't hand over before at least one person is on the shift.",
+        "close_blocked_cash_variance": "Station policy blocks handover while there is a cash difference. Ask your supervisor.",
+        "close_blocked_tank_variance": "Station policy blocks handover because the tank difference is outside the allowed limit. Ask your supervisor.",
+        "tank_type_mismatch": "The tank reading type at the end differs from the start. Ask your supervisor.",
+        "unauthorized": "Your session has ended. Sign in again.",
+        "forbidden": "You don't have permission to do this.",
+        "not_found": "We couldn't find this shift or station within your work scope.",
+        "conflict": "The action clashed with another change. Refresh and check the status.",
+        "rate_limited": "Too many requests in a short time. Wait a moment and try again.",
+        "validation": "The server rejected this action and nothing was recorded.",
+        "demo": "Preview mode doesn't send data."
+      },
+      "unknown": {
+        "timeout": "No reply from the server in time. The action may have gone through. Check the shift's status before trying again.",
+        "network": "The connection dropped after sending. The action may have gone through. Check the shift's status before trying again.",
+        "server": "The server hit an error after sending. The action may have gone through. Check the shift's status before trying again."
+      },
+      "notSent": {
+        "offline": "No internet connection. Nothing was sent — try again when you're back online.",
+        "demo": "Preview mode doesn't send data."
+      },
+      "unverified": "The server sent a reply we couldn't understand, so we can't confirm the action went through. Check the shift's status.",
+      "serverSays": "Server message: {message}",
+      "check": "Check status",
+      "checking": "Checking…",
+      "tryAgain": "Try again"
+    },
+    "openShift": {
+      "title": "Open a shift",
+      "subtitle": "Start a new shift for your station",
+      "station": "Station",
+      "responsible": "Responsible for the shift",
+      "you": "{name} (you)",
+      "floatLabel": "Starting cash (cash in the drawer now)",
+      "floatHint": "Enter the amount in riyals. It is recorded and can't be changed after the shift opens.",
+      "floatRequired": "Required by this station's policy. Enter 0 if the drawer has no cash.",
+      "floatOptional": "Optional under this station's policy.",
+      "floatZero": "No cash (0)",
+      "floatInvalid": "Enter a valid amount in riyals, like 500 or 250.50.",
+      "policyUnknown": "We couldn't read the station policy, so we ask for the starting cash to be safe.",
+      "review": "Review and open the shift",
+      "confirmTitle": "Confirm opening the shift",
+      "confirmBody": "Check the details before opening:",
+      "confirmNote": "You will be recorded as responsible for this shift. The starting cash can't be changed after opening.",
+      "confirm": "Confirm and open the shift",
+      "back": "Back",
+      "sending": "Opening the shift…",
+      "success": "Shift {number} is open",
+      "successBody": "Next: record the starting meter and tank readings.",
+      "staff": {
+        "assigning": "Adding you to the shift…",
+        "done": "You're on the shift.",
+        "failed": "The shift opened, but we couldn't add you to it.",
+        "retry": "Add me to the shift again"
+      },
+      "alreadyOpen": {
+        "title": "A shift is already open",
+        "body": "Shift {number} is open for this station. Continue it instead of opening a new one.",
+        "cta": "Go to the shift"
+      },
+      "stationInactive": "This station is inactive. A shift can't be opened on it.",
+      "noPermission": {
+        "title": "You can't open shifts",
+        "body": "Ask your supervisor to give you permission to open shifts."
+      },
+      "goReadings": "Record the starting readings"
+    },
+    "entry": {
+      "title": {
+        "opening": "Starting readings",
+        "closing": "Ending readings"
+      },
+      "subtitle": {
+        "opening": "Type what each meter shows right now",
+        "closing": "Type what each meter shows at handover"
+      },
+      "meters": "Nozzle meters",
+      "tanks": "Tanks",
+      "tankHint": "Tank level in liters, recorded as a manual measurement.",
+      "tankRequired": "Required",
+      "tankOptional": "Optional under station policy",
+      "fieldLabel": {
+        "opening": "Starting reading",
+        "closing": "Ending reading"
+      },
+      "label": {
+        "opening": "Starting reading — {name}",
+        "closing": "Ending reading — {name}"
+      },
+      "unitHint": "In liters, up to 3 decimals",
+      "saved": "Saved",
+      "previous": "Last recorded ending: {value} (shift {shift})",
+      "openingValue": "Start: {value}",
+      "computed": "Quantity: {value}",
+      "needsOpening": "Record this nozzle's starting reading first.",
+      "goOpening": "Go to starting readings",
+      "error": {
+        "opening_above_closing": "The starting reading is higher than the ending reading already recorded ({closing}). It can't be saved because it would block handing over the shift — check the number or ask your supervisor.",
+        "invalid_number": "Enter a valid number (up to 3 decimals).",
+        "closing_below_opening": "The ending reading is lower than the starting reading ({opening}). It can't be saved because it would block handing over the shift — check the number or ask your supervisor."
+      },
+      "warning": {
+        "below_previous_closing": "Lower than the last recorded ending. If the meter wasn't reset, check the number.",
+        "differs_from_previous_closing": "Differs from the last recorded ending ({value}). Make sure it's what the meter shows now.",
+        "zero_delta": "No quantity was dispensed on this nozzle. Check the number."
+      },
+      "draftNote": "What you typed is kept temporarily on this device only and hasn't been saved to the system yet.",
+      "progress": "{done} of {total} recorded",
+      "footer": {
+        "ready": "{count} ready to save",
+        "invalid": "{count} need fixing",
+        "review": "Review and save ({count})",
+        "nothing": "Type at least one reading"
+      },
+      "review": {
+        "title": "Review the readings before saving",
+        "intro": "A reading can't be changed after it is saved. Check every number.",
+        "ack": "I reviewed the warnings and confirm the numbers",
+        "confirm": "Confirm and save",
+        "back": "Back to editing",
+        "saving": "Saving…"
+      },
+      "result": {
+        "saving": "Saving",
+        "saved": "Saved",
+        "failed": "Not saved",
+        "unknown": "Unconfirmed",
+        "pending": "Not sent",
+        "summary": "{saved} of {total} saved",
+        "retry": "Retry the rest"
+      },
+      "done": {
+        "title": {
+          "opening": "Starting readings complete",
+          "closing": "Ending readings complete"
+        },
+        "next": {
+          "opening": "Back to the shift",
+          "closing": "Go to handover"
+        }
+      },
+      "notOpen": {
+        "title": "The shift isn't open",
+        "body": "Readings can only be recorded in an open shift.",
+        "back": "View the shift"
+      }
+    },
+    "handover": {
+      "title": "Hand over the shift",
+      "subtitle": "Check the readings, count the cash, then hand over",
+      "step": {
+        "readings": "Step 1: Readings",
+        "cash": "Step 2: Cash",
+        "confirm": "Step 3: Handover"
+      },
+      "readiness": {
+        "title": "Readings status",
+        "ok": "Every required reading is recorded.",
+        "meterOpening": "Starting meters",
+        "meterClosing": "Ending meters",
+        "tankOpening": "Starting tanks",
+        "tankClosing": "Ending tanks",
+        "optional": "Optional",
+        "fix": "Record now",
+        "invalidOrder": "Nozzles whose ending reading is below the start: {count}. The shift can't be handed over with them — ask your supervisor.",
+        "tankMismatch": "Tank reading type differs between start and end: {count}. Ask your supervisor.",
+        "staff": "No one is recorded on the shift.",
+        "policyUnknown": "We couldn't read the station policy; the app shows every reading as required, and the server decides at handover."
+      },
+      "liters": "Quantity computed from the meters",
+      "cash": {
+        "title": "Cash",
+        "float": "Starting cash",
+        "in": "Cash added",
+        "out": "Cash taken out",
+        "expense": "Cash expenses",
+        "expected": "Expected in the drawer",
+        "unavailable": "Not available (couldn't read the shift's cash entries)",
+        "expectedNote": "Expected = starting cash + additions − withdrawals − expenses. It does not include fuel-sale cash.",
+        "movements": "Cash entries in this shift",
+        "noMovements": "No cash entries in this shift.",
+        "add": "Record a cash entry",
+        "counted": "The actual cash you counted now",
+        "countedHint": "Count all the cash in the drawer and type the total in riyals.",
+        "countedInvalid": "Enter a valid amount in riyals, like 1250 or 1250.50. Enter 0 if the drawer is empty."
+      },
+      "movement": {
+        "title": "Record a cash entry",
+        "type": "Entry type",
+        "types": {
+          "cash_in": "Add cash",
+          "cash_out": "Take cash out",
+          "expense": "Cash expense"
+        },
+        "amount": "Amount (riyals)",
+        "amountInvalid": "Enter an amount above zero, like 50 or 12.50.",
+        "reason": "Reason",
+        "reasonHint": "Write a clear reason (at least 3 characters).",
+        "exceeds": "The amount is more than the expected cash in the drawer ({expected}).",
+        "note": "The entry is recorded and can't be deleted or edited.",
+        "confirm": "Confirm and record",
+        "cancel": "Cancel",
+        "saved": "Cash entry recorded."
+      },
+      "network": {
+        "title": "Network and cards",
+        "body": "Not available right now: network totals can't be entered or matched from here."
+      },
+      "summary": {
+        "title": "Handover summary",
+        "expected": "Expected in the drawer",
+        "counted": "Cash you counted",
+        "variance": "Difference",
+        "direction": {
+          "overage": "Overage",
+          "shortage": "Shortage",
+          "none": "Matches"
+        },
+        "note": "The difference is saved for the supervisor to review and is not settled automatically.",
+        "policyAllows": "Station policy allows handover with a difference.",
+        "policyBlocks": "Station policy blocks handover while there is a cash difference.",
+        "noCount": "Enter the actual cash to see the preview.",
+        "noteLabel": "Note for the supervisor (optional)"
+      },
+      "review": "Review and hand over the shift",
+      "blocked": "Record the required readings first.",
+      "confirm": {
+        "title": "Confirm the handover",
+        "body": "After handover the readings and cash can't be changed. The supervisor will review and approve the shift.",
+        "ack": "I confirm the readings and the count are final",
+        "cta": "Confirm handover",
+        "back": "Back",
+        "sending": "Handing over…"
+      },
+      "done": {
+        "title": "Shift handed over",
+        "body": "The shift is now waiting for supervisor approval.",
+        "alreadyTitle": "This shift has been handed over",
+        "home": "Back to home"
+      },
+      "notOpen": {
+        "title": "The shift isn't open",
+        "body": "Handover is only available for an open shift.",
+        "back": "View the shift"
+      }
     }
   }
 }

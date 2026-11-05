@@ -16,6 +16,8 @@ export interface TenantData {
   shifts: Shift[];
   /** تفاصيل ورديات بمعرّفاتها (`GET /fuel-stations/shifts/{id}`)؛ غياب المعرّف = 404 كما يفعل الخادم لوردية خارج النطاق. */
   details?: Record<string, ShiftDetail>;
+  /** UI-2: سياسة الوردية لكل محطة (`GET /fuel-stations/stations/{id}/settings`)؛ غيابها = 404 كما يفعل الخادم لمحطة خارج النطاق ⇒ سياسة «غير معروفة». */
+  settings?: Record<string, Record<string, unknown>>;
 }
 
 export interface Hold { release: () => void }
@@ -70,6 +72,12 @@ export function createBackend(data: TenantData, options: { pageSize?: number } =
         return paginate(rows, query);
       }
       default: {
+        const policy = /^\/fuel-stations\/stations\/([\w-]+)\/settings$/.exec(path);
+        if (policy) {
+          const settings = data.settings?.[policy[1]];
+          if (settings) return { data: settings };
+          throw new ApiError(404, 'not found', {});
+        }
         const match = /^\/fuel-stations\/shifts\/([\w-]+)$/.exec(path);
         const detail = match ? data.details?.[match[1]] : undefined;
         if (detail) return { data: detail };

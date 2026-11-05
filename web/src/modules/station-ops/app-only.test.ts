@@ -28,7 +28,7 @@ describe('station ops is an app of its own', () => {
       // مرساة داخلية، أو قالب يبدأ بـ OPS_BASE / رابط ديناميكي تمرّره الشاشة المستدعية (`href={href}` يُفحص عند تعريفه).
       expect(href === '' || href.startsWith('#') || href.startsWith('${OPS_BASE}') || href.startsWith('${')).toBe(true);
     }
-    for (const match of source.matchAll(/(?:replace|push)\(\s*['"`]([^'"`]*)['"`]/g)) expect(['/login', '/me']).toContain(match[1]);
+    for (const match of source.matchAll(/\brouter\.(?:replace|push)\(\s*['"`]([^'"`]*)['"`]/g)) expect(['/login', '/me']).toContain(match[1]);
   });
 
   it('defines every in-app route target under OPS_BASE', () => {
