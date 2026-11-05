@@ -165,15 +165,15 @@ function ProductsSection({ station, assets }: { station: Station; assets: Return
         <>
           <ul className="space-y-2.5">
             {assets.catalog.products.map((entry) => (
-              <li key={entry.product.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-border bg-surface p-3.5">
-                <FuelIcon id={resolveFuelIcon('product', entry.product)} size={48} />
+              <li key={entry.product.id} className="flex flex-wrap items-center gap-3 rounded-[14px] border border-border bg-surface p-3.5">
+                <FuelIcon id={resolveFuelIcon('product', entry.product)} size={48} plate="always" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-text">{entry.product.name}</p>
-                  <p className="mt-0.5 text-[13px] text-muted">
+                  <p className="break-words text-base font-semibold text-text">{entry.product.name}</p>
+                  <p className="mt-0.5 text-[13px] leading-5 text-muted">
                     {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
                   </p>
                 </div>
-                <PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} timeZone={station.timezone} />
+                <div className="w-full min-w-0 sm:w-auto"><PriceLabel allowed={prices.allowed} state={prices.state} productId={entry.product.id} timeZone={station.timezone} /></div>
               </li>
             ))}
           </ul>
