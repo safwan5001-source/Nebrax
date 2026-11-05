@@ -136,7 +136,7 @@ class FuelShiftResource extends JsonResource
             ])->values()),
             'events' => $this->whenLoaded('events', fn () => $this->events
                 // D8: تحصيل المبيعات (مبلغ + بيع + سند) لا يظهر بلا fuel.sale.view.
-                ->reject(fn ($event) => ! $canViewSales && $event->type === FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED)
+                ->reject(fn ($event) => ! $canViewSales && in_array($event->type, [FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED, FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT], true))
                 ->map(fn ($event) => [
                     'id' => $event->id,
                     'type' => $event->type,

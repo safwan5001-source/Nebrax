@@ -589,6 +589,28 @@ class FuelShiftCashReconciliationTest extends TestCase
     }
 
     /** @test */
+    public function the_post_close_adjustment_event_is_hidden_from_a_viewer_without_sales_view(): void
+    {
+        $shift = $this->open('d8ev');
+        $sale = $this->sale('d8ev-sale', $shift);
+        $total = (int) $sale->invoice->total;
+        $payment = $this->collect($sale, 'cash', null, 'd8ev-pay');
+        app(FuelShiftService::class)->close($shift, self::FLOAT + $total, null, $this->f['actor']);
+        app(PaymentReversalService::class)->reverse($payment);
+        $this->assertSame(1, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT)->count());
+
+        $seller = $this->withToken($this->f['seller']->createToken('api')->plainTextToken)->getJson('/api/fuel-stations/shifts/' . $shift->id)->assertOk();
+        $types = array_column($seller->json('data.events'), 'type');
+        $this->assertNotContains('post_close_cash_adjustment', $types);
+        $this->assertNotContains('official_cash_payment_recorded', $types);
+        $this->assertStringNotContainsString('frozen_expected_cash_minor', (string) $seller->getContent());
+        $this->assertStringNotContainsString($payment->id, (string) $seller->getContent());
+
+        $owner = $this->withToken($this->f['actor']->createToken('api')->plainTextToken)->getJson('/api/fuel-stations/shifts/' . $shift->id)->assertOk();
+        $this->assertContains('post_close_cash_adjustment', array_column($owner->json('data.events'), 'type'));
+    }
+
+    /** @test */
     public function the_show_endpoint_exposes_the_summary_and_the_cash_movement_route_accepts_a_handover(): void
     {
         $shift = $this->open('api');
