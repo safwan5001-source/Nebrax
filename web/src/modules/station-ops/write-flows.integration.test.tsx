@@ -607,6 +607,27 @@ describe('handover — cash count and closing', () => {
     await user.click(cta);
   };
 
+  it('#2021: when the server basis includes sale receipts, no local expected/variance is shown or enforced — the server decides', async () => {
+    const user = userEvent.setup();
+    connect(withShift({ ...allReadings(), cash_summary: {
+      state: 'live', basis: 'receiving_shift_receipts',
+      components: { opening_float_minor: 50_000, official_cash_receipts: { available: true, amount_minor: 100_000, count: 2, reason: null }, cash_in_minor: 0, cash_out_minor: 0, treasury_handover_minor: 0, expenses_minor: 0 },
+      expected_cash_minor: 150_000, expected_cash_partial_minor: 150_000, expected_complete: true, incompleteness: [],
+      counted_cash_minor: null, variance_minor: null, variance_final: false,
+      network_receipts: { available: false, amount_minor: null, reason: 'basis_not_enabled', information_only: true },
+      unattributed_cash_receipts: { count: 0, amount_minor: 0 },
+      post_close_adjustments: { available: true, items: [], net_effect_minor: 0 },
+    } }));
+    openScreen();
+    expect(await screen.findByText('Every required reading is recorded.')).toBeTruthy();
+    expect(document.querySelector('[data-expected]')?.textContent).not.toContain('500.00');
+    expect(screen.queryByText(/does not include fuel-sale cash|not include fuel/i)).toBeNull();
+    await user.type(await field('counted-cash'), '480');
+    const preview = document.querySelector('[data-variance-preview]') as HTMLElement;
+    expect(preview.textContent).not.toContain('Shortage'); // لا فرق محلي مخترع
+    expect((buttonNamed('Review and hand over the shift') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('a complete shift: counted cash → preview → protected confirmation → closes with exactly the counted amount (no key, no sales, no approval)', async () => {
     const user = userEvent.setup();
     connect(withShift(allReadings()));

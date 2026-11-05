@@ -318,7 +318,7 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
           ) : null}
           <div className="flex items-baseline justify-between gap-3 py-2.5"><dt className="font-medium text-text">{t('handover.cash.expected')}</dt><dd className="num text-base font-bold text-text" data-expected="">{totals ? formatMinorRiyal(totals.expected) : <span className="text-sm font-normal text-muted">{t('handover.cash.unavailable')}</span>}</dd></div>
         </dl>
-        <p className="mt-2 flex items-start gap-2 text-xs leading-5 text-muted"><Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} />{t('handover.cash.expectedNote')}</p>
+        {totals ? <p className="mt-2 flex items-start gap-2 text-xs leading-5 text-muted"><Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} />{t('handover.cash.expectedNote')}</p> : null}
 
         <div className="mt-4">
           <h3 className="text-sm font-semibold text-text">{t('handover.cash.movements')}</h3>

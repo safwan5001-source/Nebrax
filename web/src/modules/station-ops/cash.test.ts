@@ -30,6 +30,13 @@ describe('cashTotals — the server formula verbatim (float + in − out − exp
     expect(cashTotals({ opening_float_minor: 1 })).toBeNull();
     expect(cashTotals({ opening_float_minor: 1, cash_movements: [{ id: 'x', type: 'refund', amount_minor: 1, reason: null, recorded_at: null }] })).toBeNull();
   });
+  it('#2021: defers to the server when its basis includes sale receipts; unchanged for movements_only / older servers', () => {
+    const base = { opening_float_minor: 50_000, cash_movements: movements };
+    const withBasis = (basis: 'movements_only' | 'receiving_shift_receipts') => ({ ...base, cash_summary: { basis } as never });
+    expect(cashTotals(withBasis('receiving_shift_receipts'))).toBeNull();
+    expect(cashTotals(withBasis('movements_only'))).toMatchObject({ expected: 62_500 });
+    expect(cashTotals({ ...base, cash_summary: null })).toMatchObject({ expected: 62_500 });
+  });
 });
 
 describe('closePreview / movementBlocker', () => {
