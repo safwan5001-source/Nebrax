@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\FuelShiftEvent;
 use App\Services\FuelQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -9,12 +10,41 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * لقطة الشفت التشغيلية. لا تحوّل عدادات الشفت أو حركاته النقدية إلى مبيعات أو
  * دفعات رسمية؛ تلك العلاقات مؤجلة صراحةً إلى Cycle 5.
+ *
+ * #2016 / D8: مبالغ مبيعات الوقود وتحصيلها تتطلب `fuel.sale.view` ولو مرّت عبر `fuel.shift.view`:
+ *  - حدث «تحصيل نقد رسمي» (مبلغ + معرّف بيع/سند) لا يظهر في الخط الزمني لمن لا يملكها.
+ *  - الحقول المالية القديمة (`expected_operational_cash_minor`، `cash_variance_minor`، `cash_variance.*`، حمولات أحداث
+ *    الإغلاق/الفرق) تبقى كما هي ما دامت بوابة #2021 مغلقة (قيمها تشغيلية بلا نقد مبيعات). عند فتح
+ *    `fuel_stations.shift_cash_receipts_enabled` يدخل نقد المبيعات في «المتوقع» نفسه، فتُخفى (null) عمّن لا يملك
+ *    `fuel.sale.view`. الفشل مغلق: بلا مستخدم = بلا صلاحية.
  */
 class FuelShiftResource extends JsonResource
 {
+    /** حمولة حدث/تصحيح تحمل الفرق أو المتوقع (تُحذف مفاتيحها عند إخفاء المشتق من المبيعات). */
+    private const SALE_DERIVED_CASH_KEYS = ['expected_operational_cash_minor', 'cash_variance_minor', 'variance_minor', 'direction', 'variance_direction'];
+
+    private function canViewSales(Request $request): bool
+    {
+        return $request->user()?->hasPermission('fuel.sale.view') ?? false;
+    }
+
+    /** هل تُحجب الحقول المالية القديمة (المتوقع/الفرق) عن هذا العارض؟ */
+    private function hidesSaleDerivedCash(Request $request): bool
+    {
+        return (bool) config('fuel_stations.shift_cash_receipts_enabled', false) && ! $this->canViewSales($request);
+    }
+
+    /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
+    private function redactCashKeys(?array $payload, bool $hide): ?array
+    {
+        return $hide && $payload !== null ? array_diff_key($payload, array_flip(self::SALE_DERIVED_CASH_KEYS)) : $payload;
+    }
+
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
+        $hideCash = $this->hidesSaleDerivedCash($request);
+        $canViewSales = $this->canViewSales($request);
 
         return [
             'id' => $this->id,
@@ -24,8 +54,8 @@ class FuelShiftResource extends JsonResource
             'station_id' => $this->fuel_station_id,
             'opening_float_minor' => (int) $this->opening_float_minor,
             'counted_cash_minor' => $this->counted_cash_minor === null ? null : (int) $this->counted_cash_minor,
-            'expected_operational_cash_minor' => $this->expected_operational_cash_minor === null ? null : (int) $this->expected_operational_cash_minor,
-            'cash_variance_minor' => $this->cash_variance_minor === null ? null : (int) $this->cash_variance_minor,
+            'expected_operational_cash_minor' => $hideCash || $this->expected_operational_cash_minor === null ? null : (int) $this->expected_operational_cash_minor,
+            'cash_variance_minor' => $hideCash || $this->cash_variance_minor === null ? null : (int) $this->cash_variance_minor,
             'operational_meter_milliliters' => (int) $this->operational_meter_milliliters,
             'operational_liters' => $quantity->millilitersToLiters((int) $this->operational_meter_milliliters),
             'operational_delivery_milliliters' => (int) $this->operational_delivery_milliliters,
@@ -43,10 +73,10 @@ class FuelShiftResource extends JsonResource
             'cash_variance' => $this->whenLoaded('cashVariance', fn () => $this->cashVariance === null ? null : [
                 'id' => $this->cashVariance->id,
                 'status' => $this->cashVariance->status,
-                'variance_direction' => $this->cashVariance->variance_direction,
-                'expected_operational_cash_minor' => (int) $this->cashVariance->expected_operational_cash_minor,
+                'variance_direction' => $hideCash ? null : $this->cashVariance->variance_direction,
+                'expected_operational_cash_minor' => $hideCash ? null : (int) $this->cashVariance->expected_operational_cash_minor,
                 'counted_cash_minor' => (int) $this->cashVariance->counted_cash_minor,
-                'variance_minor' => (int) $this->cashVariance->variance_minor,
+                'variance_minor' => $hideCash ? null : (int) $this->cashVariance->variance_minor,
                 'note' => $this->cashVariance->note,
                 'counted_by' => $this->cashVariance->counted_by,
                 'counted_at' => $this->cashVariance->counted_at?->toISOString(),
@@ -92,19 +122,22 @@ class FuelShiftResource extends JsonResource
                 'recorded_by' => $movement->recorded_by,
                 'recorded_at' => $movement->recorded_at?->toISOString(),
             ])->values()),
-            'events' => $this->whenLoaded('events', fn () => $this->events->map(fn ($event) => [
-                'id' => $event->id,
-                'type' => $event->type,
-                'payload' => $event->payload,
-                'actor_id' => $event->actor_id,
-                'occurred_at' => $event->occurred_at?->toISOString(),
-            ])->values()),
+            'events' => $this->whenLoaded('events', fn () => $this->events
+                // D8: تحصيل المبيعات (مبلغ + بيع + سند) لا يظهر بلا fuel.sale.view.
+                ->reject(fn ($event) => ! $canViewSales && $event->type === FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED)
+                ->map(fn ($event) => [
+                    'id' => $event->id,
+                    'type' => $event->type,
+                    'payload' => $this->redactCashKeys($event->payload, $hideCash),
+                    'actor_id' => $event->actor_id,
+                    'occurred_at' => $event->occurred_at?->toISOString(),
+                ])->values()),
             'corrections' => $this->whenLoaded('corrections', fn () => $this->corrections->map(fn ($correction) => [
                 'id' => $correction->id,
                 'target_type' => $correction->target_type,
                 'target_id' => $correction->target_id,
-                'before' => $correction->before,
-                'proposed' => $correction->proposed,
+                'before' => $this->redactCashKeys($correction->before, $hideCash),
+                'proposed' => $this->redactCashKeys($correction->proposed, $hideCash),
                 'status' => $correction->status,
                 'reason' => $correction->reason,
                 'requested_by' => $correction->requested_by,

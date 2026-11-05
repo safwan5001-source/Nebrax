@@ -60,9 +60,11 @@ class FuelSaleService
 
         try {
             return DB::transaction(function () use ($attributes, $actor, $stationId, $nozzleId, $idempotencyKey, $quantity) {
-                $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $station = FuelStation::lockForUpdate()->findOrFail($stationId);
                 $this->assertStationBranch($station);
+                // #2016: نطاق الفاعل قبل أي قفل/قراءة لتفويض AVI أو فوهة أو وردية (ترتيب الأقفال: المحطة ← AVI كما في finalize).
+                $this->assertActorStationScope($actor, $station);
+                $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
                 $this->assertNozzleForStation($nozzle, $station);
                 $warehouse = $this->warehouse($station);
@@ -125,6 +127,8 @@ class FuelSaleService
     {
         return DB::transaction(function () use ($sale, $actor) {
             $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
+            // #2016: لا يرى فاعل خارج نطاق المحطة حتى حالة البيع (إعادة إنهاء نهائي أو رسالة «ملغى») — قبل أي إرجاع.
+            $this->assertActorStationScope($actor, FuelStation::findOrFail($sale->fuel_station_id));
             if ($sale->isFinalized()) {
                 return $sale->fresh(['invoice', 'stockMovement', 'cogsJournalEntry']);
             }
@@ -137,6 +141,7 @@ class FuelSaleService
 
             $station = FuelStation::lockForUpdate()->findOrFail($sale->fuel_station_id);
             $this->assertStationBranch($station);
+            $this->assertActorStationScope($actor, $station);
             $warehouse = $this->warehouse($station);
             if ($warehouse->id !== $sale->warehouse_id) {
                 throw new RuntimeException('تغير مخزن المحطة بعد إنشاء مسودة البيع؛ أنشئ مسودة جديدة لحفظ التاريخ.');
@@ -297,6 +302,9 @@ class FuelSaleService
 
         return DB::transaction(function () use ($sale, $attributes, $actor, $idempotencyKey, $paymentMethodId, $amount) {
             $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
+            $station = FuelStation::findOrFail($sale->fuel_station_id);
+            // #2016: نطاق الفاعل قبل كل شيء — بما فيه إعادة إرسال مفتاح التحصيل (لا يُرجَع سند محطة خارج النطاق).
+            $this->assertActorStationScope($actor, $station);
             if (! $sale->isFinalized() || $sale->invoice_id === null || $sale->partner_id === null) {
                 throw new RuntimeException('لا يمكن تحصيل سند قبل إنهاء بيع الوقود وفاتورته الرسمية.');
             }
@@ -311,7 +319,6 @@ class FuelSaleService
                 return $payment;
             }
 
-            $station = FuelStation::findOrFail($sale->fuel_station_id);
             $this->assertStationBranch($station);
             $settings = $this->settings->forStation($station);
             $allowed = $settings['fuel_sales_allowed_payment_method_ids'] ?? [];
@@ -432,6 +439,19 @@ class FuelSaleService
         }
         if ($station->status !== FuelStation::STATUS_ACTIVE) {
             throw new RuntimeException('محطة الوقود غير نشطة.');
+        }
+    }
+
+    /**
+     * #2016 — دفاع في العمق داخل القفل: نطاق **الفاعل** (فرع + مخزن) على المحطة، حتى لو تغيّر نطاقه بين حارس HTTP
+     * (404 الموحّد في المتحكم) وبدء المعاملة أو استُدعيت الخدمة بلا المتحكم. القاعدة نفسها في `FuelShiftService` (#2014):
+     * غير المقيَّد لا يتأثر، والمحطة بلا فرع/مخزن تبقى متاحة (عقد `AuthorizesFuelStationScope`). لا يمسّ سياسات الفرع النشط.
+     */
+    private function assertActorStationScope(User $actor, FuelStation $station): void
+    {
+        if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
+            || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+            throw new RuntimeException('محطة البيع خارج نطاق صلاحياتك.');
         }
     }
 

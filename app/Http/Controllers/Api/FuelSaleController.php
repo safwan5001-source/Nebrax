@@ -21,6 +21,12 @@ use App\Services\FuelStationSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * #2016 — كل مسار بيع/تحصيل/طرق دفع/أسعار يمرّ بحارس نطاق المحطة (فرع + مخزن) على الخادم قبل أي أثر:
+ * `FuelSale` BranchScoped (فرع فقط) و`FuelStation` CompanyWide، فبلا `AuthorizesFuelStationScope` كان مستخدم مقيَّد بمخزن/محطة
+ * داخل الفرع نفسه يقرأ ويُنشئ ويُنهي (فاتورة + COGS + مخزون) ويحصّل (سند قبض) على محطة أخرى بمجرد معرفة المعرّف.
+ * الرفض 404 موحّد، وغير المقيَّد لا يتأثر. الأسعار محروسة منذ #2010/#2019 وتبقى كما هي.
+ */
 class FuelSaleController extends ApiController
 {
     use AuthorizesFuelStationScope;
@@ -46,6 +52,9 @@ class FuelSaleController extends ApiController
             $query->where('status', $request->query('status'));
         }
 
+        // #2016: محطات المستخدم (فرع + مخزن) — `FuelSale` BranchScoped فرعاً فقط، فبلا هذا تظهر مبيعات محطة أخرى من الفرع نفسه.
+        $this->restrictToAccessibleStations($query);
+
         return FuelSaleResource::collection($this->scopeToActiveBranch($query, $request)->paginate(50))->response();
     }
 
@@ -56,6 +65,8 @@ class FuelSaleController extends ApiController
 
     public function store(StoreFuelSaleRequest $request): JsonResponse
     {
+        // قبل الخدمة: محطة خارج فرع/مخزن المستخدم (أو مستأجر آخر) = 404 موحّد بلا أي أثر.
+        $this->accessibleStation($request->validated()['fuel_station_id']);
         $sale = $this->domain(fn () => $this->sales->createDraft($request->validated(), $request->user()));
 
         return (new FuelSaleResource($this->present($sale)))->response()->setStatusCode(201);
@@ -81,6 +92,7 @@ class FuelSaleController extends ApiController
     public function paymentMethods(Request $request, string $stationId): JsonResponse
     {
         $station = $this->scopeToActiveBranch(FuelStation::query(), $request)->findOrFail($stationId);
+        $this->assertRecordAccessible($station->branch_id, [$station->warehouse_id]); // #2016
         $ids = $this->settings->forStation($station)['fuel_sales_allowed_payment_method_ids'] ?? [];
         $methods = PaymentMethod::query()
             ->whereIn('id', is_array($ids) ? $ids : [])
@@ -224,9 +236,13 @@ class FuelSaleController extends ApiController
         return $products;
     }
 
+    /** البيع في فروع المستخدم **و** محطته ضمن فرعه/مخزنه — وإلا 404 موحّد قبل أي قراءة أو كتابة (#2016). */
     private function visibleSale(string $id, Request $request): FuelSale
     {
-        return $this->scopeToActiveBranch(FuelSale::query(), $request)->findOrFail($id);
+        $sale = $this->scopeToActiveBranch(FuelSale::query(), $request)->findOrFail($id);
+        $this->accessibleStation($sale->fuel_station_id);
+
+        return $sale;
     }
 
     private function present(FuelSale $sale): FuelSale
