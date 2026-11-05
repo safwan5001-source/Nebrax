@@ -14597,7 +14597,8 @@
       "ackTax": "I confirm the product-card price has the same basis: {tax}",
       "noRetroNote": "No past sale or invoice is changed; the new price applies only to finalizations after its start.",
       "saved": "Price saved",
-      "savedReplay": "Price was already saved (not duplicated)"
+      "savedReplay": "Price was already saved (not duplicated)",
+      "suggestionLost": "The suggestion is no longer available or changed after your review. Close this sheet and review the suggestion again from the card, or set the price manually with “Change/Set price”."
     },
     "errors": {
       "generic": "Couldn't save the price. Check the details and try again.",

@@ -490,6 +490,30 @@ describe('suggestion from the product card — preview first, explicit confirmat
     expect(screen.queryByText(/The product card suggests/)).toBeNull();
   });
 
+  it('after a rejected suggestion save the sheet never degrades to a manual save of the stale amount', async () => {
+    seedUser();
+    const world = makeWorld();
+    connect(world);
+    backend.setPost(() => {
+      world.suggestions['station:a'] = [suggestionBlocked('a', 'p1', ['requires_liter_price']), suggestionBlocked('a', 'p2'), suggestionBlocked('a', 'p3')]; // البطاقة تغيّرت
+      return { status: 409, body: { message: 'x', reason: 'suggestion_stale' } };
+    });
+    renderBoard();
+    await screen.findByText(/2\.18/);
+    await userEvent.click(within(card('Alpha')).getByRole('button', { name: 'Review suggestion' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Review' }));
+    for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
+    await userEvent.click(screen.getByRole('button', { name: 'Approve price' }));
+
+    expect(await screen.findByText(/no longer available or changed/)).toBeTruthy();
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Approve price' }) as HTMLButtonElement).disabled).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve price' }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(backend.posts()).toHaveLength(1); // لا إعادة إرسال بلا source
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('a stale suggestion is refused by the server, explained, and the board refetched', async () => {
     seedUser();
     connect();

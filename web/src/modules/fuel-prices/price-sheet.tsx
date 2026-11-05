@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { formatDateTime } from '@/lib/formatting';
 import { formatMinorRiyal, minorToRiyal } from '@/lib/money';
 import { createPrice, PricesError } from './client';
-import type { CreateResult, EffectiveRow, PriceScope, SuggestionRow } from './contract';
+import type { CreateResult, EffectiveRow, PriceScope, SuggestionRow, TaxMode } from './contract';
 import { buildPayload, currentInScope, newIdempotencyKey, parsePriceInput, parseScheduled, rejectionKey, type StartMode } from './price-form';
 import { describeRow, describeSuggestion, needsSupersede } from './row-view';
 
@@ -39,9 +39,13 @@ export function PriceSheet(props: PriceSheetProps) {
 
   const view = describeRow(row);
   const sug = describeSuggestion(suggestion);
-  const sugAvail = mode === 'suggestion' && sug.kind === 'available' ? sug : null;
-  const fromSuggestion = sugAvail !== null;
-  const taxMode = sugAvail ? sugAvail.taxMode : view.kind === 'known' || view.kind === 'not_configured' ? view.taxMode : null;
+  // المصدر من وضع الورقة لا من بيانات حيّة: ورقة اقتراح لا تتحوّل أبداً إلى إدخال يدوي لو اختفى الاقتراح أو تغيّر بعد رفض.
+  const fromSuggestion = mode === 'suggestion';
+  const liveSug = fromSuggestion && sug.kind === 'available' ? sug : null;
+  const [snap, setSnap] = useState<{ minor: number; taxMode: TaxMode } | null>(null);
+  const sugRef = snap ?? (liveSug ? { minor: liveSug.minor, taxMode: liveSug.taxMode } : null);
+  const suggestionInvalid = fromSuggestion && (liveSug === null || sugRef === null || liveSug.minor !== sugRef.minor || liveSug.taxMode !== sugRef.taxMode);
+  const taxMode = fromSuggestion ? sugRef?.taxMode ?? null : view.kind === 'known' || view.kind === 'not_configured' ? view.taxMode : null;
   const current = currentInScope(row, scope);
 
   const [step, setStep] = useState<Step>('form');
@@ -61,7 +65,8 @@ export function PriceSheet(props: PriceSheetProps) {
   useEffect(() => {
     if (!open) return;
     setStep('form');
-    setPriceText(sugAvail ? minorToRiyal(sugAvail.minor) : '');
+    setSnap(liveSug ? { minor: liveSug.minor, taxMode: liveSug.taxMode } : null);
+    setPriceText(liveSug ? minorToRiyal(liveSug.minor) : '');
     setStart({ kind: 'now' });
     setNote('');
     setTouched(false);
@@ -84,7 +89,7 @@ export function PriceSheet(props: PriceSheetProps) {
   const supersede = needsSupersede(current, startMs);
   const priceError = !parsed.ok && (touched || priceText !== '') ? parsed.error : null;
   const scheduleError = scheduled && !scheduled.ok ? scheduled.error : null;
-  const formValid = parsed.ok && scheduleError === null && taxMode !== null && (!sugAvail || parsed.minor === sugAvail.minor);
+  const formValid = parsed.ok && scheduleError === null && taxMode !== null && (!fromSuggestion || (!suggestionInvalid && sugRef !== null && parsed.minor === sugRef.minor));
   const reviewReady = formValid && (!supersede || ackReplace) && (!fromSuggestion || (ackUnit && ackTax));
 
   const startLabel = useMemo(
@@ -93,7 +98,7 @@ export function PriceSheet(props: PriceSheetProps) {
   );
 
   async function save() {
-    if (savingRef.current || !parsed.ok || taxMode === null) return; // قفل ضغطتين
+    if (savingRef.current || !parsed.ok || taxMode === null || suggestionInvalid) return; // قفل ضغطتين
     savingRef.current = true;
     setSaving(true);
     setError(null);
@@ -107,7 +112,7 @@ export function PriceSheet(props: PriceSheetProps) {
           scheduledIso: scheduled?.ok ? scheduled.iso : undefined,
           note,
           supersede,
-          suggestion: sugAvail ? { tax_mode: sugAvail.taxMode } : null,
+          suggestion: fromSuggestion && sugRef ? { tax_mode: sugRef.taxMode } : null,
           idempotencyKey: keyRef.current,
         }),
       );
@@ -142,6 +147,12 @@ export function PriceSheet(props: PriceSheetProps) {
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          {suggestionInvalid ? (
+            <p role="alert" className="flex items-start gap-2 rounded-xl border border-negative/40 px-4 py-3 text-sm text-negative">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.8} />
+              <span>{t('sheet.suggestionLost')}</span>
+            </p>
+          ) : null}
           {step === 'form' ? (
             <>
               {view.kind === 'known' ? (
