@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\PublicHealthController;
 use App\Http\Controllers\Api\PublicInvoiceController;
 use App\Http\Controllers\Api\PublicPartnerController;
+use App\Http\Controllers\Api\PublicPartnerStatementController;
 use App\Http\Controllers\Api\PublicProductController;
 use App\Http\Controllers\Api\PublicWebhookController;
 use App\Http\Middleware\AuthenticateApiClient;
@@ -83,6 +84,12 @@ Route::middleware([
     Route::middleware(EnsureApiScope::class.':partners:read')->group(function () {
         Route::get('partners', [PublicPartnerController::class, 'index'])->name('partners.index');
         Route::get('partners/{id}', [PublicPartnerController::class, 'show'])->whereUuid('id')->name('partners.show');
+    });
+
+    // كشف حساب طرف — قراءة فقط، scope مستقل (يكشف أرصدة مالية لا بيانات دليل).
+    Route::middleware(EnsureApiScope::class.':statements:read')->group(function () {
+        Route::get('partners/{id}/statement', [PublicPartnerStatementController::class, 'show'])
+            ->whereUuid('id')->name('partners.statement');
     });
 
     Route::middleware(EnsureApiScope::class.':products:read')->group(function () {
