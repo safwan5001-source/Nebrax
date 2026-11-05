@@ -11651,7 +11651,8 @@
         "partners": "الأطراف",
         "products": "المنتجات",
         "invoices": "الفواتير",
-        "webhooks": "الـ Webhooks"
+        "webhooks": "الـ Webhooks",
+        "statements": "كشوف الحساب"
       },
       "descriptions": {
         "partners:read": "قراءة الأطراف (العملاء والموردين).",
@@ -11660,6 +11661,7 @@
         "products:write": "إنشاء المنتجات.",
         "invoices:read": "قراءة فواتير المبيعات.",
         "invoices:write": "إنشاء مسودات فواتير المبيعات.",
+        "statements:read": "قراءة كشوف حساب الأطراف (الأرصدة المالية).",
         "webhooks:read": "قراءة اشتراكات الـ Webhooks.",
         "webhooks:write": "إدارة اشتراكات الـ Webhooks."
       }
