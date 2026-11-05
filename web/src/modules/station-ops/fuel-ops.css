@@ -39,6 +39,8 @@
   --fo-positive-tint: #e8f5f0;
   --fo-warning-tint: #fdf1e3;
   --fo-negative-tint: #fbe9eb;
+  /* لوح أيقونات Fuel Icons V2 المشتركة: من رموز هذا النظام (الخلفية فاتحاً، النص الفاتح داكناً) — الرسم الأصلي لا يتغيّر. */
+  --awj-fuel-icon-plate: var(--background);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -72,6 +74,7 @@
   --fo-positive-tint: #12372f;
   --fo-warning-tint: #3a2a1c;
   --fo-negative-tint: #3d1f26;
+  --awj-fuel-icon-plate: var(--text);
 }
 
 /* أزرار أدوات الرأس (لغة/سمة) على خلفية الهيدر الكحلية: نص أبيض، تحويم شفاف. */
