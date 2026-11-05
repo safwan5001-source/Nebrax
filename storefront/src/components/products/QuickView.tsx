@@ -3,7 +3,7 @@
 import { Eye, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
 import {
   Dialog,
@@ -44,6 +44,9 @@ export function QuickView({
   const t = useTranslations("products");
   const { addItem } = useCart();
   const [open, setOpen] = useState(false);
+  // The trigger is a plain button next to a controlled <Dialog>, not a <DialogTrigger>, so Radix has no trigger to
+  // hand focus back to on close and would drop it on <body>. Restore it explicitly (WCAG 2.4.3).
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
 
@@ -71,6 +74,7 @@ export function QuickView({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <button
+        ref={triggerRef}
         type="button"
         aria-label={t("quickView")}
         onClick={(event) => {
@@ -82,7 +86,13 @@ export function QuickView({
       >
         <Eye className="size-4" aria-hidden="true" />
       </button>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          triggerRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-start">
             <bdi>{product.name}</bdi>

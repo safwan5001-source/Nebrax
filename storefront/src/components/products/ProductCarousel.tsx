@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type Swiper from "swiper";
 import { Navigation } from "swiper/modules";
 import { Swiper as SwiperComponent, SwiperSlide } from "swiper/react";
@@ -11,6 +11,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
 
 interface ProductCarouselProps {
@@ -39,6 +40,13 @@ interface ProductCarouselProps {
 const NAV_BUTTON_BASE =
   "absolute top-1/2 -translate-y-1/2 z-10 flex size-10 items-center justify-center cursor-pointer rounded-full border border-store-border bg-store-surface text-store-muted-foreground shadow-sm transition-colors hover:bg-store-surface-muted hover:text-store-foreground";
 
+/**
+ * An arrow with nowhere to go is disabled and invisible, but still occupies its box above the slides. Without
+ * `pointer-events-none` it swallows taps meant for the card controls beneath it — notably the first card's Quick View
+ * (bottom-start of the image), which the start arrow sits right over on phones.
+ */
+const HIDDEN_NAV_BUTTON = "pointer-events-none opacity-0";
+
 const DEFAULT_BREAKPOINTS: Record<number, SwiperOptions> = {
   640: { slidesPerView: 2, spaceBetween: 24 },
   768: { slidesPerView: 3, spaceBetween: 24 },
@@ -60,6 +68,33 @@ export function ProductCarousel({
 
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const isLuxe = usePublishedThemeMarker() === "awj-luxe-motion";
+  // Luxe cards carry a tall portrait image with Quick View at its bottom-start corner. `top-1/2` of the whole slide
+  // (image + body) lands on that corner, so a visible arrow would sit on the first card's Quick View. Centre the arrows
+  // on the image instead (measured, so any merchant image ratio works). Other themes keep `top-1/2` untouched.
+  const [arrowTop, setArrowTop] = useState<number | null>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    const image = isLuxe
+      ? root?.querySelector<HTMLElement>("[data-card-image]")
+      : null;
+    if (!root || !image) {
+      setArrowTop(null);
+      return;
+    }
+    const measure = () => {
+      const top =
+        image.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      setArrowTop(Math.round(top + image.getBoundingClientRect().height / 2));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [isLuxe]);
+  const arrowStyle = arrowTop === null ? undefined : { top: arrowTop };
 
   const handleBeforeInit = useCallback((swiper: Swiper) => {
     if (typeof swiper.params.navigation === "object") {
@@ -82,7 +117,7 @@ export function ProductCarousel({
   }
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       {/*
         `start-2`/`end-2` (inside the track, overlaying its edge slide)
         rather than a negative offset outside it: this component has no
@@ -94,18 +129,20 @@ export function ProductCarousel({
       <button
         ref={prevRef}
         type="button"
+        style={arrowStyle}
         aria-label={t("carouselPrev")}
         disabled={isBeginning}
-        className={`${NAV_BUTTON_BASE} start-2 ${isBeginning ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} start-2 ${isBeginning ? HIDDEN_NAV_BUTTON : ""}`}
       >
         <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
       </button>
       <button
         ref={nextRef}
         type="button"
+        style={arrowStyle}
         aria-label={t("carouselNext")}
         disabled={isEnd}
-        className={`${NAV_BUTTON_BASE} end-2 ${isEnd ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} end-2 ${isEnd ? HIDDEN_NAV_BUTTON : ""}`}
       >
         <ChevronRight className="w-5 h-5 rtl:rotate-180" />
       </button>

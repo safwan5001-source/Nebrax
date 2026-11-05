@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuickView } from "@/components/products/QuickView";
@@ -63,6 +63,25 @@ describe("QuickView", () => {
     await user.click(screen.getByLabelText("quickView"));
     expect(screen.getByText("Classic T-Shirt")).toBeInTheDocument();
     expect(screen.getByText("$25.00")).toBeInTheDocument();
+  });
+
+  it("returns focus to its trigger when the dialog closes (WCAG 2.4.3 — no focus loss to <body>)", async () => {
+    const user = userEvent.setup();
+    render(
+      <QuickView
+        product={simpleProduct}
+        basePath="/us/en"
+        isVariantManaged={false}
+      />,
+    );
+    const trigger = screen.getByLabelText("quickView");
+    await user.click(trigger);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveFocus();
   });
 
   it("shows the real strikethrough price only when the catalogue itself marks the product on sale", async () => {
