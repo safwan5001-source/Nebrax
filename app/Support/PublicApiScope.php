@@ -22,6 +22,10 @@ enum PublicApiScope: string
     case PRODUCTS_READ = 'products:read';
     case INVOICES_READ = 'invoices:read';
 
+    // ── كشف حساب الطرف (قراءة فقط) — scope مستقل عن `partners:read` لأنه يكشف أرصدة مالية
+    // لا بيانات دليل فقط (أقل امتياز). يُسقَط على صلاحية التقارير القائمة `reports.view`.
+    case STATEMENTS_READ = 'statements:read';
+
     // ── Write (PR-5) — كتابة محكومة. مطابقة تامّة، لا wildcard؛ القراءة لا تعني الكتابة.
     case PARTNERS_WRITE = 'partners:write';
     case PRODUCTS_WRITE = 'products:write';
@@ -38,6 +42,7 @@ enum PublicApiScope: string
             self::PARTNERS_READ  => 'partners.view',
             self::PRODUCTS_READ  => 'products.view',
             self::INVOICES_READ  => 'invoices.view',
+            self::STATEMENTS_READ => 'reports.view',
             self::PARTNERS_WRITE => 'partners.manage',
             self::PRODUCTS_WRITE => 'products.manage',
             self::INVOICES_WRITE => 'invoices.manage',

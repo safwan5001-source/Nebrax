@@ -27,6 +27,7 @@ export const OPENAPI_MODEL: OpenApiModel = {
     "partners:write",
     "products:read",
     "products:write",
+    "statements:read",
     "webhooks:read",
     "webhooks:write"
   ],
@@ -903,6 +904,163 @@ export const OPENAPI_MODEL: OpenApiModel = {
             {
               "status": "404",
               "description": "The resource does not exist within the caller's tenant. Identifiers from other tenants are reported as not found without revealing their existence.",
+              "headers": [
+                "X-Request-Id"
+              ]
+            },
+            {
+              "status": "429",
+              "description": "The per-client rate limit was exceeded.",
+              "headers": [
+                "X-Request-Id",
+                "Retry-After",
+                "X-RateLimit-Limit",
+                "X-RateLimit-Remaining",
+                "X-RateLimit-Reset"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "getPartnerStatement",
+          "method": "get",
+          "path": "/partners/{id}/statement",
+          "summary": "Get a partner account statement",
+          "description": "Read-only account statement for a customer or supplier, built from posted ledger entries (positive running balance = the partner owes the tenant). Amounts are integer minor units. The response is not paginated; a statement exceeding 2000 movements is rejected with 422 — narrow the period with `from`/`to`. Requires the dedicated `statements:read` scope.",
+          "tag": "Partners",
+          "scope": "statements:read",
+          "requiresAuth": true,
+          "idempotency": false,
+          "parameters": [
+            {
+              "name": "X-Request-Id",
+              "in": "header",
+              "required": false,
+              "description": "Optional client-supplied correlation id. When present and matching `^[A-Za-z0-9._-]{8,128}$` it is echoed in the `X-Request-Id` response header and `meta.request_id`; when absent or malformed the server generates one. Applies to every operation, health included.",
+              "type": "string",
+              "constraints": "length 8–128 · pattern ^[A-Za-z0-9._-]{8,128}$"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Resource identifier (UUID).",
+              "type": "string · uuid"
+            },
+            {
+              "name": "from",
+              "in": "query",
+              "required": false,
+              "description": "Period start (YYYY-MM-DD). Earlier movements roll into the opening balance.",
+              "type": "string · date"
+            },
+            {
+              "name": "to",
+              "in": "query",
+              "required": false,
+              "description": "Period end (YYYY-MM-DD), on or after `from`.",
+              "type": "string · date"
+            },
+            {
+              "name": "role",
+              "in": "query",
+              "required": false,
+              "description": "Restrict a dual-role partner's statement to one role.",
+              "type": "string · enum",
+              "constraints": "enum: customer · supplier"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "The partner statement.",
+              "headers": [
+                "X-Request-Id"
+              ],
+              "data": {
+                "kind": "object",
+                "itemType": "PartnerStatement",
+                "fields": [
+                  {
+                    "name": "partner",
+                    "type": "object",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "currency",
+                    "type": "string · ISO-4217",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "ISO-4217 currency code.",
+                    "example": "\"SAR\""
+                  },
+                  {
+                    "name": "from",
+                    "type": "string · date",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "to",
+                    "type": "string · date",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "opening_balance_minor",
+                    "type": "integer · minor units",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+                  },
+                  {
+                    "name": "rows",
+                    "type": "array of PartnerStatementRow",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "closing_balance_minor",
+                    "type": "integer · minor units",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+                  }
+                ]
+              }
+            },
+            {
+              "status": "401",
+              "description": "Missing or invalid API key.",
+              "headers": [
+                "X-Request-Id"
+              ]
+            },
+            {
+              "status": "403",
+              "description": "Authenticated but not permitted — insufficient scope, inactive client, missing tenant context, or inactive subscription.",
+              "headers": [
+                "X-Request-Id"
+              ]
+            },
+            {
+              "status": "404",
+              "description": "The resource does not exist within the caller's tenant. Identifiers from other tenants are reported as not found without revealing their existence.",
+              "headers": [
+                "X-Request-Id"
+              ]
+            },
+            {
+              "status": "422",
+              "description": "The request failed validation. `details` maps fields to messages.",
               "headers": [
                 "X-Request-Id"
               ]
@@ -3535,6 +3693,60 @@ export const OPENAPI_MODEL: OpenApiModel = {
         "name": "country",
         "type": "string",
         "required": false,
+        "nullable": true,
+        "readOnly": false
+      }
+    ],
+    "PartnerStatementRow": [
+      {
+        "name": "date",
+        "type": "string · date",
+        "required": true,
+        "nullable": false,
+        "readOnly": false
+      },
+      {
+        "name": "number",
+        "type": "string",
+        "required": true,
+        "nullable": true,
+        "readOnly": false
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": true,
+        "nullable": true,
+        "readOnly": false
+      },
+      {
+        "name": "debit_minor",
+        "type": "integer · minor units",
+        "required": true,
+        "nullable": false,
+        "readOnly": false,
+        "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+      },
+      {
+        "name": "credit_minor",
+        "type": "integer · minor units",
+        "required": true,
+        "nullable": false,
+        "readOnly": false,
+        "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+      },
+      {
+        "name": "balance_minor",
+        "type": "integer · minor units",
+        "required": true,
+        "nullable": false,
+        "readOnly": false,
+        "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+      },
+      {
+        "name": "source",
+        "type": "object",
+        "required": true,
         "nullable": true,
         "readOnly": false
       }

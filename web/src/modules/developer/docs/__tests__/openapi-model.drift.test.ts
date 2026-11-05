@@ -24,19 +24,20 @@ describe('OpenAPI docs model', () => {
     expect(JSON.parse(JSON.stringify(fresh))).toEqual(OPENAPI_MODEL);
   });
 
-  it('exposes the eight contract scopes and three webhook events', () => {
+  it('exposes the nine contract scopes and three webhook events', () => {
     expect(OPENAPI_MODEL.scopes).toEqual([
       'invoices:read', 'invoices:write',
       'partners:read', 'partners:write',
       'products:read', 'products:write',
+      'statements:read',
       'webhooks:read', 'webhooks:write',
     ]);
     expect(OPENAPI_MODEL.events).toEqual(['partner.created', 'product.created', 'invoice.created']);
   });
 
-  it('covers the five resource groups and sixteen operations', () => {
+  it('covers the five resource groups and seventeen operations', () => {
     expect(OPENAPI_MODEL.tags.map((tag) => tag.name)).toEqual(['Health', 'Partners', 'Products', 'Invoices', 'Webhooks']);
     const operations = OPENAPI_MODEL.tags.flatMap((tag) => tag.operations);
-    expect(operations).toHaveLength(16);
+    expect(operations).toHaveLength(17);
   });
 });
