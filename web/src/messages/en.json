@@ -14841,6 +14841,50 @@
         },
         "note": "This shift's cash only — not sales and not card/network collections."
       },
+      "cashSummary": {
+        "title": "Cash summary",
+        "live": "Live figures — they update until the shift closes.",
+        "frozen": "Frozen when the shift closed — later activity doesn't change these figures.",
+        "row": {
+          "opening": "Starting cash",
+          "sales": "Cash collected from fuel sales in this shift",
+          "cashIn": "Other cash in (not fuel sales)",
+          "handover": "Handed over to the treasury",
+          "otherOut": "Other cash out",
+          "expenses": "Cash expenses"
+        },
+        "expected": "Expected cash",
+        "expectedPartial": "Expected cash — incomplete",
+        "counted": "Counted cash",
+        "notCounted": "Not counted yet",
+        "variance": "Difference",
+        "varianceProvisional": "Provisional difference",
+        "direction": {
+          "overage": "Overage",
+          "shortage": "Shortage",
+          "none": "Matches"
+        },
+        "provisionalNote": "This difference is not final because the expected cash is incomplete — the supervisor reviews it. Don't treat it as an overage or shortage.",
+        "unavailable": {
+          "permission": "Not available for your role",
+          "basis_not_enabled": "Not counted at this station yet",
+          "not_recorded_legacy": "Not recorded for this older shift",
+          "unknown": "Not available"
+        },
+        "gap": {
+          "sales_cash_not_included": "Expected cash counts drawer movements only — cash from fuel sales is not included.",
+          "permission_sales_view": "Sales cash is hidden for your role, so the expected total can't be shown.",
+          "unattributed_cash_receipts": "{count} cash collections made before this was enabled aren't attributed to any shift.",
+          "multiple_cash_accounts": "Cash went into more than one cash box in this shift — not supported yet.",
+          "legacy_closed_snapshot": "This shift closed before fuel-sale cash was linked to shifts.",
+          "unknown": "Some parts of the expected cash are missing."
+        },
+        "network": {
+          "label": "Card / network receipts (for information)",
+          "note": "Registered bank receipts only. They aren't matched to the card terminal and are never part of the cash."
+        },
+        "afterClose": "{count} cash collection(s) were reversed after this shift closed (total {amount}). Shown for review — the closed difference is unchanged."
+      },
       "list": {
         "viewDetails": "View details",
         "notComputed": "Computed when the shift closes"

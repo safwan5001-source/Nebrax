@@ -334,7 +334,7 @@ class FuelSaleService
             }
 
             // #2021 (D1): تحت الأساس receiving_shift_receipts يُختم الإيصال بالوردية المفتوحة وقت التحصيل (لا وردية إنشاء البيع).
-            // مغلقاً (الافتراضي) $receivingShift = false فيعمل المسار القديم حرفياً. ترتيب الأقفال: البيع ← الفاتورة ← الوردية.
+            // مغلقاً (الافتراضي) $stampReceipt = false فيعمل المسار القديم حرفياً. ترتيب الأقفال: البيع ← الفاتورة ← الوردية.
             $stampReceipt = $this->cashExpectation->effectiveBasis($station) === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
             $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor) : null;
 

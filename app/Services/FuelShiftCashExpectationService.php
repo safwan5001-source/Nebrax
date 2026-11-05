@@ -145,7 +145,6 @@ class FuelShiftCashExpectationService
             gaps: $gaps, salesVisible: $salesVisible,
             counted: (int) $variance->counted_cash_minor, variance: (int) $variance->variance_minor, unattributed: [0, 0],
             shift: $shift,
-            frozenExpected: (int) $variance->expected_operational_cash_minor,
         );
     }
 
@@ -189,7 +188,6 @@ class FuelShiftCashExpectationService
         string $state, string $basis, int $opening, int $cashIn, int $cashOut, int $handover, int $expenses,
         int $receipts, ?int $receiptsCount, bool $receiptsKnown, int $network, bool $networkKnown,
         array $gaps, bool $salesVisible, ?int $counted, ?int $variance, array $unattributed, FuelShift $shift,
-        ?int $frozenExpected = null,
     ): array {
         $receiptsAvailable = $receiptsKnown && $salesVisible;
         $visibleGaps = $gaps;
@@ -197,9 +195,6 @@ class FuelShiftCashExpectationService
             $visibleGaps[] = self::GAP_PERMISSION_SALES_VIEW;
         }
         $partial = $opening + ($receiptsKnown ? $receipts : 0) + $cashIn - $cashOut - $expenses;
-        if ($state !== 'live' && $frozenExpected !== null && ! $receiptsKnown) {
-            $partial = $frozenExpected;
-        }
         $complete = $visibleGaps === [];
         $reason = static fn (bool $known, bool $visible, string $state): ?string => $known && $visible ? null
             : (! $visible && $known ? 'permission' : ($state === 'legacy_frozen' ? 'not_recorded_legacy' : 'basis_not_enabled'));
@@ -243,8 +238,11 @@ class FuelShiftCashExpectationService
     /** @return array{available:bool,items:array<int,array<string,mixed>>,net_effect_minor:?int} */
     private function postCloseAdjustments(FuelShift $shift, bool $salesVisible): array
     {
-        if ($shift->isOpen() || ! $salesVisible) {
-            return ['available' => $shift->isOpen() ? true : false, 'items' => [], 'net_effect_minor' => $shift->isOpen() ? 0 : null];
+        if ($shift->isOpen()) {
+            return ['available' => true, 'items' => [], 'net_effect_minor' => 0];
+        }
+        if (! $salesVisible) {
+            return ['available' => false, 'items' => [], 'net_effect_minor' => null];
         }
         $items = FuelShiftEvent::where('fuel_shift_id', $shift->id)
             ->where('type', FuelShiftEvent::TYPE_POST_CLOSE_CASH_ADJUSTMENT)
