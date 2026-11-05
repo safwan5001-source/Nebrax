@@ -166,7 +166,7 @@ export interface ProgressStep {
  * التقدم يتبع حالات أَوْج الثلاث فقط (open ← closed ← approved) مع تفصيل قراءات العدادات داخل الوردية المفتوحة.
  * لا حالة «مُرسلة/مُعادة» (غير موجودة في الخادم). «الحالية» = أول خطوة غير مكتملة.
  */
-export function deriveProgress(detail: ShiftDetail, summary: ReadingsSummary): ProgressStep[] {
+export function deriveProgress(detail: ShiftDetail, summary: ReadingsSummary, extra?: { openingRemaining: number; closingRemaining: number } | null): ProgressStep[] {
   const isOpen = detail.status === 'open';
   const isApproved = detail.status === 'approved';
   const closed = detail.status === 'closed' || isApproved;
@@ -178,10 +178,13 @@ export function deriveProgress(detail: ShiftDetail, summary: ReadingsSummary): P
     return done >= total ? 'done' : 'pending';
   };
 
+  const gate = (state: StepState, remaining: number | undefined): StepState => (state === 'done' && !closed && remaining !== undefined && remaining > 0 ? 'pending' : state);
+
   const steps: ProgressStep[] = [
     { key: 'opened', state: 'done', at: detail.opened_at, count: null },
-    { key: 'opening_readings', state: readingState(summary.withOpening), at: null, count: { done: summary.withOpening, total } },
-    { key: 'closing_readings', state: readingState(summary.withClosing), at: null, count: { done: summary.withClosing, total } },
+    // UI-2: قراءات الخزانات المطلوبة جزء من اكتمال المرحلة (الخادم يمنع الإغلاق بدونها)؛ العدّاد يبقى للفوهات.
+    { key: 'opening_readings', state: gate(readingState(summary.withOpening), extra?.openingRemaining), at: null, count: { done: summary.withOpening, total } },
+    { key: 'closing_readings', state: gate(readingState(summary.withClosing), extra?.closingRemaining), at: null, count: { done: summary.withClosing, total } },
     { key: 'closed', state: closed ? 'done' : 'pending', at: detail.closed_at, count: null },
     { key: 'approved', state: isApproved ? 'done' : 'pending', at: detail.approved_at, count: null },
   ];

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildStationCatalog, type StationCatalog } from './catalog';
 import { useStationOps } from './context';
 import { resolveProductPrice, type PriceResult } from './prices';
-import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftDetailPath } from './read-client';
+import { previousClosingMap } from './entry';
+import { STRICT_POLICY, toShiftPolicy, type ShiftPolicy } from './policy';
+import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftDetailPath, stationSettingsPath } from './read-client';
 import {
   fuelProductsResponse,
   nozzlesResponse,
@@ -12,6 +14,7 @@ import {
   pumpsResponse,
   shiftDetailResponse,
   shiftsResponse,
+  stationSettingsResponse,
   tanksResponse,
   type FuelProduct,
   type Nozzle,
@@ -256,4 +259,62 @@ export function useShiftHistory(station: Station | null, filter: ShiftFilter): S
     loadMore,
     reload: first.reload,
   };
+}
+
+export interface StationPolicyResult {
+  /** سياسة الوردية؛ فشل القراءة ⇒ `STRICT_POLICY` (known=false) لا خطأ يوقف العمل: السياسة تُعرِّف الواجب لا الصلاحية. */
+  policy: ShiftPolicy;
+  loading: boolean;
+}
+
+/** UI-2 — سياسة وردية المحطة من إعداداتها (قراءة فقط، `fuel_stations.view`). */
+export function useStationPolicy(station: Station | null): StationPolicyResult {
+  const { scopeKey, canViewStations } = useStationOps();
+  const stationId = station?.id ?? null;
+  const key = canViewStations && stationId ? `${scopeKey}|${stationId}|policy` : null;
+  const query = useScopedQuery<ShiftPolicy>(key, async (signal) => {
+    try {
+      const response = await opsGet(stationSettingsPath(stationId as string), stationSettingsResponse, { signal, branchId: station?.branch_id });
+      return toShiftPolicy(response.data);
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      return STRICT_POLICY;
+    }
+  });
+  if (key === null) return { policy: STRICT_POLICY, loading: false };
+  return { policy: query.state.status === 'success' ? query.state.data : STRICT_POLICY, loading: query.state.status === 'loading' };
+}
+
+export interface PreviousClosing {
+  /** رقم الوردية السابقة (للتسمية: «من الوردية …»). */
+  shiftNumber: string;
+  byNozzle: Record<string, number>;
+}
+
+/**
+ * UI-2 (B4) — آخر قراءة إغلاق لكل فوهة من **آخر وردية غير مفتوحة** للمحطة. مرجع إرشادي فقط: لا GET لسلسلة قراءات فوهة، فلا نَعِد بأنها
+ * «القراءة السابقة الرسمية» ولا نحجب بها. أي فشل ⇒ `null` (لا مرجع) ولا يعطّل الإدخال.
+ */
+export function usePreviousClosing(station: Station | null, currentShiftId: string, enabled: boolean): QueryState<PreviousClosing | null> {
+  const { scopeKey, can } = useStationOps();
+  const stationId = station?.id ?? null;
+  const key = enabled && can('fuel.shift.view') && stationId && isValidShiftId(currentShiftId) ? `${scopeKey}|${stationId}|prev-closing|${currentShiftId}` : null;
+  const query = useScopedQuery<PreviousClosing | null>(key, async (signal) => {
+    try {
+      const page = await opsGet('/fuel-stations/shifts', shiftsResponse, { signal, branchId: station?.branch_id, query: { station_id: stationId as string } });
+      const previous = page.data
+        .filter((shift) => shift.station_id === stationId && shift.status !== 'open' && shift.id !== currentShiftId)
+        .sort((a, b) => Date.parse(b.opened_at ?? '') - Date.parse(a.opened_at ?? ''))[0];
+      if (!previous || !isValidShiftId(previous.id)) return null;
+      const detail = await opsGet(shiftDetailPath(previous.id), shiftDetailResponse, { signal, branchId: station?.branch_id });
+      if (detail.data.station_id !== stationId) return null;
+      const byNozzle = previousClosingMap(detail.data);
+      return Object.keys(byNozzle).length === 0 ? null : { shiftNumber: detail.data.number, byNozzle };
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      return null;
+    }
+  });
+  const idle: QueryState<PreviousClosing | null> = useMemo(() => ({ status: 'success', data: null }), []);
+  return key === null ? idle : query.state;
 }

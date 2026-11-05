@@ -5,7 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import type { StationCatalog } from './catalog';
 import { useStationOps } from './context';
-import { useCurrentShift, useShiftDetail, useStationAssets, useStationPrices } from './data';
+import { useCurrentShift, useShiftDetail, useStationAssets, useStationPolicy, useStationPrices } from './data';
+import { pendingReadings } from './entry';
 import { formatLitersFixedFromMl } from './format';
 import { HomeMasthead, ScreenBody } from './masthead';
 import { OPS_BASE } from './nav';
@@ -54,10 +55,14 @@ function OpenShift({ station, shift, catalog, multiple }: { station: Station; sh
   const locale = useLocale();
   const { can } = useStationOps();
   const detail = useShiftDetail(station, shift.id);
+  const { policy } = useStationPolicy(station);
   const loaded = detail.state.status === 'success' && catalog !== null ? detail.state.data : null;
   const view = loaded && catalog ? buildShiftReadings(loaded, catalog) : null;
-  const steps = loaded && view ? deriveProgress(loaded, view.summary) : null;
-  const next = loaded && view ? deriveNextStep(loaded, view.summary, can) : null;
+  const extra = loaded && catalog ? pendingReadings(loaded, catalog, policy) : null;
+  const steps = loaded && view ? deriveProgress(loaded, view.summary, extra) : null;
+  const next = loaded && view ? deriveNextStep(loaded, view.summary, can, extra) : null;
+  // زر أساسي واحد: الخطوة التالية الفعلية لمن يملك صلاحيتها (داخل التطبيق)، وإلا عرض الوردية.
+  const action = next?.mine && next.href ? { href: next.href, label: t(`next.kind.${next.kind}`) } : { href: `${OPS_BASE}/shifts/${encodeURIComponent(shift.id)}`, label: t('home.ctaCurrent') };
 
   let value: string | null = null;
   let note: string | undefined;
@@ -80,9 +85,10 @@ function OpenShift({ station, shift, catalog, multiple }: { station: Station; sh
         {multiple ? <div className="mt-3"><InlineNote tone="warning">{t('shift.multipleOpen')}</InlineNote></div> : null}
       </CurrentShiftBanner>
       <div className="space-y-3 pt-1">
+        {/* الخطوة التالية وزرّها الأساسي أولاً (داخل الشاشة الأولى على الجوال)، ثم ملخص اللترات. */}
+        {next ? <NextStepCard step={next} showAction={false} /> : null}
+        <PrimaryAction href={action.href} label={action.label} />
         <FinancialSummary caption={t('shiftDetail.home.litersOpen')} value={value} unit={t('unit.liter')} note={note} cells={summaryCells(t, catalog)} />
-        {next ? <NextStepCard step={next} /> : null}
-        <PrimaryAction href={`${OPS_BASE}/shifts/${encodeURIComponent(shift.id)}`} label={t('home.ctaCurrent')} />
       </div>
     </>
   );
@@ -134,8 +140,8 @@ function ShiftArea({ station, catalog }: { station: Station; catalog: StationCat
         </div>
       </CurrentShiftBanner>
       <div className="space-y-3 pt-1">
-        {next ? <NextStepCard step={next} /> : null}
-        {can('fuel.shift.view') ? <PrimaryAction href={`${OPS_BASE}/shifts`} label={t('home.ctaHistory')} /> : null}
+        {next ? <NextStepCard step={next} showAction={false} /> : null}
+        {next?.href ? <PrimaryAction href={next.href} label={t(`next.kind.${next.kind}`)} /> : can('fuel.shift.view') ? <PrimaryAction href={`${OPS_BASE}/shifts`} label={t('home.ctaHistory')} /> : null}
       </div>
     </>
   );
@@ -166,7 +172,7 @@ function ProductsSection({ station, assets }: { station: Station; assets: Return
             {assets.catalog.products.map((entry) => (
               <li key={entry.product.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-border bg-surface p-3.5">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-text">{entry.product.name}</p>
+                  <p className="break-words text-base font-semibold text-text">{entry.product.name}</p>
                   <p className="mt-0.5 text-[13px] text-muted">
                     {t('home.pumpsNozzles', { pumps: String(entry.pumpIds.length), nozzles: String(entry.nozzles.length) })}
                   </p>

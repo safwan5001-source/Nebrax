@@ -112,6 +112,18 @@ export const tankReadingSchema = z.object({
   measured_at: instant,
 });
 
+/**
+ * UI-2 — حركات النقد التشغيلية في الوردية (`FuelShiftResource.cash_movements`). `type` نص مفتوح: نوع غير معروف لا يُسقط
+ * الاستجابة لكن يجعل «المتوقع» غير متاح (لا نجمع ما لا نعرف إشارته). `reason` نص حرّ كتبه الموظف وقد يحمل بيانات؛ يُعرض فقط.
+ */
+export const cashMovementSchema = z.object({
+  id: text.min(1),
+  type: z.string(),
+  amount_minor: z.number().int().nonnegative(),
+  reason: nullableText,
+  recorded_at: instant,
+});
+
 export const shiftDetailSchema = shiftSchema.extend({
   branch_id: nullableText,
   counted_cash_minor: z.number().int().nullable().optional(),
@@ -121,7 +133,28 @@ export const shiftDetailSchema = shiftSchema.extend({
   meter_readings: z.array(meterReadingSchema),
   tank_readings: z.array(tankReadingSchema),
   staff_assignments: z.array(z.object({ user_id: text.min(1) })).optional(),
+  cash_movements: z.array(cashMovementSchema).optional(),
   cash_variance: z.object({ status: text, variance_direction: nullableText }).nullable().optional(),
+});
+
+/**
+ * UI-2 — سياسة الوردية للمحطة (`GET /fuel-stations/stations/{id}/settings` → مفاتيح `shift_*`). كل مفتاح اختياري هنا: غياب
+ * مفتاح أو فشل القراءة يعني «غير معروف» فتُفترض السياسة الصارمة (انظر `policy.ts`) ولا يُحجب شيء بناءً على تخمين.
+ */
+export const stationSettingsResponse = z.object({
+  data: z
+    .object({
+      shift_opening_meter_reading_required: z.boolean().optional(),
+      shift_opening_tank_reading_required: z.boolean().optional(),
+      shift_opening_cash_float_required: z.boolean().optional(),
+      shift_closing_meter_reading_required: z.boolean().optional(),
+      shift_closing_tank_reading_required: z.boolean().optional(),
+      shift_mandatory_staff_assignment: z.boolean().optional(),
+      shift_mandatory_cash_count: z.boolean().optional(),
+      shift_supervisor_approval_required: z.boolean().optional(),
+      shift_allow_close_with_pending_cash_variance: z.boolean().optional(),
+    })
+    .passthrough(),
 });
 
 const collection = <T extends z.ZodTypeAny>(item: T) => z.object({ data: z.array(item) });
@@ -153,3 +186,5 @@ export type ShiftsPage = z.infer<typeof shiftsResponse>;
 export type MeterReading = z.infer<typeof meterReadingSchema>;
 export type TankReading = z.infer<typeof tankReadingSchema>;
 export type ShiftDetail = z.infer<typeof shiftDetailSchema>;
+export type CashMovement = z.infer<typeof cashMovementSchema>;
+export type StationSettings = z.infer<typeof stationSettingsResponse>['data'];

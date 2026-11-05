@@ -22,7 +22,7 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 import { ApiError, api } from '@/lib/api';
 import { AUTH_SESSION_CHANGED_EVENT, type AuthUser } from '@/lib/auth';
 import { BRANCH_CHANGED_EVENT, setActiveBranchId } from '@/lib/branch';
-import { meter, shift as makeShift, shiftDetail, nozzle, price, product, pump, station, tank } from './__fixtures__';
+import { meter, shift as makeShift, shiftDetail, nozzle, price, product, pump, station, tank, tankReading } from './__fixtures__';
 import { createBackend, type Backend, type TenantData } from './__test-harness';
 import { HomeScreen } from './home-screen';
 import { ProductsScreen } from './products-screen';
@@ -500,14 +500,17 @@ describe('role-aware navigation and honest "coming soon"', () => {
     return data;
   };
 
-  it('an operator sees THEIR next step — as inert text with a Soon badge, never a button or a link', async () => {
+  it('an operator sees THEIR next step with ONE in-app action (the readings entry); the card itself stays text', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open'] });
     connect(withOpenShift());
     renderOps(<HomeScreen />);
-    const card = (await screen.findByText('Record the starting meter readings')).closest('section') as HTMLElement;
+    const action = await screen.findByRole('link', { name: 'Record the starting meter readings' });
+    expect(action.getAttribute('href')).toBe('/fuel-stations/ops/shifts/s1/readings/opening');
+    expect(document.querySelectorAll('[data-primary-action]')).toHaveLength(1);
+    const card = document.querySelector('[data-next-step]') as HTMLElement;
     expect(within(card).getByText('Next step')).toBeTruthy();
-    expect(within(card).getByText('This step will arrive inside the app soon')).toBeTruthy();
-    expect(card.querySelector('a, button')).toBeNull();
+    expect(card.querySelector('a, button')).toBeNull(); // الزر الأساسي واحد في الشاشة، خارج البطاقة
+    expect(card.textContent).not.toContain('soon');
     expect(screen.queryByText('Approve the shift')).toBeNull();
   });
 
@@ -517,26 +520,55 @@ describe('role-aware navigation and honest "coming soon"', () => {
     renderOps(<HomeScreen />);
     const card = (await screen.findByText(/Waiting for: Record the starting meter readings/)).closest('section') as HTMLElement;
     expect(card.textContent).not.toContain('This step will arrive inside the app soon');
+    // بلا صلاحية الخطوة: الزر الأساسي يعرض الوردية فقط، لا إجراء كتابة
+    expect(screen.queryByRole('link', { name: 'Record the starting meter readings' })).toBeNull();
+    expect(screen.getByRole('link', { name: /current shift/i }).getAttribute('href')).toBe('/fuel-stations/ops/shifts/s1');
   });
 
-  it('the next step moves with the real shift state (closing readings after every opening is recorded)', async () => {
+  it('the next step moves with the real shift state: meters AND the required tank readings both gate the stage', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open'] });
+    // كل عدادات البداية مسجَّلة لكن خزانات المحطة (إلزامية افتراضياً) لا — تبقى الخطوة قراءات البداية
     connect(withOpenShift({ meter_readings: ['n1', 'n2'].map((id, i) => meter(`o${i}`, id, 'opening', 100)) }));
     renderOps(<HomeScreen />);
-    expect(await screen.findByText('Record the ending meter readings')).toBeTruthy();
-    expect(screen.getByText('Nozzles remaining: 2')).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Record the starting meter readings' })).toBeTruthy();
+    expect(screen.getByText('Readings remaining: 2')).toBeTruthy();
+    cleanup();
+
+    // بعد تسجيل قراءات الخزانات للبداية تنتقل الخطوة إلى النهاية، والمتبقي = فوهتا المحطة + خزانان
+    connect(withOpenShift({
+      meter_readings: ['n1', 'n2'].map((id, i) => meter(`o${i}`, id, 'opening', 100)),
+      tank_readings: [tankReading('to1', 't1', 'opening', 1_000), tankReading('to2', 't2', 'opening', 1_000)],
+    }));
+    renderOps(<HomeScreen />);
+    expect(await screen.findByRole('link', { name: 'Record the ending meter readings' })).toBeTruthy();
+    expect(screen.getByText('Readings remaining: 4')).toBeTruthy();
+  });
+
+  it('when the station policy is known and does not require tank readings, only meters gate the stage', async () => {
+    seedUser({ permissions: [...VIEW, 'fuel.shift.open'] });
+    const data = withOpenShift({ meter_readings: ['n1', 'n2'].map((id, i) => meter(`o${i}`, id, 'opening', 100)) });
+    data.settings = {
+      a: {
+        shift_opening_meter_reading_required: true, shift_closing_meter_reading_required: true, shift_opening_tank_reading_required: false,
+        shift_closing_tank_reading_required: false, shift_opening_cash_float_required: true, shift_mandatory_staff_assignment: false,
+      },
+    };
+    connect(data);
+    renderOps(<HomeScreen />);
+    expect(await screen.findByRole('link', { name: 'Record the ending meter readings' })).toBeTruthy();
+    expect(screen.getByText('Readings remaining: 2')).toBeTruthy();
   });
 
   it('a permission change is reflected without trusting stale privileges', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open'], role: 'cashier' });
     connect(withOpenShift());
     renderOps(<HomeScreen />);
-    await screen.findByText('Record the starting meter readings');
+    await screen.findByRole('link', { name: 'Record the starting meter readings' });
     act(() => {
       localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user') as string), permissions: VIEW }));
       window.dispatchEvent(new Event('nibras:user-changed'));
     });
-    await waitFor(() => expect(screen.queryByText('Record the starting meter readings')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Record the starting meter readings' })).toBeNull());
     expect(await screen.findByText(/Waiting for: Record the starting meter readings/)).toBeTruthy();
   });
 });

@@ -6,7 +6,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ArrowDownRight, ArrowUpRight, ChevronDown, Equal, Info, RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatMinorRiyal } from '@/lib/money';
 import { useStationOps } from './context';
-import { useShiftDetail, useStationAssets, type ShiftDetailResult, type StationAssetsResult } from './data';
+import { useShiftDetail, useStationAssets, useStationPolicy, type ShiftDetailResult, type StationAssetsResult } from './data';
+import { pendingReadings } from './entry';
 import { elapsedBetween, formatLitersFixedFromMl, formatStampInZone } from './format';
 import { PageMasthead, ScreenBody } from './masthead';
 import { OPS_BASE } from './nav';
@@ -265,9 +266,11 @@ function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query
   const stale = live && fetchedAt !== null && now - fetchedAt > STALE_AFTER_MS;
   useRefreshOnReturn(live, fetchedAt, query.reload);
 
+  const { policy } = useStationPolicy(station);
   const view: ShiftReadingsView | null = assets.catalog ? buildShiftReadings(detail, assets.catalog) : null;
-  const steps = view ? deriveProgress(detail, view.summary) : null;
-  const next = view ? deriveNextStep(detail, view.summary, can) : null;
+  const extra = assets.catalog ? pendingReadings(detail, assets.catalog, policy) : null;
+  const steps = view ? deriveProgress(detail, view.summary, extra) : null;
+  const next = view ? deriveNextStep(detail, view.summary, can, extra) : null;
 
   return (
     <div className="space-y-5">

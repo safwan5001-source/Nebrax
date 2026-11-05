@@ -19,9 +19,12 @@ describe('opsGet — read-only client', () => {
     for (const ok of ['stations', 'products', 'pumps', 'nozzles', 'tanks', 'prices', 'shifts']) {
       expect(isAllowedReadPath(`/fuel-stations/${ok}`)).toBe(true);
     }
+    // UI-2: سياسة الوردية للمحطة (قراءة فقط) مسموحة بمعرّف مُحقَّق وحده.
+    for (const good of ['/fuel-stations/stations/9f1c2d3e-0000-4000-8000-000000000001/settings', '/fuel-stations/stations/st1/settings']) expect(isAllowedReadPath(good), good).toBe(true);
+    for (const bad of ['/fuel-stations/stations/../settings', '/fuel-stations/stations//settings', '/fuel-stations/stations/a/b/settings', '/fuel-stations/stations/a/settings/x']) expect(isAllowedReadPath(bad), bad).toBe(false);
     // قراءة وردية بمعرّفها (UI-1) مسموحة؛ أما `open` (مسار POST) وما يتجاوز المعرّف إلى مسار فرعي أو `../` فلا.
     for (const good of ['/fuel-stations/shifts/9f1c2d3e-0000-4000-8000-000000000001', '/fuel-stations/shifts/s1']) expect(isAllowedReadPath(good), good).toBe(true);
-    for (const bad of ['/fuel-stations/shifts/open', '/fuel-stations/shifts/abc/close', '/fuel-stations/shifts/abc/meter-readings', '/fuel-stations/shifts/../sales', '/fuel-stations/shifts/%2e%2e', '/fuel-stations/shifts/a b', '/fuel-stations/shifts/', '/fuel-stations/sales', '/fuel-stations/stations/1/settings', '/login', '/fuel-stations/deliveries', '/fuel-stations/stations/abc']) {
+    for (const bad of ['/fuel-stations/shifts/open', '/fuel-stations/shifts/abc/close', '/fuel-stations/shifts/abc/meter-readings', '/fuel-stations/shifts/../sales', '/fuel-stations/shifts/%2e%2e', '/fuel-stations/shifts/a b', '/fuel-stations/shifts/', '/fuel-stations/sales', '/login', '/fuel-stations/deliveries', '/fuel-stations/stations/abc']) {
       expect(isAllowedReadPath(bad), bad).toBe(false);
     }
   });
