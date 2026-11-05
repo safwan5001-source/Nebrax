@@ -11651,7 +11651,8 @@
         "partners": "Partners",
         "products": "Products",
         "invoices": "Invoices",
-        "webhooks": "Webhooks"
+        "webhooks": "Webhooks",
+        "statements": "Account statements"
       },
       "descriptions": {
         "partners:read": "Read partners (customers and suppliers).",
@@ -11660,6 +11661,7 @@
         "products:write": "Create products.",
         "invoices:read": "Read sales invoices.",
         "invoices:write": "Create sales invoice drafts.",
+        "statements:read": "Read partner account statements (ledger balances).",
         "webhooks:read": "Read webhook subscriptions.",
         "webhooks:write": "Manage webhook subscriptions."
       }

@@ -13,9 +13,9 @@ import { OPENAPI_MODEL } from '@/modules/developer/docs/openapi-model.generated'
 afterEach(() => apiMock.mockReset());
 
 describe('developer catalogs (single source = the contract)', () => {
-  it('scopes mirror the contract exactly (eight, no wildcard)', () => {
+  it('scopes mirror the contract exactly (nine, no wildcard)', () => {
     expect(API_SCOPES).toEqual(OPENAPI_MODEL.scopes);
-    expect(API_SCOPES).toHaveLength(8);
+    expect(API_SCOPES).toHaveLength(9);
     expect(API_SCOPES).not.toContain('*');
   });
 

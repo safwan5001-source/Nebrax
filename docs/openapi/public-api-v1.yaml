@@ -223,6 +223,51 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /partners/{id}/statement:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getPartnerStatement
+      tags: [Partners]
+      summary: Get a partner account statement
+      description: >
+        Read-only account statement for a customer or supplier, built from posted
+        ledger entries (positive running balance = the partner owes the tenant).
+        Amounts are integer minor units. The response is not paginated; a statement
+        exceeding 2000 movements is rejected with 422 — narrow the period with
+        `from`/`to`. Requires the dedicated `statements:read` scope.
+      x-required-scope: statements:read
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: from
+          in: query
+          required: false
+          description: Period start (YYYY-MM-DD). Earlier movements roll into the opening balance.
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          description: Period end (YYYY-MM-DD), on or after `from`.
+          schema: { type: string, format: date }
+        - name: role
+          in: query
+          required: false
+          description: Restrict a dual-role partner's statement to one role.
+          schema: { type: string, enum: [customer, supplier] }
+      responses:
+        '200':
+          description: The partner statement.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartnerStatementResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /products:
     parameters:
       - $ref: '#/components/parameters/RequestId'
@@ -1017,6 +1062,44 @@ components:
       required: [data, meta]
       properties:
         data: { $ref: '#/components/schemas/Partner' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    PartnerStatementRow:
+      type: object
+      required: [date, number, description, debit_minor, credit_minor, balance_minor, source]
+      properties:
+        date: { type: string, format: date }
+        number: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        debit_minor: { $ref: '#/components/schemas/MinorAmount' }
+        credit_minor: { $ref: '#/components/schemas/MinorAmount' }
+        balance_minor: { $ref: '#/components/schemas/MinorAmount' }
+        source:
+          type: [object, 'null']
+          properties:
+            kind: { type: string }
+            id: { type: [string, 'null'] }
+    PartnerStatement:
+      type: object
+      required: [partner, currency, from, to, opening_balance_minor, rows, closing_balance_minor]
+      properties:
+        partner:
+          type: object
+          required: [id, name, type]
+          properties:
+            id: { $ref: '#/components/schemas/Uuid' }
+            name: { type: string }
+            type: { type: string }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        from: { type: [string, 'null'], format: date }
+        to: { type: [string, 'null'], format: date }
+        opening_balance_minor: { $ref: '#/components/schemas/MinorAmount' }
+        rows: { type: array, items: { $ref: '#/components/schemas/PartnerStatementRow' } }
+        closing_balance_minor: { $ref: '#/components/schemas/MinorAmount' }
+    PartnerStatementResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/PartnerStatement' }
         meta: { $ref: '#/components/schemas/Meta' }
     PartnerListResponse:
       type: object
