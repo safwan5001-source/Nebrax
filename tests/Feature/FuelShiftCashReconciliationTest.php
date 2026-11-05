@@ -589,6 +589,36 @@ class FuelShiftCashReconciliationTest extends TestCase
     }
 
     /** @test */
+    public function a_shift_frozen_under_the_receipts_basis_stays_redacted_after_the_gate_is_closed_again(): void
+    {
+        $shift = $this->open('d8gate');
+        $sale = $this->sale('d8gate-sale', $shift);
+        $total = (int) $sale->invoice->total;
+        $this->collect($sale, 'cash', null, 'd8gate-pay');
+        app(FuelShiftService::class)->close($shift, self::FLOAT + $total - 500, null, $this->f['actor']);
+        config(['fuel_stations.shift_cash_receipts_enabled' => false]);
+        $token = $this->f['seller']->createToken('api')->plainTextToken;
+
+        $show = $this->withToken($token)->getJson('/api/fuel-stations/shifts/' . $shift->id)->assertOk();
+        $show->assertJsonPath('data.expected_operational_cash_minor', null)
+            ->assertJsonPath('data.cash_variance_minor', null)
+            ->assertJsonPath('data.cash_variance.expected_operational_cash_minor', null)
+            ->assertJsonPath('data.cash_variance.variance_minor', null);
+        $closed = collect($show->json('data.events'))->firstWhere('type', 'closed');
+        $this->assertArrayNotHasKey('expected_operational_cash_minor', $closed['payload']);
+        $this->assertArrayNotHasKey('cash_variance_minor', $closed['payload']);
+
+        $list = $this->withToken($token)->getJson('/api/fuel-stations/shifts')->assertOk();
+        $row = collect($list->json('data'))->firstWhere('id', $shift->id);
+        $this->assertNull($row['expected_operational_cash_minor']);
+        $this->assertNull($row['cash_variance_minor']);
+
+        // مشرف بصلاحية المبيعات يرى القيم، وشفت أُغلق بالأساس القديم (بلا نقد مبيعات) لا يُحجب.
+        $owner = $this->withToken($this->f['actor']->createToken('api')->plainTextToken)->getJson('/api/fuel-stations/shifts/' . $shift->id)->assertOk();
+        $this->assertSame(self::FLOAT + $total, $owner->json('data.expected_operational_cash_minor'));
+    }
+
+    /** @test */
     public function the_post_close_adjustment_event_is_hidden_from_a_viewer_without_sales_view(): void
     {
         $shift = $this->open('d8ev');

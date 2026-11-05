@@ -42,7 +42,16 @@ class FuelShiftResource extends JsonResource
     /** هل تُحجب الحقول المالية القديمة (المتوقع/الفرق) عن هذا العارض؟ */
     private function hidesSaleDerivedCash(Request $request): bool
     {
-        return (bool) config('fuel_stations.shift_cash_receipts_enabled', false) && ! $this->canViewSales($request);
+        if ($this->canViewSales($request)) {
+            return false;
+        }
+        if ((bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
+            return true;
+        }
+
+        // البوابة مغلقة الآن لكن الوردية أُغلقت تحت أساس يشمل نقد المبيعات: لقطتها المجمَّدة تحمله فتبقى محجوبة (لا تعتمد على
+        // قيمة البوابة الحالية وحدها). الأساس المخزَّن في لقطة الفرق هو المرجع.
+        return $this->resource->cashVariance?->official_cash_basis === 'receiving_shift_receipts';
     }
 
     /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
