@@ -12,3 +12,7 @@ next-env.d.ts
 /playwright-report
 /test-results
 /test-results-pay-qa
+
+# Playwright outputs (visual QA)
+/test-results*/
+/playwright-report/

@@ -243,6 +243,10 @@ export interface AwjReviewIssue {
     | "contact_incomplete"
     | "delivery_method_missing"
     | "empty_cart"
+    /** COPS-H4-4 — store-level refusals (`item_id: "store"`): paused, outside opening hours, below the minimum order. */
+    | "store_paused"
+    | "outside_opening_hours"
+    | "below_minimum_order"
     | (string & {});
 }
 

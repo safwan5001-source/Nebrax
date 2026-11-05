@@ -139,6 +139,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
 use App\Http\Controllers\Api\PaymentWebhookController;
+use App\Http\Controllers\Api\PaymentMethodChannelAvailabilityController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
@@ -1122,6 +1123,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('payment-methods/{id}/logo', [PaymentMethodController::class, 'removeLogo'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
+        // COPS-H4-6 (D-H4-06): إتاحة الوسيلة لكل قناة Commerce — صلاحيتا المدفوعات والتجارة معاً + قدرة المتجر؛ يغلّف PaymentMethodChannelAvailabilityService، الافتراضي available_online.
+        Route::get('payment-methods/{id}/channel-availability', [PaymentMethodChannelAvailabilityController::class, 'index'])
+            ->whereUuid('id')->middleware([$perm('payments.view'), $perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
+        Route::put('payment-methods/{id}/channel-availability/{channelId}', [PaymentMethodChannelAvailabilityController::class, 'update'])
+            ->whereUuid(['id', 'channelId'])->middleware([$perm('payments.manage'), $perm('commerce.channel_settings.manage'), $app('commerce.storefront'), 'throttle:60,1']);
 
         // PAY-H1-01: اتصالات بوابات الدفع. القراءة (بلا أسرار) payments.view؛ الكتابة والأسرار
         // وسجل التدقيق payment_gateways.manage (owner/admin). لا استدعاء مزوّد ولا أثر محاسبي.

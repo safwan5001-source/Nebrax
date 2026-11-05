@@ -87,6 +87,31 @@ final class PaymentMethodChannelAvailabilityService
         );
     }
 
+    /**
+     * COPS-H4-6 (D-H4-06): إزالة التجاوز الصريح فيعود سلوك `available_online` الافتراضي (الغياب = السلوك التاريخي). idempotent. يُعيد القيمة السابقة (null = لم يكن هناك تجاوز).
+     */
+    public function clearOverride(PaymentMethod $method, SalesChannel $channel): ?bool
+    {
+        $tenantId = $this->requireTenant();
+        $this->assertSameTenant($tenantId, $method, $channel);
+
+        if ($channel->type === SalesChannel::TYPE_POS) {
+            throw new DomainException('POS payment-method availability must be configured through PosSettings.');
+        }
+
+        $existing = PaymentMethodChannelAvailability::query()
+            ->where('payment_method_id', $method->getKey())
+            ->where('sales_channel_id', $channel->getKey())
+            ->first();
+        if ($existing === null) {
+            return null;
+        }
+        $previous = (bool) $existing->is_enabled;
+        $existing->delete();
+
+        return $previous;
+    }
+
     private function requireTenant(): string
     {
         $tenantId = $this->tenantContext->id();

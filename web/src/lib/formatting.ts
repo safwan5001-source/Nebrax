@@ -121,6 +121,8 @@ export type FormatDateOptions = {
   /** Override empty/invalid fallback. Default: «—». */
   fallback?: string;
   style?: 'short' | 'medium' | 'long';
+  /** Explicit IANA timezone (additive; omitted = the browser's local timezone, as before — same contract as `formatTime`). */
+  timeZone?: string;
 };
 
 /**
@@ -138,6 +140,7 @@ export function formatDate(
   const style = options.style ?? 'medium';
   return formatWithParts(date, locale, {
     dateStyle: style,
+    ...(options.timeZone ? { timeZone: options.timeZone } : {}),
   });
 }
 

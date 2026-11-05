@@ -205,6 +205,32 @@ class CommerceChannelOperationsSettingsService
     }
 
     /**
+     * COPS-H4-4 (ADR-29 §2.5.3) — **القارئ الوحيد** لتحكّمات الاستقبال خارج هذه الخدمة: لقطة لحظية يستهلكها `CommerceChannelIntakeGuard` عند إتمام الطلب وفي كتلة `ordering`
+     * العامة. البوابة `commerce.channel_intake_controls_enabled` مغلقة ⇒ `null` **بلا أي استعلام** (Checkout حرفياً كما كان). قراءة عادية بلا قفل؛ الحارس يأخذ قفل القناة المشترك قبلها
+     * فيتسلسل مع كاتب الإعدادات (`FOR UPDATE` على القناة أولاً). غياب الصف = الافتراضيات (مفتوح، `accept`، بلا حد أدنى، بلا ساعات).
+     *
+     * @return null|array{accepting: bool, paused_until: ?string, pause_message: ?string, policy: string, hours: list<array{weekday: int, opens_at: string, closes_at: string}>, min_order_minor: ?int, min_order_scope: string}
+     */
+    public function intakeSnapshot(string $channelId): ?array
+    {
+        if (! (bool) config('commerce.channel_intake_controls_enabled')) {
+            return null;
+        }
+        $row = CommerceChannelOperationSetting::query()->where('sales_channel_id', $channelId)->first();
+        $values = $this->values($row, $row === null ? [] : $this->hours($channelId));
+
+        return [
+            'accepting' => $values[self::KEY_ACCEPTING],
+            'paused_until' => $values[self::KEY_PAUSED_UNTIL],
+            'pause_message' => $values[self::KEY_PAUSE_MESSAGE],
+            'policy' => $values[self::KEY_OUTSIDE_POLICY],
+            'hours' => $values[self::KEY_HOURS],
+            'min_order_minor' => $values[self::KEY_MIN_ORDER],
+            'min_order_scope' => $values[self::KEY_MIN_SCOPE],
+        ];
+    }
+
+    /**
      * @param  list<array{weekday: int, opens_at: string, closes_at: string}>  $hours
      * @return array<string, mixed>
      */
