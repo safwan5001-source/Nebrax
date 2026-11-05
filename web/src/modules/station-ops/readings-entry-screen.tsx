@@ -261,8 +261,8 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
       </div>
     );
   }
-  if (assets.state.status === 'loading' || !catalog) return <div className="pt-5"><LoadingBlock rows={3} /></div>;
   if (assets.state.status === 'error') return <div className="pt-5"><ErrorState error={assets.state.error} onRetry={assets.reload} /></div>;
+  if (assets.state.status === 'loading' || !catalog) return <div className="pt-5"><LoadingBlock rows={3} /></div>;
 
   const unitTank = (flag: boolean) => (flag ? t('entry.tankRequired') : t('entry.tankOptional'));
   const savedNow = Object.values(results).filter((r) => r.status === 'saved').length;
@@ -329,7 +329,7 @@ function Content({ station, shiftId, stage }: { station: Station; shiftId: strin
 
       <InlineNote>{t('entry.draftNote')}</InlineNote>
 
-      {!complete ? (
+      {!complete || ready.length > 0 || invalid.length > 0 ? (
         <ActionBar>
           <div className="mx-auto max-w-3xl space-y-2">
             <p role="status" className="text-xs text-muted tabular-nums">

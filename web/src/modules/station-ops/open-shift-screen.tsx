@@ -15,7 +15,7 @@ import type { Shift, ShiftDetail, Station } from './schemas';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import { opsWrite, type WriteResult } from './write-client';
-import { settledWithoutEffect } from './write-outcome';
+import { mayHaveApplied, shouldClearIntentKey } from './write-outcome';
 import { ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard, WriteNotice } from './write-ui';
 
 /**
@@ -48,6 +48,8 @@ function Form({ station }: { station: Station }) {
   const { policy, loading: policyLoading } = useStationPolicy(station);
   const intents = useMemo(() => createIntentStore(`${scopeKey}|${station.id}`), [scopeKey, station.id]);
   const submitting = useRef(false);
+  /** محاولة سابقة لهذه النية انتهت «غير مؤكدة»: لا يُمسح المفتاح بعدها بنتيجة لاحقة غير حاسمة. */
+  const uncertain = useRef(false);
 
   const [raw, setRaw] = useState('');
   const [phase, setPhase] = useState<Phase>({ name: 'form' });
@@ -82,10 +84,12 @@ function Form({ station }: { station: Station }) {
       const shift = verifiedOpen(result, station, floatMinor);
       if (shift) {
         intents.clear('open');
+        uncertain.current = false;
         void assign(shift);
         return;
       }
-      if (settledWithoutEffect(result)) intents.clear('open');
+      if (mayHaveApplied(result) || result.kind === 'ok') uncertain.current = true;
+      if (shouldClearIntentKey(result, uncertain.current)) intents.clear('open');
       // ردّ 2xx لا يطابق ما أرسلناه (أو غير مفهوم) ⇒ «غير مؤكد» ولا نعلن نجاحاً؛ المفتاح يبقى لإعادة آمنة.
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
       setPhase({ name: 'form' });

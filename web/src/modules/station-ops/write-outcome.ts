@@ -39,7 +39,11 @@ export function mayHaveApplied(result: WriteResult): boolean {
   return result.kind === 'unknown' || result.kind === 'unverified';
 }
 
-/** نتيجة تحسم النية بلا أثر (رفض نهائي أو لم يُرسَل شيء) ⇒ يمكن مسح مفتاح النية. */
-export function settledWithoutEffect(result: WriteResult): boolean {
-  return result.kind === 'rejected' || result.kind === 'not_sent';
+/**
+ * هل يُمسح مفتاح النية بعد هذه النتيجة؟ فقط **رفض نهائي** وبشرط ألا تسبقه محاولة غير مؤكدة لنفس النية (`uncertain`): محاولة سابقة قد تكون
+ * التزمت في الخادم، ورفضٌ أو «لم يُرسل» لاحق لا يثبت العكس — فيبقى المفتاح نفسه لتعيد المحاولة التالية الأثر الأول بدل أثر ثانٍ.
+ * `not_sent` (دون اتصال) لا يمسح أبداً.
+ */
+export function shouldClearIntentKey(result: WriteResult, uncertain: boolean): boolean {
+  return result.kind === 'rejected' && !uncertain;
 }

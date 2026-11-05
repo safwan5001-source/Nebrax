@@ -19,7 +19,7 @@ import type { ShiftDetail, Station } from './schemas';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import { opsWrite, type WriteResult } from './write-client';
-import { settledWithoutEffect } from './write-outcome';
+import { mayHaveApplied, shouldClearIntentKey } from './write-outcome';
 import { ActionBar, ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard, WriteNotice } from './write-ui';
 
 /**
@@ -107,6 +107,7 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<WriteResult | null>(null);
   const sending = useRef(false);
+  const uncertain = useRef(false);
 
   const totals = cashTotals(detail);
   const parsed = amountRaw.trim() === '' ? null : parseMoney(amountRaw, { min: 1 });
@@ -127,11 +128,13 @@ function MovementDialog({ open, onClose, detail, station, intents, onSaved }: {
       const confirmed = result.kind === 'ok' && (result.shift.cash_movements ?? []).some((m) => m.type === type && m.amount_minor === amount && m.reason === cleanReason);
       if (confirmed) {
         intents.clear('cash');
+        uncertain.current = false;
         setAmountRaw(''); setReason(''); setType('cash_in');
         onSaved();
         return;
       }
-      if (settledWithoutEffect(result)) intents.clear('cash');
+      if (mayHaveApplied(result) || result.kind === 'ok') uncertain.current = true;
+      if (shouldClearIntentKey(result, uncertain.current)) intents.clear('cash');
       setFailure(result.kind === 'ok' ? { kind: 'unverified' } : result);
     } finally {
       sending.current = false;
@@ -254,8 +257,8 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
   if (!can('fuel.shift.close') || !can('fuel.shift.cash_count')) {
     return <div className="pt-5"><EmptyState title={t('shift.noPermission.title')} body={t('shift.noPermission.body')} /></div>;
   }
-  if (assets.state.status === 'loading' || !catalog) return <div className="pt-5"><LoadingBlock rows={3} /></div>;
   if (assets.state.status === 'error') return <div className="pt-5"><ErrorState error={assets.state.error} onRetry={assets.reload} /></div>;
+  if (assets.state.status === 'loading' || !catalog) return <div className="pt-5"><LoadingBlock rows={3} /></div>;
 
   const base = `${OPS_BASE}/shifts/${encodeURIComponent(shiftId)}`;
   const coverage = readingsCoverage(detail, catalog);

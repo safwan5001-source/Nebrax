@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'Acme Fuel Co', logo: null }) }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn() }));
 
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import type { AuthUser } from '@/lib/auth';
 import { meter, nozzle, product, pump, shift as makeShift, shiftDetail, station, tank, tankReading } from './__fixtures__';
 import type { TenantData } from './__test-harness';
@@ -75,6 +75,7 @@ function connect(data: TenantData, options: Parameters<typeof createWriteBackend
 }
 
 beforeEach(() => {
+  setOnline(true);
   localStorage.clear();
   sessionStorage.clear();
   apiMock.mockReset();
@@ -87,6 +88,7 @@ afterEach(() => {
 });
 
 const renderOps = (ui: React.ReactElement, locale: 'en' | 'ar' = 'en') => renderIntl(<StationOpsShell>{ui}</StationOpsShell>, locale);
+const setOnline = (online: boolean) => Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
 const field = (testId: string) => screen.findByTestId(testId) as Promise<HTMLInputElement>;
 const buttonNamed = (name: string | RegExp) => screen.getByRole('button', { name });
 
@@ -188,6 +190,32 @@ describe('open shift', () => {
     expect(await screen.findByText('A shift is already open')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to the shift' }).getAttribute('href')).toBe('/fuel-stations/ops/shifts/new-1');
     expect(backend.postsTo('/open')).toHaveLength(1);
+  });
+
+  it('an offline attempt after a lost reply does NOT discard the intent key: the next online retry replays the SAME key (no second shift)', async () => {
+    const user = userEvent.setup();
+    connect(baseData());
+    backend.fail({ match: (c) => c.path.endsWith('/open'), mode: 'network_after_apply' });
+    renderOps(<OpenShiftScreen />);
+    await user.type(await field('open-float'), '500');
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    await screen.findByText(/The connection dropped after sending\./);
+
+    setOnline(false);
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    await screen.findByText(/No internet connection\. Nothing was sent/);
+    expect(backend.postsTo('/open')).toHaveLength(1);
+
+    setOnline(true);
+    await user.click(buttonNamed('Review and open the shift'));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and open the shift' }));
+    expect(await screen.findByText('Shift SH-NEW-1 is open')).toBeTruthy();
+    const keys = backend.postsTo('/open').map((c) => c.body.idempotency_key);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect(backend.openKeysUsed()).toHaveLength(1);
   });
 
   it('a different amount is a NEW intent ⇒ a NEW key (the server would otherwise replay the first effect)', async () => {
@@ -428,6 +456,30 @@ describe('meter and tank readings entry', () => {
     expect(backend.posts).toHaveLength(0);
   });
 
+  it('optional tank readings stay saveable even when every required meter reading is already saved', async () => {
+    const user = userEvent.setup();
+    const data = withShift({ meter_readings: [meter('o1', 'n1', 'opening', 100_000), meter('o2', 'n2', 'opening', 100_000)] });
+    data.settings = { a: { shift_opening_meter_reading_required: true, shift_closing_meter_reading_required: true, shift_opening_tank_reading_required: false, shift_closing_tank_reading_required: false, shift_opening_cash_float_required: true, shift_mandatory_staff_assignment: false } };
+    connect(data);
+    openScreen();
+    expect(await screen.findByText('Starting readings complete')).toBeTruthy();
+    await user.type(await field('entry-t:t1'), '21480');
+    await user.click(await screen.findByRole('button', { name: 'Review and save (1)' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm and save' }));
+    await waitFor(() => expect(backend.postsTo('/tank-readings')).toHaveLength(1));
+  });
+
+  it('a failed assets request shows an error with a retry instead of an endless skeleton', async () => {
+    const user = userEvent.setup();
+    connect(withShift());
+    backend.base.fail((url) => url.startsWith('/fuel-stations/nozzles'), new ApiError(500, 'x', {}));
+    openScreen();
+    expect(await screen.findByText("Couldn't load data")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByTestId('entry-m:n1')).toBeNull();
+    void user;
+  });
+
   it('an unknown stage in the URL is a not-found, not an entry form', async () => {
     connect(withShift());
     renderOps(<ReadingsEntryScreen shiftId="s1" stage="sideways" />);
@@ -615,6 +667,38 @@ describe('handover — cash count and closing', () => {
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBe(keys[1]);
     expect(backend.detail('s1').cash_movements).toHaveLength(1);
+  });
+
+  it('an offline attempt after a lost reply keeps the cash-entry key: the retry replays the SAME key and exactly one entry exists', async () => {
+    const user = userEvent.setup();
+    connect(withShift(allReadings()));
+    backend.fail({ match: (c) => c.path.endsWith('/cash-movements'), mode: 'network_after_apply' });
+    openScreen();
+    await user.click(await screen.findByRole('button', { name: 'Record a cash entry' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByTestId('movement-amount'), '25');
+    await user.type(within(dialog).getByLabelText('Reason'), 'Float top-up');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and record' }));
+    await within(dialog).findByText(/The connection dropped after sending\./);
+
+    setOnline(false);
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and record' }));
+    await within(dialog).findByText(/No internet connection\. Nothing was sent/);
+    setOnline(true);
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm and record' }));
+    expect(await screen.findByText('Cash entry recorded.')).toBeTruthy();
+    const keys = backend.postsTo('/cash-movements').map((c) => c.body.idempotency_key);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect(backend.detail('s1').cash_movements).toHaveLength(1);
+  });
+
+  it('a failed assets request shows an error with a retry instead of an endless skeleton', async () => {
+    connect(withShift(allReadings()));
+    backend.base.fail((url) => url.startsWith('/fuel-stations/nozzles'), new ApiError(500, 'x', {}));
+    openScreen();
+    expect(await screen.findByText("Couldn't load data")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
   it('can register the user on the shift when the policy needs staff and nobody is on it', async () => {
