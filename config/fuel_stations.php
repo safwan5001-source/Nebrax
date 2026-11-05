@@ -16,4 +16,16 @@ return [
     */
     'shift_cash_receipts_enabled' => (bool) env('FUEL_SHIFT_CASH_RECEIPTS_ENABLED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | بوابة نشر إقرار تحصيل الوردية (مبيعات العدادات × السعر الفعّال ↔ توزيع التحصيل حسب طرق الدفع)
+    |--------------------------------------------------------------------------
+    | `false` (الافتراضي): مساري `GET|POST fuel-stations/shifts/{id}/collection` يردّان 404، و`close` يعمل
+    | حرفياً كما كان (لا تجميد ولا أحداث). الميزة تشغيلية فقط: لا سند ولا فاتورة ولا قيد ولا مدخل خزينة.
+    |
+    | مستقلة تماماً عن `shift_cash_receipts_enabled` (لا تفتحها ولا تتجاوزها). لا تُقلَب إلى `true` إلا بقرار
+    | تفعيل منسَّق مستقل بعد اختبار آيفون فعلي. انظر docs/fuel-stations/AWJ_FUEL_SHIFT_COLLECTION_RECONCILIATION_CONTRACT.md.
+    */
+    'shift_collection_declaration_enabled' => (bool) env('FUEL_SHIFT_COLLECTION_DECLARATION_ENABLED', false),
+
 ];

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowDownRight, ArrowUpRight, CircleAlert, CircleCheck, CircleDashed, Equal, Info, Plus, WifiOff } from 'lucide-react';
 import { SAUDI_RIYAL_SYMBOL, formatMinorRiyal } from '@/lib/money';
+import { CollectionDetailSection, CollectionEntrySection, type CollectionStatus } from './collection-section';
 import { cashTotals, closePreview, isValidReason, movementBlocker, parseMoney, MOVEMENT_TYPES, type MovementType } from './cash';
 import { useStationOps } from './context';
 import { useShiftDetail, useStationAssets, useStationPolicy } from './data';
@@ -65,7 +66,7 @@ function DirectionBadge({ variance }: { variance: number }) {
   );
 }
 
-function DonePanel({ detail, justClosed }: { detail: ShiftDetail; justClosed: boolean }) {
+function DonePanel({ detail, justClosed, station }: { detail: ShiftDetail; justClosed: boolean; station: Station }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
   const variance = detail.cash_variance_minor;
@@ -87,6 +88,7 @@ function DonePanel({ detail, justClosed }: { detail: ShiftDetail; justClosed: bo
         </dl>
         <p className="mt-3 text-xs leading-5 text-muted">{t('handover.summary.note')}</p>
       </SectionCard>
+      <CollectionDetailSection station={station} shiftId={detail.id} />
       <Link href={OPS_BASE} data-primary-action="" className="flex min-h-14 w-full items-center justify-center rounded-[13px] bg-[color:var(--fo-cta-bg)] px-4 text-[15px] font-bold text-[color:var(--fo-cta-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">{t('handover.done.home')}</Link>
     </div>
   );
@@ -211,6 +213,7 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
   const [staffResult, setStaffResult] = useState<WriteResult | null>(null);
   const [saved, setSaved] = useState(false);
   const submitting = useRef(false);
+  const [collection, setCollection] = useState<CollectionStatus>({ enabled: false, saved: false, dirty: false });
 
   const queried: ShiftDetail | null = query.state.status === 'success' ? query.state.data : query.retained?.data ?? null;
   const detail: ShiftDetail | null = confirmed && (query.state.status !== 'success' || query.state.data === confirmed.base) ? confirmed.shift : queried;
@@ -251,13 +254,13 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
     }
   }, [countedMinor, note, query, shiftId, station.branch_id]);
 
-  if (closedShift) return <DonePanel detail={closedShift} justClosed />;
+  if (closedShift) return <DonePanel detail={closedShift} justClosed station={station} />;
   if (!query.allowed) return <div className="pt-5"><EmptyState title={t('shift.noPermission.title')} body={t('shift.noPermission.body')} /></div>;
   if (!detail) {
     if (query.state.status === 'error') return <div className="pt-5"><ErrorState error={query.state.error} onRetry={query.reload} /></div>;
     return <div className="pt-5"><LoadingBlock rows={3} /></div>;
   }
-  if (detail.status !== 'open') return <DonePanel detail={detail} justClosed={false} />;
+  if (detail.status !== 'open') return <DonePanel detail={detail} justClosed={false} station={station} />;
   if (!can('fuel.shift.close') || !can('fuel.shift.cash_count')) {
     return <div className="pt-5"><EmptyState title={t('shift.noPermission.title')} body={t('shift.noPermission.body')} /></div>;
   }
@@ -305,6 +308,8 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
         {!policy.known ? <div className="mt-2"><InlineNote tone="warning">{t('handover.readiness.policyUnknown')}</InlineNote></div> : null}
         <p className="mt-3 flex items-baseline justify-between gap-3 border-t border-border pt-3 text-sm"><span className="text-muted">{t('handover.liters')}</span><span className="text-base font-semibold text-text">{view.summary.recordedComplete > 0 ? <Quantity value={formatLitersFixedFromMl(view.summary.computedMl, locale)} unit={t('unit.liter')} /> : '—'}</span></p>
       </SectionCard>
+
+      <CollectionEntrySection station={station} shiftId={shiftId} countedMinor={countedMinor} intents={intents} onStatus={setCollection} />
 
       <SectionCard title={t('handover.step.cash')} id="handover-cash-h">
         <dl className="divide-y divide-border text-sm">
@@ -391,6 +396,9 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
       <ConfirmDialog open={confirmOpen} title={t('handover.confirm.title')} onClose={() => setConfirmOpen(false)} busy={sending}>
         <div className="space-y-4">
           <p className="text-sm leading-6 text-muted">{t('handover.confirm.body')}</p>
+          {collection.enabled && (!collection.saved || collection.dirty) ? (
+            <p role="status" data-confirm-collection-warning="" className="flex items-start gap-2 text-sm leading-6 text-warning"><CircleAlert aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" strokeWidth={2} />{t('collection.unsavedWarning')}</p>
+          ) : null}
           {preview ? (
             <dl className="space-y-2 rounded-[12px] border border-border p-3 text-sm">
               <div className="flex items-baseline justify-between gap-3"><dt className="text-muted">{t('handover.liters')}</dt><dd className="font-semibold text-text">{view.summary.recordedComplete > 0 ? <Quantity value={formatLitersFixedFromMl(view.summary.computedMl, locale)} unit={t('unit.liter')} /> : '—'}</dd></div>

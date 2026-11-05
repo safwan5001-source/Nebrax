@@ -60,6 +60,17 @@ class FuelShiftResource extends JsonResource
         return $hide && $payload !== null ? array_diff_key($payload, array_flip(self::SALE_DERIVED_CASH_KEYS)) : $payload;
     }
 
+    /** مفاتيح حمولة أحداث إقرار التحصيل المشتقة من الأسعار. */
+    private const COLLECTION_SALE_KEYS = ['sales_minor', 'difference_minor', 'cash_cross_difference_minor'];
+
+    /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
+    private function redactCollectionKeys(?array $payload, string $type, bool $hide): ?array
+    {
+        $isCollection = in_array($type, [FuelShiftEvent::TYPE_COLLECTION_DECLARED, FuelShiftEvent::TYPE_COLLECTION_FROZEN], true);
+
+        return $hide && $isCollection && $payload !== null ? array_diff_key($payload, array_flip(self::COLLECTION_SALE_KEYS)) : $payload;
+    }
+
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
@@ -149,7 +160,8 @@ class FuelShiftResource extends JsonResource
                 ->map(fn ($event) => [
                     'id' => $event->id,
                     'type' => $event->type,
-                    'payload' => $this->redactCashKeys($event->payload, $hideCash),
+                    // إقرار التحصيل: مبيعات العدادات والفرق مشتقّان من الأسعار فلا يظهران بلا fuel.sale.view (D8).
+                    'payload' => $this->redactCollectionKeys($this->redactCashKeys($event->payload, $hideCash), $event->type, ! $canViewSales),
                     'actor_id' => $event->actor_id,
                     'occurred_at' => $event->occurred_at?->toISOString(),
                 ])->values()),

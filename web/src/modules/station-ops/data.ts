@@ -6,7 +6,8 @@ import { useStationOps } from './context';
 import { resolveStationPrices, type PriceResult } from './prices';
 import { previousClosingMap } from './entry';
 import { STRICT_POLICY, toShiftPolicy, type ShiftPolicy } from './policy';
-import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftDetailPath, stationSettingsPath } from './read-client';
+import { collectionResponse, type CollectionView } from './collection';
+import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftCollectionPath, shiftDetailPath, stationSettingsPath } from './read-client';
 import {
   fuelProductsResponse,
   nozzlesResponse,
@@ -312,4 +313,60 @@ export function usePreviousClosing(station: Station | null, currentShiftId: stri
   });
   const idle: QueryState<PreviousClosing | null> = useMemo(() => ({ status: 'success', data: null }), []);
   return key === null ? idle : query.state;
+}
+
+
+export interface ShiftCollectionResult {
+  /** `false` = لا صلاحية `fuel.shift.view` (لا طلب أُرسل). */
+  allowed: boolean;
+  state: QueryState<CollectionView>;
+  /** آخر نجاح لهذا المفتاح نفسه: يبقى معروضاً أثناء التحديث التلقائي فلا تُفقد المدخلات ولا يومض القسم. */
+  retained: CollectionView | null;
+  reload: () => void;
+}
+
+const COLLECTION_REFRESH_MS = 60_000;
+const COLLECTION_FOCUS_THROTTLE_MS = 5_000;
+
+/**
+ * إقرار تحصيل الوردية (قراءة فقط). **القائمة تتبع إعدادات المحطة تلقائياً:** يُعاد الجلب عند عودة التبويب/النافذة للتركيز وكل دقيقة وهو ظاهر،
+ * فتفعيل/تعطيل طريقة دفع من إعدادات المحطة ينعكس دون إعادة تحميل الصفحة؛ والخادم يرفض عند الحفظ أي قائمة قديمة على أي حال.
+ * البوابة مغلقة ⇒ 404 ⇒ `not_found` ⇒ القسم لا يُعرض (الشاشة كما كانت).
+ */
+export function useShiftCollection(station: Station | null, shiftId: string, options: { autoRefresh?: boolean } = {}): ShiftCollectionResult {
+  const { scopeKey, can } = useStationOps();
+  const allowed = can('fuel.shift.view');
+  const stationId = station?.id ?? null;
+  const valid = isValidShiftId(shiftId);
+  const key = allowed && stationId && valid ? `${scopeKey}|${stationId}|shift|${shiftId}|collection` : null;
+
+  const query = useScopedQuery<CollectionView>(key, async (signal) => (await opsGet(shiftCollectionPath(shiftId), collectionResponse, { signal, branchId: station?.branch_id })).data);
+
+  const last = useRef<{ key: string; data: CollectionView } | null>(null);
+  if (key !== null && query.state.status === 'success') last.current = { key, data: query.state.data };
+  const retained = key !== null && last.current?.key === key ? last.current.data : null;
+
+  const { reload } = query;
+  const autoRefresh = options.autoRefresh === true;
+  useEffect(() => {
+    if (!autoRefresh || key === null) return undefined;
+    let lastRun = Date.now();
+    const run = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (Date.now() - lastRun < COLLECTION_FOCUS_THROTTLE_MS) return;
+      lastRun = Date.now();
+      reload();
+    };
+    const timer = window.setInterval(run, COLLECTION_REFRESH_MS);
+    window.addEventListener('focus', run);
+    document.addEventListener('visibilitychange', run);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', run);
+      document.removeEventListener('visibilitychange', run);
+    };
+  }, [autoRefresh, key, reload]);
+
+  const idle: QueryState<CollectionView> = useMemo(() => ({ status: 'error', error: new StationOpsError('forbidden', 403) }), []);
+  return { allowed, state: key === null ? idle : query.state, retained, reload };
 }

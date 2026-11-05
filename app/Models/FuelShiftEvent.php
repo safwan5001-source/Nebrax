@@ -25,6 +25,9 @@ class FuelShiftEvent extends BaseModel
     public const TYPE_CASH_VARIANCE_REVIEWED = 'cash_variance_reviewed';
     public const TYPE_APPROVED_LOCKED = 'approved_locked';
     public const TYPE_CORRECTION_REQUESTED = 'correction_requested';
+    // إقرار تحصيل الوردية (تشغيلي): حفظ نسخة، وتجميدها عند الإغلاق. بلا أي أثر محاسبي.
+    public const TYPE_COLLECTION_DECLARED = 'collection_declared';
+    public const TYPE_COLLECTION_FROZEN = 'collection_frozen';
 
     protected $fillable = ['tenant_id', 'branch_id', 'fuel_shift_id', 'type', 'payload', 'actor_id', 'occurred_at'];
 

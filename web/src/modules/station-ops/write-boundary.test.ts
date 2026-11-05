@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * حارس ساكن على مصدر الوحدة (باستثناء الاختبارات و`__fixtures__`):
  *  - `POST` لا يظهر إلا في `write-client.ts`؛ ولا `PUT/PATCH/DELETE` في أي مكان.
  *  - `api(` لا يُستدعى إلا من `read-client.ts` و`write-client.ts`؛ ولا `fetch` مباشر.
- *  - ستة مسارات كتابة فقط (فتح، إسناد، قراءة عدّاد، قراءة خزان، حركة نقد، إغلاق): لا اعتماد/مراجعة فرق/تصحيح، ولا مبيعات/تحصيل/أسعار/استلام.
+ *  - سبعة مسارات كتابة فقط (فتح، إسناد، قراءة عدّاد، قراءة خزان، حركة نقد، إغلاق، **إقرار تحصيل الوردية** `…/collection` التشغيلي): لا اعتماد/مراجعة فرق/تصحيح، ولا مبيعات/تحصيل رسمي/أسعار/استلام.
  *  - مفاتيح idempotency والمسودات لا تُستورد إلا في شاشات الكتابة.
  *  - لا أسماء وقود/أسعار/محطات مكتوبة، ولا بيانات اختبار في الإنتاج.
  */
@@ -19,7 +19,7 @@ const sources = readdirSync(dir)
 
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 const WRITE_CLIENT = 'write-client.ts';
-const WRITE_SCREENS = ['open-shift-screen.tsx', 'readings-entry-screen.tsx', 'handover-screen.tsx'];
+const WRITE_SCREENS = ['open-shift-screen.tsx', 'readings-entry-screen.tsx', 'handover-screen.tsx', 'collection-section.tsx'];
 
 describe('station-ops writes only through write-client.ts', () => {
   it('has module sources to scan', () => {
@@ -47,12 +47,12 @@ describe('station-ops writes only through write-client.ts', () => {
     }
   });
 
-  it('the write client exposes exactly six actions and builds its own paths (callers never pass a path)', () => {
+  it('the write client exposes exactly seven actions and builds its own paths (callers never pass a path)', () => {
     const client = code(sources.find((entry) => entry.file === WRITE_CLIENT)!.text);
     const actions = [...client.matchAll(/action: '([a-z_]+)'/g)].map((m) => m[1]);
-    expect([...new Set(actions)].sort()).toEqual(['assign_staff', 'cash_movement', 'close', 'meter_reading', 'open', 'tank_reading']);
+    expect([...new Set(actions)].sort()).toEqual(['assign_staff', 'cash_movement', 'close', 'collection', 'meter_reading', 'open', 'tank_reading']);
     const paths = [...client.matchAll(/`?['"`]?(\/fuel-stations\/[^'"`$]*|\$\{base\}\/[a-z-]+)/g)].map((m) => m[1]);
-    expect([...new Set(paths)].sort()).toEqual(['${base}/cash-movements', '${base}/close', '${base}/meter-readings', '${base}/staff', '${base}/tank-readings', '/fuel-stations/shifts/', '/fuel-stations/shifts/open'].sort());
+    expect([...new Set(paths)].sort()).toEqual(['${base}/cash-movements', '${base}/close', '${base}/collection', '${base}/meter-readings', '${base}/staff', '${base}/tank-readings', '/fuel-stations/shifts/', '/fuel-stations/shifts/open'].sort());
   });
 
   it.each(sources)('$file never reaches approval, variance review, corrections, sales, payments, prices or receiving', ({ text }) => {

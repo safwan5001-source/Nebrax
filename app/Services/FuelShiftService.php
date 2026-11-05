@@ -382,6 +382,8 @@ class FuelShiftService
                 'official_cash_basis' => $basis,
                 'expectation_complete' => $live['complete'],
             ]);
+            // إقرار تحصيل الوردية (إن وُجد): يُجمَّد مع لقطة الدرج داخل معاملة الإغلاق نفسها ولو أُغلقت بوابته بعد الحفظ. الحل الكسول عبر app() يكسر الدورة مع خدمة الإقرار.
+            app(FuelShiftCollectionService::class)->freezeAtClose($shift, $countedCashMinor, $live, $actor);
             if ($variance !== 0) {
                 $this->event($shift, FuelShiftEvent::TYPE_CASH_VARIANCE_PENDING, $actor, [
                     'cash_variance_id' => $cashVariance->id, 'variance_minor' => $variance, 'direction' => $direction,
@@ -497,7 +499,8 @@ class FuelShiftService
         });
     }
 
-    private function lockOpenShift(FuelShift $shift, User $actor): FuelShift
+    /** يقفل الوردية `FOR UPDATE` ويتحقق من نطاق الفاعل والمحطة وأنها مفتوحة (يستعمله إقرار تحصيل الوردية أيضاً). */
+    public function lockOpenShift(FuelShift $shift, User $actor): FuelShift
     {
         $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
         $station = FuelStation::findOrFail($shift->fuel_station_id);
