@@ -40,6 +40,22 @@ class StoreFuelStationProductPriceRequest extends FormRequest
         }
     }
 
+    /**
+     * قاعدة `boolean` تقبل 1/"1"/"true"… والخدمة تقارن بصرامة (=== true): نُطبّع العلمين المتحقَّق منهما إلى منطقي حقيقي
+     * فلا يُتجاهل `supersede: 1` ولا يُرفض `start_now: "1"` بسبب «effective_from مطلوب».
+     */
+    public function validated($key = null, $default = null)
+    {
+        $data = parent::validated();
+        foreach (['start_now', 'supersede'] as $flag) {
+            if (array_key_exists($flag, $data)) {
+                $data[$flag] = filter_var($data[$flag], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        return $key === null ? $data : data_get($data, $key, $default);
+    }
+
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {

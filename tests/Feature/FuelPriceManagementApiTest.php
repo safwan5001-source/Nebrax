@@ -144,6 +144,23 @@ class FuelPriceManagementApiTest extends TestCase
     }
 
     /** @test */
+    public function boolean_flags_accepted_by_the_validator_in_any_representation_behave_as_true(): void
+    {
+        $f = $this->fixture();
+        $old = $this->price($f, $f['a'], 200, now()->subDays(2));
+
+        // start_now: "1" (نص) و supersede: 1 (رقم) يُقبلان في التحقق ويجب أن يعملا كـ true لا أن يُتجاهلا.
+        $response = $this->withToken($f['owner_token'])->postJson(self::BASE . '/prices', $this->body($f, ['start_now' => '1', 'effective_from' => null, 'price_per_liter_minor' => 230, 'supersede' => 1]))->assertCreated();
+
+        $this->assertSame([$old->id], $response->json('meta.superseded_price_ids'));
+        $this->assertNotNull($old->fresh()->effective_until);
+        $this->assertSame(230, $this->effective($f['owner_token'], $f['a']->id)[0]['price_per_liter_minor']);
+
+        // قيمة "0"/false لا تُفعّل شيئاً: يبقى التعارض مرفوضاً.
+        $this->withToken($f['owner_token'])->postJson(self::BASE . '/prices', $this->body($f, ['start_now' => 1, 'effective_from' => null, 'price_per_liter_minor' => 240, 'supersede' => '0']))->assertUnprocessable();
+    }
+
+    /** @test */
     public function supersede_is_refused_for_temporary_backdated_or_later_scheduled_prices(): void
     {
         $f = $this->fixture();
