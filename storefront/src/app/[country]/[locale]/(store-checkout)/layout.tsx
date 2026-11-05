@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { CurrentYear } from "@/components/layout/CurrentYear";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreBrand } from "@/components/layout/StoreBrand";
+import { OrderingProvider } from "@/contexts/OrderingContext";
 import { DEFAULT_LOCALE, resolveSupportedLocale } from "@/i18n/locales";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import {
@@ -60,6 +61,10 @@ export default async function StoreCheckoutLayout({
     getTranslations({ locale: messageLocale, namespace: "footer" }),
   ]);
   const presentation = identity?.presentation ?? null;
+  // COPS-H4 Buyer Ordering UX — provides the intake block to the checkout flow only (the banner is rendered inside the flow,
+  // so `/track/*` and `/checkout/payment-return` — pages about orders already placed — are not cluttered by it). `null`
+  // (gate closed / absent / fetch failed) adds nothing to the tree. Checkout on the server stays the single authority.
+  const ordering = identity?.ordering ?? null;
   const displayName = publishedStoreName(
     presentation,
     identity?.name ?? null,
@@ -115,7 +120,11 @@ export default async function StoreCheckoutLayout({
         <PublishedThemeMarkerProvider
           themePreset={presentation?.themePreset ?? "awj-modern"}
         >
-          {children}
+          {ordering ? (
+            <OrderingProvider ordering={ordering}>{children}</OrderingProvider>
+          ) : (
+            children
+          )}
         </PublishedThemeMarkerProvider>
       </main>
 

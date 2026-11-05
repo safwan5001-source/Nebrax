@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { CartEmptyState } from "@/components/cart/CartEmptyState";
 import { awjCartLineView, CartLine } from "@/components/cart/CartLine";
 import { CartSummary } from "@/components/cart/CartSummary";
+import { OrderingCartNotice } from "@/components/ordering/OrderingCartNotice";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
@@ -118,6 +119,8 @@ export default function CartPage() {
           sticky
           actions={
             <div className="space-y-2">
+              {/* COPS-H4: advisory only (renders nothing while the gate is closed); Checkout stays the authority. */}
+              <OrderingCartNotice subtotal={cart.subtotal} className="mb-3" />
               <Button size="lg" asChild className="w-full">
                 <Link href={`${basePath}/checkout`}>
                   {t("proceedToCheckout")}

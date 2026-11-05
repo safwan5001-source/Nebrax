@@ -234,6 +234,9 @@ export interface AwjOrder {
 /** One failing line/reason from a `review_required` (409) response's `error.details.items`. */
 export interface AwjReviewIssue {
   item_id: string;
+  /** COPS-H4-4 — present only on a `below_minimum_order` refusal: the store's minimum and what is still missing (minor units). */
+  min_order_minor?: number;
+  shortfall_minor?: number;
   reason:
     | "unavailable"
     | "uom_invalid"
