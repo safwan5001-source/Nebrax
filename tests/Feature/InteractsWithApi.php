@@ -14,6 +14,16 @@ use App\Tenancy\TenantContext;
 trait InteractsWithApi
 {
     /**
+     * FUEL-B2: خط أساس الاختبارات القائمة = «محطات قائمة»: حدّ المحطة الجديدة لسياسة فصل المعتمِد معطَّل، فتحتفظ الاختبارات التي أنشأت
+     * محطتها بنموذج ثم اعتمدت بالمستخدم نفسه بسلوكها السابق حرفياً. اختبارات B2 (`FuelDistinctApproverTest`) تضبط الحدّ صراحةً.
+     * تستدعيه Laravel تلقائياً (`setUp{TraitName}`) بعد إقلاع التطبيق.
+     */
+    protected function setUpInteractsWithApi(): void
+    {
+        config(['fuel_stations.distinct_approver_cutover_at' => null]);
+    }
+
+    /**
      * يُنسي حُرّاس المصادقة قبل **كل** طلب حتى يُعاد حلّ المستخدم من توكنه.
      * (في الاختبار يبقى الحارس حيّاً عبر الطلبات؛ في الإنتاج كل طلب إقلاع منفصل.)
      *

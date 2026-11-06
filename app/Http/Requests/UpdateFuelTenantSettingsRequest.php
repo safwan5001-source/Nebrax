@@ -27,6 +27,7 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'shift_mandatory_staff_assignment' => ['sometimes', 'boolean'],
             'shift_mandatory_cash_count' => ['sometimes', 'boolean'],
             'shift_supervisor_approval_required' => ['sometimes', 'boolean'],
+            'fuel_distinct_approver_required' => ['sometimes', 'boolean'],
             'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'boolean'],
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'integer', 'min:0'],

@@ -27,6 +27,7 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'shift_mandatory_staff_assignment' => ['sometimes', 'nullable', 'boolean'],
             'shift_mandatory_cash_count' => ['sometimes', 'nullable', 'boolean'],
             'shift_supervisor_approval_required' => ['sometimes', 'nullable', 'boolean'],
+            'fuel_distinct_approver_required' => ['sometimes', 'nullable', 'boolean'],
             'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'nullable', 'boolean'],
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'nullable', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],

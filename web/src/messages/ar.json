@@ -2935,7 +2935,9 @@
       "publish": "نشر",
       "reassign": "إعادة إسناد",
       "use": "استخدام",
-      "repair": "تصحيح عملية منفّذة"
+      "repair": "تصحيح عملية منفّذة",
+      "record": "تسجيل",
+      "match": "مطابقة فاتورة المورد"
     },
     "weekdays": [
       "الأحد",
@@ -3040,7 +3042,11 @@
       "assistant": "المساعد",
       "consent": "الموافقة",
       "wholesale": "الجملة",
-      "channel_settings": "إعدادات القناة"
+      "channel_settings": "إعدادات القناة",
+      "delivery": "استلام الوقود",
+      "reading": "قراءات الخزانات",
+      "reconciliation": "تسوية المخزون",
+      "supplier_invoice": "فواتير موردي الوقود"
     }
   },
   "inventory": {

@@ -2935,7 +2935,9 @@
       "publish": "Publish",
       "reassign": "Reassign",
       "use": "Use",
-      "repair": "Repair executed action"
+      "repair": "Repair executed action",
+      "record": "Record",
+      "match": "Match supplier invoice"
     },
     "weekdays": [
       "Sunday",
@@ -3040,7 +3042,11 @@
       "assistant": "Assistant",
       "consent": "Consent",
       "wholesale": "Wholesale",
-      "channel_settings": "Channel settings"
+      "channel_settings": "Channel settings",
+      "delivery": "Fuel receiving",
+      "reading": "Tank readings",
+      "reconciliation": "Inventory reconciliation",
+      "supplier_invoice": "Fuel supplier invoices"
     }
   },
   "inventory": {

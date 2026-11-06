@@ -179,6 +179,15 @@ class Rbac
             'fuel.safety.view', 'fuel.safety.manage', 'fuel.safety.inspect', 'fuel.safety.verify',
             'fuel.alerts.view', 'fuel.alerts.manage', 'fuel.reports.view',
             'fuel.credit.view', 'fuel.credit.manage',
+            // FUEL-B2: مفاتيح دقيقة لدورة الاستلام والقراءات والتسوية وفواتير الموردين، بديلاً عن `fuel_stations.manage` الواسع.
+            // **توافق رجعي:** المسارات تقبل القديم (`fuel_stations.view|manage`) أو الجديد (EnsureAnyPermission)، فلا يتغير أي دور مخزَّن.
+            // القبول بمفتاح لا يتجاوز نطاق الفرع/المخزن (يُفحص في المتحكم/الخدمة بغضّ النظر عن المفتاح) ولا سياسة فصل المعتمِد
+            // (`fuel_distinct_approver_required`، تُفحص في الخدمة) ولا يكشف التكلفة (تتبع `products.view_cost` وحدها).
+            // owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve',
+            'fuel.reading.view', 'fuel.reading.record',
+            'fuel.reconciliation.view', 'fuel.reconciliation.create', 'fuel.reconciliation.approve',
+            'fuel.supplier_invoice.view', 'fuel.supplier_invoice.manage', 'fuel.supplier_invoice.match',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
             // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات
