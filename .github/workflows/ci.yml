@@ -141,10 +141,8 @@ jobs:
           php artisan install:api --no-interaction --quiet || true
           rm -f database/migrations/*_create_personal_access_tokens_table.php
 
-      # ParaTest لفرع PostgreSQL وحده (تنفيذ متوازٍ، قاعدة بيانات معزولة لكل عامل: nibras_test_N).
-      # فرع SQLite يبقى تسلسلياً كما هو.
-      - name: تثبيت ParaTest (pgsql فقط)
-        if: matrix.db == 'pgsql'
+      # ParaTest لكلا الفرعين (تنفيذ متوازٍ، قاعدة بيانات معزولة لكل عامل: nibras_test_N لـPostgreSQL وdatabase.sqlite_test_N لـSQLite).
+      - name: تثبيت ParaTest
         working-directory: ${{ env.APP_DIR }}
         run: composer require --dev "brianium/paratest:^7.4" --quiet
 
@@ -301,10 +299,10 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          # كلا الفرعين متوازٍ بعمّال بعدد أنوية العدّاد (≤4) وقاعدة معزولة لكل عامل. المجموعة كاملة بلا أي تصفية.
+          # SQLite: تجربة معزولة (Run 42301504423 و42306427592) أثبتت تطابق كل (اختبار، حالة) مع التشغيل التسلسلي وعزل ملف قاعدة بيانات لكل عامل.
+          PROCS="$(nproc)"; [ "$PROCS" -le 4 ] || PROCS=4
           if [ "${{ matrix.db }}" = "pgsql" ]; then
-            # PostgreSQL: متوازٍ بعمّال بعدد أنوية العدّاد (≤4) وقاعدة معزولة لكل عامل. المجموعة كاملة
-            # بلا أي تصفية؛ SQLite أدناه تسلسلي كما كان.
-            PROCS="$(nproc)"; [ "$PROCS" -le 4 ] || PROCS=4
             # AWJ-BACKEND-CI-02: سقفٌ لانتظار الأقفال في اتصالات الاختبار وحدها. معاملةٌ متروكة من
             # اختبارٍ فاشل كانت تعلّق عاملاً بلا حدّ (رُصد 42 دقيقة)؛ الآن يفشل المنتظر بـ55P03 مسمّى.
             # تقرؤه libpq عند كل اتصال (Laravel وPDO المنافس وأطفال pcntl_fork)، ولا يمسّ الخادم.
@@ -323,7 +321,7 @@ jobs:
               --stall-seconds 240 --pg-docker-filter ancestor=postgres:16 --pg-user awj_ci_watchdog --pg-db nibras --privileged-proc
             php artisan test --parallel --processes="$PROCS" --log-teamcity "$WD_DIR/teamcity.log" --tmp-dir "$WD_DIR/paratest" 2>&1 | tee test-output-${{ matrix.db }}.txt
           else
-            php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
+            php artisan test --parallel --processes="$PROCS" 2>&1 | tee test-output-${{ matrix.db }}.txt
           fi
 
       # AIA-0.4 (D-08): اختبارات قبول سقف صلاحيات إصدار مفاتيح Public API صارمة بلا استثناء. تعمل أيضاً ضمن التشغيل الكامل
