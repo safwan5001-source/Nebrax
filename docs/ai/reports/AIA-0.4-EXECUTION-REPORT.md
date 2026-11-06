@@ -2,7 +2,7 @@
 
 **الحالة:** مُنفَّذ، جاهز لمراجعة PR. **لا Merge ولا Deploy ولا تفعيل لسياسة الاستقلالية.**
 **الفرع:** `claude/awj-aia-0-4-scope-ceiling` · **الأساس (`main`):** `44029e38df2ea4ffa0c76b96c3ed5228a5b70915`
-**PR وHead SHA:** يُسجَّلان في وصف الـPR وفي رد التسليم (لا يستطيع تقرير داخل الـPR أن يذكر SHA الـcommit الذي يحويه، ولا نتائج CI التي تعمل بعده).
+**PR:** https://github.com/safwan5001-source/Nebrax/pull/2031 · **Head SHA:** الرأس الأصلي الذي نجح CI عليه `f1b876a006a688d134af640a45e10be87e1ad57b`، وبعده commit معالجة ملاحظة المراجعة الأمنية (القسم 9). الرأس النهائي ونتائج CI عليه تُسجَّل في وصف الـPR وفي رد التسليم (لا يستطيع تقرير داخل الـPR أن يذكر SHA الـcommit الذي يحويه ولا نتائج CI التي تعمل بعده).
 **المرجع:** `AIA-0.4-acceptance-addendum.md` (أول commit في الفرع) · Roadmap §1.1/§1.1b · Gates G-S2 · PR #2030.
 
 ---
@@ -27,7 +27,7 @@
 | `App\Services\PublicApiKeyIssuanceGuard` | نقطة التحقق الوحيدة. يحلّ صلاحيات المُصدِر **داخل سياق مستأجره هو** (ويعيد سياق الطلب كما كان)، فلا تُقرأ صلاحية دور بالاسم نفسه من مستأجر آخر |
 | `PublicApiScopeCeilingException` | 403 بجسم `{message, reason: "scope_exceeds_issuer_permissions", denied_scopes[]}` — لا `secret` ولا `key` ولا `client` |
 | `DeveloperApiClientController` | `store` و`issueKey` (مفتاح إضافي/تجديد لعميل قائم) يستدعيان الحارس **قبل أي كتابة**. `issueKey` يفحص بعد 404 المستأجر. نقطة جديدة للقراءة `GET /developer/issuable-scopes` (صلاحية `developer.view`) تعيد ما يجوز لهذا المستخدم منحه |
-| `public-api:create-client` | **سياسة A:** `--issuer` إلزامي (بريد أو UUID لمستخدم **نشط** من المستأجر نفسه) ويُطبَّق سقفه؛ الرفض قبل إنشاء أي عميل. **B** مؤجَّل: لا `--operator` ولا بوابة. **C** مغلق: لا مسار بلا `--issuer` |
+| `public-api:create-client` | **سياسة A:** `--issuer` إلزامي (بريد أو UUID لمستخدم **نشط** من المستأجر نفسه) ويُشترط أن يملك **`developer.manage`** (سلطة الإصدار نفسها في واجهة المطوّر — القسم 9) ويُطبَّق سقف الـscopes؛ الرفض قبل إنشاء أي عميل. **B** مؤجَّل: لا `--operator` ولا بوابة. **C** مغلق: لا مسار بلا `--issuer` |
 | الواجهة (`ScopePicker` + `KeyFormDialog`) | تجلب `issuable-scopes` وتعطّل ما يتجاوز الصلاحيات مع شارة «خارج صلاحياتك». **للعرض فقط**: فشل الجلب ⇒ لا تعطيل والخادم يبقى المرجع ويعرض رسالة الرفض |
 | CI | خطوة صارمة `AIA-0.4 — قبول سقف صلاحيات المفاتيح` في وظيفة test (SQLite وPostgreSQL) بـ`--fail-on-incomplete --fail-on-skipped --fail-on-risky` على ملفات الاختبار الثلاثة |
 
@@ -39,6 +39,7 @@
 |---|---|
 | `public-api:create-client acme name --scopes=…` (بلا `--issuer`) | **يفشل** (رمز خروج 1) برسالة تطلب `--issuer`؛ لا عميل ولا مفتاح |
 | `--issuer` غير موجود / معطَّل / من مستأجر آخر | يفشل |
+| `--issuer` بلا `developer.manage` (حتى لو يملك الصلاحية المقابلة للـscope) | **يفشل** ويسمّي `developer.manage`؛ لا أثر (القسم 9) |
 | `--issuer` بلا الصلاحية المقابلة لأي scope | يفشل ويسمّي الـscopes المرفوضة؛ لا أثر |
 | `--issuer` مخوَّل (أو owner/admin) | ينجح؛ يُطبع `issuer` مع السرّ مرة واحدة |
 | `--operator` أو أي استثناء إداري | غير موجود (خيار مجهول) |
@@ -54,7 +55,7 @@
 
 ## 5) الاختبارات
 
-**اختبارات القبول (27 اختباراً، 2352 تأكيداً، صارمة بلا skip/incomplete):** `PublicApiScopeCeilingEnforcementTest` (18) · `PublicApiCreateClientCommandCeilingTest` (6) · `PublicApiScopeCeilingArchitectureTest` (3) — المجموعة `aia-0-4-security`.
+**اختبارات القبول (32 اختباراً، 2387 تأكيداً، صارمة بلا skip/incomplete — بعد القسم 9):** `PublicApiScopeCeilingEnforcementTest` (19) · `PublicApiCreateClientCommandCeilingTest` (10) · `PublicApiScopeCeilingArchitectureTest` (3) — المجموعة `aia-0-4-security`.
 
 | المطلب | الاختبار |
 |---|---|
@@ -102,3 +103,32 @@
 2. بعد الدمج: ضبط تواصل مع مشغّلي أي أوامر CLI خارجية (إضافة `--issuer`).
 3. شريحة لاحقة منفصلة: ربط المفتاح بمُصدِره (تصميم AIA-0.6a) لتمكين تقرير المفاتيح المتجاوزة وإبطال اختياري بقرار مستقل.
 4. ثم المسار المخطَّط: AIA-0.1 (غلاف السلامة المالية) بعد حسم D-12.
+
+---
+
+## 9) ملاحظة مراجعة أمنية على PR #2031 — سلطة `developer.manage` في CLI
+
+**الملاحظة (من المراجعة):** `PublicApiCreateClientCommand` كان يتحقق من سقف الـscopes عبر `PublicApiKeyIssuanceGuard` لكن **لا يتحقق من `developer.manage`** للمستخدم المحدد بـ`--issuer`.
+
+**الإثبات قبل أي تعديل (اختبار رفض صارم يفشل على الكود المسلَّم `f1b876a0`):** تشغيل `PublicApiCreateClientCommandCeilingTest` بالاختبارات الجديدة على الكود السابق أعطى **3 إخفاقات من 10**:
+| الاختبار | النتيجة على الكود السابق |
+|---|---|
+| مُصدِر نشط يملك `partners.view` فقط ⇒ `--scopes=partners:read` | **أُصدر المفتاح** (كان يجب الرفض) — الملاحظة **صحيحة** |
+| مُصدِر يملك `developer.view`+`partners.view` دون `developer.manage` | **أُصدر المفتاح** |
+| دور بالاسم نفسه في مستأجرين، أحدهما بلا `developer.manage` | **أُصدر المفتاح** للمستأجر الذي بلا الصلاحية |
+والاختبار الإيجابي (مُصدِر بـ`developer.manage`+`partners.view`) نجح قبل الإصلاح وبعده.
+
+**هل CLI مستثنى عمداً؟ لا.** لا عقد موثَّق يستثنيه: ملحق القبول والخطة (A) نصّا على «التحقق من صلاحيات المستخدم» بنموذج واجهة المطوّر، وهذه تشترط `developer.manage` على الإصدار عبر وسيط المسار. ما كان موثَّقاً لـCLI هو *الإزالة المستقبلية* للتجاوز (B)، لا الإعفاء من سلطة الإصدار. فالسلوك السابق ثغرة تنفيذ لا قراراً.
+
+**الأثر:** مُصدِر مسجَّل في المستأجر بصلاحيات محدودة كان يستطيع عبر CLI (وصول خادم) إصدار مفتاح بـscopes تقابل صلاحياته القرائية حتى بلا سلطة إدارة المفاتيح، وهو ما تمنعه الواجهة. الأثر محدود بمن يملك وصول CLI، لكنه يناقض تماثل النموذجين.
+
+**الإصلاح (مقتصر على الملاحظة):**
+- `PublicApiKeyIssuanceAuthority::PERMISSION = 'developer.manage'` ثابت واحد مشترك (لا نموذج تفويض ثانٍ).
+- `PublicApiKeyIssuanceGuard::mayIssue(User)`: يحلّ صلاحيات المُصدِر داخل سياق مستأجره (كسقف الـscopes) ويشترط `developer.manage` أو `*`.
+- `assertIssuable()` (مسار REST) صار يتضمن الشرط أيضاً **دفاعاً بالعمق** لا ثقةً بوسيط المسار وحده؛ يرمي `PublicApiScopeCeilingException` بسبب مستقل `issuer_lacks_developer_manage` (403).
+- CLI: `mayIssue` قبل `denied`، وقبل إنشاء أي عميل؛ رسالة تسمّي `developer.manage`؛ رمز خروج 1.
+- الحارس البنيوي يشترط الآن أن كل مستدعٍ إنتاجي لـ`issueKey` يمرّ بـ`assertIssuable` أو `mayIssue` قبل الإصدار.
+
+**الاختبارات المضافة (5):** CLI — رفض `partners.view` فقط · رفض `developer.view` دون `manage` · نجاح `developer.manage`+`partners.view` · حلّ الصلاحية من دور مستأجر المُصدِر لا من دور بالاسم نفسه في مستأجر آخر؛ الحارس — `mayIssue` مستقل عن وسيط المسار (owner وreader يملكانها، وholder بلا سلطة يُرفض بسبب مستقل). نتيجة محلية (SQLite): 32/32 بـ`--fail-on-incomplete --fail-on-skipped --fail-on-risky`؛ 45 اختباراً مجاوراً (`DeveloperApiClientManagementTest` وغيره) ناجحة. PostgreSQL وCI الكامل: في وصف الـPR بعد التشغيل.
+
+**التوافق الخلفي والنطاق:** لا تغيير في المفاتيح القائمة ولا في عقود Public API ولا في استجابة الإصدار الناجحة؛ الأثر الجديد الوحيد أن مُصدِراً بلا `developer.manage` يُرفض في CLI (كما في الواجهة). عزل المستأجر محفوظ (الصلاحية من دور مستأجر المُصدِر). لا هجرات ولا تغيير آخر.
