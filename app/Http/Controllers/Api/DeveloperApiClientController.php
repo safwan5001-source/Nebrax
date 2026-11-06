@@ -9,6 +9,7 @@ use App\Http\Resources\DeveloperApiClientResource;
 use App\Http\Resources\DeveloperApiKeyResource;
 use App\Models\ApiClient;
 use App\Services\ApiClientKeyService;
+use App\Services\PublicApiKeyIssuanceGuard;
 use App\Support\PublicApiScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,10 +41,21 @@ class DeveloperApiClientController extends Controller
         return (new DeveloperApiClientResource($client))->response();
     }
 
+    /**
+     * الـ scopes التي يجوز لهذا المستخدم منحها فعلاً (سقف الإصدار — AIA-0.4). للعرض في الواجهة
+     * (تعطيل ما يتجاوز صلاحياته)؛ الخادم يفرض السقف نفسه عند الإصدار بصرف النظر عمّا تعرضه الواجهة.
+     */
+    public function issuableScopes(Request $request, PublicApiKeyIssuanceGuard $guard): JsonResponse
+    {
+        return response()->json(['data' => ['scopes' => $guard->issuableScopes($request->user())]]);
+    }
+
     /** ينشئ عميلًا ويُصدر مفتاحه الأوّل (النصّ الصريح مرّة واحدة). */
-    public function store(StoreDeveloperApiClientRequest $request, ApiClientKeyService $service): JsonResponse
+    public function store(StoreDeveloperApiClientRequest $request, ApiClientKeyService $service, PublicApiKeyIssuanceGuard $guard): JsonResponse
     {
         $input = $request->validated();
+        // سقف الصلاحيات **قبل أي كتابة**: scope واحد غير مصرَّح به ⇒ رفض كامل بلا عميل ولا مفتاح ولا سرّ.
+        $guard->assertIssuable($request->user(), $input['scopes']);
         $tenant = $request->user()->tenant; // المستأجر من الجلسة، لا من الجسم
 
         $client = $service->createClient($tenant, $input['name']);
@@ -53,10 +65,12 @@ class DeveloperApiClientController extends Controller
     }
 
     /** يُصدر مفتاحًا إضافيًا لعميل قائم (النصّ الصريح مرّة واحدة). */
-    public function issueKey(IssueDeveloperApiKeyRequest $request, string $apiClient, ApiClientKeyService $service): JsonResponse
+    public function issueKey(IssueDeveloperApiKeyRequest $request, string $apiClient, ApiClientKeyService $service, PublicApiKeyIssuanceGuard $guard): JsonResponse
     {
         $client = ApiClient::query()->findOrFail($apiClient);
         $input = $request->validated();
+        // السقف نفسه لمفتاحٍ إضافي/مجدَّد لعميلٍ قائم (يُفحص بعد 404 المستأجر وقبل أي كتابة).
+        $guard->assertIssuable($request->user(), $input['scopes']);
 
         $key = $service->issueKey($client, $input['name'] ?? 'key', PublicApiScope::sanitize($input['scopes']), $this->expiry($input));
 

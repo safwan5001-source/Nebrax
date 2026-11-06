@@ -326,6 +326,22 @@ jobs:
             php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
           fi
 
+      # AIA-0.4 (D-08): اختبارات قبول سقف صلاحيات إصدار مفاتيح Public API صارمة بلا استثناء. تعمل أيضاً ضمن التشغيل الكامل
+      # أعلاه؛ هذه الخطوة تفرض الصرامة وحدها: أي skip/incomplete/risky في المجموعة يُفشل البناء (على SQLite وPostgreSQL).
+      - name: AIA-0.4 — قبول سقف صلاحيات المفاتيح (صارم، بلا skip/incomplete)
+        if: ${{ !cancelled() }}
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.db }}" = "pgsql" ]; then export PGOPTIONS="-c lock_timeout=60s"; fi
+          # بملفات صريحة لا بفلتر مجموعات: حارس التكافؤ (scripts/ci-gate) يمنع ذلك في وظيفة test. وسم المجموعة
+          # aia-0-4-security يبقى على الفئات ليحرسه PublicApiScopeCeilingArchitectureTest.
+          vendor/bin/phpunit --fail-on-incomplete --fail-on-skipped --fail-on-risky \
+            tests/Feature/PublicApiScopeCeilingEnforcementTest.php \
+            tests/Feature/PublicApiCreateClientCommandCeilingTest.php \
+            tests/Feature/PublicApiScopeCeilingArchitectureTest.php 2>&1 | tee test-output-${{ matrix.db }}-aia04.txt
+
       - name: حفظ مخرجات الاختبارات للتشخيص
         if: always()
         uses: actions/upload-artifact@v4

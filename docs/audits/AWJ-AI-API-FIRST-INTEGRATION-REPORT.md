@@ -37,7 +37,7 @@ curl -s -H "$H" -H "Idempotency-Key: agent-invoice-1" -H "Content-Type: applicat
 curl -s -H "$H" "$BASE/partners/<uuid>/statement?from=2026-01-01&to=2026-03-31"
 ```
 
-إصدار المفتاح: واجهة المطوّر في الإعدادات، أو `php artisan public-api:create-client <tenant> <name> --scopes=partners:read,products:read,products:write,invoices:write,statements:read --expires-days=90`. يُعرض النص الصريح مرة واحدة فقط.
+إصدار المفتاح: واجهة المطوّر في الإعدادات، أو `php artisan public-api:create-client <tenant> <name> --issuer=<email> --scopes=partners:read,products:read,products:write,invoices:write,statements:read --expires-days=90` (**`--issuer` إلزامي منذ AIA-0.4**: يُطبَّق سقف صلاحيات المستخدم؛ الأمر بلا `--issuer` يفشل). يُعرض النص الصريح مرة واحدة فقط.
 
 ## الملفات المتغيرة
 

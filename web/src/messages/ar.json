@@ -11647,6 +11647,7 @@
     "scopes": {
       "read": "قراءة",
       "write": "كتابة",
+      "notIssuable": "خارج صلاحياتك",
       "resources": {
         "partners": "الأطراف",
         "products": "المنتجات",

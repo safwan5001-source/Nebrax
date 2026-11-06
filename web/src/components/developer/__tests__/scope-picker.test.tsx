@@ -35,4 +35,30 @@ describe('scope picker', () => {
     renderIntl(<ScopePicker scopes={API_SCOPES} value={[]} onChange={() => {}} error="مطلوب نطاق" />);
     expect(screen.getByRole('alert').textContent).toContain('مطلوب نطاق');
   });
+
+  it('disables scopes outside the issuer ceiling and never emits them (AIA-0.4)', () => {
+    const onChange = vi.fn();
+    renderIntl(
+      <ScopePicker scopes={['partners:read', 'partners:write']} value={['partners:write']} onChange={onChange} allowed={['partners:read']} />,
+      'en',
+    );
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    const byScope = (scope: string) => boxes[['partners:read', 'partners:write'].indexOf(scope)];
+    expect(byScope('partners:read').disabled).toBe(false);
+    expect(byScope('partners:write').disabled).toBe(true);
+    expect(byScope('partners:write').checked).toBe(false); // محدَّد سابقاً لكنه خارج السقف ⇒ لا يظهر محدّداً
+    expect(screen.getAllByText('Outside your permissions')).toHaveLength(1);
+
+    fireEvent.click(screen.getByText('partners:write'));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('partners:read'));
+    expect(onChange).toHaveBeenCalledWith(['partners:write', 'partners:read']);
+  });
+
+  it('does not disable anything while the ceiling is unknown (server stays the authority)', () => {
+    renderIntl(<ScopePicker scopes={API_SCOPES} value={[]} onChange={() => {}} allowed={null} />);
+    for (const box of screen.getAllByRole('checkbox') as HTMLInputElement[]) {
+      expect(box.disabled).toBe(false);
+    }
+  });
 });

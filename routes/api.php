@@ -2134,6 +2134,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
 
             // عملاء Public API ومفاتيحها (تعيد استخدام ApiClientKeyService)
+            // AIA-0.4: الـ scopes التي يجوز لهذا المستخدم إصدارها (للواجهة فقط؛ الخادم يفرض السقف عند الإصدار).
+            Route::get('issuable-scopes', [DeveloperApiClientController::class, 'issuableScopes'])->middleware($perm('developer.view'));
             Route::get('api-clients', [DeveloperApiClientController::class, 'index'])->middleware($perm('developer.view'));
             Route::post('api-clients', [DeveloperApiClientController::class, 'store'])->middleware($perm('developer.manage'));
             Route::get('api-clients/{apiClient}', [DeveloperApiClientController::class, 'show'])->whereUuid('apiClient')->middleware($perm('developer.view'));
