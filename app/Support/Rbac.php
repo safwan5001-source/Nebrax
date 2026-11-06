@@ -185,6 +185,9 @@ class Rbac
             // (`fuel_distinct_approver_required`، تُفحص في الخدمة) ولا يكشف التكلفة (تتبع `products.view_cost` وحدها).
             // owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
             'fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve',
+            // FUEL-B5.1: تسجيل تكلفة الاستلام (قبل الاعتماد) سلطة مالية مستقلة عن الإنشاء والاعتماد؛ تُشترط معها `products.view_cost` (FuelDeliveryCostAuthority).
+            // owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'fuel.delivery.cost.record',
             'fuel.reading.view', 'fuel.reading.record',
             'fuel.reconciliation.view', 'fuel.reconciliation.create', 'fuel.reconciliation.approve',
             'fuel.supplier_invoice.view', 'fuel.supplier_invoice.manage', 'fuel.supplier_invoice.match',

@@ -36,8 +36,8 @@ export function Liters({ ml }: { ml: number | null | undefined }) {
   return <span><span className="num" dir="ltr">{formatLitersFixedFromMl(ml, locale)}</span> {t('receiving.unit')}</span>;
 }
 
-export function Cost({ minor }: { minor: number | undefined }) {
-  if (minor === undefined) return null;
+export function Cost({ minor }: { minor: number | null | undefined }) {
+  if (minor === undefined || minor === null) return null;
   return <span className="num" dir="ltr">{formatMinorRiyal(minor)}</span>;
 }
 

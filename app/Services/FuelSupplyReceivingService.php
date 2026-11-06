@@ -16,6 +16,7 @@ use App\Models\Partner;
 use App\Models\ProcurementDocument;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
@@ -39,6 +40,7 @@ class FuelSupplyReceivingService
         private FuelCostBasisService $costBasis,
         private FuelQuantity $quantity,
         private AccountRoleResolver $roles,
+        private FuelStationAuditTrail $audit,
     ) {}
 
     /**
@@ -89,11 +91,13 @@ class FuelSupplyReceivingService
         if ($received <= 0) {
             throw new RuntimeException('الكمية المستلمة فعلياً يجب أن تكون موجبة.');
         }
-        $totalCost = $this->positiveInteger($data['received_total_cost_minor'] ?? null, 'قيمة الاستلام بالهللات');
+        // FUEL-B5.1: التكلفة اختيارية عند الإنشاء (موظف المحطة لا يعرفها). NULL = لم تُسجَّل، **لا صفر**؛ تُسجَّل لاحقاً بـ recordCost()
+        // وتُشترط عند الاعتماد. المُرسَلة تُقبل موجبة فقط (صلاحية إرسالها تفحصها الطبقة العليا).
+        $totalCost = $this->optionalCost($data['received_total_cost_minor'] ?? null);
 
         $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, $station->branch_id);
         $this->assertReadings($data, $station->id, $tank->id);
-        $unitCompatibilityCost = intdiv($totalCost, $received);
+        $unitCompatibilityCost = $totalCost === null ? null : intdiv($totalCost, $received);
 
         return FuelDelivery::create([
             'branch_id' => $station->branch_id,
@@ -122,6 +126,8 @@ class FuelSupplyReceivingService
             // توافق فقط؛ Cost Pool هو مصدر الحقيقة لمنتجات الوقود.
             'received_unit_cost_minor' => $unitCompatibilityCost,
             'received_total_cost_minor' => $totalCost,
+            'cost_recorded_by' => $totalCost === null ? null : ($data['created_by'] ?? null),
+            'cost_recorded_at' => $totalCost === null ? null : now(),
             'idempotency_key' => $key,
             'received_at' => $this->receivedAt($data['received_at'] ?? null),
             'created_by' => $data['created_by'] ?? null,
@@ -152,7 +158,8 @@ class FuelSupplyReceivingService
             'compartments' => $this->canonical($data['compartments'] ?? null),
             'dispatched_milliliters' => $this->liters($data['dispatched_liters'] ?? null, 'الكمية المرسلة'),
             'received_milliliters' => $this->liters($data['received_liters'] ?? null, 'الكمية المستلمة'),
-            'received_total_cost_minor' => $this->positiveInteger($data['received_total_cost_minor'] ?? null, 'قيمة الاستلام بالهللات'),
+            // FUEL-B5.1: غياب التكلفة في إعادة الإرسال لا «ادّعاء» بشيء (قد يكون المسؤول المالي سجّلها بعد الإنشاء)؛ تُقارَن المُرسَلة فقط.
+            'received_total_cost_minor' => $this->optionalCost($data['received_total_cost_minor'] ?? null),
             'temperature_milli_celsius' => $this->nullableInteger($data['temperature_milli_celsius'] ?? null),
             'density_kg_per_m3' => $this->nullableInteger($data['density_kg_per_m3'] ?? null),
             'before_physical_reading_id' => $this->idString($data['before_physical_reading_id'] ?? null),
@@ -181,7 +188,7 @@ class FuelSupplyReceivingService
             'compartments' => $this->canonical($delivery->compartments),
             'dispatched_milliliters' => (int) $delivery->dispatched_milliliters,
             'received_milliliters' => (int) $delivery->received_milliliters,
-            'received_total_cost_minor' => (int) $delivery->received_total_cost_minor,
+            'received_total_cost_minor' => $delivery->received_total_cost_minor === null ? null : (int) $delivery->received_total_cost_minor,
             'temperature_milli_celsius' => $delivery->temperature_milli_celsius === null ? null : (int) $delivery->temperature_milli_celsius,
             'density_kg_per_m3' => $delivery->density_kg_per_m3 === null ? null : (int) $delivery->density_kg_per_m3,
             'before_physical_reading_id' => $this->idString($delivery->before_physical_reading_id),
@@ -203,7 +210,13 @@ class FuelSupplyReceivingService
     {
         $requested = $this->requestedDeliveryFingerprint($data);
         $stored = $this->storedDeliveryFingerprint($existing);
-        $differs = array_keys(array_filter($requested, fn ($value, $field) => $value !== $stored[$field], ARRAY_FILTER_USE_BOTH));
+        $differs = array_keys(array_filter($requested, function ($value, $field) use ($stored) {
+            if ($field === 'received_total_cost_minor' && $value === null) {
+                return false; // لم تُرسَل تكلفة في إعادة الإرسال ⇒ لا مقارنة (انظر البصمة).
+            }
+
+            return $value !== $stored[$field];
+        }, ARRAY_FILTER_USE_BOTH));
 
         if (($data['received_at'] ?? null) !== null && $data['received_at'] !== ''
             && $this->receivedAt($data['received_at'])->format('Y-m-d H:i:s') !== $existing->received_at?->format('Y-m-d H:i:s')) {
@@ -232,9 +245,71 @@ class FuelSupplyReceivingService
         return \Carbon\Carbon::parse((string) $value)->setTimezone(config('app.timezone'));
     }
 
-    public function approveDelivery(FuelDelivery $delivery, string $actorId): FuelDelivery
+    /**
+     * FUEL-B5.1: تسجيل (أو تصحيح قبل الاعتماد) تكلفة الاستلام — إجراء مالي مستقل، **بلا أي أثر مخزني أو محاسبي** (يحرسه الاختبار):
+     * الأثر كله عند الاعتماد وحده. تحت قفل صف الاستلام؛ المعتمد يُرفض (تغيير التكلفة بعد الاعتماد = تدفق تصحيح لا هنا).
+     * قيمة مطابقة لما سُجِّل = لا أثر (idempotent، ولا حدث تدقيق). التدقيق: الفاعل والوقت **بلا المبلغ** (سجل المحطة يراه من لا يرى التكلفة).
+     */
+    public function recordCost(FuelDelivery $delivery, int $totalCostMinor, User $actor): FuelDelivery
     {
-        return DB::transaction(function () use ($delivery, $actorId) {
+        if ($totalCostMinor < 1) {
+            throw new RuntimeException('FUEL_DELIVERY_COST_INVALID: تكلفة الاستلام الفعلية يجب أن تكون هللات صحيحة موجبة.');
+        }
+
+        return DB::transaction(function () use ($delivery, $totalCostMinor, $actor) {
+            $delivery = FuelDelivery::lockForUpdate()->findOrFail($delivery->id);
+            if ($delivery->status !== FuelDelivery::STATUS_DRAFT) {
+                throw new RuntimeException('FUEL_DELIVERY_COST_LOCKED: لا يمكن تعديل تكلفة استلام معتمد.');
+            }
+            if ($delivery->received_total_cost_minor !== null && (int) $delivery->received_total_cost_minor === $totalCostMinor) {
+                return $delivery;
+            }
+
+            $before = ['cost_recorded' => $delivery->hasCost(), 'cost_recorded_by' => $delivery->cost_recorded_by, 'cost_recorded_at' => $delivery->cost_recorded_at?->toIso8601String()];
+            $delivery->update([
+                'received_total_cost_minor' => $totalCostMinor,
+                'received_unit_cost_minor' => intdiv($totalCostMinor, max(1, (int) $delivery->received_milliliters)),
+                'cost_recorded_by' => $actor->id,
+                'cost_recorded_at' => now(),
+            ]);
+            $delivery->refresh();
+            $this->audit->record(
+                'fuel_delivery.cost_recorded',
+                $delivery,
+                $before,
+                // `cost_corrected` يميّز تصحيحاً لتكلفة مسجَّلة: بدونه قد تتطابق لقطتا قبل/بعد (الفاعل نفسه في الثانية نفسها) فيُسقَط الحدث.
+                ['cost_recorded' => true, 'cost_recorded_by' => $actor->id, 'cost_recorded_at' => $delivery->cost_recorded_at?->toIso8601String()] + ($before['cost_recorded'] ? ['cost_corrected' => true] : []),
+                $actor,
+            );
+
+            return $delivery;
+        });
+    }
+
+    /**
+     * FUEL-B5.1: اكتمال الاستلام قبل أن يُنتج أثراً. تُستدعى داخل معاملة الاعتماد بعد قفل الصف وقبل أي كتابة.
+     * (١) التكلفة مسجَّلة (NULL ⇒ رفض؛ لا صفر افتراضي). (٢) إن أرسل المعتمِد التكلفة التي راجعها فلا تكون تغيّرت (409 — لا يعتمد قيمة لم يرها).
+     * (٣) دليل المستند: رقم سند التسليم **أو** مرفق واحد على الأقل (سند المورد المصوَّر). الكمية الموجبة والمراجع والخزان/المخزن تُفحص أصلاً.
+     */
+    private function assertApprovable(FuelDelivery $delivery, ?int $expectedTotalCostMinor): void
+    {
+        if (! $delivery->hasCost()) {
+            throw new RuntimeException('FUEL_DELIVERY_COST_REQUIRED: لا يمكن اعتماد استلام قبل تسجيل تكلفته الفعلية.');
+        }
+        if ($expectedTotalCostMinor !== null && (int) $delivery->received_total_cost_minor !== $expectedTotalCostMinor) {
+            throw new FuelDeliveryCostChangedException('FUEL_DELIVERY_COST_CHANGED: تغيّرت تكلفة الاستلام بعد مراجعتك؛ أعد المراجعة.');
+        }
+        if (trim((string) $delivery->delivery_note_number) === '' && ! $delivery->attachments()->exists()) {
+            throw new RuntimeException('FUEL_DELIVERY_DOCUMENT_REQUIRED: يلزم رقم سند التسليم أو إرفاق صورة السند قبل الاعتماد.');
+        }
+        if ((int) $delivery->received_milliliters <= 0) {
+            throw new RuntimeException('الكمية المستلمة فعلياً يجب أن تكون موجبة.');
+        }
+    }
+
+    public function approveDelivery(FuelDelivery $delivery, string $actorId, ?int $expectedTotalCostMinor = null): FuelDelivery
+    {
+        return DB::transaction(function () use ($delivery, $actorId, $expectedTotalCostMinor) {
             $delivery = FuelDelivery::lockForUpdate()->findOrFail($delivery->id);
             if ($delivery->status !== FuelDelivery::STATUS_DRAFT) {
                 throw new RuntimeException('لا يمكن اعتماد استلام وقود غير مسوّد أو معتمد سابقاً.');
@@ -250,6 +325,7 @@ class FuelSupplyReceivingService
             }
             // FUEL-B2: فصل المعتمِد عن المنشئ حين تلزم سياسة المحطة — داخل المعاملة وبعد قفل السجل وقبل أي أثر مخزني أو محاسبي.
             $this->settings->assertDistinctApprover($station, $delivery->created_by, $actorId, 'استلام الوقود');
+            $this->assertApprovable($delivery, $expectedTotalCostMinor);
             $this->assertStationTankProductWarehouse($station->id, $tank, $fuelProduct, $warehouse);
             $this->assertFuelProduct($fuelProduct, $fuelProduct->product);
             $grni = $this->settings->grniAccountFor($station);
@@ -769,6 +845,19 @@ class FuelSupplyReceivingService
         }
 
         return $this->quantity->litersToMilliliters($value);
+    }
+
+    /** FUEL-B5.1: null/'' ⇒ لم تُسجَّل؛ وإلا هللات صحيحة **موجبة** (الصفر ليس تكلفة فعلية). */
+    private function optionalCost(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (! is_int($value) || $value < 1) {
+            throw new RuntimeException('FUEL_DELIVERY_COST_INVALID: تكلفة الاستلام الفعلية يجب أن تكون هللات صحيحة موجبة.');
+        }
+
+        return $value;
     }
 
     private function positiveInteger(mixed $value, string $label): int

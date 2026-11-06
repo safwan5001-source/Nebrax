@@ -34,6 +34,7 @@ use Tests\TestCase;
 class FuelDistinctApproverTest extends TestCase
 {
     use RefreshDatabase;
+    use GivesFuelDeliveryCost;
     use InteractsWithApi;
 
     private const BASE = '/api/fuel-stations';
@@ -135,7 +136,8 @@ class FuelDistinctApproverTest extends TestCase
         $f = $this->fixture();
         $this->cutover(self::CUTOVER);
 
-        $delivery = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'sod-d-1'))->assertCreated()->json('data');
+        $delivery = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'sod-d-1')))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $response = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertStatus(422);
 
         $this->assertStringContainsString('FUEL_DISTINCT_APPROVER_REQUIRED', (string) $response->json('message'));
@@ -159,12 +161,14 @@ class FuelDistinctApproverTest extends TestCase
         $this->cutover(null);
 
         // محطة قائمة (سلوك سابق): المنشئ يعتمد.
-        $a = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'sod-d-off'))->assertCreated()->json('data');
+        $a = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'sod-d-off')))->assertCreated()->json('data');
+        $this->setCostDirectly($a['id']);
         $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries/' . $a['id'] . '/approve')->assertOk();
 
         // الإعداد يُقرأ لحظة الاعتماد: يُنشأ والسياسة مفعَّلة، ثم تُعطَّل صراحةً، فيُقبل الاعتماد.
         $this->withToken($f['owner'])->putJson(self::BASE . '/stations/' . $f['station_new']->id . '/settings', [self::KEY => true])->assertOk();
-        $b = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'sod-d-flip'))->assertCreated()->json('data');
+        $b = $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'sod-d-flip')))->assertCreated()->json('data');
+        $this->setCostDirectly($b['id']);
         $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries/' . $b['id'] . '/approve')->assertStatus(422);
         $this->withToken($f['owner'])->putJson(self::BASE . '/stations/' . $f['station_new']->id . '/settings', [self::KEY => false, 'reason' => 'قرار إداري'])->assertOk();
         $this->withToken($f['creator'])->postJson(self::BASE . '/deliveries/' . $b['id'] . '/approve')->assertOk();

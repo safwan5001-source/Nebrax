@@ -26,6 +26,8 @@ use Carbon\CarbonImmutable;
  */
 trait BuildsFuelStaffFixture
 {
+    use GivesFuelDeliveryCost;
+
     private string $tenantId;
 
     /** @var array<string, mixed> */
@@ -111,7 +113,7 @@ trait BuildsFuelStaffFixture
         return [
             'fuel_station_id' => $station->id, 'fuel_tank_id' => $tank->id, 'fuel_product_id' => $this->fx['fuel']->id,
             'warehouse_id' => $warehouse->id, 'supplier_id' => $this->fx['supplier']->id,
-            'dispatched_liters' => '10.000', 'received_liters' => '10.000', 'received_total_cost_minor' => 2345,
+            'dispatched_liters' => '10.000', 'received_liters' => '10.000', // بلا تكلفة: موظف المحطة ينشئ بلا سلطة مالية (B5.1)؛ `setCostDirectly()` تضعها كما تفعل المالية.
             'delivery_note_number' => 'DN-' . $key, 'idempotency_key' => $key,
         ];
     }

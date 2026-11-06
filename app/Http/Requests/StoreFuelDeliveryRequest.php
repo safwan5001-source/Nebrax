@@ -26,7 +26,8 @@ class StoreFuelDeliveryRequest extends FormRequest
             'compartments' => ['nullable', 'array'],
             'dispatched_liters' => $liters,
             'received_liters' => $liters,
-            'received_total_cost_minor' => ['required', 'integer', 'min:0'],
+            // FUEL-B5.1: اختيارية (NULL = لم تُسجَّل) وموجبة إن أُرسلت؛ إرسالها يتطلب سلطة تسجيل التكلفة (يفحصها المتحكّم).
+            'received_total_cost_minor' => ['nullable', 'integer', 'min:1'],
             'temperature_milli_celsius' => ['nullable', 'integer'],
             'density_kg_per_m3' => ['nullable', 'integer', 'min:0'],
             'before_physical_reading_id' => ['nullable', 'uuid'],

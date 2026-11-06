@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, CircleCheck, CircleDashed, ShieldCheck } from 'lucide-react';
 import { useStationOps } from '../context';
 import { useStationAssets } from '../data';
 import { PageMasthead, ScreenBody } from '../masthead';
@@ -11,6 +11,9 @@ import { ErrorState, LoadingBlock } from '../state-views';
 import { ConfirmDialog, PrimaryButton, SecondaryButton, SectionCard } from '../write-ui';
 import { Badge } from '../admin/ui';
 import { useDelivery, useReceivingAccess } from './data';
+import { AttachmentsPanel } from './attachments-panel';
+import { CostCard } from './cost-card';
+import { DocumentActions } from './document-actions';
 import { Cost, FailureNotice, Liters, RECEIVING_BASE, StatusBadge, VarianceText, deliveryTitle, when, type AnyFailure } from './parts';
 import { approveDelivery, deliveryPath, receivingGet } from './receiving-client';
 import { deliveryResponse, type Delivery } from './schemas';
@@ -55,6 +58,13 @@ function Readings({ delivery }: { delivery: Delivery }) {
   );
 }
 
+/** جاهزية الاعتماد كما يراها الخادم (إرشاد فقط — القرار النهائي للخادم عند الضغط): تكلفة مسجَّلة + دليل مستند (رقم سند أو مرفق). */
+export function readiness(delivery: Delivery, attachmentCount: number): { cost: boolean; document: boolean; ready: boolean } {
+  const cost = delivery.cost_recorded === true || typeof delivery.received_total_cost_minor === 'number';
+  const document = (delivery.delivery_note_number ?? '').trim() !== '' || attachmentCount > 0;
+  return { cost, document, ready: cost && document };
+}
+
 function Detail({ initial }: { initial: Delivery }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
@@ -86,13 +96,18 @@ function Detail({ initial }: { initial: Delivery }) {
     }
   };
 
+  const attachmentCount = delivery.attachments?.length ?? delivery.attachments_count ?? 0;
+  const ready = readiness(delivery, attachmentCount);
+
   const confirm = async () => {
     if (inFlight.current) return; // قفل إرسال مكرر
     inFlight.current = true;
     setSaving(true);
     setFailure(null);
     try {
-      const body = reason.trim() === '' ? {} : { reason: reason.trim().slice(0, 1000) };
+      // المعتمِد الذي يرى التكلفة يرسل ما راجعه: تغيّرت بعد مراجعته ⇒ 409 بلا أثر (لا يعتمد قيمة لم يرها).
+      const expected = access.seeCost && typeof delivery.received_total_cost_minor === 'number' && delivery.received_total_cost_minor > 0 ? { expected_total_cost_minor: delivery.received_total_cost_minor } : {};
+      const body = { ...(reason.trim() === '' ? {} : { reason: reason.trim().slice(0, 1000) }), ...expected };
       const result = await approveDelivery(delivery.id, body, { branchId: station?.branch_id });
       setConfirming(false);
       if (result.kind === 'ok') {
@@ -103,7 +118,7 @@ function Detail({ initial }: { initial: Delivery }) {
       }
       setFailure(result);
       // رفض «معتمد سابقاً»: الحالة تغيّرت عند غيرنا — نقرأها فوراً فتظهر كما هي.
-      if (result.kind === 'rejected' && result.code === 'already_approved') await refresh();
+      if (result.kind === 'rejected' && ['already_approved', 'cost_changed', 'cost_required', 'document_required'].includes(result.code)) await refresh();
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -156,8 +171,22 @@ function Detail({ initial }: { initial: Delivery }) {
             <Row label={t('receiving.field.dispatched')}><Liters ml={delivery.dispatched_milliliters} /></Row>
             <Row label={t('receiving.field.received')}><Liters ml={delivery.received_milliliters} /></Row>
             <Row label={t('receiving.detail.transitVariance')}><VarianceText ml={delivery.transit_variance_milliliters} /></Row>
-            {delivery.received_total_cost_minor !== undefined ? <Row label={t('receiving.field.cost')}><Cost minor={delivery.received_total_cost_minor} /></Row> : null}
           </dl>
+        </SectionCard>
+
+        <SectionCard title={t('receiving.cost.title')} id="rcv-cost-h">
+          <CostCard delivery={delivery} branchId={station?.branch_id} onSaved={(fresh) => setDelivery(fresh)} />
+        </SectionCard>
+
+        <SectionCard title={t('receiving.attach.title')} id="rcv-att-h">
+          <AttachmentsPanel
+            deliveryId={delivery.id}
+            branchId={station?.branch_id}
+            attachments={delivery.attachments ?? []}
+            canUpload={access.attach && draft}
+            canDelete={access.attach && draft}
+            onChanged={async () => { await refresh(); }}
+          />
         </SectionCard>
 
         <SectionCard title={t('receiving.detail.readingsTitle')} id="rcv-read-h"><Readings delivery={delivery} /></SectionCard>
@@ -172,12 +201,25 @@ function Detail({ initial }: { initial: Delivery }) {
           </SectionCard>
         ) : null}
 
+        <SectionCard title={t('receiving.docs.title')} id="rcv-docs-h">
+          <DocumentActions target={{ kind: 'receipt', deliveryId: delivery.id, reference: `FD-${delivery.id.slice(0, 8).toUpperCase()}` }} branchId={station?.branch_id} />
+        </SectionCard>
+
         {draft ? (
           <SectionCard title={t('receiving.approve.title')} id="rcv-approve-h">
             <p className="flex items-start gap-2 text-sm leading-6 text-muted"><ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.8} />{t('receiving.approve.effect')}</p>
+            <ul className="mt-3 space-y-1.5 text-sm" data-readiness="">
+              {([['cost', ready.cost], ['document', ready.document]] as const).map(([key, ok]) => (
+                <li key={key} data-ready-item={key} data-ok={ok ? 'true' : 'false'} className={ok ? 'flex items-center gap-2 text-positive' : 'flex items-center gap-2 text-warning'}>
+                  {ok ? <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} /> : <CircleDashed aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} />}
+                  {t(`receiving.ready.${key}_${ok ? 'ok' : 'missing'}`)}
+                </li>
+              ))}
+            </ul>
             {access.approve && mine ? <p role="note" data-creator-hint="" className="mt-3 rounded-[12px] bg-[color:var(--fo-warning-tint)] p-3 text-sm leading-6 text-warning">{t('receiving.approve.creatorHint')}</p> : null}
             {access.approve ? (
-              <div className="mt-4"><PrimaryButton data-approve-action="" disabled={saving} onClick={() => setConfirming(true)}>{t('receiving.approve.action')}</PrimaryButton></div>
+              <div className="mt-4"><PrimaryButton data-approve-action="" disabled={saving || !ready.ready} onClick={() => setConfirming(true)}>{t('receiving.approve.action')}</PrimaryButton>
+                {!ready.ready ? <p className="mt-2 text-xs leading-5 text-muted" data-not-ready="">{t('receiving.ready.blocked')}</p> : null}</div>
             ) : (
               <p className="mt-3 text-sm leading-6 text-muted">{t('receiving.approve.noPermission')}</p>
             )}
@@ -191,7 +233,7 @@ function Detail({ initial }: { initial: Delivery }) {
           <dl className="divide-y divide-border rounded-[12px] border border-border px-3">
             <Row label={t('receiving.field.supplier')}>{delivery.supplier?.name ?? '—'}</Row>
             <Row label={t('receiving.field.received')}><Liters ml={delivery.received_milliliters} /></Row>
-            {delivery.received_total_cost_minor !== undefined ? <Row label={t('receiving.field.cost')}><Cost minor={delivery.received_total_cost_minor} /></Row> : null}
+            {typeof delivery.received_total_cost_minor === 'number' ? <Row label={t('receiving.field.cost')}><Cost minor={delivery.received_total_cost_minor} /></Row> : null}
           </dl>
           <div>
             <label htmlFor="rcv-approve-reason" className="block text-sm font-medium text-text">{t('receiving.approve.reason')}</label>

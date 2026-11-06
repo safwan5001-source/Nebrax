@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_FORM, buildDeliveryBody, buildReadingBody, evaluate, matchesIntent, readingEvidenceKey, stepIssues, type FormValues } from './logic';
 
-const ok: FormValues = { ...EMPTY_FORM, supplierId: 's1', tankId: 't1', deliveryNote: 'DN-1', dispatched: '10000', received: '9995.5', cost: '12000.50', before: '1000', after: '10995.5' };
+const ok: FormValues = { ...EMPTY_FORM, supplierId: 's1', tankId: 't1', deliveryNote: 'DN-1', dispatched: '10000', received: '9995.5', before: '1000', after: '10995.5' };
 const ctx = { hasWarehouse: true };
 
 describe('receiving form evaluation', () => {
@@ -10,7 +10,6 @@ describe('receiving form evaluation', () => {
     expect(e.issues).toEqual([]);
     expect(e.receivedMl).toBe(9_995_500);
     expect(e.dispatchedMl).toBe(10_000_000);
-    expect(e.costMinor).toBe(1_200_050);
     expect(e.transitVarianceMl).toBe(-4_500);
     expect(e.tankGainMl).toBe(9_995_500);
     expect(e.tankGainDiffMl).toBe(0);
@@ -20,24 +19,22 @@ describe('receiving form evaluation', () => {
 
   it('empty is never zero: every required field is reported separately', () => {
     const e = evaluate(EMPTY_FORM, ctx);
-    expect(e.issues).toEqual(expect.arrayContaining(['supplier_required', 'tank_required', 'dispatched_required', 'received_required', 'cost_required']));
+    expect(e.issues).toEqual(expect.arrayContaining(['supplier_required', 'tank_required', 'dispatched_required', 'received_required']));
     expect(e.receivedMl).toBeNull();
-    expect(e.costMinor).toBeNull();
   });
 
-  it('rejects zero received quantity, malformed numbers, negative cost and more than three decimals', () => {
+  it('rejects zero received quantity, malformed numbers and more than three decimals', () => {
     expect(evaluate({ ...ok, received: '0' }, ctx).issues).toContain('received_not_positive');
     expect(evaluate({ ...ok, received: '1.2345' }, ctx).issues).toContain('received_invalid');
     expect(evaluate({ ...ok, dispatched: '1,500' }, ctx).issues).toContain('dispatched_invalid'); // ملتبس: لا تخمين
-    expect(evaluate({ ...ok, cost: '-5' }, ctx).issues).toContain('cost_invalid');
-    expect(evaluate({ ...ok, cost: 'abc' }, ctx).issues).toContain('cost_invalid');
   });
 
-  it('accepts Arabic-Indic digits and warns (not blocks) on zero cost', () => {
-    const e = evaluate({ ...ok, received: '٩٩٩٥٫٥', cost: '٠' }, ctx);
+  it('accepts Arabic-Indic digits, and the form has no cost at all (B5.1: cost is a separate finance action)', () => {
+    const e = evaluate({ ...ok, received: '٩٩٩٥٫٥' }, ctx);
     expect(e.receivedMl).toBe(9_995_500);
     expect(e.issues).toEqual([]);
-    expect(e.warnings).toContain('cost_zero');
+    expect('costMinor' in e).toBe(false);
+    expect(Object.keys(EMPTY_FORM)).not.toContain('cost');
   });
 
   it('blocks an impossible after-reading below the before-reading, and warns when only one reading is given', () => {
@@ -70,15 +67,15 @@ describe('receiving form evaluation', () => {
 describe('request building', () => {
   const build = { stationId: 'st', tankId: 't1', fuelProductId: 'fp', warehouseId: 'wh', idempotencyKey: 'awj-ops-k1', readingIds: {} as { before?: string; after?: string } };
 
-  it('sends liters as ≤3-decimal strings, cost as integer minor units, trimmed optionals only, and no client clock', () => {
+  it('sends liters as ≤3-decimal strings, NO cost key (NULL until finance records it), trimmed optionals only, and no client clock', () => {
     const body = buildDeliveryBody({ ...ok, tanker: ' TNK ', driver: '', notes: '' }, evaluate(ok, ctx), build);
     expect(body).toEqual({
       fuel_station_id: 'st', fuel_tank_id: 't1', fuel_product_id: 'fp', warehouse_id: 'wh', supplier_id: 's1',
-      dispatched_liters: '10000', received_liters: '9995.5', received_total_cost_minor: 1_200_050, idempotency_key: 'awj-ops-k1',
+      dispatched_liters: '10000', received_liters: '9995.5', idempotency_key: 'awj-ops-k1',
       delivery_note_number: 'DN-1', tanker_identifier: 'TNK',
     });
     expect(body).not.toHaveProperty('received_at');
-    expect(Number.isInteger(body.received_total_cost_minor)).toBe(true);
+    expect(body).not.toHaveProperty('received_total_cost_minor');
   });
 
   it('links readings under the chosen type only', () => {

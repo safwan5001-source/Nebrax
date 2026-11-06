@@ -31,7 +31,16 @@ class FuelDeliveryResource extends JsonResource
             'received_milliliters' => (int) $this->received_milliliters,
             'received_liters' => $quantity->millilitersToLiters((int) $this->received_milliliters),
             'transit_variance_milliliters' => (int) $this->transit_variance_milliliters,
-            'received_total_cost_minor' => $this->when($canSeeCost, fn () => (int) $this->received_total_cost_minor),
+            // FUEL-B5.1: NULL = لم تُسجَّل بعد (لا صفر). حالة «مسجَّلة؟» لا تكشف مبلغاً فتُعرض لكل من يرى الاستلام؛ المبلغ والفاعل لمن يرى التكلفة فقط.
+            'cost_recorded' => $this->received_total_cost_minor !== null,
+            'received_total_cost_minor' => $this->when($canSeeCost, fn () => $this->received_total_cost_minor === null ? null : (int) $this->received_total_cost_minor),
+            'cost_recorded_by' => $this->when($canSeeCost, fn () => $this->cost_recorded_by),
+            'cost_recorded_at' => $this->when($canSeeCost, fn () => $this->cost_recorded_at?->toISOString()),
+            'attachments_count' => $this->whenCounted('attachments'),
+            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($a) => [
+                'id' => $a->id, 'name' => $a->original_name, 'mime_type' => $a->mime_type, 'size' => (int) $a->size,
+                'uploaded_by' => $a->uploaded_by, 'created_at' => $a->created_at?->toISOString(),
+            ])->values()->all()),
             'grni_account_id' => $this->grni_account_id,
             'stock_movement_id' => $this->stock_movement_id,
             'journal_entry_id' => $this->journal_entry_id,

@@ -76,7 +76,6 @@ async function fillWizard(user: ReturnType<typeof userEvent.setup>, opts: { read
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.type(await screen.findByLabelText('Dispatched quantity'), '1000');
   await user.type(screen.getByLabelText('Received quantity'), '995.5');
-  await user.type(screen.getByLabelText('Receiving value'), '5000.50');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   if (opts.readings !== false) {
     await user.type(await screen.findByLabelText('Before receiving'), '100');
@@ -84,6 +83,8 @@ async function fillWizard(user: ReturnType<typeof userEvent.setup>, opts: { read
   } else {
     await screen.findByLabelText('Before receiving');
   }
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await screen.findByText('Photograph the supplier note', { selector: 'h2' }); // B5.1: خطوة المستند (اختيارية)
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await screen.findByText('Review', { selector: 'h2' });
 }
@@ -98,18 +99,18 @@ describe('visibility follows real permissions', () => {
     expect(deliveryCalls()).toHaveLength(0);
   });
 
-  it('a supervisor sees Receiving in the navigation; without the cost permission creating is explained, not offered', async () => {
+  it('a supervisor sees Receiving in the navigation and can start a receiving WITHOUT any cost permission (B5.1); no cost is shown to them', async () => {
     seedUser(SUPERVISOR);
     connect(build({ canSeeCost: false, deliveries: [draft() as never] }));
     renderOps(<ReceivingListScreen />);
     expect(await screen.findByText('DN-9')).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Receiving' }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('link', { name: 'New receiving' })).toBeNull();
-    expect(screen.getByText(/needs the fuel-cost permission/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'New receiving' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Receivings awaiting cost' })).toBeNull(); // قائمة التكلفة لمن يرى التكلفة فقط
     expect(document.body.textContent).not.toMatch(/5,000|5000|SAR/); // لا تكلفة لمن لا يملك صلاحيتها
   });
 
-  it('the new-receiving screen refuses (and sends nothing) without create or without cost permission', async () => {
+  it('the new-receiving screen refuses (and sends nothing) without the create permission, and opens for a creator without cost', async () => {
     seedUser(['fuel_stations.view', 'fuel.delivery.view']);
     connect(build());
     renderOps(<ReceivingNewScreen />);
@@ -117,9 +118,9 @@ describe('visibility follows real permissions', () => {
     cleanup();
     seedUser(SUPERVISOR);
     renderOps(<ReceivingNewScreen />);
-    expect(await screen.findByText('Creating a receiving needs the fuel-cost permission')).toBeTruthy();
+    expect(await screen.findByRole('radio', { name: /Acme Oil/ })).toBeTruthy(); // المشرف بلا تكلفة يبدأ الاستلام
+    expect(screen.getByText('Step 1 of 5', { exact: false })).toBeTruthy();
     expect(writes()).toHaveLength(0);
-    expect(deliveryCalls().filter(([path]) => String(path).includes('delivery-suppliers'))).toHaveLength(0);
   });
 });
 
@@ -149,7 +150,7 @@ describe('receiving list', () => {
 });
 
 describe('creating a draft', () => {
-  it('walks the four steps, records both readings then the draft, links the readings, and never approves or touches stock', async () => {
+  it('walks the five steps, records both readings then the draft (no cost anywhere), links the readings, and never approves or touches stock', async () => {
     const user = userEvent.setup();
     seedUser(CREATOR);
     connect(build());
@@ -173,10 +174,12 @@ describe('creating a draft', () => {
     expect(String(before.body.evidence_key)).toMatch(/^awj-ops:rcv:awj-ops-.+:before:physical$/);
     expect(create.body).toMatchObject({
       fuel_station_id: 'a', fuel_tank_id: 't1', fuel_product_id: 'p1', warehouse_id: 'wh1', supplier_id: 'sup1', dispatched_liters: '1000', received_liters: '995.5',
-      received_total_cost_minor: 500_050, delivery_note_number: 'DN-100', before_physical_reading_id: 'rd-1', after_physical_reading_id: 'rd-2',
+      delivery_note_number: 'DN-100', before_physical_reading_id: 'rd-1', after_physical_reading_id: 'rd-2',
     });
     expect(String(create.body.idempotency_key)).toMatch(/^awj-ops-/);
     expect(create.body).not.toHaveProperty('received_at');
+    expect(create.body).not.toHaveProperty('received_total_cost_minor'); // التكلفة NULL حتى تسجّلها المالية
+    expect(screen.queryByLabelText('Receiving value')).toBeNull();
     expect(world.posts.some((p) => p.path.endsWith('/approve'))).toBe(false);
     expect(screen.getByRole('link', { name: 'Open the draft' }).getAttribute('href')).toMatch(/\/fuel-stations\/ops\/receiving\/0000/);
   });
@@ -209,7 +212,6 @@ describe('creating a draft', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText('The received quantity must be greater than zero.')).toBeTruthy();
     expect(screen.getByText('Enter the dispatched quantity.')).toBeTruthy();
-    expect(screen.getByText(/Enter the receiving value/)).toBeTruthy();
     expect((screen.getByLabelText('Received quantity') as HTMLInputElement).value).toBe('0');
     expect(writes()).toHaveLength(0);
   });
@@ -224,7 +226,6 @@ describe('creating a draft', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.type(await screen.findByLabelText('Dispatched quantity'), '10');
     await user.type(screen.getByLabelText('Received quantity'), '10');
-    await user.type(screen.getByLabelText('Receiving value'), '1');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.type(await screen.findByLabelText('Before receiving'), '500');
     await user.type(screen.getByLabelText('After receiving'), '400');
@@ -271,9 +272,7 @@ describe('creating a draft', () => {
     await user.click(screen.getByRole('button', { name: 'Save as draft' }));
     expect(await screen.findByText(/already recorded for this supplier/)).toBeTruthy();
     expect(world.deliveries).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: 'Back' }));
     expect((screen.getByLabelText('Delivery note number') as HTMLInputElement).value).toBe('DN-DUP');
   });
 
@@ -324,12 +323,10 @@ describe('creating a draft', () => {
     await user.click(screen.getByRole('button', { name: 'Save as draft' }));
     expect(await screen.findByText(/does not belong to this station/)).toBeTruthy();
     // الرجوع للمراحل لا يفقد شيئاً.
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole('button', { name: 'Back' }));
     expect((screen.getByLabelText('Received quantity') as HTMLInputElement).value).toBe('995.5');
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.click(screen.getByRole('button', { name: /Save as draft|Try again/ }));
     expect(await screen.findByText(/No connection/)).toBeTruthy();
   });
@@ -373,7 +370,7 @@ describe('detail and approval', () => {
     await user.type(within(dialog).getByLabelText('Approval note (optional)'), '  checked on site  ');
     await user.click(within(dialog).getByRole('button', { name: 'Confirm approval' }));
     expect(await screen.findByText('Receiving approved')).toBeTruthy();
-    expect(world.posts).toEqual([{ path: `/fuel-stations/deliveries/${UID(1)}/approve`, body: { reason: 'checked on site' } }]);
+    expect(world.posts).toEqual([{ path: `/fuel-stations/deliveries/${UID(1)}/approve`, method: 'POST', body: { reason: 'checked on site' } }]);
     expect(screen.queryByRole('button', { name: 'Approve receiving' })).toBeNull(); // لا اعتماد ثانٍ
     expect(screen.getAllByText(/added to station stock/i).length).toBeGreaterThan(0);
   });
@@ -467,7 +464,7 @@ describe('Arabic RTL and accessibility', () => {
     connect(build({ deliveries: [draft() as never] }));
     const { container } = renderOps(<ReceivingNewScreen />, 'ar');
     await screen.findByRole('radio', { name: /Acme Oil/ });
-    expect(screen.getByText('الخطوة 1 من 4', { exact: false })).toBeTruthy();
+    expect(screen.getByText('الخطوة 1 من 5', { exact: false })).toBeTruthy();
     expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr|left|right)-\d/);
     expect((await axe(container, { rules: { 'color-contrast': { enabled: false }, region: { enabled: false } } })).violations).toEqual([]);
     cleanup();

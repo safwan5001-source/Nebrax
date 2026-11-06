@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * حدّ مساحة الاستلام (FUEL-B5): قراءة بقائمة بيضاء + **ثلاث كتابات POST فقط** من `receiving-client.ts` وحده (تسجيل قراءة خزان · إنشاء مسودة · اعتماد).
+ * حدّ مساحة الاستلام (FUEL-B5/B5.1): قراءة بقائمة بيضاء + **كتابات محددة** من `receiving-client.ts` وحده عبر مرسِل واحد:
+ * تسجيل قراءة خزان · إنشاء مسودة · اعتماد · تسجيل التكلفة · رفع مرفقات السند (POST) · حذف مرفق مسودة (DELETE وحيد).
  * لا يُضعف هذا الحارس حدّ `write-boundary.test.ts` للوحدة الأم (التي تمنع مسارات الاستلام من خارج هذا المجلد) ولا حدّ `admin/`.
  */
 const dir = fileURLToPath(new URL('.', import.meta.url));
@@ -18,35 +19,44 @@ const client = () => code(sources.find((entry) => entry.file === CLIENT)!.text);
 describe('receiving writes only through receiving-client.ts', () => {
   it('has sources to scan', () => expect(sources.length).toBeGreaterThan(8));
 
-  it.each(sources)('$file has no PUT/PATCH/DELETE', ({ text }) => {
-    expect(code(text)).not.toMatch(/['"`](PUT|PATCH|DELETE)['"`]/i);
+  it.each(sources)('$file has no PUT/PATCH', ({ text }) => {
+    expect(code(text)).not.toMatch(/['"`](PUT|PATCH)['"`]/i);
   });
 
-  it('POST exists in the client exactly once (one shared sender) and nowhere else', () => {
-    for (const { file, text } of sources) expect([...code(text).matchAll(/['"`]POST['"`]/gi)].length, file).toBe(file === CLIENT ? 1 : 0);
+  it('DELETE exists only in the client, only for an attachment of a draft, through the uuid-validated attachment path', () => {
+    for (const { file, text } of sources) expect([...code(text).matchAll(/method: 'DELETE'/g)].length, file).toBe(file === CLIENT ? 1 : 0);
+    expect(client()).toMatch(/send\(attachmentPath\(deliveryId, attachmentId\), undefined, \{ \.\.\.options, method: 'DELETE' \}\)/);
   });
 
-  it('only the client talks to api(), and nobody uses fetch/axios/XHR', () => {
+  it('the single sender defaults to POST and only the client sets a method', () => {
+    expect(client()).toMatch(/method: options\.method \?\? 'POST'/);
+    for (const { file, text } of sources) expect([...code(text).matchAll(/['"`]POST['"`]/g)].length, file).toBe(file === CLIENT ? 2 : 0); // النوع + الافتراضي في المرسل
+  });
+
+  it('only the client talks to api(), and nobody uses fetch/axios/XHR (downloads go through the central file helpers)', () => {
     for (const { file, text } of sources) {
       expect(/\bapi\s*[<(]/.test(code(text)), file).toBe(file === CLIENT);
       expect(code(text), file).not.toMatch(/\bfetch\s*\(|axios|XMLHttpRequest|sendBeacon/);
     }
   });
 
-  it('the read whitelist is exactly four endpoints (deliveries, one delivery by uuid, suppliers, readings)', () => {
+  it('the read whitelist is exactly seven endpoints (list, report, one delivery, its document, its attachments, suppliers, readings)', () => {
     const c = client();
-    expect([...c.matchAll(/^\s+(?:\/\^\\\/fuel-stations\\\/[^\n]*\$\/|new RegExp\(`\^\/fuel-stations\/deliveries\/\$\{UUID\}\$`\)),$/gm)]).toHaveLength(4);
+    expect([...c.matchAll(/^\s+(?:\/\^\\\/fuel-stations\\\/[^\n]*\$\/|new RegExp\(`\^\/fuel-stations\/deliveries\/\$\{UUID\}[^\n]*\$`\)),$/gm)]).toHaveLength(7);
     expect(c).toContain('delivery-suppliers');
-    expect(c).toMatch(/api<unknown>\(path, \{ method: 'POST'/);
+    expect(c).toContain('deliveries\\/report');
+    expect(c).toMatch(/api<unknown>\(path, \{ method: options\.method \?\? 'POST'/);
   });
 
-  it('the three write paths are fixed in the client: readings, deliveries and the uuid-validated approve', () => {
+  it('the write paths are fixed in the client: readings, deliveries, uuid-validated approve/cost/attachments (upload + delete)', () => {
     const c = client();
     expect(c).toContain("send('/fuel-stations/readings'");
     expect(c).toContain("send('/fuel-stations/deliveries'");
     expect(c).toMatch(/`\$\{deliveryPath\(id\)\}\/approve`/);
-    expect([...c.matchAll(/\bsend\(/g)].length).toBe(4); // تعريف + ثلاثة استدعاءات
-    expect(c).not.toMatch(/\/reject|\/cancel|\/void|\/edit|\/delete|\/reopen/);
+    expect(c).toMatch(/`\$\{deliveryPath\(id\)\}\/cost`/);
+    expect(c).toMatch(/`\$\{deliveryPath\(id\)\}\/attachments`/);
+    expect([...c.matchAll(/\bsend\(/g)].length).toBe(7); // تعريف + ست كتابات
+    expect(c).not.toMatch(/\/reject|\/cancel|\/void|\/edit|\/reopen|\/unapprove|\/revert/);
   });
 
   it.each(sources)('$file reaches no other module’s endpoints (no second permission system; nothing financial, sales or other fuel flows)', ({ text }) => {
@@ -63,9 +73,12 @@ describe('receiving writes only through receiving-client.ts', () => {
     }
   });
 
-  it('only the create flow and the detail screen import the write functions', () => {
+  it('write functions are imported only by their owners (create flow, detail screen, cost card, attachments, wizard upload)', () => {
     const importers = (pattern: RegExp) => sources.filter(({ text }) => pattern.test(code(text))).map(({ file }) => file).sort();
     expect(importers(/import \{[^}]*\bapproveDelivery\b[^}]*\} from '\.\/receiving-client'/)).toEqual(['receiving-detail-screen.tsx']);
+    expect(importers(/import \{[^}]*\brecordCost\b[^}]*\} from '\.\/receiving-client'/)).toEqual(['cost-card.tsx']);
+    expect(importers(/import \{[^}]*\bdeleteAttachment\b[^}]*\} from '\.\/receiving-client'/)).toEqual(['attachments-panel.tsx']);
+    expect(importers(/import \{[^}]*\buploadAttachments\b[^}]*\} from '\.\/receiving-client'/)).toEqual(['attachments-panel.tsx', 'receiving-new-screen.tsx']);
     expect(importers(/import \{[^}]*\b(createDelivery|recordReading)\b[^}]*\} from '\.\/receiving-client'/)).toEqual(['create-flow.ts']);
     expect(importers(/import \{[^}]*\brunCreate\b[^}]*\} from '\.\/create-flow'/)).toEqual(['receiving-new-screen.tsx']);
   });
@@ -80,5 +93,17 @@ describe('receiving writes only through receiving-client.ts', () => {
 
   it('cost is shown only when the server returned it (never defaulted), and never invented client-side', () => {
     for (const { file, text } of sources) expect(code(text), file).not.toMatch(/received_total_cost_minor\s*\?\?\s*0|received_total_cost_minor\s*\|\|\s*0/);
+  });
+
+  it('the creation flow can never send a cost: no cost key in the create body, the form or the flow (B5.1)', () => {
+    for (const file of ['logic.ts', 'create-flow.ts', 'receiving-new-screen.tsx', 'form-draft.ts']) {
+      expect(code(sources.find((entry) => entry.file === file)!.text), file).not.toMatch(/received_total_cost_minor|costMinor|parseMoney/);
+    }
+    const body = client().slice(client().indexOf('export interface DeliveryBody'), client().indexOf('type Options'));
+    expect(body).not.toMatch(/cost/);
+  });
+
+  it('documents are rendered from the server payload only: nothing in the module computes or defaults a price', () => {
+    for (const { file, text } of sources) expect(code(text), file).not.toMatch(/unit_cost|avg_cost|purchase_price|sale_price/);
   });
 });
