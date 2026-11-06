@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\AccessChangeAuditor;
 use App\Services\AuthRecoveryService;
 use App\Support\PlanGate;
 use App\Support\Rbac;
@@ -188,6 +189,36 @@ class UserController extends ApiController
         }
     }
 
+    /**
+     * FUEL-B3: لقطة الوصول للتدقيق — الدور والحالة ونطاق الفرع/المستودع/المحطة والربط بالموظف. **بلا بريد ولا اسم ولا كلمة مرور** (المعرّف يكفي).
+     *
+     * @return array<string,mixed>
+     */
+    private function accessSnapshot(User $user): array
+    {
+        return [
+            'role' => $user->role,
+            'is_active' => (bool) $user->is_active,
+            'employee_id' => $user->employee_id,
+            'fuel_station_scope' => $user->fuel_station_scope,
+            'branch_ids' => $user->branches()->pluck('branches.id')->sort()->values()->all(),
+            'warehouse_ids' => $user->warehouses()->pluck('warehouses.id')->sort()->values()->all(),
+            'fuel_station_ids' => $user->fuelStations()->pluck('fuel_stations.id')->sort()->values()->all(),
+        ];
+    }
+
+    /** ما حاوله الفاعل (مفاتيح وتعريفات فقط — بلا كلمة مرور). @return array<string,mixed> */
+    private function attemptedChange(array $data): array
+    {
+        return array_filter([
+            'role' => $data['role'] ?? null,
+            'is_active' => $data['is_active'] ?? null,
+            'branch_ids' => isset($data['branch_ids']) ? array_values((array) $data['branch_ids']) : null,
+            'warehouse_ids' => isset($data['warehouse_ids']) ? array_values((array) $data['warehouse_ids']) : null,
+            'password_changed' => array_key_exists('password', $data) ? true : null,
+        ], fn ($v) => $v !== null);
+    }
+
     public function index(): JsonResponse
     {
         // تُحمَّل العلاقتان هنا فتصل الشاشةَ مع القائمة — فلا مسار `show`
@@ -208,7 +239,8 @@ class UserController extends ApiController
         // فحص سقف المنح والإنشاء ومزامنة النطاق في معاملةٍ واحدة تُبقي أقفال الأدوار —
         // فلا يتّسع دورٌ بين الفحص والإنشاء (انظر `guardGrantBoundary`). الدعوة بالبريد
         // بعدها خارج المعاملة.
-        $user = DB::transaction(function () use ($request, $data, $tenantId): User {
+        $auditor = app(AccessChangeAuditor::class);
+        $user = $auditor->guard('user.created', AccessChangeAuditor::SUBJECT_USER, null, null, $request->user(), $this->attemptedChange($data), fn () => DB::transaction(function () use ($request, $data, $tenantId, $auditor): User {
             $this->guardOwnerRole($request, null, $data['role'] ?? null);
             $this->guardGrantBoundary($request, $data);
 
@@ -239,9 +271,10 @@ class UserController extends ApiController
             ]);
 
             $this->syncAccessScope($user, $data);
+            $auditor->record('user.created', AccessChangeAuditor::SUBJECT_USER, $user->id, $user->id, null, $this->accessSnapshot($user), $request->user());
 
             return $user;
-        });
+        }));
 
         $invitationSent = true;
         if ((bool) ($data['send_invitation'] ?? false)) {
@@ -288,10 +321,12 @@ class UserController extends ApiController
         // تكتب — فلا يُرقّيه مالكٌ متزامن (دوراً أو نطاقاً) بين الفحص والكتابة فتقع
         // كلمة المرور/الحالة على مستخدمٍ صار خارج سقف الفاعل. ومزامنة النطاق في
         // المعاملة نفسها فلا يبقى تحديثٌ نصفيّ.
-        $user = DB::transaction(function () use ($request, $id, $data): User {
+        $auditor = app(AccessChangeAuditor::class);
+        $user = $auditor->guard('user.updated', AccessChangeAuditor::SUBJECT_USER, $id, $id, $request->user(), $this->attemptedChange($data), fn () => DB::transaction(function () use ($request, $id, $data, $auditor): User {
             $user = User::where('tenant_id', $this->tenantId())->lockForUpdate()->findOrFail($id);
             $this->guardOwnerRole($request, $user, $data['role'] ?? null);
             $this->guardGrantBoundary($request, $data, $user);
+            $before = $this->accessSnapshot($user);
 
             // الغياب يُبقي الربط الحالي؛ `null` صريحة تفكّه؛ ومعرّفٌ يُتحقّق ثم يُربط.
             $this->assertLinkableEmployee($data['employee_id'] ?? null, $user->id);
@@ -310,8 +345,16 @@ class UserController extends ApiController
 
             $this->syncAccessScope($user, $data);
 
+            $after = $this->accessSnapshot($user->refresh());
+            // تغيير كلمة المرور يُسجَّل حدثاً (بلا قيمتها) كي لا يمرّ استيلاء على حساب بلا أثر.
+            if (array_key_exists('password', $data)) {
+                $before['password_changed'] = false;
+                $after['password_changed'] = true;
+            }
+            $auditor->record('user.updated', AccessChangeAuditor::SUBJECT_USER, $user->id, $user->id, $before, $after, $request->user());
+
             return $user;
-        });
+        }));
 
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))->response();
     }
@@ -325,14 +368,17 @@ class UserController extends ApiController
         // REM-08 / SEC-04: الحذف ناعم (`SoftDeletes`) وجدول التوكنات polymorphic بلا
         // FK متتالٍ، فلا يسقط التوكن تبعاً للمستخدم — يُسحب صراحةً قبل الحذف.
         // والهدف مقفولٌ ومفحوصٌ داخل المعاملة نفسها (انظر `update`).
-        DB::transaction(function () use ($request, $id): void {
+        $auditor = app(AccessChangeAuditor::class);
+        $auditor->guard('user.deleted', AccessChangeAuditor::SUBJECT_USER, $id, $id, $request->user(), null, fn () => DB::transaction(function () use ($request, $id, $auditor): void {
             $user = User::where('tenant_id', $this->tenantId())->lockForUpdate()->findOrFail($id);
             $this->guardOwnerRole($request, $user);
             $this->guardGrantBoundary($request, [], $user);
+            $before = $this->accessSnapshot($user);
 
             $user->tokens()->delete();
             $user->delete();
-        });
+            $auditor->record('user.deleted', AccessChangeAuditor::SUBJECT_USER, $id, $id, $before, null, $request->user());
+        }));
 
         return response()->json(['message' => 'تم الحذف.']);
     }

@@ -100,6 +100,7 @@ use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationAuditController;
 use App\Http\Controllers\Api\FuelStationDeviceController;
 use App\Http\Controllers\Api\FuelStationReadinessController;
+use App\Http\Controllers\Api\FuelStaffController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
@@ -1626,6 +1627,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // Cycle 2: حدود التسوية وتعيينات حسابات الفروق إعدادات مدققة: tenant ثم station.
         Route::get('fuel-stations/audit-events', [FuelStationAuditController::class, 'index'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core')]);
+        // FUEL-B3: إدارة موظفي المحطات (قوالب + صلاحيات فردية + نطاق محطات). `fuel.staff.manage` وحدها؛ الحدود في الخدمة.
+        Route::get('fuel-stations/staff/templates', [FuelStaffController::class, 'templates'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/staff', [FuelStaffController::class, 'index'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/staff/{id}', [FuelStaffController::class, 'show'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/staff/{id}', [FuelStaffController::class, 'update'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/settings', [FuelStationSettingsController::class, 'showTenant'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/settings', [FuelStationSettingsController::class, 'updateTenant'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);

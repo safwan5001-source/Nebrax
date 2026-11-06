@@ -45,7 +45,7 @@ class FuelReconciliationController extends ApiController
     public function index(ListFuelReconciliationsRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $reconciliations = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id'])
+        $reconciliations = $this->restrictToAccessibleStations($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id']))
             ->with(['station', 'tank', 'fuelProduct', 'warehouse'])
             ->when($data['fuel_station_id'] ?? null, fn ($query, $id) => $query->where('fuel_station_id', $id))
             ->when($data['fuel_tank_id'] ?? null, fn ($query, $id) => $query->where('fuel_tank_id', $id))
@@ -69,7 +69,7 @@ class FuelReconciliationController extends ApiController
     public function approve(ApproveFuelReconciliationRequest $request, string $id): JsonResponse
     {
         $data = $request->validated();
-        $reconciliation = $this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id'])->findOrFail($id);
+        $reconciliation = $this->restrictToAccessibleStations($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelReconciliation::query(), $request), ['warehouse_id']))->findOrFail($id);
         $this->accessibleStation($reconciliation->fuel_station_id);
         $approved = $this->domain(fn () => $this->service->approve($reconciliation, $request->user()->id, $data['reason'] ?? null));
 

@@ -24,6 +24,11 @@ trait AuthorizesFuelStationScope
     {
         $station = FuelStation::findOrFail($stationId);
         $this->assertRecordAccessible($station->branch_id, [$station->warehouse_id]);
+        // FUEL-B3: المستخدم المقيَّد بمحطات مسنَدة صراحةً (`users.fuel_station_scope = assigned`) لا يصل إلا إليها (404 موحّد)، والفراغ = لا شيء.
+        $assigned = request()->user()?->allowedFuelStationIds();
+        if ($assigned !== null && ! in_array($station->id, $assigned, true)) {
+            abort(404);
+        }
 
         return $station;
     }
@@ -37,11 +42,16 @@ trait AuthorizesFuelStationScope
         $user = request()->user();
         $branches = $user?->allowedBranchIds();
         $warehouses = $user?->allowedWarehouseIds();
-        if ($branches === null && $warehouses === null) {
+        $assigned = $user?->allowedFuelStationIds();
+        if ($branches === null && $warehouses === null && $assigned === null) {
             return null;
         }
 
         $stations = FuelStation::query()->select('id');
+        if ($assigned !== null) {
+            // تقاطع مع الفرع/المخزن أدناه: المحطة المسنَدة خارج فرعه لا تظهر. `[]` ⇒ لا محطة (whereIn الفارغة false).
+            $stations->whereIn('id', $assigned);
+        }
         if ($branches !== null) {
             $stations->where(function (Builder $q) use ($branches) {
                 $q->whereIn('branch_id', $branches)->orWhereNull('branch_id');
@@ -89,6 +99,10 @@ trait AuthorizesFuelStationScope
     /** قيد قراءة للسجلات المرتبطة بمحطة (بلا عمود مخزن): تُخفى سجلات محطات مخزنها خارج نطاق المستخدم. */
     protected function restrictToAccessibleWarehouseStations(Builder $query, string $stationColumn = 'fuel_station_id'): Builder
     {
+        $assigned = request()->user()?->allowedFuelStationIds();
+        if ($assigned !== null) {
+            $query->whereIn($stationColumn, $assigned);
+        }
         $allowed = request()->user()?->allowedWarehouseIds();
         if ($allowed === null) {
             return $query;

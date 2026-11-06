@@ -63,11 +63,15 @@ class FuelStationAuditController extends ApiController
     {
         $branches = $request->user()?->allowedBranchIds();
         $warehouses = $request->user()?->allowedWarehouseIds();
-        if ($branches === null && $warehouses === null) {
+        $assigned = $request->user()?->allowedFuelStationIds();
+        if ($branches === null && $warehouses === null && $assigned === null) {
             return;
         }
 
         $query->whereNotNull('fuel_station_id');
+        if ($assigned !== null) {
+            $query->whereIn('fuel_station_id', $assigned); // FUEL-B3: المحطات المسنَدة فقط (`[]` ⇒ لا حدث).
+        }
         if ($branches !== null) {
             $query->where(fn (Builder $q) => $q->whereIn('branch_id', $branches)->orWhereNull('branch_id'));
         }

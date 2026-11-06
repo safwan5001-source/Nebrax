@@ -505,8 +505,8 @@ class FuelSaleService
      */
     private function assertActorStationScope(User $actor, FuelStation $station): void
     {
-        if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
-            || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+        // FUEL-B3: فرع ∧ مخزن ∧ محطة مسنَدة (القاعدة الواحدة في User::canAccessFuelStation).
+        if (! $actor->canAccessFuelStation($station)) {
             throw new RuntimeException('محطة البيع خارج نطاق صلاحياتك.');
         }
     }

@@ -3047,7 +3047,8 @@
       "reading": "قراءات الخزانات",
       "reconciliation": "تسوية المخزون",
       "supplier_invoice": "فواتير موردي الوقود",
-      "governance": "حوكمة الوقود"
+      "governance": "حوكمة الوقود",
+      "staff": "موظفو المحطات"
     }
   },
   "inventory": {

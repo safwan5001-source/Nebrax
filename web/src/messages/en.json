@@ -3047,7 +3047,8 @@
       "reading": "Tank readings",
       "reconciliation": "Inventory reconciliation",
       "supplier_invoice": "Fuel supplier invoices",
-      "governance": "Fuel governance"
+      "governance": "Fuel governance",
+      "staff": "Station staff"
     }
   },
   "inventory": {

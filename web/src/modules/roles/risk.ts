@@ -54,6 +54,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'fuel.supplier_invoice.match': 'financial',
   // FUEL-B2: يعطّل/يفعّل ضابط فصل المعتمِد — من يملكه يغيّر من يستطيع اعتماد المخزون والقيود.
   'fuel.governance.manage': 'access',
+  // FUEL-B3: يفوّض صلاحيات الوقود ونطاق المحطات لموظفي المحطات — يغيّر من يصل إلى ماذا (محدود بسقف المنح والنطاق).
+  'fuel.staff.manage': 'access',
 
   // يمسّ الإقفال الضريبي والمحاسبي والامتثال
   'zatca.submit': 'compliance',
