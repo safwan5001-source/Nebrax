@@ -153,6 +153,15 @@ export async function getApiClient(id: string): Promise<DeveloperApiClient> {
   return res.data;
 }
 
+/**
+ * النطاقات التي يجوز لهذا المستخدم منحها فعلاً (سقف صلاحيات الإصدار — AIA-0.4).
+ * للعرض فقط (تعطيل ما يتجاوز صلاحياته)؛ الخادم يفرض السقف عند الإصدار بصرف النظر عنها.
+ */
+export async function listIssuableScopes(): Promise<string[]> {
+  const res = await api<{ data: { scopes: string[] } }>('/developer/issuable-scopes');
+  return res.data.scopes;
+}
+
 export function createApiClient(body: CreateApiClientInput): Promise<IssuedKey> {
   return api<IssuedKey>('/developer/api-clients', { method: 'POST', body });
 }

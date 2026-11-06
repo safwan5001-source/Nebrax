@@ -11647,6 +11647,7 @@
     "scopes": {
       "read": "Read",
       "write": "Write",
+      "notIssuable": "Outside your permissions",
       "resources": {
         "partners": "Partners",
         "products": "Products",

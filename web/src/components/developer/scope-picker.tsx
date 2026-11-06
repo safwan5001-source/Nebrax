@@ -17,12 +17,18 @@ export function ScopePicker({
   onChange,
   disabled,
   error,
+  allowed,
 }: {
   scopes: string[];
   value: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
   error?: string;
+  /**
+   * النطاقات المسموح للمستخدم بمنحها (سقف الإصدار). `undefined`/`null` = غير معروف ⇒ لا تعطيل
+   * في الواجهة (الخادم هو المرجع ويرفض ما يتجاوز الصلاحيات).
+   */
+  allowed?: string[] | null;
 }) {
   const t = useTranslations('developer.scopes');
 
@@ -45,7 +51,10 @@ export function ScopePicker({
     }));
   }, [scopes]);
 
+  const issuable = (scope: string) => allowed == null || allowed.includes(scope);
+
   const toggle = (scope: string) => {
+    if (!issuable(scope)) return;
     onChange(value.includes(scope) ? value.filter((entry) => entry !== scope) : [...value, scope]);
   };
 
@@ -57,20 +66,21 @@ export function ScopePicker({
           <div className="grid gap-px sm:grid-cols-2">
             {items.map((scope) => {
               const { action } = parseScope(scope);
-              const checked = value.includes(scope);
+              const blocked = !issuable(scope);
+              const checked = value.includes(scope) && !blocked;
               return (
                 <label
                   key={scope}
                   className={cn(
                     'flex cursor-pointer items-start gap-2.5 p-2.5 transition-colors',
                     checked ? 'bg-primary-soft' : 'hover:bg-background',
-                    disabled && 'cursor-not-allowed opacity-60',
+                    (disabled || blocked) && 'cursor-not-allowed opacity-60',
                   )}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={disabled}
+                    disabled={disabled || blocked}
                     onChange={() => toggle(scope)}
                     className="mt-0.5 h-4 w-4 accent-[color:var(--primary)]"
                   />
@@ -82,6 +92,7 @@ export function ScopePicker({
                       </Badge>
                     </span>
                     <span className="mt-0.5 block text-xs text-muted">{t(`descriptions.${scope}`)}</span>
+                    {blocked ? <span className="mt-0.5 block text-xs text-negative">{t('notIssuable')}</span> : null}
                   </span>
                 </label>
               );

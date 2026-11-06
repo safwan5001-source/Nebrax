@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScopePicker } from '@/components/developer/scope-picker';
-import { API_SCOPES, createApiClient, issueApiKey, type IssuedKey } from '@/lib/developer';
+import { API_SCOPES, createApiClient, issueApiKey, listIssuableScopes, type IssuedKey } from '@/lib/developer';
 import { ApiError } from '@/lib/api';
 
 type Mode = 'create' | 'issue';
@@ -40,6 +40,17 @@ export function KeyFormDialog({
   const [days, setDays] = useState('90');
   const [errors, setErrors] = useState<{ name?: string; scopes?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
+  // سقف الإصدار (AIA-0.4): للعرض فقط. فشل الجلب ⇒ null (لا تعطيل) والخادم يبقى المرجع.
+  const [allowed, setAllowed] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    listIssuableScopes()
+      .then((scopes) => { if (alive) setAllowed(scopes); })
+      .catch(() => { if (alive) setAllowed(null); });
+    return () => { alive = false; };
+  }, [open]);
 
   function reset() {
     setName('');
@@ -102,7 +113,7 @@ export function KeyFormDialog({
         <div className="space-y-1.5">
           <Label>{t('scopesLabel')}</Label>
           <p className="text-xs text-muted">{t('scopesHint')}</p>
-          <ScopePicker scopes={API_SCOPES} value={scopes} onChange={setScopes} error={errors.scopes} disabled={busy} />
+          <ScopePicker scopes={API_SCOPES} value={scopes} onChange={setScopes} error={errors.scopes} disabled={busy} allowed={allowed} />
         </div>
 
         <div className="space-y-1.5">
