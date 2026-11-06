@@ -234,7 +234,7 @@ class FuelApprovalConcurrencyPostgresTest extends TestCase
         $grni = Account::create(['code' => '2199', 'name' => 'GRNI اعتماد', 'type' => 'liability', 'normal_balance' => 'credit', 'is_group' => false, 'is_active' => true]);
         $this->withToken($auth['token'])->putJson(self::BASE . '/settings', ['grni_account_id' => $grni->id, 'reason' => 'GRNI لاختبار التزامن'])->assertOk();
         // السياسة مفعَّلة بقرار صريح على المحطة (مستقل عن حدّ التفعيل).
-        app(FuelStationSettingsService::class)->putStation($station, 'fuel_distinct_approver_required', true);
+        app(FuelStationSettingsService::class)->putStation($station, 'fuel_distinct_approver_required', true, User::where('tenant_id', $tenantId)->where('role', 'owner')->firstOrFail());
 
         $mk = fn (string $n) => User::create(['tenant_id' => $tenantId, 'name' => $n, 'email' => "{$n}-" . Str::random(5) . '@fuel-appr-pg.test', 'password' => 'password123', 'role' => 'staff'])->id;
 

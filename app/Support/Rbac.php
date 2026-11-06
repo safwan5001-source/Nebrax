@@ -188,6 +188,10 @@ class Rbac
             'fuel.reading.view', 'fuel.reading.record',
             'fuel.reconciliation.view', 'fuel.reconciliation.create', 'fuel.reconciliation.approve',
             'fuel.supplier_invoice.view', 'fuel.supplier_invoice.manage', 'fuel.supplier_invoice.match',
+            // FUEL-B2: حوكمة الوقود — تغيير سياسات فصل المعتمِد (`fuel_distinct_approver_required`) سلطة **إضافية** لا بديلة: تُشترط مع
+            // `fuel_stations.manage` (مسار الإعدادات) ولا تفتح أي إعداد آخر. فمن يعتمد عمليات الاستلام والتسوية بمفاتيحه التشغيلية لا يستطيع
+            // بها تعطيل الضابط الذي يقيّده. owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'fuel.governance.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
             // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات

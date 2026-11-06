@@ -9,8 +9,10 @@ use App\Models\Tenant;
 use App\Models\FuelStationConfigurationEvent;
 use App\Models\FuelStationSettingOverride;
 use App\Models\User;
+use App\Support\Rbac;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -25,6 +27,12 @@ use RuntimeException;
 class FuelStationSettingsService
 {
     public const GROUP = 'fuel_stations';
+
+    /** FUEL-B2: صلاحية الحوكمة الإضافية المطلوبة لتغيير أي مفتاح من `GOVERNANCE_KEYS` (مع صلاحية مسار الإعدادات `fuel_stations.manage`). */
+    public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
+
+    /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required'];
 
     /** @return array<string, mixed> */
     public function forTenant(): array
@@ -91,6 +99,23 @@ class FuelStationSettingsService
     public function distinctApproverRequired(FuelStation $station): bool
     {
         return $this->get($station, 'fuel_distinct_approver_required') === true;
+    }
+
+    /**
+     * FUEL-B2: يرفض (403) أي كتابة لمفتاح حوكمة من فاعل لا يملك `fuel.governance.manage` — بغضّ النظر عن القيمة (تفعيل/تعطيل/مسح override/
+     * القيمة نفسها) كي لا يُعطَّل الضابط ولا يُلتفّ عليه بمسح override. **فاعل غائب (`null`) مرفوض أيضاً** (فشل مغلق): لا مسار نظام صامت؛ من يحتاج
+     * ضبطها من أمر/هجرة يمرّر مستخدماً مخوَّلاً صريحاً. الفحص في الخدمة لا في المتحكم، فلا يتجاوزه مسار HTTP مستقبلي. لا أثر على بقية المفاتيح.
+     *
+     * @param array<int, string|int> $keys
+     */
+    private function assertGovernanceAuthority(array $keys, ?User $actor): void
+    {
+        if (array_intersect(array_map('strval', $keys), self::GOVERNANCE_KEYS) === []) {
+            return;
+        }
+        if ($actor === null || ! Rbac::allows((string) $actor->role, self::GOVERNANCE_PERMISSION)) {
+            throw new AuthorizationException('تغيير سياسات حوكمة الوقود (فصل المعتمِد) يتطلب صلاحية حوكمة الوقود.');
+        }
     }
 
     /**
@@ -169,6 +194,7 @@ class FuelStationSettingsService
     public function putTenant(array $values, ?User $actor = null, ?string $reason = null): array
     {
         $this->requireTenantContext();
+        $this->assertGovernanceAuthority(array_keys($values), $actor);
         $current = Settings::group(self::GROUP);
         $known = $this->knownValues($values);
         $changed = [];
@@ -214,6 +240,8 @@ class FuelStationSettingsService
     public function putStationValues(FuelStation $station, array $values, ?User $actor = null, ?string $reason = null): array
     {
         $this->assertStationTenant($station);
+        // قبل أي كتابة: طلب مختلط يحوي مفتاح حوكمة بلا تخويل يُرفض كله (لا تطبيق جزئي).
+        $this->assertGovernanceAuthority(array_keys($values), $actor);
         $known = [];
         foreach ($values as $key => $value) {
             $this->assertKnownKey($key);
@@ -240,6 +268,7 @@ class FuelStationSettingsService
     {
         $this->assertStationTenant($station);
         $this->assertKnownKey($key);
+        $this->assertGovernanceAuthority([$key], $actor);
 
         DB::transaction(function () use ($station, $key, $actor, $reason) {
             $existing = FuelStationSettingOverride::query()
@@ -290,6 +319,7 @@ class FuelStationSettingsService
     {
         $this->assertStationTenant($station);
         $this->assertKnownKey($key);
+        $this->assertGovernanceAuthority([$key], $actor);
         $this->assertValue($key, $value);
         $deviceKey = $this->deviceKey($deviceKey);
 
