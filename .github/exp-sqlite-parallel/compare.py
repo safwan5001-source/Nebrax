@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """مقارنة نهائية للتجربة: التطابق مع الضبط التسلسلي، العزل بين العمّال، والأزمنة مقابل الخط الأساسي. يفشل عند أي فرق غير مفسَّر."""
-import collections, glob, json, os, statistics, sys
+import collections, glob, hashlib, json, os, re, statistics, sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from summarize_junit import outcomes, totals  # noqa: E402
@@ -33,16 +33,43 @@ for d in sorted(glob.glob(os.path.join(root, "*"))):
 
 serial = {n: r for n, r in runs.items() if r["meta"]["mode"] == "serial"}
 parallel = {n: r for n, r in runs.items() if r["meta"]["mode"] == "parallel"}
-if len(serial) != 1 or len(parallel) != 5:
-    errors.append(f"unexpected run set: serial={len(serial)} parallel={len(parallel)} (expected 1 and 5)")
+EXPECT_SERIAL = int(os.environ.get("EXPECT_SERIAL", "1"))
+EXPECT_PARALLEL = int(os.environ.get("EXPECT_PARALLEL", "5"))
+if len(serial) != EXPECT_SERIAL or len(parallel) != EXPECT_PARALLEL:
+    errors.append(f"unexpected run set: serial={len(serial)} parallel={len(parallel)} (expected {EXPECT_SERIAL} and {EXPECT_PARALLEL})")
+
+
+def digest(cases):
+    """بصمة SHA-256 للقائمة الكاملة (صنف::اختبار، حالة، تكرار) مرتَّبة: تطابقها = تطابق القائمة والحالات لا العدد فقط."""
+    h = hashlib.sha256()
+    for (key, status), n in sorted(cases.items()):
+        h.update(f"{key}\t{status}\t{n}\n".encode())
+    return h.hexdigest()
+
+
+def worker_files(d):
+    """ملفات قواعد العمّال المتروكة في database/ بعد التشغيل (database.sqlite_test_N)."""
+    path = os.path.join(root, d, "database-dir.txt")
+    if not os.path.isfile(path):
+        return None
+    return sorted(set(re.findall(r"database\.sqlite_test_(\d+)", open(path, encoding="utf-8", errors="replace").read())))
 
 ref_name, ref = (next(iter(serial.items())) if serial else (None, None))
-report["serial_control"] = totals(ref["cases"]) if ref else None
+report["serial_control"] = (totals(ref["cases"]) | {"outcome_digest": digest(ref["cases"]), "distinct_tests": len({k for k, _ in ref["cases"]})}) if ref else None
 for n, r in sorted(parallel.items()):
     t = totals(r["cases"])
     diff_missing = list((ref["cases"] - r["cases"]).items())[:10] if ref else []
     diff_extra = list((r["cases"] - ref["cases"]).items())[:10] if ref else []
-    report.setdefault("parallel", {})[n] = {"totals": t, "nproc": r["meta"].get("nproc"), "test_step_s": r["meta"]["test_step_s"], "job_cpu_model": r["meta"].get("cpu")}
+    wf = worker_files(n)
+    iso_run = None
+    iso_file = os.path.join(root, n, "isolation.json")
+    if os.path.isfile(iso_file):
+        iso_run = json.load(open(iso_file))
+    if not iso_run or not iso_run.get("ok"):
+        errors.append(f"{n}: worker isolation probe failed or missing: {iso_run}")
+    if wf != ["1", "2", "3", "4"]:
+        errors.append(f"{n}: expected exactly 4 worker database files (1..4), found {wf}")
+    report.setdefault("parallel", {})[n] = {"outcome_digest": digest(r["cases"]), "digest_equals_serial": bool(ref) and digest(r["cases"]) == digest(ref["cases"]), "worker_db_files": wf, "probe_workers": (iso_run or {}).get("workers"), "totals": t, "nproc": r["meta"].get("nproc"), "test_step_s": r["meta"]["test_step_s"], "job_cpu_model": r["meta"].get("cpu")}
     if r["meta"].get("nproc") != 4:
         errors.append(f"{n}: nproc={r['meta'].get('nproc')} (experiment requires a 4-vCPU runner)")
     if t.get("failure", 0) or t.get("error", 0):
@@ -53,11 +80,6 @@ for n, r in sorted(parallel.items()):
         errors.append(f"{n}: totals {t} != serial {totals(ref['cases'])}")
 
 # عزل العمّال
-iso_path = os.path.join(root, "isolation.json")
-iso = json.load(open(iso_path)) if os.path.isfile(iso_path) else None
-report["isolation"] = iso
-if not iso or not iso.get("ok"):
-    errors.append(f"worker isolation probe failed: {iso}")
 
 steps = [r["meta"]["test_step_s"] for r in parallel.values()]
 jobs = [r["meta"]["job_s"] / 60 for r in parallel.values() if r["meta"].get("job_s")]

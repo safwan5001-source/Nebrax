@@ -14,10 +14,11 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   run:
-    name: sqlite ${{ matrix.mode }} #${{ matrix.rep }}
+    name: sqlite ${{ matrix.mode }} rep-${{ matrix.rep }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -29,7 +30,11 @@ jobs:
           - { mode: parallel, rep: 3 }
           - { mode: parallel, rep: 4 }
           - { mode: parallel, rep: 5 }
-          - { mode: serial, rep: 1 }
+          - { mode: parallel, rep: 6 }
+          - { mode: parallel, rep: 7 }
+          - { mode: parallel, rep: 8 }
+          - { mode: parallel, rep: 9 }
+          - { mode: parallel, rep: 10 }
     env:
       COMPOSER_NO_INTERACTION: '1'
       APP_DIR: /tmp/nibras-app
@@ -188,7 +193,7 @@ jobs:
 
       # عزل قواعد بيانات العمّال: 8 اختبارات تسجّل (token, ملف قاعدة البيانات, pid)؛ المطلوب 4 عمّال بملفات مختلفة وكل منها مُرحَّل.
       - name: Worker isolation probe (parallel only)
-        if: matrix.mode == 'parallel' && matrix.rep == 1
+        if: matrix.mode == 'parallel'
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         run: |
@@ -281,14 +286,23 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: runs
+      # مرجع الضبط التسلسلي: التشغيل الأول (42301504423) على الشجرة نفسها للاختبار والتطبيق (يُتحقَّق منها في خطوة لاحقة).
+      - uses: actions/download-artifact@v4
+        with:
+          name: exp-serial-1
+          path: runs/exp-serial-1
+          run-id: 42301504423
+          github-token: ${{ github.token }}
       - name: Compare
+        env:
+          EXPECT_PARALLEL: '10'
+          EXPECT_SERIAL: '1'
         run: |
           set -euo pipefail
-          # job_s الفعلي من واجهة GitHub (المتوسط الزمني للـjob) لا من داخل الـjob
           mkdir -p merged
           for d in runs/exp-*; do
-            n=$(basename "$d"); mkdir -p "merged/$n"; cp "$d"/junit.xml "$d"/meta.json "merged/$n"/ 2>/dev/null || true
-            [ -f "$d/isolation.json" ] && cp "$d/isolation.json" merged/isolation.json || true
+            n=$(basename "$d"); mkdir -p "merged/$n"
+            for f in junit.xml meta.json isolation.json database-dir.txt; do [ -f "$d/$f" ] && cp "$d/$f" "merged/$n/" || true; done
           done
           python3 .github/exp-sqlite-parallel/compare.py merged | tee compare-report.txt
       - uses: actions/upload-artifact@v4
