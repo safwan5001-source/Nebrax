@@ -262,8 +262,7 @@ class FuelShiftCollectionService
         return DB::transaction(function () use ($shift, $note, $actor) {
             $shift = FuelShift::lockForUpdate()->findOrFail($shift->id);
             $station = FuelStation::findOrFail($shift->fuel_station_id);
-            if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
-                || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+            if (! $actor->canAccessFuelStation($station)) {
                 throw new RuntimeException('محطة الشفت خارج نطاق صلاحياتك.');
             }
             if (! $shift->isClosed()) {

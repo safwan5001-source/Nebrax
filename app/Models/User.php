@@ -80,6 +80,55 @@ class User extends Authenticatable
         return $allowed === null || ($branchId !== null && in_array($branchId, $allowed, true));
     }
 
+    /** وضع نطاق المحطة: لا تقييد بمحطة (الحالة الافتراضية لكل مستخدم قائم). */
+    public const FUEL_SCOPE_ASSIGNED = 'assigned';
+
+    /**
+     * FUEL-B3: المحطات المسنَدة صراحةً (جدول `fuel_station_user`). مفيدة فقط حين `fuel_station_scope = assigned`.
+     * لا يُكتب إلا عبر `FuelStaffAccessService` (محروس ومدقَّق).
+     */
+    public function fuelStations(): BelongsToMany
+    {
+        return $this->belongsToMany(FuelStation::class, 'fuel_station_user')->withTimestamps();
+    }
+
+    /** هل نطاق محطات هذا المستخدم مقيَّد صراحةً؟ (`false` = سلوك الأدوار القديمة: فروع/مخازن فقط). */
+    public function isFuelStationScoped(): bool
+    {
+        return $this->fuel_station_scope === self::FUEL_SCOPE_ASSIGNED;
+    }
+
+    /**
+     * معرّفات محطاته المسنَدة، أو `null` إن لم يكن مقيَّداً بمحطة.
+     *
+     * **خلاف `allowedBranchIds()` عمداً: المقيَّد بلا صفوف يعيد `[]` لا `null`** — فالفراغ هنا «لا وصول لأي محطة» (فشل مغلق) لا «الكلّ»،
+     * لأن التقييد صريح (`fuel_station_scope = assigned`) ولا يُستنتج من غياب الصفوف. من يستهلك هذه الدالة يجب أن يعامل `[]` كحجب كامل.
+     *
+     * @return array<int, string>|null
+     */
+    public function allowedFuelStationIds(): ?array
+    {
+        if (! $this->isFuelStationScoped()) {
+            return null;
+        }
+
+        return $this->fuelStations()->pluck('fuel_stations.id')->all();
+    }
+
+    /** هل يصل المستخدم إلى هذه المحطة؟ تقاطع الفرع والمستودع والمحطة المسنَدة (كلٌّ يجب أن يسمح). */
+    public function canAccessFuelStation(FuelStation $station): bool
+    {
+        if ($station->branch_id !== null && ! $this->canAccessBranch($station->branch_id)) {
+            return false;
+        }
+        if ($station->warehouse_id !== null && ! $this->canAccessWarehouse($station->warehouse_id)) {
+            return false;
+        }
+        $assigned = $this->allowedFuelStationIds();
+
+        return $assigned === null || in_array($station->id, $assigned, true);
+    }
+
     /** هل يملك الوصول إلى هذا المستودع؟ (غير المقيَّد يملك الكلّ) */
     public function canAccessWarehouse(?string $warehouseId): bool
     {

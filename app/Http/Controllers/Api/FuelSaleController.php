@@ -209,7 +209,7 @@ class FuelSaleController extends ApiController
     private function organizationScopeOrFail(): ?FuelStation
     {
         $user = request()->user();
-        if ($user?->allowedBranchIds() !== null || $user?->allowedWarehouseIds() !== null) {
+        if ($user?->allowedBranchIds() !== null || $user?->allowedWarehouseIds() !== null || $user?->isFuelStationScoped()) {
             abort(403, 'سعر المؤسسة لا يملكه مستخدم مقيَّد بفرع أو مخزن.');
         }
 

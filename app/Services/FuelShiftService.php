@@ -112,6 +112,10 @@ class FuelShiftService
             if ($station->warehouse_id !== null && ! $staff->canAccessWarehouse($station->warehouse_id)) {
                 throw new RuntimeException('العامل لا يملك نطاق الوصول لمخزن محطة الشفت.');
             }
+            // FUEL-B3: عامل مقيَّد بمحطات مسنَدة لا يُسنَد إلى وردية محطة غير مسنَدة له.
+            if (! $staff->canAccessFuelStation($station)) {
+                throw new RuntimeException('العامل لا يملك نطاق الوصول لمحطة الشفت.');
+            }
             if (FuelShiftStaffAssignment::where('fuel_shift_id', $shift->id)->where('user_id', $staff->id)->exists()) {
                 throw new RuntimeException('العامل مسند بالفعل إلى هذا الشفت.');
             }
@@ -601,7 +605,8 @@ class FuelShiftService
             throw new RuntimeException('مستلم التسليم يجب أن يكون مشرفاً مخوّلاً باعتماد الوردية أو مراجعة فرق النقد.');
         }
         if (! $receiver->canAccessBranch($shift->branch_id)
-            || ($station->warehouse_id !== null && ! $receiver->canAccessWarehouse($station->warehouse_id))) {
+            || ($station->warehouse_id !== null && ! $receiver->canAccessWarehouse($station->warehouse_id))
+            || ! $receiver->canAccessFuelStation($station)) {
             throw new RuntimeException('مستلم التسليم خارج نطاق فرع/مخزن المحطة.');
         }
     }
@@ -698,8 +703,8 @@ class FuelShiftService
      */
     private function assertActorStationScope(User $actor, FuelStation $station): void
     {
-        if (($station->branch_id !== null && ! $actor->canAccessBranch($station->branch_id))
-            || ($station->warehouse_id !== null && ! $actor->canAccessWarehouse($station->warehouse_id))) {
+        // FUEL-B3: فرع ∧ مخزن ∧ محطة مسنَدة (القاعدة الواحدة في User::canAccessFuelStation).
+        if (! $actor->canAccessFuelStation($station)) {
             throw new RuntimeException('محطة الشفت خارج نطاق صلاحياتك.');
         }
     }

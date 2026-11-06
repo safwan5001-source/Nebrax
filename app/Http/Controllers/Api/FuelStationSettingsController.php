@@ -11,6 +11,8 @@ use Illuminate\Support\Arr;
 
 class FuelStationSettingsController extends ApiController
 {
+    use AuthorizesFuelStationScope;
+
     public function __construct(private FuelStationSettingsService $settings) {}
 
     public function showTenant(): JsonResponse
@@ -33,6 +35,8 @@ class FuelStationSettingsController extends ApiController
     public function showStation(UpdateFuelStationSettingsRequest $request, string $id): JsonResponse
     {
         $station = $this->scopeToActiveBranch(FuelStation::query(), $request)->findOrFail($id);
+        // FUEL-B3: نطاق الفرع/المخزن/المحطة المسنَدة على قراءة إعدادات المحطة (404 موحّد) — كانت بلا فحص نطاق مستخدم.
+        $this->accessibleStation($station->id);
 
         return response()->json(['data' => $this->settings->forStation($station)]);
     }
@@ -40,6 +44,7 @@ class FuelStationSettingsController extends ApiController
     public function updateStation(UpdateFuelStationSettingsRequest $request, string $id): JsonResponse
     {
         $station = $this->scopeToActiveBranch(FuelStation::query(), $request)->findOrFail($id);
+        $this->accessibleStation($station->id);
         $data = $request->validated();
         $settings = $this->domain(fn () => $this->settings->putStationValues(
             $station,

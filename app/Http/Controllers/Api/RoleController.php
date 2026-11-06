@@ -6,6 +6,7 @@ use App\Http\Requests\StoreRoleRequest;
 use App\Http\Resources\RoleResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AccessChangeAuditor;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -93,14 +94,24 @@ class RoleController extends ApiController
     public function store(StoreRoleRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $this->guardGrantCeiling($request, $data['permissions']);
+        $auditor = app(AccessChangeAuditor::class);
 
-        $role = Role::create([
-            'slug'        => $this->uniqueSlug(),
-            'name'        => trim($data['name']),
-            'permissions' => array_values(array_unique($data['permissions'])),
-            'is_system'   => false,
-        ]);
+        // FUEL-B3: التدقيق خارج معاملة الإنشاء (الرفض يُسجَّل بعد التراجع) وداخلها (الإنشاء الفعلي يُثبَّت مع أثره).
+        $role = $auditor->guard('role.created', AccessChangeAuditor::SUBJECT_ROLE, null, null, $request->user(), $this->attempted($data), function () use ($request, $data, $auditor): Role {
+            return DB::transaction(function () use ($request, $data, $auditor): Role {
+                $this->guardGrantCeiling($request, $data['permissions']);
+
+                $role = Role::create([
+                    'slug'        => $this->uniqueSlug(),
+                    'name'        => trim($data['name']),
+                    'permissions' => array_values(array_unique($data['permissions'])),
+                    'is_system'   => false,
+                ]);
+                $auditor->record('role.created', AccessChangeAuditor::SUBJECT_ROLE, $role->id, null, null, $this->snapshot($role), $request->user());
+
+                return $role;
+            });
+        });
 
         $role->users_count = 0;
 
@@ -114,8 +125,10 @@ class RoleController extends ApiController
         // صفّ الدور يُقفل داخل المعاملة نفسها التي تكتب، وإدارة المستخدمين تقفل الصفّ
         // نفسه قبل فحص سقف المنح (`UserController::canGrantRole`) — فلا يتّسع دورٌ بين
         // فحص تحديثٍ مفوَّض وكتابته.
-        $role = DB::transaction(function () use ($request, $id, $data): Role {
+        $auditor = app(AccessChangeAuditor::class);
+        $role = $auditor->guard('role.updated', AccessChangeAuditor::SUBJECT_ROLE, $id, null, $request->user(), $this->attempted($data), fn () => DB::transaction(function () use ($request, $id, $data, $auditor): Role {
             $role = Role::lockForUpdate()->findOrFail($id);
+            $before = $this->snapshot($role);
 
             // المالك ثابتٌ لا يُمسّ — حمايةٌ من حبس المالك عن صلاحياته.
             if ($role->isOwner()) {
@@ -128,9 +141,10 @@ class RoleController extends ApiController
                 'name'        => trim($data['name']),
                 'permissions' => array_values(array_unique($data['permissions'])),
             ]);
+            $auditor->record('role.updated', AccessChangeAuditor::SUBJECT_ROLE, $role->id, null, $before, $this->snapshot($role->refresh()), $request->user());
 
             return $role;
-        });
+        }));
 
         $role->users_count = User::where('tenant_id', $role->tenant_id)
             ->where('role', $role->slug)->count();
@@ -140,26 +154,53 @@ class RoleController extends ApiController
 
     public function destroy(string $id): JsonResponse
     {
-        $role = Role::findOrFail($id);
+        $actor = request()->user();
+        $auditor = app(AccessChangeAuditor::class);
 
-        if ($role->is_system) {
-            abort(422, 'الأدوار النظامية لا تُحذف.');
-        }
+        $auditor->guard('role.deleted', AccessChangeAuditor::SUBJECT_ROLE, $id, null, $actor, null, function () use ($id, $actor, $auditor): void {
+            $role = Role::findOrFail($id);
 
-        // سقف المنح يشمل الحذف: فاعلٌ ممنوعٌ من تعديل دورٍ لا يُتلفه كذلك.
-        if (! Rbac::covers(Rbac::permissionsForRole(request()->user()->role), $role->permissions ?? [])) {
-            abort(403, 'لا يمكنك حذف دورٍ صلاحياته تتجاوز صلاحياتك.');
-        }
+            if ($role->is_system) {
+                abort(422, 'الأدوار النظامية لا تُحذف.');
+            }
 
-        // دورٌ مسنَدٌ لمستخدمٍ لا يُحذف — لئلّا يبقى مستخدمٌ بلا دور.
-        // العزل يدويّ بالمستأجر (User لا يرث BaseModel).
-        if (User::where('tenant_id', $role->tenant_id)->where('role', $role->slug)->exists()) {
-            abort(422, 'لا يمكن حذف دورٍ مسنَدٍ إلى مستخدمين. أعِد إسنادهم أولاً.');
-        }
+            // سقف المنح يشمل الحذف: فاعلٌ ممنوعٌ من تعديل دورٍ لا يُتلفه كذلك.
+            if (! Rbac::covers(Rbac::permissionsForRole($actor->role), $role->permissions ?? [])) {
+                abort(403, 'لا يمكنك حذف دورٍ صلاحياته تتجاوز صلاحياتك.');
+            }
 
-        $role->delete();
+            // دورٌ مسنَدٌ لمستخدمٍ لا يُحذف — لئلّا يبقى مستخدمٌ بلا دور.
+            // العزل يدويّ بالمستأجر (User لا يرث BaseModel).
+            if (User::where('tenant_id', $role->tenant_id)->where('role', $role->slug)->exists()) {
+                abort(422, 'لا يمكن حذف دورٍ مسنَدٍ إلى مستخدمين. أعِد إسنادهم أولاً.');
+            }
+
+            DB::transaction(function () use ($role, $actor, $auditor): void {
+                $before = $this->snapshot($role);
+                $role->delete();
+                $auditor->record('role.deleted', AccessChangeAuditor::SUBJECT_ROLE, $role->id, null, $before, null, $actor);
+            });
+        });
 
         return response()->json(['message' => 'deleted']);
+    }
+
+    /** @return array<string,mixed> لقطة الدور للتدقيق: الاسم والصلاحيات (مرتّبة) والنظامية — بلا مستخدمين. */
+    private function snapshot(Role $role): array
+    {
+        $permissions = array_values(array_unique($role->permissions ?? []));
+        sort($permissions);
+
+        return ['name' => $role->name, 'permissions' => $permissions, 'is_system' => (bool) $role->is_system];
+    }
+
+    /** ما حاوله الفاعل (اسم + مفاتيح صلاحيات). @return array<string,mixed> */
+    private function attempted(array $data): array
+    {
+        $permissions = array_values(array_unique((array) ($data['permissions'] ?? [])));
+        sort($permissions);
+
+        return ['name' => $data['name'] ?? null, 'permissions' => $permissions];
     }
 
     /** مفتاحٌ داخليّ فريد للدور المخصَّص — الهوية المرئية هي `name` لا `slug`. */
