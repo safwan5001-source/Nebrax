@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\FuelStation;
+use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -96,5 +97,31 @@ trait AuthorizesFuelStationScope
         return $query->whereIn($stationColumn, FuelStation::query()->select('id')->where(function (Builder $q) use ($allowed) {
             $q->whereNull('warehouse_id')->orWhereIn('warehouse_id', $allowed);
         }));
+    }
+
+    /**
+     * B1: فاتورة المورد `CompanyWide` ولا تحمل محطة — وجودها بين محطات المستخدم يُستدلّ عليه من **مطابقاتها** (كل مطابقة تحمل محطتها).
+     * المستخدم المقيَّد (فرعاً أو مخزناً) يرى الفاتورة فقط إن:
+     *   1) لم يكن لها أي مطابقة على محطة خارج نطاقه (وإلا لكشفت إجمالياتها أو حالتها محطاتٍ لا يراها)، و
+     *   2) أنشأها هو، أو لها مطابقة واحدة على الأقل ضمن محطاته.
+     * فالفاتورة غير المطابَقة لا يراها إلا منشئها (فشل مغلق: لا محطة تحدد مَن يملكها). غير المقيَّد لا تُصفّى له.
+     *
+     * استعلام المطابقات يتجاوز عزل الفرع النشط عمداً (مع بقاء عزل المستأجر): مطابقة في فرع آخر يجب أن تُحتسب «خارج النطاق»
+     * لا أن تختفي فتُظهر الفاتورة كأنها نظيفة.
+     */
+    protected function restrictInvoicesToAccessibleStations(Builder $query): Builder
+    {
+        $stationIds = $this->accessibleStationIds();
+        if ($stationIds === null) {
+            return $query;
+        }
+        $userId = request()->user()?->id;
+
+        return $query
+            ->whereDoesntHave('matches', fn (Builder $m) => $m->withoutGlobalScope(BranchScope::class)->whereNotIn('fuel_station_id', $stationIds))
+            ->where(function (Builder $q) use ($stationIds, $userId) {
+                $q->where('created_by', $userId)
+                    ->orWhereHas('matches', fn (Builder $m) => $m->withoutGlobalScope(BranchScope::class)->whereIn('fuel_station_id', $stationIds));
+            });
     }
 }

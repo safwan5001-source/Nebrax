@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\FuelQuantity;
+use App\Support\FuelCostVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,6 +14,7 @@ class FuelReconciliationResource extends JsonResource
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
+        $canSeeCost = FuelCostVisibility::canSeeCost($request->user());
         $liters = static fn (?int $milliliters): ?string => $milliliters === null ? null : $quantity->millilitersToLiters($milliliters);
 
         return [
@@ -61,8 +63,8 @@ class FuelReconciliationResource extends JsonResource
                 'requires_approval' => $this->requires_approval,
             ],
             'settlement' => [
-                'unit_cost_minor' => $this->unit_cost_minor,
-                'financial_variance_minor' => $this->financial_variance_minor,
+                'unit_cost_minor' => $this->when($canSeeCost, fn () => $this->unit_cost_minor),
+                'financial_variance_minor' => $this->when($canSeeCost, fn () => $this->financial_variance_minor),
                 'stock_movement_id' => $this->stock_movement_id,
                 'journal_entry_id' => $this->journal_entry_id,
                 'approved_by' => $this->approved_by,

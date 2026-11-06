@@ -21,6 +21,7 @@ use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\LedgerService;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -40,65 +41,178 @@ class FuelSupplyReceivingService
         private AccountRoleResolver $roles,
     ) {}
 
-    /** @param array<string, mixed> $data */
+    /**
+     * FS-16: المفتاح الواحد = نية واحدة. إعادة الإرسال بالحمولة نفسها تُعيد المسودة الأولى؛ بحمولة مختلفة تُرفض
+     * (لا تجاهل صامت لتغيير الكمية أو التكلفة). وتعارض التزامن على المفتاح (طلبان متزامنان) يُحسم هنا بعد تراجع
+     * المعاملة الخاسرة: إعادة قراءة المسودة الفائزة ومقارنتها، لا 500 من فهرس القاعدة.
+     *
+     * @param array<string, mixed> $data
+     */
     public function createDelivery(array $data): FuelDelivery
     {
-        return DB::transaction(function () use ($data) {
-            [$station, $tank, $fuelProduct, $warehouse, $supplier] = $this->resolveDeliveryReferences($data);
-            $this->assertFuelProduct($fuelProduct);
-            $dispatched = $this->liters($data['dispatched_liters'] ?? null, 'الكمية المرسلة');
-            $received = $this->liters($data['received_liters'] ?? null, 'الكمية المستلمة');
-            if ($received <= 0) {
-                throw new RuntimeException('الكمية المستلمة فعلياً يجب أن تكون موجبة.');
-            }
-            $totalCost = $this->positiveInteger($data['received_total_cost_minor'] ?? null, 'قيمة الاستلام بالهللات');
-            $key = trim((string) ($data['idempotency_key'] ?? ''));
-            if ($key === '') {
-                throw new RuntimeException('مفتاح idempotency مطلوب لاستلام الوقود.');
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+        if ($key === '') {
+            throw new RuntimeException('مفتاح idempotency مطلوب لاستلام الوقود.');
+        }
+
+        try {
+            return DB::transaction(function () use ($data, $key) {
+                $existing = FuelDelivery::where('idempotency_key', $key)->first();
+                if ($existing !== null) {
+                    $this->assertSameDeliveryPayload($existing, $data);
+
+                    return $existing;
+                }
+
+                return $this->insertDelivery($data, $key);
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $winner = FuelDelivery::where('idempotency_key', $key)->first();
+            if ($winner !== null) {
+                $this->assertSameDeliveryPayload($winner, $data);
+
+                return $winner;
             }
 
-            $existing = FuelDelivery::where('idempotency_key', $key)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
+            // المفتاح أو رقم إذن التسليم محجوزان لسجل لا يراه هذا المستخدم (فرع آخر) أو لرقم إذن مكرر لمورد واحد.
+            throw new RuntimeException('FUEL_DELIVERY_DUPLICATE: مفتاح الاستلام أو رقم إذن التسليم لهذا المورد مسجَّل مسبقاً.');
+        }
+    }
 
-            $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, $station->branch_id);
-            $this->assertReadings($data, $station->id, $tank->id);
-            $unitCompatibilityCost = intdiv($totalCost, $received);
+    /** @param array<string, mixed> $data */
+    private function insertDelivery(array $data, string $key): FuelDelivery
+    {
+        [$station, $tank, $fuelProduct, $warehouse, $supplier] = $this->resolveDeliveryReferences($data);
+        $this->assertFuelProduct($fuelProduct);
+        $dispatched = $this->liters($data['dispatched_liters'] ?? null, 'الكمية المرسلة');
+        $received = $this->liters($data['received_liters'] ?? null, 'الكمية المستلمة');
+        if ($received <= 0) {
+            throw new RuntimeException('الكمية المستلمة فعلياً يجب أن تكون موجبة.');
+        }
+        $totalCost = $this->positiveInteger($data['received_total_cost_minor'] ?? null, 'قيمة الاستلام بالهللات');
 
-            return FuelDelivery::create([
-                'branch_id' => $station->branch_id,
-                'fuel_station_id' => $station->id,
-                'fuel_tank_id' => $tank->id,
-                'fuel_product_id' => $fuelProduct->id,
-                'warehouse_id' => $warehouse->id,
-                'supplier_id' => $supplier->id,
-                'procurement_order_id' => $order?->id,
-                'purchase_reference' => $this->nullableString($data['purchase_reference'] ?? null, 128),
-                'delivery_note_number' => $this->nullableString($data['delivery_note_number'] ?? null, 128),
-                'tanker_identifier' => $this->nullableString($data['tanker_identifier'] ?? null, 128),
-                'driver_name' => $this->nullableString($data['driver_name'] ?? null, 255),
-                'compartments' => $data['compartments'] ?? null,
-                'dispatched_milliliters' => $dispatched,
-                'received_milliliters' => $received,
-                'transit_variance_milliliters' => $received - $dispatched,
-                'temperature_milli_celsius' => $this->nullableInteger($data['temperature_milli_celsius'] ?? null),
-                'density_kg_per_m3' => $this->nullableInteger($data['density_kg_per_m3'] ?? null),
-                'before_physical_reading_id' => $data['before_physical_reading_id'] ?? null,
-                'after_physical_reading_id' => $data['after_physical_reading_id'] ?? null,
-                'before_atg_reading_id' => $data['before_atg_reading_id'] ?? null,
-                'after_atg_reading_id' => $data['after_atg_reading_id'] ?? null,
-                'evidence' => $data['evidence'] ?? null,
-                'status' => FuelDelivery::STATUS_DRAFT,
-                // توافق فقط؛ Cost Pool هو مصدر الحقيقة لمنتجات الوقود.
-                'received_unit_cost_minor' => $unitCompatibilityCost,
-                'received_total_cost_minor' => $totalCost,
-                'idempotency_key' => $key,
-                'received_at' => $this->receivedAt($data['received_at'] ?? null),
-                'created_by' => $data['created_by'] ?? null,
-                'notes' => $this->nullableString($data['notes'] ?? null, 1000),
-            ]);
-        });
+        $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, $station->branch_id);
+        $this->assertReadings($data, $station->id, $tank->id);
+        $unitCompatibilityCost = intdiv($totalCost, $received);
+
+        return FuelDelivery::create([
+            'branch_id' => $station->branch_id,
+            'fuel_station_id' => $station->id,
+            'fuel_tank_id' => $tank->id,
+            'fuel_product_id' => $fuelProduct->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'procurement_order_id' => $order?->id,
+            'purchase_reference' => $this->nullableString($data['purchase_reference'] ?? null, 128),
+            'delivery_note_number' => $this->nullableString($data['delivery_note_number'] ?? null, 128),
+            'tanker_identifier' => $this->nullableString($data['tanker_identifier'] ?? null, 128),
+            'driver_name' => $this->nullableString($data['driver_name'] ?? null, 255),
+            'compartments' => $data['compartments'] ?? null,
+            'dispatched_milliliters' => $dispatched,
+            'received_milliliters' => $received,
+            'transit_variance_milliliters' => $received - $dispatched,
+            'temperature_milli_celsius' => $this->nullableInteger($data['temperature_milli_celsius'] ?? null),
+            'density_kg_per_m3' => $this->nullableInteger($data['density_kg_per_m3'] ?? null),
+            'before_physical_reading_id' => $data['before_physical_reading_id'] ?? null,
+            'after_physical_reading_id' => $data['after_physical_reading_id'] ?? null,
+            'before_atg_reading_id' => $data['before_atg_reading_id'] ?? null,
+            'after_atg_reading_id' => $data['after_atg_reading_id'] ?? null,
+            'evidence' => $data['evidence'] ?? null,
+            'status' => FuelDelivery::STATUS_DRAFT,
+            // توافق فقط؛ Cost Pool هو مصدر الحقيقة لمنتجات الوقود.
+            'received_unit_cost_minor' => $unitCompatibilityCost,
+            'received_total_cost_minor' => $totalCost,
+            'idempotency_key' => $key,
+            'received_at' => $this->receivedAt($data['received_at'] ?? null),
+            'created_by' => $data['created_by'] ?? null,
+            'notes' => $this->nullableString($data['notes'] ?? null, 1000),
+        ]);
+    }
+
+    /**
+     * بصمة النية المرسلة، بالأشكال نفسها التي تُخزَّن بها (ملّيلترات صحيحة، نصوص مقتطعة كما في الإدراج). لا تقرأ قاعدة
+     * البيانات ولا تتحقق من وجود المراجع — هي للمقارنة فقط.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function requestedDeliveryFingerprint(array $data): array
+    {
+        return [
+            'fuel_station_id' => $this->idString($data['fuel_station_id'] ?? null),
+            'fuel_tank_id' => $this->idString($data['fuel_tank_id'] ?? null),
+            'fuel_product_id' => $this->idString($data['fuel_product_id'] ?? null),
+            'warehouse_id' => $this->idString($data['warehouse_id'] ?? null),
+            'supplier_id' => $this->idString($data['supplier_id'] ?? null),
+            'procurement_order_id' => $this->idString($data['procurement_order_id'] ?? null),
+            'purchase_reference' => $this->nullableString($data['purchase_reference'] ?? null, 128),
+            'delivery_note_number' => $this->nullableString($data['delivery_note_number'] ?? null, 128),
+            'tanker_identifier' => $this->nullableString($data['tanker_identifier'] ?? null, 128),
+            'driver_name' => $this->nullableString($data['driver_name'] ?? null, 255),
+            'compartments' => $this->canonical($data['compartments'] ?? null),
+            'dispatched_milliliters' => $this->liters($data['dispatched_liters'] ?? null, 'الكمية المرسلة'),
+            'received_milliliters' => $this->liters($data['received_liters'] ?? null, 'الكمية المستلمة'),
+            'received_total_cost_minor' => $this->positiveInteger($data['received_total_cost_minor'] ?? null, 'قيمة الاستلام بالهللات'),
+            'temperature_milli_celsius' => $this->nullableInteger($data['temperature_milli_celsius'] ?? null),
+            'density_kg_per_m3' => $this->nullableInteger($data['density_kg_per_m3'] ?? null),
+            'before_physical_reading_id' => $this->idString($data['before_physical_reading_id'] ?? null),
+            'after_physical_reading_id' => $this->idString($data['after_physical_reading_id'] ?? null),
+            'before_atg_reading_id' => $this->idString($data['before_atg_reading_id'] ?? null),
+            'after_atg_reading_id' => $this->idString($data['after_atg_reading_id'] ?? null),
+            'evidence' => $this->canonical($data['evidence'] ?? null),
+            'notes' => $this->nullableString($data['notes'] ?? null, 1000),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function storedDeliveryFingerprint(FuelDelivery $delivery): array
+    {
+        return [
+            'fuel_station_id' => $this->idString($delivery->fuel_station_id),
+            'fuel_tank_id' => $this->idString($delivery->fuel_tank_id),
+            'fuel_product_id' => $this->idString($delivery->fuel_product_id),
+            'warehouse_id' => $this->idString($delivery->warehouse_id),
+            'supplier_id' => $this->idString($delivery->supplier_id),
+            'procurement_order_id' => $this->idString($delivery->procurement_order_id),
+            'purchase_reference' => $this->nullableString($delivery->purchase_reference, 128),
+            'delivery_note_number' => $this->nullableString($delivery->delivery_note_number, 128),
+            'tanker_identifier' => $this->nullableString($delivery->tanker_identifier, 128),
+            'driver_name' => $this->nullableString($delivery->driver_name, 255),
+            'compartments' => $this->canonical($delivery->compartments),
+            'dispatched_milliliters' => (int) $delivery->dispatched_milliliters,
+            'received_milliliters' => (int) $delivery->received_milliliters,
+            'received_total_cost_minor' => (int) $delivery->received_total_cost_minor,
+            'temperature_milli_celsius' => $delivery->temperature_milli_celsius === null ? null : (int) $delivery->temperature_milli_celsius,
+            'density_kg_per_m3' => $delivery->density_kg_per_m3 === null ? null : (int) $delivery->density_kg_per_m3,
+            'before_physical_reading_id' => $this->idString($delivery->before_physical_reading_id),
+            'after_physical_reading_id' => $this->idString($delivery->after_physical_reading_id),
+            'before_atg_reading_id' => $this->idString($delivery->before_atg_reading_id),
+            'after_atg_reading_id' => $this->idString($delivery->after_atg_reading_id),
+            'evidence' => $this->canonical($delivery->evidence),
+            'notes' => $this->nullableString($delivery->notes, 1000),
+        ];
+    }
+
+    /**
+     * يرفض إعادة استعمال مفتاح استلام بحمولة مختلفة. الرسالة لا تحمل أي قيمة (كمية/تكلفة) من السجل الأصلي — يكفي اسم
+     * الحقول المختلفة. `received_at` يُقارَن فقط إن أرسله العميل صراحةً (غيابه = «الآن» عند كل محاولة).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function assertSameDeliveryPayload(FuelDelivery $existing, array $data): void
+    {
+        $requested = $this->requestedDeliveryFingerprint($data);
+        $stored = $this->storedDeliveryFingerprint($existing);
+        $differs = array_keys(array_filter($requested, fn ($value, $field) => $value !== $stored[$field], ARRAY_FILTER_USE_BOTH));
+
+        if (($data['received_at'] ?? null) !== null && $data['received_at'] !== ''
+            && $this->receivedAt($data['received_at'])->format('Y-m-d H:i:s') !== $existing->received_at?->format('Y-m-d H:i:s')) {
+            $differs[] = 'received_at';
+        }
+
+        if ($differs !== []) {
+            throw new RuntimeException('FUEL_IDEMPOTENCY_PAYLOAD_MISMATCH: مفتاح idempotency مستعمل لاستلام وقود بمحتوى مختلف (' . implode('، ', $differs) . ')؛ استعمل مفتاحاً جديداً لاستلام جديد أو أعد إرسال الحمولة الأصلية نفسها.');
+        }
     }
 
     /**
@@ -208,68 +322,166 @@ class FuelSupplyReceivingService
         });
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * FS-16: المفتاح الطبيعي (المورد + رقم الفاتورة). إعادة الإرسال بالمحتوى نفسه تُعيد الفاتورة الأولى؛ بمحتوى مختلف
+     * (سطر أو كمية أو قيمة أو عملة أو مراجع) تُرفض، وتعارض التزامن يُحسم بإعادة قراءة الفائزة.
+     *
+     * @param array<string, mixed> $data
+     */
     public function createSupplierInvoice(array $data): FuelSupplierInvoice
     {
         $lines = $data['lines'] ?? [];
         if (! is_array($lines) || $lines === []) {
             throw new RuntimeException('فاتورة مورد الوقود تحتاج سطراً واحداً على الأقل.');
         }
+        $number = trim((string) ($data['invoice_number'] ?? ''));
+        if ($number === '') {
+            throw new RuntimeException('رقم فاتورة المورد مطلوب.');
+        }
+        $supplierId = (string) ($data['supplier_id'] ?? '');
 
-        return DB::transaction(function () use ($data, $lines) {
-            $supplier = Partner::findOrFail($data['supplier_id'] ?? '');
-            $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, null);
-            $purchase = $this->resolvePurchase($data['purchase_id'] ?? null, $supplier);
-            $number = trim((string) ($data['invoice_number'] ?? ''));
-            if ($number === '') {
-                throw new RuntimeException('رقم فاتورة المورد مطلوب.');
-            }
-            $existing = FuelSupplierInvoice::where('supplier_id', $supplier->id)->where('invoice_number', $number)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
+        try {
+            return DB::transaction(function () use ($data, $lines, $number) {
+                $supplier = Partner::findOrFail($data['supplier_id'] ?? '');
+                $existing = FuelSupplierInvoice::where('supplier_id', $supplier->id)->where('invoice_number', $number)->first();
+                if ($existing !== null) {
+                    $this->assertSameInvoicePayload($existing, $data, $lines);
 
-            $invoice = FuelSupplierInvoice::create([
-                'supplier_id' => $supplier->id,
-                'procurement_order_id' => $order?->id,
-                'purchase_id' => $purchase?->id,
-                'invoice_number' => $number,
-                'invoice_date' => $data['invoice_date'] ?? now()->toDateString(),
-                'currency' => $data['currency'] ?? 'SAR',
-                'status' => FuelSupplierInvoice::STATUS_UNMATCHED,
-                'created_by' => $data['created_by'] ?? null,
-                'evidence' => $data['evidence'] ?? null,
-                'notes' => $this->nullableString($data['notes'] ?? null, 1000),
-            ]);
-            $totalQuantity = $totalValue = 0;
-            foreach (array_values($lines) as $index => $line) {
-                $fuelProduct = FuelProduct::findOrFail($line['fuel_product_id'] ?? '');
-                $this->assertFuelProduct($fuelProduct);
-                $quantity = $this->liters($line['quantity_liters'] ?? null, 'كمية سطر الفاتورة');
-                $value = $this->positiveInteger($line['value_minor'] ?? null, 'قيمة سطر الفاتورة');
-                if ($quantity <= 0) {
-                    throw new RuntimeException('كمية سطر فاتورة المورد يجب أن تكون موجبة.');
+                    return $existing->load('lines');
                 }
-                $totalQuantity = $this->safeAdd($totalQuantity, $quantity, 'إجمالي كمية فاتورة المورد');
-                $totalValue = $this->safeAdd($totalValue, $value, 'إجمالي قيمة فاتورة المورد');
-                FuelSupplierInvoiceLine::create([
-                    'fuel_supplier_invoice_id' => $invoice->id,
-                    'fuel_product_id' => $fuelProduct->id,
-                    'line_number' => $index + 1,
-                    'quantity_milliliters' => $quantity,
-                    'value_minor' => $value,
-                ]);
-            }
-            $invoice->update(['total_quantity_milliliters' => $totalQuantity, 'total_value_minor' => $totalValue]);
 
-            return $invoice->fresh('lines');
-        });
+                return $this->insertSupplierInvoice($data, $lines, $supplier, $number);
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $winner = FuelSupplierInvoice::where('supplier_id', $supplierId)->where('invoice_number', $number)->first();
+            if ($winner !== null) {
+                $this->assertSameInvoicePayload($winner, $data, $lines);
+
+                return $winner->load('lines');
+            }
+
+            throw new RuntimeException('FUEL_INVOICE_DUPLICATE: فاتورة الشراء المرتبطة مستعملة في فاتورة مورد وقود أخرى.');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, mixed> $lines
+     */
+    private function insertSupplierInvoice(array $data, array $lines, Partner $supplier, string $number): FuelSupplierInvoice
+    {
+        $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, null);
+        $purchase = $this->resolvePurchase($data['purchase_id'] ?? null, $supplier);
+
+        $invoice = FuelSupplierInvoice::create([
+            'supplier_id' => $supplier->id,
+            'procurement_order_id' => $order?->id,
+            'purchase_id' => $purchase?->id,
+            'invoice_number' => $number,
+            'invoice_date' => $data['invoice_date'] ?? now()->toDateString(),
+            'currency' => $data['currency'] ?? 'SAR',
+            'status' => FuelSupplierInvoice::STATUS_UNMATCHED,
+            'created_by' => $data['created_by'] ?? null,
+            'evidence' => $data['evidence'] ?? null,
+            'notes' => $this->nullableString($data['notes'] ?? null, 1000),
+        ]);
+        $totalQuantity = $totalValue = 0;
+        foreach (array_values($lines) as $index => $line) {
+            $fuelProduct = FuelProduct::findOrFail($line['fuel_product_id'] ?? '');
+            $this->assertFuelProduct($fuelProduct);
+            $quantity = $this->liters($line['quantity_liters'] ?? null, 'كمية سطر الفاتورة');
+            $value = $this->positiveInteger($line['value_minor'] ?? null, 'قيمة سطر الفاتورة');
+            if ($quantity <= 0) {
+                throw new RuntimeException('كمية سطر فاتورة المورد يجب أن تكون موجبة.');
+            }
+            $totalQuantity = $this->safeAdd($totalQuantity, $quantity, 'إجمالي كمية فاتورة المورد');
+            $totalValue = $this->safeAdd($totalValue, $value, 'إجمالي قيمة فاتورة المورد');
+            FuelSupplierInvoiceLine::create([
+                'fuel_supplier_invoice_id' => $invoice->id,
+                'fuel_product_id' => $fuelProduct->id,
+                'line_number' => $index + 1,
+                'quantity_milliliters' => $quantity,
+                'value_minor' => $value,
+            ]);
+        }
+        $invoice->update(['total_quantity_milliliters' => $totalQuantity, 'total_value_minor' => $totalValue]);
+
+        return $invoice->fresh('lines');
+    }
+
+    /**
+     * يرفض إعادة استعمال (مورد، رقم فاتورة) بمحتوى مختلف. الرسالة تسمّي الحقول المختلفة فقط، لا قيماً من الفاتورة الأصلية.
+     * تاريخ الفاتورة يُقارَن إن أُرسل صراحةً (غيابه = «اليوم» عند كل محاولة).
+     *
+     * @param array<string, mixed> $data
+     * @param array<int, mixed> $lines
+     */
+    private function assertSameInvoicePayload(FuelSupplierInvoice $existing, array $data, array $lines): void
+    {
+        $differs = [];
+        $check = function (string $field, mixed $requested, mixed $stored) use (&$differs): void {
+            if ($requested !== $stored) {
+                $differs[] = $field;
+            }
+        };
+        $check('procurement_order_id', $this->idString($data['procurement_order_id'] ?? null), $this->idString($existing->procurement_order_id));
+        $check('purchase_id', $this->idString($data['purchase_id'] ?? null), $this->idString($existing->purchase_id));
+        $check('currency', (string) ($data['currency'] ?? 'SAR'), (string) $existing->currency);
+        $check('evidence', $this->canonical($data['evidence'] ?? null), $this->canonical($existing->evidence));
+        $check('notes', $this->nullableString($data['notes'] ?? null, 1000), $this->nullableString($existing->notes, 1000));
+        if (($data['invoice_date'] ?? null) !== null && $data['invoice_date'] !== '') {
+            $check('invoice_date', \Carbon\Carbon::parse((string) $data['invoice_date'])->toDateString(), $existing->invoice_date?->toDateString());
+        }
+
+        $requestedLines = array_map(fn ($line) => [
+            $this->idString($line['fuel_product_id'] ?? null),
+            $this->liters($line['quantity_liters'] ?? null, 'كمية سطر الفاتورة'),
+            $this->positiveInteger($line['value_minor'] ?? null, 'قيمة سطر الفاتورة'),
+        ], array_values($lines));
+        $storedLines = $existing->lines()->orderBy('line_number')->get()->map(fn ($line) => [
+            $this->idString($line->fuel_product_id),
+            (int) $line->quantity_milliliters,
+            (int) $line->value_minor,
+        ])->all();
+        $check('lines', $requestedLines, $storedLines);
+
+        if ($differs !== []) {
+            throw new RuntimeException('FUEL_IDEMPOTENCY_PAYLOAD_MISMATCH: رقم فاتورة المورد مسجَّل لهذا المورد بمحتوى مختلف (' . implode('، ', $differs) . ')؛ لا تُعدَّل فاتورة مسجَّلة بإعادة الإرسال.');
+        }
+    }
+
+    /**
+     * FS-16: مفتاح المطابقة على مستوى المستأجر. إعادة الإرسال بالمفتاح نفسه تُعيد المطابقة الأولى فقط إن كانت لنفس
+     * الفاتورة والسطر والاستلام والكمية؛ غير ذلك يُرفض (لا تُرجَع مطابقة فاتورة أخرى بصمت). وتعارض التزامن على
+     * المفتاح بين فاتورتين يُحسم بإعادة قراءة الفائزة ومقارنتها بعد تراجع المعاملة الخاسرة (قيدها وعدّاداتها).
+     *
+     * @param array<string, mixed> $data
+     */
+    public function matchSupplierInvoiceLine(FuelSupplierInvoice $invoice, array $data, string $actorId): FuelSupplierInvoiceMatch
+    {
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+        if ($key === '') {
+            throw new RuntimeException('مفتاح idempotency مطلوب لمطابقة فاتورة المورد.');
+        }
+
+        try {
+            return $this->matchSupplierInvoiceLineOnce($invoice, $data, $actorId, $key);
+        } catch (UniqueConstraintViolationException $e) {
+            $winner = FuelSupplierInvoiceMatch::where('idempotency_key', $key)->first();
+            if ($winner !== null) {
+                $this->assertSameMatchPayload($winner, $invoice->id, $data);
+
+                return $winner;
+            }
+
+            throw new RuntimeException('FUEL_MATCH_DUPLICATE: مفتاح المطابقة مستعمل في عملية أخرى.');
+        }
     }
 
     /** @param array<string, mixed> $data */
-    public function matchSupplierInvoiceLine(FuelSupplierInvoice $invoice, array $data, string $actorId): FuelSupplierInvoiceMatch
+    private function matchSupplierInvoiceLineOnce(FuelSupplierInvoice $invoice, array $data, string $actorId, string $key): FuelSupplierInvoiceMatch
     {
-        return DB::transaction(function () use ($invoice, $data, $actorId) {
+        return DB::transaction(function () use ($invoice, $data, $actorId, $key) {
             $invoice = FuelSupplierInvoice::lockForUpdate()->findOrFail($invoice->id);
             $line = FuelSupplierInvoiceLine::where('fuel_supplier_invoice_id', $invoice->id)
                 ->lockForUpdate()->findOrFail($data['fuel_supplier_invoice_line_id'] ?? '');
@@ -280,18 +492,15 @@ class FuelSupplyReceivingService
             if ($delivery->supplier_id !== $invoice->supplier_id || $delivery->fuel_product_id !== $line->fuel_product_id) {
                 throw new RuntimeException('المورد أو منتج الوقود في الفاتورة لا يطابق الاستلام.');
             }
-            $key = trim((string) ($data['idempotency_key'] ?? ''));
-            if ($key === '') {
-                throw new RuntimeException('مفتاح idempotency مطلوب لمطابقة فاتورة المورد.');
-            }
-            $existing = FuelSupplierInvoiceMatch::where('idempotency_key', $key)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
-
             $quantity = $this->liters($data['quantity_liters'] ?? null, 'كمية المطابقة');
             if ($quantity <= 0) {
                 throw new RuntimeException('كمية المطابقة يجب أن تكون موجبة.');
+            }
+            $existing = FuelSupplierInvoiceMatch::where('idempotency_key', $key)->first();
+            if ($existing !== null) {
+                $this->assertSameMatchPayload($existing, $invoice->id, $data);
+
+                return $existing;
             }
             $deliveryMatchedQuantity = (int) FuelSupplierInvoiceMatch::where('fuel_delivery_id', $delivery->id)->sum('matched_quantity_milliliters');
             $lineMatchedQuantity = (int) $line->matched_quantity_milliliters;
@@ -352,6 +561,32 @@ class FuelSupplyReceivingService
 
             return $match;
         });
+    }
+
+    /**
+     * يطابق إعادة الإرسال بالمفتاح نفسه مع المطابقة المسجَّلة: الفاتورة والسطر والاستلام والكمية. الرسالة لا تحمل قيماً مالية.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function assertSameMatchPayload(FuelSupplierInvoiceMatch $existing, string $invoiceId, array $data): void
+    {
+        $differs = [];
+        if ($existing->fuel_supplier_invoice_id !== $invoiceId) {
+            $differs[] = 'invoice';
+        }
+        if ($this->idString($data['fuel_supplier_invoice_line_id'] ?? null) !== $existing->fuel_supplier_invoice_line_id) {
+            $differs[] = 'invoice_line';
+        }
+        if ($this->idString($data['fuel_delivery_id'] ?? null) !== $existing->fuel_delivery_id) {
+            $differs[] = 'delivery';
+        }
+        if ($this->liters($data['quantity_liters'] ?? null, 'كمية المطابقة') !== (int) $existing->matched_quantity_milliliters) {
+            $differs[] = 'quantity';
+        }
+
+        if ($differs !== []) {
+            throw new RuntimeException('FUEL_IDEMPOTENCY_PAYLOAD_MISMATCH: مفتاح المطابقة مستعمل لمطابقة مختلفة (' . implode('، ', $differs) . ')؛ استعمل مفتاحاً جديداً.');
+        }
     }
 
     /** @return array{0:\App\Models\FuelStation,1:FuelTank,2:FuelProduct,3:Warehouse,4:Partner} */
@@ -569,6 +804,37 @@ class FuelSupplyReceivingService
         }
 
         return $value;
+    }
+
+    private function idString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /** يطبّع قيمة مركّبة للمقارنة: null/فارغ ⇒ null، المصفوفات الترابطية مرتّبة المفاتيح، والنتيجة نص JSON ثابت. */
+    private function canonical(mixed $value): ?string
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return null;
+        }
+        $normalize = function (mixed $node) use (&$normalize): mixed {
+            if (! is_array($node)) {
+                return $node;
+            }
+            $node = array_map($normalize, $node);
+            if (! array_is_list($node)) {
+                ksort($node);
+            }
+
+            return $node;
+        };
+
+        return json_encode($normalize($value), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION) ?: null;
     }
 
     private function safeAdd(int $left, int $right, string $label): int

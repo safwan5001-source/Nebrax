@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\FuelQuantity;
+use App\Support\FuelCostVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,7 @@ class FuelSupplierInvoiceMatchResource extends JsonResource
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
+        $canSeeCost = FuelCostVisibility::canSeeCost($request->user());
 
         return [
             'id' => $this->id,
@@ -26,12 +28,12 @@ class FuelSupplierInvoiceMatchResource extends JsonResource
             'grni_account_id' => $this->grni_account_id,
             'matched_quantity_milliliters' => (int) $this->matched_quantity_milliliters,
             'matched_quantity_liters' => $quantity->millilitersToLiters((int) $this->matched_quantity_milliliters),
-            'matched_receipt_value_minor' => (int) $this->matched_receipt_value_minor,
-            'matched_invoice_value_minor' => (int) $this->matched_invoice_value_minor,
-            'cleared_value_minor' => (int) $this->cleared_value_minor,
-            'value_variance_minor' => (int) $this->value_variance_minor,
+            'matched_receipt_value_minor' => $this->when($canSeeCost, fn () => (int) $this->matched_receipt_value_minor),
+            'matched_invoice_value_minor' => $this->when($canSeeCost, fn () => (int) $this->matched_invoice_value_minor),
+            'cleared_value_minor' => $this->when($canSeeCost, fn () => (int) $this->cleared_value_minor),
+            'value_variance_minor' => $this->when($canSeeCost, fn () => (int) $this->value_variance_minor),
             'quantity_variance_milliliters' => (int) $this->quantity_variance_milliliters,
-            'variance_direction' => $this->variance_direction,
+            'variance_direction' => $this->when($canSeeCost, fn () => $this->variance_direction),
             'currency' => $this->currency,
             'journal_entry_id' => $this->journal_entry_id,
             'created_at' => $this->created_at?->toISOString(),

@@ -57,7 +57,7 @@ class FuelSupplyReceivingController extends ApiController
 
     public function invoices(Request $request)
     {
-        $query = FuelSupplierInvoice::query()->with('lines')->latest('invoice_date');
+        $query = $this->restrictInvoicesToAccessibleStations(FuelSupplierInvoice::query())->with('lines')->latest('invoice_date');
         if ($request->filled('supplier_id')) {
             $query->where('supplier_id', $request->query('supplier_id'));
         }
@@ -70,7 +70,7 @@ class FuelSupplyReceivingController extends ApiController
 
     public function showInvoice(string $id)
     {
-        return new FuelSupplierInvoiceResource(FuelSupplierInvoice::with(['lines', 'matches'])->findOrFail($id));
+        return new FuelSupplierInvoiceResource($this->restrictInvoicesToAccessibleStations(FuelSupplierInvoice::query())->with(['lines', 'matches'])->findOrFail($id));
     }
 
     public function storeInvoice(StoreFuelSupplierInvoiceRequest $request)
@@ -82,7 +82,8 @@ class FuelSupplyReceivingController extends ApiController
 
     public function matchInvoice(StoreFuelSupplierInvoiceMatchRequest $request, string $id)
     {
-        $invoice = FuelSupplierInvoice::findOrFail($id);
+        // B1: الفاتورة نفسها ضمن نطاق المستخدم (404 موحّد) قبل أي أثر.
+        $invoice = $this->restrictInvoicesToAccessibleStations(FuelSupplierInvoice::query())->findOrFail($id);
         // الاستلام المُطابَق يجب أن يقع في مخازن المستخدم (BranchScoped يحصره بالفرع النشط أصلاً).
         $this->scopeToAccessibleWarehouses(FuelDelivery::query(), ['warehouse_id'])->findOrFail($request->validated()['fuel_delivery_id']);
         return $this->domain(fn () => new FuelSupplierInvoiceMatchResource(
