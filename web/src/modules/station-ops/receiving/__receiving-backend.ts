@@ -38,6 +38,7 @@ export function connectReceiving(world: ReceivingWorld, apiMock: { mockImplement
   const view = (row: Delivery & { _key?: string }): Delivery => {
     const copy = clone(row) as Delivery & { _key?: string };
     delete copy._key;
+    (copy as { reference?: string }).reference = `FD-${row.id.slice(0, 8).toUpperCase()}`;
     if (!world.canSeeCost) {
       delete (copy as { received_total_cost_minor?: number | null }).received_total_cost_minor;
       delete (copy as { cost_recorded_by?: string | null }).cost_recorded_by;
@@ -105,6 +106,7 @@ export function connectReceiving(world: ReceivingWorld, apiMock: { mockImplement
       if (route === '/fuel-stations/deliveries') {
         const b = post.body as Record<string, string | number>;
         const existing = world.deliveries.find((d) => d._key === b.idempotency_key);
+        if (!existing && String(b.delivery_note_number ?? '').trim() === '') throw new ApiError(422, 'FUEL_DELIVERY_NOTE_REQUIRED: رقم سند التسليم من المورد إلزامي لإنشاء استلام وقود جديد.', {});
         if (existing) {
           if (existing.received_milliliters !== ml(String(b.received_liters)) || existing.supplier_id !== b.supplier_id) throw new ApiError(422, 'FUEL_IDEMPOTENCY_PAYLOAD_MISMATCH: مفتاح idempotency مستعمل لاستلام وقود بمحتوى مختلف (received_milliliters).', {});
           return { data: view(existing) } as never;
@@ -138,7 +140,7 @@ export function connectReceiving(world: ReceivingWorld, apiMock: { mockImplement
         if (stored === null || stored === undefined) throw new ApiError(422, 'FUEL_DELIVERY_COST_REQUIRED: لا يمكن اعتماد استلام قبل تسجيل تكلفته الفعلية.', {});
         const expected = (post.body as { expected_total_cost_minor?: number }).expected_total_cost_minor;
         if (expected !== undefined && expected !== stored) throw new ApiError(409, 'FUEL_DELIVERY_COST_CHANGED: تغيّرت تكلفة الاستلام بعد مراجعتك؛ أعد المراجعة.', {});
-        if ((row.delivery_note_number ?? '').trim() === '' && (world.attachments?.[row.id] ?? []).length === 0) throw new ApiError(422, 'FUEL_DELIVERY_DOCUMENT_REQUIRED: يلزم رقم سند التسليم أو إرفاق صورة السند قبل الاعتماد.', {});
+        // لا شرط سند عند الاعتماد: الرقم يُفرض عند الإنشاء، والقديم بلا رقم لا يُحجب، والمرفق اختياري.
         row.status = 'approved';
         row.approved_by = world.viewerId;
         row.approved_at = '2026-11-06T09:00:00+00:00';

@@ -14,7 +14,7 @@ import { useDelivery, useReceivingAccess } from './data';
 import { AttachmentsPanel } from './attachments-panel';
 import { CostCard } from './cost-card';
 import { DocumentActions } from './document-actions';
-import { Cost, FailureNotice, Liters, RECEIVING_BASE, StatusBadge, VarianceText, deliveryTitle, when, type AnyFailure } from './parts';
+import { Cost, FailureNotice, Liters, RECEIVING_BASE, StatusBadge, VarianceText, internalRef, when, type AnyFailure } from './parts';
 import { approveDelivery, deliveryPath, receivingGet } from './receiving-client';
 import { deliveryResponse, type Delivery } from './schemas';
 
@@ -58,11 +58,14 @@ function Readings({ delivery }: { delivery: Delivery }) {
   );
 }
 
-/** جاهزية الاعتماد كما يراها الخادم (إرشاد فقط — القرار النهائي للخادم عند الضغط): تكلفة مسجَّلة + دليل مستند (رقم سند أو مرفق). */
-export function readiness(delivery: Delivery, attachmentCount: number): { cost: boolean; document: boolean; ready: boolean } {
+/**
+ * جاهزية الاعتماد كما يراها الخادم (إرشاد فقط — القرار النهائي للخادم عند الضغط): **التكلفة المسجَّلة وحدها شرط**.
+ * رقم سند المورد يُفرض عند الإنشاء (فكل استلام جديد يحمله)؛ والاستلامات القديمة بلا رقم لا تُحجب، والمرفق اختياري — فيظهران معلومةً لا شرطاً.
+ */
+export function readiness(delivery: Delivery, attachmentCount: number): { cost: boolean; note: boolean; attachment: boolean; ready: boolean } {
   const cost = delivery.cost_recorded === true || typeof delivery.received_total_cost_minor === 'number';
-  const document = (delivery.delivery_note_number ?? '').trim() !== '' || attachmentCount > 0;
-  return { cost, document, ready: cost && document };
+  const note = (delivery.delivery_note_number ?? '').trim() !== '';
+  return { cost, note, attachment: attachmentCount > 0, ready: cost };
 }
 
 function Detail({ initial }: { initial: Delivery }) {
@@ -118,7 +121,7 @@ function Detail({ initial }: { initial: Delivery }) {
       }
       setFailure(result);
       // رفض «معتمد سابقاً»: الحالة تغيّرت عند غيرنا — نقرأها فوراً فتظهر كما هي.
-      if (result.kind === 'rejected' && ['already_approved', 'cost_changed', 'cost_required', 'document_required'].includes(result.code)) await refresh();
+      if (result.kind === 'rejected' && ['already_approved', 'cost_changed', 'cost_required'].includes(result.code)) await refresh();
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -132,7 +135,7 @@ function Detail({ initial }: { initial: Delivery }) {
     if (fresh?.status === 'approved') { setFailure(null); setJustApproved(true); }
   };
 
-  const title = deliveryTitle(delivery, t('receiving.untitled'));
+  const title = internalRef(delivery);
 
   return (
     <>
@@ -155,10 +158,11 @@ function Detail({ initial }: { initial: Delivery }) {
 
         <SectionCard title={t('receiving.detail.deliveryTitle')} id="rcv-delivery-h">
           <dl className="divide-y divide-border">
+            <Row label={t('receiving.field.internalNumber')}><span className="num" dir="ltr" data-internal-number="">{internalRef(delivery)}</span></Row>
             <Row label={t('receiving.field.supplier')}>{delivery.supplier?.name ?? '—'}</Row>
             <Row label={t('receiving.field.tank')}>{delivery.tank?.name ?? '—'}{productName ? <span className="text-muted"> · {productName}</span> : null}</Row>
             <Row label={t('receiving.field.warehouse')}>{delivery.warehouse?.name ?? '—'}</Row>
-            <Row label={t('receiving.field.deliveryNote')}>{delivery.delivery_note_number || <span className="text-muted">{t('receiving.detail.none')}</span>}</Row>
+            <Row label={t('receiving.field.deliveryNote')}>{delivery.delivery_note_number ? <span dir="auto" data-supplier-note="">{delivery.delivery_note_number}</span> : <span className="text-muted" data-supplier-note-legacy="">{t('receiving.detail.noteLegacy')}</span>}</Row>
             <Row label={t('receiving.field.purchaseRef')}>{delivery.purchase_reference || <span className="text-muted">{t('receiving.detail.none')}</span>}</Row>
             {delivery.tanker_identifier ? <Row label={t('receiving.field.tanker')}>{delivery.tanker_identifier}</Row> : null}
             {delivery.driver_name ? <Row label={t('receiving.field.driver')}>{delivery.driver_name}</Row> : null}
@@ -209,12 +213,19 @@ function Detail({ initial }: { initial: Delivery }) {
           <SectionCard title={t('receiving.approve.title')} id="rcv-approve-h">
             <p className="flex items-start gap-2 text-sm leading-6 text-muted"><ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.8} />{t('receiving.approve.effect')}</p>
             <ul className="mt-3 space-y-1.5 text-sm" data-readiness="">
-              {([['cost', ready.cost], ['document', ready.document]] as const).map(([key, ok]) => (
-                <li key={key} data-ready-item={key} data-ok={ok ? 'true' : 'false'} className={ok ? 'flex items-center gap-2 text-positive' : 'flex items-center gap-2 text-warning'}>
-                  {ok ? <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} /> : <CircleDashed aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} />}
-                  {t(`receiving.ready.${key}_${ok ? 'ok' : 'missing'}`)}
-                </li>
-              ))}
+              <li data-ready-item="cost" data-ok={ready.cost ? 'true' : 'false'} className={ready.cost ? 'flex items-center gap-2 text-positive' : 'flex items-center gap-2 text-warning'}>
+                {ready.cost ? <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} /> : <CircleDashed aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} />}
+                {t(`receiving.ready.cost_${ready.cost ? 'ok' : 'missing'}`)}
+              </li>
+              {/* معلومات لا شروط: السند يُفرض عند الإنشاء، والقديم بلا رقم لا يُحجب، والمرفق اختياري. */}
+              <li data-ready-item="note" data-ok={ready.note ? 'true' : 'false'} data-blocking="false" className="flex items-center gap-2 text-muted">
+                <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                {t(`receiving.ready.note_${ready.note ? 'ok' : 'legacy'}`)}
+              </li>
+              <li data-ready-item="attachment" data-ok={ready.attachment ? 'true' : 'false'} data-blocking="false" className="flex items-center gap-2 text-muted">
+                <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                {t(`receiving.ready.attachment_${ready.attachment ? 'ok' : 'none'}`)}
+              </li>
             </ul>
             {access.approve && mine ? <p role="note" data-creator-hint="" className="mt-3 rounded-[12px] bg-[color:var(--fo-warning-tint)] p-3 text-sm leading-6 text-warning">{t('receiving.approve.creatorHint')}</p> : null}
             {access.approve ? (

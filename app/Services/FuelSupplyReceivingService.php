@@ -95,6 +95,11 @@ class FuelSupplyReceivingService
         // وتُشترط عند الاعتماد. المُرسَلة تُقبل موجبة فقط (صلاحية إرسالها تفحصها الطبقة العليا).
         $totalCost = $this->optionalCost($data['received_total_cost_minor'] ?? null);
 
+        // FUEL-B5.1: رقم سند التسليم من المورد إلزامي لكل استلام **جديد** (والمرفق وحده لا يكفي). الاستلامات القائمة قبل B5.1 لا تتأثر (لا يُعاد فحصها ولا تُحجب).
+        if ($this->nullableString($data['delivery_note_number'] ?? null, 128) === null) {
+            throw new RuntimeException('FUEL_DELIVERY_NOTE_REQUIRED: رقم سند التسليم من المورد إلزامي لإنشاء استلام وقود جديد.');
+        }
+
         $order = $this->resolveOrder($data['procurement_order_id'] ?? null, $supplier, $station->branch_id);
         $this->assertReadings($data, $station->id, $tank->id);
         $unitCompatibilityCost = $totalCost === null ? null : intdiv($totalCost, $received);
@@ -289,7 +294,8 @@ class FuelSupplyReceivingService
     /**
      * FUEL-B5.1: اكتمال الاستلام قبل أن يُنتج أثراً. تُستدعى داخل معاملة الاعتماد بعد قفل الصف وقبل أي كتابة.
      * (١) التكلفة مسجَّلة (NULL ⇒ رفض؛ لا صفر افتراضي). (٢) إن أرسل المعتمِد التكلفة التي راجعها فلا تكون تغيّرت (409 — لا يعتمد قيمة لم يرها).
-     * (٣) دليل المستند: رقم سند التسليم **أو** مرفق واحد على الأقل (سند المورد المصوَّر). الكمية الموجبة والمراجع والخزان/المخزن تُفحص أصلاً.
+     * (٣) **لا شرط سند هنا عمداً:** رقم سند المورد إلزامي عند **إنشاء** الاستلام الجديد (`insertDelivery`)، فلا يوجد استلام جديد بلا سند؛ والاستلامات القائمة قبل
+     *     B5.1 (بلا رقم سند) لا تُحجب عن الاعتماد، والمرفق اختياري ولا يحلّ محل الرقم. الكمية الموجبة والمراجع والخزان/المخزن تُفحص أصلاً.
      */
     private function assertApprovable(FuelDelivery $delivery, ?int $expectedTotalCostMinor): void
     {
@@ -298,9 +304,6 @@ class FuelSupplyReceivingService
         }
         if ($expectedTotalCostMinor !== null && (int) $delivery->received_total_cost_minor !== $expectedTotalCostMinor) {
             throw new FuelDeliveryCostChangedException('FUEL_DELIVERY_COST_CHANGED: تغيّرت تكلفة الاستلام بعد مراجعتك؛ أعد المراجعة.');
-        }
-        if (trim((string) $delivery->delivery_note_number) === '' && ! $delivery->attachments()->exists()) {
-            throw new RuntimeException('FUEL_DELIVERY_DOCUMENT_REQUIRED: يلزم رقم سند التسليم أو إرفاق صورة السند قبل الاعتماد.');
         }
         if ((int) $delivery->received_milliliters <= 0) {
             throw new RuntimeException('الكمية المستلمة فعلياً يجب أن تكون موجبة.');

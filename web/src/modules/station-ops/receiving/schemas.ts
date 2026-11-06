@@ -28,6 +28,8 @@ export const attachmentsResponse = z.object({ data: z.array(attachmentSchema) })
 
 export const deliverySchema = z.object({
   id: text.min(1),
+  /** رقم الاستلام الداخلي `FD-XXXXXXXX` (≠ رقم سند المورد `delivery_note_number`). غيابه (خادم أقدم) ⇒ يُشتق من المعرّف بنفس القاعدة. */
+  reference: z.string().optional(),
   /** `draft` | `approved` — الحالتان الوحيدتان في الخادم (`FuelDelivery::STATUS_*`)؛ لا حالة «مرفوض». */
   status: text,
   station_id: text.min(1),

@@ -25,16 +25,16 @@ import type { Delivery } from './schemas';
 
 const INTENT = 'rcv-create';
 
-function TextField({ id, label, value, onChange, hint, maxLength = 128, multiline = false, disabled = false }: {
-  id: string; label: string; value: string; onChange: (value: string) => void; hint?: string; maxLength?: number; multiline?: boolean; disabled?: boolean;
+function TextField({ id, label, value, onChange, hint, maxLength = 128, multiline = false, disabled = false, required = false }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; hint?: string; maxLength?: number; multiline?: boolean; disabled?: boolean; required?: boolean;
 }) {
   const cls = 'mt-1.5 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60';
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="block text-sm font-medium text-text">{label}</label>
+      <label htmlFor={id} className={cn('block text-sm font-medium text-text', required && "after:ms-1 after:text-negative after:content-['*']")}>{label}</label>
       {multiline
         ? <textarea id={id} value={value} maxLength={maxLength} rows={2} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`${cls} py-3`} />
-        : <input id={id} type="text" value={value} maxLength={maxLength} disabled={disabled} autoComplete="off" onChange={(event) => onChange(event.target.value)} className={`${cls} h-12`} />}
+        : <input id={id} type="text" value={value} maxLength={maxLength} disabled={disabled} required={required} aria-required={required || undefined} autoComplete="off" onChange={(event) => onChange(event.target.value)} className={`${cls} h-12`} />}
       {hint ? <p className="mt-1 text-xs leading-5 text-muted">{hint}</p> : null}
     </div>
   );
@@ -252,7 +252,7 @@ function Wizard({ station }: { station: Station }) {
 
           <SectionCard title={t('receiving.wizard.referencesTitle')} id="rcv-refs-h">
             <div className="space-y-4">
-              <TextField id="rcv-note" label={t('receiving.field.deliveryNote')} value={form.deliveryNote} onChange={(v) => set('deliveryNote', v)} hint={t('receiving.wizard.deliveryNoteHint')} />
+              <TextField id="rcv-note" required label={t('receiving.field.deliveryNote')} value={form.deliveryNote} onChange={(v) => set('deliveryNote', v)} hint={t('receiving.wizard.deliveryNoteHint')} />
               <TextField id="rcv-po" label={t('receiving.field.purchaseRef')} value={form.purchaseRef} onChange={(v) => set('purchaseRef', v)} />
               <TextField id="rcv-tanker" label={t('receiving.field.tanker')} value={form.tanker} onChange={(v) => set('tanker', v)} />
               <TextField id="rcv-driver" label={t('receiving.field.driver')} value={form.driver} onChange={(v) => set('driver', v)} maxLength={255} />

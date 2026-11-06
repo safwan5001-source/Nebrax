@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  *    فلا يصل المبلغ إلى أي عميل (واجهة، PDF مرسوم في المتصفح، أو Excel) ما لم يخوّله الخادم. الواجهة لا تُخفي شيئاً: لا تتلقاه.
  *  القائمة البيضاء صريحة (لا `toArray()` للنموذج) فلا ينجرف حقل مالي إلى النسخة التشغيلية بإضافة عمود لاحقاً.
  *
- * رقم السند: مرجع AWJ للاستلام = أول ثمانية أحرف من المعرّف (مقروءة ومستقرة)؛ رقم سند المورد حقل منفصل. لا ترقيم تسلسلي لاستلامات الوقود
+ * رقمان متمايزان: `reference` = رقم الاستلام **الداخلي** `FD-XXXXXXXX` (مشتق من المعرّف، مستقر)، و`delivery_note_number` = رقم سند المورد (يطبعه المورد). لا ترقيم تسلسلي لاستلامات الوقود
  * في هذه الشريحة (يحتاج عموداً وعدّاداً — انظر التقرير).
  */
 class FuelDeliveryDocumentBuilder
@@ -142,9 +142,10 @@ class FuelDeliveryDocumentBuilder
         ];
     }
 
+    /** رقم الاستلام الداخلي `FD-XXXXXXXX` (≠ رقم سند المورد). */
     public function reference(FuelDelivery $d): string
     {
-        return 'FD-'.strtoupper(substr((string) $d->id, 0, 8));
+        return $d->reference();
     }
 
     /** @return array{name: ?string, vat_number: ?string, cr_number: ?string, currency: string} */

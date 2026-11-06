@@ -49,10 +49,16 @@ describe('receiving form evaluation', () => {
     expect(evaluate({ ...ok, after: '11000' }, ctx).warnings).toContain('tank_gain_differs');
   });
 
-  it('a station without a warehouse blocks (the server refuses with no fallback) and a missing note number only warns', () => {
+  it('a station without a warehouse blocks, and the supplier delivery note number is REQUIRED for a new receiving (an attachment never replaces it)', () => {
     expect(evaluate(ok, { hasWarehouse: false }).issues).toContain('warehouse_required');
-    expect(evaluate({ ...ok, deliveryNote: '  ' }, ctx).warnings).toContain('no_delivery_note');
-    expect(evaluate({ ...ok, deliveryNote: '  ' }, ctx).issues).toEqual([]);
+    for (const blank of ['', '   ', '\t\n']) {
+      const e = evaluate({ ...ok, deliveryNote: blank }, ctx);
+      expect(e.issues).toContain('delivery_note_required');
+      expect(stepIssues('who', e)).toContain('delivery_note_required');
+      expect(stepIssues('review', e)).toContain('delivery_note_required');
+    }
+    expect(evaluate(ok, ctx).issues).toEqual([]);
+    expect(evaluate({ ...ok, deliveryNote: ' DN-2 ' }, ctx).issues).toEqual([]);
   });
 
   it('splits issues by step', () => {

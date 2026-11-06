@@ -31,11 +31,11 @@ export const EMPTY_FORM: FormValues = {
 };
 
 export type Issue =
-  | 'supplier_required' | 'tank_required' | 'warehouse_required'
+  | 'supplier_required' | 'tank_required' | 'warehouse_required' | 'delivery_note_required'
   | 'dispatched_required' | 'dispatched_invalid' | 'received_required' | 'received_invalid' | 'received_not_positive'
   | 'before_invalid' | 'after_invalid' | 'after_below_before';
 
-export type Warning = 'no_delivery_note' | 'received_above_dispatched' | 'received_below_dispatched' | 'readings_incomplete' | 'no_readings' | 'tank_gain_differs';
+export type Warning = 'received_above_dispatched' | 'received_below_dispatched' | 'readings_incomplete' | 'no_readings' | 'tank_gain_differs';
 
 export interface Evaluation {
   issues: Issue[];
@@ -70,6 +70,8 @@ export function evaluate(form: FormValues, context: EvaluateContext): Evaluation
   const warnings: Warning[] = [];
 
   if (form.supplierId === '') issues.push('supplier_required');
+  // FUEL-B5.1: رقم سند التسليم من المورد إلزامي لكل استلام جديد (والمرفق اختياري ولا يحلّ محله). الخادم يفرضه أيضاً.
+  if (form.deliveryNote.trim() === '') issues.push('delivery_note_required');
   if (form.tankId === '') issues.push('tank_required');
   if (!context.hasWarehouse) issues.push('warehouse_required');
 
@@ -100,7 +102,6 @@ export function evaluate(form: FormValues, context: EvaluateContext): Evaluation
   const tankGainMl = beforeMl !== null && afterMl !== null && afterMl >= beforeMl ? afterMl - beforeMl : null;
   const tankGainDiffMl = tankGainMl !== null && receivedMl !== null ? tankGainMl - receivedMl : null;
   if (tankGainDiffMl !== null && tankGainDiffMl !== 0) warnings.push('tank_gain_differs');
-  if (form.deliveryNote.trim() === '') warnings.push('no_delivery_note');
 
   return { issues, warnings, dispatchedMl, receivedMl, beforeMl, afterMl, transitVarianceMl, tankGainMl, tankGainDiffMl };
 }
@@ -111,7 +112,7 @@ export const STEPS: readonly StepId[] = ['who', 'quantities', 'readings', 'docum
 
 const STEP_ISSUES: Record<Exclude<StepId, 'review'>, readonly Issue[]> = {
   documents: [],
-  who: ['supplier_required', 'tank_required', 'warehouse_required'],
+  who: ['supplier_required', 'tank_required', 'warehouse_required', 'delivery_note_required'],
   quantities: ['dispatched_required', 'dispatched_invalid', 'received_required', 'received_invalid', 'received_not_positive'],
   readings: ['before_invalid', 'after_invalid', 'after_below_before'],
 };

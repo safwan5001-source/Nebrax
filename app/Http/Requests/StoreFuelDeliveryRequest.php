@@ -20,7 +20,8 @@ class StoreFuelDeliveryRequest extends FormRequest
             'supplier_id' => ['required', 'uuid'],
             'procurement_order_id' => ['nullable', 'uuid'],
             'purchase_reference' => ['nullable', 'string', 'max:128'],
-            'delivery_note_number' => ['nullable', 'string', 'max:128'],
+            // FUEL-B5.1: رقم سند التسليم من المورد إلزامي للاستلام الجديد (غير فارغ بعد القصّ — تفحصه الخدمة أيضاً)؛ المرفق وحده لا يكفي.
+            'delivery_note_number' => ['required', 'string', 'max:128', 'regex:/\S/u'],
             'tanker_identifier' => ['nullable', 'string', 'max:128'],
             'driver_name' => ['nullable', 'string', 'max:255'],
             'compartments' => ['nullable', 'array'],

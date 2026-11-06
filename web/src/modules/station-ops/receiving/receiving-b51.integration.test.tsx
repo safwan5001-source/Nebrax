@@ -179,14 +179,41 @@ describe('cost card (B5.1)', () => {
 });
 
 describe('approval readiness and the cost the approver reviewed (B5.1)', () => {
-  it('approval is not offered until the cost is recorded and a document exists; the checklist says why', async () => {
+  it('approval is not offered until the cost is recorded; the checklist says why, and the note/attachment lines never block', async () => {
     seedUser(MANAGER);
-    connect(build({ deliveries: [draft({ delivery_note_number: null }) as never] }));
+    connect(build({ deliveries: [draft() as never] }));
     await open();
     expect((screen.getByRole('button', { name: 'Approve receiving' }) as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector('[data-ready-item="cost"]')?.getAttribute('data-ok')).toBe('false');
-    expect(document.querySelector('[data-ready-item="document"]')?.getAttribute('data-ok')).toBe('false');
-    expect(screen.getByText(/Complete the items above/)).toBeTruthy();
+    expect(screen.getByText(/Record the actual cost first/)).toBeTruthy();
+    // السند والمرفق معلومات لا شروط.
+    for (const key of ['note', 'attachment']) expect(document.querySelector(`[data-ready-item="${key}"]`)?.getAttribute('data-blocking')).toBe('false');
+  });
+
+  it('a receiving that pre-dates B5.1 (no note number, no attachment) is NOT blocked once its cost exists; the note line explains why', async () => {
+    const user = userEvent.setup();
+    seedUser(MANAGER);
+    connect(build({ deliveries: [draft({ delivery_note_number: null, received_total_cost_minor: 500_000 }) as never] }));
+    await open();
+    expect(document.querySelector('[data-ready-item="note"]')?.getAttribute('data-ok')).toBe('false');
+    expect(screen.getByText(/Legacy receiving with no note number: this does not block approval/)).toBeTruthy();
+    expect(document.querySelector('[data-supplier-note-legacy]')).not.toBeNull();
+    const button = screen.getByRole('button', { name: 'Approve receiving' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    await user.click(button);
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirm approval' }));
+    await screen.findByText('Receiving approved');
+    expect(posts('/approve')).toHaveLength(1);
+  });
+
+  it('the internal receiving number (FD-…) and the supplier note number are shown as two distinct, separately-labelled fields', async () => {
+    seedUser(MANAGER);
+    connect(build({ deliveries: [draft({ received_total_cost_minor: 1 }) as never] }));
+    await open();
+    expect(document.querySelector('[data-internal-number]')?.textContent).toBe('FD-00000000');
+    expect(document.querySelector('[data-supplier-note]')?.textContent).toBe('DN-9');
+    expect(screen.getByText('Internal receiving number')).toBeTruthy();
+    expect(screen.getByText('Supplier delivery note number')).toBeTruthy();
   });
 
   it('becomes ready when the cost is recorded and the note number exists; a cost-seeing approver sends the cost they reviewed', async () => {
@@ -285,7 +312,7 @@ describe('supplier-note attachments (B5.1)', () => {
     renderOps(<ReceivingNewScreen />);
     await user.click(await screen.findByRole('radio', { name: /Acme Oil/ }));
     await user.click(await screen.findByRole('radio', { name: /Tank One/ }));
-    await user.type(screen.getByLabelText('Delivery note number'), 'DN-W1');
+    await user.type(screen.getByLabelText('Supplier delivery note number'), 'DN-W1');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.type(await screen.findByLabelText('Dispatched quantity'), '100');
     await user.type(screen.getByLabelText('Received quantity'), '99');
@@ -368,7 +395,7 @@ describe('print, download and share (B5.1)', () => {
     seedUser(STAFF);
     connect(build({ canSeeCost: false, deliveries: [draft() as never] }));
     renderOps(<ReceivingListScreen />);
-    await screen.findByText('DN-9');
+    await screen.findByText(/DN-9/);
     const details = document.querySelector('[data-export-report]') as HTMLDetailsElement;
     details.open = true;
     await user.click(details.querySelector('[data-doc-action="pdf-download"]') as HTMLElement);
@@ -386,11 +413,11 @@ describe('list search and the cost queue (B5.1)', () => {
     seedUser(STAFF);
     connect(build({ deliveries: [draft() as never, draft({ id: UID(2), delivery_note_number: 'XYZ-77', supplier: { id: 'sup1', name: 'Acme Oil', code: 'S-1' } }) as never] }));
     renderOps(<ReceivingListScreen />);
-    await screen.findByText('DN-9');
+    await screen.findByText(/DN-9/);
     await user.type(screen.getByLabelText('Search receivings'), 'xyz');
     await waitFor(() => expect(world.gets.some((url) => /[?&]q=xyz/.test(url))).toBe(true));
     await waitFor(() => expect(screen.queryByText('DN-9')).toBeNull());
-    expect(screen.getByText('XYZ-77')).toBeTruthy();
+    expect(screen.getByText(/XYZ-77/)).toBeTruthy();
     await user.clear(screen.getByLabelText('Search receivings'));
     (document.querySelector('[data-more-filters]') as HTMLDetailsElement).open = true;
     await user.click(screen.getByRole('radio', { name: 'Awaiting cost' }));
@@ -402,14 +429,14 @@ describe('list search and the cost queue (B5.1)', () => {
     seedUser(STAFF);
     connect(build({ deliveries: [draft() as never] }));
     renderOps(<ReceivingListScreen />);
-    await screen.findByText('DN-9');
+    await screen.findByText(/DN-9/);
     expect(document.querySelector('[data-costs-link]')).toBeNull();
     cleanup();
 
     seedUser(FINANCE);
     connect(build({ deliveries: [draft() as never, draft({ id: UID(2), delivery_note_number: 'DN-HAS', received_total_cost_minor: 100 }) as never] }));
     renderOps(<ReceivingListScreen />);
-    await screen.findByText('DN-9');
+    await screen.findByText(/DN-9/);
     expect(document.querySelector('[data-costs-link]')?.getAttribute('href')).toBe('/fuel-stations/ops/receiving/costs');
     cleanup();
 

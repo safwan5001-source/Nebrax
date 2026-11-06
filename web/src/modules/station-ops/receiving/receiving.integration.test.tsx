@@ -72,7 +72,7 @@ const writes = () => apiMock.mock.calls.filter(([, init]) => (init as { method?:
 async function fillWizard(user: ReturnType<typeof userEvent.setup>, opts: { readings?: boolean; note?: string } = {}) {
   await user.click(await screen.findByRole('radio', { name: /Acme Oil/ }));
   await user.click(await screen.findByRole('radio', { name: /Tank One/ }));
-  await user.type(screen.getByLabelText('Delivery note number'), opts.note ?? 'DN-100');
+  await user.type(screen.getByLabelText('Supplier delivery note number'), opts.note ?? 'DN-100');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.type(await screen.findByLabelText('Dispatched quantity'), '1000');
   await user.type(screen.getByLabelText('Received quantity'), '995.5');
@@ -103,7 +103,7 @@ describe('visibility follows real permissions', () => {
     seedUser(SUPERVISOR);
     connect(build({ canSeeCost: false, deliveries: [draft() as never] }));
     renderOps(<ReceivingListScreen />);
-    expect(await screen.findByText('DN-9')).toBeTruthy();
+    expect(await screen.findByText(/DN-9/)).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Receiving' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'New receiving' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Receivings awaiting cost' })).toBeNull(); // قائمة التكلفة لمن يرى التكلفة فقط
@@ -129,7 +129,7 @@ describe('receiving list', () => {
     seedUser(CREATOR);
     connect(build({ deliveries: [draft() as never, draft({ id: UID(2), status: 'approved', delivery_note_number: 'DN-8', approved_by: 'u-x' }) as never] }));
     renderOps(<ReceivingListScreen />);
-    const row = (await screen.findByText('DN-9')).closest('li') as HTMLElement;
+    const row = (await screen.findByText(/DN-9/)).closest('li') as HTMLElement;
     expect(within(row).getByText('Draft')).toBeTruthy();
     expect(within(row).getByText(/995\.500/)).toBeTruthy();
     expect(within(row).getByText(/Short/)).toBeTruthy();
@@ -142,7 +142,7 @@ describe('receiving list', () => {
     seedUser(CREATOR);
     connect(build({ deliveries: [draft() as never] }));
     renderOps(<ReceivingListScreen />);
-    await screen.findByText('DN-9');
+    await screen.findByText(/DN-9/);
     await user.click(screen.getByRole('radio', { name: 'Approved' }));
     expect(await screen.findByText('No receivings')).toBeTruthy();
     expect(world.gets.some((url) => url.includes('status=approved') && url.includes('station_id=a'))).toBe(true);
@@ -207,6 +207,7 @@ describe('creating a draft', () => {
     expect(screen.getByText('Choose the tank.')).toBeTruthy();
     await user.click(screen.getByRole('radio', { name: /Acme Oil/ }));
     await user.click(screen.getByRole('radio', { name: /Tank One/ }));
+    await user.type(screen.getByLabelText('Supplier delivery note number'), 'DN-STEP');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.type(await screen.findByLabelText('Received quantity'), '0');
     await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -216,6 +217,37 @@ describe('creating a draft', () => {
     expect(writes()).toHaveLength(0);
   });
 
+  it('the supplier delivery note number is required at step one: blank or spaces block the step, the field says required, and nothing is sent', async () => {
+    const user = userEvent.setup();
+    seedUser(CREATOR);
+    connect(build());
+    renderOps(<ReceivingNewScreen />);
+    await user.click(await screen.findByRole('radio', { name: /Acme Oil/ }));
+    await user.click(await screen.findByRole('radio', { name: /Tank One/ }));
+    const field = screen.getByLabelText('Supplier delivery note number') as HTMLInputElement;
+    expect(field.getAttribute('aria-required')).toBe('true');
+    await user.type(field, '   ');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Enter the supplier delivery note number (required).')).toBeTruthy();
+    expect(screen.getByText('Step 1 of 5', { exact: false })).toBeTruthy(); // لم نتقدّم
+    expect(writes()).toHaveLength(0);
+    await user.clear(field);
+    await user.type(field, 'DN-REQ-1');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByLabelText('Dispatched quantity')).toBeTruthy();
+  });
+
+  it('a server refusal for a missing note number (defence in depth) is explained and the draft is not created', async () => {
+    const user = userEvent.setup();
+    seedUser(CREATOR);
+    connect(build({ beforePost: (post) => { if (post.path === '/fuel-stations/deliveries') throw new ApiError(422, 'FUEL_DELIVERY_NOTE_REQUIRED: رقم سند التسليم من المورد إلزامي لإنشاء استلام وقود جديد.', {}); } }));
+    renderOps(<ReceivingNewScreen />);
+    await fillWizard(user, { readings: false });
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }));
+    expect(await screen.findByText(/supplier delivery note number is required to create a new receiving/i)).toBeTruthy();
+    expect(world.deliveries).toHaveLength(0);
+  });
+
   it('refuses an after-reading below the before-reading before anything is sent', async () => {
     const user = userEvent.setup();
     seedUser(CREATOR);
@@ -223,6 +255,7 @@ describe('creating a draft', () => {
     renderOps(<ReceivingNewScreen />);
     await user.click(await screen.findByRole('radio', { name: /Acme Oil/ }));
     await user.click(await screen.findByRole('radio', { name: /Tank One/ }));
+    await user.type(screen.getByLabelText('Supplier delivery note number'), 'DN-AFTER');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.type(await screen.findByLabelText('Dispatched quantity'), '10');
     await user.type(screen.getByLabelText('Received quantity'), '10');
@@ -273,7 +306,7 @@ describe('creating a draft', () => {
     expect(await screen.findByText(/already recorded for this supplier/)).toBeTruthy();
     expect(world.deliveries).toHaveLength(1);
     for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect((screen.getByLabelText('Delivery note number') as HTMLInputElement).value).toBe('DN-DUP');
+    expect((screen.getByLabelText('Supplier delivery note number') as HTMLInputElement).value).toBe('DN-DUP');
   });
 
   it('lost reply after saving: no automatic resend; checking the server finds the draft instead of creating another', async () => {

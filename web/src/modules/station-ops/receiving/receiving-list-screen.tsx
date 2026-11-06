@@ -13,7 +13,7 @@ import { SecondaryButton } from '../write-ui';
 import { Badge, LinkCard } from '../admin/ui';
 import { DocumentActions } from './document-actions';
 import { listQuery, useDeliveryList, useReceivingAccess, type ListFilters, type StatusFilter } from './data';
-import { Cost, Liters, RECEIVING_BASE, StatusBadge, VarianceText, deliveryTitle, when } from './parts';
+import { Cost, Liters, RECEIVING_BASE, StatusBadge, VarianceText, internalRef, when } from './parts';
 import type { Delivery } from './schemas';
 import type { Station } from '../schemas';
 
@@ -22,8 +22,9 @@ const FILTERS: readonly StatusFilter[] = ['all', 'draft', 'approved'];
 function Row({ row }: { row: Delivery }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
-  const title = deliveryTitle(row, t('receiving.untitled'));
-  const hint = [row.supplier?.name, row.tank?.name].filter((part): part is string => !!part).join(' · ');
+  const title = internalRef(row);
+  const note = row.delivery_note_number && row.delivery_note_number.trim() !== '' ? `${t('receiving.field.deliveryNote')}: ${row.delivery_note_number}` : null;
+  const hint = [note, row.supplier?.name, row.tank?.name].filter((part): part is string => !!part).join(' · ');
   return (
     <li className="space-y-1.5">
       <LinkCard href={`${RECEIVING_BASE}/${row.id}`} title={title} hint={hint || undefined} trailing={<StatusBadge status={row.status} />} />

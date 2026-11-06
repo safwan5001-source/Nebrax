@@ -69,6 +69,7 @@ export async function mockB5Api(page: Page, opts: { baseUrl: string; locale: Loc
   const lookup = (id?: string | null) => { const r = readings.find((x) => x.id === id); return r ? { id: r.id, quantity_milliliters: r.quantity_milliliters, quantity_liters: String(r.quantity_milliliters / 1000), measured_at: r.measured_at } : id ? { id } : null; };
   const view = (row: Dict): Dict => {
     const copy = JSON.parse(JSON.stringify(row));
+    copy.reference = `FD-${String(row.id).slice(0, 8).toUpperCase()}`;
     copy.cost_recorded = row.received_total_cost_minor !== null && row.received_total_cost_minor !== undefined;
     if (!opts.canSeeCost) { delete copy.received_total_cost_minor; delete copy.cost_recorded_by; delete copy.cost_recorded_at; }
     copy.attachments = attachments[row.id] ?? [];

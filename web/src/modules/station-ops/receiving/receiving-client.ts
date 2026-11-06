@@ -66,7 +66,7 @@ export async function receivingGet<S extends z.ZodTypeAny>(path: string, schema:
 // ───────────────────────── الكتابات الثلاث ─────────────────────────
 
 export type RejectionCode =
-  | 'cost_required' | 'cost_locked' | 'cost_changed' | 'document_required' | 'attachment_invalid' | 'attachment_limit' | 'attachment_locked'
+  | 'cost_required' | 'cost_locked' | 'cost_changed' | 'note_required' | 'attachment_invalid' | 'attachment_limit' | 'attachment_locked'
   | 'idempotency_mismatch' | 'duplicate' | 'distinct_approver' | 'already_approved' | 'grni_missing' | 'cost_baseline' | 'warehouse_mismatch' | 'tank_mismatch'
   | 'product_inactive' | 'quantity_invalid' | 'cost_invalid' | 'evidence_exists' | 'reading_mismatch' | 'order_mismatch'
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
@@ -75,7 +75,7 @@ const KNOWN: ReadonlyArray<[RegExp, RejectionCode]> = [
   [/FUEL_DELIVERY_COST_REQUIRED/, 'cost_required'],
   [/FUEL_DELIVERY_COST_LOCKED/, 'cost_locked'],
   [/FUEL_DELIVERY_COST_CHANGED/, 'cost_changed'],
-  [/FUEL_DELIVERY_DOCUMENT_REQUIRED/, 'document_required'],
+  [/FUEL_DELIVERY_NOTE_REQUIRED/, 'note_required'],
   [/لا يمكن حذف مرفق/, 'attachment_locked'],
   [/الحد الأقصى \d+ مرفقات|مرفقات في الطلب/, 'attachment_limit'],
   [/الأنواع المسموحة|حجم الملف|نوع الملف|امتداد الملف|الصورة تالفة|أبعاد الصورة|اسم الملف|تعذر قراءة الملف|ملف غير صالح/, 'attachment_invalid'],

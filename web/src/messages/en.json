@@ -15780,7 +15780,6 @@
     "receiving": {
       "title": "Fuel receiving",
       "subtitle": "Receiving drafts and approvals",
-      "untitled": "Receiving without a delivery note",
       "unit": "L",
       "currency": "SAR",
       "status": {
@@ -15810,7 +15809,7 @@
         "cost": "Value",
         "draftNote": "A draft does not change station stock. Only approval adds the quantity to stock.",
         "search": "Search receivings",
-        "searchPlaceholder": "Search by delivery note, purchase reference or supplier",
+        "searchPlaceholder": "Search by supplier note number, receiving number (FD-…) or supplier",
         "moreFilters": "More filters",
         "costFilter": "Cost status",
         "cost_missing": "Awaiting cost",
@@ -15823,14 +15822,15 @@
         "supplier": "Supplier",
         "tank": "Tank",
         "warehouse": "Station warehouse",
-        "deliveryNote": "Delivery note number",
+        "deliveryNote": "Supplier delivery note number",
         "purchaseRef": "Purchase reference",
         "tanker": "Tanker number",
         "driver": "Driver name",
         "notes": "Notes",
         "dispatched": "Dispatched quantity",
         "received": "Received quantity",
-        "cost": "Receiving value"
+        "cost": "Receiving value",
+        "internalNumber": "Internal receiving number"
       },
       "detail": {
         "none": "Not recorded",
@@ -15848,7 +15848,8 @@
         "approvedBy": "Approved by",
         "you": "You",
         "another": "Another user",
-        "approvedEffect": "The received quantity was added to station stock and its value recorded. An approved receiving cannot be edited or deleted."
+        "approvedEffect": "The received quantity was added to station stock and its value recorded. An approved receiving cannot be edited or deleted.",
+        "noteLegacy": "Not recorded (legacy receiving)"
       },
       "approve": {
         "doneTitle": "Receiving approved",
@@ -15884,7 +15885,7 @@
         "noTanks": "This station has no tanks",
         "tankUnavailable": "Unavailable (inactive)",
         "referencesTitle": "References",
-        "deliveryNoteHint": "Prevents the same receiving being entered twice for one supplier. Without it the system cannot detect duplicates.",
+        "deliveryNoteHint": "Required: the number printed on the supplier's delivery note (not the internal FD- receiving number). Prevents the same receiving being entered twice for one supplier.",
         "readingsHint": "Optional: record the tank reading before and after unloading to cross-check the quantity. Both readings are recorded before the draft.",
         "readingType": "Reading type",
         "draftEffect": "Saving only creates a draft: station stock does not change and you do not enter a cost here; authorised users record it later. Approval is a separate step.",
@@ -15919,10 +15920,10 @@
         "received_not_positive": "The received quantity must be greater than zero.",
         "before_invalid": "The before-receiving reading is invalid.",
         "after_invalid": "The after-receiving reading is invalid.",
-        "after_below_before": "The after reading is lower than the before reading, which is impossible after unloading. Check both readings."
+        "after_below_before": "The after reading is lower than the before reading, which is impossible after unloading. Check both readings.",
+        "delivery_note_required": "Enter the supplier delivery note number (required)."
       },
       "warning": {
-        "no_delivery_note": "Without a delivery note number the system cannot prevent this receiving being duplicated.",
         "received_above_dispatched": "Received is more than dispatched.",
         "received_below_dispatched": "Received is less than dispatched.",
         "readings_incomplete": "Only one reading was recorded; the tank rise cannot be cross-checked without both.",
@@ -15964,10 +15965,10 @@
         "cost_required": "Record the receiving cost first: a receiving without a cost cannot be approved.",
         "cost_locked": "The receiving is approved, so its cost cannot be changed.",
         "cost_changed": "The cost changed after you reviewed it. Review the new value, then approve.",
-        "document_required": "A delivery note number or an attached photo of the note is required before approval.",
         "attachment_invalid": "The file is not accepted: check the type (PDF/JPG/PNG), the size (up to 10 MB) and that the file is intact.",
         "attachment_limit": "You exceeded the attachment limit.",
-        "attachment_locked": "An approved receiving's attachment cannot be deleted."
+        "attachment_locked": "An approved receiving's attachment cannot be deleted.",
+        "note_required": "The supplier delivery note number is required to create a new receiving. Enter it and try again."
       },
       "attach": {
         "title": "Supplier note attachments",
@@ -15990,7 +15991,7 @@
         "openPdf": "Open PDF",
         "close": "Close",
         "stepTitle": "Photograph the supplier note",
-        "stepHint": "Optional now: photograph the delivery note or attach its file. It uploads after the draft is saved and can be added later from the receiving details.",
+        "stepHint": "Optional: photograph the delivery note or attach its file so it stays linked to the receiving. The supplier note number is entered in the first step and is the required one; an attachment does not replace it. It uploads after the draft is saved and can be added later.",
         "stepNone": "No files added.",
         "reject": {
           "type": "File type not allowed (PDF, JPG or PNG only)",
@@ -16033,9 +16034,11 @@
       "ready": {
         "cost_ok": "Cost recorded",
         "cost_missing": "Cost not recorded",
-        "document_ok": "Document present (note number or attachment)",
-        "document_missing": "A delivery note number or an attached photo of the note is required",
-        "blocked": "Complete the items above to enable approval."
+        "blocked": "Record the actual cost first to enable approval.",
+        "note_ok": "Supplier delivery note number recorded",
+        "note_legacy": "Legacy receiving with no note number: this does not block approval",
+        "attachment_ok": "Delivery note attachment present",
+        "attachment_none": "No delivery note attachment (optional)"
       },
       "docs": {
         "title": "Print and export",
@@ -16062,7 +16065,7 @@
       "doc": {
         "title": "Fuel Receiving Voucher",
         "reportTitle": "Fuel Receiving Statement",
-        "reference": "Reference",
+        "reference": "Internal receiving number",
         "variantOperational": "Operational version — no prices or costs",
         "variantFinancial": "Financial version — includes cost",
         "company": "Company",

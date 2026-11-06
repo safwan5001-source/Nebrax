@@ -17,6 +17,8 @@ class FuelDeliveryResource extends JsonResource
 
         return [
             'id' => $this->id,
+            // رقم الاستلام الداخلي (≠ رقم سند المورد `delivery_note_number`).
+            'reference' => $this->reference(),
             'status' => $this->status,
             'station_id' => $this->fuel_station_id,
             'tank_id' => $this->fuel_tank_id,

@@ -235,22 +235,134 @@ class FuelDeliveryCostAndAttachmentsTest extends TestCase
     }
 
     /** @test */
-    public function approval_needs_a_delivery_note_number_or_an_attachment(): void
+    public function a_new_receiving_requires_the_supplier_delivery_note_number_and_an_attachment_never_replaces_it(): void
     {
         Storage::fake('local');
         $this->buildFixture();
-        ['station' => $station, 'manager' => $manager] = $this->actors();
-        config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
-        $payload = $this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b51-nodoc');
+        ['station' => $station] = $this->actors();
+        $base = $this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b51-note');
+
+        // غائب، فارغ، مسافات فقط، null: كلها 422 قبل أي أثر، ولا استلام ولا قراءة تُنشأ.
+        $bad = [[], ['delivery_note_number' => null], ['delivery_note_number' => ''], ['delivery_note_number' => '   '], ['delivery_note_number' => "\t\n "]];
+        foreach ($bad as $i => $override) {
+            $payload = array_merge($base, ['idempotency_key' => "b51-note-bad-{$i}"]);
+            unset($payload['delivery_note_number']);
+            $res = $this->withToken($station['token'])->postJson(self::BASE.'/deliveries', array_merge($payload, $override));
+            $res->assertStatus(422);
+            $this->assertArrayHasKey('delivery_note_number', (array) $res->json('errors'));
+        }
+        $this->assertSame(0, FuelDelivery::count());
+
+        // مع رقم سند صحيح: يُنشأ (بلا مرفق). والرقم يُحفظ مقصوصاً.
+        $ok = $this->withToken($station['token'])->postJson(self::BASE.'/deliveries', array_merge($base, ['delivery_note_number' => '  DN-OK-1  ', 'idempotency_key' => 'b51-note-ok']))->assertCreated()->json('data');
+        $this->assertSame('DN-OK-1', $ok['delivery_note_number']);
+        $this->assertSame(0, FuelDeliveryAttachment::count());
+
+        // الخدمة نفسها ترفض أيضاً (لا مسار داخلي يتجاوز): بلا رقم رغم مرفق جاهز.
+        $service = app(\App\Services\FuelSupplyReceivingService::class);
+        $payload = array_merge($base, ['idempotency_key' => 'b51-note-svc', 'created_by' => $station['user']->id]);
         unset($payload['delivery_note_number']);
-        $draft = $this->withToken($station['token'])->postJson(self::BASE.'/deliveries', $payload)->assertCreated()->json('data');
-        $this->setCostDirectly($draft['id']);
+        try {
+            $service->createDelivery($payload);
+            $this->fail('expected FUEL_DELIVERY_NOTE_REQUIRED');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('FUEL_DELIVERY_NOTE_REQUIRED', $e->getMessage());
+        }
+        $this->assertSame(1, FuelDelivery::count());
 
-        $r = $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$draft['id'].'/approve')->assertStatus(422);
-        $this->assertStringContainsString('FUEL_DELIVERY_DOCUMENT_REQUIRED', (string) $r->json('message'));
+        // رقم السند المكرر لنفس المورد يبقى مرفوضاً.
+        $this->withToken($station['token'])->postJson(self::BASE.'/deliveries', array_merge($base, ['delivery_note_number' => 'DN-OK-1', 'idempotency_key' => 'b51-note-dup']))->assertStatus(422);
+    }
 
-        $this->withToken($station['token'])->post(self::BASE.'/deliveries/'.$draft['id'].'/attachments', ['attachments' => [$this->pdf()]], ['Accept' => 'application/json'])->assertCreated();
-        $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$draft['id'].'/approve')->assertOk();
+    /** @test */
+    public function the_attachment_is_optional_for_approval_and_a_new_receiving_with_a_note_approves_without_one(): void
+    {
+        $this->buildFixture();
+        ['station' => $station, 'finance' => $finance, 'manager' => $manager] = $this->actors();
+        config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
+        $draft = $this->draft($station, 'b51-noatt');
+        $this->withToken($finance['token'])->postJson(self::BASE.'/deliveries/'.$draft['id'].'/cost', ['received_total_cost_minor' => self::COST])->assertOk();
+
+        $this->assertSame(0, FuelDeliveryAttachment::count());
+        $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$draft['id'].'/approve')->assertOk()->assertJsonPath('data.status', 'approved');
+    }
+
+    /** @test */
+    public function receivings_that_pre_date_b51_are_never_blocked_for_a_missing_note_or_attachment_but_every_other_condition_still_applies(): void
+    {
+        $this->buildFixture();
+        ['station' => $station, 'finance' => $finance, 'manager' => $manager] = $this->actors();
+        config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
+
+        // استلام «قديم»: أُنشئ قبل B5.1 بلا رقم سند ولا مرفق (محاكاة بتعديل صف الاختبار نفسه).
+        $legacy = $this->draft($station, 'b51-legacy-nonote');
+        DB::table('fuel_deliveries')->where('id', $legacy['id'])->update(['delivery_note_number' => null]);
+        $this->assertSame(0, FuelDeliveryAttachment::count());
+
+        // الشروط الأخرى سارية: بلا تكلفة ⇒ مرفوض (COST_REQUIRED لا DOCUMENT).
+        $r = $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$legacy['id'].'/approve')->assertStatus(422);
+        $this->assertStringContainsString('FUEL_DELIVERY_COST_REQUIRED', (string) $r->json('message'));
+        $this->assertStringNotContainsString('DOCUMENT', (string) $r->json('message'));
+
+        // الصلاحية: من لا يملك مفتاح الاعتماد ممنوع حتى لو كان الاستلام قديماً.
+        $this->withToken($station['token'])->postJson(self::BASE.'/deliveries/'.$legacy['id'].'/approve')->assertForbidden();
+
+        // فصل المهام: المنشئ نفسه لا يعتمد حيث تسري السياسة.
+        $this->withToken($finance['token'])->postJson(self::BASE.'/deliveries/'.$legacy['id'].'/cost', ['received_total_cost_minor' => self::COST])->assertOk();
+        $own = $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries', ['delivery_note_number' => 'DN-OWN'] + $this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b51-legacy-own'))->assertCreated()->json('data');
+        DB::table('fuel_deliveries')->where('id', $own['id'])->update(['delivery_note_number' => null]);
+        $this->withToken($finance['token'])->postJson(self::BASE.'/deliveries/'.$own['id'].'/cost', ['received_total_cost_minor' => self::COST])->assertOk();
+        $sod = $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$own['id'].'/approve')->assertStatus(422);
+        $this->assertStringContainsString('FUEL_DISTINCT_APPROVER_REQUIRED', (string) $sod->json('message'));
+
+        // وبعد تسجيل التكلفة وبمعتمِد مختلف: القديم بلا سند ولا مرفق يُعتمد، بأثر مخزني/محاسبي واحد.
+        $movements = StockMovement::count();
+        $entries = JournalEntry::count();
+        $this->withToken($manager['token'])->postJson(self::BASE.'/deliveries/'.$legacy['id'].'/approve')->assertOk()->assertJsonPath('data.status', 'approved');
+        $this->assertSame($movements + 1, StockMovement::count());
+        $this->assertSame($entries + 1, JournalEntry::count());
+        $this->assertNull(DB::table('fuel_deliveries')->where('id', $legacy['id'])->value('delivery_note_number')); // لم يُمسّ
+    }
+
+    /** @test */
+    public function the_internal_receiving_number_is_distinct_from_the_supplier_note_number_everywhere(): void
+    {
+        $this->buildFixture();
+        ['station' => $station, 'finance' => $finance] = $this->actors();
+        $d = $this->draft($station, 'b51-refs');
+        $internal = 'FD-'.strtoupper(substr($d['id'], 0, 8));
+
+        // JSON: حقلان منفصلان وقيمتان مختلفتان.
+        $this->assertSame($internal, $d['reference']);
+        $this->assertSame('DN-b51-refs', $d['delivery_note_number']);
+        $this->assertNotSame($d['reference'], $d['delivery_note_number']);
+        $doc = $this->withToken($station['token'])->getJson(self::BASE."/deliveries/{$d['id']}/document")->assertOk()->json('data');
+        $this->assertSame($internal, $doc['reference']);
+        $this->assertSame('DN-b51-refs', $doc['delivery_note_number']);
+
+        // البحث: بكل منهما (الداخلي بحروف كبيرة/صغيرة/بلا شرطة، والسند نصياً) ولا يلتبس أحدهما بالآخر.
+        $ids = fn (string $q) => collect($this->withToken($station['token'])->getJson(self::BASE.'/deliveries?q='.urlencode($q))->assertOk()->json('data'))->pluck('id')->all();
+        $this->assertSame([$d['id']], $ids($internal));
+        $this->assertSame([$d['id']], $ids(strtolower($internal)));
+        $this->assertSame([$d['id']], $ids(str_replace('-', '', $internal)));
+        $this->assertSame([$d['id']], $ids('DN-b51-refs'));
+        $this->assertSame([], $ids('FD-ZZZZZZZZ'));
+
+        // Excel: عمودان/صفّان منفصلان بتسميتين مختلفتين.
+        $tmp = tempnam(sys_get_temp_dir(), 'xl');
+        file_put_contents($tmp, $this->withToken($station['token'])->get(self::BASE.'/deliveries/export')->getContent());
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($tmp));
+        $xml = '';
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $xml .= $zip->getFromIndex($i);
+        }
+        $zip->close();
+        @unlink($tmp);
+        $this->assertStringContainsString('رقم الاستلام الداخلي', $xml);
+        $this->assertStringContainsString('رقم سند المورد', $xml);
+        $this->assertStringContainsString($internal, $xml);
+        $this->assertStringContainsString('DN-b51-refs', $xml);
     }
 
     /** @test */

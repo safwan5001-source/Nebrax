@@ -85,10 +85,13 @@ class FuelSupplyReceivingController extends ApiController
         }
         if (! empty($f['q'])) {
             $needle = '%'.mb_strtolower(trim($f['q'])).'%';
+            // رقم الاستلام الداخلي `FD-XXXXXXXX` يُطابق بادئة المعرّف؛ رقم سند المورد ومرجع الشراء واسم المورد نصياً.
+            $internal = preg_match('/^fd-?([0-9a-f]{1,8})$/i', trim($f['q']), $m) === 1 ? strtolower($m[1]) : null;
             $query->where(fn (Builder $q) => $q
                 ->whereRaw('LOWER(delivery_note_number) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(purchase_reference) LIKE ?', [$needle])
-                ->orWhereHas('supplier', fn (Builder $s) => $s->whereRaw('LOWER(name) LIKE ?', [$needle])));
+                ->orWhereHas('supplier', fn (Builder $s) => $s->whereRaw('LOWER(name) LIKE ?', [$needle]))
+                ->when($internal !== null, fn (Builder $w) => $w->orWhereRaw('LOWER(CAST(id AS VARCHAR(36))) LIKE ?', [$internal.'%'])));
             $applied['q'] = trim($f['q']);
         }
 
@@ -236,7 +239,7 @@ class FuelSupplyReceivingController extends ApiController
     public function exportReport(Request $request)
     {
         [$payload, $financial] = $this->reportPayload($request);
-        $headers = ['المرجع', 'تاريخ الاستلام', 'الحالة', 'رقم سند المورد', 'المحطة', 'المورد', 'المنتج', 'الخزان', 'الكمية المرسلة (لتر)', 'الكمية المستلمة (لتر)', 'فرق النقل (لتر)'];
+        $headers = ['رقم الاستلام الداخلي', 'تاريخ الاستلام', 'الحالة', 'رقم سند المورد', 'المحطة', 'المورد', 'المنتج', 'الخزان', 'الكمية المرسلة (لتر)', 'الكمية المستلمة (لتر)', 'فرق النقل (لتر)'];
         $types = [SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_TEXT, SpreadsheetWriter::TYPE_NUMBER, SpreadsheetWriter::TYPE_NUMBER, SpreadsheetWriter::TYPE_NUMBER];
         if ($financial) {
             $headers[] = 'التكلفة الإجمالية';
@@ -264,7 +267,7 @@ class FuelSupplyReceivingController extends ApiController
         $doc = $this->documents->document($delivery, $financial, $request->user());
 
         $pairs = [
-            ['المرجع', $doc['reference']], ['الحالة', $doc['status']], ['رقم سند المورد', $doc['delivery_note_number']], ['مرجع الشراء', $doc['purchase_reference']],
+            ['رقم الاستلام الداخلي', $doc['reference']], ['الحالة', $doc['status']], ['رقم سند المورد', $doc['delivery_note_number']], ['مرجع الشراء', $doc['purchase_reference']],
             ['الشركة', $doc['company']['name']], ['المحطة', $doc['station']['name'] ?? null], ['المورد', $doc['supplier']['name'] ?? null],
             ['المنتج', $doc['product']['name'] ?? null], ['الخزان', $doc['tank']['code'] ?? null], ['المستودع', $doc['warehouse']['name'] ?? null],
             ['الصهريج', $doc['tanker_identifier']], ['السائق', $doc['driver_name']],
