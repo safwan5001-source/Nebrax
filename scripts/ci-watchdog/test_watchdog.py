@@ -505,7 +505,10 @@ class CiWiring(unittest.TestCase):
         self.assertLess(pg.index("trap awj_watchdog_stop EXIT"), pg.index("awj_watchdog_start"))
         self.assertLess(pg.index("awj_watchdog_start"), pg.index("php artisan test --parallel"))
         self.assertNotIn("watchdog", sqlite)
-        self.assertIn("php artisan test 2>&1 | tee", sqlite)
+        # فرع SQLite متوازٍ بلا مراقب (المراقب مقصور على pgsql): المجموعة كاملة وبلا أي مرشّح.
+        self.assertIn('php artisan test --parallel --processes="$PROCS" 2>&1 | tee', sqlite)
+        for flag in ("--filter", "--group", "--exclude-group", "--testsuite", "--stop-on"):
+            self.assertNotIn(flag, sqlite)
 
     def test_paratest_files_go_where_the_watchdog_looks(self):
         tmp = re.search(r'--paratest-tmp-dir "([^"]+)"', self.step).group(1)
