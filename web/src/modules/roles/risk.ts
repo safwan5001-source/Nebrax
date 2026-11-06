@@ -47,6 +47,13 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'fuel.shift.cash_variance_review': 'financial',
   'fuel.sale.collect': 'financial',
   'fuel.sale.price.manage': 'financial',
+  // FUEL-B2: اعتماد الاستلام والتسوية يرحّلان مخزوناً وقيداً؛ وفاتورة المورد ومطابقتها تسوّيان GRNI إلى الموردين.
+  'fuel.delivery.approve': 'financial',
+  'fuel.reconciliation.approve': 'financial',
+  'fuel.supplier_invoice.manage': 'financial',
+  'fuel.supplier_invoice.match': 'financial',
+  // FUEL-B2: يعطّل/يفعّل ضابط فصل المعتمِد — من يملكه يغيّر من يستطيع اعتماد المخزون والقيود.
+  'fuel.governance.manage': 'access',
 
   // يمسّ الإقفال الضريبي والمحاسبي والامتثال
   'zatca.submit': 'compliance',

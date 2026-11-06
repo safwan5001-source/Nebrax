@@ -9,8 +9,10 @@ use App\Models\Tenant;
 use App\Models\FuelStationConfigurationEvent;
 use App\Models\FuelStationSettingOverride;
 use App\Models\User;
+use App\Support\Rbac;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -25,6 +27,12 @@ use RuntimeException;
 class FuelStationSettingsService
 {
     public const GROUP = 'fuel_stations';
+
+    /** FUEL-B2: صلاحية الحوكمة الإضافية المطلوبة لتغيير أي مفتاح من `GOVERNANCE_KEYS` (مع صلاحية مسار الإعدادات `fuel_stations.manage`). */
+    public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
+
+    /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required'];
 
     /** @return array<string, mixed> */
     public function forTenant(): array
@@ -62,7 +70,64 @@ class FuelStationSettingsService
             $settings[$override->setting_key] = $override->value;
         }
 
+        // FUEL-B2: «لم يُحسم» (null) لا يخرج من القرار الفعّال أبداً — يُحسم بتاريخ إنشاء المحطة. قيمة صريحة (محطة/مستأجر) تبقى كما هي.
+        if (($settings['fuel_distinct_approver_required'] ?? null) === null) {
+            $settings['fuel_distinct_approver_required'] = $this->isNewerThanDistinctApproverCutover($station);
+        }
+
         return $settings;
+    }
+
+    /** المحطة المنشأة عند الحدّ أو بعده؟ غياب الحدّ أو عدم صلاحيته ⇒ false (لا حسم تلقائي). */
+    private function isNewerThanDistinctApproverCutover(FuelStation $station): bool
+    {
+        $cutover = config('fuel_stations.distinct_approver_cutover_at');
+        if (! is_string($cutover) || trim($cutover) === '' || $station->created_at === null) {
+            return false;
+        }
+        try {
+            return $station->created_at->greaterThanOrEqualTo(\Carbon\CarbonImmutable::parse($cutover));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * FUEL-B2: هل تُلزم سياسة المحطة اعتماداً من مستخدم **غير** منشئ الاستلام/التسوية؟ القرار الوحيد (محطة ← مستأجر ← افتراضي false).
+     * الغياب = false: المحطات القائمة بلا override تحفظ سلوكها السابق.
+     */
+    public function distinctApproverRequired(FuelStation $station): bool
+    {
+        return $this->get($station, 'fuel_distinct_approver_required') === true;
+    }
+
+    /**
+     * FUEL-B2: يرفض (403) أي كتابة لمفتاح حوكمة من فاعل لا يملك `fuel.governance.manage` — بغضّ النظر عن القيمة (تفعيل/تعطيل/مسح override/
+     * القيمة نفسها) كي لا يُعطَّل الضابط ولا يُلتفّ عليه بمسح override. **فاعل غائب (`null`) مرفوض أيضاً** (فشل مغلق): لا مسار نظام صامت؛ من يحتاج
+     * ضبطها من أمر/هجرة يمرّر مستخدماً مخوَّلاً صريحاً. الفحص في الخدمة لا في المتحكم، فلا يتجاوزه مسار HTTP مستقبلي. لا أثر على بقية المفاتيح.
+     *
+     * @param array<int, string|int> $keys
+     */
+    private function assertGovernanceAuthority(array $keys, ?User $actor): void
+    {
+        if (array_intersect(array_map('strval', $keys), self::GOVERNANCE_KEYS) === []) {
+            return;
+        }
+        if ($actor === null || ! Rbac::allows((string) $actor->role, self::GOVERNANCE_PERMISSION)) {
+            throw new AuthorizationException('تغيير سياسات حوكمة الوقود (فصل المعتمِد) يتطلب صلاحية حوكمة الوقود.');
+        }
+    }
+
+    /**
+     * يرفض اعتماد المنشئ لسجله حين تلزم السياسة. يُستدعى من خدمة الاعتماد **داخل المعاملة وبعد قفل السجل**، فلا يُلتفّ عليه بتبديل الإعداد بين
+     * الفحص والكتابة. منشئ مجهول (`null`: مهمة نظام أو بيانات تاريخية) لا يطابق أي معتمِد فلا يُرفض به أحد.
+     * الرسالة لا تحمل قيماً مالية.
+     */
+    public function assertDistinctApprover(FuelStation $station, ?string $creatorId, string $approverId, string $what): void
+    {
+        if ($creatorId !== null && $creatorId === $approverId && $this->distinctApproverRequired($station)) {
+            throw new RuntimeException("FUEL_DISTINCT_APPROVER_REQUIRED: سياسة المحطة تتطلب أن يعتمد {$what} مستخدمٌ غير الذي أنشأه.");
+        }
     }
 
     public function get(FuelStation $station, string $key, ?string $deviceKey = null): mixed
@@ -129,6 +194,7 @@ class FuelStationSettingsService
     public function putTenant(array $values, ?User $actor = null, ?string $reason = null): array
     {
         $this->requireTenantContext();
+        $this->assertGovernanceAuthority(array_keys($values), $actor);
         $current = Settings::group(self::GROUP);
         $known = $this->knownValues($values);
         $changed = [];
@@ -174,6 +240,8 @@ class FuelStationSettingsService
     public function putStationValues(FuelStation $station, array $values, ?User $actor = null, ?string $reason = null): array
     {
         $this->assertStationTenant($station);
+        // قبل أي كتابة: طلب مختلط يحوي مفتاح حوكمة بلا تخويل يُرفض كله (لا تطبيق جزئي).
+        $this->assertGovernanceAuthority(array_keys($values), $actor);
         $known = [];
         foreach ($values as $key => $value) {
             $this->assertKnownKey($key);
@@ -200,6 +268,7 @@ class FuelStationSettingsService
     {
         $this->assertStationTenant($station);
         $this->assertKnownKey($key);
+        $this->assertGovernanceAuthority([$key], $actor);
 
         DB::transaction(function () use ($station, $key, $actor, $reason) {
             $existing = FuelStationSettingOverride::query()
@@ -230,7 +299,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -250,6 +319,7 @@ class FuelStationSettingsService
     {
         $this->assertStationTenant($station);
         $this->assertKnownKey($key);
+        $this->assertGovernanceAuthority([$key], $actor);
         $this->assertValue($key, $value);
         $deviceKey = $this->deviceKey($deviceKey);
 
@@ -316,7 +386,7 @@ class FuelStationSettingsService
             'shift_opening_meter_reading_required', 'shift_opening_tank_reading_required',
             'shift_opening_cash_float_required', 'shift_closing_meter_reading_required',
             'shift_closing_tank_reading_required', 'shift_mandatory_staff_assignment',
-            'shift_mandatory_cash_count', 'shift_supervisor_approval_required',
+            'shift_mandatory_cash_count', 'shift_supervisor_approval_required', 'fuel_distinct_approver_required',
             'shift_allow_close_with_pending_cash_variance', 'shift_allow_close_with_unresolved_operational_variance',
             'fuel_sales_allow_deferred_payment',
             'corporate_credit_enabled', 'require_active_contract', 'driver_required', 'vehicle_required', 'fuel_card_required',

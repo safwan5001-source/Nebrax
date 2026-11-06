@@ -217,6 +217,7 @@ use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsureCustomerPrincipal;
 use App\Http\Middleware\EnsureImportFilesScanned;
+use App\Http\Middleware\EnsureAnyPermission;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EnsureUserPrincipal;
@@ -469,13 +470,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('system-updates', [SystemUpdateController::class, 'index']);
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
+        // FUEL-B2: أي صلاحية من القائمة (قديمة أو دقيقة) — انظر EnsureAnyPermission.
+        $permAny = fn (string ...$p) => EnsureAnyPermission::class . ':' . implode(',', $p);
         $app = fn (string $k) => EnsureApplicationActive::class . ':' . $k;
         // للمسارات التي تُبنى بعد منصة الاستحقاقات: الإنفاذ التجاري المركب
         // إلزامي من اليوم الأول ولا يعتمد cohort rollout للجسور القديمة.
         $commercialApp = fn (string $k, string $operation = 'read') => EnsureCommercialApplicationAccess::class . ':' . $k . ',' . $operation;
 
         // الموارد تتطلب اشتراكاً نشطاً
-        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $app, $commercialApp) {
+        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $permAny, $app, $commercialApp) {
 
         // AWJ Intelligence (AI-01): بوابة المساعد الذكي — مغلقة افتراضياً (AI_ASSISTANT_ENABLED)،
         // تجريبية فقط، بلا أي اتصال خارجي. التفويض الكامل داخل AiAssistantGateway.
@@ -1629,21 +1632,21 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'updateStation'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // Cycle 2: evidence stays read-only until an explicit approved reconciliation posts inventory and ledger effects.
-        Route::get('fuel-stations/readings', [FuelReconciliationController::class, 'readings'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::post('fuel-stations/readings', [FuelReconciliationController::class, 'storeReading'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
-        Route::get('fuel-stations/reconciliations', [FuelReconciliationController::class, 'index'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::post('fuel-stations/reconciliations', [FuelReconciliationController::class, 'store'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
-        Route::post('fuel-stations/reconciliations/{id}/approve', [FuelReconciliationController::class, 'approve'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/readings', [FuelReconciliationController::class, 'readings'])->middleware([$permAny('fuel_stations.view', 'fuel.reading.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/readings', [FuelReconciliationController::class, 'storeReading'])->middleware([$permAny('fuel_stations.manage', 'fuel.reading.record'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/reconciliations', [FuelReconciliationController::class, 'index'])->middleware([$permAny('fuel_stations.view', 'fuel.reconciliation.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/reconciliations', [FuelReconciliationController::class, 'store'])->middleware([$permAny('fuel_stations.manage', 'fuel.reconciliation.create'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/reconciliations/{id}/approve', [FuelReconciliationController::class, 'approve'])->middleware([$permAny('fuel_stations.manage', 'fuel.reconciliation.approve'), $commercialApp('fuel_stations.core', 'write')]);
 
         // Cycle 3 — استلام المورد → GRNI، ثم مطابقة فاتورة المورد بلا حركة مخزون ثانية.
-        Route::get('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'deliveries'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::get('fuel-stations/deliveries/{id}', [FuelSupplyReceivingController::class, 'showDelivery'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::post('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'storeDelivery'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
-        Route::post('fuel-stations/deliveries/{id}/approve', [FuelSupplyReceivingController::class, 'approveDelivery'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
-        Route::get('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'invoices'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::get('fuel-stations/supplier-invoices/{id}', [FuelSupplyReceivingController::class, 'showInvoice'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
-        Route::post('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'storeInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
-        Route::post('fuel-stations/supplier-invoices/{id}/matches', [FuelSupplyReceivingController::class, 'matchInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'deliveries'])->middleware([$permAny('fuel_stations.view', 'fuel.delivery.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/deliveries/{id}', [FuelSupplyReceivingController::class, 'showDelivery'])->middleware([$permAny('fuel_stations.view', 'fuel.delivery.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'storeDelivery'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.create'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/deliveries/{id}/approve', [FuelSupplyReceivingController::class, 'approveDelivery'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.approve'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'invoices'])->middleware([$permAny('fuel_stations.view', 'fuel.supplier_invoice.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/supplier-invoices/{id}', [FuelSupplyReceivingController::class, 'showInvoice'])->middleware([$permAny('fuel_stations.view', 'fuel.supplier_invoice.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'storeInvoice'])->middleware([$permAny('fuel_stations.manage', 'fuel.supplier_invoice.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/supplier-invoices/{id}/matches', [FuelSupplyReceivingController::class, 'matchInvoice'])->middleware([$permAny('fuel_stations.manage', 'fuel.supplier_invoice.match'), $commercialApp('fuel_stations.core', 'write')]);
 
         // Cycle 4 — حقائق الشفت والـforecourt التشغيلية فقط؛ لا FuelSale/Payment/Invoice/ZATCA أو قيد تلقائي.
         Route::get('fuel-stations/shifts', [FuelShiftController::class, 'index'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);

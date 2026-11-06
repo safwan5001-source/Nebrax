@@ -248,6 +248,8 @@ class FuelSupplyReceivingService
             if (! $station || ! $tank || ! $fuelProduct || ! $warehouse || ! $delivery->supplier) {
                 throw new RuntimeException('علاقات استلام الوقود غير مكتملة.');
             }
+            // FUEL-B2: فصل المعتمِد عن المنشئ حين تلزم سياسة المحطة — داخل المعاملة وبعد قفل السجل وقبل أي أثر مخزني أو محاسبي.
+            $this->settings->assertDistinctApprover($station, $delivery->created_by, $actorId, 'استلام الوقود');
             $this->assertStationTankProductWarehouse($station->id, $tank, $fuelProduct, $warehouse);
             $this->assertFuelProduct($fuelProduct, $fuelProduct->product);
             $grni = $this->settings->grniAccountFor($station);

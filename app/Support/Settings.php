@@ -410,6 +410,13 @@ class Settings
             'shift_mandatory_staff_assignment' => false,
             'shift_mandatory_cash_count' => true,
             'shift_supervisor_approval_required' => true,
+            // FUEL-B2: فصل المعتمِد عن المنشئ في **اعتماد استلام الوقود وتسوية المخزون** (سياسة عمل قابلة للضبط، قاعدة 6).
+            // `null` = «لم يُحسم» وهي الحالة الافتراضية (حالة ثلاثية عمداً، لأن `Settings::put` يحفظ المجموعة كاملة بافتراضاتها فلا يُميَّز
+            // «false صريح» من «false افتراضي»): تحسمها `FuelStationSettingsService::forStation` بتاريخ إنشاء المحطة مقابل
+            // `config('fuel_stations.distinct_approver_cutover_at')` — المحطة الأقدم من الحدّ ⇒ false (سلوكها السابق حرفياً)، والأحدث ⇒ true.
+            // قيمة صريحة (محطة ثم مستأجر) تتقدّم دائماً على الحسم الافتراضي. لا عتبة قيمة: السياسة كلّ-أو-لا-شيء. اعتماد الوردية له
+            // `shift_supervisor_approval_required` ولا يتأثر بهذا المفتاح.
+            'fuel_distinct_approver_required' => null,
             // A2: الفرق يبقى pending_review؛ هذا المفتاح يحدد منع الإغلاق لا تسويته.
             'shift_allow_close_with_pending_cash_variance' => true,
             // فرق الخزان التشغيلي لا يغيّر Book Stock؛ يمنع الإغلاق فقط إن اختار المستأجر ذلك.

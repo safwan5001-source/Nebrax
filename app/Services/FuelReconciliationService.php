@@ -162,6 +162,8 @@ class FuelReconciliationService
             }
 
             $station = $this->station($reconciliation->fuel_station_id);
+            // FUEL-B2: فصل المعتمِد عن المنشئ حين تلزم سياسة المحطة — داخل المعاملة وبعد قفل المسودة وقبل أي أثر مخزني أو محاسبي.
+            $this->settings->assertDistinctApprover($station, $reconciliation->created_by, $approverId, 'تسوية المخزون');
             $warehouse = $this->warehouse($station);
             if ($warehouse->id !== $reconciliation->warehouse_id) {
                 throw new RuntimeException('تغير تكوين مخزن المحطة بعد إنشاء المسودة. أنشئ تسوية جديدة حتى يبقى التاريخ صادقاً.');
