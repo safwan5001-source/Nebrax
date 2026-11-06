@@ -192,5 +192,36 @@ class PartnerStatementEnvelopeTest extends TestCase
 
         $this->assertContains('source_documents_reconciliation', $e['integrity']['not_checked']);
         $this->assertContains('role_attribution_independent_verification', $e['integrity']['not_checked']);
+        $this->assertContains('completeness_independent_verification', $e['integrity']['not_checked'], 'الاكتمال المستقل مؤجَّل إلى AIA-0.2 ولا يُدّعى.');
+    }
+
+    #[Test]
+    public function totals_beyond_the_safe_range_make_the_report_unverified_with_no_partial_totals(): void
+    {
+        // حركات متوازنة متكررة: كل حركة والرصيد الجاري آمنان، وإجمالي كل جانب يتجاوز 2^53−1 دون تجاوز PHP_INT_MAX.
+        $x = 4503599627370496;
+        $e = Envelope::build($this->statement('customer', 0, [[$x, 0], [0, $x], [$x, 0], [0, $x], [$x, 0], [0, $x]]), 'customer', 'SAR', emittedRowCount: 6);
+
+        $this->assertSame('unverified', $e['report_status']);
+        $this->assertSame('failed', $e['integrity']['status']);
+        $this->assertContains('computed_values_within_safe_range', $e['integrity']['failed_checks']);
+        $this->assertNull($e['display']);
+        $this->assertNull($e['position']);
+        $this->assertNull($e['totals']['debit_minor']);
+        $this->assertNull($e['totals']['credit_minor']);
+        $this->assertNull($e['totals']['net_minor']);
+        $this->assertSame(6, $e['totals']['row_count']);
+        $this->assertSame(6, $e['row_count']);
+    }
+
+    #[Test]
+    public function the_emitted_row_count_is_compared_but_is_not_an_independent_completeness_proof(): void
+    {
+        $st = $this->statement('customer', 0, [[100, 0], [0, 30]]);
+
+        $this->assertSame('final', Envelope::build($st, null, 'SAR', emittedRowCount: 2)['report_status']);
+        $mismatch = Envelope::build($st, null, 'SAR', emittedRowCount: 1);
+        $this->assertSame('unverified', $mismatch['report_status']);
+        $this->assertSame(['row_count_matches_rows'], $mismatch['integrity']['failed_checks']);
     }
 }

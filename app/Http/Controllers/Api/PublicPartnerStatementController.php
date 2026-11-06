@@ -62,7 +62,7 @@ class PublicPartnerStatementController extends PublicApiController
         ], $statement['rows']);
 
         $currency = PublicMoney::currency($request);
-        $envelope = PartnerStatementEnvelope::build($statement, $filters['role'] ?? null, $currency);
+        $envelope = PartnerStatementEnvelope::build($statement, $filters['role'] ?? null, $currency, emittedRowCount: count($rows));
 
         if ($envelope['integrity']['status'] === 'failed') {
             // لا قيم ولا أسماء أطراف في السجل: معرّف الفحوص الفاشلة فقط.

@@ -150,11 +150,127 @@ class StatementIntegrityTest extends TestCase
         $r = StatementIntegrity::evaluate(0, $rows, 0, 3000);
 
         $this->assertFalse($r['passed']);
-        $this->assertContains('minor_units_are_integers', $r['failed']);
-        $this->assertSame(0, $r['totals']['debit_minor'], 'لا إجمالي جزئي مضلّل عند الفشل.');
-        foreach ($r['totals'] as $v) {
-            $this->assertIsInt($v);
+        $this->assertContains('computed_values_within_safe_range', $r['failed']);
+        $this->assertNoPartialTotals($r);
+    }
+
+    /** لا إجماليات جزئية مضللة: كل المجاميع null (لا صفر) و`row_count` وحده يبقى لأنه عدّ. */
+    private function assertNoPartialTotals(array $r): void
+    {
+        $this->assertNull($r['totals']['debit_minor']);
+        $this->assertNull($r['totals']['credit_minor']);
+        $this->assertNull($r['totals']['net_minor']);
+        $this->assertIsInt($r['totals']['row_count']);
+    }
+
+    #[Test]
+    public function balanced_repeated_movements_exceed_the_safe_total_without_overflowing_php(): void
+    {
+        // كل حركة (2^52) آمنة والرصيد الجاري لا يتجاوز 2^52، وإجمالي كل جانب 3 × 2^52 > 2^53−1 لكنه ≪ PHP_INT_MAX.
+        $x = 4503599627370496;
+        $this->assertLessThan(StatementIntegrity::MAX_SAFE_MINOR, $x);
+        $rows = $this->chain(0, [[$x, 0], [0, $x], [$x, 0], [0, $x], [$x, 0], [0, $x]]);
+        foreach ($rows as $row) {
+            $this->assertTrue(StatementIntegrity::isSafeMinor($row['balance']), 'الرصيد الجاري يبقى آمناً.');
         }
+        $this->assertLessThan(PHP_INT_MAX, 3 * $x, 'المجموع لا يتجاوز PHP_INT_MAX: فيض int لا يكشفه.');
+        $this->assertGreaterThan(StatementIntegrity::MAX_SAFE_MINOR, 3 * $x);
+
+        $r = StatementIntegrity::evaluate(0, $rows, 0, 6);
+
+        $this->assertFalse($r['passed']);
+        $this->assertContains('computed_values_within_safe_range', $r['failed']);
+        $this->assertNotContains('minor_units_are_integers', $r['failed'], 'كل قيمة مُدخَلة آمنة؛ الفشل في المحسوب.');
+        $this->assertNotContains('running_balance_chain', $r['failed'], 'السلسلة نفسها سليمة.');
+        $this->assertNoPartialTotals($r);
+        $this->assertSame(6, $r['totals']['row_count']);
+    }
+
+    #[Test]
+    public function the_positive_boundary_of_every_computed_sum_is_enforced(): void
+    {
+        $max = StatementIntegrity::MAX_SAFE_MINOR;
+
+        // مجموع المدين = MAX تماماً (على جانبين: صفّان) ⇒ مقبول.
+        $ok = StatementIntegrity::evaluate(0, $this->chain(0, [[$max - 5, 0], [5, 0]]), $max, 2);
+        $this->assertTrue($ok['passed']);
+        $this->assertSame($max, $ok['totals']['debit_minor']);
+        $this->assertSame($max, $ok['totals']['net_minor']);
+
+        // مجموع المدين = MAX + 1 ⇒ مرفوض، والرصيد الجاري يتجاوز النطاق أيضاً فلا سلسلة تُقبل.
+        $rows = [
+            ['debit' => $max, 'credit' => 0, 'balance' => $max],
+            ['debit' => 1, 'credit' => 0, 'balance' => $max], // رصيد "آمن" مزيَّف لا يطابق المحسوب
+        ];
+        $over = StatementIntegrity::evaluate(0, $rows, $max, 2);
+        $this->assertFalse($over['passed']);
+        $this->assertContains('computed_values_within_safe_range', $over['failed']);
+        $this->assertContains('running_balance_chain', $over['failed']);
+        $this->assertNoPartialTotals($over);
+    }
+
+    #[Test]
+    public function the_negative_boundary_of_every_computed_sum_is_enforced(): void
+    {
+        $max = StatementIntegrity::MAX_SAFE_MINOR;
+
+        // صافي = −MAX تماماً ⇒ مقبول (التماثل مع الحد الموجب).
+        $ok = StatementIntegrity::evaluate(0, $this->chain(0, [[0, $max - 5], [0, 5]]), -$max, 2);
+        $this->assertTrue($ok['passed']);
+        $this->assertSame($max, $ok['totals']['credit_minor']);
+        $this->assertSame(-$max, $ok['totals']['net_minor']);
+
+        // مجموع الدائن = MAX + 1 ⇒ مرفوض بلا إجماليات جزئية.
+        $rows = [
+            ['debit' => 0, 'credit' => $max, 'balance' => -$max],
+            ['debit' => 0, 'credit' => 1, 'balance' => -$max],
+        ];
+        $over = StatementIntegrity::evaluate(0, $rows, -$max, 2);
+        $this->assertFalse($over['passed']);
+        $this->assertContains('computed_values_within_safe_range', $over['failed']);
+        $this->assertNoPartialTotals($over);
+    }
+
+    #[Test]
+    public function a_negative_running_balance_at_the_limit_passes_and_one_beyond_is_rejected(): void
+    {
+        $max = StatementIntegrity::MAX_SAFE_MINOR;
+        $rows = [['debit' => 0, 'credit' => 1, 'balance' => -$max]];
+        $r = StatementIntegrity::evaluate(-$max + 1, $rows, -$max, 1);
+        $this->assertTrue($r['passed'], 'الحد السالب نفسه مقبول: −MAX.');
+
+        $r2 = StatementIntegrity::evaluate(-$max, [['debit' => 0, 'credit' => 1, 'balance' => -$max - 1]], -$max - 1, 1);
+        $this->assertFalse($r2['passed']);
+        $this->assertContains('minor_units_are_integers', $r2['failed'], 'رصيد خارج النطاق السالب يُرفض كمُدخَل.');
+        $this->assertNoPartialTotals($r2);
+    }
+
+    #[Test]
+    public function an_unsafe_intermediate_running_balance_fails_the_chain_not_a_silent_float(): void
+    {
+        // الرصيدان المُعلنان آمنان لكن المسار المعاد حسابه يمرّ بقيمة خارج النطاق (MAX + 1 ثم العودة).
+        $max = StatementIntegrity::MAX_SAFE_MINOR;
+        $rows = [
+            ['debit' => $max, 'credit' => 0, 'balance' => $max],
+            ['debit' => 1, 'credit' => 0, 'balance' => $max],   // المعاد: MAX+1 (خارج)
+            ['debit' => 0, 'credit' => 1, 'balance' => $max],   // المعاد: يبقى مكسوراً
+        ];
+        $r = StatementIntegrity::evaluate(0, $rows, $max, 3);
+
+        $this->assertFalse($r['passed']);
+        $this->assertContains('running_balance_chain', $r['failed']);
+        $this->assertNoPartialTotals($r);
+    }
+
+    #[Test]
+    public function the_row_count_check_only_compares_rows_examined_with_rows_emitted(): void
+    {
+        // القارن هنا عدد المُخرَج: يكشف صفاً مفقوداً/مكرَّراً في طبقة التسلسل، ولا يملك مصدراً مستقلاً للاكتمال.
+        $rows = $this->chain(0, [[100, 0], [0, 30]]);
+        $this->assertSame([], StatementIntegrity::evaluate(0, $rows, 70, 2)['failed']);
+        $this->assertSame(['row_count_matches_rows'], StatementIntegrity::evaluate(0, $rows, 70, 1)['failed']);
+        // بلا عدد مُخرَج معلوم لا يُدّعى فحص.
+        $this->assertSame([], StatementIntegrity::evaluate(0, $rows, 70)['failed']);
     }
 
     #[Test]

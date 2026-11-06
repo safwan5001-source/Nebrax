@@ -1058,7 +1058,7 @@ export const OPENAPI_MODEL: OpenApiModel = {
                     "required": true,
                     "nullable": false,
                     "readOnly": false,
-                    "description": "Computed server-side from the source rows with integer arithmetic."
+                    "description": "Computed server-side from the source rows with integer arithmetic. If a sum cannot be computed safely (a non-integer value, or a total/running balance beyond +/-(2^53-1)), `debit_minor`, `credit_minor` and `net_minor` are all `null` - never a partial or zero placeholder - and the report is never `final`."
                   },
                   {
                     "name": "balance_convention",

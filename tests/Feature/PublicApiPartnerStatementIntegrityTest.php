@@ -367,6 +367,16 @@ class PublicApiPartnerStatementIntegrityTest extends TestCase
             'closing mismatch'    => [fn (array $s) => tap($s, fn (&$x) => $x['closing_balance'] = 7), 'closing_equals_opening_plus_net'],
             'float amount'        => [fn (array $s) => tap($s, fn (&$x) => $x['rows'][0]['debit'] = 100.0), 'minor_units_are_integers'],
             'numeric string'      => [fn (array $s) => tap($s, fn (&$x) => $x['rows'][0]['credit'] = '0'), 'minor_units_are_integers'],
+            'unsafe totals'       => [fn (array $s) => tap($s, function (&$x) {
+                $big = 4503599627370496; // 2^52: كل حركة والرصيد الجاري آمنان، وإجمالي كل جانب 3×2^52 > 2^53−1
+                $rows = [];
+                for ($i = 0; $i < 3; $i++) {
+                    $rows[] = ['date' => '2026-03-10', 'number' => 'D'.$i, 'description' => null, 'debit' => $big, 'credit' => 0, 'balance' => $big, 'source' => null];
+                    $rows[] = ['date' => '2026-03-10', 'number' => 'C'.$i, 'description' => null, 'debit' => 0, 'credit' => $big, 'balance' => 0, 'source' => null];
+                }
+                $x['rows'] = $rows;
+                $x['closing_balance'] = 0;
+            }), 'computed_values_within_safe_range'],
             'beyond safe range'   => [fn (array $s) => tap($s, function (&$x) {
                 $big = 9007199254740993;
                 $x['rows'] = [['date' => '2026-03-10', 'number' => 'B', 'description' => null, 'debit' => $big, 'credit' => 0, 'balance' => $big, 'source' => null]];
@@ -406,10 +416,20 @@ class PublicApiPartnerStatementIntegrityTest extends TestCase
 
         // السبب الجذري يظهر دائماً. فشل سلامة الأعداد الصحيحة يُسقط تبعاً الفحوص التي لا يمكن تقييمها بدونه.
         $this->assertContains($failedCheck, $response->json('data.integrity.failed_checks'));
-        if ($failedCheck !== 'minor_units_are_integers') {
+        if (in_array($failedCheck, ['running_balance_chain', 'closing_equals_opening_plus_net'], true)) {
             $this->assertSame([$failedCheck], $response->json('data.integrity.failed_checks'), 'خلل واحد ⇒ فحص واحد فاشل.');
         }
+        if ($failedCheck === 'computed_values_within_safe_range') {
+            // الإجماليات غير قابلة للحساب الآمن فلا يمكن التحقق من الختامي = الافتتاحي + الصافي، لكن السلسلة سليمة وكل مُدخَل آمن.
+            $this->assertSame(['computed_values_within_safe_range', 'closing_equals_opening_plus_net'], $response->json('data.integrity.failed_checks'));
+        }
         $this->assertNotSame('final', $response->json('data.report_status'));
+        // عند عجز الجمع لا إجماليات جزئية: كل المجاميع null لا صفر مضلّل.
+        if (in_array($failedCheck, ['computed_values_within_safe_range', 'minor_units_are_integers'], true)) {
+            foreach (['debit_minor', 'credit_minor', 'net_minor'] as $key) {
+                $this->assertNull($response->json('data.totals.'.$key), $key);
+            }
+        }
     }
 
     #[Test]

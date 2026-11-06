@@ -17,7 +17,9 @@ namespace App\Support;
  *   صحتها كوحدات فعلية.
  * - **`report_status`**: `final` فقط حين العملة مدعومة وكل الفحوص ناجحة والنتيجة كاملة؛ وإلا `unverified` (فحص فشل)
  *   أو `partial` (نتيجة غير مكتملة) أو `unsupported`. لا `display` ولا `position` إلا مع `final`/`partial` سليمين.
- * - لا `float` ولا تقريب ولا قسمة هنا؛ الحساب كله في `StatementIntegrity` بأعداد صحيحة.
+ * - لا `float` ولا تقريب ولا قسمة هنا؛ الحساب كله في `StatementIntegrity` بأعداد صحيحة، وحدّ `2^53−1` يسري على كل مجموع
+ *   ورصيد وسيط محسوب. عند فشل الجمع تكون `totals.debit_minor/credit_minor/net_minor = null` (لا إجماليات جزئية مضللة).
+ * - `row_count_matches_rows` ليس إثبات اكتمال مستقلاً (العددان مشتقان من الصفوف نفسها)؛ الاكتمال المستقل في AIA-0.2.
  */
 final class PartnerStatementEnvelope
 {
@@ -31,22 +33,29 @@ final class PartnerStatementEnvelope
     public const SIDE_SETTLED = 'settled';
 
     /** ما لا تغطيه الفحوص صراحةً: يُعلَن كي لا يُقرأ «verified» كمطابقة مع دفاتر أخرى. */
-    private const NOT_CHECKED = ['role_attribution_independent_verification', 'source_documents_reconciliation'];
+    private const NOT_CHECKED = [
+        'role_attribution_independent_verification',
+        'source_documents_reconciliation',
+        // AIA-0.1 لا يملك مصدراً مستقلاً لعدد الحركات المتوقع؛ تحقق الاكتمال المستقل مؤجَّل إلى AIA-0.2.
+        'completeness_independent_verification',
+    ];
 
     /**
      * @param  array{partner?:array, opening_balance:mixed, rows:array, closing_balance:mixed}  $statement  ناتج `ReportService::partnerStatement` كما هو
      * @param  mixed  $currency  رمز عملة المستأجر كما خُزِّن
      * @param  bool  $complete  `false` ⇒ نتيجة جزئية (لا `final`)
+     * @param  int|null  $emittedRowCount  عدد الصفوف المُخرَجة في الاستجابة فعلاً. المقارنة به تحرس طبقة التسلسل فقط
+     *                                     (صف مفقود/مكرَّر)، **وليست إثبات اكتمال مستقلاً** لأن العددين مشتقان من المصفوفة نفسها (AIA-0.2).
      * @return array<string, mixed>
      */
-    public static function build(array $statement, ?string $role, mixed $currency, bool $complete = true): array
+    public static function build(array $statement, ?string $role, mixed $currency, bool $complete = true, ?int $emittedRowCount = null): array
     {
         $rows = $statement['rows'] ?? [];
         $evaluation = StatementIntegrity::evaluate(
             $statement['opening_balance'] ?? null,
             $rows,
             $statement['closing_balance'] ?? null,
-            count($rows),
+            $emittedRowCount,
         );
 
         $exponent = CurrencyMinorUnits::exponentFor($currency);
@@ -122,7 +131,7 @@ final class PartnerStatementEnvelope
      * نصوص جاهزة بصيغة `Money::toRiyal` حرفياً (أرقام 0–9، نقطة عشرية، بلا فاصل آلاف). الإجماليات والأرصدة المطلقة
      * بجانب صريح؛ `net` بإشارته.
      *
-     * @param  array{debit_minor:int, credit_minor:int, net_minor:int, row_count:int}  $totals
+     * @param  array{debit_minor:int, credit_minor:int, net_minor:int, row_count:int}  $totals  غير فارغة هنا: لا يُستدعى إلا والفحوص ناجحة
      * @return array<string, mixed>
      */
     private static function display(array $statement, array $totals, string $currency): array

@@ -1117,8 +1117,14 @@ components:
       properties:
         id:
           type: string
+          description: >
+            `computed_values_within_safe_range` fails when any computed total, running balance or expected closing
+            exceeds +/-(2^53-1) even if every single movement is safe. `row_count_matches_rows` compares the rows
+            examined with the rows emitted; both derive from the same array, so it guards serialization only and is
+            NOT an independent proof that the source data is complete (independent completeness checking is deferred).
           enum:
             - minor_units_are_integers
+            - computed_values_within_safe_range
             - amounts_are_non_negative
             - running_balance_chain
             - closing_equals_opening_plus_net
@@ -1164,13 +1170,16 @@ components:
         row_count: { type: integer, minimum: 0, description: Number of movements in `rows` (equals `totals.row_count`). }
         totals:
           type: object
-          description: Computed server-side from the source rows with integer arithmetic.
+          description: >
+            Computed server-side from the source rows with integer arithmetic. If a sum cannot be computed safely
+            (a non-integer value, or a total/running balance beyond +/-(2^53-1)), `debit_minor`, `credit_minor` and
+            `net_minor` are all `null` - never a partial or zero placeholder - and the report is never `final`.
           required: [row_count, debit_minor, credit_minor, net_minor]
           properties:
             row_count: { type: integer, minimum: 0 }
-            debit_minor: { $ref: '#/components/schemas/MinorAmount' }
-            credit_minor: { $ref: '#/components/schemas/MinorAmount' }
-            net_minor: { $ref: '#/components/schemas/MinorAmount' }
+            debit_minor: { type: [integer, 'null'], format: int64 }
+            credit_minor: { type: [integer, 'null'], format: int64 }
+            net_minor: { type: [integer, 'null'], format: int64 }
         balance_convention:
           type: object
           required: [formula, positive_means, negative_means]
@@ -1216,7 +1225,9 @@ components:
             not_checked:
               type: array
               items: { type: string }
-              description: Aspects the checks explicitly do not cover (so `verified` is not read as a reconciliation against other books).
+              description: >
+                Aspects the checks explicitly do not cover (so `verified` is not read as a reconciliation against
+                other books or as proof of completeness; independent completeness verification is deferred).
         report_status:
           type: string
           enum: [final, partial, unverified, unsupported]
