@@ -85,7 +85,7 @@ class FuelReceivingAppContractTest extends TestCase
             'fuel_station_id' => $s1->id, 'fuel_tank_id' => $t1->id, 'reading_type' => 'physical', 'quantity_liters' => '110.000', 'evidence_key' => 'b5-after',
         ])->assertCreated()->json('data');
 
-        $payload = $this->deliveryPayload($s1, $t1, $this->fx['wA1'], 'b5-dlv-1') + [
+        $payload = $this->withoutCost($this->deliveryPayload($s1, $t1, $this->fx['wA1'], 'b5-dlv-1')) + [
             'tanker_identifier' => 'TNK-1', 'driver_name' => 'سائق', 'before_physical_reading_id' => $before['id'], 'after_physical_reading_id' => $after['id'],
         ];
         $created = $this->withToken($supervisor['token'])->postJson(self::BASE . '/deliveries', $payload)->assertCreated()->json('data');
@@ -102,9 +102,13 @@ class FuelReceivingAppContractTest extends TestCase
         $this->assertSame(110000, $show['readings']['after_physical']['quantity_milliliters']);
         $this->assertArrayNotHasKey('received_total_cost_minor', $show);
 
-        // المالك (يملك التكلفة عبر *) يراها كما كان.
+        // لم تُسجَّل تكلفة بعد: المشرف يرى الحالة لا المبلغ، والمالك يرى null (لا صفر).
+        $this->assertFalse($created['cost_recorded']);
         $owner = $this->withToken($this->fx['owner'])->getJson(self::BASE . '/deliveries/' . $created['id'])->assertOk()->json('data');
-        $this->assertSame(2345, $owner['received_total_cost_minor']);
+        $this->assertNull($owner['received_total_cost_minor']);
+        $this->assertFalse($owner['cost_recorded']);
+        $this->setCostDirectly($created['id']);
+        $this->assertSame(2345, $this->withToken($this->fx['owner'])->getJson(self::BASE . '/deliveries/' . $created['id'])->assertOk()->json('data.received_total_cost_minor'));
     }
 
     /** @test */
@@ -113,7 +117,7 @@ class FuelReceivingAppContractTest extends TestCase
         $this->buildFixture();
         ['supervisor' => $supervisor, 'manager' => $manager] = $this->staff();
         config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
-        $payload = $this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b5-dlv-2');
+        $payload = $this->withoutCost($this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b5-dlv-2'));
 
         $movements = StockMovement::count();
         $entries = JournalEntry::count();
@@ -122,6 +126,7 @@ class FuelReceivingAppContractTest extends TestCase
         $this->assertSame(1, FuelDelivery::count());
         $this->assertSame($movements, StockMovement::count());
         $this->assertSame($entries, JournalEntry::count());
+        $this->setCostDirectly($draft['id']);
 
         // المشرف لا يعتمد (لا مفتاح)، والمدير يعتمد استلام غيره.
         $this->withToken($supervisor['token'])->postJson(self::BASE . '/deliveries/' . $draft['id'] . '/approve')->assertForbidden();
@@ -144,7 +149,8 @@ class FuelReceivingAppContractTest extends TestCase
         $this->buildFixture();
         ['manager' => $manager] = $this->staff();
         config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
-        $draft = $this->withToken($manager['token'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b5-dlv-3'))->assertCreated()->json('data');
+        $draft = $this->withToken($manager['token'])->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($this->fx['s1'], $this->fx['t1'], $this->fx['wA1'], 'b5-dlv-3')))->assertCreated()->json('data');
+        $this->setCostDirectly($draft['id']);
         $this->assertSame($manager['user']->id, $draft['created_by']);
 
         $movements = StockMovement::count();

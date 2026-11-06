@@ -889,6 +889,10 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **الصلاحيات:** `fuel.delivery.view|create|approve` + `fuel.reading.record` (أو `fuel_stations.manage` القديم)، والتكلفة `products.view_cost` وحدها (غيابها ⇒ المفتاح محذوف من الاستجابة). **بدء استلام من التطبيق يتطلب التكلفة** لأنها إلزامية في الإنشاء (D-B5-1 للمالك).
 - **API إضافية (قراءة فقط):** `GET fuel-stations/delivery-suppliers` وإثراء `FuelDeliveryResource` (أسماء، `created_by`، قراءات مربوطة).
 
+### FUEL-B5.1 — الاستلام بلا تكلفة، المرفقات، التكلفة المنفصلة، الطباعة والتصدير (هجرة واحدة)
+
+التفاصيل: `docs/fuel-stations/FUEL_REMEDIATION_HORIZON.md` (B5.1). **التكلفة NULL = لم تُسجَّل (لا صفر)**: `received_*_cost_minor` nullable + `cost_recorded_by/at`؛ موظف المحطة ينشئ المسودة بلا تكلفة، وتسجّلها المالية بـ`POST deliveries/{id}/cost` (موجب، مسودة فقط، `FuelDeliveryCostAuthority` = `fuel.delivery.cost.record` أو `fuel_stations.manage` **و** `products.view_cost`، تدقيق بلا مبلغ، **لا أثر مخزني/محاسبي**). الاعتماد (`assertApprovable`) يشترط تكلفة مسجَّلة فقط، و`expected_total_cost_minor` اختياري لمن يرى التكلفة (409 عند تغيّرها). **رقم سند المورد `delivery_note_number` إلزامي لإنشاء أي استلام جديد** (`FUEL_DELIVERY_NOTE_REQUIRED`؛ المرفق وحده لا يكفي)، والمرفق اختياري، والاستلامات القائمة قبل B5.1 لا تُحجب عن الاعتماد بسبب غياب السند/المرفق؛ **رقم الاستلام الداخلي `FD-XXXXXXXX` (`reference`) ≠ رقم سند المورد** ولا يختلطان في أي سطح. مرفقات السند: `fuel_delivery_attachments` فوق `AttachmentStorage` + `DocumentFileInspector` (PDF/JPG/PNG ≤ 10MB). السند والكشف من `FuelDeliveryDocumentBuilder` وحده: تشغيلية بلا أي مبلغ، ومالية 403 لغير من يرى التكلفة؛ PDF يُرسم في المتصفح من حمولة الخادم، وExcel من الخادم. لا تُضف مساراً يكتب `received_*_cost_minor` خارج `FuelSupplyReceivingService`.
+
 ## إقرار تحصيل الوردية — Fuel Shift Collection Declaration (مغلق افتراضياً، تشغيلي فقط)
 
 مبيعات الوردية المشتقة من العدادات (فرق العدادين × سعر اللتر الفعّال) مقابل ما حُصِّل حسب طريقة الدفع. العقد الكامل: `docs/fuel-stations/AWJ_FUEL_SHIFT_COLLECTION_RECONCILIATION_CONTRACT.md`.

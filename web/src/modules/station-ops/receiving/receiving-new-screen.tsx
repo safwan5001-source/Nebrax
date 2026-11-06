@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { CheckCircle2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, FileText, TriangleAlert, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStationOps } from '../context';
 import { useStationAssets } from '../data';
@@ -17,21 +17,24 @@ import { findDeliveryByIntent, runCreate, type FlowInput, type FlowResult } from
 import { useReceivingAccess, useStationWarehouse, useSuppliers } from './data';
 import { clearForm, formKey, loadForm, saveForm } from './form-draft';
 import { EMPTY_FORM, STEPS, evaluate, stepIssues, type FormValues, type Issue, type StepId, type Warning } from './logic';
-import { Cost, FailureNotice, Liters, RECEIVING_BASE, VarianceText, type AnyFailure } from './parts';
+import { formatBytes, type FileCheck } from './attachments';
+import { FilePicker } from './file-picker';
+import { FailureNotice, Liters, RECEIVING_BASE, VarianceText, type AnyFailure } from './parts';
+import { uploadAttachments } from './receiving-client';
 import type { Delivery } from './schemas';
 
 const INTENT = 'rcv-create';
 
-function TextField({ id, label, value, onChange, hint, maxLength = 128, multiline = false, disabled = false }: {
-  id: string; label: string; value: string; onChange: (value: string) => void; hint?: string; maxLength?: number; multiline?: boolean; disabled?: boolean;
+function TextField({ id, label, value, onChange, hint, maxLength = 128, multiline = false, disabled = false, required = false }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; hint?: string; maxLength?: number; multiline?: boolean; disabled?: boolean; required?: boolean;
 }) {
   const cls = 'mt-1.5 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60';
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="block text-sm font-medium text-text">{label}</label>
+      <label htmlFor={id} className={cn('block text-sm font-medium text-text', required && "after:ms-1 after:text-negative after:content-['*']")}>{label}</label>
       {multiline
         ? <textarea id={id} value={value} maxLength={maxLength} rows={2} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`${cls} py-3`} />
-        : <input id={id} type="text" value={value} maxLength={maxLength} disabled={disabled} autoComplete="off" onChange={(event) => onChange(event.target.value)} className={`${cls} h-12`} />}
+        : <input id={id} type="text" value={value} maxLength={maxLength} disabled={disabled} required={required} aria-required={required || undefined} autoComplete="off" onChange={(event) => onChange(event.target.value)} className={`${cls} h-12`} />}
       {hint ? <p className="mt-1 text-xs leading-5 text-muted">{hint}</p> : null}
     </div>
   );
@@ -43,7 +46,7 @@ function StepHeader({ step }: { step: StepId }) {
   return (
     <nav aria-label={t('receiving.wizard.steps')}>
       <p className="text-sm text-muted"><span className="num">{t('receiving.wizard.stepOf', { step: index + 1, total: STEPS.length })}</span> · <span className="font-semibold text-text">{t(`receiving.wizard.step.${step}`)}</span></p>
-      <ol className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
+      <ol className="mt-2 grid grid-cols-5 gap-1.5" aria-hidden="true">
         {STEPS.map((id, i) => <li key={id} className={cn('h-1.5 rounded-full', i <= index ? 'bg-primary' : 'bg-border')} />)}
       </ol>
     </nav>
@@ -85,6 +88,9 @@ function Wizard({ station }: { station: Station }) {
   const [stopped, setStopped] = useState<{ failure: AnyFailure; stage: string } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [created, setCreated] = useState<Delivery | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [rejectedFiles, setRejectedFiles] = useState<FileCheck['rejected']>([]);
+  const [uploadState, setUploadState] = useState<{ status: 'idle' | 'uploading' | 'done' } | { status: 'failed'; failure: AnyFailure }>({ status: 'idle' });
   const inFlight = useRef(false);
   const lastInput = useRef<FlowInput | null>(null);
   const savedReadings = useRef<{ signature: string; ids: { before?: string; after?: string } } | null>(null);
@@ -141,6 +147,7 @@ function Wizard({ station }: { station: Station }) {
         intents.clear(INTENT);
         clearForm(key);
         setCreated(result.delivery);
+        await sendFiles(result.delivery.id);
         return;
       }
       const failure = result.failure;
@@ -159,8 +166,18 @@ function Wizard({ station }: { station: Station }) {
     setChecking(true);
     const found = await findDeliveryByIntent(lastInput.current);
     setChecking(false);
-    if (found) { intents.clear(INTENT); clearForm(key); setCreated(found); } else setNotFound(true);
+    if (found) { intents.clear(INTENT); clearForm(key); setCreated(found); await sendFiles(found.id); } else setNotFound(true);
   };
+
+  /** رفع مرفقات السند بعد وجود المسودة (يحتاج معرّفها). فشله لا يُلغي المسودة: تبقى محفوظة والمستخدم يعيد الرفع صراحةً من هنا أو من التفاصيل. */
+  const sendFiles = async (deliveryId: string) => {
+    if (files.length === 0) return;
+    setUploadState({ status: 'uploading' });
+    const outcome = await uploadAttachments(deliveryId, files, { branchId: station.branch_id });
+    if (outcome.kind === 'ok') { setUploadState({ status: 'done' }); setFiles([]); } else setUploadState({ status: 'failed', failure: outcome });
+  };
+
+  const picked = (result: FileCheck) => { setRejectedFiles(result.rejected); setFiles((current) => [...current, ...result.accepted].slice(0, 5)); };
 
   if (created) {
     return (
@@ -168,6 +185,15 @@ function Wizard({ station }: { station: Station }) {
         <CheckCircle2 aria-hidden="true" className="mx-auto h-9 w-9 text-positive" strokeWidth={1.7} />
         <h2 className="text-lg font-semibold text-text">{t('receiving.created.title')}</h2>
         <p className="mx-auto max-w-sm text-sm leading-6 text-muted">{t('receiving.created.body')}</p>
+        {uploadState.status === 'uploading' ? <p role="status" data-upload-state="uploading" className="text-sm text-muted">{t('receiving.attach.uploading')}</p> : null}
+        {uploadState.status === 'done' ? <p role="status" data-upload-state="done" className="text-sm font-medium text-positive">{t('receiving.created.attached')}</p> : null}
+        {uploadState.status === 'failed' ? (
+          <div className="space-y-2 text-start" data-upload-state="failed">
+            <FailureNotice failure={uploadState.failure} />
+            <p className="text-sm leading-6 text-muted">{t('receiving.created.attachFailed')}</p>
+            <SecondaryButton data-retry-upload="" onClick={() => void sendFiles(created.id)}>{t('receiving.created.retryUpload')}</SecondaryButton>
+          </div>
+        ) : null}
         <Link href={`${RECEIVING_BASE}/${created.id}`} data-primary-action="" className="inline-flex min-h-12 w-full items-center justify-center rounded-[13px] bg-[color:var(--fo-cta-bg)] px-4 text-[15px] font-bold text-[color:var(--fo-cta-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('receiving.created.open')}</Link>
         <Link href={RECEIVING_BASE} className="inline-flex min-h-12 w-full items-center justify-center rounded-[13px] border border-[color:var(--fo-control)] px-4 text-[15px] font-bold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('receiving.created.list')}</Link>
       </div>
@@ -226,7 +252,7 @@ function Wizard({ station }: { station: Station }) {
 
           <SectionCard title={t('receiving.wizard.referencesTitle')} id="rcv-refs-h">
             <div className="space-y-4">
-              <TextField id="rcv-note" label={t('receiving.field.deliveryNote')} value={form.deliveryNote} onChange={(v) => set('deliveryNote', v)} hint={t('receiving.wizard.deliveryNoteHint')} />
+              <TextField id="rcv-note" required label={t('receiving.field.deliveryNote')} value={form.deliveryNote} onChange={(v) => set('deliveryNote', v)} hint={t('receiving.wizard.deliveryNoteHint')} />
               <TextField id="rcv-po" label={t('receiving.field.purchaseRef')} value={form.purchaseRef} onChange={(v) => set('purchaseRef', v)} />
               <TextField id="rcv-tanker" label={t('receiving.field.tanker')} value={form.tanker} onChange={(v) => set('tanker', v)} />
               <TextField id="rcv-driver" label={t('receiving.field.driver')} value={form.driver} onChange={(v) => set('driver', v)} maxLength={255} />
@@ -241,7 +267,6 @@ function Wizard({ station }: { station: Station }) {
             <div className="space-y-4">
               <NumberField label={t('receiving.field.dispatched')} value={form.dispatched} onChange={(v) => set('dispatched', v)} suffix={t('receiving.unit')} testId="rcv-dispatched" />
               <NumberField label={t('receiving.field.received')} value={form.received} onChange={(v) => set('received', v)} suffix={t('receiving.unit')} testId="rcv-received" />
-              <NumberField label={t('receiving.field.cost')} value={form.cost} onChange={(v) => set('cost', v)} suffix={t('receiving.currency')} hint={t('receiving.wizard.costHint')} testId="rcv-cost" />
               <TextField id="rcv-notes" label={t('receiving.field.notes')} value={form.notes} onChange={(v) => set('notes', v)} maxLength={1000} multiline />
             </div>
           </SectionCard>
@@ -272,6 +297,32 @@ function Wizard({ station }: { station: Station }) {
         </div>
       ) : null}
 
+      {step === 'documents' ? (
+        <div className="space-y-5">
+          <SectionCard title={t('receiving.attach.stepTitle')} id="rcv-doc-h">
+            <p className="mb-3 text-sm leading-6 text-muted">{t('receiving.attach.stepHint')}</p>
+            <FilePicker existing={files.length} onPicked={picked} />
+            {rejectedFiles.length > 0 ? (
+              <ul role="alert" data-rejected-files="" className="mt-3 space-y-1 rounded-[12px] bg-[color:var(--fo-negative-tint)] p-3 text-sm leading-6 text-negative">
+                {rejectedFiles.map((item, index) => <li key={`${item.name}-${index}`} dir="auto">{item.name} — {t(`receiving.attach.reject.${item.reason}`)}</li>)}
+              </ul>
+            ) : null}
+            {files.length > 0 ? (
+              <ul className="mt-3 space-y-1.5" data-staged="">
+                {files.map((file, index) => (
+                  <li key={`${file.name}-${index}`} className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-3 py-2 text-sm">
+                    <FileText aria-hidden="true" className="h-4 w-4 shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1 truncate" dir="auto">{file.name}</span>
+                    <span className="num text-xs text-muted">{formatBytes(file.size)}</span>
+                    <button type="button" aria-label={`${t('receiving.attach.unstage')}: ${file.name}`} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))} className="grid h-11 w-11 shrink-0 place-items-center rounded-md hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden="true" className="h-4 w-4" /></button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-3 text-sm text-muted" data-no-staged="">{t('receiving.attach.stepNone')}</p>}
+          </SectionCard>
+        </div>
+      ) : null}
+
       {step === 'review' ? (
         <div className="space-y-5">
           <SectionCard title={t('receiving.wizard.step.review')} id="rcv-rev-h">
@@ -285,7 +336,7 @@ function Wizard({ station }: { station: Station }) {
               <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.field.dispatched')}</dt><dd><Liters ml={evaluation.dispatchedMl} /></dd></div>
               <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.field.received')}</dt><dd><Liters ml={evaluation.receivedMl} /></dd></div>
               <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.detail.transitVariance')}</dt><dd><VarianceText ml={evaluation.transitVarianceMl} /></dd></div>
-              <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.field.cost')}</dt><dd>{evaluation.costMinor === null ? '—' : <Cost minor={evaluation.costMinor} />}</dd></div>
+              <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.attach.title')}</dt><dd className="num" data-review-files="">{files.length}</dd></div>
               <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.detail.before')}</dt><dd><Liters ml={evaluation.beforeMl} /></dd></div>
               <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.detail.after')}</dt><dd><Liters ml={evaluation.afterMl} /></dd></div>
               {evaluation.tankGainDiffMl !== null ? <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">{t('receiving.detail.gainVsReceived')}</dt><dd><VarianceText ml={evaluation.tankGainDiffMl} /></dd></div> : null}
@@ -320,8 +371,7 @@ export function ReceivingNewScreen() {
       <PageMasthead title={t('receiving.wizard.title')} subtitle={t('receiving.wizard.subtitle')} backHref={RECEIVING_BASE} backLabel={t('receiving.title')} />
       <ScreenBody>
         {!access.create ? <EmptyState title={t('receiving.wizard.noCreate.title')} body={t('receiving.wizard.noCreate.body')} />
-          : !access.seeCost ? <EmptyState title={t('receiving.wizard.needsCost.title')} body={t('receiving.wizard.needsCost.body')} />
-            : <StationGate>{(station) => <Wizard station={station} />}</StationGate>}
+          : <StationGate>{(station) => <Wizard station={station} />}</StationGate>}
       </ScreenBody>
     </>
   );

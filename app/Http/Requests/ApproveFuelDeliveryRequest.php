@@ -12,6 +12,8 @@ class ApproveFuelDeliveryRequest extends FormRequest
     {
         return [
             'reason' => ['nullable', 'string', 'max:1000'],
+            // FUEL-B5.1: التكلفة التي راجعها المعتمِد؛ تغيّرها قبل الاعتماد ⇒ 409. لا تُقبل إلا ممن يرى التكلفة (يفحصه المتحكّم) كي لا تصير قناة استدلال.
+            'expected_total_cost_minor' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

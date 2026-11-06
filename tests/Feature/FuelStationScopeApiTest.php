@@ -30,6 +30,7 @@ use Tests\TestCase;
 class FuelStationScopeApiTest extends TestCase
 {
     use RefreshDatabase;
+    use GivesFuelDeliveryCost;
     use InteractsWithApi;
 
     /** @test */
@@ -50,7 +51,7 @@ class FuelStationScopeApiTest extends TestCase
 
         // وفي نطاقه الخاص يعمل كالمعتاد (لا حجب زائد).
         $this->withToken($token)->postJson('/api/fuel-stations/readings', $this->readingPayload($f['station_a'], $f['tank_a'], 'scope-a-1'))->assertCreated();
-        $this->withToken($token)->postJson('/api/fuel-stations/deliveries', $this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'scope-a-1'))->assertCreated();
+        $this->withToken($token)->postJson('/api/fuel-stations/deliveries', $this->withoutCost($this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'scope-a-1')))->assertCreated();
     }
 
     /** @test */
@@ -79,7 +80,7 @@ class FuelStationScopeApiTest extends TestCase
         $this->assertNotNull($reading['id']);
 
         // وهو نفسه يعمل على محطة مخزنه المسموح.
-        $this->withToken($token)->postJson('/api/fuel-stations/deliveries', $this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'wh-in-1'))->assertCreated();
+        $this->withToken($token)->postJson('/api/fuel-stations/deliveries', $this->withoutCost($this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'wh-in-1')))->assertCreated();
         $this->withToken($token)->getJson('/api/fuel-stations/deliveries')->assertOk()->assertJsonCount(1, 'data');
         $this->assertSame('draft', FuelDelivery::where('id', $delivery['id'])->value('status'));
     }
