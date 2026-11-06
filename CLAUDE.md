@@ -822,6 +822,13 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **النشر:** الكود أولاً ثم الهجرة. نسخة أقدم من الخدمة أثناء إيقاف قائم تُرفض بخطأ قاعدة (500) بدل 422 (فشل مغلق). D-B5 (أثر محاسبي/ضريبي لتأخر الاستردادات ومهل الإصدار) **غير معتمد** لتفعيل إنتاجي.
 - المرجع: `docs/audits/horizon/REM-18b-3d-IMPLEMENTATION-REPORT.md` و`REM-18b-3c-EMERGENCY-STOP-POLICY-B-CONTRACT-PROPOSAL.md`.
 
+## حماية عملة المؤسسة — CUR-1 (D-12)
+
+`PUT /company` لا يغيّر `tenants.currency` إلى قيمة **مختلفة** (بعد التطبيع إلى أحرف كبيرة) ما دام للمؤسسة قيد `posted` أو `reversed`: **422** بجسم `{message, reason: "company_currency_locked", errors:{currency:[…]}}` وتراجع كامل (لا حفظ جزئي لبقية حقول الشركة). `App\Services\Accounting\CompanyCurrencyGuard` هو المصدر الوحيد للقاعدة؛ و`App\Support\Iso4217` قائمة رموز ISO 4217 الصالحة (155 رمزاً من SIX list-one بتاريخ 2026-09-17؛ مستبعد: الصناديق والمعادن والوحدات الحسابية وXXX/XTS) — **رموز فقط بلا منازل عشرية** (تفسير القيم المخزّنة قرار D-12 الخيار C المنفصل).
+- **العملة نفسها (ولو اختلفت الأحرف) ليست تغييراً**: لا كتابة ولا رفض، ولا إعادة كتابة تلقائية لرمز تاريخي (`sar` أو غير ISO مخزَّن). `currency` غائب/`null`/`''` = لا تغيير مطلوب (كان `null` يسقط في قيد NOT NULL).
+- **التزامن بلا قفل جديد:** التحديث كله في معاملة تقفل صفّ المستأجر `FOR UPDATE` **أولاً** (مِرساة كل ترحيل/عكس قيد عبر `AccountingDateGuard`) ثم يفحص القيود. **لا تنقل الفحص قبل القفل ولا تجعله «فحص ثم كتابة»**: عندها يمرّ التغيير فوق قيد يُودَع أثناء الانتظار (يحرسه `CompanyCurrencyRacePostgresTest`).
+- لا تحويل عملات ولا مساس بـ`Money::toRiyal`/`ZatcaService::formatAmount`/ZATCA XML/البيانات التاريخية. المرجع: `docs/ai/reports/AIA-D12-CURRENCY-MONEY-CONTRACT-ASSESSMENT.md` §10 و`docs/ai/reports/CUR-1-IMPLEMENTATION-REPORT.md`.
+
 ## حقل الهاتف الدولي — INTL-PHONE-V1
 
 `web/src/components/ui/international-phone-input.tsx` (`InternationalPhoneInput`) هو حقل الهاتف المشترك؛ يستعمله `/register` أولاً ويصلح للعملاء والموردين والموظفين لاحقاً. المنطق في `web/src/lib/phone/` (`digits.ts` تطبيع الأرقام، `phone.ts` فوق libphonenumber-js `max`، `countries.ts` القائمة والبحث).
