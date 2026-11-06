@@ -31,6 +31,7 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'boolean'],
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'integer', 'min:0'],
+            'tank_reading_stale_after_minutes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:43200'],
             'shift_tank_tolerance_milliliters' => ['sometimes', 'integer', 'min:0'],
             'fuel_price_tax_mode' => ['sometimes', 'in:tax_inclusive,tax_exclusive'],
             'corporate_credit_enabled' => ['sometimes', 'boolean'],

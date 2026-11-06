@@ -69,9 +69,15 @@ export type RejectionCode =
   | 'cost_required' | 'cost_locked' | 'cost_changed' | 'note_required' | 'attachment_invalid' | 'attachment_limit' | 'attachment_locked'
   | 'idempotency_mismatch' | 'duplicate' | 'distinct_approver' | 'already_approved' | 'grni_missing' | 'cost_baseline' | 'warehouse_mismatch' | 'tank_mismatch'
   | 'product_inactive' | 'quantity_invalid' | 'cost_invalid' | 'evidence_exists' | 'reading_mismatch' | 'order_mismatch'
+  | 'reading_over_capacity' | 'reading_future' | 'reading_older' | 'tank_inactive'
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
 
 const KNOWN: ReadonlyArray<[RegExp, RejectionCode]> = [
+  // FUEL-B6: رموز قراءة الخزان الجديدة (الخادم يبدأ الرسالة بالرمز)
+  [/FUEL_READING_EXCEEDS_CAPACITY/, 'reading_over_capacity'],
+  [/FUEL_READING_FUTURE_TIME/, 'reading_future'],
+  [/FUEL_READING_OLDER_THAN_LATEST/, 'reading_older'],
+  [/FUEL_READING_TANK_INACTIVE/, 'tank_inactive'],
   [/FUEL_DELIVERY_COST_REQUIRED/, 'cost_required'],
   [/FUEL_DELIVERY_COST_LOCKED/, 'cost_locked'],
   [/FUEL_DELIVERY_COST_CHANGED/, 'cost_changed'],
@@ -141,7 +147,8 @@ async function send(path: string, body: unknown, options: { timeoutMs?: number; 
   }
 }
 
-export interface ReadingBody { fuel_station_id: string; fuel_tank_id: string; reading_type: 'physical' | 'atg'; quantity_liters: string; evidence_key: string }
+/** `evidence` (B6) اختياري: طريقة القياس وملاحظة قصيرة؛ لا `measured_at` أبداً — ساعة الخادم وحدها تختم الوقت. */
+export interface ReadingBody { fuel_station_id: string; fuel_tank_id: string; reading_type: 'physical' | 'atg'; quantity_liters: string; evidence_key: string; evidence?: { method?: string; note?: string } }
 
 export interface DeliveryBody {
   fuel_station_id: string;

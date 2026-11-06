@@ -10,11 +10,13 @@ use App\Models\FuelStation;
 use App\Models\FuelTank;
 use App\Models\FuelTankReading;
 use App\Models\ProductWarehouseStock;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\AccountRoleResolver;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\LedgerService;
 use App\Tenancy\BranchScope;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -34,9 +36,23 @@ class FuelReconciliationService
         private InventoryService $inventory,
         private LedgerService $ledger,
         private AccountRoleResolver $roles,
+        private FuelStationAuditTrail $audit,
     ) {}
 
-    /** @param array<string, mixed> $data */
+    /**
+     * FUEL-B6: تسجيل قراءة خزان مستقلة (دليل تشغيلي) — الكاتب الوحيد لـ`fuel_tank_readings`.
+     *
+     * **لا أثر مخزني أو محاسبي أبداً:** لا حركة مخزون ولا متوسط تكلفة ولا قيد ولا تسوية (يحرسه اختبار ساكن). التحويل إلى فروق = دورة التسوية.
+     *
+     * التحقق (بعد قفل صف الخزان `FOR UPDATE` فيتسلسل ما يخص الخزان الواحد):
+     *  1) الخزان ضمن المحطة وفرعها وغير معطَّل؛  2) الكمية ≤ سعة الخزان (لا سياسة معتمدة تسمح بالأكثر ⇒ رفض)؛
+     *  3) `measured_at` المرسَل صراحةً: ليس في المستقبل (بسماحية انحراف الساعة `device_max_future_skew_seconds`) وليس أقدم من آخر قراءة
+     *     من النوع نفسه للخزان (لا سياسة تأريخ معتمدة ⇒ رفض صريح لا قبول صامت)؛ غيابه ⇒ ساعة الخادم (وهو المسار المعتمد للتطبيق)؛
+     *  4) idempotency بمفتاح الدليل: نفس المفتاح مع نفس (المحطة، الخزان، النوع، الكمية، الفاعل) يعيد القراءة الأولى بلا إنشاء؛ أي اختلاف ⇒ رفض.
+     * يُسجَّل الإنشاء بحدث تدقيق داخل المعاملة نفسها. `wasRecentlyCreated` يميّز الإنشاء (201) من الإعادة (200).
+     *
+     * @param array<string, mixed> $data
+     */
     public function recordReading(array $data): FuelTankReading
     {
         try {
@@ -48,26 +64,93 @@ class FuelReconciliationService
                     throw new RuntimeException('نوع قراءة الخزان غير صالح.');
                 }
                 $milliliters = $this->quantity->litersToMilliliters($data['quantity_liters']);
+                $evidenceKey = trim((string) ($data['evidence_key'] ?? ''));
+                if ($evidenceKey === '') {
+                    throw new RuntimeException('مفتاح دليل القياس مطلوب.');
+                }
+                $actorId = $data['recorded_by'] ?? null;
 
-                return FuelTankReading::create([
+                // تسلسل كل ما يخص هذا الخزان (فحص الترتيب + الإدراج) — لا يمسّ بقية الجداول.
+                $tank = FuelTank::whereKey($tank->id)->lockForUpdate()->firstOrFail();
+
+                $existing = FuelTankReading::where('evidence_key', $evidenceKey)->first();
+                if ($existing !== null) {
+                    return $this->replayOrReject($existing, $station, $tank, $type, $milliliters, $actorId);
+                }
+
+                if ($tank->status === FuelTank::STATUS_INACTIVE) {
+                    throw new RuntimeException('FUEL_READING_TANK_INACTIVE: الخزان معطَّل ولا تُسجَّل له قراءات.');
+                }
+                if ($milliliters > (int) $tank->capacity_milliliters) {
+                    throw new RuntimeException('FUEL_READING_EXCEEDS_CAPACITY: الكمية المقاسة تتجاوز سعة الخزان المعتمدة ولا تُقبل.');
+                }
+                $measuredAt = $this->measuredAt($data['measured_at'] ?? null, $station, $tank, $type);
+
+                $reading = FuelTankReading::create([
                     'branch_id' => $station->branch_id,
                     'fuel_station_id' => $station->id,
                     'fuel_tank_id' => $tank->id,
                     'reading_type' => $type,
                     'quantity_milliliters' => $milliliters,
-                    'measured_at' => $data['measured_at'] ?? now(),
-                    'evidence_key' => trim($data['evidence_key']),
+                    'measured_at' => $measuredAt,
+                    'evidence_key' => $evidenceKey,
                     'evidence' => $data['evidence'] ?? null,
-                    'recorded_by' => $data['recorded_by'] ?? null,
+                    'recorded_by' => $actorId,
                 ]);
+                $this->audit->record(
+                    'tank_reading.recorded',
+                    $reading,
+                    null,
+                    $this->audit->snapshot($reading),
+                    $actorId === null ? null : User::query()->find($actorId),
+                );
+
+                return $reading;
             });
         } catch (QueryException $exception) {
             if (str_contains($exception->getMessage(), 'fuel_reading_evidence_unique')) {
-                throw new RuntimeException('مفتاح دليل القياس مستخدم مسبقاً ولا يمكن تسجيل القياس مرتين.', previous: $exception);
+                throw new RuntimeException('FUEL_READING_EVIDENCE_MISMATCH: مفتاح دليل القياس مستخدم مسبقاً ولا يمكن تسجيل القياس مرتين.', previous: $exception);
             }
 
             throw $exception;
         }
+    }
+
+    private function replayOrReject(FuelTankReading $existing, FuelStation $station, FuelTank $tank, string $type, int $milliliters, mixed $actorId): FuelTankReading
+    {
+        $same = $existing->fuel_station_id === $station->id
+            && $existing->fuel_tank_id === $tank->id
+            && $existing->reading_type === $type
+            && (int) $existing->quantity_milliliters === $milliliters
+            && $existing->recorded_by === $actorId;
+        if (! $same) {
+            throw new RuntimeException('FUEL_READING_EVIDENCE_MISMATCH: مفتاح دليل القياس مستخدم مسبقاً ولا يمكن تسجيل القياس مرتين.');
+        }
+
+        return $existing; // إعادة إرسال مقصودة/منقطعة: الأثر الأول نفسه بلا إنشاء ولا تدقيق ثانٍ.
+    }
+
+    private function measuredAt(mixed $given, FuelStation $station, FuelTank $tank, string $type): CarbonImmutable
+    {
+        $now = CarbonImmutable::now();
+        if ($given === null || $given === '') {
+            return $now;
+        }
+        try {
+            $measuredAt = CarbonImmutable::parse($given);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('وقت القياس غير صالح.', previous: $exception);
+        }
+        $skew = (int) $this->settings->get($station, 'device_max_future_skew_seconds');
+        if ($measuredAt->greaterThan($now->addSeconds($skew))) {
+            throw new RuntimeException('FUEL_READING_FUTURE_TIME: وقت القياس في المستقبل ولا يُقبل.');
+        }
+        $latest = FuelTankReading::where('fuel_tank_id', $tank->id)->where('reading_type', $type)->max('measured_at');
+        if ($latest !== null && $measuredAt->lessThan(CarbonImmutable::parse($latest))) {
+            throw new RuntimeException('FUEL_READING_OLDER_THAN_LATEST: وقت القياس أقدم من آخر قراءة مسجَّلة لهذا الخزان ونوع القراءة، ولا سياسة معتمدة لقبول التأريخ الرجعي.');
+        }
+
+        return $measuredAt;
     }
 
     /** @param array<string, mixed> $data */

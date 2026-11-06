@@ -8,7 +8,7 @@
 export const OPS_BASE = '/fuel-stations/ops';
 
 export type OpsMode = 'supervisor' | 'operator' | 'viewer';
-export type OpsNavId = 'home' | 'products' | 'shifts' | 'receiving' | 'manage' | 'profile';
+export type OpsNavId = 'home' | 'products' | 'shifts' | 'receiving' | 'tanks' | 'manage' | 'profile';
 
 export interface OpsNavItem {
   id: OpsNavId;
@@ -37,6 +37,8 @@ export const OPS_NAV: readonly OpsNavItem[] = [
   { id: 'products', href: `${OPS_BASE}/products`, labelKey: 'navProducts', requires: ['fuel_stations.view'] },
   { id: 'shifts', href: `${OPS_BASE}/shifts`, labelKey: 'navShifts', requires: ['fuel_stations.view', 'fuel.shift.view'] },
   { id: 'receiving', href: `${OPS_BASE}/receiving`, labelKey: 'navReceiving', requires: ['fuel_stations.view'], requiresAny: RECEIVING_PERMISSIONS },
+  // FUEL-B6: مستويات الخزانات (مراقبة + قراءات مستقلة). القراءة بمفتاح كل مستخدم محطة؛ التسجيل يتحكم به الخادم ومفتاح `fuel.reading.record`.
+  { id: 'tanks', href: `${OPS_BASE}/tanks`, labelKey: 'navTanks', requires: ['fuel_stations.view'] },
   { id: 'manage', href: `${OPS_BASE}/manage`, labelKey: 'navManage', requires: [], requiresAny: MANAGE_PERMISSIONS },
   { id: 'profile', href: `${OPS_BASE}/profile`, labelKey: 'navProfile', requires: [] },
 ];

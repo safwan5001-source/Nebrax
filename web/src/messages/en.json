@@ -14652,6 +14652,7 @@
     "navProducts": "Products",
     "navShifts": "Shifts",
     "navReceiving": "Receiving",
+    "navTanks": "Tanks",
     "navProfile": "Profile",
     "navManage": "Manage",
     "navSettings": "Settings",
@@ -15777,6 +15778,105 @@
         "saving": "Saving…"
       }
     },
+    "tanks": {
+      "title": "Tank levels",
+      "subtitle": "Latest measurement for each tank and the reading log",
+      "list": {
+        "empty": "There are no active tanks for this station.",
+        "emptyBody": "Ask an administrator to set up the station tanks.",
+        "summaryReview": "{count} tank needs review",
+        "summaryOk": "No tanks need review",
+        "measuredNote": "The quantity shown is the latest measurement at the time stated, not a current balance. Alerts are operational only and create no adjustment and change no stock.",
+        "open": "Open tank"
+      },
+      "card": {
+        "fill": "Filled",
+        "last": "Last measured",
+        "none": "No reading yet",
+        "capacity": "Capacity",
+        "available": "Available",
+        "safe": "Safe capacity",
+        "minimum": "Minimum level",
+        "deadStock": "Unpumpable stock",
+        "unit": "L",
+        "ageNow": "just now",
+        "ageMinutes": "{value} min ago",
+        "ageHours": "{value} h ago",
+        "ageDays": "{value} d ago",
+        "stalePolicy": "A reading is outdated after {value} minutes",
+        "noPolicy": "No outdated-reading period is set for this station"
+      },
+      "type": {
+        "physical": "Manual measurement",
+        "atg": "ATG reading entered manually",
+        "atgHint": "The value is copied from the ATG console; there is no direct device connection."
+      },
+      "method": {
+        "dipstick": "Dipstick",
+        "gauge": "Tank gauge",
+        "atg_console": "ATG console",
+        "other": "Other"
+      },
+      "freshness": {
+        "fresh": "Recent",
+        "stale": "Outdated",
+        "none": "No reading"
+      },
+      "flag": {
+        "above_capacity": "Above capacity",
+        "above_safe_capacity": "Above safe capacity",
+        "below_minimum_level": "Below minimum level",
+        "below_dead_stock": "Below unpumpable stock"
+      },
+      "needsReview": "Needs review",
+      "detail": {
+        "back": "Back to tanks",
+        "notFound": "This tank is not available to you.",
+        "recordTitle": "Record a reading",
+        "recordHint": "A standalone measurement, not tied to a receiving or a shift.",
+        "checkMissing": "This reading was not found in the log, so it was not saved. You can safely resend it; the same key prevents duplicates.",
+        "typeLabel": "Reading type",
+        "methodLabel": "Source",
+        "quantityLabel": "Measured quantity",
+        "quantityHint": "In liters, up to three decimals. Digits 0–9 only.",
+        "quantitySuffix": "L",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "e.g. one hour after unloading",
+        "timeLabel": "Measurement time",
+        "timeValue": "Stamped with the server time when saved",
+        "recorderLabel": "Recorded by",
+        "recorderValue": "It will be recorded under your name: {name}",
+        "invalid": "The quantity is not valid. Enter a positive number with no separators and up to three decimals.",
+        "over": "The quantity is above the tank capacity ({capacity} L). Check the measurement.",
+        "preview": "It will be {percent}% full with {available} L available.",
+        "delta": "Difference from the last reading of this type: {value} L.",
+        "review": "Review and save",
+        "confirmTitle": "Confirm saving the reading",
+        "confirmBody": "A reading cannot be edited or deleted once saved.",
+        "confirmSave": "Save reading",
+        "confirmBack": "Back to edit",
+        "saving": "Saving…",
+        "saved": "The reading was saved.",
+        "viewOnly": "You do not have permission to record readings. You can view the level and the log only.",
+        "operationalNote": "Recording a reading is operational only: it creates no stock movement, changes no cost and approves no adjustment.",
+        "tankMaintenance": "The tank is under maintenance; readings can still be recorded."
+      },
+      "history": {
+        "title": "Reading log",
+        "empty": "No readings have been recorded for this tank yet.",
+        "by": "Recorded by {name}",
+        "filterAll": "All",
+        "filterLabel": "Filter the log by type",
+        "prev": "Previous",
+        "next": "Next",
+        "page": "Page {page} of {last}",
+        "pagination": "Log page navigation"
+      },
+      "stale": {
+        "refreshed": "Data refreshed.",
+        "refresh": "Refresh"
+      }
+    },
     "receiving": {
       "title": "Fuel receiving",
       "subtitle": "Receiving drafts and approvals",
@@ -15943,6 +16043,10 @@
         "quantity_invalid": "The quantity is invalid. Check the entered values.",
         "cost_invalid": "The receiving value is invalid.",
         "evidence_exists": "This tank reading was already recorded with the same key.",
+        "reading_over_capacity": "The quantity is above the approved tank capacity. The reading was not saved.",
+        "reading_future": "The measurement time is in the future. The reading was not saved.",
+        "reading_older": "The measurement time is earlier than the latest recorded reading. The reading was not saved.",
+        "tank_inactive": "The tank is inactive and takes no readings.",
         "reading_mismatch": "The tank reading does not match the station, tank or reading type.",
         "order_mismatch": "The purchase reference does not match the supplier or branch.",
         "unauthorized": "Your session ended. Sign in and try again.",

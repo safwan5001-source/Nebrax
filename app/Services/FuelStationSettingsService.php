@@ -202,6 +202,10 @@ class FuelStationSettingsService
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
             // مسح mapping الحساب والعودة إلى fallback الموثق لمحرك الجرد.
             $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id'], true) && $value === null ? '' : $value;
+            // FUEL-B6: مسح مدة قِدم قراءة الخزان على مستوى المؤسسة (null ⇒ «غير مضبوطة»)؛ القارئ يعامل '' كـnull. لا تغيير إن كانت غير مضبوطة أصلاً.
+            if ($key === 'tank_reading_stale_after_minutes' && $value === null) {
+                $normalized = in_array($current[$key] ?? null, [null, ''], true) ? $current[$key] : '';
+            }
             $known[$key] = $normalized;
             if ($current[$key] !== $normalized) {
                 $changed[$key] = ['before' => $current[$key], 'after' => $normalized];
@@ -398,6 +402,15 @@ class FuelStationSettingsService
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
                 throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tank_reading_stale_after_minutes') {
+            // null = غير مضبوط (لا حكم بقِدم القراءة)؛ وإلا عدد صحيح موجب بالدقائق (حتى 30 يوماً).
+            if ($value !== null && (! is_int($value) || $value < 1 || $value > 43200)) {
+                throw new RuntimeException('مدة قِدم قراءة الخزان يجب أن تكون عدداً صحيحاً بين 1 و43200 دقيقة أو فارغة.');
             }
 
             return;

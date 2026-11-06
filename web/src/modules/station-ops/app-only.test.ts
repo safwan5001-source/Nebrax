@@ -14,8 +14,8 @@ const dir = fileURLToPath(new URL('.', import.meta.url));
 const read = (base: string, prefix: string) => readdirSync(join(dir, base))
   .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file) && !file.startsWith('__'))
   .map((file) => ({ file: `${prefix}${file}`, text: readFileSync(join(dir, base, file), 'utf8') }));
-// FUEL-B4/B5: مساحتا الإدارة (`admin/`) والاستلام (`receiving/`) جزء من التطبيق نفسه وتخضعان للقواعد نفسها.
-const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/')];
+// FUEL-B4/B5/B6: مساحات الإدارة (`admin/`) والاستلام (`receiving/`) والخزانات (`tanks/`) جزء من التطبيق نفسه وتخضع للقواعد نفسها.
+const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/')];
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
 type Tree = { [key: string]: string | Tree };
@@ -36,7 +36,7 @@ describe('station ops is an app of its own', () => {
   it('defines every in-app route target under OPS_BASE', () => {
     const nav = sources.find((entry) => entry.file === 'nav.ts')!.text;
     expect(nav).toMatch(/OPS_BASE = '\/fuel-stations\/ops'/);
-    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(6); // FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»
+    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(7); // FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»، FUEL-B6: + «الخزانات»
     for (const match of code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)) expect(match[1]).toMatch(/OPS_BASE/);
   });
 

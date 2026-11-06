@@ -23,13 +23,22 @@ class FuelReconciliationController extends ApiController
     public function readings(ListFuelTankReadingsRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $readings = $this->restrictToAccessibleWarehouseStations(FuelTankReading::query())
+        if (! empty($data['fuel_station_id'])) {
+            $this->accessibleStation($data['fuel_station_id']); // 404 موحّد لمحطة خارج نطاق المستخدم
+        }
+        $query = $this->restrictToAccessibleWarehouseStations(FuelTankReading::query())
             ->with(['station', 'tank', 'recorder'])
-            ->when($data['fuel_tank_id'] ?? null, fn ($query, $id) => $query->where('fuel_tank_id', $id))
-            ->latest('measured_at')
-            ->get();
+            ->when($data['fuel_station_id'] ?? null, fn ($q, $id) => $q->where('fuel_station_id', $id))
+            ->when($data['fuel_tank_id'] ?? null, fn ($q, $id) => $q->where('fuel_tank_id', $id))
+            ->when($data['reading_type'] ?? null, fn ($q, $type) => $q->where('reading_type', $type))
+            ->latest('measured_at')->latest('created_at')->orderByDesc('id');
 
-        return FuelTankReadingResource::collection($readings)->response();
+        // بلا per_page: السلوك القديم حرفياً (قائمة كاملة). معها: سجل مرقَّم لشاشة القراءات.
+        if (! empty($data['per_page'])) {
+            return FuelTankReadingResource::collection($query->paginate((int) $data['per_page']))->response();
+        }
+
+        return FuelTankReadingResource::collection($query->get())->response();
     }
 
     public function storeReading(StoreFuelTankReadingRequest $request): JsonResponse
@@ -39,7 +48,8 @@ class FuelReconciliationController extends ApiController
         $data['recorded_by'] = $request->user()->id;
         $reading = $this->domain(fn () => $this->service->recordReading($data));
 
-        return (new FuelTankReadingResource($reading->load(['station', 'tank', 'recorder'])))->response()->setStatusCode(201);
+        // 201 للإنشاء، 200 لإعادة إرسال مطابقة (الأثر الأول نفسه بلا إنشاء).
+        return (new FuelTankReadingResource($reading->load(['station', 'tank', 'recorder'])))->response()->setStatusCode($reading->wasRecentlyCreated ? 201 : 200);
     }
 
     public function index(ListFuelReconciliationsRequest $request): JsonResponse

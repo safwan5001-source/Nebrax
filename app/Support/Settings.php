@@ -401,6 +401,9 @@ class Settings
             'device_offline_after_seconds' => 300,
             'device_max_retry_attempts' => 3,
             'device_simulated_ingress_enabled' => true,
+            // FUEL-B6: بعد كم دقيقة تُعدّ آخر قراءة خزان «قديمة» في شاشة المراقبة. سياسة عمل تختلف بين المحطات (قاعدة 6): `null` = غير مضبوطة
+            // (الافتراضي الآمن) فلا يُحكم بحداثة ولا قِدَم ويُعرض عمر القياس فقط؛ لا حدّ اختراعي. لا أثر مخزني أو محاسبي.
+            'tank_reading_stale_after_minutes' => null,
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,
