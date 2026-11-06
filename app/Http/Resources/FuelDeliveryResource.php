@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\FuelQuantity;
+use App\Support\FuelCostVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,8 @@ class FuelDeliveryResource extends JsonResource
     public function toArray(Request $request): array
     {
         $quantity = app(FuelQuantity::class);
+        // FS-23 (B1): تكلفة الشراء تتبع `products.view_cost`؛ `fuel_stations.view` وحدها (صلاحية البائع في التطبيق) لا تكشفها. المفتاح يُحذف كاملاً.
+        $canSeeCost = FuelCostVisibility::canSeeCost($request->user());
 
         return [
             'id' => $this->id,
@@ -28,7 +31,7 @@ class FuelDeliveryResource extends JsonResource
             'received_milliliters' => (int) $this->received_milliliters,
             'received_liters' => $quantity->millilitersToLiters((int) $this->received_milliliters),
             'transit_variance_milliliters' => (int) $this->transit_variance_milliliters,
-            'received_total_cost_minor' => (int) $this->received_total_cost_minor,
+            'received_total_cost_minor' => $this->when($canSeeCost, fn () => (int) $this->received_total_cost_minor),
             'grni_account_id' => $this->grni_account_id,
             'stock_movement_id' => $this->stock_movement_id,
             'journal_entry_id' => $this->journal_entry_id,

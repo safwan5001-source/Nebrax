@@ -18,8 +18,9 @@ import { useIntentKeys } from '@/lib/intent-key';
 import { formatMinorRiyal, isValidRiyal, riyalToMinor } from '@/lib/money';
 
 type Entity = { id: string; name?: string; code?: string; fuel_station_id?: string; warehouse_id?: string; branch_id?: string | null; is_active?: boolean };
-type Delivery = { id: string; status: string; delivery_note_number?: string | null; supplier_id: string; received_liters: string; received_total_cost_minor: number; warehouse_id: string; received_at?: string | null };
-type SupplierInvoice = { id: string; invoice_number: string; status: string; supplier_id: string; total_value_minor: number; currency: string };
+// B1: القيم المالية (تكلفة الاستلام، قيمة الفاتورة) تغيب كاملةً من الاستجابة لمن لا يملك `products.view_cost` — تُعرض «—» لا صفراً.
+type Delivery = { id: string; status: string; delivery_note_number?: string | null; supplier_id: string; received_liters: string; received_total_cost_minor?: number; warehouse_id: string; received_at?: string | null };
+type SupplierInvoice = { id: string; invoice_number: string; status: string; supplier_id: string; total_value_minor?: number; currency: string };
 
 const emptyForm = { fuel_station_id: '', fuel_tank_id: '', fuel_product_id: '', warehouse_id: '', supplier_id: '', dispatched_liters: '', received_liters: '', received_total_cost: '', delivery_note_number: '' };
 
