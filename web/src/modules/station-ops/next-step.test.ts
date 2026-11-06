@@ -44,7 +44,9 @@ describe('deriveNextStep', () => {
   });
 
   it('closed shift waits for approval — mine only for an approver; approved is complete and nobody\'s task', () => {
-    expect(step(shiftDetail('s', 'a', { status: 'closed' }), 'fuel.shift.approve')).toEqual({ kind: 'approve_shift', mine: true, remaining: null, href: null });
+    expect(step(shiftDetail('s', 'a', { status: 'closed' }), 'fuel.shift.approve')).toEqual({ kind: 'approve_shift', mine: true, remaining: null, href: '/fuel-stations/ops/shifts/s/review' });
+    // مراجع الفروق وحده يصل لشاشة المراجعة (لا يملك الاعتماد فليست خطوته)
+    expect(step(shiftDetail('s', 'a', { status: 'closed' }), 'fuel.shift.cash_variance_review')).toEqual({ kind: 'approve_shift', mine: false, remaining: null, href: '/fuel-stations/ops/shifts/s/review' });
     expect(step(shiftDetail('s', 'a', { status: 'closed' }), 'fuel.shift.open')).toEqual({ kind: 'approve_shift', mine: false, remaining: null, href: null });
     expect(step(shiftDetail('s', 'a', { status: 'approved' }), 'fuel.shift.approve')).toEqual({ kind: 'complete', mine: false, remaining: null, href: null });
   });

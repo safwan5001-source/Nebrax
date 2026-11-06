@@ -15071,7 +15071,7 @@
         "opening_readings": "Record the starting meter readings",
         "closing_readings": "Record the ending meter readings",
         "close_shift": "Close and hand over the shift",
-        "approve_shift": "Approve the shift"
+        "approve_shift": "Review and approve the shift"
       },
       "remaining": "Readings remaining: {count}",
       "waiting": "Waiting for: {step}",
@@ -15177,6 +15177,86 @@
         "unrecorded_settlements_excluded": "Unrecorded settlements are not part of this check."
       }
     },
+    "review": {
+      "title": "Review the shift",
+      "subtitle": "Review the frozen figures, then approve",
+      "status": {
+        "closed": "Closed — waiting for supervisor review and approval",
+        "approved": "Approved and locked"
+      },
+      "closedAt": "Closed",
+      "reconTitle": "Operational reconciliation — sales and collection",
+      "noCollection": "No collection breakdown is recorded for this shift (the feature is off or none was saved).",
+      "noSalesView": "Meter sales and difference details need the sales-view permission. Ask your administrator for it to review differences.",
+      "cashSummaryNote": "This section is about the drawer cash and its amounts are separate from the reconciliation above — figures are never added across the two.",
+      "explain": {
+        "title": "What is the difference between the two sections?",
+        "reconTitle": "Operational reconciliation",
+        "reconBody": "Compares the estimated meter sales (litres × effective price) with what the seller declared as collected per payment method. An operational estimate to help the supervisor; it records no amount in the books.",
+        "cashTitle": "Drawer cash summary",
+        "cashBody": "The opening float, the documented cash movements and the cash counted in the drawer at handover. Its figures are separate from the reconciliation and never mixed with it.",
+        "frozen": "Figures are frozen at handover. Review and approval are recorded in the log and never change a frozen figure."
+      },
+      "reviewsTitle": "Required reviews",
+      "noReviewPermission": "You do not have permission to review differences. Ask an authorised supervisor.",
+      "row": {
+        "collection": {
+          "title": "Collection reconciliation difference",
+          "pending": "Needs a supervisor review before approval.",
+          "reviewed": "Reviewed and the supervisor note is recorded.",
+          "none": "No difference needs review.",
+          "action": "Review the collection difference",
+          "dialogTitle": "Review the collection difference"
+        },
+        "cash": {
+          "title": "Drawer cash difference",
+          "pending": "A pending difference needs a supervisor review before approval.",
+          "reviewed": "Reviewed and the supervisor note is recorded.",
+          "none": "No pending difference.",
+          "action": "Review the drawer cash difference",
+          "dialogTitle": "Review the drawer cash difference"
+        }
+      },
+      "reviewDialogBody": "Write what you checked and why you accept it or object. The review is recorded once; it does not change the difference and creates no amount.",
+      "noteLabel": "Supervisor note (required)",
+      "noteHint": "At least 3 characters.",
+      "reviewConfirm": "Record the review",
+      "reviewSaved": "The review was recorded.",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "approveCta": "Approve the shift",
+      "approveDialogTitle": "Confirm shift approval",
+      "approveDialogBody": "After approval the shift is locked for good and none of its figures can be changed.",
+      "approveNoteLabel": "Approval note (optional)",
+      "approveAck": "I confirm I reviewed the shift figures and differences",
+      "approveConfirm": "Confirm approval",
+      "approvedNow": "The shift was approved and locked.",
+      "approvedAlready": "This shift is approved and locked.",
+      "noApprovePermission": "You do not have permission to approve shifts. You can review only if you were granted that permission.",
+      "hiddenReviewNote": "There may be a collection review you cannot see; if the server refuses approval, ask an authorised supervisor to review it.",
+      "blocker": {
+        "collection_review": "Approval is not possible before the collection reconciliation difference is reviewed.",
+        "cash_variance_review": "Approval is not possible before the drawer cash difference is reviewed.",
+        "same_user": "Station policy requires a supervisor other than the one who opened the shift to approve it."
+      },
+      "notClosed": {
+        "title": "The shift is not closed",
+        "body": "A shift is reviewed after the seller hands it over.",
+        "back": "View the shift"
+      },
+      "audit": {
+        "title": "Shift log",
+        "note": "A permanent log that cannot be edited.",
+        "type": {
+          "closed": "Shift handed over",
+          "collection_frozen": "Collection breakdown frozen",
+          "cash_variance_pending_review": "Cash difference awaiting review",
+          "collection_reviewed": "Collection difference reviewed",
+          "cash_variance_reviewed": "Drawer cash difference reviewed",
+          "approved_locked": "Shift approved and locked"
+        }
+      }
+    },
     "write": {
       "reject": {
         "shift_already_open": "This station already has an open shift. Open it instead of creating a second one.",
@@ -15204,6 +15284,13 @@
         "collection_incomplete": "The enabled payment methods changed since the last save. Update and save the collection breakdown before handover.",
         "collection_no_methods": "No payment methods are enabled for this station. Ask the administrator to enable one.",
         "collection_reason_required": "There is a collection difference. Write its reason in the handover note and try again.",
+        "approve_needs_closed": "Only a closed shift can be approved. Refresh to see its state.",
+        "approve_needs_other_supervisor": "Station policy requires a supervisor other than the one who opened the shift to approve it.",
+        "collection_review_required": "A collection reconciliation difference needs a recorded supervisor review before approval.",
+        "cash_variance_review_required": "A drawer cash difference needs a recorded supervisor review before approval.",
+        "review_already_done": "This difference was already reviewed. Refresh the page.",
+        "review_not_needed": "This shift has no difference that needs review.",
+        "review_needs_closed": "Differences are reviewed only for a closed shift, before it is approved.",
         "unauthorized": "Your session has ended. Sign in again.",
         "forbidden": "You don't have permission to do this.",
         "not_found": "We couldn't find this shift or station within your work scope.",

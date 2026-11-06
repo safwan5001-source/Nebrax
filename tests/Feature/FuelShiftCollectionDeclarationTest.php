@@ -524,6 +524,64 @@ class FuelShiftCollectionDeclarationTest extends TestCase
         $this->assertSame('approved', $shift->fresh()->status);
     }
 
+    // ───────── اعتماد المشرف: لا اعتماد قبل اكتمال مراجعة أي فرق (تحصيل أو نقد الدرج) — والبوابة مفتوحة ─────────
+
+    /** @test */
+    public function a_pending_cash_variance_blocks_approval_until_it_is_reviewed_through_the_existing_review_endpoint(): void
+    {
+        $shift = $this->open('ap1');
+        $this->meter($shift, 'opening', 1_000_000);
+        $this->meter($shift, 'closing', 1_100_000);
+        $this->saveCollection($shift, 0, $this->fullLines(20000, 3000), 'ap1-a'); // تحصيل = مبيعات ⇒ لا فرق تحصيل
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 500, null, $this->f['actor']); // نقد الدرج +500 ⇒ فرق معلَّق
+        $this->assertFalse(FuelShiftCollectionDeclaration::sole()->review_required);
+        $approver = $this->roleUser($this->f['tenant_id'], 'ap-approver', 'ap-approver@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.approve']);
+        $reviewer = $this->roleUser($this->f['tenant_id'], 'ap-reviewer', 'ap-reviewer@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.cash_variance_review']);
+
+        $this->withToken($approver->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/approve", [])
+            ->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'FUEL_CASH_VARIANCE_REVIEW_REQUIRED') && ! preg_match('/\d{3,}/', $m));
+        $this->assertSame('closed', $shift->fresh()->status);
+
+        $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/cash-variance/review", ['note' => 'راجعت فرق الدرج'])->assertOk();
+        $this->withToken($approver->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/approve", [])->assertOk()->assertJsonPath('data.status', 'approved');
+        // الاعتماد قفل: لا حفظ إقرار ولا مراجعة تحصيل بعده.
+        $e = $this->rejects(fn () => $this->saveCollection($shift->fresh(), 1, $this->fullLines(1, 1), 'ap1-late'));
+        $this->assertStringContainsString('الشفت ليس مفتوحاً', $e->getMessage());
+    }
+
+    /** @test */
+    public function both_reviews_are_required_before_approval_and_the_order_does_not_matter(): void
+    {
+        $shift = $this->shortShift('ap2');
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 700, 'نقص الفكة', $this->f['actor']);
+        $approver = $this->roleUser($this->f['tenant_id'], 'ap2-approver', 'ap2-approver@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.approve']);
+        $reviewer = $this->roleUser($this->f['tenant_id'], 'ap2-reviewer', 'ap2-reviewer@fuel-collection.test', ['fuel.shift.view', 'fuel.shift.cash_variance_review', 'fuel.sale.view']);
+        $approve = fn () => $this->withToken($approver->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/approve", []);
+        $review = fn (string $path) => $this->withToken($reviewer->createToken('t')->plainTextToken)->postJson(self::BASE . "/{$shift->id}/{$path}", ['note' => 'تمت المراجعة']);
+
+        $approve()->assertStatus(422);
+        $review('cash-variance/review')->assertOk();
+        $approve()->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'FUEL_COLLECTION_REVIEW_REQUIRED'));
+        $review('collection/review')->assertOk();
+        $approve()->assertOk();
+        $this->assertSame('approved', $shift->fresh()->status);
+        $this->assertSame(1, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_COLLECTION_REVIEWED)->count());
+        $this->assertSame(1, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_CASH_VARIANCE_REVIEWED)->count());
+        $this->assertSame(1, FuelShiftEvent::where('type', FuelShiftEvent::TYPE_APPROVED_LOCKED)->count());
+    }
+
+    /** @test */
+    public function the_rollback_path_gate_off_leaves_approval_with_a_pending_cash_variance_exactly_as_before(): void
+    {
+        $shift = $this->open('ap3');
+        config(['fuel_stations.shift_collection_declaration_enabled' => false]);
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 500, null, $this->f['actor']);
+
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $this->f['supervisor']);
+
+        $this->assertSame('approved', $shift->fresh()->status);
+    }
+
     // ───────── Q2: لا كشف لقيم المبيعات/الفرق/وجود المراجعة لغير المخوَّل ─────────
 
     /** @test */

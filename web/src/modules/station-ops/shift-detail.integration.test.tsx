@@ -409,13 +409,14 @@ describe('read-only and app-only', () => {
     expect(document.body.textContent).not.toMatch(/full shifts screen|in AWJ/i);
   });
 
-  it('shows the NEXT STEP in the employee\'s language before the readings, as inert text with a Soon note', async () => {
+  it('shows the NEXT STEP in the employee\'s language before the readings; an approver gets one in-app link to the review screen', async () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.approve'] });
     open();
-    const card = (await screen.findByText('Approve the shift')).closest('section') as HTMLElement;
+    const card = (await screen.findByRole('link', { name: 'Review and approve the shift' })).closest('section') as HTMLElement;
     expect(card.textContent).toContain('Next step');
-    expect(card.textContent).toContain('This step will arrive inside the app soon');
-    expect(card.querySelector('a, button')).toBeNull();
+    expect(card.textContent).not.toContain('This step will arrive inside the app soon');
+    expect(card.querySelector('button')).toBeNull();
+    expect(card.querySelector('a')?.getAttribute('href')).toBe('/fuel-stations/ops/shifts/s1/review');
     const readings = screen.getByRole('heading', { name: 'Meter readings' });
     expect(card.compareDocumentPosition(readings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // الخطوة التالية تسبق القراءات
   });
@@ -438,7 +439,7 @@ describe('read-only and app-only', () => {
 
   it('a viewer without the approve permission is told who the shift is waiting for', async () => {
     open();
-    expect(await screen.findByText('Waiting for: Approve the shift')).toBeTruthy();
+    expect(await screen.findByText('Waiting for: Review and approve the shift')).toBeTruthy();
   });
 });
 

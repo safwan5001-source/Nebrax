@@ -143,7 +143,13 @@ export const shiftDetailSchema = shiftSchema.extend({
   tank_readings: z.array(tankReadingSchema),
   staff_assignments: z.array(z.object({ user_id: text.min(1) })).optional(),
   cash_movements: z.array(cashMovementSchema).optional(),
-  cash_variance: z.object({ status: text, variance_direction: nullableText }).nullable().optional(),
+  cash_variance: z.object({ status: text, variance_direction: nullableText, reviewed_at: nullableText, reviewed_by: nullableText }).nullable().optional(),
+  /** من فتح/أغلق/اعتمد (معرّفات فقط): تُستعمل في شاشة مراجعة المشرف لقاعدة «مشرف مختلف عن فاتح الوردية» ولا تُعرض أسماء مخمَّنة. */
+  opened_by: nullableText,
+  closed_by: nullableText,
+  approved_by: nullableText,
+  /** سجل أحداث الوردية (تدقيق append-only). الحمولة حرّة فلا تُعرض منها إلا `note` النصية لمراجعات المشرف. */
+  events: z.array(z.object({ id: text.min(1), type: text, actor_id: nullableText, occurred_at: nullableText, payload: z.record(z.unknown()).nullish() })).optional(),
   /** #2021: ملخص النقد من الخادم (D1/D2/D5)؛ غيابه = خادم أقدم ⇒ يبقى قسم النقد القديم. */
   cash_summary: cashSummarySchema.nullish(),
 });

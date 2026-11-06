@@ -18,7 +18,7 @@ export interface NextStep {
   mine: boolean;
   /** قراءات متبقية (فوهات + خزانات مطلوبة) لخطوات القراءات؛ `null` حين لا مقام معروف. */
   remaining: number | null;
-  /** UI-2: وجهة الإجراء **داخل التطبيق** للخطوة التي تُنفَّذ فعلاً (فتح/قراءات/تسليم)؛ `null` = لا إجراء (اعتماد المشرف، الاكتمال). */
+  /** وجهة الإجراء **داخل التطبيق** للخطوة التي تُنفَّذ فعلاً (فتح/قراءات/تسليم/مراجعة واعتماد المشرف)؛ `null` = لا إجراء (الاكتمال، أو لا صلاحية). */
   href: string | null;
 }
 
@@ -41,7 +41,12 @@ export function deriveNextStep(
     return can(PERMISSION.open_shift) ? { kind: 'open_shift', mine: true, remaining: null, href: `${OPS_BASE}/shifts/open` } : null;
   }
   if (detail.status === 'approved') return { kind: 'complete', mine: false, remaining: null, href: null };
-  if (detail.status === 'closed') return { kind: 'approve_shift', mine: can(PERMISSION.approve_shift), remaining: null, href: null };
+  if (detail.status === 'closed') {
+    // مشرف الاعتماد أو مراجع الفروق ⇒ شاشة مراجعة الوردية داخل التطبيق؛ غيرهما «بانتظار …» بلا رابط.
+    const mine = can(PERMISSION.approve_shift);
+    const reviews = mine || can('fuel.shift.cash_variance_review');
+    return { kind: 'approve_shift', mine, remaining: null, href: reviews ? `${OPS_BASE}/shifts/${encodeURIComponent(detail.id)}/review` : null };
+  }
   if (detail.status !== 'open' || summary === null) return null;
 
   const base = `${OPS_BASE}/shifts/${encodeURIComponent(detail.id)}`;
