@@ -14651,6 +14651,7 @@
     "navProducts": "Products",
     "navShifts": "Shifts",
     "navProfile": "Profile",
+    "navManage": "Manage",
     "navSettings": "Settings",
     "offlineBanner": "You are offline. What you see may be out of date, and nothing will be saved.",
     "stationLabel": "Station",
@@ -15540,6 +15541,238 @@
         "title": "The shift isn't open",
         "body": "Handover is only available for an open shift.",
         "back": "View the shift"
+      }
+    },
+    "manage": {
+      "title": "Manage",
+      "subtitle": "Staff, permissions and allowed stations",
+      "back": "Back to Manage",
+      "close": "Close",
+      "sectionsLabel": "Management sections",
+      "noAccess": {
+        "title": "No management sections available",
+        "body": "Only the sections your permissions allow are shown here. Ask a station administrator to enable what you need."
+      },
+      "summary": {
+        "title": "Station summary",
+        "openShifts": "Open shifts",
+        "closedShifts": "Closed shifts",
+        "closedHint": "Awaiting approval",
+        "staff": "Assigned staff",
+        "staffHint": "For this station",
+        "unavailable": "Could not load",
+        "moreThan": "{count}+ (first page)"
+      },
+      "staff": {
+        "title": "Staff",
+        "subtitle": "Template, permissions and allowed stations for each employee",
+        "hint": "Templates, permissions and stations per employee",
+        "add": "Add an employee to manage",
+        "addTitle": "Choose an employee",
+        "addHint": "Employees with no template or stations yet. Nothing changes until you save.",
+        "search": "Search by name",
+        "noCandidates": "No employees available",
+        "noCandidatesBody": "Everyone you can manage is already managed, or their account is outside your scope.",
+        "manageAction": "Manage",
+        "empty": "No managed employees yet",
+        "emptyBody": "Add an employee to give them a template and stations.",
+        "noMatch": "No matches",
+        "inactive": "Account disabled",
+        "permCount": "{count} permissions",
+        "noStationsBadge": "No stations — no access",
+        "selfNote": "Your account — view only"
+      },
+      "permissions": {
+        "title": "Permissions",
+        "subtitle": "What each template grants and what you can delegate",
+        "hint": "Templates and delegable permissions",
+        "notAssignable": "Above your permissions",
+        "reservedTitle": "Reserved permissions",
+        "reservedBody": "These permissions are in no template and not in “all permissions”, and only the owner or top administrator can grant them.",
+        "delegableCount": "You can delegate {count} of {total} fuel permissions"
+      },
+      "audit": {
+        "title": "Change log",
+        "subtitle": "Who changed what and when — read only",
+        "hint": "Permission and station changes, and refused attempts",
+        "filter": "Outcome",
+        "filterOption": {
+          "all": "All",
+          "applied": "Applied",
+          "denied": "Refused"
+        },
+        "readOnly": "This log is read only: no event can be edited or deleted. Passwords and tokens are never shown.",
+        "empty": "No events",
+        "emptyBody": "Permission and station-scope changes will appear here when they happen.",
+        "applied": "Applied",
+        "denied": "Refused",
+        "actor": "Done by",
+        "target": "Employee",
+        "targetRole": "Role",
+        "unknown": "Unknown",
+        "attempted": "What was attempted:",
+        "reason": "Reason: {reason}",
+        "details": "Show details",
+        "yes": "Yes",
+        "no": "No",
+        "fromTo": "from {from} to {to}",
+        "pagination": "Log pages",
+        "prev": "Previous",
+        "next": "Next",
+        "pageOf": "{page} / {last}",
+        "action": {
+          "fuel_staff_updated": "Station staff permissions changed",
+          "role_created": "Role created",
+          "role_updated": "Role updated",
+          "role_deleted": "Role deleted",
+          "user_created": "User created",
+          "user_updated": "User updated",
+          "user_deleted": "User deleted"
+        },
+        "key": {
+          "permissions": "Permissions",
+          "fuel_permissions": "Fuel permissions",
+          "add_permissions": "Permissions to add",
+          "remove_permissions": "Permissions to remove",
+          "station_ids": "Stations",
+          "fuel_station_ids": "Fuel stations",
+          "branch_ids": "Branches",
+          "warehouse_ids": "Warehouses",
+          "template": "Template",
+          "role": "Role",
+          "name": "Name",
+          "is_active": "Account active",
+          "is_system": "System role",
+          "fuel_station_scope": "Station scope",
+          "grant_all_fuel": "All fuel permissions",
+          "employee_id": "Employee link",
+          "password_changed": "Password changed"
+        }
+      },
+      "prices": {
+        "title": "Fuel prices",
+        "hint": "Effective prices and price periods for stations"
+      },
+      "template": {
+        "seller": "Seller",
+        "supervisor": "Supervisor",
+        "station_manager": "Station manager",
+        "custom": "Custom",
+        "none": "No fuel permissions"
+      },
+      "group": {
+        "shifts": "Shifts",
+        "sales": "Sales and collection",
+        "receiving": "Receiving, readings and reconciliation",
+        "stations": "Station data",
+        "monitoring": "Alerts, reports and maintenance",
+        "customers": "Contracts, cards and fleet",
+        "governance": "Governance and administration",
+        "other": "Other"
+      },
+      "stations": {
+        "title": "Allowed stations",
+        "hint": "The stations this employee works in. You only see stations within your own scope.",
+        "other": "Station",
+        "none": "No stations within your scope",
+        "noneBody": "You cannot assign stations because your scope includes none.",
+        "noAssignmentNote": "A station-limited employee with no assigned station cannot reach any station. Nobody’s scope is ever widened automatically.",
+        "emptyWarning": "No stations: after saving, this employee will not reach any station.",
+        "intersectionNote": "Effective access is the overlap of assigned stations with the employee’s branch and warehouses. The server rejects a station outside their branch or warehouse.",
+        "hiddenKept": "{count} other station(s) outside your scope stay as they are."
+      },
+      "editor": {
+        "subtitle": "Template, permissions and stations",
+        "active": "Account active",
+        "templateTitle": "Template",
+        "templateHint": "Pick a template as a starting point, then customise permissions for this employee alone.",
+        "templateDesc": {
+          "seller": "Open and close shifts, count cash",
+          "supervisor": "Includes seller, plus approval, readings and receiving",
+          "station_manager": "Includes supervisor, plus receiving and reconciliation approval, and sales"
+        },
+        "templateBlocked": "Above your permissions: you cannot delegate it",
+        "customNote": "Current permissions match no template (custom).",
+        "noneNote": "This employee has no fuel permissions right now.",
+        "permissionsTitle": "Detailed permissions",
+        "permissionsHint": "Turn each permission on or off. Your change affects this employee only, never anyone else.",
+        "selectAll": "Select everything I can delegate",
+        "selectAllNote": "Only permissions you are allowed to delegate; reserved ones are not included.",
+        "reset": "Undo changes",
+        "clearGroup": "Clear group",
+        "selectGroup": "Select group",
+        "changed": "Changed",
+        "sensitive": "Sensitive",
+        "reservedBadge": "Reserved",
+        "lockedReserved": "Reserved: only the owner can grant it",
+        "lockedBeyond": "Beyond what you can delegate",
+        "willAdd": "Will be added on save",
+        "willRemove": "Will be removed on save",
+        "reservedNote": "Reserved permissions and anything above your own cannot be granted here; the server rejects any attempt regardless of this screen.",
+        "selfLocked": "You cannot change your own permissions or stations. Ask another administrator.",
+        "cancelEdits": "Cancel",
+        "review": "Review and save ({count})",
+        "noChanges": "No changes",
+        "notice": {
+          "serverSays": "Server said: {message}",
+          "rebase": "Refresh and reapply my edits",
+          "discard": "Discard my edits and load latest",
+          "check": "Check status",
+          "checking": "Checking…",
+          "backToList": "Back to staff",
+          "editsKept": "Your edits are kept on screen and nothing was sent.",
+          "saved": {
+            "title": "Saved",
+            "body": "The employee’s permissions and stations were updated."
+          },
+          "conflict": {
+            "title": "Another administrator changed this employee",
+            "body": "Their assignment changed since you opened it. Nothing was saved. You can reapply your edits on top of the latest state, or discard them."
+          },
+          "changed": {
+            "title": "The state changed",
+            "body": "The current state differs from what you intended. Review your edits on top of the latest state before saving."
+          },
+          "forbidden": {
+            "title": "You are not allowed to make this change",
+            "body": "The server refused the change and nothing was saved."
+          },
+          "not_found": {
+            "title": "Employee unavailable",
+            "body": "This employee is no longer in your scope or was removed."
+          },
+          "validation": {
+            "title": "The change could not be saved",
+            "body": "The server rejected the values sent and nothing was saved."
+          },
+          "unknown": {
+            "title": "We could not confirm the save",
+            "body": "The connection dropped after sending, so the change may have gone through. Check the status instead of resending."
+          },
+          "offline": {
+            "title": "No connection",
+            "body": "Nothing was sent. Try again when you are back online."
+          },
+          "other": {
+            "title": "Could not save",
+            "body": "Nothing was saved."
+          }
+        }
+      },
+      "review": {
+        "title": "Review changes for {name}",
+        "intro": "Review the difference before saving. Nothing changes for the employee until you confirm.",
+        "permAdded": "Permissions to be added",
+        "permRemoved": "Permissions to be removed",
+        "stationsAdded": "Stations to be added",
+        "stationsRemoved": "Stations to be removed",
+        "reservedWarning": "These changes include a reserved permission (fuel governance or staff management). Make sure it is intended.",
+        "noStationsWarning": "After saving, the employee will have no station, so they will not reach any station.",
+        "reason": "Reason for the change (optional)",
+        "reasonHint": "Recorded with the event in the change log.",
+        "back": "Back",
+        "confirm": "Confirm and save",
+        "saving": "Saving…"
       }
     }
   }

@@ -73,6 +73,41 @@ class FuelStaffAccessService
             ->values()->all();
     }
 
+    /**
+     * FUEL-B4: موظفون **يمكن** لهذا الفاعل البدء بإدارتهم (لم يُسنَد لهم قالب/نطاق محطات بعد). قراءة فقط، وتمرّ كل حالة بالحراس نفسها التي
+     * يطبّقها `update()` (ليس هو، ولا المالك/المسؤول، وصلاحياته غير الوقودية ضمن خط الأساس، وضمن سقفه ونطاقه)، فلا تُعرض هوية
+     * لن يقبلها الخادم لاحقاً. حدّ أعلى 200 صف؛ لا يكشف غير المعرّف والاسم والبريد والحالة.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function candidates(User $actor): array
+    {
+        return User::where('tenant_id', $actor->tenant_id)
+            ->where('id', '!=', $actor->id)
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('fuel_station_scope')->where('role', 'not like', self::ROLE_PREFIX . '%'))
+            ->orderBy('name')->limit(1000)->get()
+            ->filter(function (User $u): bool {
+                $permissions = Rbac::permissionsForRole($u->role);
+
+                return ! $this->isTopAccount($u, $permissions);
+            })
+            ->filter(fn (User $u) => $this->canManage($actor, $u))
+            ->take(200)
+            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'is_active' => (bool) $u->is_active])
+            ->values()->all();
+    }
+
+    /**
+     * FUEL-B4: معرّفات من يراهم هذا الفاعل في إدارة الموظفين (نفس قاعدة `list()`): تُستعمل لتقييد قراءة سجل التدقيق بنطاقه.
+     *
+     * @return list<string>
+     */
+    public function visibleStaffIds(User $actor): array
+    {
+        return array_values(array_map(fn (array $row) => $row['user']['id'], $this->list($actor)));
+    }
+
     /** @return array<string, mixed> */
     public function show(User $actor, string $userId): array
     {
@@ -160,6 +195,18 @@ class FuelStaffAccessService
         }
         if (! $this->withinActorScope($actor, $target)) {
             throw new AuthorizationException('نطاق وصول هذا الموظف أوسع من نطاقك.');
+        }
+    }
+
+    /** هل يقبل `update()` هذا الهدف من هذا الفاعل (الحراس نفسها بلا استثناء)؟ */
+    private function canManage(User $actor, User $target): bool
+    {
+        try {
+            $this->assertManageable($actor, $target);
+
+            return true;
+        } catch (AuthorizationException) {
+            return false;
         }
     }
 
