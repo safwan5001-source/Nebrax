@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\PublicApiKeyIssuanceAuthority;
 use App\Support\PublicApiScopeCeiling;
 use App\Support\PublicApiScopeCeilingException;
 use App\Support\Rbac;
@@ -25,6 +26,18 @@ class PublicApiKeyIssuanceGuard
     public function __construct(private readonly TenantContext $tenant) {}
 
     /**
+     * هل يملك المُصدِر سلطة إصدار المفاتيح أصلاً (`developer.manage`)؟ شرطٌ **مستقل** عن سقف الـscopes ومطلوب في
+     * كل مسار إصدار — فمن يملك `partners.view` وحدها لا يُصدر مفتاح `partners:read` (نموذج واجهة المطوّر نفسه).
+     */
+    public function mayIssue(User $issuer): bool
+    {
+        $permissions = $this->permissionsOf($issuer);
+
+        return in_array('*', $permissions, true)
+            || in_array(PublicApiKeyIssuanceAuthority::PERMISSION, $permissions, true);
+    }
+
+    /**
      * @param  array<int, string>  $scopes
      * @return list<string> الـ scopes الممنوعة على هذا المُصدِر
      */
@@ -36,10 +49,14 @@ class PublicApiKeyIssuanceGuard
     /**
      * @param  array<int, string>  $scopes
      *
-     * @throws PublicApiScopeCeilingException إن احتوى الطلب على scope واحد غير مصرَّح به
+     * @throws PublicApiScopeCeilingException إن فقد المُصدِر `developer.manage` أو احتوى الطلب scope غير مصرَّح به
      */
     public function assertIssuable(User $issuer, array $scopes): void
     {
+        if (! $this->mayIssue($issuer)) {
+            throw PublicApiScopeCeilingException::lacksAuthority();
+        }
+
         $denied = $this->denied($issuer, $scopes);
 
         if ($denied !== []) {

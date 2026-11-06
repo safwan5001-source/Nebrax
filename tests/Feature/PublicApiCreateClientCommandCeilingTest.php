@@ -140,4 +140,78 @@ class PublicApiCreateClientCommandCeilingTest extends TestCase
             $this->assertSame($before, $this->footprint());
         }
     }
+
+    // ── المُصدِر يجب أن يملك سلطة الإصدار نفسها (developer.manage) وفق نموذج واجهة المطوّر ──
+
+    /** @return array{slug:string,tenant_id:string,owner:string} */
+    private function setUpTenantWithRoles(string $slug, array $roles): array
+    {
+        $owner = $this->registerTenant($slug, "owner@{$slug}.test");
+        app(TenantContext::class)->set($owner['tenant_id']);
+        foreach ($roles as $role => $permissions) {
+            Role::create(['tenant_id' => $owner['tenant_id'], 'slug' => $role, 'name' => $role, 'permissions' => $permissions]);
+        }
+        app(TenantContext::class)->forget();
+        foreach (array_keys($roles) as $role) {
+            $this->tokenForRole($owner['tenant_id'], $role, "{$role}@{$slug}.test");
+        }
+        app(TenantContext::class)->forget();
+
+        return ['slug' => $slug, 'tenant_id' => $owner['tenant_id'], 'owner' => "owner@{$slug}.test"];
+    }
+
+    #[Test]
+    public function an_active_issuer_holding_only_partners_view_cannot_issue_via_the_cli(): void
+    {
+        $t = $this->setUpTenantWithRoles('acme', ['partners_viewer' => ['partners.view']]);
+        $before = $this->footprint();
+
+        // يملك الصلاحية المقابلة للـscope (partners.view ⇒ partners:read) لكن لا يملك developer.manage.
+        $this->createClient(['tenant' => $t['slug'], 'name' => 'x', '--scopes' => 'partners:read', '--issuer' => 'partners_viewer@acme.test'])
+            ->expectsOutputToContain('developer.manage')
+            ->assertExitCode(1);
+
+        $this->assertSame($before, $this->footprint(), 'لا عميل ولا مفتاح.');
+    }
+
+    #[Test]
+    public function an_issuer_with_developer_view_but_not_manage_cannot_issue_via_the_cli(): void
+    {
+        $t = $this->setUpTenantWithRoles('acme', ['dev_view_partners' => ['developer.view', 'partners.view']]);
+        $before = $this->footprint();
+
+        $this->createClient(['tenant' => $t['slug'], 'name' => 'x', '--scopes' => 'partners:read', '--issuer' => 'dev_view_partners@acme.test'])
+            ->assertExitCode(1);
+
+        $this->assertSame($before, $this->footprint());
+    }
+
+    #[Test]
+    public function an_issuer_with_developer_manage_and_the_matching_permission_can_issue_via_the_cli(): void
+    {
+        $t = $this->setUpTenantWithRoles('acme', ['dev_partners' => ['developer.manage', 'partners.view']]);
+        $before = $this->footprint();
+
+        $this->createClient(['tenant' => $t['slug'], 'name' => 'ok', '--scopes' => 'partners:read', '--issuer' => 'dev_partners@acme.test'])
+            ->assertExitCode(0);
+
+        $after = $this->footprint();
+        $this->assertSame($before['clients'] + 1, $after['clients']);
+        $this->assertSame($before['tokens'] + 1, $after['tokens']);
+    }
+
+    #[Test]
+    public function developer_manage_is_resolved_from_the_issuers_own_tenant_role_not_a_same_named_role_elsewhere(): void
+    {
+        $a = $this->setUpTenantWithRoles('acme', ['shared_slug' => ['developer.manage', 'partners.view']]);
+        $b = $this->setUpTenantWithRoles('beta', ['shared_slug' => ['partners.view']]); // بلا developer.manage
+        $before = $this->footprint();
+
+        $this->createClient(['tenant' => $b['slug'], 'name' => 'x', '--scopes' => 'partners:read', '--issuer' => 'shared_slug@beta.test'])
+            ->assertExitCode(1);
+        $this->assertSame($before, $this->footprint());
+
+        $this->createClient(['tenant' => $a['slug'], 'name' => 'ok', '--scopes' => 'partners:read', '--issuer' => 'shared_slug@acme.test'])
+            ->assertExitCode(0);
+    }
 }

@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\ApiClient;
 use App\Models\Role;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Services\PublicApiKeyIssuanceGuard;
+use App\Support\PublicApiScopeCeilingException;
 use App\Services\ApiClientKeyService;
 use App\Support\PublicApiScope;
 use App\Tenancy\TenantContext;
@@ -317,5 +320,30 @@ class PublicApiScopeCeilingEnforcementTest extends TestCase
         $s = $this->scenario();
 
         $this->issue($s['limited'], ['not:a-scope'])->assertStatus(422);
+    }
+
+    // ── سلطة الإصدار (developer.manage) في الحارس نفسه، لا في وسيط المسار وحده ──
+
+    #[Test]
+    public function the_guard_requires_developer_manage_independently_of_the_route_middleware(): void
+    {
+        $s = $this->scenario();
+        $this->role($s['tenant_id'], 'partners_only', ['partners.view']);
+        $this->tokenForRole($s['tenant_id'], 'partners_only', 'po@acme.test');
+        $guard = app(PublicApiKeyIssuanceGuard::class);
+
+        $holderless = User::query()->where('email', 'po@acme.test')->firstOrFail();
+        $this->assertFalse($guard->mayIssue($holderless));
+        $this->assertTrue($guard->mayIssue(User::query()->where('email', 'owner@acme.test')->firstOrFail()));
+        $this->assertTrue($guard->mayIssue(User::query()->where('email', 'reader@acme.test')->firstOrFail()));
+
+        // يملك partners.view المقابلة لـpartners:read لكن لا سلطة إصدار ⇒ الحارس يرفض بسبب مستقل.
+        try {
+            $guard->assertIssuable($holderless, ['partners:read']);
+            $this->fail('كان يجب أن يُرفض المُصدِر الذي لا يملك developer.manage.');
+        } catch (PublicApiScopeCeilingException $e) {
+            $this->assertSame(PublicApiScopeCeilingException::REASON_LACKS_AUTHORITY, $e->reason());
+            $this->assertSame([], $e->deniedScopes());
+        }
     }
 }

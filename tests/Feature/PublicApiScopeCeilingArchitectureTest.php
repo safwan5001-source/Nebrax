@@ -60,6 +60,8 @@ class PublicApiScopeCeilingArchitectureTest extends TestCase
         foreach ($callers as $name => $src) {
             $this->assertStringContainsString('PublicApiKeyIssuanceGuard', $src, "{$name} يُصدر مفتاحاً بلا حارس السقف.");
             $this->assertMatchesRegularExpression('/->\s*(assertIssuable|denied)\s*\(/', $src, "{$name} لا يفرض السقف قبل الإصدار.");
+            // سلطة الإصدار (developer.manage): إما عبر assertIssuable (تتضمنها) أو بفحص mayIssue الصريح.
+            $this->assertMatchesRegularExpression('/->\s*(assertIssuable|mayIssue)\s*\(/', $src, "{$name} لا يشترط سلطة الإصدار (developer.manage).");
             // الحارس قبل الإصدار نصّاً (ترتيب الاستدعاء داخل الملف).
             $guardPos = preg_match('/->\s*(assertIssuable|denied)\s*\(/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : PHP_INT_MAX;
             $issuePos = preg_match('/->\s*issueKey\s*\(/', $src, $m2, PREG_OFFSET_CAPTURE) ? $m2[0][1] : PHP_INT_MAX;

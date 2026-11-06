@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\ApiClientKeyService;
 use App\Services\PublicApiKeyIssuanceGuard;
+use App\Support\PublicApiKeyIssuanceAuthority;
 use App\Support\PublicApiScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -84,6 +85,13 @@ class PublicApiCreateClientCommand extends Command
 
         if ($issuer === null || ! $issuer->is_active) {
             $this->error('المُصدِر غير موجود في هذا المستأجر أو غير نشط.');
+
+            return self::FAILURE;
+        }
+
+        // سلطة الإصدار نفسها المشترطة في واجهة المطوّر (developer.manage) — مستقلة عن سقف الـscopes.
+        if (! $guard->mayIssue($issuer)) {
+            $this->error('رُفض الإصدار: المُصدِر لا يملك الصلاحية '.PublicApiKeyIssuanceAuthority::PERMISSION.'. لم يُنشأ عميل ولا مفتاح.');
 
             return self::FAILURE;
         }
