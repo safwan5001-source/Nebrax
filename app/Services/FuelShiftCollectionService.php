@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FuelShift;
+use App\Models\FuelShiftCashVariance;
 use App\Models\FuelShiftCollectionDeclaration;
 use App\Models\FuelShiftCollectionRevision;
 use App\Models\FuelShiftEvent;
@@ -289,7 +290,13 @@ class FuelShiftCollectionService
         });
     }
 
-    /** الاعتماد يتطلب مراجعة المشرف لأي فرق تحصيل (Q3) — والبوابة مفتوحة فقط. لا يكشف قيماً (رمز ورسالة فقط). */
+    /**
+     * شرط الاعتماد — والبوابة مفتوحة فقط (OFF ⇒ `approve()` كما كان حرفياً):
+     *  1. فرق مطابقة التحصيل غير الصفري يحتاج مراجعة مشرف مسجَّلة (Q3).
+     *  2. فرق نقد الدرج المعلَّق (`pending_review`) يحتاج مراجعته المسجَّلة بـ`reviewCashVariance` نفسها (لا مسار جديد). السبب: قرار المالك بأن كل فرق
+     *     يتطلب مراجعة مشرف يُمنع اعتماده قبل اكتمالها؛ وهو سلوك الاعتماد الجديد الوحيد المتعلق بفرق النقد ويقتصر على من فعّل هذه الميزة.
+     * رسائل بلا قيم (رمز وسبب فقط).
+     */
     public function assertApprovable(FuelShift $shift): void
     {
         if (! self::enabled()) {
@@ -299,6 +306,10 @@ class FuelShiftCollectionService
         if ($declaration !== null && $declaration->status === FuelShiftCollectionDeclaration::STATUS_FROZEN
             && $declaration->review_required && $declaration->reviewed_at === null) {
             throw new RuntimeException('FUEL_COLLECTION_REVIEW_REQUIRED: يوجد فرق في مطابقة التحصيل يحتاج مراجعة مشرف مسجَّلة قبل اعتماد الوردية.');
+        }
+        $variance = FuelShiftCashVariance::where('fuel_shift_id', $shift->id)->first();
+        if ($variance !== null && $variance->status === FuelShiftCashVariance::STATUS_PENDING_REVIEW && $variance->reviewed_at === null) {
+            throw new RuntimeException('FUEL_CASH_VARIANCE_REVIEW_REQUIRED: يوجد فرق في نقد الدرج يحتاج مراجعة مشرف مسجَّلة قبل اعتماد الوردية.');
         }
     }
 

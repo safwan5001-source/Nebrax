@@ -16,7 +16,7 @@ import { shiftDetailResponse, type ShiftDetail } from './schemas';
  * - لا إعادة محاولة تلقائية أبداً.
  */
 
-export type WriteAction = 'open' | 'assign_staff' | 'meter_reading' | 'tank_reading' | 'cash_movement' | 'close' | 'collection';
+export type WriteAction = 'open' | 'assign_staff' | 'meter_reading' | 'tank_reading' | 'cash_movement' | 'close' | 'collection' | 'approve' | 'review_cash_variance' | 'review_collection';
 
 export type WriteRequest =
   | { action: 'open'; body: { fuel_station_id: string; idempotency_key: string; opening_float_minor?: number } }
@@ -24,11 +24,17 @@ export type WriteRequest =
   | { action: 'meter_reading'; shiftId: string; body: { fuel_nozzle_id: string; reading_stage: 'opening' | 'closing'; meter_milliliters: number; evidence_key: string } }
   | { action: 'tank_reading'; shiftId: string; body: { fuel_tank_id: string; reading_stage: 'opening' | 'closing'; reading_type: 'physical' | 'atg'; quantity_milliliters: number; evidence_key: string } }
   | { action: 'cash_movement'; shiftId: string; body: { type: 'cash_in' | 'cash_out' | 'expense'; amount_minor: number; reason: string; idempotency_key: string } }
-  | { action: 'close'; shiftId: string; body: { counted_cash_minor: number; closing_note?: string } };
+  | { action: 'close'; shiftId: string; body: { counted_cash_minor: number; closing_note?: string } }
+  // اعتماد المشرف (واجهات الخادم القائمة نفسها؛ الصلاحيات والقواعد يفرضها الخادم): اعتماد الوردية المغلقة ومراجعة فرق نقد الدرج
+  | { action: 'approve'; shiftId: string; body: { note?: string } }
+  | { action: 'review_cash_variance'; shiftId: string; body: { note: string } };
+
+/** مراجعة المشرف لفرق مطابقة التحصيل: ردّها عرض التحصيل (لا الوردية) فله دالة مستقلة `opsWriteReviewCollection`. */
+type ReviewCollectionRequest = { action: 'review_collection'; shiftId: string; body: { note: string } };
 
 /** إقرار تحصيل الوردية: نتيجته من نوع مختلف (`CollectionWriteResult`) فله دالة مستقلة `opsWriteCollection`. */
 type CollectionRequest = { action: 'collection'; shiftId: string; body: CollectionBody };
-type AnyRequest = WriteRequest | CollectionRequest;
+type AnyRequest = WriteRequest | CollectionRequest | ReviewCollectionRequest;
 
 export type RejectionCode =
   // رسائل الخادم المعروفة (تصنيف بالنص — الخادم يعيد 422 + رسالة عربية حرة)
@@ -39,6 +45,8 @@ export type RejectionCode =
   | 'collection_method_not_allowed' | 'collection_methods_changed' | 'collection_invalid' | 'collection_stale_revision'
   // شرط الإغلاق (Q1/Q3) عند رفض `close`
   | 'collection_required' | 'collection_incomplete' | 'collection_no_methods' | 'collection_reason_required'
+  // اعتماد المشرف ومراجعة الفروق
+  | 'approve_needs_closed' | 'approve_needs_other_supervisor' | 'collection_review_required' | 'cash_variance_review_required' | 'review_already_done' | 'review_not_needed' | 'review_needs_closed'
   // حالات HTTP
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
 
@@ -46,6 +54,13 @@ const KNOWN_MESSAGES: ReadonlyArray<[RegExp, RejectionCode]> = [
   [/FUEL_COLLECTION_METHOD_NOT_ALLOWED/, 'collection_method_not_allowed'],
   [/FUEL_COLLECTION_METHODS_CHANGED/, 'collection_methods_changed'],
   [/FUEL_COLLECTION_INVALID/, 'collection_invalid'],
+  [/FUEL_COLLECTION_REVIEW_REQUIRED/, 'collection_review_required'],
+  [/FUEL_CASH_VARIANCE_REVIEW_REQUIRED/, 'cash_variance_review_required'],
+  [/لا تعتمد إلا وردية مغلقة/, 'approve_needs_closed'],
+  [/مشرف مختلف عن فاتح الشفت/, 'approve_needs_other_supervisor'],
+  [/(تمت مراجعة فرق النقد|روجع فرق التحصيل).*بالفعل/, 'review_already_done'],
+  [/لا يوجد فرق (نقد|تحصيل)/, 'review_not_needed'],
+  [/لا (تراجع|تراجَع) .*(إلا بعد إغلاق|إلا لوردية مغلقة)/, 'review_needs_closed'],
   [/FUEL_COLLECTION_REQUIRED/, 'collection_required'],
   [/FUEL_COLLECTION_INCOMPLETE/, 'collection_incomplete'],
   [/FUEL_COLLECTION_NO_METHODS/, 'collection_no_methods'],
@@ -107,6 +122,9 @@ function buildPath(request: AnyRequest): string {
     case 'cash_movement': return `${base}/cash-movements`;
     case 'close': return `${base}/close`;
     case 'collection': return `${base}/collection`;
+    case 'approve': return `${base}/approve`;
+    case 'review_cash_variance': return `${base}/cash-variance/review`;
+    case 'review_collection': return `${base}/collection/review`;
   }
 }
 
@@ -170,4 +188,12 @@ export async function opsWriteCollection(shiftId: string, body: CollectionBody, 
   if (!('raw' in sent)) return sent;
   const parsed = collectionResponse.safeParse(sent.raw);
   return parsed.success ? { kind: 'ok', view: parsed.data.data, replayed: parsed.data.meta?.replayed ?? false, unchanged: parsed.data.meta?.unchanged ?? false } : { kind: 'unverified' };
+}
+
+/** مراجعة المشرف لفرق مطابقة التحصيل (`POST …/collection/review`، `fuel.shift.cash_variance_review`): النجاح يُعلَن فقط إن أعاد الخادم `review.state = reviewed`. */
+export async function opsWriteReviewCollection(shiftId: string, note: string, options: { branchId?: string | null; timeoutMs?: number } = {}): Promise<CollectionWriteResult> {
+  const sent = await send({ action: 'review_collection', shiftId, body: { note } }, options);
+  if (!('raw' in sent)) return sent;
+  const parsed = collectionResponse.safeParse(sent.raw);
+  return parsed.success ? { kind: 'ok', view: parsed.data.data, replayed: false, unchanged: false } : { kind: 'unverified' };
 }

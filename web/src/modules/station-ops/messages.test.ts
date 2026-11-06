@@ -56,7 +56,7 @@ describe('stationOps messages', () => {
       ['shiftDetail.cash.review', ['pending_review', 'reviewed', 'not_required']],
       ['next.kind', ['open_shift', 'opening_readings', 'closing_readings', 'close_shift', 'approve_shift']],
       // UI-2 — الكتابة (مفاتيح تُبنى ديناميكياً من رموز write-client وحالات الشاشات)
-      ['write.reject', ['shift_already_open', 'idempotency_conflict', 'float_required', 'station_branch', 'station_inactive', 'shift_not_open', 'reading_exists', 'evidence_conflict', 'asset_unavailable', 'staff_already_assigned', 'cash_exceeds_balance', 'closing_below_opening', 'close_needs_readings', 'close_needs_staff', 'close_blocked_cash_variance', 'close_blocked_tank_variance', 'tank_type_mismatch', 'collection_method_not_allowed', 'collection_methods_changed', 'collection_invalid', 'collection_stale_revision', 'collection_required', 'collection_incomplete', 'collection_no_methods', 'collection_reason_required', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'rate_limited', 'validation', 'demo']],
+      ['write.reject', ['shift_already_open', 'idempotency_conflict', 'float_required', 'station_branch', 'station_inactive', 'shift_not_open', 'reading_exists', 'evidence_conflict', 'asset_unavailable', 'staff_already_assigned', 'cash_exceeds_balance', 'closing_below_opening', 'close_needs_readings', 'close_needs_staff', 'close_blocked_cash_variance', 'close_blocked_tank_variance', 'tank_type_mismatch', 'collection_method_not_allowed', 'collection_methods_changed', 'collection_invalid', 'collection_stale_revision', 'collection_required', 'collection_incomplete', 'collection_no_methods', 'collection_reason_required', 'approve_needs_closed', 'approve_needs_other_supervisor', 'collection_review_required', 'cash_variance_review_required', 'review_already_done', 'review_not_needed', 'review_needs_closed', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'rate_limited', 'validation', 'demo']],
       ['write.unknown', ['timeout', 'network', 'server']],
       ['write.notSent', ['offline', 'demo']],
       ['entry.title', ['opening', 'closing']],
@@ -75,6 +75,12 @@ describe('stationOps messages', () => {
       ['collection.nozzleStatus', ['missing_opening', 'missing_closing', 'missing_both', 'closing_below_opening', 'unknown']],
       ['collection.entry.type', ['cash', 'bank']],
       ['collection.gate', ['no_methods', 'required', 'incomplete', 'unsaved']],
+      // مراجعة الوردية واعتمادها (المشرف)
+      ['review.status', ['closed', 'approved']],
+      ['review.row.collection', ['title', 'pending', 'reviewed', 'none', 'action', 'dialogTitle']],
+      ['review.row.cash', ['title', 'pending', 'reviewed', 'none', 'action', 'dialogTitle']],
+      ['review.blocker', ['collection_review', 'cash_variance_review', 'same_user']],
+      ['review.audit.type', ['closed', 'collection_frozen', 'cash_variance_pending_review', 'collection_reviewed', 'cash_variance_reviewed', 'approved_locked']],
       ['collection.recon.direction', ['overage', 'shortage', 'none']],
       ['collection.disclaimer', ['operational_not_financial_proof', 'credit_sales_excluded', 'unrecorded_settlements_excluded']],
     ];

@@ -19,7 +19,7 @@ const sources = readdirSync(dir)
 
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 const WRITE_CLIENT = 'write-client.ts';
-const WRITE_SCREENS = ['open-shift-screen.tsx', 'readings-entry-screen.tsx', 'handover-screen.tsx', 'collection-section.tsx'];
+const WRITE_SCREENS = ['open-shift-screen.tsx', 'readings-entry-screen.tsx', 'handover-screen.tsx', 'collection-section.tsx', 'review-screen.tsx'];
 
 describe('station-ops writes only through write-client.ts', () => {
   it('has module sources to scan', () => {
@@ -47,16 +47,22 @@ describe('station-ops writes only through write-client.ts', () => {
     }
   });
 
-  it('the write client exposes exactly seven actions and builds its own paths (callers never pass a path)', () => {
+  it('the write client exposes exactly ten actions and builds its own paths (callers never pass a path)', () => {
     const client = code(sources.find((entry) => entry.file === WRITE_CLIENT)!.text);
     const actions = [...client.matchAll(/action: '([a-z_]+)'/g)].map((m) => m[1]);
-    expect([...new Set(actions)].sort()).toEqual(['assign_staff', 'cash_movement', 'close', 'collection', 'meter_reading', 'open', 'tank_reading']);
+    expect([...new Set(actions)].sort()).toEqual(['approve', 'assign_staff', 'cash_movement', 'close', 'collection', 'meter_reading', 'open', 'review_cash_variance', 'review_collection', 'tank_reading']);
     const paths = [...client.matchAll(/`?['"`]?(\/fuel-stations\/[^'"`$]*|\$\{base\}\/[a-z-]+)/g)].map((m) => m[1]);
-    expect([...new Set(paths)].sort()).toEqual(['${base}/cash-movements', '${base}/close', '${base}/collection', '${base}/meter-readings', '${base}/staff', '${base}/tank-readings', '/fuel-stations/shifts/', '/fuel-stations/shifts/open'].sort());
+    expect([...new Set(paths)].sort()).toEqual(['${base}/approve', '${base}/cash-movements', '${base}/cash-variance', '${base}/close', '${base}/collection', '${base}/meter-readings', '${base}/staff', '${base}/tank-readings', '/fuel-stations/shifts/', '/fuel-stations/shifts/open'].sort());
   });
 
-  it.each(sources)('$file never reaches approval, variance review, corrections, sales, payments, prices or receiving', ({ text }) => {
-    expect(code(text)).not.toMatch(/\/approve['"`]|cash-variance|\/corrections|fuel-stations\/(sales|deliveries|supplier-invoices|reconciliations|readings|corporate|fleet|fuel-cards|avi)|sale-payment-methods|sales\/\$\{|\/payments/);
+  it.each(sources)('$file never reaches corrections, sales, payments, prices or receiving', ({ text }) => {
+    expect(code(text)).not.toMatch(/\/corrections|fuel-stations\/(sales|deliveries|supplier-invoices|reconciliations|readings|corporate|fleet|fuel-cards|avi)|sale-payment-methods|sales\/\$\{|\/payments/);
+  });
+
+  // اعتماد المشرف ومراجعة الفروق: مساراتها تُبنى في write-client وحده، ولا يستعملها إلا شاشة المراجعة (لا كتابة اعتماد من أي شاشة أخرى).
+  it.each(sources)('$file mentions approval / difference-review paths only if it is the write client', ({ file, text }) => {
+    const mentions = /\/approve['"`]|cash-variance|\/collection\/review|opsWriteReviewCollection|action: 'approve'|action: 'review_/.test(code(text));
+    expect(mentions, file).toBe(file === WRITE_CLIENT || file === 'review-screen.tsx');
   });
 
   it('keeps idempotency/draft helpers out of everything but the write screens', () => {

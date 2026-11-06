@@ -166,7 +166,7 @@ function DrawerBlock({ view, countedMinor, cashDeclaredMinor }: { view: Collecti
 }
 
 /** عرض للقراءة فقط (تفاصيل الوردية للمشرف، وبعد التسليم): الإقرار المحفوظ أو المجمَّد، المبيعات، المطابقة، الدرج. */
-export function CollectionReadOnly({ view }: { view: CollectionView }) {
+export function CollectionReadOnly({ view, title }: { view: CollectionView; title?: string }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
   const declaration = view.declaration;
@@ -175,7 +175,7 @@ export function CollectionReadOnly({ view }: { view: CollectionView }) {
   return (
     <section aria-labelledby="fo-collection-ro-h" data-collection-readonly={view.state} className="space-y-4 rounded-[14px] border border-border bg-surface p-4">
       <div>
-        <h2 id="fo-collection-ro-h" className="text-base font-semibold text-text">{t('collection.title')}</h2>
+        <h2 id="fo-collection-ro-h" className="text-base font-semibold text-text">{title ?? t('collection.title')}</h2>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs leading-5 text-muted">{frozen ? <Lock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} /> : null}{frozen ? t('collection.frozen') : t('collection.live')}</p>
       </div>
       <SalesBlock view={view} />

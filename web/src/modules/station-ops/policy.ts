@@ -17,6 +17,8 @@ export interface ShiftPolicy {
   staffMandatory: boolean;
   /** `null` = غير معروف (لا نَعِد بالسماح بالإغلاق مع فرق نقد ولا نمنعه — الخادم يحكم). */
   allowCloseWithCashVariance: boolean | null;
+  /** `true` ⇒ الاعتماد من مشرف مختلف عن فاتح الوردية (الخادم يفرضه)؛ `null` = غير معروف (لا حجب محلي). */
+  supervisorApprovalRequired: boolean | null;
 }
 
 export const STRICT_POLICY: ShiftPolicy = {
@@ -28,6 +30,7 @@ export const STRICT_POLICY: ShiftPolicy = {
   closingTankRequired: true,
   staffMandatory: true,
   allowCloseWithCashVariance: null,
+  supervisorApprovalRequired: null,
 };
 
 export function toShiftPolicy(settings: StationSettings): ShiftPolicy {
@@ -49,5 +52,6 @@ export function toShiftPolicy(settings: StationSettings): ShiftPolicy {
     closingTankRequired: pick(settings.shift_closing_tank_reading_required, true),
     staffMandatory: pick(settings.shift_mandatory_staff_assignment, true),
     allowCloseWithCashVariance: settings.shift_allow_close_with_pending_cash_variance ?? null,
+    supervisorApprovalRequired: settings.shift_supervisor_approval_required ?? null,
   };
 }
