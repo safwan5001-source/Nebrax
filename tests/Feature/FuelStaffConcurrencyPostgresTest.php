@@ -75,8 +75,15 @@ class FuelStaffConcurrencyPostgresTest extends TestCase
         $scene = $this->scene();
         $this->enter($scene);
         $service = app(FuelStaffAccessService::class);
-        $revision = $service->update(User::findOrFail($scene['actor']), $scene['target'], ['template' => 'seller', 'station_ids' => [$this->fx['s1']->id]])['revision'];
+        // حالة الأساس. **كل** وظيفة منافسة أدناه تغيّر هذه الحالة فعلاً (قالبها أو محطتها يختلف): وظيفة تطابق الأساس بلا تغيير لا تحرّك الـrevision
+        // (بصمة حالة لا عدّاد)، فتنجح كـno-op قبل الفائز الحقيقي أو بعده بحسب من يأخذ القفل أولاً، وهذا سباق في الاختبار لا في الخدمة
+        // (يغطّيه الاختبار الحتمي `a_noop_with_the_current_revision…` أدناه).
+        $baseline = ['template' => 'supervisor', 'station' => 's1'];
+        $revision = $service->update(User::findOrFail($scene['actor']), $scene['target'], ['template' => $baseline['template'], 'station_ids' => [$this->fx[$baseline['station']]->id]])['revision'];
         $templates = ['seller', 'supervisor', 'station_manager', 'supervisor', 'station_manager', 'seller'];
+        foreach ($templates as $i => $template) {
+            $this->assertNotSame($baseline, ['template' => $template, 'station' => $i % 2 === 0 ? 's1' : 's2'], "الوظيفة {$i} تطابق حالة الأساس فلا تُعدّ منافسة حقيقية على الـrevision.");
+        }
 
         $jobs = [];
         foreach ($templates as $i => $template) {
@@ -103,7 +110,42 @@ class FuelStaffConcurrencyPostgresTest extends TestCase
         // الحالة النهائية = الفائز كاملاً.
         [, $template, $station] = explode(':', $winners[0]);
         $this->assertFinalState($scene, $template, $station);
+        $this->assertNotSame($revision, app(FuelStaffAccessService::class)->show(User::findOrFail($scene['actor']), $scene['target'])['revision'], 'الفائز غيّر الحالة فتغيّر الـrevision.');
         $this->assertSame(2, (int) DB::table('access_change_events')->where('tenant_id', $this->tenantId)->where('action', 'fuel_staff.updated')->where('outcome', 'applied')->count()); // التهيئة + الفائز
+    }
+
+    /**
+     * عقد `revision`: بصمة **حالة** لا عدّاد. تعديل يطابق الحالة الحالية لا يغيّرها ولا يُنتج حدث تدقيق، فيبقى الـrevision صالحاً؛ ثم تعديل حقيقي بنفس الـrevision
+     * ينجح، وبعده يُرفض كل من يحمل الـrevision القديم. حتمي (تسلسل صريح بلا fork) ويشرح سبب أن الاختبار التنافسي أعلاه لا يتضمن وظيفة no-op.
+     *
+     * @test
+     */
+    public function a_noop_with_the_current_revision_is_accepted_without_changing_it_or_writing_an_audit_event(): void
+    {
+        $scene = $this->scene();
+        $this->enter($scene);
+        $service = app(FuelStaffAccessService::class);
+        $actor = User::findOrFail($scene['actor']);
+        $state = ['template' => 'seller', 'station_ids' => [$this->fx['s1']->id]];
+        $revision = $service->update($actor, $scene['target'], $state)['revision'];
+        $applied = fn () => (int) DB::table('access_change_events')->where('tenant_id', $this->tenantId)->where('action', 'fuel_staff.updated')->where('outcome', 'applied')->count();
+        $this->assertSame(1, $applied());
+
+        $noop = $service->update($actor, $scene['target'], $state + ['expected_revision' => $revision]);
+        $this->assertSame($revision, $noop['revision'], 'تعديل يطابق الحالة لا يحرّك الـrevision.');
+        $this->assertSame(1, $applied(), 'تعديل بلا تغيير فعلي لا يُنتج حدث تدقيق.');
+
+        $real = $service->update($actor, $scene['target'], ['template' => 'supervisor', 'station_ids' => [$this->fx['s2']->id], 'expected_revision' => $revision]);
+        $this->assertNotSame($revision, $real['revision']);
+        $this->assertSame(2, $applied());
+
+        try {
+            $service->update($actor, $scene['target'], ['template' => 'station_manager', 'station_ids' => [$this->fx['s1']->id], 'expected_revision' => $revision]);
+            $this->fail('الـrevision القديم بعد تغيير حقيقي يجب أن يُرفض.');
+        } catch (FuelStaffRevisionConflictException $e) {
+            $this->assertSame($real['revision'], $e->currentRevision);
+        }
+        $this->assertSame(2, $applied());
     }
 
     /** @test */
