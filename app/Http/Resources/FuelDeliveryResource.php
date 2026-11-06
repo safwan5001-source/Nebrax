@@ -36,12 +36,53 @@ class FuelDeliveryResource extends JsonResource
             'stock_movement_id' => $this->stock_movement_id,
             'journal_entry_id' => $this->journal_entry_id,
             'operational_ledger_id' => $this->fuel_operational_ledger_id,
+            // FUEL-B5 (إضافي): ما تحتاجه شاشة الاستلام لتعرض السجل بلا اختلاق — أسماء المراجع المحمَّلة، المنشئ (لتلميح فصل المعتمِد)، بيانات الناقلة، وقراءات الخزان المربوطة.
+            'created_by' => $this->created_by,
+            'tanker_identifier' => $this->tanker_identifier,
+            'driver_name' => $this->driver_name,
+            'temperature_milli_celsius' => $this->temperature_milli_celsius,
+            'density_kg_per_m3' => $this->density_kg_per_m3,
+            'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier ? ['id' => $this->supplier->id, 'name' => $this->supplier->name, 'code' => $this->supplier->code] : null),
+            'tank' => $this->whenLoaded('tank', fn () => $this->tank ? ['id' => $this->tank->id, 'code' => $this->tank->code, 'name' => $this->tank->name] : null),
+            'warehouse' => $this->whenLoaded('warehouse', fn () => $this->warehouse ? ['id' => $this->warehouse->id, 'name' => $this->warehouse->name, 'code' => $this->warehouse->code] : null),
+            'readings' => [
+                'before_physical' => $this->readingBlock('beforePhysicalReading'),
+                'after_physical' => $this->readingBlock('afterPhysicalReading'),
+                'before_atg' => $this->readingBlock('beforeAtgReading'),
+                'after_atg' => $this->readingBlock('afterAtgReading'),
+            ],
             'received_at' => $this->received_at?->toISOString(),
             'approved_at' => $this->approved_at?->toISOString(),
             'approved_by' => $this->approved_by,
             'evidence' => $this->evidence,
             'notes' => $this->notes,
             'created_at' => $this->created_at?->toISOString(),
+        ];
+    }
+
+    /** قراءة خزان مربوطة (معرّف + كمية + وقت) أو null؛ تُحمَّل علاقتها في العرض المفرد فقط، وغير المحمَّلة تُعاد بمعرّفها وحده. */
+    private function readingBlock(string $relation): ?array
+    {
+        $idColumn = match ($relation) {
+            'beforePhysicalReading' => 'before_physical_reading_id',
+            'afterPhysicalReading' => 'after_physical_reading_id',
+            'beforeAtgReading' => 'before_atg_reading_id',
+            default => 'after_atg_reading_id',
+        };
+        $id = $this->{$idColumn};
+        if ($id === null) {
+            return null;
+        }
+        $reading = $this->relationLoaded($relation) ? $this->{$relation} : null;
+        if ($reading === null) {
+            return ['id' => $id];
+        }
+
+        return [
+            'id' => $reading->id,
+            'quantity_milliliters' => (int) $reading->quantity_milliliters,
+            'quantity_liters' => app(FuelQuantity::class)->millilitersToLiters((int) $reading->quantity_milliliters),
+            'measured_at' => $reading->measured_at?->toIso8601String(),
         ];
     }
 }

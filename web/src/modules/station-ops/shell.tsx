@@ -4,12 +4,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { Droplets, Gauge, House, ShieldCheck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
+import { Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StationOpsProvider, useStationOps } from './context';
 import { isNavActive, visibleOpsNav, type OpsNavId } from './nav';
 
-const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, manage: ShieldCheck, profile: UserRound };
+const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, receiving: Truck, manage: ShieldCheck, profile: UserRound };
 
 function subscribeOnline(onChange: () => void): () => void {
   window.addEventListener('online', onChange);
@@ -53,7 +53,7 @@ function Frame({ children }: { children: ReactNode }) {
         aria-label={t('navLabel')}
         className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:static md:inset-auto md:border-e md:border-t-0 md:pb-0"
       >
-        <ul className="mx-auto flex max-w-xl justify-around px-1.5 pt-1.5 md:max-w-none md:flex-col md:gap-1 md:p-3">
+        <ul className="mx-auto flex max-w-xl justify-around px-1 pt-1.5 md:max-w-none md:flex-col md:gap-1 md:p-3">
           {items.map((item) => {
             const Icon = NAV_ICONS[item.id];
             const active = isNavActive(pathname, item.href);
@@ -63,7 +63,7 @@ function Frame({ children }: { children: ReactNode }) {
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-[56px] flex-col items-center justify-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary md:min-h-11 md:flex-row md:justify-start md:gap-3 md:rounded-lg md:px-3 md:text-sm',
+                    'flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 px-0.5 py-1.5 text-[11px] sm:px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary md:min-h-11 md:flex-row md:justify-start md:gap-3 md:rounded-lg md:px-3 md:text-sm',
                     active ? 'font-bold text-primary md:bg-primary-soft' : 'font-medium text-muted hover:text-text',
                   )}
                 >

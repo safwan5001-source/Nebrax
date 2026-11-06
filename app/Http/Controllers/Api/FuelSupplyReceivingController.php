@@ -11,6 +11,7 @@ use App\Http\Resources\FuelSupplierInvoiceMatchResource;
 use App\Http\Resources\FuelSupplierInvoiceResource;
 use App\Models\FuelDelivery;
 use App\Models\FuelSupplierInvoice;
+use App\Models\Partner;
 use App\Services\FuelSupplyReceivingService;
 use Illuminate\Http\Request;
 
@@ -35,7 +36,7 @@ class FuelSupplyReceivingController extends ApiController
 
     public function showDelivery(Request $request, string $id)
     {
-        $delivery = $this->restrictToAccessibleStations($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelDelivery::query(), $request), ['warehouse_id']))->with(['station', 'tank', 'fuelProduct', 'warehouse', 'supplier'])->findOrFail($id);
+        $delivery = $this->restrictToAccessibleStations($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelDelivery::query(), $request), ['warehouse_id']))->with(['station', 'tank', 'fuelProduct', 'warehouse', 'supplier', 'beforePhysicalReading', 'afterPhysicalReading', 'beforeAtgReading', 'afterAtgReading'])->findOrFail($id);
         return new FuelDeliveryResource($delivery);
     }
 
@@ -53,6 +54,23 @@ class FuelSupplyReceivingController extends ApiController
         $delivery = $this->restrictToAccessibleStations($this->scopeToAccessibleWarehouses($this->scopeToActiveBranch(FuelDelivery::query(), $request), ['warehouse_id']))->findOrFail($id);
         $this->accessibleStation($delivery->fuel_station_id);
         return $this->domain(fn () => new FuelDeliveryResource($this->service->approveDelivery($delivery, $request->user()->id)));
+    }
+
+    /**
+     * FUEL-B5: موردو الوقود المتاحون لاختيار المورد عند إنشاء استلام — قراءة فقط ومحدودة الحقول (معرّف/اسم/رمز، بلا رصيد أو ضريبة أو تواصل).
+     * `GET /partners` يتطلب `partners.view` وهي ليست من صلاحيات موظف المحطة. الصلاحية = نفس صلاحية إنشاء الاستلام (القديم أو الدقيق).
+     * `Partner` يخضع لعزل المستأجر والفرع النشط كما في إنشاء الاستلام نفسه (الذي يحلّ المورد بالطريقة نفسها).
+     */
+    public function suppliers(Request $request)
+    {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $query = Partner::query()->whereIn('type', ['supplier', 'both'])->where('is_active', true)->orderBy('name')->limit(100);
+        if (! empty($filters['q'])) {
+            $needle = '%' . mb_strtolower($filters['q']) . '%'; // بحث المستخدم نفسه: المحارف الخاصة لا تتجاوز نطاق المورّدين المصرَّح به أصلاً
+            $query->where(fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', [$needle])->orWhereRaw('LOWER(code) LIKE ?', [$needle]));
+        }
+
+        return response()->json(['data' => $query->get(['id', 'name', 'code'])->map(fn (Partner $p) => ['id' => $p->id, 'name' => $p->name, 'code' => $p->code])->values()->all()]);
     }
 
     public function invoices(Request $request)
