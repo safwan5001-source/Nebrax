@@ -28,6 +28,17 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'manage', 'profile']);
   });
 
+  // FUEL-B5: «الاستلام» من مفتاح الاستلام الدقيق أو القديم `fuel_stations.manage` — لا من `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة).
+  it('shows Receiving only to someone holding a receiving permission, never for plain station view', () => {
+    const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.open'])).not.toContain('receiving'); // بائع
+    expect(ids(['fuel_stations.view', 'fuel.delivery.view'])).toContain('receiving');
+    expect(ids(['fuel_stations.view', 'fuel.delivery.create'])).toContain('receiving');
+    expect(ids(['fuel_stations.view', 'fuel.delivery.approve'])).toContain('receiving');
+    expect(ids(['fuel_stations.view', 'fuel_stations.manage'])).toContain('receiving');
+    expect(ids(['fuel.delivery.view'])).not.toContain('receiving'); // بلا قراءة المحطات لا تطبيق
+  });
+
   it('marks the active item without matching sibling prefixes', () => {
     expect(isNavActive(OPS_BASE, OPS_BASE)).toBe(true);
     expect(isNavActive(`${OPS_BASE}/products`, OPS_BASE)).toBe(false);

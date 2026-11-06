@@ -874,6 +874,14 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **API قراءة فقط:** `GET fuel-stations/staff/candidates` و`GET fuel-stations/staff/audit` (`AccessChangeAuditReader`: ملخص `changes` لا لقطات خام، حامل `*` يرى الكل وغيره أحداث `fuel_staff` ضمن نطاقه فقط، ترقيم خادمي).
 - **الاستثناء الوحيد لقاعدة «التطبيق وحده»:** `PRICES_HREF = /fuel-stations/prices` (إدارة أسعار الوقود القائمة) لمن يملك `fuel.sale.price.manage` — بطلب المالك، يحرسه `app-only.test.ts`.
 
+### FUEL-B5 — استلام الوقود داخل التطبيق (`/fuel-stations/ops/receiving`، `web/src/modules/station-ops/receiving/`)
+
+دورة الاستلام الفعلية (مسودة ← اعتماد) فوق `FuelSupplyReceivingService` بلا دورة موازية؛ التفاصيل وأثر الاعتماد والمخاطر: `docs/fuel-stations/FUEL_REMEDIATION_HORIZON.md` (Phase B / B5).
+- **لا حالة «مرفوض»** في الخادم (`draft|approved` فقط)؛ رفض الاعتماد خطأ صريح بسببه. الحفظ مسودة بلا أثر مخزني/محاسبي؛ الاعتماد وحده يُدخل المخزون ويقيّد (مدين المخزون/دائن مخزون مستلم غير مفوتر للمحطة) داخل معاملة بعد فحص فصل المعتمِد.
+- **حدّ الشبكة:** كل HTTP في `receiving/receiving-client.ts`: قراءة بقائمة بيضاء (قائمة/استلام بـuuid/`delivery-suppliers`/`readings`) و**ثلاث POST فقط** (قراءة خزان · مسودة · اعتماد). نتيجة غير مؤكدة ⇒ «تحقق من الحالة» بالقراءة، ولا إعادة إرسال إلا بفعل صريح وبالمفتاح نفسه (idempotency للمسودة؛ مفتاح دليل حتمي للقراءات). يحرسه `receiving/receiving-boundary.test.ts`.
+- **الصلاحيات:** `fuel.delivery.view|create|approve` + `fuel.reading.record` (أو `fuel_stations.manage` القديم)، والتكلفة `products.view_cost` وحدها (غيابها ⇒ المفتاح محذوف من الاستجابة). **بدء استلام من التطبيق يتطلب التكلفة** لأنها إلزامية في الإنشاء (D-B5-1 للمالك).
+- **API إضافية (قراءة فقط):** `GET fuel-stations/delivery-suppliers` وإثراء `FuelDeliveryResource` (أسماء، `created_by`، قراءات مربوطة).
+
 ## إقرار تحصيل الوردية — Fuel Shift Collection Declaration (مغلق افتراضياً، تشغيلي فقط)
 
 مبيعات الوردية المشتقة من العدادات (فرق العدادين × سعر اللتر الفعّال) مقابل ما حُصِّل حسب طريقة الدفع. العقد الكامل: `docs/fuel-stations/AWJ_FUEL_SHIFT_COLLECTION_RECONCILIATION_CONTRACT.md`.
