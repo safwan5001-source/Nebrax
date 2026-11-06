@@ -39,7 +39,7 @@ function Pending({ station }: { station: Station }) {
               <li key={row.id} className="space-y-3 rounded-[14px] border border-border bg-surface p-4" data-pending-id={row.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link href={`${RECEIVING_BASE}/${row.id}`} className="block truncate text-[15px] font-semibold text-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" dir="auto">{deliveryTitle(row, t('receiving.untitled'))}</Link>
+                    <Link href={`${RECEIVING_BASE}/${row.id}`} className="flex min-h-11 items-center truncate text-[15px] font-semibold text-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" dir="auto">{deliveryTitle(row, t('receiving.untitled'))}</Link>
                     <p className="truncate text-sm text-muted" dir="auto">{[row.supplier?.name, row.tank?.name].filter(Boolean).join(' · ')}</p>
                   </div>
                   <Badge tone="warning">{t('receiving.cost.missing')}</Badge>

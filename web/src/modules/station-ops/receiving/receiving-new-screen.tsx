@@ -314,7 +314,7 @@ function Wizard({ station }: { station: Station }) {
                     <FileText aria-hidden="true" className="h-4 w-4 shrink-0 text-muted" />
                     <span className="min-w-0 flex-1 truncate" dir="auto">{file.name}</span>
                     <span className="num text-xs text-muted">{formatBytes(file.size)}</span>
-                    <button type="button" aria-label={`${t('receiving.attach.unstage')}: ${file.name}`} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))} className="grid h-9 w-9 place-items-center rounded-md hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden="true" className="h-4 w-4" /></button>
+                    <button type="button" aria-label={`${t('receiving.attach.unstage')}: ${file.name}`} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))} className="grid h-11 w-11 shrink-0 place-items-center rounded-md hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden="true" className="h-4 w-4" /></button>
                   </li>
                 ))}
               </ul>
