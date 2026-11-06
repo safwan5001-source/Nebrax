@@ -3012,6 +3012,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "cost": "Cost",
       "actions": "Executable actions",
       "alerts": "Alerts",
       "audit": "Audit",
