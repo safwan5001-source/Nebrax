@@ -40,6 +40,10 @@ describe('stationOps messages', () => {
       ['error', ['unauthorized', 'forbidden', 'not_found', 'offline', 'server', 'invalid_shape', 'demo']],
       ['shiftStatus', ['open', 'closed', 'approved']],
       ['assetStatus', ['active', 'inactive', 'maintenance']],
+      // مؤشر منسوب الخزان (عرض فقط، غير موصول بعد)
+      ['tankLevel.band', ['healthy', 'monitor', 'low']],
+      ['tankLevel.source', ['physical', 'atg', 'book', 'estimated']],
+      ['tankLevel.unavailable.reason', ['missing_level', 'invalid_level', 'invalid_capacity', 'conflicting_unit']],
       ['blocked', ['station_inactive', 'nozzle_inactive', 'pump_missing', 'pump_inactive', 'tank_missing', 'tank_inactive', 'product_missing', 'product_inactive', 'product_tank_mismatch']],
       ['mode', ['supervisor', 'operator', 'viewer']],
       ['shifts.filter', ['all', 'open', 'closed', 'approved']],

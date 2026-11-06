@@ -14788,6 +14788,39 @@
       "tankLevelNote": "Current tank levels aren't shown here yet; they will appear once tank readings are connected in a later slice.",
       "subtitle": "View only"
     },
+    "tankLevel": {
+      "meterLabel": "Tank level",
+      "percentValue": "{value}%",
+      "percentStatus": "{percent} — {status}",
+      "band": {
+        "healthy": "Good",
+        "monitor": "Monitor",
+        "low": "Low"
+      },
+      "amount": "{level} of {capacity} {unit}",
+      "source": {
+        "physical": "Manual measurement",
+        "atg": "Automatic gauge (ATG)",
+        "book": "Book balance",
+        "estimated": "Estimated"
+      },
+      "updatedAt": "Last updated: {time}",
+      "unavailable": {
+        "title": "Level unavailable",
+        "reason": {
+          "missing_level": "No level data for this tank.",
+          "invalid_level": "The level value is not valid.",
+          "invalid_capacity": "The tank capacity is not valid for comparison.",
+          "conflicting_unit": "The level unit does not match the capacity unit."
+        }
+      },
+      "overCapacity": {
+        "title": "Level exceeds capacity",
+        "body": "Unusual value; verify the reading before relying on it."
+      },
+      "loading": "Loading level",
+      "error": "Couldn't load the level"
+    },
     "assetStatus": {
       "active": "Active",
       "inactive": "Inactive",

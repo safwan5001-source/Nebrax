@@ -14788,6 +14788,39 @@
       "tankLevelNote": "المنسوب الحالي للخزانات لا يُعرض هنا بعد؛ يظهر بعد ربط قراءات الخزانات في شريحة لاحقة.",
       "subtitle": "للعرض فقط"
     },
+    "tankLevel": {
+      "meterLabel": "منسوب الخزان",
+      "percentValue": "{value}%",
+      "percentStatus": "{percent} — {status}",
+      "band": {
+        "healthy": "جيد",
+        "monitor": "متابعة",
+        "low": "منخفض"
+      },
+      "amount": "{level} من {capacity} {unit}",
+      "source": {
+        "physical": "قياس يدوي",
+        "atg": "قياس آلي (ATG)",
+        "book": "رصيد دفتري",
+        "estimated": "تقديري"
+      },
+      "updatedAt": "آخر تحديث: {time}",
+      "unavailable": {
+        "title": "المستوى غير متاح",
+        "reason": {
+          "missing_level": "لا توجد بيانات منسوب لهذا الخزان.",
+          "invalid_level": "قيمة المنسوب غير صالحة.",
+          "invalid_capacity": "سعة الخزان غير صالحة للمقارنة.",
+          "conflicting_unit": "وحدة المنسوب لا تطابق وحدة السعة."
+        }
+      },
+      "overCapacity": {
+        "title": "المنسوب يتجاوز السعة",
+        "body": "قيمة غير معتادة؛ يلزم التحقق من القراءة قبل الاعتماد عليها."
+      },
+      "loading": "جارٍ تحميل المنسوب",
+      "error": "تعذّر تحميل المنسوب"
+    },
     "assetStatus": {
       "active": "نشط",
       "inactive": "غير نشط",
