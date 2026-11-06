@@ -1,7 +1,21 @@
 # AIA-0.1 — الغلاف المالي لكشف حساب الطرف (تقرير التنفيذ)
 
 **الحالة:** جاهز للمراجعة. لا Merge ولا Deploy ولا تفعيل سياسة الاستقلالية. لم يبدأ AIA-0.2 ولا AIA-0.3.
-**Branch:** `claude/jolly-cray-4dgo88` · **Base SHA:** `0f59ccc5fa1b638043fcd7bb33d4a5f02dedbe31` (= `origin/main` عند البدء) · **Code Head SHA:** `b8500e986f3da93605a659be20fad0a4180eff2a` (التقرير في commit لاحق؛ رقم الـPR ورأس الفرع النهائي في وصف الـPR).
+**PR:** #2043 · **Branch:** `claude/jolly-cray-4dgo88` · **Base SHA:** `0f59ccc5fa1b638043fcd7bb33d4a5f02dedbe31` (= `origin/main` عند البدء).
+**التسلسل:** `b8500e98` (التنفيذ الأول) ← `4382708a` (التقرير الأول، رأس المراجعة الأولى) ← `b780db49` (**تصحيح المراجعة المالية — الكود**) ← commit هذا التقرير المحدَّث (رأس الفرع النهائي يُذكر في وصف الـPR وفي رد التسليم؛ لا يمكن لتقرير أن يحمل SHA الـcommit الذي يحويه).
+
+## 0) تصحيح المراجعة المالية على الرأس `4382708a` (مغلق في `b780db49`)
+
+| # | الملاحظة | التصحيح |
+|---|---|---|
+| 1 | كشف فيض `int` لا يكفي؛ يجب منع `final` عند تجاوز أي مجموع أو رصيد وسيط محسوب `2^53−1` ولو كانت كل حركة آمنة | كل جمع محسوب (مجموع المدين، مجموع الدائن، الصافي، الرصيد الجاري المُعاد حسابه، الختامي المتوقع) يمرّ عبر `StatementIntegrity::addSafe` الذي يعيد `null` عند فيض `int` **أو** تجاوز `±MAX_SAFE_MINOR` (متماثل: `−MAX` مقبول و`−MAX−1` مرفوض). فحص جديد مستقل `computed_values_within_safe_range` يفشل عندها، فيصبح التقرير `unverified` بلا `display` ولا `position`. |
+| 2 | اختبار حركات متوازنة متكررة | `balanced_repeated_movements_exceed_the_safe_total_without_overflowing_php`: ست حركات (مدين/دائن بقيمة `2^52`) — الأرصدة الجارية ≤ `2^52` (آمنة) وإجمالي كل جانب `3×2^52 = 1.35e16 > 2^53−1` وهو ≪ `PHP_INT_MAX` (9.22e18)، فلا يكشفه فحص الفيض القديم. يثبت: `passed=false`، السبب الجذري `computed_values_within_safe_range`، و`minor_units_are_integers` و`running_balance_chain` **سليمان**. وبنسخته التكاملية عبر HTTP (`unsafe totals`): `report_status=unverified`، `display=null`، `position=null`، `failed_checks=[computed_values_within_safe_range, closing_equals_opening_plus_net]`. **تحقق عكسي:** شغّلت الاختبارات الجديدة على `StatementIntegrity` القديم من `HEAD` فسقطت خمسة منها (القديم لا يكشف الحالة)، وتنجح على الجديد. |
+| 3 | لا إجماليات جزئية مضللة؛ حدود موجبة وسالبة | عند فشل الجمع: `totals.debit_minor/credit_minor/net_minor = null` (لا صفر)، و`row_count` وحده يبقى لأنه عدّ لا جمع. اختبارات: الحد الموجب (مجموع مدين = `MAX` مقبول، `MAX+1` مرفوض)، الحد السالب (صافي `−MAX` مقبول، مجموع دائن `MAX+1` مرفوض)، رصيد سالب `−MAX` مقبول و`−MAX−1` مرفوض، رصيد وسيط خارج النطاق يكسر السلسلة، وكل حالة فاشلة تثبت `null` للمجاميع الثلاثة. |
+| 4 | توضيح أن `row_count_matches_rows` ليس إثبات اكتمال | كان العدد المتوقع يُشتق من `count($rows)` نفسه (فحص تحصيل حاصل دائماً ناجح). صار `Envelope::build(..., emittedRowCount: count($rows))` يمرّر عدد الصفوف **المُخرَجة** في الاستجابة (بعد التحويل)، فيحرس طبقة التسلسل (صف مفقود/مكرَّر) فقط. وُثِّق ذلك في الشيفرة وOpenAPI وCLAUDE.md، وأُضيف `completeness_independent_verification` إلى `integrity.not_checked`. **لا ادعاء بأن الاكتمال المستقل تم؛ مؤجَّل إلى AIA-0.2.** |
+
+**القرارات المعتمدة (ثُبّتت دون تغيير):** `PUBLIC_API_STATEMENT_REJECT_ON_INTEGRITY_FAILURE=false` افتراضياً · `internal_error` مع `details.reason=report_integrity_failed` · استعلام العملات قراءة مجمَّعة بمشغّل مخوَّل فقط ولا توسعة للعملات (لم أنفّذ أي استعلام).
+
+**تغييرات العقد (إضافية داخل الإصدار نفسه غير المدموج):** معرّف فحص جديد في `integrity.checks[].id`؛ و`totals.debit_minor/credit_minor/net_minor` صارت `integer|null` (null عند فشل الجمع). `PartnerStatementEnvelope::build` اكتسب معاملاً اختيارياً أخيراً `emittedRowCount` (لا كسر للاستدعاءات القائمة).
 
 ## 1) المعمارية
 
@@ -10,7 +24,7 @@
 | الفئة | الدور |
 |---|---|
 | `CurrencyMinorUnits` | قائمة بيضاء `SAR => 2` (D-12 الخيار C). تطبّع الحروف/الفراغات؛ غيرها `null`. |
-| `StatementIntegrity` | يحسب الإجماليات من الصفوف الأصلية بأعداد صحيحة ويقيّم الفحوص الخمسة. جمع عبر `addExact` يكتشف فيض `int`؛ حدّ كل مبلغ `2^53−1`؛ لا تحويل صامت لأي قيمة (`is_int` صارم). |
+| `StatementIntegrity` | يحسب الإجماليات من الصفوف الأصلية بأعداد صحيحة ويقيّم الفحوص الستة. كل جمع عبر `addSafe` (فيض `int` **وتجاوز `±(2^53−1)`** لأي مجموع أو رصيد وسيط)؛ لا تحويل صامت لأي قيمة (`is_int` صارم). |
 | `PartnerStatementEnvelope` | يركّب الحقول الإضافية، `position`، `display` (عبر `Money::toRiyal` دون تعديلها)، و`report_status`. |
 
 `PublicPartnerStatementController` يستدعي الغلاف بعد فحص السقف 2000 ويدمجه (`+`) بعد الحقول القديمة. لا تغيير في `ReportService` ولا `LedgerService` ولا `Money` ولا ZATCA، ولا هجرة، ولا عمليات مالية أو قيود جديدة.
@@ -28,6 +42,7 @@
   "role": "supplier",                       // المطلوب أو null
   "row_count": 2,
   "totals": { "row_count": 2, "debit_minor": 50000, "credit_minor": 115000, "net_minor": -65000 },
+                                            // debit/credit/net = null إن تعذّر الجمع الآمن (لا صفر ولا جزئي)
   "balance_convention": { "formula": "debit_minus_credit", "positive_means": "partner_owes_us", "negative_means": "we_owe_partner" },
   "position": {                             // null إن لم يكن verified+SAR
     "opening": { "side": "settled",  "amount_minor": 0,     "opposite_sign": false },
@@ -51,7 +66,7 @@
 }
 ```
 
-الفحوص: `minor_units_are_integers` · `amounts_are_non_negative` · `running_balance_chain` · `closing_equals_opening_plus_net` · `row_count_matches_rows`. فشل الأولى يُسقط تبعاً الفحوص المعتمدة عليها (ما لا يمكن التحقق منه لا يُعدّ ناجحاً). **الفحوص اتساق حسابي داخلي فقط** ولا تطابق دفاتر الطرف ولا المستندات؛ لذلك `not_checked` معلن. لم أُضف فحص `role_filter_applied` من الـroadmap لأنه لا يمكن التحقق منه بشكل مستقل داخل المتحكّم دون استعلام إضافي — فحص صوري كان سيعطي ثقة كاذبة.
+الفحوص: `minor_units_are_integers` · `computed_values_within_safe_range` · `amounts_are_non_negative` · `running_balance_chain` · `closing_equals_opening_plus_net` · `row_count_matches_rows`. فشل الأولى يُسقط تبعاً الفحوص المعتمدة عليها (ما لا يمكن التحقق منه لا يُعدّ ناجحاً). **الفحوص اتساق حسابي داخلي فقط** ولا تطابق دفاتر الطرف ولا المستندات؛ لذلك `not_checked` معلن. لم أُضف فحص `role_filter_applied` من الـroadmap لأنه لا يمكن التحقق منه بشكل مستقل داخل المتحكّم دون استعلام إضافي — فحص صوري كان سيعطي ثقة كاذبة. وللسبب نفسه `row_count_matches_rows` **ليس إثبات اكتمال** (انظر §0، البند 4).
 
 ### سلوك الفشل
 - **الافتراضي (تدرّج آمن، حسب D-02 §1.2.5):** يُسجَّل الفشل (معرّفات الفحوص فقط، بلا قيم) ويُردّ 200 بحقول قديمة كاملة مع `report_status=unverified` و`display`/`position = null`. لا يمكن أن يظهر `final`.
@@ -66,7 +81,7 @@ SAR فقط، `minor_unit_exponent=2`. KWD/JPY/USD/رمز غير معروف/فا�
 - OpenAPI: إضافات فقط (`required` لحقول الاستجابة الجديدة)؛ `PublicApiOpenApiContractTest` واختبار انجراف الويب أخضران.
 
 ## 5) الاختبارات
-ملفات جديدة (سطر لكل مجال): `CurrencyMinorUnitsTest` · `StatementIntegrityTest` (يتضمن قيم باشت المُبلَّغة وفيض الجمع وقرب 2^53) · `PartnerStatementEnvelopeTest` · `PublicApiPartnerStatementIntegrityTest` (قيود حقيقية عبر الخدمات: مورد، عميل، both، افتتاحي غير صفري، ختامي مدين/دائن، بلا حركات، `from`/`to`، 2000/2001، حقن 5 أنواع فساد، رفض صلب، KWD/JPY/USD/XYZ، عزل، 403) · `StatementEnvelopeNoFloatArchitectureTest` (فحص tokens: لا ثابت عشري ولا cast ولا round/number_format ولا قسمة، مع ضابط تعطيل يثبت أن الماسح يلتقط الخطأ).
+ملفات جديدة (سطر لكل مجال): `CurrencyMinorUnitsTest` · `StatementIntegrityTest` (يتضمن قيم باشت المُبلَّغة وفيض `PHP_INT_MAX` وقرب 2^53 **وحركات متوازنة متكررة تتجاوز المجموع الآمن دون فيض، والحدود الموجبة والسالبة، وانعدام الإجماليات الجزئية**) · `PartnerStatementEnvelopeTest` · `PublicApiPartnerStatementIntegrityTest` (قيود حقيقية عبر الخدمات: مورد، عميل، both، افتتاحي غير صفري، ختامي مدين/دائن، بلا حركات، `from`/`to`، 2000/2001، حقن 5 أنواع فساد، رفض صلب، KWD/JPY/USD/XYZ، عزل، 403) · `StatementEnvelopeNoFloatArchitectureTest` (فحص tokens: لا ثابت عشري ولا cast ولا round/number_format ولا قسمة، مع ضابط تعطيل يثبت أن الماسح يلتقط الخطأ).
 
 حالة باشت المرجعية (6 حركات، 586086/608511/705403 لكل جانب): بيانات **اصطناعية** عبر مشتريات ودفعات حقيقية بـ`role=supplier` وبدونه ⇒ مدين = دائن = 1,900,000 هللة (`19000.00`)، افتتاحي = ختامي = 0، `settled`، `final`. هذا اختبار حسابي مستقل ولا يؤكد بيانات الإنتاج.
 
@@ -80,13 +95,24 @@ SAR فقط، `minor_unit_exponent=2`. KWD/JPY/USD/رمز غير معروف/فا�
 | PostgreSQL، **المجموعة الكاملة** | **لم تُشغَّل محلياً** — تُترك لـCI |
 | Web | `vitest src/modules/developer` أخضر؛ النموذج المولَّد بـ`npm run openapi:generate` |
 
+**جولة تصحيح المراجعة (على `b780db49`، محلياً):**
+
+| البيئة | النتيجة |
+|---|---|
+| وحدات + تكامل + OpenAPI + كشف الحساب، SQLite (`PublicApi\|PartnerStatement\|Report` + الملفات الخمسة الجديدة) | **835 نجح، 34 متخطّى، 0 فشل** |
+| PostgreSQL 16 محلي (`StatementIntegrity\|PartnerStatementEnvelope\|PublicApi\|CurrencyMinorUnits\|StatementEnvelopeNoFloat\|PartnerStatementReport\|StorefrontOfferPublicApi`) | **345 نجح، 0 فشل** |
+| Web `vitest src/modules/developer` (يشمل انجراف النموذج المولَّد) | 8 نجح |
+| تحقق عكسي | الاختبارات الجديدة على `StatementIntegrity` القديم: **5 فشلت** (تثبت أنها تلتقط الثغرة) |
+
+ملاحظة صدق: أول محاولة PG في هذه الجولة أعطت 269 `QueryException` لأن خادم PostgreSQL المحلي كان متوقفاً بعد إعادة تشغيل الحاوية؛ أُعيدت بعد تشغيله والنتيجة أعلاه. **المجموعة الكاملة** لم أعدها محلياً (التغيير محصور في ملفات الغلاف ومتحكّمه، والجولة الكاملة السابقة نجحت عدا إخفاقات بيئية موثَّقة)؛ التغطية الكاملة على SQLite وPostgreSQL تتم في CI.
+
 ## 6) CI وBuild
-لم يكن CI قد اكتمل وقت كتابة التقرير؛ النتيجة الرسمية في فحوص الـPR (matrix sqlite/pgsql + Web CI). `npm run build` الكامل للويب لم أشغّله محلياً (التغيير في ملف مولَّد فقط، واختبار الانجراف أخضر).
+CI على رأس المراجعة الأولى `4382708a` كان **أخضر بالكامل** (sqlite وpgsql وweb build وبوابة الأداء وCI Gate). بعد التصحيح يعيد CI التشغيل على الرأس الجديد؛ نتيجته الرسمية في فحوص الـPR وتُذكر في رد التسليم (لا يمكن لتقرير أن يحمل نتيجة commit يحويه). `npm run build` الكامل للويب لم أشغّله محلياً (التغيير في ملف مولَّد فقط، واختبار الانجراف أخضر).
 
 ## 7) مخاطر الدقة المالية
 1. **الفحوص ≠ مطابقة دفاتر.** `verified` يعني اتساقاً حسابياً داخلياً؛ إسناد الدور (`role`) يأتي من `ReportService` ولا يُتحقَّق منه مستقلاً (`not_checked`).
 2. **غير SAR:** القيم الخام قد لا تكون وحدات صغرى حقيقية؛ الغلاف يمنع `final` و`display` لكنه لا يصلح البيانات. استعلام قراءة الإنتاج لعدد المستأجرين بعملة ≠ SAR (D-12.3/D-12.5) ما زال مطلوباً قبل أي توسعة.
-3. **حدّ 2^53−1** لوكلاء JS؛ ما فوقه ⇒ فشل سلامة لا تقريب. لا `*_minor_str` بعد.
+3. **حدّ 2^53−1** لوكلاء JS يسري على المدخلات **وعلى كل مجموع ورصيد محسوب**؛ ما فوقه ⇒ `computed_values_within_safe_range` يفشل، `unverified`، ومجاميع `null`. لا `*_minor_str` بعد؛ كشف بإجمالي جانب يتجاوز 9.007e15 هللة (≈ 90 تريليون ريال) سيبقى `unverified` حتى يُضاف ذلك الحقل.
 4. **الرفض الصلب مغلق:** مستهلك لا يقرأ `report_status` سيظل يرى 200 عند `unverified`. مقصود للتوافق؛ الوكيل ملزم (AIA-0.3) بعدم تقديم أي مخرج غير `final`.
 5. **إشارة الرصيد في الحقول القديمة غير مقلوبة** (مورد دائن = سالب)؛ من يكتفي بها بلا `position`/`display` معرّض للخلط نفسه. الغلاف يعالج ذلك للقارئين الجدد فقط.
 6. حقن الفساد في الاختبارات يتم بـMockery على `ReportService` (لا يمكن إنتاج صفوف مكسورة من الدفتر الحقيقي)؛ لا يثبت حدوث فساد فعلي في الإنتاج.
