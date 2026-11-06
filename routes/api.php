@@ -1630,8 +1630,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // FUEL-B3: إدارة موظفي المحطات (قوالب + صلاحيات فردية + نطاق محطات). `fuel.staff.manage` وحدها؛ الحدود في الخدمة.
         Route::get('fuel-stations/staff/templates', [FuelStaffController::class, 'templates'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/staff', [FuelStaffController::class, 'index'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
-        Route::get('fuel-stations/staff/{id}', [FuelStaffController::class, 'show'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
-        Route::put('fuel-stations/staff/{id}', [FuelStaffController::class, 'update'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/staff/candidates', [FuelStaffController::class, 'candidates'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/staff/audit', [FuelStaffController::class, 'audit'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/staff/{id}', [FuelStaffController::class, 'show'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/staff/{id}', [FuelStaffController::class, 'update'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/settings', [FuelStationSettingsController::class, 'showTenant'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/settings', [FuelStationSettingsController::class, 'updateTenant'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);

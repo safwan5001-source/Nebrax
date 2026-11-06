@@ -204,11 +204,11 @@ class FuelStationScopeAssignedTest extends TestCase
             }
             $source = (string) file_get_contents($file->getPathname());
             if (preg_match('/fuel_station_scope|fuelStations\(\)->(sync|attach|detach|toggle)|fuel_station_user/', $source) === 1
-                && ! in_array($file->getFilename(), ['UserController.php', 'AuthorizesFuelStationScope.php'], true)) {
+                && ! in_array($file->getFilename(), ['UserController.php', 'AuthorizesFuelStationScope.php', 'AccessChangeAuditReader.php'], true)) {
                 $offenders[] = $file->getPathname();
             }
-            // المتحكم العام يقرأ الوضع للتدقيق فقط: لا كتابة (لا sync/attach/forceFill/update بالوضع).
-            if ($file->getFilename() === 'UserController.php' && preg_match('/fuelStations\(\)->(sync|attach|detach|toggle)|forceFill\([^)]*fuel_station_scope/', $source) === 1) {
+            // المتحكم العام وقارئ سجل التدقيق (B4، قراءة فقط) يذكران مفتاح الوضع للتدقيق/العرض فقط: لا كتابة (لا sync/attach/forceFill/update بالوضع).
+            if (in_array($file->getFilename(), ['UserController.php', 'AccessChangeAuditReader.php'], true) && preg_match('/fuelStations\(\)->(sync|attach|detach|toggle)|forceFill\([^)]*fuel_station_scope/', $source) === 1) {
                 $offenders[] = $file->getPathname();
             }
         }

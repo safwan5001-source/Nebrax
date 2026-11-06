@@ -11,9 +11,11 @@ import en from '@/messages/en.json';
  * في أَوْج، (3) لا مصطلحات ERP/محاسبة في نصوص التطبيق. (منع الوصول بالرابط من الخادم = بوابة الموظف المقيّدة لاحقاً، فجوة G7.)
  */
 const dir = fileURLToPath(new URL('.', import.meta.url));
-const sources = readdirSync(dir)
+const read = (base: string, prefix: string) => readdirSync(join(dir, base))
   .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file) && !file.startsWith('__'))
-  .map((file) => ({ file, text: readFileSync(join(dir, file), 'utf8') }));
+  .map((file) => ({ file: `${prefix}${file}`, text: readFileSync(join(dir, base, file), 'utf8') }));
+// FUEL-B4: مساحة الإدارة (`admin/`) جزء من التطبيق نفسه وتخضع للقواعد نفسها.
+const sources = [...read('.', ''), ...read('admin', 'admin/')];
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
 type Tree = { [key: string]: string | Tree };
@@ -34,8 +36,18 @@ describe('station ops is an app of its own', () => {
   it('defines every in-app route target under OPS_BASE', () => {
     const nav = sources.find((entry) => entry.file === 'nav.ts')!.text;
     expect(nav).toMatch(/OPS_BASE = '\/fuel-stations\/ops'/);
-    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(4);
+    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(5); // FUEL-B4: + «الإدارة»
     for (const match of code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)) expect(match[1]).toMatch(/OPS_BASE/);
+  });
+
+  // FUEL-B4: الاستثناء الوحيد المعتمد بطلب المالك — رابط إدارة أسعار الوقود القائمة، يعرّفه nav.ts وتستعمله شاشة الإدارة وحدها.
+  it('has exactly one approved link out of the app: the existing fuel-price management screen', () => {
+    const nav = code(sources.find((entry) => entry.file === 'nav.ts')!.text);
+    expect([...nav.matchAll(/['"`](\/fuel-stations\/(?!ops)[^'"`]*)['"`]/g)].map((m) => m[1])).toEqual(['/fuel-stations/prices']);
+    expect(nav).toMatch(/PRICES_HREF = '\/fuel-stations\/prices'/);
+    const users = sources.filter(({ text }) => /\bPRICES_HREF\b/.test(code(text))).map(({ file }) => file).sort();
+    expect(users).toEqual(['admin/manage-screen.tsx', 'nav.ts']);
+    for (const { file, text } of sources) if (file !== 'nav.ts') expect(code(text), file).not.toMatch(/href=\{?['"`]\/fuel-stations\/prices|['"`]\/fuel-stations\/prices['"`]/);
   });
 
   it('no sentence sends the user to another AWJ screen or to administration', () => {

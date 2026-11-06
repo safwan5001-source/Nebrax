@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\UpdateFuelStaffRequest;
+use App\Services\AccessChangeAuditReader;
 use App\Services\AccessChangeAuditor;
 use App\Services\FuelStaffAccessService;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,7 @@ use Illuminate\Http\Request;
  */
 class FuelStaffController extends ApiController
 {
-    public function __construct(private FuelStaffAccessService $staff, private AccessChangeAuditor $auditor) {}
+    public function __construct(private FuelStaffAccessService $staff, private AccessChangeAuditor $auditor, private AccessChangeAuditReader $audit) {}
 
     public function templates(Request $request): JsonResponse
     {
@@ -24,6 +25,27 @@ class FuelStaffController extends ApiController
     public function index(Request $request): JsonResponse
     {
         return response()->json(['data' => $this->staff->list($request->user())]);
+    }
+
+    /** FUEL-B4: موظفون يمكن البدء بإدارتهم (قراءة فقط، بنفس حراس التعديل). */
+    public function candidates(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->staff->candidates($request->user())]);
+    }
+
+    /** FUEL-B4: سجل تغييرات الصلاحيات — قراءة فقط ومقيَّد بنطاق الفاعل، بترقيم صفحات على الخادم. */
+    public function audit(Request $request): JsonResponse
+    {
+        $filters = $request->validate([
+            'outcome' => ['nullable', 'string', 'in:applied,denied'],
+            'target_user_id' => ['nullable', 'uuid'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        return response()->json($this->audit->page($request->user(), $filters));
     }
 
     public function show(Request $request, string $id): JsonResponse

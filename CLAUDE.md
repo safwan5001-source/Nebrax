@@ -866,6 +866,14 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 
 وكيل خارجي مخوَّل يستعمل **الـ Public API القائمة نفسها** (`/api/v1`، مفتاح M2M بـ scopes أقل امتياز، لا مصادقة موازية ولا MCP/Gateway): بحث الأطراف `partners:read` · بحث المنتجات `products:read` · إنشاء منتج `products:write` · إنشاء **مسودة** فاتورة `invoices:write` (idempotency إلزامي، الخادم يحسب الإجماليات، بلا قيد/ترحيل/سداد/ZATCA) · **كشف حساب طرف** `GET /partners/{id}/statement` بـ`statements:read` (قراءة فقط، غلاف فوق `ReportService::partnerStatement`، مبالغ بالهللات، سقف 2000 حركة ⇒ 422 لتضييق `from`/`to`، تفاصيل: `docs/audits/AWJ-AI-API-FIRST-INTEGRATION-REPORT.md`). `statements:read` scope مستقل عن `partners:read` عمداً (أرصدة مالية) ويُسقَط على `reports.view`. ملاحظة اختبارات: مسارات الـ Internal تترك `Auth::shouldUse('sanctum')` في عملية الاختبار، فاضبط `shouldUse('web')` قبل نداء Public في اختبار يخلطهما.
 
+### FUEL-B4 — الإدارة داخل التطبيق (`/fuel-stations/ops/manage`، `web/src/modules/station-ops/admin/`)
+
+واجهة جوال لإدارة موظفي المحطات فوق خدمات B3 (`FuelStaffAccessService`) بلا RBAC موازٍ؛ التفاصيل والمخاطر: `docs/fuel-stations/FUEL_REMEDIATION_HORIZON.md` (Phase B / B4).
+- **الظهور من الصلاحيات الفعلية:** «الإدارة» في التنقل لمن يملك `fuel.staff.manage` أو `fuel.sale.price.manage`؛ كل قسم تحت مفتاحه، والخادم السلطة في كل طلب. المحجوزان (`fuel.governance.manage`، `fuel.staff.manage`) وما فوق سقف الفاعل مقفلان في المحرر (`templates.delegable/reserved` من الخادم) و«اختيار الكل» لا يشمل المحجوز.
+- **حدّ الشبكة:** كل HTTP للإدارة في `admin/admin-client.ts` وحده: قراءة بقائمة بيضاء (`staff`، `staff/templates`، `staff/candidates`، `staff/audit`، `staff/{uuid}`) و**PUT واحد** `staff/{uuid}`. الحمولة تفاضلية (`add/remove_permissions` + `station_ids` + `expected_revision` + `reason`) وهي ما يعرضه حوار المراجعة. لا حفظ تلقائي؛ 409 يحفظ التعديلات ويخيّر بين إعادة تطبيقها فوق الأحدث أو تجاهلها؛ النتيجة غير المؤكدة تُحسم بالقراءة لا بإعادة الإرسال. يحرسه `admin/admin-boundary.test.ts`، و`write-boundary.test.ts` الأصلي لم يُضعف.
+- **API قراءة فقط:** `GET fuel-stations/staff/candidates` و`GET fuel-stations/staff/audit` (`AccessChangeAuditReader`: ملخص `changes` لا لقطات خام، حامل `*` يرى الكل وغيره أحداث `fuel_staff` ضمن نطاقه فقط، ترقيم خادمي).
+- **الاستثناء الوحيد لقاعدة «التطبيق وحده»:** `PRICES_HREF = /fuel-stations/prices` (إدارة أسعار الوقود القائمة) لمن يملك `fuel.sale.price.manage` — بطلب المالك، يحرسه `app-only.test.ts`.
+
 ## إقرار تحصيل الوردية — Fuel Shift Collection Declaration (مغلق افتراضياً، تشغيلي فقط)
 
 مبيعات الوردية المشتقة من العدادات (فرق العدادين × سعر اللتر الفعّال) مقابل ما حُصِّل حسب طريقة الدفع. العقد الكامل: `docs/fuel-stations/AWJ_FUEL_SHIFT_COLLECTION_RECONCILIATION_CONTRACT.md`.

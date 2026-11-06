@@ -65,6 +65,11 @@ describe('station-ops writes only through write-client.ts', () => {
     expect(mentions, file).toBe(file === WRITE_CLIENT || file === 'review-screen.tsx');
   });
 
+  // FUEL-B4: إدارة الموظفين لها عميلها المنفصل في `admin/` (حارسه admin/admin-boundary.test.ts). الحدّ هنا يبقى كما هو ويمنع التسرّب إليه.
+  it.each(sources)('$file never touches staff management (that lives only in admin/)', ({ text }) => {
+    expect(code(text)).not.toMatch(/fuel-stations\/staff|from '\.\/admin\/|admin-client|saveStaff/);
+  });
+
   it('keeps idempotency/draft helpers out of everything but the write screens', () => {
     for (const { file, text } of sources) {
       const uses = /from '\.\/(intents|drafts)'/.test(code(text));

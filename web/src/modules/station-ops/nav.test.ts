@@ -19,6 +19,15 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toEqual(['home', 'products', 'shifts', 'profile']);
   });
 
+  // FUEL-B4: «الإدارة» تظهر لمن يملك أي وظيفة إدارية فعلية، لا لاسم دور؛ والخادم يفرض كل طلب.
+  it('shows Manage only to someone holding an administrative permission (any one is enough)', () => {
+    const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.approve'])).not.toContain('manage'); // مشرف وردية بلا إدارة
+    expect(ids(['fuel.staff.manage'])).toEqual(['manage', 'profile']);
+    expect(ids(['fuel.sale.price.manage'])).toEqual(['manage', 'profile']);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'manage', 'profile']);
+  });
+
   it('marks the active item without matching sibling prefixes', () => {
     expect(isNavActive(OPS_BASE, OPS_BASE)).toBe(true);
     expect(isNavActive(`${OPS_BASE}/products`, OPS_BASE)).toBe(false);
