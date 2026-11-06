@@ -76,7 +76,7 @@ export function SwitchRow({ id, label, checked, onChange, disabled = false, lock
           checked ? 'border-primary bg-primary' : 'border-[color:var(--fo-control)] bg-background',
         )}
       >
-        <span aria-hidden="true" className={cn('inline-block h-6 w-6 rounded-full bg-white shadow transition-transform', checked ? 'ltr:translate-x-7 rtl:-translate-x-7' : 'ltr:translate-x-1 rtl:-translate-x-1', !checked && 'bg-muted/70')} />
+        <span aria-hidden="true" className={cn('inline-block h-6 w-6 rounded-full shadow transition-transform', checked ? 'ltr:translate-x-7 rtl:-translate-x-7' : 'ltr:translate-x-1 rtl:-translate-x-1', checked ? 'bg-surface' : 'bg-muted/70')} />
       </button>
     </div>
   );

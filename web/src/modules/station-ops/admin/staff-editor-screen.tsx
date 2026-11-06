@@ -219,7 +219,7 @@ function StationPicker({ base, intent, disabled, onToggle }: { base: StaffView; 
                 onClick={() => onToggle(station.id)}
                 className={cn('flex min-h-[56px] w-full items-center gap-3 rounded-[12px] border px-3.5 py-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60', on ? 'border-primary bg-primary-soft' : 'border-[color:var(--fo-control)] bg-surface')}
               >
-                <span aria-hidden="true" className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 text-xs font-bold', on ? 'border-primary bg-primary text-white' : 'border-[color:var(--fo-control)]')}>{on ? '✓' : ''}</span>
+                <span aria-hidden="true" className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 text-xs font-bold', on ? 'border-primary bg-primary text-primary-foreground' : 'border-[color:var(--fo-control)]')}>{on ? '✓' : ''}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-medium text-text">{station.name}</span>
                   <span className="block text-xs text-muted">{station.code}{station.status !== 'active' ? ` · ${t('stationInactive')}` : ''}</span>
