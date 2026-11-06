@@ -236,6 +236,24 @@ paths:
         Amounts are integer minor units. The response is not paginated; a statement
         exceeding 2000 movements is rejected with 422 — narrow the period with
         `from`/`to`. Requires the dedicated `statements:read` scope.
+
+
+        **Verified envelope (AIA-0.1).** Besides the legacy fields (unchanged), the server returns
+        `totals`, `row_count`, `balance_convention`, `position`, `display`, `minor_unit_exponent`,
+        `integrity` and `report_status`. Totals are computed server-side from the source rows with
+        integer arithmetic; clients should quote `display` and `position` rather than recompute them.
+        Balance direction is never flipped in the legacy fields: `balance = debit - credit` for every
+        role, so a negative balance means the tenant owes the partner (`payable`). Only a response with
+        `report_status = final` may be presented as a final statement.
+
+
+        **Currency (D-12).** Only `SAR` is supported (`minor_unit_exponent = 2`). For any other
+        tenant currency `report_status = unsupported`, `display` and `position` are `null`, and the raw
+        legacy amounts are returned unchanged for backward compatibility **without any guarantee that they
+        are true minor units of the declared currency**; they must not be presented as reliable figures.
+        When the optional server flag `PUBLIC_API_STATEMENT_REJECT_ON_INTEGRITY_FAILURE` is enabled, a
+        failed integrity check returns `500` (`internal_error`, `details.reason = report_integrity_failed`)
+        instead of an `unverified` statement.
       x-required-scope: statements:read
       parameters:
         - $ref: '#/components/parameters/IdPath'
@@ -1078,9 +1096,53 @@ components:
           properties:
             kind: { type: string }
             id: { type: [string, 'null'] }
+    StatementSide:
+      type: string
+      enum: [receivable, payable, settled]
+      description: >
+        `receivable` = the partner owes the tenant (balance > 0); `payable` = the tenant owes the partner
+        (balance < 0); `settled` = zero. Derived from the sign of the balance, not from the partner role.
+    StatementPositionEntry:
+      type: object
+      required: [side, amount_minor, opposite_sign]
+      properties:
+        side: { $ref: '#/components/schemas/StatementSide' }
+        amount_minor: { type: integer, format: int64, minimum: 0, description: Absolute balance in minor units. }
+        opposite_sign:
+          type: boolean
+          description: True when the side contradicts the expected role (a customer in credit, or a supplier in debit).
+    StatementIntegrityCheck:
+      type: object
+      required: [id, passed]
+      properties:
+        id:
+          type: string
+          enum:
+            - minor_units_are_integers
+            - amounts_are_non_negative
+            - running_balance_chain
+            - closing_equals_opening_plus_net
+            - row_count_matches_rows
+        passed: { type: boolean }
     PartnerStatement:
       type: object
-      required: [partner, currency, from, to, opening_balance_minor, rows, closing_balance_minor]
+      required:
+        - partner
+        - currency
+        - from
+        - to
+        - opening_balance_minor
+        - rows
+        - closing_balance_minor
+        - role
+        - row_count
+        - totals
+        - balance_convention
+        - position
+        - display
+        - minor_unit_exponent
+        - integrity
+        - report_status
       properties:
         partner:
           type: object
@@ -1095,6 +1157,72 @@ components:
         opening_balance_minor: { $ref: '#/components/schemas/MinorAmount' }
         rows: { type: array, items: { $ref: '#/components/schemas/PartnerStatementRow' } }
         closing_balance_minor: { $ref: '#/components/schemas/MinorAmount' }
+        role:
+          type: [string, 'null']
+          enum: [customer, supplier, null]
+          description: The requested role filter, or null when none was requested.
+        row_count: { type: integer, minimum: 0, description: Number of movements in `rows` (equals `totals.row_count`). }
+        totals:
+          type: object
+          description: Computed server-side from the source rows with integer arithmetic.
+          required: [row_count, debit_minor, credit_minor, net_minor]
+          properties:
+            row_count: { type: integer, minimum: 0 }
+            debit_minor: { $ref: '#/components/schemas/MinorAmount' }
+            credit_minor: { $ref: '#/components/schemas/MinorAmount' }
+            net_minor: { $ref: '#/components/schemas/MinorAmount' }
+        balance_convention:
+          type: object
+          required: [formula, positive_means, negative_means]
+          properties:
+            formula: { type: string, enum: [debit_minus_credit] }
+            positive_means: { type: string, enum: [partner_owes_us] }
+            negative_means: { type: string, enum: [we_owe_partner] }
+        position:
+          type: [object, 'null']
+          description: Business-language direction of the opening and closing balances. Null unless the statement is verified and the currency supported.
+          required: [opening, closing]
+          properties:
+            opening: { $ref: '#/components/schemas/StatementPositionEntry' }
+            closing: { $ref: '#/components/schemas/StatementPositionEntry' }
+        display:
+          type: [object, 'null']
+          description: >
+            Ready-to-quote strings (digits 0-9, dot decimal, no thousands separator), produced by the server.
+            `opening` and `closing` are absolute values with an explicit side; `net` is signed. Null unless the
+            statement is verified and the currency supported.
+          required: [currency, minor_unit_exponent, opening, opening_side, debit, credit, net, closing, closing_side]
+          properties:
+            currency: { $ref: '#/components/schemas/CurrencyCode' }
+            minor_unit_exponent: { type: integer, enum: [2] }
+            opening: { type: string }
+            opening_side: { $ref: '#/components/schemas/StatementSide' }
+            debit: { type: string }
+            credit: { type: string }
+            net: { type: string }
+            closing: { type: string }
+            closing_side: { $ref: '#/components/schemas/StatementSide' }
+        minor_unit_exponent:
+          type: [integer, 'null']
+          description: 2 for the supported currency (SAR); null when the currency is unsupported.
+        integrity:
+          type: object
+          required: [status, checks, not_checked]
+          properties:
+            status: { type: string, enum: [verified, failed, unsupported] }
+            reason: { type: string, enum: [currency_exponent_unsupported], description: Present when status is `unsupported`. }
+            checks: { type: array, items: { $ref: '#/components/schemas/StatementIntegrityCheck' } }
+            failed_checks: { type: array, items: { type: string }, description: Present only when at least one check failed. }
+            not_checked:
+              type: array
+              items: { type: string }
+              description: Aspects the checks explicitly do not cover (so `verified` is not read as a reconciliation against other books).
+        report_status:
+          type: string
+          enum: [final, partial, unverified, unsupported]
+          description: >
+            `final` only when the currency is supported, every integrity check passed and the result is complete.
+            Anything else must not be presented as a final statement.
     PartnerStatementResponse:
       type: object
       required: [data, meta]
