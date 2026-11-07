@@ -9,7 +9,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>
   ),
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/fuel-stations' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/fuel-stations', useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'Acme', logo: null }) }));
 vi.mock('@/lib/branch', () => ({
   useBranches: () => ({ branches: [], active: null, activeId: null, setActiveBranchId: () => {} }),

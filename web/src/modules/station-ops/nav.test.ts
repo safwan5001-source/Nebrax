@@ -14,20 +14,20 @@ describe('ops navigation is derived from AWJ permissions only', () => {
 
   it('hides screens whose permissions are missing; profile is always reachable', () => {
     const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
-    expect(ids([])).toEqual(['profile']);
-    expect(ids(['fuel_stations.view'])).toEqual(['home', 'products', 'tanks', 'profile']);
-    expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toEqual(['home', 'products', 'shifts', 'tanks', 'profile']);
+    expect(ids([])).toEqual(['help', 'profile']); // المساعدة والملف متاحان لكل مستخدم موثّق
+    expect(ids(['fuel_stations.view'])).toEqual(['home', 'products', 'tanks', 'help', 'profile']);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toEqual(['home', 'products', 'shifts', 'tanks', 'help', 'profile']);
   });
 
   // FUEL-B4: «الإدارة» تظهر لمن يملك أي وظيفة إدارية فعلية، لا لاسم دور؛ والخادم يفرض كل طلب.
   it('shows Manage only to someone holding an administrative permission (any one is enough)', () => {
     const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
     expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.approve'])).not.toContain('manage'); // مشرف وردية بلا إدارة
-    expect(ids(['fuel.staff.manage'])).toEqual(['manage', 'profile']);
-    expect(ids(['fuel.sale.price.manage'])).toEqual(['manage', 'profile']);
+    expect(ids(['fuel.staff.manage'])).toEqual(['manage', 'help', 'profile']);
+    expect(ids(['fuel.sale.price.manage'])).toEqual(['manage', 'help', 'profile']);
     expect(ids(['fuel_stations.manage'])).toContain('manage'); // PR-2: مدير المحطة يصل إلى معالج الرصيد الافتتاحي
-    expect(ids(['fuel.governance.manage'])).toEqual(['manage', 'profile']); // سياسة القراءات المتأخرة (B6) تتبع الحوكمة
-    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'tanks', 'manage', 'profile']);
+    expect(ids(['fuel.governance.manage'])).toEqual(['manage', 'help', 'profile']); // سياسة القراءات المتأخرة (B6) تتبع الحوكمة
+    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'tanks', 'manage', 'help', 'profile']);
   });
 
   // FUEL-B5: «الاستلام» من مفتاح الاستلام الدقيق أو القديم `fuel_stations.manage` — لا من `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة).
