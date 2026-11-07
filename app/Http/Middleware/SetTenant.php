@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\StationSessionBoundary;
 use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
 use Closure;
@@ -48,6 +49,13 @@ class SetTenant
         // ومساراتهم التي تمرّ بهذا الـmiddleware لا يتغيّر سلوكها.
         if ($user instanceof User && $user->is_active === false) {
             return response()->json(['message' => 'الحساب غير مفعّل.'], 403);
+        }
+
+        // STATION-PIN: جلسة تطبيق المحطات (توكن بقدرة `station-ops` بلا `*`) لا تصل إلا إلى مسارات تشغيل المحطات. الفحص هنا لأن `SetTenant`
+        // هو البوابة المشتركة لكل مسارات مستخدمي ERP (بما فيها ما تسجّله مزوّدو الخدمة خارج `routes/api.php`)؛ فمسار جديد لا يمكنه تفاديها.
+        // توكنات الدخول العادية (`*`) لا تتأثر إطلاقاً.
+        if ($user instanceof User && StationSessionBoundary::isRestricted($request) && ! StationSessionBoundary::allows($request)) {
+            return response()->json(['message' => 'جلسة تطبيق المحطات لا تصل إلى هذا المسار.'], 403);
         }
 
         $this->tenant->set($user->tenant_id);

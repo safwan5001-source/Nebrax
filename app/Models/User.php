@@ -25,6 +25,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'station_pin_set_at' => 'datetime',
         'password'          => 'hashed',
         'permissions'       => 'array',
         'preferences'       => 'array',

@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\Employee;
 use App\Models\FuelStation;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\FuelStaffRevisionConflictException;
 use App\Support\FuelStaffTemplates;
 use App\Support\Rbac;
+use App\Support\StationPin;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -174,6 +177,95 @@ class FuelStaffAccessService
 
             return $this->view($target);
         });
+    }
+
+    /**
+     * STATION-PIN: تعيين/تغيير رمز PIN (6 أرقام) لدخول تطبيق المحطات لموظف **بحسابه القائم** — بلا مستخدم موازٍ.
+     * يمر بحراس `update()` نفسها (ليس نفسه، ولا المالك/المسؤول، وضمن سقف الفاعل ونطاقه) ويشترط موظفاً نشطاً مرتبطاً بالحساب.
+     * `$pin = null` ⇒ يولَّد رمز عشوائي مشفّر ويُعاد في `generated_pin` **مرة واحدة** فقط. التجزئة وحدها تُخزَّن؛ لا يدخل الرمز أي
+     * سجل تدقيق. كل جلسات المحطة السابقة لهذا الموظف تُلغى. الجلسة نفسها يجب ألا تكون جلسة PIN (يحرسه `StationSessionBoundary`).
+     *
+     * @return array<string, mixed>
+     */
+    public function setStationPin(User $actor, string $userId, ?string $pin, ?string $reason = null): array
+    {
+        return DB::transaction(function () use ($actor, $userId, $pin, $reason): array {
+            $target = $this->find($actor, $userId, lock: true);
+            $this->assertManageable($actor, $target);
+            $this->assertPinEligible($target);
+
+            $generated = false;
+            if ($pin === null || $pin === '') {
+                $pin = StationPin::generate();
+                $generated = true;
+            } else {
+                $pin = StationPin::normalize($pin);
+                if (! StationPin::isWellFormed($pin)) {
+                    throw new RuntimeException('رمز PIN يجب أن يكون 6 أرقام.');
+                }
+                if (StationPin::isWeak($pin)) {
+                    throw new RuntimeException('رمز PIN ضعيف (أرقام متكررة أو متتالية). اختر رمزاً آخر.');
+                }
+            }
+
+            $before = $this->pinState($target);
+            $target->forceFill(['station_pin_hash' => Hash::make($pin), 'station_pin_set_at' => now()])->save();
+            app(StationPinCredentialService::class)->revokeSessions($target);
+
+            $this->auditor->record(
+                'fuel_staff.station_pin_set', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $target->id, $target->id,
+                $before + ['change' => null], $this->pinState($target->refresh()) + ['change' => 'set'], $actor, $reason,
+            );
+
+            return $this->view($target) + ['station_pin' => $this->pinState($target)] + ($generated ? ['generated_pin' => $pin] : []);
+        });
+    }
+
+    /** STATION-PIN: إزالة PIN الموظف (لا دخول بالمحطة بعدها) وإلغاء جلساته. @return array<string, mixed> */
+    public function clearStationPin(User $actor, string $userId, ?string $reason = null): array
+    {
+        return DB::transaction(function () use ($actor, $userId, $reason): array {
+            $target = $this->find($actor, $userId, lock: true);
+            $this->assertManageable($actor, $target);
+
+            $before = $this->pinState($target);
+            $target->forceFill(['station_pin_hash' => null, 'station_pin_set_at' => null])->save();
+            app(StationPinCredentialService::class)->revokeSessions($target);
+
+            $this->auditor->record(
+                'fuel_staff.station_pin_cleared', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $target->id, $target->id,
+                $before + ['change' => null], $this->pinState($target->refresh()) + ['change' => 'cleared'], $actor, $reason,
+            );
+
+            return $this->view($target) + ['station_pin' => $this->pinState($target)];
+        });
+    }
+
+    /** يتحقق من وجود الهدف في مؤسسة الفاعل **ومن ظهوره له** (404 موحّد) — يُستدعى من المتحكّم قبل `domain()`. */
+    public function ensureVisibleTarget(User $actor, string $userId): void
+    {
+        $target = $this->find($actor, $userId);
+        if (! $this->isVisibleTo($actor, $target)) {
+            throw new ModelNotFoundException();
+        }
+    }
+
+    private function assertPinEligible(User $target): void
+    {
+        $employee = $target->employee_id === null ? null : Employee::query()
+            ->where('tenant_id', $target->tenant_id)->where('id', $target->employee_id)->first();
+        if ($employee === null || ! $employee->is_active || ! $target->is_active) {
+            throw new RuntimeException('الموظف غير نشط أو غير مرتبط بحساب مستخدم؛ لا يمكن تعيين PIN.');
+        }
+    }
+
+    /** @return array{has_pin: bool, set_at: string|null} */
+    private function pinState(User $target): array
+    {
+        return [
+            'has_pin' => is_string($target->station_pin_hash) && $target->station_pin_hash !== '',
+            'set_at' => $target->station_pin_set_at?->toIso8601String(),
+        ];
     }
 
     // ───────────────────────── الحراس ─────────────────────────
@@ -383,9 +475,9 @@ class FuelStaffAccessService
     /** @return array<string, mixed> */
     private function view(User $target): array
     {
-        return ['user' => ['id' => $target->id, 'name' => $target->name, 'email' => $target->email, 'is_active' => (bool) $target->is_active]]
+        return ['user' => ['id' => $target->id, 'name' => $target->name, 'email' => $target->email, 'is_active' => (bool) $target->is_active, 'employee_no' => $target->employee?->employee_no]]
             + $this->state($target)
-            + ['revision' => $this->revision($target)];
+            + ['revision' => $this->revision($target), 'station_pin' => $this->pinState($target)];
     }
 
     /** @param list<string> $fuel */

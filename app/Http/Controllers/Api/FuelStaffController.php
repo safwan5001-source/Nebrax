@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\SetStationPinRequest;
 use App\Http\Requests\UpdateFuelStaffRequest;
 use App\Services\AccessChangeAuditReader;
 use App\Services\AccessChangeAuditor;
@@ -71,5 +72,37 @@ class FuelStaffController extends ApiController
         );
 
         return response()->json(['data' => $result]);
+    }
+
+    /**
+     * STATION-PIN: تعيين/تغيير PIN دخول تطبيق المحطات لموظف (يولَّد عشوائياً إن لم يُرسَل). الحراس نفسها كـ`update()`؛ لا يُقبل من جلسة PIN
+     * (`StationSessionBoundary`). الرمز المولَّد يُعاد مرة واحدة بلا تخزين مؤقت ولا يدخل التدقيق.
+     */
+    public function setPin(SetStationPinRequest $request, string $id): JsonResponse
+    {
+        $input = $request->validated();
+        $this->staff->ensureTargetExists($request->user(), $id);
+
+        $result = $this->auditor->guard(
+            'fuel_staff.station_pin_set', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $id, $id, $request->user(),
+            ['pin_supplied' => ! empty($input['pin'])],
+            fn () => $this->domain(fn () => $this->staff->setStationPin($request->user(), $id, $input['pin'] ?? null, $input['reason'] ?? null)),
+        );
+
+        return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
+    }
+
+    /** STATION-PIN: إزالة PIN الموظف وإلغاء جلساته. */
+    public function clearPin(Request $request, string $id): JsonResponse
+    {
+        $reason = $request->validate(['reason' => ['nullable', 'string', 'max:500']])['reason'] ?? null;
+        $this->staff->ensureTargetExists($request->user(), $id);
+
+        $result = $this->auditor->guard(
+            'fuel_staff.station_pin_cleared', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $id, $id, $request->user(), [],
+            fn () => $this->domain(fn () => $this->staff->clearStationPin($request->user(), $id, $reason)),
+        );
+
+        return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }
 }

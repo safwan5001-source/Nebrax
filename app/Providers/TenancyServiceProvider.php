@@ -6,6 +6,7 @@ use App\Http\Middleware\SlowRequestAttribution;
 use App\Models\CustomerIdentity;
 use App\Models\PreviewSession;
 use App\Services\Commerce\Edge\RailwayStorefrontEdgeClient;
+use App\Services\StationPinCredentialService;
 use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\Dns\DnsTxtResolver;
 use App\Support\Dns\NativeDnsTxtResolver;
@@ -115,6 +116,21 @@ class TenancyServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(20)->by("customer-login|{$tenant}|ip|{$request->ip()}"),
                 Limit::perMinute(5)->by("customer-login|{$tenant}|email|{$email}"),
+            ];
+        });
+
+        // STATION-PIN: PIN من 6 أرقام (مليون احتمال) ⇒ حماية من التخمين الآلي **بتحديد المعدل لا بقفل الحساب**: لا حالة تُخزَّن على المستخدم
+        // ولا تعطيل بعد عدد ثابت — النافذة تنزلق وتنتهي وحدها. أربعة مفاتيح: عنوان+مستأجر (دقيقة/ساعة)، ورقم موظف+مستأجر (دقيقة/ساعة).
+        // الرقم المجهول يُحتسب كالمعروف فلا يُستدل على وجوده من الرد. مفتاح المستأجر من مضيف الطلب (`HostnameTenantContext`) لا من الجسم.
+        RateLimiter::for('station-pin-login', function (Request $request): array {
+            $tenant = app(HostnameTenantContext::class)->id() ?? 'unresolved';
+            $employee = Str::lower(trim(StationPinCredentialService::normalizeEmployeeNumber((string) $request->input('employee_no'))));
+
+            return [
+                Limit::perMinute(20)->by("station-pin|{$tenant}|ip|{$request->ip()}"),
+                Limit::perHour(120)->by("station-pin-h|{$tenant}|ip|{$request->ip()}"),
+                Limit::perMinute(6)->by("station-pin|{$tenant}|emp|{$employee}"),
+                Limit::perHour(40)->by("station-pin-h|{$tenant}|emp|{$employee}"),
             ];
         });
 

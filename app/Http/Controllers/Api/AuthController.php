@@ -17,7 +17,9 @@ use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\TenantReferenceNumberService;
 use App\Services\AuthRecoveryService;
+use App\Support\AuthUserPayload;
 use App\Support\PlanGate;
+use App\Support\StationSessionBoundary;
 use App\Support\Rbac;
 use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
@@ -292,7 +294,8 @@ class AuthController extends ApiController
         $user = $request->user();
 
         return response()->json([
-            'user'    => $this->userPayload($user) + $this->ownScopePayload($user),
+            'user'    => $this->userPayload($user) + $this->ownScopePayload($user)
+                + (StationSessionBoundary::isStationSession($request) ? ['station_session' => true] : []),
             'company' => $this->companyPayload($tenant),
         ]);
     }
@@ -328,16 +331,7 @@ class AuthController extends ApiController
 
     private function userPayload(User $user): array
     {
-        return [
-            'id'        => $user->id,
-            'name'      => $user->name,
-            'email'     => $user->email,
-            'role'        => $user->role,
-            'permissions' => Rbac::permissionsForRole($user->role),
-            'employee_id' => $user->employee_id,
-            'tenant_id'   => $user->tenant_id,
-            'preferences' => $user->preferences ?? ['locale' => 'ar', 'theme' => 'system', 'appTheme' => 'default'],
-        ];
+        return AuthUserPayload::for($user);
     }
 
     /** بيانات الشركة (البائع) لإظهارها في رأس المستندات كالفاتورة الضريبية. */
