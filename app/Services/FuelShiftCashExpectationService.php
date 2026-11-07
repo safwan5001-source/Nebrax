@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FuelSale;
 use App\Models\FuelSalePaymentReceipt;
 use App\Models\FuelShift;
+use App\Models\FuelShiftCollectionDeclaration;
 use App\Models\FuelShiftCashMovement;
 use App\Models\FuelShiftCashVariance;
 use App\Models\FuelShiftEvent;
@@ -18,40 +19,57 @@ use App\Models\User;
  * يستعمله ثلاثة مواضع فقط: حارس السحب/التسليم في `recordCashMovement`، لقطة `close`، ومورد `show`. ممنوع حساب ثانٍ في
  * متحكم أو واجهة. لا يكتب شيئاً ولا يأخذ أقفالاً (المستدعي يملك قفل الوردية عند الحاجة لاتساق القرار).
  *
- *   E = O + R + I − U − X          (R يدخل فقط تحت الأساس receiving_shift_receipts)
+ *   E = O + S + I − U − X
  *
- * R = إيصالات نقد مختومة بهذه الوردية وسندها `posted` — لا مصدر آخر، فلا احتساب مزدوج (سند واحد = إيصال واحد).
+ * S (نقد المبيعات) **مصدر واحد فقط بحسب الأساس** — لا يُجمع مصدران أبداً (منع الاحتساب المزدوج):
+ *   - movements_only (الافتراضي): S = 0.
+ *   - receiving_shift_receipts: S = R = إيصالات نقد مختومة بهذه الوردية وسندها `posted` (سند واحد = إيصال واحد).
+ *   - declared_collection (P1-2): S = D = النقد المُقَرّ به في إقرار تحصيل الوردية. D إجمالي الوردية (بيع ERP وغيره)
+ *     فيشمل R أصلاً؛ لذلك لا يُضاف R إليه، ويُستعمل R تحقّقاً فقط (D ≥ R وإلا ثغرة `declared_cash_below_recorded_receipts`).
+ *
+ * مطابقة العدادات (الإقرار مقابل مبيعات العدادات) ومطابقة الدرج (V = C − E) **ضابطان مستقلان**: اعتماد D في E لا يلغي الأول
+ * (يبقى يكشف إخفاء المبيعات)، والثاني يكشف نقصاً حقيقياً في الدرج بعد تصريح صحيح.
  * الشبكة N تُعرض للعلم ولا تدخل E أبداً. المتوقع لا يُعاد إجماليًا إلا إذا اكتملت مكوّناته.
  */
 class FuelShiftCashExpectationService
 {
     public const BASIS_MOVEMENTS_ONLY = 'movements_only';
     public const BASIS_RECEIVING_SHIFT = 'receiving_shift_receipts';
+    public const BASIS_DECLARED_COLLECTION = 'declared_collection';
 
     public const GAP_SALES_CASH_NOT_INCLUDED = 'sales_cash_not_included';
     public const GAP_PERMISSION_SALES_VIEW = 'permission_sales_view';
     public const GAP_UNATTRIBUTED = 'unattributed_cash_receipts';
     public const GAP_MULTIPLE_CASH_ACCOUNTS = 'multiple_cash_accounts';
     public const GAP_LEGACY_SNAPSHOT = 'legacy_closed_snapshot';
+    public const GAP_DECLARATION_MISSING = 'collection_not_declared';
+    public const GAP_DECLARED_BELOW_RECEIPTS = 'declared_cash_below_recorded_receipts';
 
     public function __construct(private FuelStationSettingsService $settings) {}
 
-    /** الأساس الفعّال: البوابة المغلقة تفرض movements_only مهما خُزِّن. */
+    /**
+     * الأساس الفعّال: كل أساس خلف بوابته؛ البوابة المغلقة تفرض movements_only مهما خُزِّن.
+     *  - receiving_shift_receipts ⇐ `FUEL_SHIFT_CASH_RECEIPTS_ENABLED`.
+     *  - declared_collection ⇐ `FUEL_SHIFT_COLLECTION_DECLARATION_ENABLED` (بوابة الإقرار، مستقلة عن بوابة الإيصالات).
+     */
     public function effectiveBasis(FuelStation $station): string
     {
-        if (! (bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
-            return self::BASIS_MOVEMENTS_ONLY;
+        $stored = $this->settings->forStation($station)['shift_expected_cash_basis'] ?? null;
+
+        if ($stored === self::BASIS_DECLARED_COLLECTION && (bool) config('fuel_stations.shift_collection_declaration_enabled', false)) {
+            return self::BASIS_DECLARED_COLLECTION;
+        }
+        if ($stored === self::BASIS_RECEIVING_SHIFT && (bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
+            return self::BASIS_RECEIVING_SHIFT;
         }
 
-        return ($this->settings->forStation($station)['shift_expected_cash_basis'] ?? null) === self::BASIS_RECEIVING_SHIFT
-            ? self::BASIS_RECEIVING_SHIFT
-            : self::BASIS_MOVEMENTS_ONLY;
+        return self::BASIS_MOVEMENTS_ONLY;
     }
 
     /**
      * الحساب الحيّ (حقيقة الخادم، بلا اعتبار لصلاحيات العارض). أرقامه هي ما تحرسه القواعد وما يُجمَّد عند الإغلاق.
      *
-     * @return array{basis:string,opening:int,receipts:int,receipts_count:int,cash_in:int,cash_out:int,handover:int,expenses:int,expected:int,network:int,network_count:int,unattributed_count:int,unattributed_amount:int,cash_accounts:int,gaps:array<int,string>,complete:bool}
+     * @return array{basis:string,opening:int,declared_cash:int,declaration_present:bool,receipts:int,receipts_count:int,cash_in:int,cash_out:int,handover:int,expenses:int,expected:int,network:int,network_count:int,unattributed_count:int,unattributed_amount:int,cash_accounts:int,gaps:array<int,string>,complete:bool}
      */
     public function live(FuelShift $shift, string $basis): array
     {
@@ -72,10 +90,25 @@ class FuelShiftCashExpectationService
         [$unCount, $unAmount] = $this->unattributedCash($shift);
 
         $opening = (int) $shift->opening_float_minor;
-        $counted = $basis === self::BASIS_RECEIVING_SHIFT ? $receipts : 0;
+        $declaration = $basis === self::BASIS_DECLARED_COLLECTION
+            ? FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->first()
+            : null;
+        $declared = (int) ($declaration?->cash_declared_minor ?? 0);
+        // مصدر واحد لنقد المبيعات بحسب الأساس — لا جمع بين R وD (D يشمل R).
+        $counted = match ($basis) {
+            self::BASIS_RECEIVING_SHIFT => $receipts,
+            self::BASIS_DECLARED_COLLECTION => $declared,
+            default => 0,
+        };
         $gaps = [];
         if ($basis === self::BASIS_MOVEMENTS_ONLY) {
             $gaps[] = self::GAP_SALES_CASH_NOT_INCLUDED;
+        } elseif ($basis === self::BASIS_DECLARED_COLLECTION) {
+            if ($declaration === null) {
+                $gaps[] = self::GAP_DECLARATION_MISSING;
+            } elseif ($receipts > $declared) {
+                $gaps[] = self::GAP_DECLARED_BELOW_RECEIPTS;
+            }
         } else {
             if ($unCount > 0) {
                 $gaps[] = self::GAP_UNATTRIBUTED;
@@ -88,6 +121,8 @@ class FuelShiftCashExpectationService
         return [
             'basis' => $basis,
             'opening' => $opening,
+            'declared_cash' => $declared,
+            'declaration_present' => $declaration !== null,
             'receipts' => $receipts,
             'receipts_count' => $receiptsCount,
             'cash_in' => $in,
@@ -124,6 +159,8 @@ class FuelShiftCashExpectationService
                 opening: $live['opening'], cashIn: $live['cash_in'], cashOut: $live['cash_out'], handover: $live['handover'], expenses: $live['expenses'],
                 receipts: $live['receipts'], receiptsCount: $live['receipts_count'], receiptsKnown: $live['basis'] === self::BASIS_RECEIVING_SHIFT,
                 network: $live['network'], networkKnown: $live['basis'] === self::BASIS_RECEIVING_SHIFT, gaps: $live['gaps'], salesVisible: $salesVisible,
+                declared: $live['declared_cash'], declaredKnown: $live['basis'] === self::BASIS_DECLARED_COLLECTION && $live['declaration_present'],
+                declaredBasis: $live['basis'] === self::BASIS_DECLARED_COLLECTION,
                 counted: null, variance: null, unattributed: [$live['unattributed_count'], $live['unattributed_amount']],
                 shift: $shift,
             );
@@ -143,6 +180,9 @@ class FuelShiftCashExpectationService
             receiptsKnown: $frozen && $variance->official_cash_basis === self::BASIS_RECEIVING_SHIFT,
             network: (int) ($variance->registered_network_receipts_minor ?? 0), networkKnown: $variance->registered_network_receipts_minor !== null,
             gaps: $gaps, salesVisible: $salesVisible,
+            declared: (int) ($variance->documented_declared_cash_minor ?? 0),
+            declaredKnown: $frozen && $variance->official_cash_basis === self::BASIS_DECLARED_COLLECTION && $variance->documented_declared_cash_minor !== null,
+            declaredBasis: $frozen && $variance->official_cash_basis === self::BASIS_DECLARED_COLLECTION,
             counted: (int) $variance->counted_cash_minor, variance: (int) $variance->variance_minor, unattributed: [0, 0],
             shift: $shift,
         );
@@ -188,15 +228,19 @@ class FuelShiftCashExpectationService
         string $state, string $basis, int $opening, int $cashIn, int $cashOut, int $handover, int $expenses,
         int $receipts, ?int $receiptsCount, bool $receiptsKnown, int $network, bool $networkKnown,
         array $gaps, bool $salesVisible, ?int $counted, ?int $variance, array $unattributed, FuelShift $shift,
+        int $declared = 0, bool $declaredKnown = false, bool $declaredBasis = false,
     ): array {
         $receiptsAvailable = $receiptsKnown && $salesVisible;
+        $declaredAvailable = $declaredKnown && $salesVisible;
+        // مكوّن نقد المبيعات (R أو D) يخصّ صلاحية المبيعات: غيابها يحجب المجموع والفرق معاً (D8).
+        $salesComponentHidden = ($receiptsKnown || $declaredKnown) && ! $salesVisible;
         $visibleGaps = $gaps;
-        if ($receiptsKnown && ! $salesVisible) {
+        if ($salesComponentHidden) {
             $visibleGaps[] = self::GAP_PERMISSION_SALES_VIEW;
         }
         // المجموع الجزئي المعروض يُبنى من المكوّنات المسموح للعارض برؤيتها فقط: وإلا كشف طرحُ المكوّنات الظاهرة منه
         // مبلغ نقد المبيعات المحجوب. الحساب الداخلي (live()['expected']) لا يتأثر.
-        $partial = $opening + ($receiptsAvailable ? $receipts : 0) + $cashIn - $cashOut - $expenses;
+        $partial = $opening + ($receiptsAvailable ? $receipts : 0) + ($declaredAvailable ? $declared : 0) + $cashIn - $cashOut - $expenses;
         $complete = $visibleGaps === [];
         $reason = static fn (bool $known, bool $visible, string $state): ?string => $known && $visible ? null
             : (! $visible && $known ? 'permission' : ($state === 'legacy_frozen' ? 'not_recorded_legacy' : 'basis_not_enabled'));
@@ -212,6 +256,11 @@ class FuelShiftCashExpectationService
                     'count' => $receiptsAvailable ? $receiptsCount : null,
                     'reason' => $reason($receiptsKnown, $salesVisible, $state),
                 ],
+                'declared_cash' => [
+                    'available' => $declaredAvailable,
+                    'amount_minor' => $declaredAvailable ? $declared : null,
+                    'reason' => $declaredBasis ? ($declaredKnown ? ($salesVisible ? null : 'permission') : 'not_declared') : 'basis_not_enabled',
+                ],
                 'cash_in_minor' => $cashIn,
                 'cash_out_minor' => $cashOut,
                 'treasury_handover_minor' => $handover,
@@ -223,7 +272,7 @@ class FuelShiftCashExpectationService
             'incompleteness' => array_values(array_unique($visibleGaps)),
             'counted_cash_minor' => $counted,
             // الفرق = المعدود − المتوقع الكامل؛ يُخفى عمّن لا يرى مكوّن المبيعات وإلا كشف المتوقع (المعدود − الفرق) — D8.
-            'variance_minor' => $receiptsKnown && ! $salesVisible ? null : $variance,
+            'variance_minor' => $salesComponentHidden ? null : $variance,
             'variance_final' => $complete && $counted !== null,
             'network_receipts' => [
                 'available' => $networkKnown && $salesVisible,

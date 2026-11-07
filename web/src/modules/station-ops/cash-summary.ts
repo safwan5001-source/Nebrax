@@ -16,10 +16,12 @@ const available = z.object({ available: z.boolean(), amount_minor: int.nullable(
 
 export const cashSummarySchema = z.object({
   state: z.enum(['live', 'frozen', 'legacy_frozen']),
-  basis: z.enum(['movements_only', 'receiving_shift_receipts']),
+  basis: z.enum(['movements_only', 'receiving_shift_receipts', 'declared_collection']),
   components: z.object({
     opening_float_minor: int,
     official_cash_receipts: available.extend({ count: int.nullable() }),
+    /** النقد المُقَرّ به في إقرار التحصيل (P1-2). غيابه = خادم أقدم ⇒ أساس الحركات/الإيصالات. */
+    declared_cash: available.optional(),
     cash_in_minor: int,
     cash_out_minor: int,
     treasury_handover_minor: int,
@@ -43,8 +45,8 @@ export const cashSummarySchema = z.object({
 
 export type CashSummary = z.infer<typeof cashSummarySchema>;
 
-export type CashRowKey = 'opening' | 'sales' | 'cashIn' | 'handover' | 'otherOut' | 'expenses';
-export type UnavailableReason = 'permission' | 'basis_not_enabled' | 'not_recorded_legacy' | 'unknown';
+export type CashRowKey = 'opening' | 'sales' | 'declaredSales' | 'cashIn' | 'handover' | 'otherOut' | 'expenses';
+export type UnavailableReason = 'permission' | 'basis_not_enabled' | 'not_recorded_legacy' | 'not_declared' | 'unknown';
 
 export interface CashRowView {
   key: CashRowKey;
@@ -74,18 +76,20 @@ export interface CashSummaryView {
 }
 
 function normalizeReason(value: string | null): UnavailableReason {
-  return value === 'permission' || value === 'basis_not_enabled' || value === 'not_recorded_legacy' ? value : 'unknown';
+  return value === 'permission' || value === 'basis_not_enabled' || value === 'not_recorded_legacy' || value === 'not_declared' ? value : 'unknown';
 }
 
 /** يحوّل ما يرسله الخادم إلى عرض صادق. دالة نقية: لا حسابات مالية جديدة (الطرح الوحيد: الصادر الآخر = الصادر − التسليم للعرض). */
 export function buildCashSummaryView(summary: CashSummary): CashSummaryView {
   const c = summary.components;
-  const sales = c.official_cash_receipts;
+  // الأساس المُقَرّ به: مصدر نقد المبيعات الوحيد هو الإقرار (لا يُجمع مع الإيصالات)، فيُعنوَن صفّه «مُقَرّ به» لا «محصّل».
+  const declaredBasis = summary.basis === 'declared_collection' && c.declared_cash !== undefined;
+  const sales = declaredBasis && c.declared_cash ? c.declared_cash : c.official_cash_receipts;
   const otherOut = Math.max(0, c.cash_out_minor - c.treasury_handover_minor);
 
   const rows: CashRowView[] = [
     { key: 'opening', sign: 1, amountMinor: c.opening_float_minor, unavailable: null },
-    { key: 'sales', sign: 1, amountMinor: sales.available ? sales.amount_minor : null, unavailable: sales.available ? null : normalizeReason(sales.reason) },
+    { key: declaredBasis ? 'declaredSales' : 'sales', sign: 1, amountMinor: sales.available ? sales.amount_minor : null, unavailable: sales.available ? null : normalizeReason(sales.reason) },
     { key: 'cashIn', sign: 1, amountMinor: c.cash_in_minor, unavailable: null },
     { key: 'handover', sign: -1, amountMinor: c.treasury_handover_minor, unavailable: null },
     { key: 'otherOut', sign: -1, amountMinor: otherOut, unavailable: null },

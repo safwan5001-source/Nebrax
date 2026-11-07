@@ -29,14 +29,14 @@ export interface CashTotals {
 
 /**
  * `null` = لا نعرف الحركات (الخادم لم يعدها) أو فيها نوع غير معروف — لا نعرض متوقعاً مخترعاً.
- * وكذلك حين يعلن الخادم (#2021) أن أساس المتوقع يشمل نقد البيع المستلَم (`receiving_shift_receipts`): معادلة الحركات وحدها
+ * وكذلك حين يعلن الخادم (#2021) أن أساس المتوقع يشمل نقد البيع المستلَم (`receiving_shift_receipts`) أو المُقَرّ به (`declared_collection`): معادلة الحركات وحدها
  * لم تعد معادلة الخادم، فلا نعرض معاينة محلية ولا نحجب بناءً عليها؛ الخادم وحده يحكم ويظهر ملخصه في تفاصيل الوردية.
  * غياب `cash_summary` (خادم أقدم) أو أساس `movements_only` (الافتراضي) ⇒ المعادلة الحرفية كما كانت.
  */
 export function cashTotals(detail: Pick<ShiftDetail, 'opening_float_minor' | 'cash_movements' | 'cash_summary'>): CashTotals | null {
   const movements = detail.cash_movements;
   if (movements === undefined) return null;
-  if (detail.cash_summary?.basis === 'receiving_shift_receipts') return null;
+  if (detail.cash_summary?.basis === 'receiving_shift_receipts' || detail.cash_summary?.basis === 'declared_collection') return null;
   let cashIn = 0;
   let cashOut = 0;
   let expenses = 0;
