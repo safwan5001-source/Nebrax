@@ -1,0 +1,357 @@
+import type { FuelHelpArticle } from './types';
+
+/** أدلة دورة الوردية: من فتحها إلى اعتمادها. كل جملة مأخوذة من سلوك الشاشات والرسائل الفعلية في تطبيق «محطات أَوْج». */
+export const FUEL_SHIFT_ARTICLES: readonly FuelHelpArticle[] = [
+  {
+    slug: 'fuel-shift-lifecycle',
+    category: 'shifts',
+    title: { ar: 'دورة الوردية والخطوة التالية', en: 'The shift lifecycle and the next step' },
+    summary: { ar: 'افهم مراحل الوردية من الفتح إلى الاعتماد ولماذا يقترح التطبيق خطوة بعينها.', en: 'Understand the stages from opening to approval and why the app suggests a specific step.' },
+    keywords: { ar: 'وردية مراحل مفتوحة مغلقة معتمدة الخطوة التالية سجل الورديات تصفية حالة', en: 'shift stages open closed approved next step shift history filter status' },
+    minutes: 4,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'both',
+    overview: {
+      ar: 'الوردية هي فترة العمل التي تُسجَّل فيها عدّادات المضخات ونقد الدرج. تمرّ بخمس مراحل: فتح الوردية، قراءات الافتتاح، قراءات الإغلاق، إغلاق الوردية (التسليم)، ثم الاعتماد. بطاقة «الخطوة التالية» في الرئيسية وفي تفاصيل الوردية تُشتق من حالة الوردية الفعلية على الخادم ومن صلاحياتك، فلا تقترح عليك ما لا تملك تنفيذه.',
+      en: 'A shift is the working period during which pump meters and drawer cash are recorded. It moves through five stages: open, opening readings, closing readings, close (handover), and approval. The "Next step" card on the home screen and shift detail is derived from the shift’s real server state and your permissions, so it never suggests something you cannot do.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view'],
+    permissionsNote: { ar: 'العرض يتطلب الصلاحيتين معاً. كل إجراء لاحق له صلاحيته المذكورة في دليله.', en: 'Viewing needs both permissions. Each later action has its own permission, listed in its guide.' },
+    procedures: [
+      {
+        title: { ar: 'متابعة وردية من الرئيسية', en: 'Follow a shift from the home screen' },
+        steps: [
+          { ar: 'افتح «الرئيسية» وتأكد من اسم المحطة في الرأس.', en: 'Open Home and confirm the station name in the header.' },
+          { ar: 'اقرأ بطاقة «الخطوة التالية» واضغط الزر الأساسي إن ظهر لك؛ ظهوره يعني أن الخطوة من صلاحياتك.', en: 'Read the "Next step" card and press the primary button if shown; its presence means the step is within your permissions.' },
+          { ar: 'إن ظهرت الخطوة نصاً بلا زر مثل «بانتظار: اعتماد الوردية»، فهي بانتظار شخص آخر يملك صلاحيتها.', en: 'If the step appears as text without a button, such as "Waiting for: shift approval", it is waiting for someone else who holds that permission.' },
+          { ar: 'من «الورديات» استخدم التصفية: الكل، مفتوحة، بانتظار الاعتماد، معتمدة، ثم افتح الوردية لرؤية تقدمها.', en: 'From Shifts, filter by All, Open, Awaiting approval, or Approved, then open a shift to see its progress.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'التقدّم في الوردية', en: 'Shift progress' }, description: { ar: 'خمس مراحل: فتح الوردية، قراءات الافتتاح، قراءات الإغلاق، إغلاق الوردية، اعتماد الوردية؛ كل مرحلة «تمّت» أو «التالية» أو «لم تتم».', en: 'Five stages: opened, opening readings, closing readings, closed, approved; each is Done, Next, or Not done.' } },
+      { name: { ar: 'بانتظار الاعتماد', en: 'Awaiting approval' }, description: { ar: 'الوردية المغلقة التي سلّمها البائع ولم يعتمدها مشرف بعد.', en: 'A closed shift that the attendant handed over and no supervisor has approved yet.' } },
+      { name: { ar: 'آخر تحديث / تحديث', en: 'Last updated / Refresh' }, description: { ar: 'يعرض وقت آخر تحميل للبيانات؛ إن بدت قديمة اضغط «تحديث». عند تعذّر التحديث تُعرض آخر بيانات محمّلة مع تنبيه.', en: 'Shows when data was last loaded; press Refresh if it looks stale. If refreshing fails, the last loaded data is shown with a warning.' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا يظهر لي زر في «الخطوة التالية».', en: 'There is no button in "Next step".' }, fix: { ar: 'الخطوة تخص صلاحية لا تملكها (مثل الاعتماد)، أو تنتظر موظفاً آخر. اطلب من المشرف أو مسؤول المحطة.', en: 'The step needs a permission you do not hold (such as approval), or is waiting for another person. Ask your supervisor or station manager.' } },
+      { problem: { ar: 'قائمة الورديات لا تعرض وردية أعرف أنها موجودة.', en: 'The shift list does not show a shift I know exists.' }, fix: { ar: 'تحقق من المحطة المختارة في الرأس ومن التصفية، ثم اضغط «تحميل المزيد». الورديات تُعرض حسب المحطات المسموحة لحسابك.', en: 'Check the selected station in the header and the filter, then press Load more. Shifts are shown per the stations your account may access.' } },
+    ],
+    screens: [
+      { label: { ar: 'سجل الورديات', en: 'Shift history' }, appHref: '/fuel-stations/ops/shifts', erpHref: '/fuel-stations/shifts' },
+    ],
+    related: ['fuel-open-shift', 'fuel-meter-readings', 'fuel-handover-shift', 'fuel-review-approve-shift'],
+  },
+  {
+    slug: 'fuel-open-shift',
+    category: 'shifts',
+    title: { ar: 'فتح وردية جديدة', en: 'Open a new shift' },
+    summary: { ar: 'ابدأ الوردية بعهدة افتتاح صحيحة، وتسجّل باسمك مسؤولاً عنها.', en: 'Start the shift with a correct opening float and be recorded as responsible for it.' },
+    keywords: { ar: 'فتح وردية عهدة افتتاح نقد الدرج بداية بدء مسؤول', en: 'open shift opening float drawer cash start begin responsible' },
+    minutes: 3,
+    audiences: ['operator', 'supervisor'],
+    surface: 'app',
+    overview: {
+      ar: 'لا يمكن تسجيل أي قراءة قبل فتح وردية. تفتح وردية واحدة فقط لكل محطة في الوقت نفسه. عند الفتح تُسجَّل عهدة الافتتاح (النقد الموجود في الدرج الآن) وتُسجَّل أنت مسؤولاً عن الوردية.',
+      en: 'No reading can be recorded before a shift is open. Only one shift can be open per station at a time. On opening, the opening float (cash in the drawer right now) is recorded and you are registered as the person responsible.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.open'],
+    procedures: [
+      {
+        title: { ar: 'فتح الوردية', en: 'Open the shift' },
+        steps: [
+          { ar: 'اختر المحطة الصحيحة من الرأس، ثم افتح «الورديات» واضغط فتح وردية.', en: 'Select the right station in the header, then open Shifts and press Open shift.' },
+          { ar: 'اعدّ النقد الموجود في الدرج الآن واكتبه في «عهدة الافتتاح» بالريال (مثل 500 أو 250.50).', en: 'Count the cash in the drawer now and enter it in "Opening float" in riyals (for example 500 or 250.50).' },
+          { ar: 'إن لم يكن في الدرج نقد اضغط «لا يوجد نقد (0)» بدل ترك الحقل فارغاً.', en: 'If the drawer is empty, press "No cash (0)" instead of leaving the field blank.' },
+          { ar: 'اضغط «مراجعة وفتح الوردية» وراجع البيانات في نافذة التأكيد.', en: 'Press "Review and open shift" and check the details in the confirmation dialog.' },
+          { ar: 'اضغط «تأكيد فتح الوردية». ستظهر رسالة نجاح برقم الوردية وتُسجَّل أنت عليها تلقائياً.', en: 'Press "Confirm opening the shift". A success message with the shift number appears and you are registered on it automatically.' },
+          { ar: 'انتقل إلى «تسجيل قراءات البداية» لإدخال قراءات العدادات والخزانات.', en: 'Continue with "Record opening readings" to enter meter and tank readings.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'المحطة', en: 'Station' }, description: { ar: 'المحطة المختارة في الرأس؛ يجب أن تكون نشطة وضمن الفرع الحالي.', en: 'The station selected in the header; it must be active and within the current branch.' } },
+      { name: { ar: 'المسؤول عن الوردية', en: 'Shift owner' }, description: { ar: 'أنت. تُسجَّل مسؤولاً عند الفتح.', en: 'You. You are recorded as responsible on opening.' } },
+      { name: { ar: 'عهدة الافتتاح', en: 'Opening float' }, description: { ar: 'النقد في الدرج عند البداية. مطلوبة أو اختيارية حسب سياسة المحطة، ولا تُعدَّل بعد فتح الوردية. صفر مقبول عند الإلزام.', en: 'Cash in the drawer at the start. Required or optional per station policy and cannot be changed after opening. Zero is accepted when it is required.' } },
+    ],
+    problems: [
+      { problem: { ar: 'توجد وردية مفتوحة لهذه المحطة بالفعل.', en: 'A shift is already open for this station.' }, fix: { ar: 'اضغط «الذهاب إلى الوردية» وأكملها بدل فتح وردية ثانية.', en: 'Press "Go to the shift" and continue it instead of opening a second one.' } },
+      { problem: { ar: 'هذه المحطة تتطلب إدخال عهدة الافتتاح، ولو كانت صفراً.', en: 'This station requires an opening float, even if it is zero.' }, fix: { ar: 'اكتب المبلغ أو اضغط «لا يوجد نقد (0)».', en: 'Enter the amount or press "No cash (0)".' } },
+      { problem: { ar: 'المحطة غير نشطة / ليست ضمن الفرع المحدد.', en: 'The station is inactive / not in the selected branch.' }, fix: { ar: 'بدّل الفرع أو المحطة. تفعيل المحطة من مسؤول المحطة.', en: 'Switch the branch or station. Activating a station is done by the station manager.' } },
+      { problem: { ar: 'فُتحت الوردية لكن تعذّر تسجيلي عليها.', en: 'The shift opened but I could not be registered on it.' }, fix: { ar: 'اضغط «أعد تسجيلي على الوردية». لا تفتح وردية جديدة.', en: 'Press "Register me on the shift again". Do not open a new shift.' } },
+      { problem: { ar: 'لا تملك صلاحية فتح الوردية.', en: 'You do not have permission to open a shift.' }, fix: { ar: 'اطلب من المشرف منحك صلاحية فتح الوردية.', en: 'Ask your supervisor to grant you the open-shift permission.' } },
+    ],
+    notes: [
+      { ar: 'إن انقطع الاتصال بعد الضغط على التأكيد فقد تكون الوردية فُتحت. افتح قائمة الورديات وتحقق قبل المحاولة مجدداً؛ لا يعيد التطبيق الإرسال تلقائياً.', en: 'If the connection drops after you confirm, the shift may have opened. Check the shift list before trying again; the app never resends automatically.' },
+    ],
+    screens: [{ label: { ar: 'فتح وردية', en: 'Open a shift' }, appHref: '/fuel-stations/ops/shifts/open' }],
+    related: ['fuel-meter-readings', 'fuel-shift-lifecycle'],
+  },
+  {
+    slug: 'fuel-meter-readings',
+    category: 'shifts',
+    title: { ar: 'تسجيل قراءات العدادات والخزانات', en: 'Record meter and tank readings' },
+    summary: { ar: 'سجّل قراءات بداية ونهاية الوردية لكل فوهة وخزان، وراجعها قبل الحفظ.', en: 'Record opening and closing readings for every nozzle and tank, and review them before saving.' },
+    keywords: { ar: 'قراءة عداد فوهة خزان بداية نهاية افتتاح إغلاق لترات مراجعة حفظ', en: 'meter reading nozzle tank opening closing litres review save' },
+    minutes: 5,
+    audiences: ['operator', 'supervisor'],
+    surface: 'app',
+    overview: {
+      ar: 'تُسجَّل قراءة لكل فوهة نشطة عند بداية الوردية وعند نهايتها، وتُسجَّل قراءات الخزانات حسب سياسة المحطة. القراءة لا تُعدَّل بعد حفظها، لذلك تمرّ كل دفعة بشاشة مراجعة إلزامية قبل الإرسال.',
+      en: 'One reading is recorded for each active nozzle at the start and the end of the shift, and tank readings follow the station policy. A saved reading cannot be edited, so every batch goes through a mandatory review screen before sending.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.open'],
+    procedures: [
+      {
+        title: { ar: 'تسجيل القراءات', en: 'Record readings' },
+        steps: [
+          { ar: 'افتح الوردية ثم اضغط «تسجيل قراءات البداية» (أو «قراءات النهاية» قبل التسليم).', en: 'Open the shift and press "Record opening readings" (or "closing readings" before handover).' },
+          { ar: 'اكتب الرقم الظاهر الآن على كل عدّاد باللتر، حتى 3 منازل عشرية، بأرقام 0–9.', en: 'Enter the number currently shown on each meter in litres, up to 3 decimals, using digits 0–9.' },
+          { ar: 'في قسم «الخزانات» اكتب القياس باللتر؛ يُسجَّل كقياس يدوي. ويكون مطلوباً أو اختيارياً حسب سياسة المحطة.', en: 'In the Tanks section enter the measurement in litres, recorded as a manual measurement. It is required or optional per station policy.' },
+          { ar: 'اقرأ التنبيهات تحت كل حقل (مثل اختلاف القراءة عن آخر إغلاق مسجّل أو كمية صفرية) وصحّح الرقم إن لزم.', en: 'Read the notices under each field (for example a difference from the last recorded closing or a zero quantity) and fix the number if needed.' },
+          { ar: 'اضغط «مراجعة وحفظ» ثم راجع كل رقم، وفعّل «راجعت التنبيهات وأؤكد الأرقام» إن وُجدت تنبيهات.', en: 'Press "Review and save", check every number, and tick "I reviewed the notices and confirm the numbers" if notices exist.' },
+          { ar: 'اضغط «تأكيد وحفظ». تظهر لكل قراءة حالتها: حُفظت، لم تُحفظ، غير مؤكدة، لم تُرسل. أعد المحاولة للباقي إن لزم.', en: 'Press "Confirm and save". Each reading shows Saved, Failed, Unconfirmed, or Not sent. Retry the remainder if needed.' },
+          { ar: 'بعد اكتمال قراءات النهاية انتقل إلى «التسليم».', en: 'After closing readings are complete, continue to Handover.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'قراءة البداية / النهاية', en: 'Opening / closing reading' }, description: { ar: 'رقم عداد الفوهة باللتر. الكمية المصروفة = النهاية − البداية.', en: 'The nozzle meter number in litres. Dispensed quantity = closing − opening.' } },
+      { name: { ar: 'آخر إغلاق مسجّل', en: 'Last recorded closing' }, description: { ar: 'مرجع إرشادي من آخر وردية غير مفتوحة لمساعدتك في اكتشاف خطأ إدخال؛ تنبيه ناعم لا يمنع الحفظ.', en: 'An indicative reference from the last non-open shift to help catch typing errors; a soft notice that does not block saving.' } },
+      { name: { ar: 'محفوظة مؤقتاً على هذا الجهاز', en: 'Saved temporarily on this device' }, description: { ar: 'ما تكتبه قبل الحفظ يبقى على جهازك فقط ولا يصل إلى النظام حتى تؤكد الحفظ.', en: 'What you type before saving stays on your device only and does not reach the system until you confirm.' } },
+    ],
+    problems: [
+      { problem: { ar: 'قراءة النهاية أقل من قراءة البداية.', en: 'The closing reading is lower than the opening reading.' }, fix: { ar: 'لا يحفظها التطبيق لأنها تمنع تسليم الوردية. راجع الرقم على العدّاد، وإن كان صحيحاً أبلغ المشرف.', en: 'The app will not save it because it would block handover. Re-check the meter, and if the number is correct tell your supervisor.' } },
+      { problem: { ar: 'قراءة البداية أعلى من النهاية المسجّلة.', en: 'The opening reading is higher than the recorded closing.' }, fix: { ar: 'لا يمكن حفظها للسبب نفسه؛ راجع الرقم أو أبلغ المشرف.', en: 'It cannot be saved for the same reason; re-check the number or inform your supervisor.' } },
+      { problem: { ar: 'هذه القراءة مسجّلة بالفعل ولا يمكن تعديلها.', en: 'This reading is already recorded and cannot be edited.' }, fix: { ar: 'حدّث الصفحة وراجع القراءة المسجّلة. التصحيح قرار المشرف.', en: 'Refresh and check the recorded reading. Corrections are the supervisor’s decision.' } },
+      { problem: { ar: 'تتعارض مع قراءة مسجّلة سابقاً بقيمة مختلفة.', en: 'It conflicts with a previously recorded reading of a different value.' }, fix: { ar: 'حدّث الصفحة؛ لا تعد الإرسال بقيمة أخرى قبل رؤية القيمة المسجّلة.', en: 'Refresh the page; do not resend a different value before seeing the recorded one.' } },
+      { problem: { ar: 'حالة قراءة «غير مؤكدة».', en: 'A reading shows "Unconfirmed".' }, fix: { ar: 'انقطع الاتصال بعد الإرسال فقد تكون حُفظت. افتح تفاصيل الوردية وتحقق، ثم أعد المحاولة للباقي فقط.', en: 'The connection dropped after sending, so it may have been saved. Open the shift detail to check, then retry only what remains.' } },
+      { problem: { ar: 'هذه الفوهة أو الخزان غير متاح حالياً.', en: 'This nozzle or tank is currently unavailable.' }, fix: { ar: 'أُوقف في إعداد المحطة. أبلغ مسؤول المحطة.', en: 'It was deactivated in the station setup. Tell the station manager.' } },
+    ],
+    notes: [
+      { ar: 'القراءات هي أساس احتساب اللترات والمبيعات. الخطأ هنا لا يُصحَّح بتعديل، لذلك راجع الأرقام جيداً.', en: 'Readings drive the litres and sales calculation. A mistake here cannot be fixed by editing, so check the numbers carefully.' },
+    ],
+    screens: [
+      { label: { ar: 'قراءات البداية', en: 'Opening readings' }, appHref: '/fuel-stations/ops/shifts' },
+    ],
+    related: ['fuel-sales-liters', 'fuel-handover-shift', 'fuel-open-shift'],
+  },
+  {
+    slug: 'fuel-sales-liters',
+    category: 'salesCollection',
+    title: { ar: 'اللترات ومبيعات الوقود من العدادات', en: 'Litres and fuel sales from the meters' },
+    summary: { ar: 'كيف تُحسب اللترات والمبالغ، ولماذا قد يظهر «—» بدل رقم.', en: 'How litres and amounts are calculated, and why a dash may appear instead of a number.' },
+    keywords: { ar: 'لترات مبيعات سعر فعال عداد فرق احتساب إجمالي جزئي شاذة', en: 'litres sales effective price meter difference calculation total partial anomalous' },
+    minutes: 4,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'both',
+    overview: {
+      ar: 'اللترات = قراءة النهاية − قراءة البداية لكل فوهة. قيمة المبيعات = اللترات × سعر اللتر الفعّال للمنتج. هذه أرقام تشغيلية مشتقة من العدادات: ليست تحصيلاً ولا مخزوناً ولا قيداً محاسبياً. لا يعرض التطبيق رقماً غير موثوق: عند نقص أي مدخل يظهر «—» أو «غير متاح» ولا يظهر صفر.',
+      en: 'Litres = closing reading − opening reading per nozzle. Sales value = litres × the product’s effective price per litre. These are operational figures derived from the meters: they are not collections, stock, or accounting entries. The app never shows an untrustworthy figure: when an input is missing you see a dash or "Not available", never a zero.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view'],
+    permissionsNote: { ar: 'اللترات تُعرض لكل من يعرض الوردية. مبالغ المبيعات والفروق تتطلب أيضاً «عرض المبيعات» (fuel.sale.view).', en: 'Litres are visible to anyone who can view the shift. Sales amounts and variances also need View sales (fuel.sale.view).' },
+    procedures: [
+      {
+        title: { ar: 'قراءة اللترات في وردية', en: 'Read the litres of a shift' },
+        steps: [
+          { ar: 'افتح الوردية من «الورديات» وانظر بطاقة اللترات.', en: 'Open the shift from Shifts and look at the litres card.' },
+          { ar: 'في الوردية المفتوحة يُحسب الإجمالي من الفوهات المكتملة فقط (قراءتا البداية والنهاية) ويوسم «مجموع جزئي».', en: 'In an open shift the total is computed from complete nozzles only (both readings) and labelled partial.' },
+          { ar: 'قارن عدد «فوهات مكتملة» و«بانتظار قراءة» و«تحتاج مراجعة» لمعرفة ما ينقص.', en: 'Compare the "complete", "waiting for a reading", and "need review" counts to see what is missing.' },
+          { ar: 'افتح قسم قراءات العدادات لرؤية الكمية المحسوبة لكل فوهة وحالتها.', en: 'Open the meter readings section to see each nozzle’s computed quantity and status.' },
+          { ar: 'في الوردية المغلقة يعتمد الإجمالي على الخادم، وإن اختلف عن مجموع الفوهات المعروضة ظهر تنبيه فأبلغ المشرف.', en: 'In a closed shift the total comes from the server; if it differs from the displayed nozzle sum a warning shows, so tell the supervisor.' },
+        ],
+      },
+      {
+        title: { ar: 'فهم سعر اللتر المعروض', en: 'Understand the displayed price per litre' },
+        steps: [
+          { ar: 'افتح «المنتجات» وانظر السعر تحت كل منتج وقود.', en: 'Open Products and look at the price under each fuel product.' },
+          { ar: 'السعر المعتمد للمحطة يتقدّم، وإلا يُستعمل سعر المؤسسة الافتراضي، ويظهر مصدره وتاريخ سريانه.', en: 'The station’s approved price comes first, otherwise the organisation default is used; its source and start date are shown.' },
+          { ar: 'عبارة «شامل الضريبة» أو «قبل الضريبة» تبيّن نمط السعر، و«نمط الضريبة غير معيَّن» يمنع احتساب البيع الرسمي.', en: '"Tax inclusive" or "Before tax" shows the price mode; "Tax mode not set" blocks the official sale calculation.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'الكمية المحسوبة', en: 'Computed quantity' }, description: { ar: 'نهاية − بداية للفوهة، بدقة المليلتر.', en: 'Closing − opening for the nozzle, to millilitre precision.' } },
+      { name: { ar: 'مجموع جزئي', en: 'Partial total' }, description: { ar: 'يشمل الفوهات التي اكتملت قراءتاها فقط؛ ليس إجمالي الوردية النهائي.', en: 'Includes only nozzles with both readings; it is not the final shift total.' } },
+      { name: { ar: 'السعر الفعّال', en: 'Effective price' }, description: { ar: 'سعر اللتر المعتمد: سعر المحطة ثم الافتراضي. لا يُستعمل أي سعر آخر عند غيابه.', en: 'The approved price per litre: station price, then the default. No other price is used when absent.' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا لترات محسوبة حتى الآن.', en: 'No litres are computed yet.' }, fix: { ar: 'لم تكتمل قراءتا أي فوهة. سجّل قراءات البداية والنهاية. ليس المقصود أن المبيعات صفر.', en: 'No nozzle has both readings yet. Record opening and closing readings. It does not mean sales are zero.' } },
+      { problem: { ar: 'السعر غير مضبوط أو البيع الرسمي غير جاهز.', en: 'The price is not configured or official sale is not ready.' }, fix: { ar: 'اطلب من المسؤول ضبط سعر معتمد أو نمط الضريبة أو تهيئة وحدة المنتج باللتر.', en: 'Ask the manager to set an approved price, the tax mode, or the product’s litre unit.' } },
+      { problem: { ar: 'قراءة نهاية أقل من البداية استُبعدت من المجموع.', en: 'A closing reading below opening was excluded from the total.' }, fix: { ar: 'تحتاج مراجعة المشرف؛ لا يُحتسب مبلغ مبيعات حتى تُحسم.', en: 'It needs supervisor review; no sales amount is calculated until resolved.' } },
+      { problem: { ar: 'تغيّر سعر أحد المنتجات أثناء الوردية.', en: 'A product’s price changed during the shift.' }, fix: { ar: 'لا يُقسَّم المبلغ بالتخمين؛ يراجعه المشرف.', en: 'The amount is not split by guesswork; the supervisor reviews it.' } },
+    ],
+    notes: [
+      { ar: 'لترات العدّاد ليست مبيعات مسجّلة رسمياً ولا تحصيلاً ولا مخزوناً.', en: 'Meter litres are not officially recorded sales, collections, or stock.' },
+    ],
+    unavailable: [
+      { ar: 'سياسة تصفير العدّاد أو استبداله والقراءة السابقة الرسمية لم تُبنَ بعد؛ ما يظهر باسم «آخر إغلاق مسجّل» إرشاد فقط ولا يُلزمك.', en: 'A meter-reset/replacement policy and an official previous reading are not built yet; the "Last recorded closing" shown is guidance only and not binding.' },
+    ],
+    screens: [
+      { label: { ar: 'المنتجات والأسعار', en: 'Products and prices' }, appHref: '/fuel-stations/ops/products' },
+      { label: { ar: 'مبيعات الوقود', en: 'Fuel sales' }, erpHref: '/fuel-stations/sales' },
+    ],
+    related: ['fuel-collection-reconciliation', 'fuel-products-prices'],
+  },
+  {
+    slug: 'fuel-handover-shift',
+    category: 'shifts',
+    title: { ar: 'تسليم الوردية وإغلاقها', en: 'Hand over and close the shift' },
+    summary: { ar: 'أكمل القراءات، اعدّ النقد، اكتب التحصيل ثم سلّم الوردية.', en: 'Complete readings, count cash, enter collections, then hand over the shift.' },
+    keywords: { ar: 'تسليم إغلاق وردية نقد معدود عهدة سحب مصروف حركة نقد فرق ملاحظة', en: 'handover close shift counted cash float withdrawal expense cash movement variance note' },
+    minutes: 6,
+    audiences: ['operator', 'supervisor'],
+    surface: 'app',
+    overview: {
+      ar: 'التسليم ثلاث خطوات: (1) جاهزية القراءات، (2) النقد، (3) التأكيد. بعد التأكيد تُجمَّد القراءات والنقد ولا تُعدَّل، ويراجع المشرف الوردية ويعتمدها.',
+      en: 'Handover has three steps: (1) readings readiness, (2) cash, (3) confirmation. After confirmation readings and cash are frozen and cannot be edited, and a supervisor reviews and approves the shift.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.close', 'fuel.shift.cash_count'],
+    permissionsNote: { ar: 'لا ترى قيم المبيعات وفروقها دون «عرض المبيعات» (fuel.sale.view).', en: 'You will not see sales values and their variances without View sales (fuel.sale.view).' },
+    procedures: [
+      {
+        title: { ar: 'تسليم الوردية', en: 'Hand over the shift' },
+        steps: [
+          { ar: 'من الوردية اضغط «الانتقال إلى التسليم» بعد تسجيل قراءات النهاية.', en: 'From the shift, press "Continue to handover" after recording the closing readings.' },
+          { ar: 'الخطوة 1: راجع «جاهزية القراءات». أي سطر ناقص فيه زر «سجّل الآن». لا تسليم قبل اكتمال المطلوب.', en: 'Step 1: review "Readings readiness". Any missing line has a "Record now" button. No handover before all required items are in.' },
+          { ar: 'الخطوة 2: راجع المتوقع في الدرج = عهدة الافتتاح + الإضافات − السحوبات − المصروفات.', en: 'Step 2: review the expected drawer cash = opening float + additions − withdrawals − expenses.' },
+          { ar: 'إن حدثت حركة نقد (إضافة أو سحب أو مصروف) اضغط «تسجيل حركة نقد»، اختر النوع، اكتب المبلغ والسبب (3 أحرف على الأقل) وأكّد.', en: 'If a cash movement happened (addition, withdrawal, or expense) press "Record a cash movement", choose the type, enter the amount and a reason (at least 3 characters), and confirm.' },
+          { ar: 'اعدّ كل النقد في الدرج واكتب المجموع في «النقد الفعلي الذي عددته» (اكتب 0 إن كان فارغاً).', en: 'Count all cash in the drawer and enter the total in "Actual cash you counted" (enter 0 if empty).' },
+          { ar: 'إذا ظهر قسم «المبيعات والتحصيل» فاكتب ما حصّلته بكل طريقة دفع (0 إن لم تحصّل شيئاً) ثم اضغط «حفظ توزيع التحصيل».', en: 'If the "Sales and collection" section appears, enter what you collected per payment method (0 if none) and press "Save collection split".' },
+          { ar: 'راجع «ملخص التسليم»: المتوقع، المعدود، الفرق (زيادة/عجز/مطابق). اكتب ملاحظة للمشرف عند وجود فرق.', en: 'Review the handover summary: expected, counted, and variance (overage/shortage/match). Add a note for the supervisor when there is a variance.' },
+          { ar: 'اضغط «مراجعة وتسليم الوردية»، فعّل «أؤكد أن القراءات والعدّ نهائيان» ثم «تأكيد التسليم».', en: 'Press "Review and hand over", tick "I confirm readings and count are final", then press "Confirm handover".' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'المتوقع في الدرج', en: 'Expected in drawer' }, description: { ar: 'عهدة الافتتاح + الإضافات − السحوبات − المصروفات. لا يشمل نقد مبيعات الوقود.', en: 'Opening float + additions − withdrawals − expenses. It does not include fuel-sales cash.' } },
+      { name: { ar: 'النقد الفعلي الذي عددته', en: 'Actual cash counted' }, description: { ar: 'مجموع ما في الدرج بالريال. يقبل صيغة 1250 أو 1250.50.', en: 'The drawer total in riyals. Accepts 1250 or 1250.50.' } },
+      { name: { ar: 'الفرق', en: 'Variance' }, description: { ar: 'المعدود − المتوقع: زيادة أو عجز أو مطابق. يُحفظ للمشرف ولا يُسوّى تلقائياً.', en: 'Counted − expected: overage, shortage, or match. Saved for the supervisor and never settled automatically.' } },
+      { name: { ar: 'نوع حركة النقد', en: 'Cash movement type' }, description: { ar: 'إضافة نقد، سحب نقد، أو مصروف نقدي. لا تُحذف الحركة ولا تُعدَّل بعد تسجيلها.', en: 'Cash addition, cash withdrawal, or cash expense. A movement cannot be deleted or edited once recorded.' } },
+      { name: { ar: 'ملاحظة للمشرف', en: 'Note for the supervisor' }, description: { ar: 'اختيارية، وتصبح لازمة عند وجود فرق تحصيل (سبب الفرق).', en: 'Optional, and required when there is a collection variance (the reason).' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا يمكن التسليم قبل تسجيل كل القراءات المطلوبة.', en: 'Handover is blocked until every required reading is recorded.' }, fix: { ar: 'اضغط «سجّل الآن» على السطر الناقص. القراءات المطلوبة تتبع سياسة المحطة.', en: 'Press "Record now" on the missing line. Required readings follow the station policy.' } },
+      { problem: { ar: 'لا يوجد موظف مسجّل على الوردية.', en: 'No staff member is registered on the shift.' }, fix: { ar: 'يُسجَّل الموظف عند فتح الوردية. إن لم يُسجَّل أحد فأبلغ المشرف قبل التسليم.', en: 'Staff are registered when the shift opens. If nobody is registered, tell your supervisor before handing over.' } },
+      { problem: { ar: 'سياسة المحطة تمنع التسليم مع وجود فرق في النقد.', en: 'Station policy blocks handover with a cash variance.' }, fix: { ar: 'أعد عدّ النقد وراجع الحركات المسجّلة، وإن بقي الفرق فراجع المشرف.', en: 'Recount the cash and review recorded movements; if the variance remains, see your supervisor.' } },
+      { problem: { ar: 'سياسة المحطة تمنع التسليم لأن فرق الخزان خارج الحد.', en: 'Station policy blocks handover because the tank variance is out of range.' }, fix: { ar: 'راجع المشرف.', en: 'See your supervisor.' } },
+      { problem: { ar: 'احفظ توزيع التحصيل أولاً — لا يمكن تسليم الوردية بدونه.', en: 'Save the collection split first — handover is not possible without it.' }, fix: { ar: 'أدخل مبلغاً لكل طريقة دفع واحفظ. إن تغيّرت الطرق المفعّلة فأعد الإدخال والحفظ.', en: 'Enter an amount for every payment method and save. If enabled methods changed, re-enter and save again.' } },
+      { problem: { ar: 'لا توجد طرق دفع مفعّلة لهذه المحطة.', en: 'No payment methods are enabled for this station.' }, fix: { ar: 'اطلب من المسؤول تفعيل طريقة دفع للمحطة.', en: 'Ask the manager to enable a payment method for the station.' } },
+      { problem: { ar: 'يوجد فرق في التحصيل. اكتب سببه في ملاحظة التسليم.', en: 'There is a collection variance. Write its reason in the handover note.' }, fix: { ar: 'اكتب السبب في «ملاحظة للمشرف» ثم أعد المحاولة.', en: 'Enter the reason in "Note for the supervisor" and retry.' } },
+      { problem: { ar: 'المبلغ أكبر من النقد المتوقع في الوردية.', en: 'The amount is larger than the expected shift cash.' }, fix: { ar: 'تحقق من المبلغ ونوع الحركة قبل التسجيل.', en: 'Check the amount and movement type before recording.' } },
+    ],
+    notes: [
+      { ar: 'التسليم لا يُعاد فتحه من التطبيق. تأكد من القراءات والعدّ قبل التأكيد.', en: 'A handover cannot be reopened from the app. Verify readings and the count before confirming.' },
+    ],
+    unavailable: [
+      { ar: 'إدخال إجمالي الشبكة والبطاقات ومطابقته غير متاح حالياً في التطبيق؛ تعرض الشاشة العبارة «غير متاح حاليًا». أدخل مبالغ الشبكة ضمن توزيع التحصيل فقط عند ظهور القسم.', en: 'Entering and reconciling the card/network total is not available in the app yet; the screen says "Not available at the moment". Enter network amounts only through the collection split when that section appears.' },
+    ],
+    screens: [{ label: { ar: 'تفاصيل الوردية وتسليمها', en: 'Shift detail and handover' }, appHref: '/fuel-stations/ops/shifts' }],
+    related: ['fuel-collection-reconciliation', 'fuel-review-approve-shift', 'fuel-meter-readings'],
+  },
+  {
+    slug: 'fuel-collection-reconciliation',
+    category: 'salesCollection',
+    title: { ar: 'التحصيل والشبكة ومطابقة الفروقات', en: 'Collections, network, and variance reconciliation' },
+    summary: { ar: 'قارن مبيعات العدادات بما حصّلته بكل طريقة دفع، وافهم الفرق ومن يراجعه.', en: 'Compare meter sales with what you collected per payment method, and understand the variance and who reviews it.' },
+    keywords: { ar: 'تحصيل نقد شبكة بنك مطابقة فرق عجز زيادة مراجعة مشرف طريقة دفع درج', en: 'collection cash network bank reconciliation variance shortage overage supervisor review payment method drawer' },
+    minutes: 5,
+    audiences: ['operator', 'supervisor'],
+    surface: 'app',
+    overview: {
+      ar: 'مطابقة تشغيلية تساعدك والمشرف: تقارن تقدير مبيعات العدادات (لترات × السعر الفعّال) بما أقررت بتحصيله بكل طريقة دفع (نقد، شبكة/بنك). هي ليست سند قبض ولا قيداً محاسبياً، ولا تُنشئ مبلغاً. تظهر فقط حين تكون الميزة مفعّلة لمؤسستك.',
+      en: 'An operational reconciliation for you and the supervisor: it compares the estimated meter sales (litres × effective price) with what you declared collected per payment method (cash, network/bank). It is not a receipt voucher or an accounting entry and creates no amount. It appears only when the feature is enabled for your company.',
+    },
+    permissions: ['fuel.shift.close', 'fuel.shift.cash_count', 'fuel.sale.view', 'fuel.shift.cash_variance_review'],
+    permissionsNote: { ar: 'الإدخال للبائع عند التسليم. رؤية قيم المبيعات والفروق تتطلب fuel.sale.view، ومراجعة الفرق تتطلب fuel.shift.cash_variance_review.', en: 'The attendant enters at handover. Seeing sales values and variances needs fuel.sale.view, and reviewing a variance needs fuel.shift.cash_variance_review.' },
+    procedures: [
+      {
+        title: { ar: 'إدخال التحصيل (البائع)', en: 'Enter collections (attendant)' },
+        steps: [
+          { ar: 'في خطوة التسليم افتح قسم «المبيعات والتحصيل».', en: 'In the handover step, open "Sales and collection".' },
+          { ar: 'اكتب لكل طريقة دفع ما حصّلته بالريال، و0 إن لم تحصّل بها شيئاً. لا يحفظ التطبيق قبل إدخال كل طريقة.', en: 'For each payment method enter what you collected in riyals, and 0 if nothing. The app does not save until every method has a value.' },
+          { ar: 'راجع معاينة «المطابقة التشغيلية» (زيادة/عجز/مطابق) و«النقد في الدرج».', en: 'Review the "Operational reconciliation" preview (overage/shortage/match) and "Cash in drawer".' },
+          { ar: 'اضغط «حفظ توزيع التحصيل». يظهر رقم النسخة؛ أي تغيير بعدها يتطلب حفظاً جديداً.', en: 'Press "Save collection split". A revision number appears; any later change needs a new save.' },
+          { ar: 'عند وجود فرق اكتب سببه في ملاحظة التسليم قبل التسليم.', en: 'When there is a variance, write its reason in the handover note before handing over.' },
+        ],
+      },
+      {
+        title: { ar: 'مراجعة الفرق (المشرف)', en: 'Review a variance (supervisor)' },
+        steps: [
+          { ar: 'افتح «مراجعة الوردية» للوردية المغلقة وانظر قسم «المراجعات المطلوبة».', en: 'Open the closed shift’s review and look at "Required reviews".' },
+          { ar: 'اضغط «مراجعة فرق التحصيل» أو «مراجعة فرق نقد الدرج» لكل فرق معلّق.', en: 'Press "Review collection variance" or "Review drawer-cash variance" for each pending variance.' },
+          { ar: 'اكتب ملاحظتك (3 أحرف على الأقل) فيها ما راجعته وسبب قبولك أو تحفّظك.', en: 'Write your note (at least 3 characters) with what you checked and why you accept it or object.' },
+          { ar: 'اضغط «تسجيل المراجعة». تُسجَّل مرة واحدة ولا تعدّل الفرق ولا تنشئ أي مبلغ.', en: 'Press "Record review". It is recorded once and neither changes the variance nor creates any amount.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'نقد / شبكة-بنك', en: 'Cash / Network-bank' }, description: { ar: 'طرق الدفع المفعّلة لمحطتك. تُضبط من إعدادات المحطة لا من التطبيق.', en: 'The payment methods enabled for your station. They are set in station settings, not in the app.' } },
+      { name: { ar: 'مبيعات العدادات', en: 'Meter sales' }, description: { ar: 'اللترات × السعر الفعّال. «غير متاحة» عند نقص قراءة أو سعر أو نمط ضريبة.', en: 'Litres × effective price. "Not available" when a reading, price, or tax mode is missing.' } },
+      { name: { ar: 'النقد في الدرج', en: 'Cash in drawer' }, description: { ar: 'المعدود − العهدة − الإضافات + السحوبات (تشمل المسلَّم للخزنة) + المصروفات = نقد المبيعات الذي يدلّ عليه الدرج.', en: 'Counted − float − additions + withdrawals (including cash handed to the safe) + expenses = the sales cash implied by the drawer.' } },
+      { name: { ar: 'مجمّد عند تسليم الوردية', en: 'Frozen at handover' }, description: { ar: 'بعد التسليم تثبت الأرقام. قبله حساب حيّ.', en: 'After handover the figures are fixed. Before it, they are live.' } },
+    ],
+    problems: [
+      { problem: { ar: 'مبيعات العدادات «غير متاحة».', en: 'Meter sales are "Not available".' }, fix: { ar: 'السبب ظاهر تحت الحقل: قراءة ناقصة، نهاية أقل من البداية، سعر غير متاح، تغيّر سعر أثناء الوردية، أو نمط ضريبة غير معيَّن. عالج السبب أو أبلغ المشرف.', en: 'The reason shows under the field: missing reading, closing below opening, unavailable price, price change during the shift, or unset tax mode. Fix it or tell the supervisor.' } },
+      { problem: { ar: 'عُدِّل توزيع التحصيل من جهاز آخر.', en: 'The collection split was changed from another device.' }, fix: { ar: 'حُدِّث الإقرار؛ راجع المبالغ ثم احفظ من جديد.', en: 'The declaration was refreshed; review the amounts and save again.' } },
+      { problem: { ar: 'طريقة دفع أصبحت معطّلة / فُعِّلت طريقة جديدة.', en: 'A payment method became disabled / a new one was enabled.' }, fix: { ar: 'حُدِّثت القائمة؛ أدخل مبلغ الطريقة الجديدة واحفظ.', en: 'The list was refreshed; enter the new method’s amount and save.' } },
+      { problem: { ar: 'لا يمكن الاعتماد قبل مراجعة فرق مطابقة التحصيل.', en: 'Approval is blocked before the collection variance is reviewed.' }, fix: { ar: 'سجّل مراجعة المشرف أولاً (انظر الإجراء الثاني).', en: 'Record the supervisor review first (see the second procedure).' } },
+    ],
+    notes: [
+      { ar: 'المبيعات الآجلة (على الحساب) والتسويات غير المسجّلة لا تدخل هذه المطابقة.', en: 'Credit (on-account) sales and unrecorded settlements are excluded from this reconciliation.' },
+      { ar: 'قسما «المطابقة التشغيلية» و«نقد الدرج» مستقلان بمبالغهما؛ لا تجمع بينهما.', en: 'The "Operational reconciliation" and "Drawer cash" sections have separate amounts; do not add them together.' },
+    ],
+    unavailable: [
+      { ar: 'إدخال إجمالي الشبكة من جهاز نقاط البيع ومطابقته آلياً غير متاح؛ المتاح هو الإقرار اليدوي لكل طريقة دفع.', en: 'Entering the card-terminal total and reconciling it automatically is not available; the manual declaration per payment method is what exists.' },
+    ],
+    screens: [{ label: { ar: 'مراجعة الوردية', en: 'Shift review' }, appHref: '/fuel-stations/ops/shifts' }],
+    related: ['fuel-handover-shift', 'fuel-review-approve-shift', 'fuel-sales-liters'],
+  },
+  {
+    slug: 'fuel-review-approve-shift',
+    category: 'shifts',
+    title: { ar: 'مراجعة الوردية واعتمادها', en: 'Review and approve a shift' },
+    summary: { ar: 'راجع الأرقام المجمّدة والفروق ثم اعتمد الوردية لقفلها نهائياً.', en: 'Review the frozen figures and variances, then approve the shift to lock it permanently.' },
+    keywords: { ar: 'اعتماد مراجعة وردية مشرف قفل فرق سجل ملاحظة نفس المستخدم', en: 'approve review shift supervisor lock variance audit log note same user' },
+    minutes: 4,
+    audiences: ['supervisor', 'manager'],
+    surface: 'app',
+    overview: {
+      ar: 'بعد تسليم الوردية يراجع المشرف الأرقام المجمّدة ويسجّل مراجعة الفروق المعلّقة ثم يعتمد الوردية. الاعتماد يقفلها نهائياً فلا يُسمح بتعديل أي بيان فيها، ويُسجَّل في سجل ثابت.',
+      en: 'After handover the supervisor reviews the frozen figures, records reviews for pending variances, and approves the shift. Approval locks it permanently so no statement in it can be edited, and it is written to an immutable log.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.approve', 'fuel.shift.cash_variance_review', 'fuel.sale.view'],
+    permissionsNote: { ar: 'الاعتماد يتطلب fuel.shift.approve. مراجعة الفروق تتطلب fuel.shift.cash_variance_review، ورؤية تفاصيل المبيعات تتطلب fuel.sale.view.', en: 'Approving needs fuel.shift.approve. Reviewing variances needs fuel.shift.cash_variance_review, and seeing sales details needs fuel.sale.view.' },
+    procedures: [
+      {
+        title: { ar: 'اعتماد وردية مغلقة', en: 'Approve a closed shift' },
+        steps: [
+          { ar: 'من «الورديات» اختر التصفية «بانتظار الاعتماد» وافتح الوردية.', en: 'In Shifts, choose the "Awaiting approval" filter and open the shift.' },
+          { ar: 'اضغط الإجراء «مراجعة الوردية واعتمادها» من بطاقة الخطوة التالية.', en: 'Press "Review and approve the shift" in the Next step card.' },
+          { ar: 'راجع «المطابقة التشغيلية» و«ملخص نقد الدرج» كلاً على حدة، واقرأ شرح الفرق بين القسمين.', en: 'Review the "Operational reconciliation" and "Drawer cash summary" separately, and read the explanation of how they differ.' },
+          { ar: 'في «المراجعات المطلوبة» سجّل مراجعة لكل فرق معلّق (ملاحظة إلزامية).', en: 'Under "Required reviews", record a review for each pending variance (note is mandatory).' },
+          { ar: 'اضغط «اعتماد الوردية»، اكتب ملاحظة اختيارية، وفعّل «أؤكد أنني راجعت أرقام الوردية والفروق».', en: 'Press "Approve shift", optionally add a note, and tick "I confirm I reviewed the shift figures and variances".' },
+          { ar: 'اضغط «تأكيد الاعتماد». تظهر الوردية معتمدة ومقفلة، وتُضاف حركة إلى «سجل الوردية».', en: 'Press "Confirm approval". The shift shows approved and locked and an entry is added to the shift log.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'المراجعات المطلوبة', en: 'Required reviews' }, description: { ar: 'صفّان: فرق مطابقة التحصيل، وفرق نقد الدرج. لكل صف حالته: يحتاج مراجعة / روجع / لا فرق.', en: 'Two rows: collection reconciliation variance and drawer-cash variance. Each row is Needs review / Reviewed / No variance.' } },
+      { name: { ar: 'ملاحظة المشرف', en: 'Supervisor note' }, description: { ar: 'إلزامية في المراجعة (3 أحرف فأكثر). تُسجَّل مرة واحدة.', en: 'Mandatory in a review (3+ characters). Recorded once.' } },
+      { name: { ar: 'سجل الوردية', en: 'Shift log' }, description: { ar: 'سجل ثابت لا يُعدَّل: التسليم، تجميد التحصيل، المراجعات، والاعتماد.', en: 'An immutable log: handover, collection freeze, reviews, and approval.' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا يمكن الاعتماد قبل مراجعة فرق مطابقة التحصيل / فرق نقد الدرج.', en: 'Approval is blocked until the collection / drawer-cash variance is reviewed.' }, fix: { ar: 'سجّل المراجعة المطلوبة أولاً ثم أعد الاعتماد.', en: 'Record the required review first, then approve again.' } },
+      { problem: { ar: 'سياسة المحطة تتطلب اعتماد الوردية من مشرف مختلف عمّن فتحها.', en: 'Station policy requires approval by a supervisor different from the person who opened the shift.' }, fix: { ar: 'اطلب من مشرف آخر مخوّل الاعتماد.', en: 'Ask another authorised supervisor to approve.' } },
+      { problem: { ar: 'لا تملك صلاحية مراجعة الفروق / اعتماد الورديات.', en: 'You lack permission to review variances / approve shifts.' }, fix: { ar: 'اطلب الصلاحية من مسؤول لديه إدارة الموظفين.', en: 'Ask someone with staff management to grant it.' } },
+      { problem: { ar: 'الوردية ليست مغلقة.', en: 'The shift is not closed.' }, fix: { ar: 'تُراجَع الوردية بعد تسليمها من البائع.', en: 'A shift is reviewed after the attendant hands it over.' } },
+      { problem: { ar: 'قد توجد مراجعة تحصيل لا أملك صلاحية رؤيتها.', en: 'There may be a collection review I cannot see.' }, fix: { ar: 'إن رفض الخادم الاعتماد فاطلب المراجعة من مشرف مخوّل برؤية المبيعات.', en: 'If the server refuses approval, ask an authorised supervisor who can see sales to review it.' } },
+    ],
+    notes: [
+      { ar: 'الاعتماد نهائي. لا توجد في التطبيق وظيفة تصحيح أو إعادة فتح لوردية معتمدة.', en: 'Approval is final. The app has no correction or reopen function for an approved shift.' },
+    ],
+    screens: [{ label: { ar: 'الورديات بانتظار الاعتماد', en: 'Shifts awaiting approval' }, appHref: '/fuel-stations/ops/shifts', erpHref: '/fuel-stations/shifts' }],
+    related: ['fuel-collection-reconciliation', 'fuel-handover-shift', 'fuel-troubleshooting'],
+  },
+];

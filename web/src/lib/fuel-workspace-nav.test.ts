@@ -40,7 +40,12 @@ describe('Fuel Workspace navigation presentation', () => {
   });
 
   it('allows the server-authorized wildcard role to see every built workspace route', () => {
-    expect(routes(['*'])).toHaveLength(14);
+    expect(routes(['*'])).toHaveLength(15); // + مركز المساعدة
+  });
+
+  it('shows the help center to every station user and never without the station view key', () => {
+    expect(routes(['fuel_stations.view'])).toContain('/fuel-stations/help');
+    expect(routes(['fuel.shift.view'])).not.toContain('/fuel-stations/help');
   });
 
   it('shows the price management route only with the sale-view permission', () => {

@@ -538,7 +538,7 @@ describe('role-aware navigation and honest "coming soon"', () => {
     renderOps(<HomeScreen />);
     await screen.findByText('Alpha');
     const navigation = screen.getByRole('navigation', { name: /Station Operations main navigation/ });
-    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Products', 'Tanks', 'Profile']);
+    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Products', 'Tanks', 'Help', 'Profile']);
   });
 
   const withOpenShift = (readings: Parameters<typeof shiftDetail>[2] = {}) => {
@@ -723,14 +723,14 @@ describe('accessibility', () => {
 });
 
 describe('V2 composition (visual contract, PR #1990)', () => {
-  it('masthead carries one action icon (settings) and the station field — no language/theme toggles', async () => {
+  it('masthead carries two action icons (contextual help + settings) and the station field — no language/theme toggles', async () => {
     seedUser();
     connect(tenantData());
     const { container } = renderOps(<HomeScreen />);
     await screen.findByText('Alpha');
     const header = container.querySelector('header') as HTMLElement;
     const actions = [...header.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label'));
-    expect(actions).toEqual(['Settings']);
+    expect(actions).toEqual(['Help for this screen', 'Settings']);
     expect(header.querySelector('select')).not.toBeNull();
     expect(container.querySelectorAll('main').length).toBe(1);
     expect(container.querySelectorAll('h1').length).toBe(1);
