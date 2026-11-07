@@ -1,4 +1,5 @@
 import { litersToMilliliters } from '@/lib/fuel-quantity';
+import { zonedLocalToIso } from '@/lib/formatting';
 import type { LevelFlag } from './schemas';
 
 /**
@@ -83,36 +84,7 @@ export function evidenceBody(method: Method, note: string): { method: Method; no
 
 // ───────────────────────── القراءة المتأخرة (بتاريخ سابق) ─────────────────────────
 
-/**
- * `YYYY-MM-DDTHH:mm` (قيمة `datetime-local` بلا منطقة) مفسَّرةً **بتوقيت المحطة** ⇒ لحظة ISO (UTC).
- * وقت القياس يختاره المستخدم صراحةً فقط (لا ساعة عميل تلقائية)؛ التحويل بمنطقة المحطة لا بمنطقة الجهاز. منطقة غائبة/غير صالحة ⇒ منطقة الجهاز.
- * `null` لمدخل غير صالح (لا تخمين).
- */
-export function zonedLocalToIso(local: string, timeZone: string | null | undefined): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local.trim());
-  if (!match) return null;
-  const [year, month, day, hour, minute] = match.slice(1).map(Number);
-  const asUtc = Date.UTC(year, month - 1, day, hour, minute);
-  if (Number.isNaN(asUtc)) return null;
-  const roundTrip = new Date(asUtc);
-  if (roundTrip.getUTCMonth() !== month - 1 || roundTrip.getUTCDate() !== day) return null; // تاريخ غير موجود (31 فبراير…)
-
-  if (timeZone) {
-    try {
-      const offsetAt = (ts: number) => {
-        const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ts));
-        const pick = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-        return Date.UTC(pick('year'), pick('month') - 1, pick('day'), pick('hour'), pick('minute'), pick('second')) - ts;
-      };
-      const first = asUtc - offsetAt(asUtc);
-      return new Date(asUtc - offsetAt(first)).toISOString();
-    } catch {
-      // منطقة غير صالحة ⇒ منطقة الجهاز أدناه
-    }
-  }
-  const device = new Date(year, month - 1, day, hour, minute);
-  return Number.isNaN(device.getTime()) ? null : device.toISOString();
-}
+export { zonedLocalToIso };
 
 export type LateWindow =
   | { kind: 'empty' }

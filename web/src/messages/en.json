@@ -3013,6 +3013,7 @@
     "close": "Close",
     "perm_areas": {
       "cost": "Cost",
+      "late": "Late readings",
       "actions": "Executable actions",
       "alerts": "Alerts",
       "audit": "Audit",
