@@ -113,8 +113,43 @@ class ShardJobParity(unittest.TestCase):
         self.assertEqual(up["with"]["name"], "shard-${{ matrix.shard }}")
         self.assertEqual(up["with"]["if-no-files-found"], "error")
         self.assertTrue(up["with"]["overwrite"])
-        for f in ("all_files.txt", "assigned.txt", "inventory.txt", "planned.txt", "junit.xml"):
+        for f in ("all_files.txt", "assigned.txt", "inventory.txt", "planned.txt", "junit.xml", "env.txt"):
             self.assertIn(f"shard-out/{f}", up["with"]["path"])
+        # every uploaded path stays under shard-out/ so the artifact root is shard-out/ (the layout shard_proof.py reads)
+        for line in (l.strip() for l in up["with"]["path"].splitlines() if l.strip()):
+            self.assertIn("/shard-out/", line, line)
+
+    # ── PG-SHARD-SAFETY-PARITY (A): runner facts, recording only ───────────────────────────────────────────
+    FACTS = "حقائق المشغّل (تسجيل فقط)"
+
+    def test_runner_facts_step_records_cpu_image_cores_and_a_bench(self):
+        st = steps(self.shard)[self.FACTS]
+        run = st["run"]
+        for needle in ("RUNNER_NAME", "ImageOS", "ImageVersion", "nproc", "/proc/cpuinfo", "model name", "bench_ms", "shard-out/env.txt", "GITHUB_STEP_SUMMARY"):
+            self.assertIn(needle, run)
+        self.assertEqual(sum(self.FACTS == s.get("name") for s in self.shard["steps"]), 1)
+
+    def test_runner_facts_step_cannot_change_behaviour_or_fail_the_job(self):
+        st = steps(self.shard)[self.FACTS]
+        self.assertNotIn("if", st)
+        self.assertNotIn("continue-on-error", st)  # forbidden in required jobs: failures are contained by `|| true` instead
+        run = st["run"]
+        self.assertTrue(run.rstrip().endswith("|| true"), "the whole recording block must be failure-proof")
+        for bad in ("php artisan", "phpunit", "docker", "psql", "composer", "sed -i", "export ", "PGOPTIONS", ">> .env", "> .env"):
+            self.assertNotIn(bad, run, bad)
+        self.assertIsNone(st.get("env"))
+        self.assertIsNone(st.get("working-directory"))
+
+    def test_runner_facts_step_runs_after_setup_and_before_selection_and_tests(self):
+        order = [s.get("name", "") for s in self.shard["steps"]]
+        i = order.index(self.FACTS)
+        self.assertGreater(i, order.index("تهيئة قاعدة البيانات (pgsql)"))
+        self.assertLess(i, order.index("اختيار الشريحة (${{ matrix.shard }}/2) وجرد الاختبارات"))
+        self.assertLess(i, order.index(self.run_step()["name"]))
+
+    def test_the_full_job_and_proof_job_do_not_carry_the_facts_step(self):
+        self.assertNotIn(self.FACTS, steps(self.full))
+        self.assertNotIn(self.FACTS, steps(self.proof))
 
     # ── proof job: trusted script, needs the shards, no skip ──────────────────────────────────────────────
     def test_proof_runs_the_script_from_the_trusted_base_not_the_pr(self):
