@@ -159,9 +159,15 @@ class FuelStationE2ERobustnessTest extends TestCase
         // مفتاح مستعمل لكمية مختلفة ← رفض.
         $this->assertSame(422, $this->draftSale('seller', $shift, 30000, 's09-draft')->status());
 
-        // إنهاء ×3.
-        for ($i = 0; $i < 3; $i++) { $this->as('seller')->postJson("/api/fuel-stations/sales/{$ids[0]}/finalize")->assertSuccessful(); }
+        // إنهاء ×3: لقطة بعد الأول، ثم الإعادتان لا تغيّران شيئاً (بما فيه القيود).
+        $this->as('seller')->postJson("/api/fuel-stations/sales/{$ids[0]}/finalize")->assertSuccessful();
+        $afterFirstFinalize = $this->footprint();
+        $booksAfterFirst = $this->books();
+        for ($i = 0; $i < 2; $i++) { $this->as('seller')->postJson("/api/fuel-stations/sales/{$ids[0]}/finalize")->assertSuccessful(); }
         $afterFinal = $this->footprint();
+        $this->assertSame($afterFirstFinalize, $afterFinal, 'إعادة الإنهاء لا تغيّر أي أثر (فواتير/مخزون/قيود)');
+        $this->assertSame($booksAfterFirst, $this->books(), 'إعادة الإنهاء لا تضيف سطور قيد ولا تغيّر أي حساب');
+        $this->assertSame(2, $afterFirstFinalize['journals'] - $base['journals'], 'الإنهاء الأول ينتج قيدين بالضبط: الفاتورة والتكلفة');
         $this->assertSame($base['invoices'] + 1, $afterFinal['invoices']);
         $this->assertSame($base['movements'] + 1, $afterFinal['movements']);
         $this->assertSame($base['ledger'] + 1, $afterFinal['ledger']);
