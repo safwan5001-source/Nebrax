@@ -145,6 +145,7 @@ use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PaymentMethodChannelAvailabilityController;
+use App\Http\Controllers\Api\StationAuthController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
@@ -275,6 +276,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->middleware('throttle:register')
         ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    // STATION-PIN: دخول تطبيق المحطات برقم الموظف + PIN. المستأجر من المضيف فقط؛ جلسة مقيَّدة بـ`station-ops`؛ تحديد معدل بلا قفل حساب.
+    Route::post('station/login', [StationAuthController::class, 'login'])->middleware('throttle:station-pin-login');
     // PAY-H1-04: مستقبِل webhook مزوّد الدفع — عام (الهوية = مفتاح الاتصال + توقيع المزوّد)، بلا SetTenant، بحد حجم 64KB داخل الخدمة.
     Route::post('payment-webhooks/{provider}/{webhookKey}', [PaymentWebhookController::class, 'receive'])
         ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
@@ -1637,6 +1640,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('fuel-stations/staff/audit', [FuelStaffController::class, 'audit'])->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/staff/{id}', [FuelStaffController::class, 'show'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/staff/{id}', [FuelStaffController::class, 'update'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        // STATION-PIN: PIN دخول تطبيق المحطات — تعيين/تصفير على الحراس نفسها؛ مستثنى من قائمة جلسة PIN (`StationSessionBoundary`) عمداً.
+        Route::post('fuel-stations/staff/{id}/pin', [FuelStaffController::class, 'setPin'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write'), 'throttle:20,1']);
+        Route::delete('fuel-stations/staff/{id}/pin', [FuelStaffController::class, 'clearPin'])->whereUuid('id')->middleware([$perm('fuel.staff.manage'), $commercialApp('fuel_stations.core', 'write'), 'throttle:20,1']);
         Route::get('fuel-stations/settings', [FuelStationSettingsController::class, 'showTenant'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/settings', [FuelStationSettingsController::class, 'updateTenant'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);

@@ -118,6 +118,20 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
+        // STATION-PIN: طبقة الإغراق/الروبوتات فقط (لكل عنوان+مستأجر، كل الطلبات) — سخيّة عمداً ولا تعرف رقم الموظف.
+        // الحماية من **تخمين** الـPIN (مليون احتمال) لا تُعدّ هنا الطلبات كلها بل **الفاشلة منها** داخل `StationAuthController`:
+        // (أ) لكل (مستأجر، رقم موظف، عنوان) 5 فشلات/5 دقائق، (ب) سقف عالمي لكل (مستأجر، رقم موظف) 25 فشلاً/ساعة ضد الهجوم الموزَّع.
+        // بهذا لا يُعطَّل عاملٌ بعينه بمجرد أن يطرق مهاجمٌ من عنوان آخر رقمَه، ولا تحجب المحاولةُ الصحيحة إلا من عنوانٍ استنفد فشلاته.
+        // لا قفل حساب ولا حالة على المستخدم: النوافذ تنتهي وحدها.
+        RateLimiter::for('station-pin-login', function (Request $request): array {
+            $tenant = app(HostnameTenantContext::class)->id() ?? 'unresolved';
+
+            return [
+                Limit::perMinute(30)->by("station-pin|{$tenant}|ip|{$request->ip()}"),
+                Limit::perHour(300)->by("station-pin-h|{$tenant}|ip|{$request->ip()}"),
+            ];
+        });
+
         RateLimiter::for('auth-recovery', fn (Request $request): array => [
             Limit::perMinute(5)->by('auth-recovery|ip|' . $request->ip()),
             Limit::perMinute(3)->by('auth-recovery|email|' . Str::lower(trim((string) $request->input('email')))),

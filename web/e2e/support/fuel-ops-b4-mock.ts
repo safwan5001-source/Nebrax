@@ -123,7 +123,7 @@ export async function mockB4Api(page: Page, opts: { baseUrl: string; locale: Loc
     if (method !== 'GET') issues.push(`unexpected ${method} ${p}`); // قراءات الغلاف العامة (أيقونة الشركة…) لا تعنينا؛ أي كتابة غير متوقعة تُفشل
     return json(route, { data: [] });
   });
-  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
+  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', JSON.parse(u).id); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
 
   return { controls, puts, requests, issues, staff, names: n };
 }

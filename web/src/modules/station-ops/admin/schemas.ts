@@ -9,7 +9,7 @@ const text = z.string();
 const strings = z.array(z.string());
 
 export const staffViewSchema = z.object({
-  user: z.object({ id: text.min(1), name: text, email: z.string().nullable().optional(), is_active: z.boolean() }),
+  user: z.object({ id: text.min(1), name: text, email: z.string().nullable().optional(), is_active: z.boolean(), employee_no: z.string().nullable().optional() }),
   role: text,
   /** `seller` | `supervisor` | `station_manager` | `custom` | `none` — يحدّده الخادم من الصلاحيات الفعلية. */
   template: text,
@@ -17,6 +17,8 @@ export const staffViewSchema = z.object({
   fuel_station_scope: z.string().nullable(),
   station_ids: strings,
   revision: text.min(1),
+  /** STATION-PIN: حالة رمز دخول التطبيق فقط (لا تجزئة ولا رمز). غيابها = خادم أقدم. */
+  station_pin: z.object({ has_pin: z.boolean(), set_at: z.string().nullable() }).optional(),
 });
 
 export const templateSchema = z.object({

@@ -1,6 +1,14 @@
 import { isDemo } from './demo';
 import { mockApi } from './mock-data';
 import { readDemoMediaFile } from './demo-product-store';
+import {
+  STATION_LOGIN_PATH, activeUserKey, clearStationSession, getErpToken, getStationToken, inStationApp, stationUsesErpSession,
+} from './station-scope';
+
+export {
+  STATION_APP_PREFIX, STATION_LOGIN_PATH, STATION_TOKEN_KEY, STATION_USER_KEY, STATION_USE_ERP_KEY, activeUserKey, clearStationSession, getErpToken,
+  getStationToken, inStationApp, setStationToken, stationUsesErpSession,
+} from './station-scope';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
@@ -58,7 +66,8 @@ export function hasApiStatus(exception: unknown, status: number): boolean {
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  if (inStationApp()) return getStationToken() ?? (stationUsesErpSession() ? getErpToken() : null);
+  return getErpToken();
 }
 
 export function setToken(token: string): void {
@@ -66,6 +75,11 @@ export function setToken(token: string): void {
 }
 
 export function clearToken(): void {
+  if (inStationApp()) {
+    // داخل التطبيق: يُمسح اعتماد المحطات (أو موافقة استعمال أَوْج) فقط؛ جلسة أَوْج في المتصفح نفسه باقية.
+    clearStationSession();
+    return;
+  }
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('demo');
@@ -80,21 +94,25 @@ function handleUnauthorized(sentToken: string | null): void {
   if (typeof window === 'undefined') return;
   if (getToken() !== sentToken) return;
   clearToken();
-  // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل
-  if (!window.location.pathname.startsWith('/login')) window.location.assign('/login');
+  // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل.
+  // داخل تطبيق المحطات يعود إلى دخول رقم الموظف + PIN لا إلى دخول البريد.
+  const target = inStationApp() ? STATION_LOGIN_PATH : '/login';
+  if (!window.location.pathname.startsWith(target)) window.location.assign(target);
 }
 
 type Options = Omit<RequestInit, 'body'> & { body?: unknown };
 
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {
   // وضع المعاينة: لا اتصال بأي خادم — البيانات من الموجّه الوهمي.
-  if (isDemo()) {
+  // جلسة تطبيق المحطات لا تتأثر بوضع معاينة أَوْج ولا بفرعه النشط (نطاقها يحدّده الخادم من مستخدمها).
+  const stationOwn = inStationApp() && getStationToken() !== null;
+  if (isDemo() && !stationOwn) {
     return mockApi<T>(path, options.method ?? 'GET', options.body);
   }
 
   const token = getToken();
   // الفرع النشط — يوسم به الخادمُ المستنداتِ وسطورَ قيدها (بلا ترويسة: الفرع الرئيسي).
-  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const branchId = typeof window !== 'undefined' && !stationOwn ? localStorage.getItem('nibras_active_branch') : null;
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: 'application/json',

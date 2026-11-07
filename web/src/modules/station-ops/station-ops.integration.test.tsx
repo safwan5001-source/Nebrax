@@ -639,7 +639,7 @@ describe('settings and profile come from AWJ', () => {
     expectAllLinksInApp();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/login'));
+    await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/fuel-stations/ops/login'));
     expect(apiMock).toHaveBeenCalledWith('/logout', expect.objectContaining({ method: 'POST' }));
   });
 

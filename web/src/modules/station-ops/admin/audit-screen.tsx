@@ -16,8 +16,8 @@ import { MANAGE_BASE } from './manage-screen';
 import type { AuditEvent } from './schemas';
 import { Badge } from './ui';
 
-const KNOWN_ACTIONS = ['fuel_staff.updated', 'role.created', 'role.updated', 'role.deleted', 'user.created', 'user.updated', 'user.deleted'];
-const KNOWN_KEYS = ['permissions', 'fuel_permissions', 'add_permissions', 'remove_permissions', 'station_ids', 'fuel_station_ids', 'branch_ids', 'warehouse_ids', 'template', 'role', 'name', 'is_active', 'is_system', 'fuel_station_scope', 'grant_all_fuel', 'employee_id', 'password_changed'];
+const KNOWN_ACTIONS = ['fuel_staff.updated', 'fuel_staff.station_pin_set', 'fuel_staff.station_pin_cleared', 'role.created', 'role.updated', 'role.deleted', 'user.created', 'user.updated', 'user.deleted'];
+const KNOWN_KEYS = ['permissions', 'fuel_permissions', 'add_permissions', 'remove_permissions', 'station_ids', 'fuel_station_ids', 'branch_ids', 'warehouse_ids', 'template', 'role', 'name', 'is_active', 'is_system', 'fuel_station_scope', 'grant_all_fuel', 'employee_id', 'password_changed', 'station_pin', 'station_pin_event'];
 const PERMISSION_LIST_KEYS = new Set(['permissions', 'fuel_permissions', 'add_permissions', 'remove_permissions']);
 const STATION_LIST_KEYS = new Set(['station_ids', 'fuel_station_ids']);
 
@@ -30,7 +30,11 @@ function ChangeLine({ change, denied }: { change: AuditEvent['changes'][number];
   const item = (value: string) => (PERMISSION_LIST_KEYS.has(change.key) ? label(value) : STATION_LIST_KEYS.has(change.key) ? (names.get(value) ?? t('manage.stations.other')) : value);
 
   if (change.kind === 'scalar') {
-    const show = (value: string | boolean | null | undefined) => (value === null || value === undefined ? '—' : typeof value === 'boolean' ? (value ? t('manage.audit.yes') : t('manage.audit.no')) : value);
+    const show = (value: string | boolean | null | undefined) => (value === null || value === undefined
+      ? '—'
+      : typeof value === 'boolean'
+        ? (value ? t('manage.audit.yes') : t('manage.audit.no'))
+        : change.key === 'station_pin_event' && (value === 'set' || value === 'cleared') ? t(`manage.audit.pinEvent.${value}`) : value);
     return (
       <li className="text-sm leading-6 text-text">
         <span className="font-medium">{keyLabel}</span>{': '}
