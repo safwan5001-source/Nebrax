@@ -155,8 +155,8 @@ class FuelSaleService
             if ($nozzle->fuel_product_id !== $sale->fuel_product_id || $nozzle->fuel_tank_id !== $sale->fuel_tank_id || $nozzle->fuel_pump_id !== $sale->fuel_pump_id) {
                 throw new RuntimeException('تغير ربط الفوهة بالمنتج أو الخزان أو المضخة؛ لا يمكن إنهاء مسودة البيع الحالية.');
             }
-            // FUEL-P1-1: المضخة والخزان يجب أن يكونا نشطين وقت الإنهاء أيضاً (قفل مشترك يمنع تحويلهما إلى الصيانة بين الفحص والترحيل).
-            $this->assertNozzleEquipmentOperational($nozzle, $station, lock: true);
+            // FUEL-P1-1: المضخة والخزان يجب أن يكونا نشطين وقت الإنهاء أيضاً (قراءة بلا قفل — انظر الدالة).
+            $this->assertNozzleEquipmentOperational($nozzle, $station);
             $this->assertFinalizationShift($sale, $station);
             $this->aviAuthorizations->assertFinalizationAllowed($sale);
 
@@ -537,13 +537,17 @@ class FuelSaleService
 
     /**
      * FUEL-P1-1: لا يُباع وقود عبر مضخة أو خزان غير `active` (صيانة أو تعطيل) حتى لو كانت الفوهة نفسها نشطة.
-     * الفحص على مستوى الفوهة وحده كان يترك المضخة/الخزان في الصيانة يبيعان فاتورةً وخصمَ مخزون.
-     * ترتيب الأقفال عند `$lock`: الفوهة (المأخوذة قبلاً) ← المضخة ← الخزان، بقفل مشترك؛ ولا مسار آخر يأخذ قفل مضخة أو خزان ثم المحطة.
+     * الفحص على مستوى الفوهة وحدها كان يترك المضخة/الخزان في الصيانة يبيعان فاتورةً وخصمَ مخزون.
+     *
+     * **قراءة عادية بلا قفل صفّ — عمداً.** `finalize` يمسك المحطة `FOR UPDATE`؛ وقفل الخزان بعدها يعاكس ترتيب
+     * `FuelReconciliationService::recordReading` (الخزان `FOR UPDATE` ثم `KEY SHARE` على المحطة من FK صف القراءة)
+     * و`FuelStationMasterDataService::updateTank` ⇒ جمود 40P01 مُثبَت بتجربة PostgreSQL (انظر FuelSaleEquipmentStatePostgresTest).
+     * البوابة سياسة تشغيلية لا حدّ ترحيل لحظي: بيعٌ يلتزم في اللحظة نفسها التي تُحوَّل فيها المعدة إلى الصيانة يسجّل وقوداً صُرف فعلاً
+     * قبل التحويل، فلا حاجة لتسلسل صارم مع تعديل الحالة.
      */
-    private function assertNozzleEquipmentOperational(FuelNozzle $nozzle, FuelStation $station, bool $lock = false): void
+    private function assertNozzleEquipmentOperational(FuelNozzle $nozzle, FuelStation $station): void
     {
-        $pumpQuery = FuelPump::whereKey($nozzle->fuel_pump_id);
-        $pump = ($lock ? $pumpQuery->sharedLock() : $pumpQuery)->first();
+        $pump = FuelPump::whereKey($nozzle->fuel_pump_id)->first();
         if ($pump === null || $pump->fuel_station_id !== $station->id || $pump->branch_id !== $station->branch_id) {
             throw new RuntimeException('FUEL_PUMP_NOT_OPERATIONAL: مضخة الفوهة غير موجودة أو لا تخص محطة/فرع البيع.');
         }
@@ -551,8 +555,7 @@ class FuelSaleService
             throw new RuntimeException('FUEL_PUMP_NOT_OPERATIONAL: المضخة ' . $pump->pump_number . ' ' . $this->equipmentStatusLabel($pump->status) . '؛ لا يمكن بيع الوقود عبرها.');
         }
 
-        $tankQuery = FuelTank::whereKey($nozzle->fuel_tank_id);
-        $tank = ($lock ? $tankQuery->sharedLock() : $tankQuery)->first();
+        $tank = FuelTank::whereKey($nozzle->fuel_tank_id)->first();
         if ($tank === null || $tank->fuel_station_id !== $station->id || $tank->branch_id !== $station->branch_id) {
             throw new RuntimeException('FUEL_TANK_NOT_OPERATIONAL: خزان الفوهة غير موجود أو لا يخص محطة/فرع البيع.');
         }
