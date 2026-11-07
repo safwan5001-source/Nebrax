@@ -889,6 +889,14 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **الصلاحيات:** `fuel.delivery.view|create|approve` + `fuel.reading.record` (أو `fuel_stations.manage` القديم)، والتكلفة `products.view_cost` وحدها (غيابها ⇒ المفتاح محذوف من الاستجابة). **بدء استلام من التطبيق يتطلب التكلفة** لأنها إلزامية في الإنشاء (D-B5-1 للمالك).
 - **API إضافية (قراءة فقط):** `GET fuel-stations/delivery-suppliers` وإثراء `FuelDeliveryResource` (أسماء، `created_by`، قراءات مربوطة).
 
+## رصيد الخزان الدفتري — TANK-BALANCE-P1 (قراءة فقط، مفتوح لكل مستأجر دون بوابة)
+
+`GET fuel-stations/tanks` و`/tanks/{id}` يضيفان حقلين **اختياريين** (استجابات الإنشاء/التعديل بلا تغيير): `book_level` = `{milliliters, basis:"warehouse_book", as_of:null}` أو `null`، و`book_level_unavailable_reason`. المصدر الوحيد `FuelTankBookBalanceReader` فوق `product_warehouse_stock` — **بلا كتابة ولا مخطط ولا استنتاج من الدفتر التشغيلي أو المبيعات/الاستلامات**.
+- **النسب إلى خزان فقط حين يكون الوحيد المغذّي للمجمّع (مخزن × منتج)**، يُحصى كل خزان بأي حالة (المعطَّل منه) وعبر **كل** محطات المؤسسة لا ما يصله المستخدم؛ غير ذلك `multi_tank`. العدّ قرار «هل يُنسب» ولا يخرج منه إلا رمز السبب؛ الرصيد المجمَّع لا يُعاد إلا لخزان وحيد ظاهر للمستخدم أصلاً (المتحكّم يقيّد القائمة بالمحطة/الفرع/المخزن قبل الخدمة).
+- **لا تخمين:** غياب سجل الرصيد `no_stock_record` (≠ صفر؛ الصفر الحقيقي يُعاد 0)، أكثر من سجل (متغيّرات) `ambiguous_stock_record`، سالب `invalid_stock_record`، وحدة غير mL/L `unit_mismatch`، محطة بلا مخزن `no_warehouse`، خزان `inactive` `tank_inactive`، علاقة/منتج ناقص `invalid_configuration`. **`as_of` دائماً `null`** — لا دلالة مثبتة لـ`updated_at` على «آخر حركة».
+- **استعلامات ثابتة** (≤ 3 فوق القائمة: عدّ الخزانات المشتركة + وحدة المنتج + سجلات الرصيد) مهما كان عدد الخزانات، يحرسها اختبار يقارن عبارات SQL الموحَّدة. الصلاحية كما كانت (`fuel_stations.view`)؛ قرار تضييقها بيد المالك.
+- **لا واجهة بعد** (`TankLevelIndicator` غير موصول). المرجع: `docs/fuel-stations/AWJ_STATIONS_TANK_BALANCE_P1_REPORT.md`.
+
 ## إقرار تحصيل الوردية — Fuel Shift Collection Declaration (مغلق افتراضياً، تشغيلي فقط)
 
 مبيعات الوردية المشتقة من العدادات (فرق العدادين × سعر اللتر الفعّال) مقابل ما حُصِّل حسب طريقة الدفع. العقد الكامل: `docs/fuel-stations/AWJ_FUEL_SHIFT_COLLECTION_RECONCILIATION_CONTRACT.md`.
