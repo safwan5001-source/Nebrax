@@ -51,6 +51,10 @@ class Sandbox:
         mp = self.root / ".github/ci-gate/required-checks.json"
         manifest = json.loads(mp.read_text(encoding="utf-8"))
         doc = yaml.safe_load((self.root / CI).read_text(encoding="utf-8"))
+        # the live repo now declares the approved additive group: every fixture starts from the group-free baseline
+        manifest.pop("shard_groups", None)
+        for live_job in ("test-pg-shards", "test-pg-shards-proof"):
+            doc["jobs"].pop(live_job, None)
         grp = copy.deepcopy(group) if group else None
         if grp:
             manifest["shard_groups"] = [grp]
@@ -97,36 +101,44 @@ class Base(unittest.TestCase):
 # ───────────────────────────── backward compatibility ─────────────────────────────
 
 class BackwardCompatibility(Base):
-    def test_live_manifest_declares_no_group_and_expands_to_itself(self):
+    def test_live_manifest_declares_only_the_approved_additive_group(self):
         raw = json.loads((REAL / ".github/ci-gate/required-checks.json").read_text(encoding="utf-8"))
-        self.assertNotIn("shard_groups", raw)  # PG-SHARD-GATE-1 must not activate sharding
+        self.assertEqual([x["id"] for x in raw["shard_groups"]], ["pgsql-suite"])
+        live = raw["shard_groups"][0]
+        self.assertEqual((live["status"], live["supersedes"], live["count"]), ("additive", LEGACY, 2))  # never superseding here
         m = g.load_manifest()
-        self.assertEqual(m["shard_groups"], [])
-        self.assertEqual([c["name"] for c in m["checks"]], [c["name"] for c in raw["checks"]])
-        self.assertTrue(all("_group" not in c for c in m["checks"]))
+        self.assertEqual([c["name"] for c in m["checks"]][: len(raw["checks"])], [c["name"] for c in raw["checks"]])
+        self.assertEqual([c["name"] for c in m["checks"] if c.get("_group")], [S1, S2, PROOF])
+        self.assertIn(LEGACY, [c["name"] for c in raw["checks"]])  # the full pgsql check is still a declared, blocking check
+        self.assertTrue(next(c for c in raw["checks"] if c["name"] == LEGACY)["tier"] == "always")
 
     def test_empty_or_null_groups_equal_absent_groups(self):
+        plain = self.sb()
         for val in ([], None):
             s = self.sb(mutate=lambda m, d, v=val: m.__setitem__("shard_groups", v))
-            self.assertEqual(s.manifest()["checks"], g.load_manifest()["checks"])
-            self.assertEqual(s.validate(), g.validate(REAL)[0])
+            self.assertEqual(s.manifest()["checks"], plain.manifest()["checks"])
+            self.assertEqual(s.validate(), plain.validate())
 
     def test_live_repo_still_validates_clean(self):
         self.assertEqual(g.validate(REAL)[0], [])
 
-    def test_group_free_sandbox_equals_live_validation(self):
-        s = self.sb()
-        self.assertEqual(g.validate(s.root), g.validate(REAL))
+    def test_group_free_sandbox_validates_clean(self):
+        self.assertEqual(self.sb().validate(), [])
 
-    def test_baseline_compare_without_groups_is_unchanged(self):
+    def test_baseline_compare_of_the_live_tree_with_itself_is_clean(self):
         self.assertEqual(g.compare_baseline(REAL, REAL), [])
+
+    def test_adding_the_group_to_a_group_free_tree_is_not_a_weakening(self):
+        self.assertEqual(g.compare_baseline(self.sb().root, REAL), [])
 
     def test_existing_checks_keep_their_names_with_a_group(self):
         s = self.sb(GROUP)
         names = [c["name"] for c in s.manifest()["checks"]]
+        plain = [c["name"] for c in self.sb().manifest()["checks"]]
         for n in (SQLITE, LEGACY, PERF):
             self.assertIn(n, names)
-        self.assertEqual(sorted(set(names) - {c["name"] for c in g.load_manifest()["checks"]}), sorted([S1, S2, PROOF]))
+        self.assertEqual(sorted(set(names) - set(plain)), sorted([S1, S2, PROOF]))
+        self.assertEqual(names[: len(plain)], plain)
 
 
 # ───────────────────────────── validation: positive ─────────────────────────────
@@ -550,8 +562,9 @@ class Verdict(Base):
         self.assertEqual(self.verdict([cr(SQLITE), cr(PERF), cr(S1, "failure"), cr(S2), cr(LEGACY)], m=m)[0], "fail")
 
     def test_group_free_manifest_verdict_is_unchanged(self):
-        live = g.load_manifest()
-        docs = {c["workflow"]: g.load_yaml(REAL / c["workflow"]) for c in live["checks"]}
+        plain = self.sb()
+        live = plain.manifest()
+        docs = {c["workflow"]: g.load_yaml(plain.root / c["workflow"]) for c in live["checks"]}
         exp = g.expected_checks(live, docs, ["app/X.php"])
         v, _, _ = g.evaluate(live, exp, [cr(SQLITE), cr(LEGACY), cr(PERF)], [{"path": CI, "status": "in_progress"}], 60, 4200)
         self.assertEqual(v, "pass")
