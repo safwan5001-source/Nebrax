@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\FuelNozzle;
 use App\Models\FuelOperationalLedger;
 use App\Models\FuelProduct;
+use App\Models\FuelPump;
+use App\Models\FuelTank;
 use App\Models\FuelSale;
 use App\Models\FuelSalePaymentReceipt;
 use App\Models\FuelShift;
@@ -68,6 +70,7 @@ class FuelSaleService
                 $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
                 $this->assertNozzleForStation($nozzle, $station);
+                $this->assertNozzleEquipmentOperational($nozzle, $station);
                 $warehouse = $this->warehouse($station);
                 $fuelProduct = FuelProduct::findOrFail($nozzle->fuel_product_id);
                 $product = Product::findOrFail($fuelProduct->product_id);
@@ -149,9 +152,11 @@ class FuelSaleService
             }
             $nozzle = FuelNozzle::lockForUpdate()->findOrFail($sale->fuel_nozzle_id);
             $this->assertNozzleForStation($nozzle, $station);
-            if ($nozzle->fuel_product_id !== $sale->fuel_product_id || $nozzle->fuel_tank_id !== $sale->fuel_tank_id) {
-                throw new RuntimeException('تغير ربط الفوهة بالمنتج أو الخزان؛ لا يمكن إنهاء مسودة البيع الحالية.');
+            if ($nozzle->fuel_product_id !== $sale->fuel_product_id || $nozzle->fuel_tank_id !== $sale->fuel_tank_id || $nozzle->fuel_pump_id !== $sale->fuel_pump_id) {
+                throw new RuntimeException('تغير ربط الفوهة بالمنتج أو الخزان أو المضخة؛ لا يمكن إنهاء مسودة البيع الحالية.');
             }
+            // FUEL-P1-1: المضخة والخزان يجب أن يكونا نشطين وقت الإنهاء أيضاً (قفل مشترك يمنع تحويلهما إلى الصيانة بين الفحص والترحيل).
+            $this->assertNozzleEquipmentOperational($nozzle, $station, lock: true);
             $this->assertFinalizationShift($sale, $station);
             $this->aviAuthorizations->assertFinalizationAllowed($sale);
 
@@ -528,6 +533,37 @@ class FuelSaleService
         if ($nozzle->fuel_station_id !== $station->id || $nozzle->branch_id !== $station->branch_id || $nozzle->status !== FuelNozzle::STATUS_ACTIVE) {
             throw new RuntimeException('الفوهة لا تخص محطة/فرع البيع أو ليست نشطة.');
         }
+    }
+
+    /**
+     * FUEL-P1-1: لا يُباع وقود عبر مضخة أو خزان غير `active` (صيانة أو تعطيل) حتى لو كانت الفوهة نفسها نشطة.
+     * الفحص على مستوى الفوهة وحده كان يترك المضخة/الخزان في الصيانة يبيعان فاتورةً وخصمَ مخزون.
+     * ترتيب الأقفال عند `$lock`: الفوهة (المأخوذة قبلاً) ← المضخة ← الخزان، بقفل مشترك؛ ولا مسار آخر يأخذ قفل مضخة أو خزان ثم المحطة.
+     */
+    private function assertNozzleEquipmentOperational(FuelNozzle $nozzle, FuelStation $station, bool $lock = false): void
+    {
+        $pumpQuery = FuelPump::whereKey($nozzle->fuel_pump_id);
+        $pump = ($lock ? $pumpQuery->sharedLock() : $pumpQuery)->first();
+        if ($pump === null || $pump->fuel_station_id !== $station->id || $pump->branch_id !== $station->branch_id) {
+            throw new RuntimeException('FUEL_PUMP_NOT_OPERATIONAL: مضخة الفوهة غير موجودة أو لا تخص محطة/فرع البيع.');
+        }
+        if ($pump->status !== FuelPump::STATUS_ACTIVE) {
+            throw new RuntimeException('FUEL_PUMP_NOT_OPERATIONAL: المضخة ' . $pump->pump_number . ' ' . $this->equipmentStatusLabel($pump->status) . '؛ لا يمكن بيع الوقود عبرها.');
+        }
+
+        $tankQuery = FuelTank::whereKey($nozzle->fuel_tank_id);
+        $tank = ($lock ? $tankQuery->sharedLock() : $tankQuery)->first();
+        if ($tank === null || $tank->fuel_station_id !== $station->id || $tank->branch_id !== $station->branch_id) {
+            throw new RuntimeException('FUEL_TANK_NOT_OPERATIONAL: خزان الفوهة غير موجود أو لا يخص محطة/فرع البيع.');
+        }
+        if ($tank->status !== FuelTank::STATUS_ACTIVE) {
+            throw new RuntimeException('FUEL_TANK_NOT_OPERATIONAL: الخزان ' . $tank->code . ' ' . $this->equipmentStatusLabel($tank->status) . '؛ لا يمكن بيع الوقود منه.');
+        }
+    }
+
+    private function equipmentStatusLabel(string $status): string
+    {
+        return $status === 'maintenance' ? 'في الصيانة' : 'معطّل';
     }
 
     private function assertOptionalPartner(mixed $partnerId): void
