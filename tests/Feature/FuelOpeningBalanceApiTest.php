@@ -335,4 +335,31 @@ class FuelOpeningBalanceApiTest extends TestCase
         $this->withToken($manager['token'])->postJson(self::BASE . "/{$id}/post")->assertForbidden();
         $this->assertSame('draft', FuelOpeningBalance::findOrFail($id)->status);
     }
+
+    #[Test]
+    public function the_distinct_approver_policy_is_governed_by_settings_and_never_bypassed_by_the_opening_flow(): void
+    {
+        $w = $this->openingWorld();
+        $t = $w['owner_token'];
+        $station = "/api/fuel-stations/stations/{$w['station']->id}/settings";
+        $policy = ['fuel_distinct_approver_required' => true, 'reason' => 'اختبار فصل المعتمِد'];
+
+        // المخوَّل (المالك) يفعّل السياسة؛ فالمنشئ لا يعتمد مستنده ولا يُنشأ قيد.
+        $this->withToken($t)->putJson($station, $policy)->assertOk()->assertJsonPath('data.fuel_distinct_approver_required', true);
+        $id = $this->createDraftAsOwner($w);
+        $this->withToken($t)->postJson(self::BASE . "/{$id}/post")->assertStatus(422);
+        $this->assertSame('draft', FuelOpeningBalance::findOrFail($id)->status);
+        $this->assertSame(0, DB::table('journal_entries')->where('source_type', FuelOpeningBalance::class)->count());
+
+        // مدير تشغيلي بلا حوكمة: لا يعطّل السياسة بأي شكل (المحطة ولا المؤسسة) والسياسة تبقى.
+        $manager = $this->userWith($w, 'fob-pol-mgr', ['fuel_stations.view', 'fuel_stations.manage', 'accounts.view']);
+        $this->withToken($manager['token'])->putJson($station, ['fuel_distinct_approver_required' => false])->assertForbidden();
+        $this->withToken($manager['token'])->putJson('/api/fuel-stations/settings', ['fuel_distinct_approver_required' => false])->assertForbidden();
+        $this->withToken($t)->getJson($station)->assertJsonPath('data.fuel_distinct_approver_required', true);
+
+        // المخوَّل وحده يعطّلها صراحةً، والتغيير مُدقَّق بفاعله؛ عندها يعتمد المنشئ (قرار حوكمة لا تجاوز).
+        $this->withToken($t)->putJson($station, ['fuel_distinct_approver_required' => false, 'reason' => 'قرار الحوكمة'])->assertOk();
+        $this->assertTrue(DB::table('fuel_station_configuration_events')->where('setting_key', 'fuel_distinct_approver_required')->whereNotNull('changed_by')->exists());
+        $this->withToken($t)->postJson(self::BASE . "/{$id}/post")->assertOk()->assertJsonPath('data.status', 'posted');
+    }
 }
