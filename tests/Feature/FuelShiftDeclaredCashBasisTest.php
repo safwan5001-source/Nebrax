@@ -138,19 +138,23 @@ class FuelShiftDeclaredCashBasisTest extends TestCase
     }
 
     /** @test */
-    public function receipts_are_never_added_on_top_of_the_declared_cash(): void
+    public function receipts_collected_under_the_declared_basis_are_attributed_but_never_added_on_top_of_the_declared_cash(): void
     {
-        // بيع ERP نقدي مختوم بالوردية تحت أساس الإيصالات، ثم يُعتمد أساس الإقرار: E يستعمل D وحده (D يشمل R أصلاً).
+        // بوابة الإيصالات مفتوحة والأساس declared_collection: بيع ERP نقدي يُختم بالوردية المفتوحة (للتحقق D ≥ R) لكنه لا يدخل E.
         config(['fuel_stations.shift_cash_receipts_enabled' => true]);
-        $this->setBasis('receiving_shift_receipts');
         $shift = $this->open('d1');
         $sale = $this->sale('d1-sale', $shift);
         $payment = $this->collect($sale, 'cash', null, 'd1-pay');
         $receipts = (int) $payment->amount;
         $this->assertGreaterThan(0, $receipts);
-        $this->assertSame(20000 + $receipts, $this->expectation()->live($shift->fresh(), 'receiving_shift_receipts')['expected']);
 
-        $this->setBasis('declared_collection');
+        $receipt = FuelSalePaymentReceipt::sole();
+        $this->assertSame($shift->id, $receipt->fuel_shift_id, 'الإيصال يُختم بالوردية تحت الأساس المُقَرّ به أيضاً');
+        $this->assertSame('cash', $receipt->settlement_type);
+        $event = \App\Models\FuelShiftEvent::where('type', \App\Models\FuelShiftEvent::TYPE_OFFICIAL_CASH_PAYMENT_RECORDED)->sole();
+        $this->assertTrue($event->payload['comparison_only']);
+        $this->assertFalse($event->payload['counted_in_expected_cash']);
+
         $this->meter($shift, 'opening', 1_000_000);
         $this->meter($shift, 'closing', 1_001_000);
         $this->declare($shift, $receipts + 500, 0, 'd1-decl'); // الإقرار يشمل نقد ERP + نقداً آخر غير ERP
@@ -162,11 +166,31 @@ class FuelShiftDeclaredCashBasisTest extends TestCase
         $this->assertSame([], $live['gaps']);
         $this->assertTrue($live['complete']);
 
-        // إقرار نقد أقل من الإيصالات المسجَّلة = تصريح متناقض ⇒ المتوقع غير مكتمل بثغرة صريحة.
-        $this->declare($shift, max(0, $receipts - 1), 0, 'd1-decl2', 1);
+        // إقرار نقد أقل من الإيصالات المسجَّلة = تصريح متناقض ⇒ المتوقع غير مكتمل بثغرة صريحة (حتى لو عُوِّض بشبكة مضخَّمة).
+        $this->declare($shift, $receipts - 1, 5000, 'd1-decl2', 1);
         $low = $this->expectation()->live($shift->fresh(), 'declared_collection');
         $this->assertSame([FuelShiftCashExpectationService::GAP_DECLARED_BELOW_RECEIPTS], $low['gaps']);
         $this->assertFalse($low['complete']);
+    }
+
+    /** @test */
+    public function the_declared_basis_never_refuses_a_collection_for_lack_of_an_open_shift_and_the_closed_gate_leaves_receipts_unstamped(): void
+    {
+        // بلا وردية مفتوحة: التحصيل يمرّ بلا ختم (الختم للمطابقة فقط، بخلاف أساس الإيصالات الذي يرفض).
+        config(['fuel_stations.shift_cash_receipts_enabled' => true]);
+        $shift = $this->open('d2');
+        $sale = $this->sale('d2-sale', $shift);
+        $this->declare($shift, 0, 0, 'd2-decl');
+        app(FuelShiftService::class)->close($shift->fresh(), 20000, null, $this->f['actor']);
+        $this->collect($sale, 'cash', null, 'd2-pay');
+        $this->assertNull(FuelSalePaymentReceipt::sole()->fuel_shift_id);
+
+        // بوابة الإيصالات مغلقة (الافتراضي): السلوك القديم حرفياً — لا ختم.
+        config(['fuel_stations.shift_cash_receipts_enabled' => false]);
+        $open = $this->open('d3');
+        $sale2 = $this->sale('d3-sale', $open);
+        $this->collect($sale2, 'cash', null, 'd3-pay');
+        $this->assertSame(1, FuelSalePaymentReceipt::whereNull('settlement_type')->count());
     }
 
     /** @test */
