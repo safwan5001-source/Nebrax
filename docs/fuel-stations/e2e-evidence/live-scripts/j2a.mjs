@@ -1,0 +1,41 @@
+import { newPhone, dump, layout, WEB } from './lib.mjs';
+import fs from 'node:fs';
+const seed = JSON.parse(fs.readFileSync('/tmp/claude-0/e2e/seed.json', 'utf8'));
+const API = 'http://e2e-ui.awj.app:8000/api';
+const shot = (page, n) => page.screenshot({ path: `/tmp/claude-0/e2e/shots/${n}.png`, fullPage: true });
+const s = await newPhone('ar'); const { page, errors } = s;
+await page.goto(WEB + '/fuel-stations/ops/login', { waitUntil: 'networkidle' });
+await page.locator('input[name=employee_no]').fill(seed.pins.seller.employee_no);
+await page.locator('input[name=pin]').fill(seed.pins.seller.pin);
+await page.getByRole('button', { name: 'دخول' }).last().click();
+await page.waitForFunction(() => document.body.innerText.includes('مساحة عمل'), null, { timeout: 20000 });
+await page.waitForTimeout(1500);
+// فتح وردية 2
+await page.getByRole('link', { name: 'فتح وردية جديدة' }).first().click();
+await page.waitForURL(/shifts\/open/);
+await page.getByTestId('open-float').fill('500');
+await page.getByRole('button', { name: 'مراجعة وفتح الوردية' }).click();
+await page.getByRole('dialog').getByRole('button', { name: 'تأكيد فتح الوردية' }).click();
+await page.waitForTimeout(3000);
+const shifts = await (await fetch(API + '/fuel-stations/shifts', { headers: { Authorization: 'Bearer ' + seed.tokens.owner, Accept: 'application/json' } })).json();
+const sh = shifts.data.find(x => x.status === 'open'); console.log('shift2', sh.number);
+fs.writeFileSync('/tmp/claude-0/e2e/live-shift2.json', JSON.stringify({ shift: sh.id }));
+async function readings(stage, nozzle, tank) {
+  await page.goto(`${WEB}/fuel-stations/ops/shifts/${sh.id}/readings/${stage}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
+  const inputs = page.locator('[data-entry-input]');
+  await inputs.nth(0).fill(nozzle); await inputs.nth(1).fill(tank);
+  await page.getByRole('button', { name: /مراجعة وحفظ/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'تأكيد وحفظ' }).click();
+  await page.waitForTimeout(3000);
+}
+await readings('opening', '1020', '9980');
+await readings('closing', '1050', '9950');
+await page.goto(`${WEB}/fuel-stations/ops/shifts/${sh.id}/handover`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(3500);
+await shot(page, '40-handover-collection');
+console.log('TEXT:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').slice(0, 2600));
+console.log(await dump(page));
+console.log('LAYOUT', await layout(page));
+console.log('ERRORS', errors.filter(e=>!/reqfailed/.test(e)));
+await s.b.close();
