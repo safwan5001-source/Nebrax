@@ -64,6 +64,7 @@ export function SwitchRow({ id, label, checked, onChange, disabled = false, lock
         ) : null}
         {note}
       </div>
+      {/* منطقة اللمس 56×48 (≥ 44px على iPhone) والمظهر المرئي كما كان: مسار 56×32 داخلها. */}
       <button
         id={id}
         type="button"
@@ -71,12 +72,14 @@ export function SwitchRow({ id, label, checked, onChange, disabled = false, lock
         aria-checked={checked}
         disabled={off}
         onClick={onChange}
-        className={cn(
-          'relative mt-0.5 inline-flex h-8 w-14 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
-          checked ? 'border-primary bg-primary' : 'border-[color:var(--fo-control)] bg-background',
-        )}
+        className="inline-flex h-12 w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span aria-hidden="true" className={cn('inline-block h-6 w-6 rounded-full shadow transition-transform', checked ? 'ltr:translate-x-7 rtl:-translate-x-7' : 'ltr:translate-x-1 rtl:-translate-x-1', checked ? 'bg-surface' : 'bg-muted/70')} />
+        <span
+          aria-hidden="true"
+          className={cn('relative inline-flex h-8 w-14 items-center rounded-full border transition-colors', checked ? 'border-primary bg-primary' : 'border-[color:var(--fo-control)] bg-background')}
+        >
+          <span className={cn('inline-block h-6 w-6 rounded-full shadow transition-transform', checked ? 'ltr:translate-x-7 rtl:-translate-x-7' : 'ltr:translate-x-1 rtl:-translate-x-1', checked ? 'bg-surface' : 'bg-muted/70')} />
+        </span>
       </button>
     </div>
   );

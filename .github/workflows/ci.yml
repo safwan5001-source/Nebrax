@@ -353,6 +353,342 @@ jobs:
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════
+  #  PG-SHARD-ADDITIVE-1 — مجموعة PostgreSQL مقسَّمة إلى شريحتين، **فوق** وظيفة `test` الكاملة (لا بديلاً عنها)
+  # ═══════════════════════════════════════════════════════════════
+  #  مرحلة `additive` من مجموعة الشرائح في .github/ci-gate/required-checks.json: فحص `php artisan test (L11, pgsql)` الكامل يبقى إلزامياً
+  #  كما هو؛ والشريحتان ووظيفة الإثبات فحوص إلزامية إضافية. لا يُسحب أيٌّ من الفحوص الحالية ولا يتغير اسمه. (`superseding` قرار منفصل.)
+  #  • كل شريحة تجمّع التطبيق بالخطوات نفسها حرفياً (يحرس تطابقها scripts/ci-gate/test_shard_job_parity.py) وتشغّل نصف الملفات
+  #    (scripts/ci-gate/select_shard.py + scripts/ci-gate/pg-shards.json)، بلا أي تصفية بالعلامات؛ كل الملفات تبقى على القرص.
+  #  • خصائص durability في PostgreSQL كما في `test` (لا tmpfs ولا تعديل fsync/synchronous_commit/full_page_writes).
+  #  • وظيفة الإثبات تتحقق بالهوية أن الشريحتين نفّذتا معاً كل اختبار مرة واحدة، وتشغّل سكربت الإثبات من **نسخة base الموثوقة** لا من الـPR.
+  #  • لا يغطّي هذا الفحص خطوة AIA-0.4 الصارمة (تبقى في `test`)؛ حمّلها `superseding` قبل أي سحب لفحص pgsql الكامل.
+  test-pg-shards:
+    name: php artisan test (L11, pgsql, shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    env:
+      COMPOSER_NO_INTERACTION: '1'
+      APP_DIR: /tmp/nibras-app
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nibras
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: nibras
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nibras"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout core (النواة)
+        uses: actions/checkout@v4
+
+      # ═══════════════════════════════════════════════════════════════
+      #  حارس قائمة النسخ — لا ملفَّ نواة يسقط صامتاً
+      # ═══════════════════════════════════════════════════════════════
+      #  المستودع نواةٌ فقط، ويُجمَّع مشروع Laravel كامل أدناه بنسخ **قوائم
+      #  صريحة** من المجلدات. والـ glob `*.php` لا يلتقط المجلدات الفرعية،
+      #  فمجلدٌ جديد يبقى في المستودع ولا يصل إلى الخادم — ويسقط الترحيل
+      #  بخطأ «صنف غير موجود» بعد أن مرّ محلياً.
+      #
+      #  حدث هذا مرّتين (`app/Console`، ثم `app/Models/Concerns`). فبدل
+      #  انتظار الثالثة: أي مجلد يحمل ملفات PHP وليس في القائمة **يُفشل
+      #  الـ CI هنا** برسالة تقول أين يُضاف.
+      - name: حارس قائمة النسخ
+        run: |
+          ALLOWED="app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware \
+                   app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications app/Tenancy \
+                   app/Http/Middleware app/Http/Controllers/Api \
+                   app/Http/Requests app/Http/Resources app/Providers \
+                   app/Console/Commands"
+          MISSING=0
+          for f in $(find app -name '*.php' | sort); do
+            d=$(dirname "$f")
+            case " $(echo $ALLOWED) " in
+              *" $d "*) ;;
+              *) echo "::error file=$f::المجلد «$d» ليس في قائمة النسخ — أضفه إلى .github/workflows/ci.yml و deploy/assemble.sh"; MISSING=1 ;;
+            esac
+          done
+          [ "$MISSING" -eq 0 ] || exit 1
+          echo "✔ كل ملفات النواة مشمولة بقائمة النسخ."
+          # AWJ-BACKEND-CI-03: setup.sh يبني البيئة المحلية (وخطّاف بدء الجلسة) بقائمة يدوية مستقلة؛
+          # انحرافها لا يظهر هنا فيمرّ بصمت (حدث مع app/Mail وresources/views وحزمة AWS). نتحقق أنه
+          # ينسخ كل مصدر ‹$CORE/…› تنسخه خطوة الدمج في هذا الملف، ويثبّت كل حزمة يثبّتها.
+          for src in $(grep -oE '"\$CORE/[^"]+"' .github/workflows/ci.yml | sed 's/^"\$CORE\///; s/"$//' | sort -u); do
+            grep -qF "\"\$CORE_DIR/$src\"" setup.sh || { echo "::error file=setup.sh::setup.sh لا ينسخ «$src» — أضفه كما في ci.yml"; MISSING=1; }
+          done
+          # السطر الفعلي في خطوة «تثبيت Sanctum…» (مرسوٌّ ببداية السطر كي لا يطابق هذا الحارس نفسه).
+          PKGS="$(grep -m1 -E '^[[:space:]]+composer require laravel/sanctum ' .github/workflows/ci.yml | sed -E 's/^[[:space:]]+composer require //; s/ --.*$//')"
+          [ -n "$PKGS" ] || { echo "::error::تعذّر قراءة حزم composer require من ci.yml"; exit 1; }
+          for p in $PKGS; do
+            # مطابقة كلمة كاملة: «…:4.1.10» لا تُرضي «…:4.1.1».
+            grep -E '^composer require ' setup.sh | tr ' ' '\n' | grep -qxF -- "$p" || { echo "::error file=setup.sh::setup.sh لا يثبّت «$p» — أضفها كما في ci.yml"; MISSING=1; }
+          done
+          [ "$MISSING" -eq 0 ] || exit 1
+          echo "✔ setup.sh مطابق لقائمة النسخ وحزم CI."
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip, dom, gd
+          coverage: none
+
+      - name: التحقق من GD وصيغ الصور وعمليات resize الأساسية
+        run: php "$GITHUB_WORKSPACE/tests/Fixtures/gd-runtime-smoke.php"
+
+      - name: تثبيت محركات PDF وXML
+        run: |
+          # مصدر Google Chrome APT مثبَّت مسبقاً على عدّاد GitHub-hosted ولا علاقة له
+          # بالمشروع؛ يفشل أحياناً بـ"Hash Sum mismatch" فيوقف كل خطوة apt-get update.
+          # نعطّل ملف مصدره فقط دون المساس بأي مصدر آخر أو كبت أخطاء apt عامة.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils libxml2-utils
+
+      # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
+      # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
+      - name: السماح بتثبيت Laravel 11 (بيئة CI مؤقتة)
+        run: composer config --global policy.advisories.block false
+
+      - name: إنشاء مشروع Laravel 11
+        run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
+
+      - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          # يقرأ «حارس قائمة النسخ» هذا السطر (laravel/sanctum أولاً، سطرٌ واحد) ليطابق حزم setup.sh.
+          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --quiet
+          php "$GITHUB_WORKSPACE/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
+          php artisan install:api --no-interaction --quiet || true
+          rm -f database/migrations/*_create_personal_access_tokens_table.php
+
+      # ParaTest لكلا الفرعين (تنفيذ متوازٍ، قاعدة بيانات معزولة لكل عامل: nibras_test_N لـPostgreSQL وdatabase.sqlite_test_N لـSQLite).
+      - name: تثبيت ParaTest
+        working-directory: ${{ env.APP_DIR }}
+        run: composer require --dev "brianium/paratest:^7.4" --quiet
+
+      - name: دمج ملفات النواة وطبقة الـ API
+        run: |
+          CORE="$GITHUB_WORKSPACE"
+          cd "$APP_DIR"
+          mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
+                   app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
+                   app/Http/Requests app/Http/Resources app/Console/Commands \
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+          cp -r "$CORE/app/Models/"*.php                  app/Models/
+          cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
+          cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
+          cp -r "$CORE/app/Listeners/"*.php  app/Listeners/ 2>/dev/null || true
+          cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
+          cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
+          cp -r "$CORE/app/Jobs/Accounting/"*.php          app/Jobs/Accounting/
+          # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
+          cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
+          cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
+          cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
+          cp -r "$CORE/app/Services/Commerce/"*.php       app/Services/Commerce/
+          cp -r "$CORE/app/Services/Commerce/Edge/"*.php  app/Services/Commerce/Edge/
+          cp -r "$CORE/app/Services/Commerce/Otp/"*.php   app/Services/Commerce/Otp/
+          cp -r "$CORE/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
+          cp -r "$CORE/app/Services/AppBuilder/"*.php     app/Services/AppBuilder/
+          cp -r "$CORE/app/Services/DeliveryHub/"*.php    app/Services/DeliveryHub/
+          cp -r "$CORE/app/Services/Pos/"*.php            app/Services/Pos/
+          cp -r "$CORE/app/Services/Pos/Hardware/"*.php   app/Services/Pos/Hardware/
+          cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
+          cp -r "$CORE/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
+          cp -r "$CORE/app/Support/"*.php                 app/Support/
+          cp -r "$CORE/app/Support/Inventory/"*.php       app/Support/Inventory/
+          cp -r "$CORE/app/Support/Dns/"*.php             app/Support/Dns/
+          cp -r "$CORE/app/Support/Commerce/"*.php        app/Support/Commerce/
+          cp -r "$CORE/app/Services/Communications/"*.php app/Services/Communications/
+          cp -r "$CORE/app/Support/Communications/"*.php  app/Support/Communications/
+          cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
+          cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/
+          cp -r "$CORE/app/Http/Controllers/Api/"*.php    app/Http/Controllers/Api/
+          cp -r "$CORE/app/Http/Requests/"*.php           app/Http/Requests/
+          cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
+          cp -r "$CORE/app/Providers/"*.php               app/Providers/
+          cp -r "$CORE/config/"*.php                      config/
+          # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
+          cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
+          cp -r "$CORE/database/migrations/"*.php         database/migrations/
+          cp -r "$CORE/routes/api.php"                    routes/api.php
+          cp -r "$CORE/routes/api_public.php"          routes/api_public.php
+          cp -r "$CORE/routes/api_storefront.php"      routes/api_storefront.php
+          cp -r "$CORE/routes/api_commerce.php"        routes/api_commerce.php
+          cp -r "$CORE/routes/api_preview.php"         routes/api_preview.php
+          cp -r "$CORE/routes/console.php"                routes/console.php
+          cp -r "$CORE/resources/views/"*                 resources/views/ 2>/dev/null || true
+          cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
+          cp -r "$CORE/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
+          # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
+          cp -r "$CORE/docs/openapi/"*.yaml               docs/openapi/
+          # حدود PHP الإنتاجية (AWJ-UPLOAD-PHP-LIMITS-1) — يقرؤها PhpUploadLimitsContractTest وPhpUploadRuntimeTest
+          mkdir -p deploy/php
+          cp "$CORE/deploy/php/awj-uploads.ini"            deploy/php/
+          # عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
+          # base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
+          cp -r "$CORE/contracts/app-builder/"*.json      contracts/app-builder/
+          # أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
+          mkdir -p contracts/app-builder/archive
+          cp -r "$CORE/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
+          # سجل قوالب التطبيقات (AD-11 / S22a) — يقرؤه AppTemplateRegistry عبر resource_path()؛ نفس الملفات يقرؤها اختبار Dart.
+          mkdir -p resources/app-builder/templates
+          cp -r "$CORE/resources/app-builder/templates/"*.json resources/app-builder/templates/
+          # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
+          # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
+          cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
+          # عقد رحلة التاجر الإدارية (FLOWERS-H2-15): الطلبات تولّدها الواجهة، والاستجابات يلتقطها الخادم؛ يقارنهما FlowersMerchantAdminJourneyTest.
+          cp -r "$CORE/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
+          cp -r "$CORE/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/
+
+      - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          grep -q "TenancyServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+          grep -q "DocumentCenterServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
+          grep -q "PublicApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "StorefrontApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\StorefrontApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "CommerceApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\CommerceApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "PreviewApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\PreviewApiServiceProvider::class,|" bootstrap/providers.php
+          grep -q "WebhookServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+          grep -q "MailServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
+          rm -f database/migrations/0001_01_01_000000_create_users_table.php
+
+      # كل عامل متوازٍ ينفّذ `migrate:fresh` مرتين عند بدئه (إقلاع Laravel الموازي ثم RefreshDatabase)،
+      # وكل مرة `DROP TABLE` لـ ~330 جدولاً و~1150 فهرساً في معاملة واحدة ≈ 1500 قفل. بالافتراض
+      # (max_locks_per_transaction=64 × max_connections=100 = 6400 خانة مشتركة) تكاد أربعة عمّال
+      # أن تستنفدها (≈5900) فينهار التشغيل بـ«out of shared memory» أو يعلَّق (رُصد محلياً 3 من 4).
+      # الحدّ لا يتغيّر إلا بإعادة تشغيل الخادم (postmaster)، فنعيد تشغيل حاوية الخدمة ونتحقّق من القيمة.
+      - name: رفع حدّ أقفال PostgreSQL للتنفيذ المتوازي (pgsql فقط)
+        run: |
+          set -euo pipefail
+          CID="$(docker ps -q --filter ancestor=postgres:16)"
+          [ -n "$CID" ] && [ "$(echo "$CID" | wc -l)" -eq 1 ] || { echo "::error::تعذّر تحديد حاوية postgres الوحيدة"; exit 1; }
+          docker exec "$CID" psql -U nibras -d nibras -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_locks_per_transaction = 1024"
+          docker restart "$CID" >/dev/null
+          for i in $(seq 1 60); do
+            docker exec "$CID" pg_isready -U nibras -d nibras >/dev/null 2>&1 && break
+            sleep 1
+          done
+          LIMIT="$(docker exec "$CID" psql -U nibras -d nibras -Atc "SHOW max_locks_per_transaction")"
+          echo "max_locks_per_transaction=$LIMIT"
+          [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
+
+      - name: تهيئة قاعدة البيانات (pgsql)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          sed -i "/^DB_HOST=/d;/^DB_PORT=/d;/^DB_DATABASE=/d;/^DB_USERNAME=/d;/^DB_PASSWORD=/d" .env
+          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" .env
+          printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
+          php artisan migrate:fresh --force
+
+      # PG-SHARD-SAFETY-PARITY (A): حقائق المشغّل للتشخيص فقط — طراز CPU والصورة والأنوية ومعيار صغير `bench_ms` (≈0.2 ث) لتفسير تفاوت أزمنة الشرائح
+      # بين المشغّلات. لا تغيّر سلوك الاختبارات ولا تدخل في أي حكم: تُطبع في ملخص الوظيفة وتُرفع مع artifact الشريحة (`env.txt`). كل أمر محميّ داخلياً
+      # (الوظيفة مطلوبة فلا يُسمح لخطواتها بتجاوز الفشل) فغيابها أو فشلها لا يُفشل الوظيفة.
+      - name: حقائق المشغّل (تسجيل فقط)
+        run: |
+          mkdir -p "$APP_DIR/shard-out" || true
+          {
+            echo "shard=${{ matrix.shard }} runner=${RUNNER_NAME:-?} image=${ImageOS:-?}/${ImageVersion:-?} arch=$(uname -m) nproc=$(nproc)"
+            echo "cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ //' || true)"
+            echo "bench_ms=$(python3 -c 'import time;t=time.perf_counter();sum(i*i for i in range(3000000));print(round((time.perf_counter()-t)*1000))' || echo '?')"
+          } | tee "$APP_DIR/shard-out/env.txt" >> "$GITHUB_STEP_SUMMARY" || true
+
+      # الجرد الكامل **قبل** الاختيار (phpunit.xml الأصلي) ثم اختيار ملفات الشريحة ثم خطتها. تُرفع الثلاثة مع قوائم الملفات ليقارنها الإثبات.
+      - name: اختيار الشريحة (${{ matrix.shard }}/2) وجرد الاختبارات
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$APP_DIR/shard-out"; mkdir -p "$OUT"
+          vendor/bin/phpunit --list-tests > "$OUT/inventory.txt"
+          python3 "$GITHUB_WORKSPACE/scripts/ci-gate/select_shard.py" --app "$APP_DIR" --shard "${{ matrix.shard }}" --count 2 \
+            --manifest "$GITHUB_WORKSPACE/scripts/ci-gate/pg-shards.json" --out "$OUT"
+          vendor/bin/phpunit --list-tests > "$OUT/planned.txt"
+          echo "inventory: $(grep -c '^ - ' "$OUT/inventory.txt") tests; shard plan: $(grep -c '^ - ' "$OUT/planned.txt") tests"
+
+      - name: تشغيل اختبارات الشريحة (${{ matrix.shard }}/2)
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          set -o pipefail
+          # بلا أي تصفية: الشريحة = ملفاتها كاملة بقائمة <file> في phpunit.xml. العمّال وقاعدة كل عامل كما في `test`.
+          PROCS="$(nproc)"; [ "$PROCS" -le 4 ] || PROCS=4
+          export PGOPTIONS="-c lock_timeout=60s"
+          php artisan test --parallel --processes="$PROCS" --log-junit "$APP_DIR/shard-out/junit.xml" 2>&1 | tee "$APP_DIR/shard-out/test-output.txt"
+
+      - name: حفظ مخرجات الشريحة للإثبات
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: |
+            ${{ env.APP_DIR }}/shard-out/all_files.txt
+            ${{ env.APP_DIR }}/shard-out/assigned.txt
+            ${{ env.APP_DIR }}/shard-out/inventory.txt
+            ${{ env.APP_DIR }}/shard-out/planned.txt
+            ${{ env.APP_DIR }}/shard-out/junit.xml
+            ${{ env.APP_DIR }}/shard-out/env.txt
+            ${{ env.APP_DIR }}/shard-out/test-output.txt
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+
+  test-pg-shards-proof:
+    name: php artisan test (L11, pgsql, shards proven)
+    needs: [test-pg-shards]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (الشجرة تحت الاختبار — ملفات الاختبار المتتبَّعة)
+        uses: actions/checkout@v4
+
+      # سكربت الإثبات يُنفَّذ من القاعدة الموثوقة لا من الـPR (كما تفعل ci-gate.yml مع ci_gate.py): تعديلٌ في الـPR لا يستطيع إضعاف الحكم على نفسه.
+      # على push/workflow_dispatch لا PR، فالمرجع هو الـSHA نفسه.
+      - name: Checkout سكربت الإثبات من القاعدة الموثوقة
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: |
+            scripts/ci-gate
+
+      - name: تنزيل مخرجات الشريحتين
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: proof
+
+      - name: إثبات أن كل اختبار نُفِّذ مرة واحدة بالضبط
+        run: |
+          set -euo pipefail
+          git ls-files tests/Feature tests/Unit | grep 'Test\.php$' | sort > proof/tracked_test_files.txt
+          python3 .trusted/scripts/ci-gate/shard_proof.py --root proof --shards 2 --manifest scripts/ci-gate/pg-shards.json
+
+  # ═══════════════════════════════════════════════════════════════
   #  COPS-H1-1 — قياس أداء قفل تغذية الأحداث على PostgreSQL، في وظيفة مخصصة على مشغّل خاص
   # ═══════════════════════════════════════════════════════════════
   #  اختبارا الأداء (المجموعة cops-h1-1-perf) يقيسان الكمون بمؤقّت جداري، فيتشوّهان حين يشاركان الجهاز مع عمّال ParaTest الأربعة أو يعملان

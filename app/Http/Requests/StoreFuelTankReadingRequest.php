@@ -19,8 +19,13 @@ class StoreFuelTankReadingRequest extends FormRequest
             'reading_type' => ['required', 'in:physical,atg'],
             'quantity_liters' => ['required', 'string', 'max:32'],
             'evidence_key' => ['required', 'string', 'max:128'],
-            'evidence' => ['nullable', 'array'],
+            // FUEL-B6: الدليل بيانات وصفية صغيرة (طريقة القياس + ملاحظة)؛ مفاتيح أخرى تبقى مقبولة للتوافق لكن بسقف عددي.
+            'evidence' => ['nullable', 'array', 'max:20'],
+            'evidence.method' => ['nullable', 'string', 'in:dipstick,gauge,atg_console,other'],
+            'evidence.note' => ['nullable', 'string', 'max:500'],
             'measured_at' => ['nullable', 'date'],
+            // FUEL-B6 (تعديل): سبب القراءة المتأخرة (يُفرض خادمياً حين تلزمه السياسة).
+            'late_reason' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

@@ -16,7 +16,10 @@ import ci_gate as g
 M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
 PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)",
-       "PostgreSQL feed-lock performance (COPS-H1-1)"]  # COPS-H1-1: dedicated perf job, tier=always (PHP[2])
+       "PostgreSQL feed-lock performance (COPS-H1-1)",  # COPS-H1-1: dedicated perf job, tier=always (PHP[2])
+       # PG-SHARD-ADDITIVE-1: the additive shard group (2 shards + proof) — always-required on top of the full pgsql check
+       "php artisan test (L11, pgsql, shard 1)", "php artisan test (L11, pgsql, shard 2)",
+       "php artisan test (L11, pgsql, shards proven)"]
 HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=paths (only PRs that touch Horizon files)
 HZ_WF = ".github/workflows/horizon-eval-ci.yml"
 HZ_FILES = ["scripts/horizon-eval/horizon_eval.py"]  # a Horizon-related diff
@@ -72,7 +75,7 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 12)  # 10 previously; +1 = path-scoped storefront Docker build context check; +1 = COPS-H1-1 dedicated perf job (always)
+        self.assertEqual(len(exp), 15)  # 10 previously; +1 = path-scoped storefront Docker build context check; +1 = COPS-H1-1 dedicated perf job (always); +3 = PG shard group (additive)
         self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):
@@ -176,7 +179,7 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail")
 
     def test_rerun_uses_latest_attempt_and_warns(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901), cr(PHP[2])]
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901), cr(PHP[2])] + [cr(n) for n in PHP[3:]]
         v, _, warns = ev(["a.md"], runs)[1]
         self.assertEqual(v, "pass")
         self.assertTrue(any("earlier attempt" in w for w in warns))
@@ -446,7 +449,7 @@ class Binding(unittest.TestCase):
 
     def test_rerun_same_suite_takes_newest(self):
         wf = [wfr(self.CI, 2)]
-        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31), scr(PHP[2], 2, 22)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31), scr(PHP[2], 2, 22)] + [scr(n, 2, 40 + i) for i, n in enumerate(PHP[3:])]
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "pass")

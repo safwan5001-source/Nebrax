@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { api, ApiError, downloadFile, fetchPrivateFileUrl } from '@/lib/api';
 import { isDemo } from '@/lib/demo';
 import { StationOpsError, isAbort, toStationOpsError } from '../read-client';
+import { lateRequestResponse, type LateRequest } from '../tanks/schemas';
 import { attachmentsResponse, deliveryResponse, readingResponse, receiptDocumentResponse, receiptReportResponse, type Attachment, type Delivery, type ReceiptDocument, type ReceiptReport, type TankReading } from './schemas';
 
 /**
@@ -69,9 +70,23 @@ export type RejectionCode =
   | 'cost_required' | 'cost_locked' | 'cost_changed' | 'note_required' | 'attachment_invalid' | 'attachment_limit' | 'attachment_locked'
   | 'idempotency_mismatch' | 'duplicate' | 'distinct_approver' | 'already_approved' | 'grni_missing' | 'cost_baseline' | 'warehouse_mismatch' | 'tank_mismatch'
   | 'product_inactive' | 'quantity_invalid' | 'cost_invalid' | 'evidence_exists' | 'reading_mismatch' | 'order_mismatch'
+  | 'reading_over_capacity' | 'reading_future' | 'reading_older' | 'tank_inactive'
+  | 'backdating_denied' | 'backdating_too_old' | 'backdating_reason_required' | 'backdating_not_authorized' | 'backdating_not_allowed' | 'self_approval' | 'rejection_note_required'
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
 
 const KNOWN: ReadonlyArray<[RegExp, RejectionCode]> = [
+  // FUEL-B6: رموز قراءة الخزان الجديدة (الخادم يبدأ الرسالة بالرمز)
+  [/FUEL_READING_EXCEEDS_CAPACITY/, 'reading_over_capacity'],
+  [/FUEL_READING_FUTURE_TIME/, 'reading_future'],
+  [/FUEL_READING_OLDER_THAN_LATEST/, 'reading_older'],
+  [/FUEL_READING_TANK_INACTIVE/, 'tank_inactive'],
+  [/FUEL_READING_BACKDATING_DENIED/, 'backdating_denied'],
+  [/FUEL_READING_BACKDATING_TOO_OLD/, 'backdating_too_old'],
+  [/FUEL_READING_BACKDATING_REASON_REQUIRED/, 'backdating_reason_required'],
+  [/FUEL_READING_BACKDATING_NOT_AUTHORIZED/, 'backdating_not_authorized'],
+  [/FUEL_READING_BACKDATING_NOT_ALLOWED/, 'backdating_not_allowed'],
+  [/FUEL_READING_SELF_APPROVAL/, 'self_approval'],
+  [/FUEL_READING_REJECTION_NOTE_REQUIRED/, 'rejection_note_required'],
   [/FUEL_DELIVERY_COST_REQUIRED/, 'cost_required'],
   [/FUEL_DELIVERY_COST_LOCKED/, 'cost_locked'],
   [/FUEL_DELIVERY_COST_CHANGED/, 'cost_changed'],
@@ -113,7 +128,8 @@ export type WriteFailure =
   | { kind: 'not_sent'; reason: 'offline' | 'demo' };
 
 export type DeliveryWrite = { kind: 'ok'; delivery: Delivery } | WriteFailure;
-export type ReadingWrite = { kind: 'ok'; reading: TankReading } | WriteFailure;
+/** `pending` = قراءة متأخرة قُبل طلبها وبانتظار موافقة المشرف (ليست قراءة تشغيلية بعد). */
+export type ReadingWrite = { kind: 'ok'; reading: TankReading } | { kind: 'pending'; request: LateRequest } | WriteFailure;
 
 export const WRITE_TIMEOUT_MS = 25_000;
 
@@ -141,7 +157,11 @@ async function send(path: string, body: unknown, options: { timeoutMs?: number; 
   }
 }
 
-export interface ReadingBody { fuel_station_id: string; fuel_tank_id: string; reading_type: 'physical' | 'atg'; quantity_liters: string; evidence_key: string }
+/**
+ * `evidence` (B6) اختياري: طريقة القياس وملاحظة قصيرة. `measured_at` و`late_reason` (تعديل B6) **لا يُرسَلان إلا بإدخال صريح من المستخدم** لقراءة متأخرة حين تسمح السياسة؛
+ * غيابهما = ساعة الخادم (المسار المعتمد للاستلام وللتسجيل العادي).
+ */
+export interface ReadingBody { fuel_station_id: string; fuel_tank_id: string; reading_type: 'physical' | 'atg'; quantity_liters: string; evidence_key: string; evidence?: { method?: string; note?: string }; measured_at?: string; late_reason?: string }
 
 export interface DeliveryBody {
   fuel_station_id: string;
@@ -169,6 +189,8 @@ export type ReceivingExportVariant = 'operational' | 'financial';
 export async function recordReading(body: ReadingBody, options: Options = {}): Promise<ReadingWrite> {
   const sent = await send('/fuel-stations/readings', body, options);
   if (!('raw' in sent)) return sent;
+  const late = lateRequestResponse.safeParse(sent.raw);
+  if (late.success) return { kind: 'pending', request: late.data.data };
   const parsed = readingResponse.safeParse(sent.raw);
   return parsed.success ? { kind: 'ok', reading: parsed.data.data } : { kind: 'unverified' };
 }

@@ -51,6 +51,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'fuel.delivery.approve': 'financial',
   // FUEL-B5.1: تسجيل تكلفة الاستلام يحدّد أساس تكلفة المخزون عند الاعتماد (يُشترط معه products.view_cost).
   'fuel.delivery.cost.record': 'financial',
+  'fuel.reading.late.record': 'financial',
+  'fuel.reading.late.approve': 'financial',
   'fuel.reconciliation.approve': 'financial',
   'fuel.supplier_invoice.manage': 'financial',
   'fuel.supplier_invoice.match': 'financial',

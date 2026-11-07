@@ -17,7 +17,8 @@ const read = (base: string, prefix: string) => readdirSync(join(dir, base))
 // FUEL-B4/B5: مساحتا الإدارة (`admin/`) والاستلام (`receiving/`) جزء من التطبيق نفسه وتخضعان للقواعد نفسها. PR-2: ومعالج الرصيد الافتتاحي (`opening/`) كذلك
 // (روابطه داخل التطبيق فقط). نصوصه في فضاء `stationOpsOpening` المستقل: هو تدفّق مالي بسلطة مالية (ترحيل + تكلفة) يعرض القيد المحاسبي صراحةً بطلب المالك،
 // فلا يخضع لحارس «لغة الموظف» الذي يحرس نصوص البائع والمشرف في `stationOps` وحدها.
-const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('opening', 'opening/')];
+// FUEL-B6: ومساحة الخزانات (`tanks/`) كذلك.
+const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/'), ...read('opening', 'opening/')];
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
 type Tree = { [key: string]: string | Tree };
@@ -38,7 +39,7 @@ describe('station ops is an app of its own', () => {
   it('defines every in-app route target under OPS_BASE', () => {
     const nav = sources.find((entry) => entry.file === 'nav.ts')!.text;
     expect(nav).toMatch(/OPS_BASE = '\/fuel-stations\/ops'/);
-    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(6); // FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»
+    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(7); // FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»، FUEL-B6: + «الخزانات»
     for (const match of code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)) expect(match[1]).toMatch(/OPS_BASE/);
   });
 

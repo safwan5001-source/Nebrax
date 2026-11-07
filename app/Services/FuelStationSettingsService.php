@@ -32,7 +32,28 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required'];
+
+    /** @var list<string> قيم سياسة التأريخ الرجعي لقراءات الخزانات (FUEL-B6). */
+    public const BACKDATING_POLICIES = ['deny', 'supervisor_approval', 'authorized_user'];
+
+    /**
+     * FUEL-B6: السياسة الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي `deny`). قيمة تالفة/غير معروفة تُعامَل `deny` (فشل مغلق).
+     *
+     * @return array{policy: string, max_hours: int, reason_required: bool}
+     */
+    public function tankReadingBackdating(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $policy = $all['tank_reading_backdating_policy'] ?? 'deny';
+        $hours = $all['tank_reading_backdating_max_hours'] ?? 24;
+
+        return [
+            'policy' => is_string($policy) && in_array($policy, self::BACKDATING_POLICIES, true) ? $policy : 'deny',
+            'max_hours' => is_int($hours) && $hours >= 1 ? $hours : 24,
+            'reason_required' => ($all['tank_reading_backdating_reason_required'] ?? true) !== false,
+        ];
+    }
 
     /** @return array<string, mixed> */
     public function forTenant(): array
@@ -202,6 +223,10 @@ class FuelStationSettingsService
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
             // مسح mapping الحساب والعودة إلى fallback الموثق لمحرك الجرد.
             $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id', 'fuel_opening_balance_account_id'], true) && $value === null ? '' : $value;
+            // FUEL-B6: مسح مدة قِدم قراءة الخزان على مستوى المؤسسة (null ⇒ «غير مضبوطة»)؛ القارئ يعامل '' كـnull. لا تغيير إن كانت غير مضبوطة أصلاً.
+            if ($key === 'tank_reading_stale_after_minutes' && $value === null) {
+                $normalized = in_array($current[$key] ?? null, [null, ''], true) ? $current[$key] : '';
+            }
             $known[$key] = $normalized;
             if ($current[$key] !== $normalized) {
                 $changed[$key] = ['before' => $current[$key], 'after' => $normalized];
@@ -398,6 +423,39 @@ class FuelStationSettingsService
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
                 throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tank_reading_backdating_policy') {
+            if (! is_string($value) || ! in_array($value, self::BACKDATING_POLICIES, true)) {
+                throw new RuntimeException('سياسة تسجيل القراءات بتاريخ سابق يجب أن تكون deny أو supervisor_approval أو authorized_user.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tank_reading_backdating_max_hours') {
+            if (! is_int($value) || $value < 1 || $value > 720) {
+                throw new RuntimeException('الحد الأقصى لتأخير القراءة يجب أن يكون عدداً صحيحاً بين 1 و720 ساعة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tank_reading_backdating_reason_required') {
+            if (! is_bool($value)) {
+                throw new RuntimeException('إلزام سبب القراءة المتأخرة يجب أن يكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tank_reading_stale_after_minutes') {
+            // null = غير مضبوط (لا حكم بقِدم القراءة)؛ وإلا عدد صحيح موجب بالدقائق (حتى 30 يوماً).
+            if ($value !== null && (! is_int($value) || $value < 1 || $value > 43200)) {
+                throw new RuntimeException('مدة قِدم قراءة الخزان يجب أن تكون عدداً صحيحاً بين 1 و43200 دقيقة أو فارغة.');
             }
 
             return;
