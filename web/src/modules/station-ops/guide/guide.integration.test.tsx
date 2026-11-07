@@ -219,6 +219,33 @@ describe('AWJ Smart Guide — tours panel in the Help Center', () => {
     expect(within(card()).getByText('Step 3 of 8')).toBeTruthy();
   }, 15000);
 
+  it('resume from another screen carries the saved step through the navigation (not restarting at step 1)', async () => {
+    state.pathname = '/fuel-stations/ops/shifts';
+    window.localStorage.setItem(progressKey('t1', 'u1'), JSON.stringify({ welcome: { version: 1, status: 'in_progress', step: 2, at: 'x' } }));
+    const view = renderIntl(<GuideProvider><Home /><GuideToursPanel /></GuideProvider>, 'en');
+    const row = document.querySelector('[data-tour="welcome"]') as HTMLElement;
+    await act(async () => { fireEvent.click(within(row).getByRole('button', { name: M.guide.panel.resume })); });
+    expect(state.push).toHaveBeenCalledWith('/fuel-stations/ops');
+
+    state.pathname = '/fuel-stations/ops'; // وصل المستخدم إلى الرئيسية
+    view.rerender(<GuideProvider><Home /><GuideToursPanel /></GuideProvider>);
+    await waitForGuide();
+    expect(within(card()).getByText('Step 3 of 8')).toBeTruthy();
+    expect(readProgress(progressKey('t1', 'u1')).welcome?.step).toBe(2);
+  }, 15000);
+
+  it('a plan still being built when the user leaves the screen never activates on the new screen', async () => {
+    // لا عناصر إلا التنقل: الخطة تنتظر أول هدف (~2.5ث) ثم تكتمل غير فارغة — وقتها يكون المستخدم قد غادر.
+    const Slow = () => <nav aria-label="Main">nav</nav>;
+    const view = renderIntl(<GuideProvider><Slow /></GuideProvider>, 'en');
+    await new Promise((resolve) => setTimeout(resolve, 1400)); // بدأ البدء التلقائي وخطته قيد الانتظار
+    state.pathname = '/fuel-stations/ops/shifts';
+    view.rerender(<GuideProvider><Slow /></GuideProvider>);
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[data-smart-guide]')).toBeNull();
+  }, 15000);
+
   it('offers “start this screen’s tour” in the contextual help only where a tour exists for the user', () => {
     state.pathname = '/fuel-stations/ops/products';
     const view = renderIntl(<GuideProvider><GuideScreenShortcut close={() => {}} /></GuideProvider>, 'en');

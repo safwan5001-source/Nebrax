@@ -37,6 +37,10 @@ interface Active { tour: Tour; steps: readonly TourStep[]; index: number }
 
 const AUTO_DELAY_MS = 900;
 
+function normalize(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
 export function GuideProvider({ children }: { children: ReactNode }) {
   const { viewer, can } = useStationOps();
   const pathname = usePathname() ?? '';
@@ -46,11 +50,15 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [active, setActive] = useState<Active | null>(null);
   const runRef = useRef<AbortController | null>(null);
-  const pendingRef = useRef<TourId | null>(null);
+  const pendingRef = useRef<{ id: TourId; resume: boolean } | null>(null);
+  const progressRef = useRef<ProgressMap>({});
+  const pathRef = useRef(pathname);
   const autoTriedRef = useRef<string | null>(null);
   const directionRef = useRef<1 | -1>(1);
   const canRef = useRef(can);
   canRef.current = can;
+  progressRef.current = progress;
+  pathRef.current = pathname;
 
   // قراءة التقدّم عند تغيّر المستخدم/المؤسسة؛ لا تسرب بين الموظفين.
   useEffect(() => {
@@ -74,7 +82,8 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     runRef.current = controller;
     const steps = await buildPlan(tour, (permission) => canRef.current(permission), controller.signal);
-    if (controller.signal.aborted || steps.length === 0) return false;
+    // انتهى بناء الخطة بعد أن غادر المستخدم الشاشة: لا تُفعَّل جولة على شاشة أخرى.
+    if (controller.signal.aborted || steps.length === 0 || !tour.route.test(normalize(pathRef.current))) return false;
     const index = Math.min(Math.max(startAt, 0), steps.length - 1);
     directionRef.current = 1;
     setActive({ tour, steps, index });
@@ -85,9 +94,9 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const start = useCallback(async (id: TourId, options?: { resume?: boolean }): Promise<boolean> => {
     const tour = getTour(id);
     if (!tour || !tourAvailable(tour, (permission) => canRef.current(permission))) return false;
-    if (!tour.route.test(pathname.replace(/\/+$/, '') || '/')) {
+    if (!tour.route.test(normalize(pathname))) {
       if (tour.dynamic) return false;
-      pendingRef.current = id; // تبدأ عند وصول المستخدم إلى شاشتها
+      pendingRef.current = { id, resume: Boolean(options?.resume) }; // تبدأ عند وصول المستخدم إلى شاشتها، وتحمل خيار المتابعة
       router.push(tour.entry);
       return true;
     }
@@ -97,11 +106,15 @@ export function GuideProvider({ children }: { children: ReactNode }) {
 
   // تغيّر الشاشة: أوقف الجولة النشطة (محفوظة قيد التقدم)، وابدأ جولة كانت بانتظار وصول المستخدم.
   useEffect(() => {
-    setActive((current) => (current && !current.tour.route.test(pathname.replace(/\/+$/, '') || '/') ? null : current));
-    const pending = pendingRef.current ? getTour(pendingRef.current) : undefined;
-    if (pending && pending.route.test(pathname.replace(/\/+$/, '') || '/')) {
+    // أي تغيّر شاشة يُلغي بناء خطة لم يكتمل (لا تفعيل متأخر على شاشة أخرى)، ثم تُستأنف جولة كانت بانتظار الوصول.
+    runRef.current?.abort();
+    setActive((current) => (current && !current.tour.route.test(normalize(pathname)) ? null : current));
+    const pending = pendingRef.current;
+    const pendingTour = pending ? getTour(pending.id) : undefined;
+    if (pending && pendingTour && pendingTour.route.test(normalize(pathname))) {
       pendingRef.current = null;
-      void begin(pending, 0);
+      const record = currentRecord(progressRef.current, pendingTour.id, pendingTour.version);
+      void begin(pendingTour, pending.resume && record?.status === 'in_progress' ? record.step : 0);
     }
   }, [pathname, begin]);
 
@@ -109,7 +122,7 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydratedKey !== key || active || autoTriedRef.current === key) return;
     const welcome = TOURS.find((tour) => tour.auto);
-    if (!welcome || !welcome.route.test(pathname.replace(/\/+$/, '') || '/')) return;
+    if (!welcome || !welcome.route.test(normalize(pathname))) return;
     if (currentRecord(progress, welcome.id, welcome.version)) return;
     if (!tourAvailable(welcome, (permission) => canRef.current(permission)) || !autoStartAllowed()) return;
     const timer = window.setTimeout(() => {
