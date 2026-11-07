@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf';
+import { jsPDF, type jsPDFOptions } from 'jspdf';
 import { describe, expect, it } from 'vitest';
 import { buildPdfBlob, getPdfImageSlices, type PdfPaper } from '@/lib/pdf';
 import { inspectPdf, type InspectedImage } from './helpers/pdf-inspect';
@@ -15,9 +15,10 @@ const PAGE_PX = Math.round((A4.heightMm * DOC_WIDTH) / A4.widthMm); // 2246
 const toBuffer = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
 
 async function render(doc: SyntheticDocument, options: { compress?: boolean } = {}) {
-  const Ctor = options.compress === false
-    ? (class extends jsPDF { constructor(o: ConstructorParameters<typeof jsPDF>[0]) { super({ ...(o as object), compress: false } as never); } } as typeof jsPDF)
-    : jsPDF;
+  const Uncompressed = class extends jsPDF {
+    constructor(init?: jsPDFOptions) { super({ ...init, compress: false }); }
+  } as typeof jsPDF;
+  const Ctor = options.compress === false ? Uncompressed : jsPDF;
   const contentHeight = doc.height - Math.max(0, doc.trailingBlank - 16);
   const blob = buildPdfBlob(Ctor, doc.raster, A4, doc.safeBreaks, contentHeight);
   return inspectPdf(await toBuffer(blob));

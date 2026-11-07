@@ -1,0 +1,230 @@
+[
+ {
+  "file": "purchase-order-twenty-ltr__desktop",
+  "pages": 3,
+  "MB": 19.48,
+  "MB_per_page": 6.49,
+  "pages_ink_pct_extent_pct": [
+   [
+    7.6,
+    99
+   ],
+   [
+    3.87,
+    80
+   ],
+   [
+    0.0,
+    0
+   ]
+  ]
+ },
+ {
+  "file": "purchase-order-twenty-ltr__iphone13",
+  "pages": 2,
+  "MB": 19.48,
+  "MB_per_page": 9.74,
+  "pages_ink_pct_extent_pct": [
+   [
+    6.33,
+    83
+   ],
+   [
+    5.64,
+    97
+   ]
+  ]
+ },
+ {
+  "file": "quotation-five-rtl__desktop",
+  "pages": 3,
+  "MB": 13.82,
+  "MB_per_page": 4.61,
+  "pages_ink_pct_extent_pct": [
+   [
+    3.8,
+    97
+   ],
+   [
+    0.25,
+    28
+   ],
+   [
+    0.01,
+    0
+   ]
+  ]
+ },
+ {
+  "file": "quotation-five-rtl__iphone13",
+  "pages": 2,
+  "MB": 13.82,
+  "MB_per_page": 6.91,
+  "pages_ink_pct_extent_pct": [
+   [
+    2.84,
+    56
+   ],
+   [
+    1.22,
+    68
+   ]
+  ]
+ },
+ {
+  "file": "simplified-retail-v2-three-rtl__desktop",
+  "pages": 1,
+  "MB": 7.8,
+  "MB_per_page": 7.8,
+  "pages_ink_pct_extent_pct": [
+   [
+    4.54,
+    71
+   ]
+  ]
+ },
+ {
+  "file": "simplified-retail-v2-three-rtl__iphone13",
+  "pages": 1,
+  "MB": 7.8,
+  "MB_per_page": 7.8,
+  "pages_ink_pct_extent_pct": [
+   [
+    4.54,
+    71
+   ]
+  ]
+ },
+ {
+  "file": "tax-classic-v2-twenty-ltr__desktop",
+  "pages": 3,
+  "MB": 21.44,
+  "MB_per_page": 7.15,
+  "pages_ink_pct_extent_pct": [
+   [
+    8.28,
+    94
+   ],
+   [
+    8.76,
+    98
+   ],
+   [
+    0.29,
+    7
+   ]
+  ]
+ },
+ {
+  "file": "tax-classic-v2-twenty-ltr__iphone13",
+  "pages": 3,
+  "MB": 21.78,
+  "MB_per_page": 7.26,
+  "pages_ink_pct_extent_pct": [
+   [
+    8.01,
+    91
+   ],
+   [
+    8.97,
+    100
+   ],
+   [
+    0.4,
+    7
+   ]
+  ]
+ },
+ {
+  "file": "tax-erp-v2-multipage-rtl__desktop",
+  "pages": 4,
+  "MB": 24.33,
+  "MB_per_page": 6.08,
+  "pages_ink_pct_extent_pct": [
+   [
+    8.89,
+    99
+   ],
+   [
+    8.69,
+    99
+   ],
+   [
+    1.72,
+    28
+   ],
+   [
+    0.03,
+    0
+   ]
+  ]
+ },
+ {
+  "file": "tax-erp-v2-multipage-rtl__iphone13",
+  "pages": 3,
+  "MB": 25.55,
+  "MB_per_page": 8.52,
+  "pages_ink_pct_extent_pct": [
+   [
+    8.43,
+    93
+   ],
+   [
+    8.76,
+    100
+   ],
+   [
+    2.14,
+    32
+   ]
+  ]
+ },
+ {
+  "file": "tax-erp-v2-single-rtl__desktop",
+  "pages": 1,
+  "MB": 6.66,
+  "MB_per_page": 6.66,
+  "pages_ink_pct_extent_pct": [
+   [
+    4.7,
+    61
+   ]
+  ]
+ },
+ {
+  "file": "tax-erp-v2-single-rtl__iphone13",
+  "pages": 1,
+  "MB": 6.66,
+  "MB_per_page": 6.66,
+  "pages_ink_pct_extent_pct": [
+   [
+    4.7,
+    61
+   ]
+  ]
+ },
+ {
+  "file": "tax-modern-v2-long-rtl__desktop",
+  "pages": 1,
+  "MB": 10.41,
+  "MB_per_page": 10.41,
+  "pages_ink_pct_extent_pct": [
+   [
+    6.24,
+    95
+   ]
+  ]
+ },
+ {
+  "file": "tax-modern-v2-long-rtl__iphone13",
+  "pages": 1,
+  "MB": 10.41,
+  "MB_per_page": 10.41,
+  "pages_ink_pct_extent_pct": [
+   [
+    6.24,
+    95
+   ]
+  ]
+ }
+]
