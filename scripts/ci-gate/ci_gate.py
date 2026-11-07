@@ -529,6 +529,16 @@ def touches_gate(files: list[str] | None) -> bool:
     return files is None or any(f.startswith(GATE_PATHS) for f in files)
 
 
+def _additive_proof_taken_over(bc: dict, hgrp: dict | None, base_blocking: set[str]) -> bool:
+    """True only for the one legal way an `additive` group's proof context may leave the manifest: the SAME group (id) becomes `superseding`, its proof
+    stays the very same job of the same workflow, and it now carries the name of the full check the group supersedes (a blocking check on `main`).
+    The requirement is not lowered: the shards and the proof job stay required, and the retired full check is judged by the checks above/below
+    (its guard is compared with the group's shard guard, and `required_steps` may not regress). Any other disappearance stays an error."""
+    return (bc.get("_role") == "proof" and bc.get("_status") == "additive" and hgrp is not None and hgrp.get("status") == "superseding"
+            and hgrp["proof"].get("job") == bc.get("job") and hgrp.get("workflow") == bc.get("workflow")
+            and hgrp["proof"].get("name") == bc.get("_supersedes") and bc.get("_supersedes") in base_blocking)
+
+
 def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
     """A PR may add checks or tighten, never weaken what `main` already requires.
     Compares the base branch's manifest/workflows with the PR's. Errors = weakening."""
@@ -539,6 +549,8 @@ def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
     errors = []
     hmap = {c["name"]: c for c in head["checks"]}
     head_group_ids = {g["id"] for g in head.get("shard_groups") or []}
+    head_groups_by_id = {g["id"]: g for g in head.get("shard_groups") or []}
+    base_blocking = {c["name"] for c in base["checks"] if c["tier"] in BLOCKING}
     derived = re.compile(r"--shards \d+")  # implied by the group's `count`; a count change is judged by the shard names
     retiring = {g["supersedes"]: g for g in head.get("shard_groups") or [] if g["status"] == "superseding"}
     rank = {"advisory": 0, "paths": 1, "always": 2}
@@ -550,6 +562,18 @@ def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
             legacy = hmap.get(bc.get("_supersedes", ""))
             if (bc.get("_status") == "additive" and bc.get("_group") not in head_group_ids and legacy is not None and legacy.get("_group") is None and legacy["tier"] in BLOCKING):
                 continue  # dropping a whole additive group leaves the superseded full-suite check in force: coverage unchanged
+            hgrp = head_groups_by_id.get(bc.get("_group"))
+            if _additive_proof_taken_over(bc, hgrp, base_blocking):
+                # additive -> superseding: the same proof job now carries the name of the full check it retires. The old proof's guard is
+                # compared with the proof guard the group now declares (tighten-only), so the transition cannot loosen it.
+                bg, hg = bc.get("guard") or {}, hgrp["proof"].get("guard") or {}
+                for key in ("forbidden", "require"):
+                    lost = {x for x in set(bg.get(key, [])) - set(hg.get(key, [])) if not derived.fullmatch(x)}
+                    if lost:
+                        errors.append(f"[{bc['name']}] guard.{key} lost {sorted(lost)}")
+                if bg.get("step_run_contains") != hg.get("step_run_contains"):
+                    errors.append(f"[{bc['name']}] guard.step_run_contains changed")
+                continue
             errors.append(f"[{bc['name']}] blocking check removed from the manifest")
             continue
         if rank[hc["tier"]] < rank[bc["tier"]]:
