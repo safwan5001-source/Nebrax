@@ -10,6 +10,7 @@ import { MANAGE_PERMISSIONS, OPS_BASE, PRICES_HREF } from '../nav';
 import type { Station } from '../schemas';
 import { EmptyState } from '../state-views';
 import { StationGate } from '../station-gate';
+import { OpeningEntryLink } from '../opening/opening-link';
 import { STAFF_PERMISSION, useStaffList } from './data';
 import { Badge, LinkCard } from './ui';
 
@@ -64,7 +65,7 @@ function StationSummary({ station }: { station: Station }) {
 
 export function ManageScreen() {
   const t = useTranslations('stationOps');
-  const { can } = useStationOps();
+  const { can, selectedStation } = useStationOps();
   const canStaff = can(STAFF_PERMISSION);
   // جلسة PIN لا تصل إلى شاشة الأسعار القائمة (واجهة أَوْج الإدارية): لا يُعرض رابط ميت.
   const canPrices = can('fuel.sale.price.manage') && !isStationSession();
@@ -95,6 +96,7 @@ export function ManageScreen() {
               {canPrices ? (
                 <LinkCard href={PRICES_HREF} icon={<Tag className="h-5 w-5" strokeWidth={1.8} />} title={t('manage.prices.title')} hint={t('manage.prices.hint')} />
               ) : null}
+              {selectedStation && can('fuel_stations.manage') ? <OpeningEntryLink station={selectedStation} /> : null}
             </nav>
           </>
         )}

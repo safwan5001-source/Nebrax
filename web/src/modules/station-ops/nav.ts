@@ -24,7 +24,7 @@ export interface OpsNavItem {
 export const RECEIVING_PERMISSIONS = ['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel.delivery.cost.record', 'fuel_stations.manage'] as const;
 
 /** FUEL-B4 (+B6: سياسة القراءات المتأخرة تتبع `fuel.governance.manage`): صلاحيات الوظائف الإدارية داخل التطبيق (القائمة الكنسية؛ منها يُشتق ظهور «الإدارة» وأقسامها، والخادم يفرضها في كل طلب). */
-export const MANAGE_PERMISSIONS = ['fuel.staff.manage', 'fuel.sale.price.manage', 'fuel.governance.manage'] as const;
+export const MANAGE_PERMISSIONS = ['fuel.staff.manage', 'fuel.sale.price.manage', 'fuel.governance.manage', 'fuel_stations.manage'] as const; // + B6: الحوكمة · + PR-2: إعداد المحطة (معالج الرصيد الافتتاحي)
 
 /**
  * FUEL-B4: **الاستثناء الوحيد** لقاعدة «لا روابط خارج التطبيق»: إدارة أسعار الوقود الموجودة (شاشة المسؤول القائمة) — بطلب صريح من المالك،

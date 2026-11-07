@@ -222,7 +222,7 @@ class FuelStationSettingsService
         foreach ($known as $key => $value) {
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
             // مسح mapping الحساب والعودة إلى fallback الموثق لمحرك الجرد.
-            $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id'], true) && $value === null ? '' : $value;
+            $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id', 'fuel_opening_balance_account_id'], true) && $value === null ? '' : $value;
             // FUEL-B6: مسح مدة قِدم قراءة الخزان على مستوى المؤسسة (null ⇒ «غير مضبوطة»)؛ القارئ يعامل '' كـnull. لا تغيير إن كانت غير مضبوطة أصلاً.
             if ($key === 'tank_reading_stale_after_minutes' && $value === null) {
                 $normalized = in_array($current[$key] ?? null, [null, ''], true) ? $current[$key] : '';
