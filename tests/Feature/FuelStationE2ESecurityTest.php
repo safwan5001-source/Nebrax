@@ -205,9 +205,14 @@ class FuelStationE2ESecurityTest extends TestCase
         // كميات كسرية بالميلي لتر: غير قابلة للقسمة على السعر (2.30/لتر).
         foreach ([1, 3, 7, 11, 217, 1999, 12345, 33333, 99999] as $i => $ml) {
             $d = $this->draftSale('seller', $shift, $ml, "s14-{$i}");
-            if ($d->status() >= 300) { $rows[] = ['ml' => $ml, 'draft_status' => $d->status(), 'msg' => mb_substr((string) $d->json('message'), 0, 100)]; continue; }
+            $this->assertSame(201, $d->status(), "{$ml} مل: المسودة يجب أن تُنشأ");
             $f = $this->as('seller')->postJson('/api/fuel-stations/sales/' . $d['data']['id'] . '/finalize');
-            if ($f->status() >= 300) { $rows[] = ['ml' => $ml, 'finalize_status' => $f->status(), 'msg' => mb_substr((string) $f->json('message'), 0, 100)]; continue; }
+            if ($ml === 1) { // 0.23 هللة تُقرَّب إلى صفر: الرفض متوقع صراحةً (P3 في التقرير: الرسالة غير واضحة).
+                $this->assertSame(422, $f->status(), '1 مل: بيع بقيمة صفر يجب أن يُرفض 422');
+                $rows[] = ['ml' => $ml, 'finalize_status' => 422, 'msg' => mb_substr((string) $f->json('message'), 0, 100)];
+                continue;
+            }
+            $this->assertSame(200, $f->status(), "{$ml} مل: الإنهاء يجب أن ينجح — " . mb_substr((string) $f->getContent(), 0, 200));
             $s = $f['data'];
             $inv = DB::table('invoices')->where('id', DB::table('fuel_sales')->where('id', $s['id'])->value('invoice_id'))->first();
             $exact = $ml * 230 / 1000; // هللات بدقة كسرية
@@ -217,6 +222,8 @@ class FuelStationE2ESecurityTest extends TestCase
             $this->assertSame((int) $inv->subtotal + (int) $inv->tax_amount, (int) $inv->total, "{$ml} مل: الإجمالي ≠ صافي + ضريبة");
         }
         $this->evidence('S14', ['rows' => $rows]);
+        $this->assertCount(9, $rows, 'كل الكميات التسع خضعت للفحص');
+        $this->assertSame(8, DB::table('invoices')->count(), 'ثماني فواتير ناجحة (1 مل مرفوض)');
         // تكامل الدفتر بعد كل الكسور.
         $this->assertBooksIntegrity('s14');
         $b = $this->books();
