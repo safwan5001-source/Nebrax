@@ -31,10 +31,38 @@ GROUP = {
 }
 
 
-def shard_job(count=2, name="php artisan test (L11, pgsql, shard ${{ matrix.shard }})", extra=""):
+RS = [  # the safeguards a superseding group must carry (ci_gate.SUPERSEDE_REQUIRED_LABELS), as the real design declares them
+    {"label": "aia-0.4", "run_contains": ["set -euo pipefail", "--fail-on-incomplete", "--fail-on-skipped", "--fail-on-risky",
+                                          "PublicApiScopeCeilingEnforcementTest.php", "PublicApiCreateClientCommandCeilingTest.php",
+                                          "PublicApiScopeCeilingArchitectureTest.php"],
+     "forbidden": ["--filter", "--group"], "allowed_if": ["${{ !cancelled() }}"]},
+    {"label": "watchdog.role", "run_contains": ["CREATE ROLE awj_ci_watchdog", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "IN ROLE pg_monitor"]},
+    {"label": "watchdog.tests", "run_contains": ["unittest discover -s scripts/ci-watchdog"], "env": {"AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER": "ancestor=postgres:16"}},
+    {"label": "lock.limit", "run_contains": ["max_locks_per_transaction = 1024"]},
+    {"label": "watchdog.upload", "uses": "actions/upload-artifact", "if_equals": "always()", "with_contains": {"path": ["shard-out/watchdog"]}},
+]
+
+
+def required_step_defs():
+    """Workflow steps that satisfy RS exactly (the fixture a compliant PR would contain)."""
+    return [
+        {"name": "AIA", "if": "${{ !cancelled() }}", "run": "set -euo pipefail\nvendor/bin/phpunit --fail-on-incomplete --fail-on-skipped --fail-on-risky \\\n"
+         "  tests/Feature/PublicApiScopeCeilingEnforcementTest.php \\\n  tests/Feature/PublicApiCreateClientCommandCeilingTest.php \\\n"
+         "  tests/Feature/PublicApiScopeCeilingArchitectureTest.php\n"},
+        {"name": "role", "run": "set -euo pipefail\ndocker exec x psql -c \"CREATE ROLE awj_ci_watchdog LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+         "NOREPLICATION IN ROLE pg_monitor\"\n"},
+        {"name": "wd tests", "env": {"AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER": "ancestor=postgres:16"}, "run": "python3 -m unittest discover -s scripts/ci-watchdog -v\n"},
+        {"name": "lock", "run": "set -euo pipefail\ndocker exec x psql -c \"ALTER SYSTEM SET max_locks_per_transaction = 1024\"\n"},
+        {"name": "upload", "if": "always()", "uses": "actions/upload-artifact@v4",
+         "with": {"name": "shard-${{ matrix.shard }}", "path": "x/shard-out/junit.xml\nx/shard-out/watchdog/\n"}},
+    ]
+
+
+def shard_job(count=2, name="php artisan test (L11, pgsql, shard ${{ matrix.shard }})", extra="", required=False):
+    steps_ = [{"name": "Run shard", "run": "set -o pipefail\nphp artisan test --parallel --processes=4 " + extra + "2>&1 | tee out.txt\n"}]
     return {"name": name, "runs-on": "ubuntu-latest",
             "strategy": {"fail-fast": False, "matrix": {"shard": list(range(1, count + 1))}},
-            "steps": [{"name": "Run shard", "run": "set -o pipefail\nphp artisan test --parallel --processes=4 " + extra + "2>&1 | tee out.txt\n"}]}
+            "steps": steps_ + (required_step_defs() if required else [])}
 
 
 def proof_job(count=2, run=None, name=PROOF):
@@ -60,7 +88,7 @@ class Sandbox:
             manifest["shard_groups"] = [grp]
             if shards:
                 n = grp["count"] if isinstance(grp["count"], int) and not isinstance(grp["count"], bool) else 2
-                doc["jobs"][grp["job"]] = shard_job(n)
+                doc["jobs"][grp["job"]] = shard_job(n, required=bool(grp.get("required_steps")))
                 if grp["proof"].get("job"):
                     doc["jobs"][grp["proof"]["job"]] = proof_job(n, name=grp["proof"].get("name", PROOF))
         if retire_legacy:  # the superseded check leaves `checks` and the `test` matrix; its name lives on the proof job
@@ -85,6 +113,7 @@ def superseding(**kw):
     grp = copy.deepcopy(GROUP)
     grp["status"] = "superseding"
     grp["proof"]["name"] = LEGACY
+    grp["required_steps"] = copy.deepcopy(RS)  # a superseding group must carry every safeguard of the check it retires
     return grp
 
 
