@@ -34,6 +34,7 @@ use Tests\TestCase;
 class FuelReceivingHardeningTest extends TestCase
 {
     use RefreshDatabase;
+    use GivesFuelDeliveryCost;
     use InteractsWithApi;
 
     private const BASE = '/api/fuel-stations';
@@ -211,9 +212,10 @@ class FuelReceivingHardeningTest extends TestCase
         $this->assertArrayHasKey('status', $shown);
 
         // استجابات الكتابة تُحجب كذلك: إنشاء استلام جديد ومطابقة جديدة.
-        $created = $this->withToken($token)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'b1-cost-2'))->assertCreated()->json('data');
+        $created = $this->withToken($token)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'b1-cost-2')))->assertCreated()->json('data');
+        $this->setCostDirectly($created['id']);
         $this->assertLacksKeys($deliveryKeys, $created);
-        $this->assertLacksKeys($deliveryKeys, $this->withToken($token)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'b1-cost-2'))->assertOk()->json('data'));
+        $this->assertLacksKeys($deliveryKeys, $this->withToken($token)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, $f['station_a'], $f['tank_a'], $f['warehouse_a'], 'b1-cost-2')))->assertOk()->json('data'));
         $this->assertLacksKeys($deliveryKeys, $this->withToken($token)->postJson(self::BASE . '/deliveries/' . $created['id'] . '/approve')->assertOk()->json('data'));
         $second = $this->withToken($token)->postJson(self::BASE . '/supplier-invoices', $this->invoicePayload($f, 'B1-INV-COST-2'))->assertOk()->json('data');
         $this->assertLacksKeys($invoiceKeys, $second);

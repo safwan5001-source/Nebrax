@@ -1,0 +1,762 @@
+[
+  {
+    "id": "ar-light-390x844",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — جيد. 18,700 من 34,000 لتر",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 177.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — متابعة. 11,900 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 112.7,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — منخفض. 4,760 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 45.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — منخفض. 0 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — منخفض. 4,000 من 34,000 لتر. تنبيه: الرصيد أقل من الحد الأدنى المضبوط للخزان (5,000 لتر).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 37.9,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — متابعة. 6,800 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 64.4,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — متابعة. 17,000 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 161,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 2746,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5013,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "ar-dark-390x844",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — جيد. 18,700 من 34,000 لتر",
+        "band": "healthy",
+        "fillBg": "rgb(76, 201, 168)",
+        "fillWidthPx": 177.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — متابعة. 11,900 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 112.7,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — منخفض. 4,760 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 45.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — منخفض. 0 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — منخفض. 4,000 من 34,000 لتر. تنبيه: الرصيد أقل من الحد الأدنى المضبوط للخزان (5,000 لتر).",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 37.9,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — متابعة. 6,800 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 64.4,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — متابعة. 17,000 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 161,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "rtl",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 2746,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5013,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "en-light-390x844",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — Good. 18,700 of 34,000 L",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 177.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — Monitor. 11,900 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 112.7,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — Low. 4,760 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 45.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — Low. 0 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — Low. 4,000 of 34,000 L. Alert: the balance is below the tank's configured minimum level (5,000 L).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 37.9,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — Monitor. 6,800 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 64.4,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — Monitor. 17,000 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 161,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 655,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5145,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "en-dark-390x844",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — Good. 18,700 of 34,000 L",
+        "band": "healthy",
+        "fillBg": "rgb(76, 201, 168)",
+        "fillWidthPx": 177.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — Monitor. 11,900 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 112.7,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — Low. 4,760 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 45.1,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — Low. 0 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — Low. 4,000 of 34,000 L. Alert: the balance is below the tank's configured minimum level (5,000 L).",
+        "band": "low",
+        "fillBg": "rgb(255, 138, 148)",
+        "fillWidthPx": 37.9,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — Monitor. 6,800 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 64.4,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — Monitor. 17,000 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(242, 176, 104)",
+        "fillWidthPx": 161,
+        "trackWidthPx": 324,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "ltr",
+    "dark": true,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 655,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5145,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "ar-light-320x568",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 2,
+    "meters": [
+      {
+        "text": "55% — جيد. 18,700 من 34,000 لتر",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 138.6,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — متابعة. 11,900 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 88.2,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — منخفض. 4,760 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 35.3,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — منخفض. 0 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — منخفض. 4,000 من 34,000 لتر. تنبيه: الرصيد أقل من الحد الأدنى المضبوط للخزان (5,000 لتر).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 29.6,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — متابعة. 6,800 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 50.4,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — متابعة. 17,000 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 126,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 3086,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5241,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "en-light-320x568",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 7,
+    "meters": [
+      {
+        "text": "55% — Good. 18,700 of 34,000 L",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 138.6,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — Monitor. 11,900 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 88.2,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — Low. 4,760 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 35.3,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — Low. 0 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — Low. 4,000 of 34,000 L. Alert: the balance is below the tank's configured minimum level (5,000 L).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 29.6,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — Monitor. 6,800 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 50.4,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — Monitor. 17,000 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 126,
+        "trackWidthPx": 254,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 1238,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5377,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "ar-light-430x932",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — جيد. 18,700 من 34,000 لتر",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 199.1,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — متابعة. 11,900 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 126.7,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — منخفض. 4,760 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 50.7,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — منخفض. 0 من 34,000 لتر",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — منخفض. 4,000 من 34,000 لتر. تنبيه: الرصيد أقل من الحد الأدنى المضبوط للخزان (5,000 لتر).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 42.6,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — متابعة. 6,800 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 72.4,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — متابعة. 17,000 من 34,000 لتر",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 181,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "rtl",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 2638,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 4993,
+    "issues": [],
+    "writes": 0
+  },
+  {
+    "id": "en-light-430x932",
+    "overflow": 0,
+    "small": [],
+    "clipped": [],
+    "titleTruncated": 0,
+    "meters": [
+      {
+        "text": "55% — Good. 18,700 of 34,000 L",
+        "band": "healthy",
+        "fillBg": "rgb(11, 110, 90)",
+        "fillWidthPx": 199.1,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "35% — Monitor. 11,900 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 126.7,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "14% — Low. 4,760 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 50.7,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "0% — Low. 0 of 34,000 L",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 0,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "12% — Low. 4,000 of 34,000 L. Alert: the balance is below the tank's configured minimum level (5,000 L).",
+        "band": "low",
+        "fillBg": "rgb(180, 35, 50)",
+        "fillWidthPx": 42.6,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "20% — Monitor. 6,800 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 72.4,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      },
+      {
+        "text": "50% — Monitor. 17,000 of 34,000 L",
+        "band": "monitor",
+        "fillBg": "rgb(143, 77, 8)",
+        "fillWidthPx": 181,
+        "trackWidthPx": 364,
+        "fillStartsAtInlineStart": true,
+        "transition": "0s"
+      }
+    ],
+    "dir": "ltr",
+    "dark": false,
+    "arabicIndicDigits": false,
+    "lastCardBottomVsNavTop": 422,
+    "devtools": false,
+    "statuses": [
+      "ok:healthy",
+      "ok:monitor",
+      "ok:low",
+      "ok:low",
+      "over_capacity:",
+      "unavailable:multi_tank",
+      "unavailable:no_stock_record",
+      "unavailable:not_provided",
+      "unavailable:invalid_data",
+      "ok:low",
+      "ok:monitor",
+      "ok:monitor"
+    ],
+    "minAlerts": 1,
+    "pageHeight": 5077,
+    "issues": [],
+    "writes": 0
+  }
+]

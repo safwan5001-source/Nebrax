@@ -3012,6 +3012,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "cost": "Cost",
       "actions": "Executable actions",
       "alerts": "Alerts",
       "audit": "Audit",
@@ -14785,8 +14786,56 @@
       "tankProduct": "Product",
       "tankCapacity": "Capacity",
       "tankNozzles": "Linked nozzles",
-      "tankLevelNote": "Current tank levels aren't shown here yet; they will appear once tank readings are connected in a later slice.",
+      "tankLevelNote": "The balance shown is a book balance computed from approved movements, not a physical measurement of the tank; it can differ from reality until a stock count is reconciled.",
       "subtitle": "View only"
+    },
+    "tankLevel": {
+      "meterLabel": "Tank level",
+      "percentValue": "{value}%",
+      "percentStatus": "{percent} — {status}",
+      "band": {
+        "healthy": "Good",
+        "monitor": "Monitor",
+        "low": "Low"
+      },
+      "amount": "{level} of {capacity} {unit}",
+      "source": {
+        "physical": "Manual measurement",
+        "atg": "Automatic gauge (ATG)",
+        "book": "Book balance",
+        "estimated": "Estimated"
+      },
+      "updatedAt": "Last updated: {time}",
+      "bookBalance": "Book balance",
+      "belowMinimum": "Alert: the balance is below the tank's configured minimum level ({minimum} {unit}).",
+      "unavailable": {
+        "title": "Level unavailable",
+        "api": {
+          "multi_tank": "Balance isn't available per tank: more than one tank feeds the same stock.",
+          "no_stock_record": "There is no stock record for this product in the warehouse yet.",
+          "ambiguous_stock_record": "More than one stock record exists for this product; the balance can't be determined.",
+          "invalid_stock_record": "The stock record is invalid and needs review.",
+          "no_warehouse": "The station isn't linked to a warehouse.",
+          "tank_inactive": "The tank is inactive.",
+          "unit_mismatch": "The product unit doesn't match millilitres/litres.",
+          "invalid_configuration": "The tank or product setup is incomplete.",
+          "not_provided": "The server didn't send balance data.",
+          "invalid_data": "The balance data received isn't valid.",
+          "unknown_reason": "No balance is available for this tank."
+        },
+        "reason": {
+          "missing_level": "No level data for this tank.",
+          "invalid_level": "The level value is not valid.",
+          "invalid_capacity": "The tank capacity is not valid for comparison.",
+          "conflicting_unit": "The level unit does not match the capacity unit."
+        }
+      },
+      "overCapacity": {
+        "title": "Level exceeds capacity",
+        "body": "Unusual value; verify the reading before relying on it."
+      },
+      "loading": "Loading level",
+      "error": "Couldn't load the level"
     },
     "assetStatus": {
       "active": "Active",
@@ -15779,7 +15828,6 @@
     "receiving": {
       "title": "Fuel receiving",
       "subtitle": "Receiving drafts and approvals",
-      "untitled": "Receiving without a delivery note",
       "unit": "L",
       "currency": "SAR",
       "status": {
@@ -15797,7 +15845,6 @@
       },
       "list": {
         "new": "New receiving",
-        "needsCost": "Creating a receiving needs the fuel-cost permission because the receiving value is mandatory. You can still view receivings.",
         "filter": "Receiving status",
         "all": "All",
         "empty": "No receivings",
@@ -15808,20 +15855,30 @@
         "pageOf": "{page} / {last}",
         "received": "Received",
         "cost": "Value",
-        "draftNote": "A draft does not change station stock. Only approval adds the quantity to stock."
+        "draftNote": "A draft does not change station stock. Only approval adds the quantity to stock.",
+        "search": "Search receivings",
+        "searchPlaceholder": "Search by supplier note number, receiving number (FD-…) or supplier",
+        "moreFilters": "More filters",
+        "costFilter": "Cost status",
+        "cost_missing": "Awaiting cost",
+        "cost_recorded": "Cost recorded",
+        "from": "From date",
+        "to": "To date",
+        "rangeInvalid": "The end date is before the start date."
       },
       "field": {
         "supplier": "Supplier",
         "tank": "Tank",
         "warehouse": "Station warehouse",
-        "deliveryNote": "Delivery note number",
+        "deliveryNote": "Supplier delivery note number",
         "purchaseRef": "Purchase reference",
         "tanker": "Tanker number",
         "driver": "Driver name",
         "notes": "Notes",
         "dispatched": "Dispatched quantity",
         "received": "Received quantity",
-        "cost": "Receiving value"
+        "cost": "Receiving value",
+        "internalNumber": "Internal receiving number"
       },
       "detail": {
         "none": "Not recorded",
@@ -15839,7 +15896,8 @@
         "approvedBy": "Approved by",
         "you": "You",
         "another": "Another user",
-        "approvedEffect": "The received quantity was added to station stock and its value recorded. An approved receiving cannot be edited or deleted."
+        "approvedEffect": "The received quantity was added to station stock and its value recorded. An approved receiving cannot be edited or deleted.",
+        "noteLegacy": "Not recorded (legacy receiving)"
       },
       "approve": {
         "doneTitle": "Receiving approved",
@@ -15865,7 +15923,8 @@
           "who": "Supplier and tank",
           "quantities": "Quantities and value",
           "readings": "Tank readings",
-          "review": "Review"
+          "review": "Review",
+          "documents": "Supplier note"
         },
         "noWarehouse": "Not linked",
         "searchSupplier": "Search suppliers",
@@ -15874,11 +15933,10 @@
         "noTanks": "This station has no tanks",
         "tankUnavailable": "Unavailable (inactive)",
         "referencesTitle": "References",
-        "deliveryNoteHint": "Prevents the same receiving being entered twice for one supplier. Without it the system cannot detect duplicates.",
-        "costHint": "Total receiving value in riyals, as on the supplier document.",
+        "deliveryNoteHint": "Required: the number printed on the supplier's delivery note (not the internal FD- receiving number). Prevents the same receiving being entered twice for one supplier.",
         "readingsHint": "Optional: record the tank reading before and after unloading to cross-check the quantity. Both readings are recorded before the draft.",
         "readingType": "Reading type",
-        "draftEffect": "Saving only creates a draft: station stock does not change and no value is recorded. Approval is a separate step by an authorised user.",
+        "draftEffect": "Saving only creates a draft: station stock does not change and you do not enter a cost here; authorised users record it later. Approval is a separate step.",
         "notFoundYet": "No matching draft was found on the server. You can retry safely: the same key never creates a duplicate receiving.",
         "back": "Back",
         "retry": "Try again",
@@ -15888,17 +15946,16 @@
         "noCreate": {
           "title": "You cannot create receivings",
           "body": "Ask a station administrator to enable the receiving-creation permission."
-        },
-        "needsCost": {
-          "title": "Creating a receiving needs the fuel-cost permission",
-          "body": "The receiving value is a mandatory field and only people with the cost permission can enter it. Ask a station administrator."
         }
       },
       "created": {
         "title": "Draft saved",
-        "body": "Station stock has not changed yet. An authorised user approves the receiving.",
+        "body": "Station stock has not changed yet. Finance records its cost, then an authorised user approves it.",
         "open": "Open the draft",
-        "list": "Receiving list"
+        "list": "Receiving list",
+        "attached": "Supplier note attachments uploaded.",
+        "attachFailed": "The draft was saved, but the attachments did not finish uploading. Nothing is lost: retry here or from the receiving details.",
+        "retryUpload": "Retry attachment upload"
       },
       "issue": {
         "supplier_required": "Choose the supplier.",
@@ -15909,15 +15966,12 @@
         "received_required": "Enter the received quantity.",
         "received_invalid": "The received quantity is invalid (digits, up to three decimals).",
         "received_not_positive": "The received quantity must be greater than zero.",
-        "cost_required": "Enter the receiving value (an explicit zero if it is zero).",
-        "cost_invalid": "The receiving value is invalid.",
         "before_invalid": "The before-receiving reading is invalid.",
         "after_invalid": "The after-receiving reading is invalid.",
-        "after_below_before": "The after reading is lower than the before reading, which is impossible after unloading. Check both readings."
+        "after_below_before": "The after reading is lower than the before reading, which is impossible after unloading. Check both readings.",
+        "delivery_note_required": "Enter the supplier delivery note number (required)."
       },
       "warning": {
-        "no_delivery_note": "Without a delivery note number the system cannot prevent this receiving being duplicated.",
-        "cost_zero": "The receiving value is zero. Make sure it is intended before saving.",
         "received_above_dispatched": "Received is more than dispatched.",
         "received_below_dispatched": "Received is less than dispatched.",
         "readings_incomplete": "Only one reading was recorded; the tank rise cannot be cross-checked without both.",
@@ -15955,7 +16009,152 @@
         "reading_conflict": "A reading with the same key exists with a different value. Start a new receiving after reviewing the readings.",
         "serverSays": "Server said: {message}",
         "check": "Check status",
-        "checking": "Checking…"
+        "checking": "Checking…",
+        "cost_required": "Record the receiving cost first: a receiving without a cost cannot be approved.",
+        "cost_locked": "The receiving is approved, so its cost cannot be changed.",
+        "cost_changed": "The cost changed after you reviewed it. Review the new value, then approve.",
+        "attachment_invalid": "The file is not accepted: check the type (PDF/JPG/PNG), the size (up to 10 MB) and that the file is intact.",
+        "attachment_limit": "You exceeded the attachment limit.",
+        "attachment_locked": "An approved receiving's attachment cannot be deleted.",
+        "note_required": "The supplier delivery note number is required to create a new receiving. Enter it and try again."
+      },
+      "attach": {
+        "title": "Supplier note attachments",
+        "none": "No attachments yet.",
+        "count": "{count} attachment(s)",
+        "takePhoto": "Photograph note",
+        "chooseFile": "Choose file",
+        "hint": "A photo of the note or a PDF/JPG/PNG file, up to 10 MB each and 5 files at a time.",
+        "upload": "Upload {count} file(s)",
+        "uploading": "Uploading…",
+        "unstage": "Remove from list",
+        "preview": "Preview",
+        "download": "Download",
+        "remove": "Delete",
+        "removeTitle": "Delete attachment?",
+        "removeConfirm": "Delete",
+        "keep": "Keep",
+        "loading": "Loading…",
+        "previewFailed": "The file could not be shown. Try downloading it.",
+        "openPdf": "Open PDF",
+        "close": "Close",
+        "stepTitle": "Photograph the supplier note",
+        "stepHint": "Optional: photograph the delivery note or attach its file so it stays linked to the receiving. The supplier note number is entered in the first step and is the required one; an attachment does not replace it. It uploads after the draft is saved and can be added later.",
+        "stepNone": "No files added.",
+        "reject": {
+          "type": "File type not allowed (PDF, JPG or PNG only)",
+          "size": "Larger than 10 MB",
+          "empty": "The file is empty",
+          "limit": "File limit exceeded"
+        }
+      },
+      "cost": {
+        "title": "Receiving cost",
+        "state": "Cost status",
+        "recorded": "Recorded",
+        "missing": "Awaiting cost",
+        "blindRecorded": "Finance recorded the cost of this receiving.",
+        "blindMissing": "Finance records the receiving cost before approval. You do not need to enter it.",
+        "label": "Actual total receiving cost",
+        "correctLabel": "Correct the receiving cost (before approval)",
+        "hint": "The total actually paid, in riyals, positive. Recording it does not change stock; only approval adds the quantity.",
+        "required": "Enter the cost.",
+        "invalid": "Invalid cost: enter a positive amount (up to two decimals).",
+        "save": "Record cost",
+        "saving": "Recording…",
+        "saved": "Cost recorded.",
+        "back": "Back",
+        "confirm": "Confirm",
+        "confirmTitle": "Confirm cost",
+        "confirmBody": "This value becomes the stock cost basis when the receiving is approved. You can correct it only before approval.",
+        "noPermission": "Recording cost needs a dedicated financial permission, which you do not have.",
+        "locked": "The receiving is approved: its cost is locked."
+      },
+      "costs": {
+        "title": "Awaiting cost",
+        "subtitle": "Drafts with no recorded cost",
+        "open": "Receivings awaiting cost",
+        "intro": "Record each draft's actual cost before it is approved.",
+        "introReadonly": "These drafts are waiting for an authorised user to record their cost.",
+        "empty": "No receivings awaiting cost",
+        "emptyBody": "Every current draft has its cost recorded."
+      },
+      "ready": {
+        "cost_ok": "Cost recorded",
+        "cost_missing": "Cost not recorded",
+        "blocked": "Record the actual cost first to enable approval.",
+        "note_ok": "Supplier delivery note number recorded",
+        "note_legacy": "Legacy receiving with no note number: this does not block approval",
+        "attachment_ok": "Delivery note attachment present",
+        "attachment_none": "No delivery note attachment (optional)"
+      },
+      "docs": {
+        "title": "Print and export",
+        "variant": "Document version",
+        "variant_operational": "Operational (no prices)",
+        "variant_financial": "Financial (with cost)",
+        "operationalNote": "The operational version contains no price or cost.",
+        "financialNote": "The financial version includes cost, for authorised users only.",
+        "print": "Print",
+        "download": "Download",
+        "share": "Share",
+        "working": "Preparing…",
+        "downloaded": "The file is ready and downloading.",
+        "opened": "The file opened in a new tab; print it from there.",
+        "popupBlocked": "The browser blocked opening the file. Use download.",
+        "shared": "Shared.",
+        "demo": "Preview mode does not create files.",
+        "forbidden": "You are not allowed this version.",
+        "notFound": "This record is not available to you.",
+        "failed": "The file could not be prepared. Try again.",
+        "reportTitle": "Export receiving statement",
+        "reportHint": "The statement covers receivings matching the current search and filters (up to 2,000 rows)."
+      },
+      "doc": {
+        "title": "Fuel Receiving Voucher",
+        "reportTitle": "Fuel Receiving Statement",
+        "reference": "Internal receiving number",
+        "variantOperational": "Operational version — no prices or costs",
+        "variantFinancial": "Financial version — includes cost",
+        "company": "Company",
+        "vat": "VAT number",
+        "cr": "CR number",
+        "station": "Station",
+        "product": "Product",
+        "receivedAt": "Received at",
+        "variancePct": "Variance %",
+        "cost": "Cost",
+        "costTotal": "Total cost",
+        "costPerLiter": "Average cost per litre",
+        "costRecordedBy": "Cost recorded by",
+        "costCol": "Cost",
+        "currency": "SAR",
+        "receiver": "Received by",
+        "approver": "Approved by",
+        "driverSignature": "Driver",
+        "signature": "Signature",
+        "notApproved": "Not approved yet",
+        "generatedBy": "Generated by",
+        "generatedAt": "Generated",
+        "page": "Page",
+        "operationalNote": "Operational version: contains no prices or costs.",
+        "state": "Status",
+        "total": "Total",
+        "count": "Count",
+        "uncosted": "Receivings without cost",
+        "truncated": "The statement is limited to the first 2,000 receivings; narrow the filters.",
+        "empty": "No matching receivings.",
+        "filtersTitle": "Filters",
+        "filter": {
+          "q": "Search",
+          "status": "Status",
+          "cost": "Cost",
+          "from": "From",
+          "to": "To",
+          "supplier": "Supplier",
+          "station": "Station"
+        },
+        "variance": "Transit variance"
       }
     }
   }

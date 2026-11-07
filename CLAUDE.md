@@ -822,6 +822,13 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **النشر:** الكود أولاً ثم الهجرة. نسخة أقدم من الخدمة أثناء إيقاف قائم تُرفض بخطأ قاعدة (500) بدل 422 (فشل مغلق). D-B5 (أثر محاسبي/ضريبي لتأخر الاستردادات ومهل الإصدار) **غير معتمد** لتفعيل إنتاجي.
 - المرجع: `docs/audits/horizon/REM-18b-3d-IMPLEMENTATION-REPORT.md` و`REM-18b-3c-EMERGENCY-STOP-POLICY-B-CONTRACT-PROPOSAL.md`.
 
+## حماية عملة المؤسسة — CUR-1 (D-12)
+
+`PUT /company` لا يغيّر `tenants.currency` إلى قيمة **مختلفة** (بعد التطبيع إلى أحرف كبيرة) ما دام للمؤسسة قيد `posted` أو `reversed`: **422** بجسم `{message, reason: "company_currency_locked", errors:{currency:[…]}}` وتراجع كامل (لا حفظ جزئي لبقية حقول الشركة). `App\Services\Accounting\CompanyCurrencyGuard` هو المصدر الوحيد للقاعدة؛ و`App\Support\Iso4217` قائمة رموز ISO 4217 الصالحة (155 رمزاً من SIX list-one بتاريخ 2026-09-17؛ مستبعد: الصناديق والمعادن والوحدات الحسابية وXXX/XTS) — **رموز فقط بلا منازل عشرية** (تفسير القيم المخزّنة قرار D-12 الخيار C المنفصل).
+- **العملة نفسها (ولو اختلفت الأحرف) ليست تغييراً**: لا كتابة ولا رفض، ولا إعادة كتابة تلقائية لرمز تاريخي (`sar` أو غير ISO مخزَّن). `currency` غائب/`null`/`''` = لا تغيير مطلوب (كان `null` يسقط في قيد NOT NULL).
+- **التزامن بلا قفل جديد:** التحديث كله في معاملة تقفل صفّ المستأجر `FOR UPDATE` **أولاً** (مِرساة كل ترحيل/عكس قيد عبر `AccountingDateGuard`) ثم يفحص القيود. **لا تنقل الفحص قبل القفل ولا تجعله «فحص ثم كتابة»**: عندها يمرّ التغيير فوق قيد يُودَع أثناء الانتظار (يحرسه `CompanyCurrencyRacePostgresTest`).
+- لا تحويل عملات ولا مساس بـ`Money::toRiyal`/`ZatcaService::formatAmount`/ZATCA XML/البيانات التاريخية. المرجع: `docs/ai/reports/AIA-D12-CURRENCY-MONEY-CONTRACT-ASSESSMENT.md` §10 و`docs/ai/reports/CUR-1-IMPLEMENTATION-REPORT.md`.
+
 ## حقل الهاتف الدولي — INTL-PHONE-V1
 
 `web/src/components/ui/international-phone-input.tsx` (`InternationalPhoneInput`) هو حقل الهاتف المشترك؛ يستعمله `/register` أولاً ويصلح للعملاء والموردين والموظفين لاحقاً. المنطق في `web/src/lib/phone/` (`digits.ts` تطبيع الأرقام، `phone.ts` فوق libphonenumber-js `max`، `countries.ts` القائمة والبحث).
@@ -866,6 +873,14 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 
 وكيل خارجي مخوَّل يستعمل **الـ Public API القائمة نفسها** (`/api/v1`، مفتاح M2M بـ scopes أقل امتياز، لا مصادقة موازية ولا MCP/Gateway): بحث الأطراف `partners:read` · بحث المنتجات `products:read` · إنشاء منتج `products:write` · إنشاء **مسودة** فاتورة `invoices:write` (idempotency إلزامي، الخادم يحسب الإجماليات، بلا قيد/ترحيل/سداد/ZATCA) · **كشف حساب طرف** `GET /partners/{id}/statement` بـ`statements:read` (قراءة فقط، غلاف فوق `ReportService::partnerStatement`، مبالغ بالهللات، سقف 2000 حركة ⇒ 422 لتضييق `from`/`to`، تفاصيل: `docs/audits/AWJ-AI-API-FIRST-INTEGRATION-REPORT.md`). `statements:read` scope مستقل عن `partners:read` عمداً (أرصدة مالية) ويُسقَط على `reports.view`. ملاحظة اختبارات: مسارات الـ Internal تترك `Auth::shouldUse('sanctum')` في عملية الاختبار، فاضبط `shouldUse('web')` قبل نداء Public في اختبار يخلطهما.
 
+### AIA-0.1 — الغلاف المالي لكشف حساب الطرف (إضافي، بلا هجرة)
+
+`GET /api/v1/partners/{id}/statement` يضيف بعد الحقول القديمة (التي لا تتغيّر قيمةً ولا ترتيباً) حقولاً **إضافية** يبنيها `App\Support\PartnerStatementEnvelope` فوق `StatementIntegrity` و`CurrencyMinorUnits` (كلها دوال نقية في `app/Support/` مباشرةً لأن `setup.sh` ينسخ `Support/*.php` فقط): `role` · `row_count` · `totals{row_count,debit_minor,credit_minor,net_minor}` · `balance_convention` · `position{opening,closing}` · `display` · `minor_unit_exponent` · `integrity{status,checks,not_checked}` · `report_status`.
+- **الاتجاه لا يُقلب في الحقول القديمة:** الرصيد = مدين − دائن لكل الأدوار؛ الجانب (`receivable`/`payable`/`settled`) من إشارة الرصيد لا من الدور، و`opposite_sign` لعميل دائن أو مورد مدين. الإجماليات من الصفوف الأصلية بأعداد صحيحة فقط، وحدّ 2^53−1 يسري على **كل قيمة محسوبة** (مجموع المدين/الدائن، الصافي، الرصيد الجاري، الختامي المتوقع) عبر `addSafe` لا على المدخلات وحدها — حركات متوازنة متكررة قد تُبقي الرصيد صغيراً وتتجاوز الإجمالي الحدّ دون فيض `PHP_INT_MAX` (فحص `computed_values_within_safe_range`)؛ وعند فشل الجمع تكون `totals.debit_minor/credit_minor/net_minor = null` لا صفراً. ولا `float` ولا قسمة في ملفات الغلاف (يحرسه `StatementEnvelopeNoFloatArchitectureTest`).
+- **`report_status`:** `final` فقط عند عملة مدعومة + كل الفحوص ناجحة + نتيجة كاملة؛ وإلا `unverified` (فحص فشل: `display`/`position` = `null`) أو `partial` أو `unsupported`. الفحوص اتساق حسابي داخلي ولا تطابق دفاتر أخرى ولا تثبت الاكتمال: `row_count_matches_rows` يقارن العدد المفحوص بالمُخرَج وكلاهما من المصفوفة نفسها (حارس تسلسل فقط)، والاكتمال المستقل = AIA-0.2 (`integrity.not_checked` يعلن ذلك).
+- **D-12 الخيار C:** `SAR` فقط (الأُسّ 2، `display` عبر `Money::toRiyal` دون تعديلها). غير SAR ⇒ `unsupported` بلا `display`/`position`، والقيم الخام تبقى للتوافق **دون ضمان أنها وحدات صغرى حقيقية للعملة المعلنة**.
+- **الرفض الصلب مغلق افتراضياً:** `PUBLIC_API_STATEMENT_REJECT_ON_INTEGRITY_FAILURE` (`config/public_api.php`) — مفتوحاً يردّ 500 (`internal_error` + `details.reason=report_integrity_failed`) بلا بيانات؛ مغلقاً يُسجَّل فقط ويبقى الرد 200 `unverified`. فتحه قرار مالك لاحق. الترقيم (`cursor`) هو AIA-0.2 ولم يُبنَ؛ السقف 2000 ⇒ 422 كما كان. المرجع: `docs/ai/reports/AIA-0.1-EXECUTION-REPORT.md`.
+
 ### FUEL-B4 — الإدارة داخل التطبيق (`/fuel-stations/ops/manage`، `web/src/modules/station-ops/admin/`)
 
 واجهة جوال لإدارة موظفي المحطات فوق خدمات B3 (`FuelStaffAccessService`) بلا RBAC موازٍ؛ التفاصيل والمخاطر: `docs/fuel-stations/FUEL_REMEDIATION_HORIZON.md` (Phase B / B4).
@@ -881,6 +896,18 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **حدّ الشبكة:** كل HTTP في `receiving/receiving-client.ts`: قراءة بقائمة بيضاء (قائمة/استلام بـuuid/`delivery-suppliers`/`readings`) و**ثلاث POST فقط** (قراءة خزان · مسودة · اعتماد). نتيجة غير مؤكدة ⇒ «تحقق من الحالة» بالقراءة، ولا إعادة إرسال إلا بفعل صريح وبالمفتاح نفسه (idempotency للمسودة؛ مفتاح دليل حتمي للقراءات). يحرسه `receiving/receiving-boundary.test.ts`.
 - **الصلاحيات:** `fuel.delivery.view|create|approve` + `fuel.reading.record` (أو `fuel_stations.manage` القديم)، والتكلفة `products.view_cost` وحدها (غيابها ⇒ المفتاح محذوف من الاستجابة). **بدء استلام من التطبيق يتطلب التكلفة** لأنها إلزامية في الإنشاء (D-B5-1 للمالك).
 - **API إضافية (قراءة فقط):** `GET fuel-stations/delivery-suppliers` وإثراء `FuelDeliveryResource` (أسماء، `created_by`، قراءات مربوطة).
+
+### FUEL-B5.1 — الاستلام بلا تكلفة، المرفقات، التكلفة المنفصلة، الطباعة والتصدير (هجرة واحدة)
+
+التفاصيل: `docs/fuel-stations/FUEL_REMEDIATION_HORIZON.md` (B5.1). **التكلفة NULL = لم تُسجَّل (لا صفر)**: `received_*_cost_minor` nullable + `cost_recorded_by/at`؛ موظف المحطة ينشئ المسودة بلا تكلفة، وتسجّلها المالية بـ`POST deliveries/{id}/cost` (موجب، مسودة فقط، `FuelDeliveryCostAuthority` = `fuel.delivery.cost.record` أو `fuel_stations.manage` **و** `products.view_cost`، تدقيق بلا مبلغ، **لا أثر مخزني/محاسبي**). الاعتماد (`assertApprovable`) يشترط تكلفة مسجَّلة فقط، و`expected_total_cost_minor` اختياري لمن يرى التكلفة (409 عند تغيّرها). **رقم سند المورد `delivery_note_number` إلزامي لإنشاء أي استلام جديد** (`FUEL_DELIVERY_NOTE_REQUIRED`؛ المرفق وحده لا يكفي)، والمرفق اختياري، والاستلامات القائمة قبل B5.1 لا تُحجب عن الاعتماد بسبب غياب السند/المرفق؛ **رقم الاستلام الداخلي `FD-XXXXXXXX` (`reference`) ≠ رقم سند المورد** ولا يختلطان في أي سطح. مرفقات السند: `fuel_delivery_attachments` فوق `AttachmentStorage` + `DocumentFileInspector` (PDF/JPG/PNG ≤ 10MB). السند والكشف من `FuelDeliveryDocumentBuilder` وحده: تشغيلية بلا أي مبلغ، ومالية 403 لغير من يرى التكلفة؛ PDF يُرسم في المتصفح من حمولة الخادم، وExcel من الخادم. لا تُضف مساراً يكتب `received_*_cost_minor` خارج `FuelSupplyReceivingService`.
+
+## رصيد الخزان الدفتري — TANK-BALANCE-P1 (قراءة فقط، مفتوح لكل مستأجر دون بوابة)
+
+`GET fuel-stations/tanks` و`/tanks/{id}` يضيفان حقلين **اختياريين** (استجابات الإنشاء/التعديل بلا تغيير): `book_level` = `{milliliters, basis:"warehouse_book", as_of:null}` أو `null`، و`book_level_unavailable_reason`. المصدر الوحيد `FuelTankBookBalanceReader` فوق `product_warehouse_stock` — **بلا كتابة ولا مخطط ولا استنتاج من الدفتر التشغيلي أو المبيعات/الاستلامات**.
+- **النسب إلى خزان فقط حين يكون الوحيد المغذّي للمجمّع (مخزن × منتج)**، يُحصى كل خزان بأي حالة (المعطَّل منه) وعبر **كل** محطات المؤسسة لا ما يصله المستخدم؛ غير ذلك `multi_tank`. العدّ قرار «هل يُنسب» ولا يخرج منه إلا رمز السبب؛ الرصيد المجمَّع لا يُعاد إلا لخزان وحيد ظاهر للمستخدم أصلاً (المتحكّم يقيّد القائمة بالمحطة/الفرع/المخزن قبل الخدمة).
+- **لا تخمين:** غياب سجل الرصيد `no_stock_record` (≠ صفر؛ الصفر الحقيقي يُعاد 0)، أكثر من سجل (متغيّرات) `ambiguous_stock_record`، سالب `invalid_stock_record`، وحدة غير mL/L `unit_mismatch`، محطة بلا مخزن `no_warehouse`، خزان `inactive` `tank_inactive`، علاقة/منتج ناقص `invalid_configuration`. **`as_of` دائماً `null`** — لا دلالة مثبتة لـ`updated_at` على «آخر حركة».
+- **استعلامات ثابتة** (≤ 3 فوق القائمة: عدّ الخزانات المشتركة + وحدة المنتج + سجلات الرصيد) مهما كان عدد الخزانات، يحرسها اختبار يقارن عبارات SQL الموحَّدة. الصلاحية كما كانت (`fuel_stations.view`)؛ قرار تضييقها بيد المالك.
+- **لا واجهة بعد** (`TankLevelIndicator` غير موصول). المرجع: `docs/fuel-stations/AWJ_STATIONS_TANK_BALANCE_P1_REPORT.md`.
 
 ## إقرار تحصيل الوردية — Fuel Shift Collection Declaration (مغلق افتراضياً، تشغيلي فقط)
 

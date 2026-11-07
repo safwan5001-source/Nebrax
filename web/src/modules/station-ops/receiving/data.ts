@@ -24,14 +24,25 @@ export type StatusFilter = 'all' | 'draft' | 'approved';
 
 export interface DeliveryPage { rows: Delivery[]; page: number; lastPage: number }
 
-export function useDeliveryList(station: Station | null, status: StatusFilter, page: number): ScopedQuery<DeliveryPage> & { allowed: boolean } {
+/** مرشحات القائمة الإضافية (B5.1): بحث نصي برقم سند التسليم/مرجع الشراء/المورد، حالة التكلفة، الفترة، المورد. تُرسل للخادم الذي يطبّقها داخل نطاق المستخدم. */
+export interface ListFilters { q?: string; cost?: 'missing' | 'recorded'; from?: string; to?: string; supplier_id?: string }
+
+export function listQuery(stationId: string, status: StatusFilter, filters: ListFilters): Record<string, string | undefined> {
+  return {
+    station_id: stationId, status: status === 'all' ? undefined : status,
+    q: filters.q?.trim() || undefined, cost: filters.cost, from: filters.from || undefined, to: filters.to || undefined, supplier_id: filters.supplier_id || undefined,
+  };
+}
+
+export function useDeliveryList(station: Station | null, status: StatusFilter, page: number, filters: ListFilters = {}): ScopedQuery<DeliveryPage> & { allowed: boolean } {
   const { scopeKey } = useStationOps();
   const access = useReceivingAccess();
   const stationId = station?.id ?? null;
-  const key = access.view && stationId ? `${scopeKey}|rcv|list|${stationId}|${status}|${page}` : null;
+  const signature = JSON.stringify(listQuery(stationId ?? '', status, filters));
+  const key = access.view && stationId ? `${scopeKey}|rcv|list|${signature}|${page}` : null;
   const query = useScopedQuery<DeliveryPage>(key, async (signal) => {
     const result = await receivingGet('/fuel-stations/deliveries', deliveriesResponse, {
-      signal, branchId: station?.branch_id, query: { station_id: stationId as string, status: status === 'all' ? undefined : status, page },
+      signal, branchId: station?.branch_id, query: { ...listQuery(stationId as string, status, filters), page },
     });
     return { rows: result.data.filter((row) => row.station_id === stationId), page: result.meta?.current_page ?? page, lastPage: result.meta?.last_page ?? 1 };
   });

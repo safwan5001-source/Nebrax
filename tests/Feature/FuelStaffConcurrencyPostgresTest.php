@@ -75,14 +75,12 @@ class FuelStaffConcurrencyPostgresTest extends TestCase
         $scene = $this->scene();
         $this->enter($scene);
         $service = app(FuelStaffAccessService::class);
-        // حالة الأساس. **كل** وظيفة منافسة أدناه تغيّر هذه الحالة فعلاً (قالبها أو محطتها يختلف): وظيفة تطابق الأساس بلا تغيير لا تحرّك الـrevision
-        // (بصمة حالة لا عدّاد)، فتنجح كـno-op قبل الفائز الحقيقي أو بعده بحسب من يأخذ القفل أولاً، وهذا سباق في الاختبار لا في الخدمة
-        // (يغطّيه الاختبار الحتمي `a_noop_with_the_current_revision…` أدناه).
-        $baseline = ['template' => 'supervisor', 'station' => 's1'];
-        $revision = $service->update(User::findOrFail($scene['actor']), $scene['target'], ['template' => $baseline['template'], 'station_ids' => [$this->fx[$baseline['station']]->id]])['revision'];
-        $templates = ['seller', 'supervisor', 'station_manager', 'supervisor', 'station_manager', 'seller'];
+        $revision = $service->update(User::findOrFail($scene['actor']), $scene['target'], ['template' => 'seller', 'station_ids' => [$this->fx['s1']->id]])['revision'];
+        // كل متسابق يغيّر الحالة فعلاً عن الابتدائية (seller على s1): `revision` مشتق من المحتوى، فمتسابق يطابقها لا يغيّره
+        // ولو فاز أولاً، فيُقبل معه متسابق ثانٍ بالنسخة نفسها (الفهرس الزوجي = s1، الفردي = s2).
+        $templates = ['supervisor', 'supervisor', 'station_manager', 'supervisor', 'station_manager', 'seller'];
         foreach ($templates as $i => $template) {
-            $this->assertNotSame($baseline, ['template' => $template, 'station' => $i % 2 === 0 ? 's1' : 's2'], "الوظيفة {$i} تطابق حالة الأساس فلا تُعدّ منافسة حقيقية على الـrevision.");
+            $this->assertNotSame('seller:s1', $template . ':' . ($i % 2 === 0 ? 's1' : 's2'), "المتسابق {$i} يطابق الحالة الابتدائية فلا يقدّم revision");
         }
 
         $jobs = [];

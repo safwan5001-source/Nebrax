@@ -20,13 +20,15 @@ class StoreFuelDeliveryRequest extends FormRequest
             'supplier_id' => ['required', 'uuid'],
             'procurement_order_id' => ['nullable', 'uuid'],
             'purchase_reference' => ['nullable', 'string', 'max:128'],
-            'delivery_note_number' => ['nullable', 'string', 'max:128'],
+            // FUEL-B5.1: رقم سند التسليم من المورد إلزامي للاستلام الجديد (غير فارغ بعد القصّ — تفحصه الخدمة أيضاً)؛ المرفق وحده لا يكفي.
+            'delivery_note_number' => ['required', 'string', 'max:128', 'regex:/\S/u'],
             'tanker_identifier' => ['nullable', 'string', 'max:128'],
             'driver_name' => ['nullable', 'string', 'max:255'],
             'compartments' => ['nullable', 'array'],
             'dispatched_liters' => $liters,
             'received_liters' => $liters,
-            'received_total_cost_minor' => ['required', 'integer', 'min:0'],
+            // FUEL-B5.1: اختيارية (NULL = لم تُسجَّل) وموجبة إن أُرسلت؛ إرسالها يتطلب سلطة تسجيل التكلفة (يفحصها المتحكّم).
+            'received_total_cost_minor' => ['nullable', 'integer', 'min:1'],
             'temperature_milli_celsius' => ['nullable', 'integer'],
             'density_kg_per_m3' => ['nullable', 'integer', 'min:0'],
             'before_physical_reading_id' => ['nullable', 'uuid'],

@@ -39,6 +39,8 @@ describe.each(Object.entries(themes))('V2 tokens — %s', (_name, t) => {
     ['text', 'background'], ['text', 'surface'], ['muted', 'background'], ['muted', 'surface'],
     ['primary', 'background'], ['primary', 'surface'], ['primary', 'primary-soft'], ['primary-foreground', 'primary'],
     ['positive', 'surface'], ['negative', 'surface'], ['warning', 'surface'], ['warning', 'background'],
+    // TANK-LEVEL-P2: تنبيه الحد الأدنى (نص negative على خلفية fo-negative-tint) وفوق شريط التقدّم.
+    ['negative', 'fo-negative-tint'], ['text', 'fo-negative-tint'],
   ])('%s on %s ≥ 4.5:1', (fg, bg) => {
     expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5);
   });

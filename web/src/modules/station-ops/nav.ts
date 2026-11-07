@@ -21,7 +21,7 @@ export interface OpsNavItem {
 }
 
 /** FUEL-B5: أي قدرة استلام (عرض/إنشاء/اعتماد) — المفتاح الدقيق من B2 أو `fuel_stations.manage` القديم؛ `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة) لا تكفي. */
-export const RECEIVING_PERMISSIONS = ['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel_stations.manage'] as const;
+export const RECEIVING_PERMISSIONS = ['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel.delivery.cost.record', 'fuel_stations.manage'] as const;
 
 /** FUEL-B4: صلاحيات الوظائف الإدارية داخل التطبيق (القائمة الكنسية؛ منها يُشتق ظهور «الإدارة» وأقسامها، والخادم يفرضها في كل طلب). */
 export const MANAGE_PERMISSIONS = ['fuel.staff.manage', 'fuel.sale.price.manage'] as const;

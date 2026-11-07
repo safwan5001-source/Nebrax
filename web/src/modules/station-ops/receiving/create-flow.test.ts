@@ -3,7 +3,7 @@ import { defaultDeps, runCreate, type FlowDeps, type FlowInput } from './create-
 import { EMPTY_FORM, evaluate, type FormValues } from './logic';
 import type { Delivery, TankReading } from './schemas';
 
-const form: FormValues = { ...EMPTY_FORM, supplierId: 's1', tankId: 't1', deliveryNote: 'DN-1', dispatched: '100', received: '99', cost: '500', before: '10', after: '109' };
+const form: FormValues = { ...EMPTY_FORM, supplierId: 's1', tankId: 't1', deliveryNote: 'DN-1', dispatched: '100', received: '99', before: '10', after: '109' };
 const base = (over: Partial<FlowInput> = {}): FlowInput => ({ form, evaluation: evaluate(form, { hasWarehouse: true }), stationId: 'st', tankId: 't1', fuelProductId: 'fp', warehouseId: 'wh', intentKey: 'awj-ops-k', ...over });
 const delivery = { id: 'd1', status: 'draft' } as unknown as Delivery;
 const reading = (id: string, ml: number, key: string): TankReading => ({ id, fuel_tank_id: 't1', reading_type: 'physical', quantity_milliliters: ml, evidence_key: key });
@@ -26,7 +26,8 @@ describe('create flow', () => {
     expect(result).toMatchObject({ kind: 'ok', delivery });
     expect(d.calls).toEqual(['reading:awj-ops:rcv:awj-ops-k:before:physical', 'reading:awj-ops:rcv:awj-ops-k:after:physical', 'delivery:awj-ops-k']);
     const body = vi.mocked(d.createDelivery).mock.calls[0][0];
-    expect(body).toMatchObject({ before_physical_reading_id: 'r-before', after_physical_reading_id: 'r-after', received_liters: '99', received_total_cost_minor: 50_000 });
+    expect(body).toMatchObject({ before_physical_reading_id: 'r-before', after_physical_reading_id: 'r-after', received_liters: '99' });
+    expect(body).not.toHaveProperty('received_total_cost_minor');
   });
 
   it('without readings it only creates the draft', async () => {

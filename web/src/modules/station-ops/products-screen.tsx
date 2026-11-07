@@ -7,11 +7,13 @@ import { useStationAssets, useStationPrices } from './data';
 import type { NozzleView } from './catalog';
 import { formatLitersNumberFromMl } from './format';
 import { Quantity } from './quantity';
+import { resolveTankBookLevel } from './tank-book-level';
+import { TankLevelIndicator } from './tank-level-indicator';
 import { PriceLabel } from './price-label';
 import { PageMasthead, ScreenBody } from './masthead';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
-import type { Station } from './schemas';
+import type { Station, Tank } from './schemas';
 
 const STATUS_STYLE: Record<string, string> = {
   active: 'bg-[color:var(--fo-positive-tint)] text-positive',
@@ -47,6 +49,17 @@ function NozzleRow({ view, showPump = true }: { view: NozzleView; showPump?: boo
       </div>
       <AssetStatus status={view.nozzle.status} />
     </li>
+  );
+}
+
+/** مؤشر الرصيد الدفتري داخل بطاقة الخزان — الحالة كلها من عقد الخادم (`book_level`)، ولا حساب منسوب في المتصفح. */
+function TankBookLevel({ tank }: { tank: Tank }) {
+  const view = resolveTankBookLevel(tank);
+
+  return view.kind === 'level' ? (
+    <TankLevelIndicator state="ready" input={view.input} tankName={tank.name} minimumLevelMilliliters={tank.minimum_level_milliliters} />
+  ) : (
+    <TankLevelIndicator state="unavailable" reason={view.reason} />
   );
 }
 
@@ -158,6 +171,9 @@ function Content({ station }: { station: Station }) {
                     <dd className="num mt-0.5 text-text">{nozzleCount}</dd>
                   </div>
                 </dl>
+                <div className="mt-3 border-t border-border pt-3">
+                  <TankBookLevel tank={tank} />
+                </div>
               </li>
             ))}
           </ul>

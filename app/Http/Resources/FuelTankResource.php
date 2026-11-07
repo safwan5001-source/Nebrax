@@ -8,6 +8,38 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin \App\Models\FuelTank */
 class FuelTankResource extends JsonResource
 {
+    /**
+     * TANK-BALANCE-P1: العقد الإضافي للرصيد الدفتري. يظهر فقط حين يستدعي المتحكّم `withBookLevel()` (قراءتا القائمة والعرض)؛
+     * استجابات الإنشاء والتعديل وأي استدعاء آخر تبقى حرفياً كما كانت بلا المفتاحين.
+     *
+     * @var array{book_level: array<string,mixed>|null, book_level_unavailable_reason: string|null}|null
+     */
+    private ?array $bookLevel = null;
+
+    /** @param array{book_level: array<string,mixed>|null, book_level_unavailable_reason: string|null} $payload */
+    public function withBookLevel(array $payload): static
+    {
+        $this->bookLevel = $payload;
+
+        return $this;
+    }
+
+    /**
+     * @param  iterable<\App\Models\FuelTank>  $tanks
+     * @param  array<string, array{book_level: array<string,mixed>|null, book_level_unavailable_reason: string|null}>  $levels  بمعرّف الخزان (من FuelTankBookBalanceReader)
+     */
+    public static function collectionWithBookLevels(iterable $tanks, array $levels): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        $collection = static::collection($tanks);
+        foreach ($collection->collection as $resource) {
+            if (isset($levels[$resource->id])) {
+                $resource->withBookLevel($levels[$resource->id]);
+            }
+        }
+
+        return $collection;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
@@ -35,6 +67,6 @@ class FuelTankResource extends JsonResource
             ])->values()),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-        ];
+        ] + ($this->bookLevel ?? []);
     }
 }
