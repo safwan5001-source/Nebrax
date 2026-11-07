@@ -61,6 +61,45 @@ PR #2054 · مهمة #2053 · الفرع `feat/fuel-station-pin-login` · **لا
   - **CI فعلي على الـPR** (head `cc80ecc`، run 42385849893، workflow `CI`): **نجح** (sqlite + pgsql + shard 1/2 + feed-lock perf). `web build` فشل على `cc80ecc` بسبب mock جزئي لـ`@/lib/api` وأُصلح في `252de41` (نقل مساعدات النطاق إلى `lib/station-scope.ts`)، وأصبح `web build` **ناجحاً** على `252de41`. لا تعديل PHP بين الاثنين.
 - انحدارات مطلوبة (نطاق المستخدم/الموظف، الدخول بـ`employee_no`، إصدار/تصفير PIN، حدود الوصول، دخول البريد، RTL 320/390): مغطاة بـ`StationPinLoginTest` وملفات `FuelStaff*`/`AccessChange*`/`ApiAuth*`/`AuthRemember*`/`TenantSubdomain*` ضمن المجموعة الكاملة، وPlaywright (390/320 × ar/en × فاتح/داكن).
 
+## بوابة المراجعة النهائية — أدلة (head `45bff80`)
+
+### 1) سبب `mergeable=false`
+**تعارض دمج حقيقي** لا حالة قديمة ولا سياسة: `main` تقدّم 3 commits (`3f95289` PR-2 الرصيد الافتتاحي، `35124e7`، `0763ef1`) وكان `git merge-tree` يُظهر تعارضاً في `web/playwright.visual-qa.config.ts` و`web/src/modules/station-ops/app-only.test.ts` (كلاهما أضاف PR-2 إليه سطراً). **وبسبب التعارض لم يُنشئ GitHub تشغيلات `pull_request` للـhead `14c2c09`** (يعمل `ci.yml` على merge-ref؛ لا merge-ref مع تعارض) — لذلك لم تُرجَع أي فحوص له، ولم أعدّ الخضرة السابقة (`cc80ecc`) إثباتاً له. الحل: `git merge origin/main` في الفرع (commit `526176d`، بلا rebase ولا إعادة كتابة تاريخ)، وحلّ التعارضين بدمج الطرفين (إضافة `opening-visual|opening-live` ومجلد `opening/` من `main` **مع** `station-login` ومجلدَي `login/` و`pin/` منّا).
+
+### 2) CI على الـhead الدقيق
+Head `45bff8039de278e045e74f0cc372ee0afec21353` (بعد الدمج، `mergeable` محسوب)؛ كل الفحوص التسعة **success**:
+| الفحص | النتيجة | الرابط |
+|---|---|---|
+| CI Gate | success | https://github.com/safwan5001-source/Nebrax/actions/runs/42389011062/job/128452442787 |
+| web build (Next.js) ×2 | success | https://github.com/safwan5001-source/Nebrax/actions/runs/42389011065/job/128452442770 · https://github.com/safwan5001-source/Nebrax/actions/runs/42389007326/job/128452432287 |
+| php artisan test (sqlite) | success | https://github.com/safwan5001-source/Nebrax/actions/runs/42389011058/job/128452443471 |
+| php artisan test (pgsql) | success | https://github.com/safwan5001-source/Nebrax/actions/runs/42389011058/job/128452443420 |
+| pgsql shard 1 / shard 2 / shards proven | success | …/job/128452443285 · …/job/128452443422 · …/job/128456305383 |
+| PostgreSQL feed-lock performance | success | …/job/128452443516 |
+- كل تشغيل بحدث `pull_request` (`ci.yml` يعمل على كل push لفرع له PR: لا فلتر مسارات على `pull_request`؛ `web-ci.yml` يفلتر بمسارات `web/**` وما قرأته اختبارات vitest). لا تجاوز لأي فحص مطلوب.
+- محلياً قبل الدفع: vitest الكامل = 936 ملفاً / 12200 اختباراً ناجحاً؛ `StationPinLoginTest` = 37 ناجحاً.
+- ما بعد هذا الـhead commit توثيقي فقط (هذا الملف)؛ نتيجة CI عليه تُدرج في تعليق الـPR.
+
+### 3) تدقيق `StationSessionBoundary` — أقل امتياز لجلسة PIN
+**ما وُجد:** البادئات الواسعة (`fuel-stations/staff`، `stations`، `pumps`…) كانت تتيح لجلسة PIN — لمن يحمل RBAC مدير/مالك — كل طرق الكتابة تحتها: تعديل صلاحيات الموظفين (`PUT staff/{id}`)، إنشاء/تعديل/حذف محطات ومضخات وفوهات وخزانات ومنتجات، `POST prices`، المبيعات وتحصيلها، تصحيح الورديات، وسياسة الحوكمة `PUT stations/{id}/settings`. PIN من 6 أرقام عامل ضعيف لا يُفوَّض به ذلك.
+
+**الإصلاح:** قراءات (GET/HEAD) بالبادئات مع **إسقاط `staff*` كلياً** (قراءة وكتابة)، وكتابات بقائمة **(طريقة + مسار)** صريحة بما يفعله التطبيق فعلاً:
+`POST shifts/open` · `POST shifts/{id}/(staff|meter-readings|tank-readings|cash-movements|close|collection|collection/review|cash-variance/review|approve)` · `POST readings` · `POST reading-requests/{id}/(approve|reject)` · `POST deliveries` · `POST deliveries/{id}/(approve|cost|attachments)` · `DELETE deliveries/{id}/attachments/{id}`.
+يُرفض لجلسة PIN (403 من الحدّ لا من RBAC): `PUT staff/{id}`، `staff*` كلها، `POST|DELETE staff/{id}/pin`، `POST|PUT|DELETE stations|pumps|nozzles|tanks|products`، `PUT stations/{id}/settings`، `PUT settings`، `POST prices`، `POST sales*`، `POST shifts/{id}/corrections`، `opening-balances*`. (الرصيد الافتتاحي في main PR-2 خارج القائمة أصلاً.) الواجهة تُخفي «الإدارة» لجلسة PIN.
+
+**الاختبارات (في `StationPinLoginTest`):**
+- لقطة صريحة بالمجموعة الدقيقة لمسارات الكتابة القابلة للوصول (18 مساراً) تُستخرج من **كل مسارات `api/fuel-stations/*` المسجَّلة فعلاً** — أي مسار كتابة جديد محجوب افتراضياً ويُفشل اللقطة حتى يُضاف عمداً.
+- طلبات حقيقية: جلسة PIN لمالك **ولمدير** على 27 مساراً إدارياً ⇒ 403 برسالة الحدّ (لا RBAC)، ولا تغيّر في اسم المحطة/عدد المحطات/أحداث الصلاحيات/دور الموظف/PIN.
+- انحدار جلسة ERP العادية: المسارات نفسها لا تصطدم بالحدّ أبداً، وتعمل فعلياً (تعيين PIN، قراءة الموظفين، `GET settings`، `PUT staff/{id}`).
+- موظف بلا صلاحية يصل إلى RBAC (لا الحدّ) لكل كتابة مشروعة، وبائع حقيقي يفتح ورديته عبر جلسة PIN.
+- حارس معماري: كل مسار `auth:sanctum` يمر بـ`SetTenant`.
+
+### 4) موافقة `station_use_erp` لا تتسرب
+- **مربوطة بمعرّف مستخدم أَوْج الذي وافق** (لا علم `1`): إن دخل مستخدم أَوْج آخر في تبويب آخر أو زالت الجلسة، تبطل الموافقة (`getToken()`/`currentUser()` ⇒ null).
+- **`stationLogin()` و`logout()` في التطبيق يمسحانها** (`clearStationSession`): بعد دخول موظف بـPIN لا موافقة، وبعد خروجه أو تبديل الموظف لا رجوع إلى هوية أَوْج.
+- الخروج بموافقة أَوْج فقط لا يرسل طلب خروج ولا يمسّ جلسة أَوْج.
+- الاختبارات: `station-session.test.ts` (opt-in ثم PIN ثم خروج ثم موظف آخر ثم خروج؛ ربط المستخدم؛ لا جلسة أَوْج ⇒ لا أثر) و`login-screen.integration.test.tsx`.
+
 ## قبول Safari/iPhone حقيقي (البند 4)
 **معلّق — لم يُنفَّذ.** ما نُفِّذ هو محاكاة Chromium بحجم/لمس/DPR iPhone وليس Safari ولا جهازاً. المطلوب من جهاز فعلي قبل أي تفعيل: ظهور لوحة الأرقام للـPIN، عدم تكبير الصفحة عند التركيز، نسخ الـPIN المولَّد، سلوك زر الرجوع بعد الخروج، تبديل الموظف على الجهاز نفسه، وإضافة التطبيق إلى الشاشة الرئيسية إن لزم.
 
