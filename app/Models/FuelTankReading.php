@@ -17,7 +17,7 @@ class FuelTankReading extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'fuel_station_id', 'fuel_tank_id', 'reading_type',
-        'quantity_milliliters', 'measured_at', 'evidence_key', 'evidence', 'recorded_by',
+        'quantity_milliliters', 'measured_at', 'evidence_key', 'intent_hash', 'evidence', 'recorded_by',
     ];
 
     protected $casts = [

@@ -20,7 +20,7 @@ class FuelStationAuditController extends ApiController
     {
         $filters = $request->validate([
             'fuel_station_id' => ['nullable', 'uuid'],
-            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery'],
+            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest'],
             'subject_id' => ['nullable', 'uuid'],
             'actor_id' => ['nullable', 'uuid'],
             'action' => ['nullable', 'string', 'max:80'],

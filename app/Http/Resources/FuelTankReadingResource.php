@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\FuelQuantity;
+use App\Support\FuelTankLevel;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,17 @@ class FuelTankReadingResource extends JsonResource
             'evidence' => $this->evidence,
             'recorded_by' => $this->recorded_by,
             'recorder' => $this->whenLoaded('recorder', fn () => ['id' => $this->recorder?->id, 'name' => $this->recorder?->name]),
+            // FUEL-B6: أعلام المراجعة من بيانات الخزان المعتمدة (تظهر حين يُحمَّل الخزان فقط)؛ لا تنشئ تسوية.
+            'flags' => $this->whenLoaded('tank', fn () => FuelTankLevel::flags(
+                (int) $this->quantity_milliliters,
+                (int) $this->tank?->capacity_milliliters,
+                (int) $this->tank?->safe_capacity_milliliters,
+                (int) $this->tank?->minimum_level_milliliters,
+                (int) $this->tank?->dead_stock_milliliters,
+            )),
+            // قراءة سُجِّلت بتاريخ سابق (مباشرة بصلاحية مخصَّصة أو بعد اعتماد مشرف): السبب ومعرّف الطلب من الخادم وحده.
+            'late_entry' => is_array($this->evidence) && array_key_exists('late_reason', $this->evidence),
+            'late_reason' => is_array($this->evidence) ? ($this->evidence['late_reason'] ?? null) : null,
             'measured_at' => $this->measured_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
