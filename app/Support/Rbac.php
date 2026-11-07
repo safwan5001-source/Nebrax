@@ -189,6 +189,10 @@ class Rbac
             // owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
             'fuel.delivery.cost.record',
             'fuel.reading.view', 'fuel.reading.record',
+            // FUEL-B6 (تعديل): قراءات الخزانات بتاريخ سابق — سلطتان **دقيقتان مستقلتان** عن `fuel.reading.record` ولا يكفي بهما `fuel_stations.manage` القديم:
+            // `fuel.reading.late.record` (سياسة authorized_user: تسجيل قراءة متأخرة مباشرة) و`fuel.reading.late.approve` (سياسة supervisor_approval: اعتماد/رفض
+            // طلبات القراءات المتأخرة، ولا اعتماد ذاتي). owner/admin عبر `*`؛ لا تُضافان لـ`MATRIX` ولا لأي قالب موظف ولا لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'fuel.reading.late.record', 'fuel.reading.late.approve',
             'fuel.reconciliation.view', 'fuel.reconciliation.create', 'fuel.reconciliation.approve',
             'fuel.supplier_invoice.view', 'fuel.supplier_invoice.manage', 'fuel.supplier_invoice.match',
             // FUEL-B2: حوكمة الوقود — تغيير سياسات فصل المعتمِد (`fuel_distinct_approver_required`) سلطة **إضافية** لا بديلة: تُشترط مع

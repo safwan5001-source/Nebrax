@@ -8,9 +8,11 @@ use App\Http\Requests\ListFuelTankReadingsRequest;
 use App\Http\Requests\StoreFuelReconciliationRequest;
 use App\Http\Requests\StoreFuelTankReadingRequest;
 use App\Http\Resources\FuelReconciliationResource;
+use App\Http\Resources\FuelTankReadingRequestResource;
 use App\Http\Resources\FuelTankReadingResource;
 use App\Models\FuelReconciliation;
 use App\Models\FuelTankReading;
+use App\Models\FuelTankReadingRequest;
 use App\Services\FuelReconciliationService;
 use Illuminate\Http\JsonResponse;
 
@@ -23,13 +25,22 @@ class FuelReconciliationController extends ApiController
     public function readings(ListFuelTankReadingsRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $readings = $this->restrictToAccessibleWarehouseStations(FuelTankReading::query())
+        if (! empty($data['fuel_station_id'])) {
+            $this->accessibleStation($data['fuel_station_id']); // 404 موحّد لمحطة خارج نطاق المستخدم
+        }
+        $query = $this->restrictToAccessibleWarehouseStations(FuelTankReading::query())
             ->with(['station', 'tank', 'recorder'])
-            ->when($data['fuel_tank_id'] ?? null, fn ($query, $id) => $query->where('fuel_tank_id', $id))
-            ->latest('measured_at')
-            ->get();
+            ->when($data['fuel_station_id'] ?? null, fn ($q, $id) => $q->where('fuel_station_id', $id))
+            ->when($data['fuel_tank_id'] ?? null, fn ($q, $id) => $q->where('fuel_tank_id', $id))
+            ->when($data['reading_type'] ?? null, fn ($q, $type) => $q->where('reading_type', $type))
+            ->latest('measured_at')->latest('created_at')->orderByDesc('id');
 
-        return FuelTankReadingResource::collection($readings)->response();
+        // بلا per_page: السلوك القديم حرفياً (قائمة كاملة). معها: سجل مرقَّم لشاشة القراءات.
+        if (! empty($data['per_page'])) {
+            return FuelTankReadingResource::collection($query->paginate((int) $data['per_page']))->response();
+        }
+
+        return FuelTankReadingResource::collection($query->get())->response();
     }
 
     public function storeReading(StoreFuelTankReadingRequest $request): JsonResponse
@@ -37,9 +48,15 @@ class FuelReconciliationController extends ApiController
         $data = $request->validated();
         $this->accessibleStation($data['fuel_station_id']);
         $data['recorded_by'] = $request->user()->id;
-        $reading = $this->domain(fn () => $this->service->recordReading($data));
+        $result = $this->domain(fn () => $this->service->recordReading($data));
 
-        return (new FuelTankReadingResource($reading->load(['station', 'tank', 'recorder'])))->response()->setStatusCode(201);
+        // طلب قراءة متأخرة بانتظار موافقة المشرف (لا قراءة تشغيلية): 202 للإنشاء، 200 لإعادة إرسال مطابقة.
+        if ($result instanceof FuelTankReadingRequest) {
+            return (new FuelTankReadingRequestResource($result->load(['station', 'tank', 'requester', 'decider'])))->response()->setStatusCode($result->wasRecentlyCreated ? 202 : 200);
+        }
+
+        // 201 للإنشاء، 200 لإعادة إرسال مطابقة (الأثر الأول نفسه بلا إنشاء).
+        return (new FuelTankReadingResource($result->load(['station', 'tank', 'recorder'])))->response()->setStatusCode($result->wasRecentlyCreated ? 201 : 200);
     }
 
     public function index(ListFuelReconciliationsRequest $request): JsonResponse

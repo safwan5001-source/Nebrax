@@ -56,6 +56,7 @@ async function ensureReading(
   const key = readingEvidenceKey(input.intentKey, stage, type);
   const result: ReadingWrite = await deps.recordReading(buildReadingBody(input.stationId, input.tankId, type, ml, key), { branchId: input.branchId });
   if (result.kind === 'ok') return { id: result.reading.id };
+  if (result.kind === 'pending') return { stop: { failure: { kind: 'unverified' } } }; // لا يحدث: الاستلام لا يرسل وقتاً صريحاً ⇒ لا طلب متأخر
 
   // موجودة مسبقاً (محاولة سابقة) أو غير مؤكدة: نقرأ الخادم ونتحقق من تطابق القيمة قبل أن نستعملها.
   const existsAlready = (result.kind === 'rejected' && result.code === 'evidence_exists') || result.kind === 'unknown' || result.kind === 'unverified';

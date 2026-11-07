@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { History, ListChecks, Tag, Users } from 'lucide-react';
+import { History, ListChecks, Tag, Users, Hourglass } from 'lucide-react';
 import { useStationOps } from '../context';
 import { useShiftHistory } from '../data';
 import { PageMasthead, ScreenBody } from '../masthead';
@@ -66,6 +66,7 @@ export function ManageScreen() {
   const { can } = useStationOps();
   const canStaff = can(STAFF_PERMISSION);
   const canPrices = can('fuel.sale.price.manage');
+  const canPolicy = can('fuel.governance.manage'); // سياسة القراءات المتأخرة (B6): الاطلاع/التعديل بحسب الصلاحيات، والخادم السلطة
   const any = MANAGE_PERMISSIONS.some((permission) => can(permission));
 
   return (
@@ -85,6 +86,9 @@ export function ManageScreen() {
                   <LinkCard href={`${MANAGE_BASE}/permissions`} icon={<ListChecks className="h-5 w-5" strokeWidth={1.8} />} title={t('manage.permissions.title')} hint={t('manage.permissions.hint')} />
                   <LinkCard href={`${MANAGE_BASE}/audit`} icon={<History className="h-5 w-5" strokeWidth={1.8} />} title={t('manage.audit.title')} hint={t('manage.audit.hint')} />
                 </>
+              ) : null}
+              {canPolicy ? (
+                <LinkCard href={`${MANAGE_BASE}/reading-policy`} icon={<Hourglass className="h-5 w-5" strokeWidth={1.8} />} title={t('manage.readingPolicy.title')} hint={t('manage.readingPolicy.hint')} />
               ) : null}
               {canPrices ? (
                 <LinkCard href={PRICES_HREF} icon={<Tag className="h-5 w-5" strokeWidth={1.8} />} title={t('manage.prices.title')} hint={t('manage.prices.hint')} />
