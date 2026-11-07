@@ -26,10 +26,16 @@ vi.mock('html2canvas', () => ({
   }),
 }));
 
+/** يسجّل خيارات إنشاء jsPDF واستدعاءات addImage (ضغط الصور بلا فقد — AWJ-DOC-V2-PR1). */
+const pdfCalls: { ctor: Array<Record<string, unknown>>; images: Array<{ format: unknown; w: unknown; h: unknown }>; pages: number } = {
+  ctor: [], images: [], pages: 0,
+};
+
 vi.mock('jspdf', () => ({
   jsPDF: class {
-    addImage() {}
-    addPage() {}
+    constructor(options: Record<string, unknown>) { pdfCalls.ctor.push(options); }
+    addImage(_data: unknown, format: unknown, _x: unknown, _y: unknown, w: unknown, h: unknown) { pdfCalls.images.push({ format, w, h }); }
+    addPage() { pdfCalls.pages += 1; }
     output() { return new Blob(['pdf'], { type: 'application/pdf' }); }
   },
 }));
@@ -40,6 +46,7 @@ beforeEach(() => {
   captured.minHeightDuringCapture = '';
   captured.boxShadowDuringCapture = '';
   captured.options = undefined;
+  pdfCalls.ctor = []; pdfCalls.images = []; pdfCalls.pages = 0;
   // jsdom لا يوفّر هذه افتراضياً — نُثبّتها بأمان دون الاعتماد على وجود خطأ نوعيّ.
   (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => 'blob:mock');
   (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = vi.fn();
@@ -95,5 +102,28 @@ describe('elementToPdfBlob — سلوك المُصدِّر القائم محفو
     const addr = clone.querySelector('div') as HTMLElement;
     expect(addr.style.overflow).toBe('visible');
     expect(addr.style.maxHeight).toBe('none');
+  });
+});
+
+describe('elementToPdfBlob — الضغط والمقاسات (AWJ-DOC-V2-PR1)', () => {
+  it('يُنشئ jsPDF بـ compress:true ويبقى A4 (210×297) لورق الصفحات', async () => {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    await downloadPdf(el, 'doc');
+    expect(pdfCalls.ctor).toHaveLength(1);
+    expect(pdfCalls.ctor[0]).toMatchObject({ unit: 'mm', format: [210, 297], orientation: 'portrait', compress: true });
+    expect(pdfCalls.images).toHaveLength(1);
+    expect(pdfCalls.images[0].format).toBe('PNG'); // بلا فقد: لا JPEG
+  });
+
+  it('الحراري (ارتفاع مفتوح): صفحة بعرض الورق وارتفاع المحتوى، ومضغوطة', async () => {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    await downloadPdf(el, 'receipt', { widthMm: 80, heightMm: 0 });
+    expect(pdfCalls.ctor[0]).toMatchObject({ unit: 'mm', orientation: 'portrait', compress: true });
+    const format = pdfCalls.ctor[0].format as number[];
+    expect(format[0]).toBe(80);
+    expect(format[1]).toBeCloseTo((400 * 80) / 800, 5); // الكانفاس الوهمي 800×400
+    expect(pdfCalls.pages).toBe(0);
   });
 });

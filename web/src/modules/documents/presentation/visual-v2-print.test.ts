@@ -105,6 +105,7 @@ describe('تحييد PDF يوازي الطباعة (A4 regression)', () => {
 
   it('مسار PDF يتخطّى التقطيع عندما يتّسع المحتوى في صفحة واحدة', () => {
     const pdf = readFileSync(resolve(process.cwd(), 'src/lib/pdf.ts'), 'utf8');
-    expect(pdf).toContain('canvas.height <= pageHeightCanvas');
+    // AWJ-DOC-V2-PR1: القاعدة انتقلت إلى getPdfImageSlices (شريحة واحدة ما دام المتبقي يتّسع في الصفحة).
+    expect(pdf).toContain('imageHeight - top <= pageHeight + PAGE_FIT_TOLERANCE_PX');
   });
 });
