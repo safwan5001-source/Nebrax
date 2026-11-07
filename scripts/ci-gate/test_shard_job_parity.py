@@ -99,14 +99,20 @@ class ShardJobParity(unittest.TestCase):
         order = [s.get("name", "") for s in self.shard["steps"]]
         self.assertLess(order.index("اختيار الشريحة (${{ matrix.shard }}/2) وجرد الاختبارات"), order.index(self.run_step()["name"]))
 
-    def test_no_step_is_skippable_except_the_artifact_upload(self):
+    def test_no_step_is_skippable_except_the_artifact_upload_and_the_aia_step(self):
         self.assertNotIn("if", self.shard)
         self.assertNotIn("continue-on-error", self.shard)
+        conditional = []
         for s in self.shard["steps"]:
             self.assertNotIn("continue-on-error", s, s.get("name"))
             if "if" in s:
-                self.assertEqual(s["if"], "always()")
-                self.assertTrue(s["uses"].startswith("actions/upload-artifact@"), s.get("name"))
+                conditional.append(s)
+                if str(s.get("uses", "")).startswith("actions/upload-artifact@"):
+                    self.assertEqual(s["if"], "always()")
+                else:  # the only other conditional step: AIA-0.4 (runs after a failed suite so both failures are reported)
+                    self.assertEqual(s["if"], "${{ !cancelled() }}", s.get("name"))
+                    self.assertIn("--fail-on-skipped", s["run"], s.get("name"))
+        self.assertEqual(len(conditional), 2, [s.get("name") for s in conditional])  # exactly: AIA-0.4 + the artifact upload
 
     def test_artifacts_are_named_per_shard_and_complete(self):
         up = next(s for s in self.shard["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
@@ -150,6 +156,70 @@ class ShardJobParity(unittest.TestCase):
     def test_the_full_job_and_proof_job_do_not_carry_the_facts_step(self):
         self.assertNotIn(self.FACTS, steps(self.full))
         self.assertNotIn(self.FACTS, steps(self.proof))
+
+    # ── PG-SHARD-SAFETY-PARITY (C): the safeguards of `test` (pgsql) live in the shard jobs too ───────────────
+    def test_watchdog_role_and_tests_are_literal_copies_and_run_before_the_suite(self):
+        names = [s.get("name", "") for s in self.shard["steps"]]
+        full, shard = steps(self.full), steps(self.shard)
+        for n in ("دور مراقبة PostgreSQL للقراءة فقط (pgsql فقط)", "اختبارات مراقب تعليق الاختبارات (pgsql فقط)", "رفع حدّ أقفال PostgreSQL للتنفيذ المتوازي (pgsql فقط)"):
+            self.assertIn(n, shard)
+            self.assertEqual(norm(shard[n]), norm(full[n]), n)  # `if: matrix.db == 'pgsql'` is the only difference
+            self.assertLess(names.index(n), names.index(self.run_step()["name"]))
+        self.assertLess(names.index("دور مراقبة PostgreSQL للقراءة فقط (pgsql فقط)"), names.index("اختبارات مراقب تعليق الاختبارات (pgsql فقط)"))
+
+    def test_the_suite_is_wrapped_by_the_watchdog_exactly_as_in_the_full_job(self):
+        run = self.run_step()["run"]
+        self.assertLess(run.index("trap awj_watchdog_stop EXIT"), run.index("awj_watchdog_start"))
+        self.assertLess(run.index("awj_watchdog_start"), run.index("php artisan test --parallel"))
+        self.assertIn('export PGOPTIONS="-c lock_timeout=60s"', run)
+        self.assertLess(run.index("lock_timeout=60s"), run.index("awj_watchdog_start"))
+        tmp = re.search(r'--paratest-tmp-dir "([^"]+)"', run).group(1)
+        tc = re.search(r'--teamcity-log "([^"]+)"', run).group(1)
+        self.assertIn(f'--tmp-dir "{tmp}"', run)
+        self.assertIn(f'--log-teamcity "{tc}"', run)
+        self.assertGreater(float(re.search(r"--stall-seconds (\d+)", run).group(1)), float(re.search(r"lock_timeout=(\d+)s", run).group(1)))
+        self.assertIn("--pg-user awj_ci_watchdog", run)
+        self.assertIn("--privileged-proc", run)
+        self.assertIn("ancestor=postgres:16", run)
+        self.assertIn('--log-junit "$APP_DIR/shard-out/junit.xml"', run)  # the exactly-once proof's input is still produced
+        # the full job keeps the very same wrapper flags (a shard may not run a weaker watchdog than `test` does)
+        full_run = steps(self.full)["تشغيل الاختبارات"]["run"]
+        for flag in ("--stall-seconds 240", "--pg-docker-filter ancestor=postgres:16", "--pg-user awj_ci_watchdog", "--pg-db nibras", "--privileged-proc"):
+            self.assertIn(flag, run)
+            self.assertIn(flag, full_run)
+
+    def test_watchdog_diagnostics_stay_under_shard_out_so_the_artifact_root_is_unchanged(self):
+        run = self.run_step()["run"]
+        self.assertIn('WD_DIR="$APP_DIR/shard-out/watchdog"', run)
+        up = next(s for s in self.shard["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+        paths = [p.strip() for p in up["with"]["path"].splitlines() if p.strip()]
+        self.assertTrue(any(p.endswith("/shard-out/watchdog/") for p in paths), paths)
+        self.assertTrue(all("/shard-out/" in p for p in paths), paths)  # a path outside shard-out/ moves the archive root and breaks the proof
+        self.assertIn("shard-out/test-output-aia04.txt", up["with"]["path"])
+
+    def test_aia_step_is_strict_explicit_and_after_the_suite(self):
+        names = [s.get("name", "") for s in self.shard["steps"]]
+        aia = next(s for s in self.shard["steps"] if "PublicApiScopeCeilingEnforcementTest.php" in s.get("run", ""))
+        run = aia["run"]
+        for need in ("set -euo pipefail", "--fail-on-incomplete", "--fail-on-skipped", "--fail-on-risky", "PublicApiCreateClientCommandCeilingTest.php",
+                     "PublicApiScopeCeilingArchitectureTest.php", "lock_timeout=60s"):
+            self.assertIn(need, run)
+        for bad in ("--filter", "--group", "|| true", "continue-on-error"):
+            self.assertNotIn(bad, run)
+        self.assertEqual(aia["if"], "${{ !cancelled() }}")
+        self.assertGreater(names.index(aia["name"]), names.index(self.run_step()["name"]))
+        full_aia = next(s for s in self.full["steps"] if "PublicApiScopeCeilingEnforcementTest.php" in s.get("run", ""))
+        for f in ("PublicApiScopeCeilingEnforcementTest.php", "PublicApiCreateClientCommandCeilingTest.php", "PublicApiScopeCeilingArchitectureTest.php"):
+            self.assertIn(f, full_aia["run"])  # the same three files in both jobs
+
+    def test_manifest_declares_every_safeguard_so_the_trusted_gate_enforces_them(self):
+        g = self.group
+        self.assertEqual(g["max_timeout_minutes"], 60)
+        self.assertEqual(self.shard["timeout-minutes"], 60)
+        self.assertEqual({r["label"] for r in g["required_steps"]}, {"aia-0.4", "watchdog.role", "watchdog.tests", "lock.limit", "watchdog.upload"})
+        for need in ("trap awj_watchdog_stop EXIT", "awj_watchdog_start", "lock_timeout=60s", "--stall-seconds 240", "--pg-user awj_ci_watchdog", "--log-junit"):
+            self.assertIn(need, g["guard"]["require"])
+        self.assertEqual(g["status"], "additive")  # still additive: the full pgsql check stays mandatory
 
     # ── proof job: trusted script, needs the shards, no skip ──────────────────────────────────────────────
     def test_proof_runs_the_script_from_the_trusted_base_not_the_pr(self):

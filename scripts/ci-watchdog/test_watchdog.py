@@ -539,6 +539,65 @@ class CiWiring(unittest.TestCase):
         self.assertIn("pgsql-watchdog", upload)
 
 
+class ShardCiWiring(unittest.TestCase):
+    """PG-SHARD-SAFETY-PARITY (C): the PostgreSQL shard jobs carry the same watchdog wiring as the full job (text level, like CiWiring).
+    The trusted gate (scripts/ci-gate/ci_gate.py + required_steps in the manifest) is the authority; these checks are the second layer."""
+
+    @classmethod
+    def setUpClass(cls):
+        text = CI_YML.read_text()
+        job = text[text.index("\n  test-pg-shards:\n"):text.index("\n  test-pg-shards-proof:\n")]
+        start = job.index("- name: تشغيل اختبارات الشريحة")
+        cls.job = job
+        cls.step = job[start:job.index("\n      - name:", start + 10)]
+
+    def test_lock_timeout_is_kept_and_precedes_the_watchdog(self):
+        self.assertIn('export PGOPTIONS="-c lock_timeout=60s"', self.step)
+        self.assertLess(self.step.index("lock_timeout=60s"), self.step.index("awj_watchdog_start"))
+
+    def test_watchdog_wraps_the_suite_with_an_exit_trap(self):
+        self.assertIn("trap awj_watchdog_stop EXIT", self.step)
+        self.assertLess(self.step.index("trap awj_watchdog_stop EXIT"), self.step.index("awj_watchdog_start"))
+        self.assertLess(self.step.index("awj_watchdog_start"), self.step.index("php artisan test --parallel"))
+        self.assertIn("set -o pipefail", self.step)
+
+    def test_paratest_files_go_where_the_watchdog_looks(self):
+        tmp = re.search(r'--paratest-tmp-dir "([^"]+)"', self.step).group(1)
+        self.assertIn(f'--tmp-dir "{tmp}"', self.step)
+        tc = re.search(r'--teamcity-log "([^"]+)"', self.step).group(1)
+        self.assertIn(f'--log-teamcity "{tc}"', self.step)
+
+    def test_stall_threshold_exceeds_the_lock_timeout(self):
+        stall = float(re.search(r"--stall-seconds (\d+)", self.step).group(1))
+        lock = float(re.search(r"lock_timeout=(\d+)s", self.step).group(1))
+        self.assertGreater(stall, lock)
+
+    def test_gate_rules_still_hold(self):
+        for bad in ("--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"):
+            self.assertNotIn(bad, self.step)
+
+    def test_diagnostics_live_under_shard_out_and_are_uploaded_after_failure(self):
+        self.assertIn('WD_DIR="$APP_DIR/shard-out/watchdog"', self.step)
+        upload = self.job[self.job.index("- name: حفظ مخرجات الشريحة للإثبات"):]
+        head = upload.split("\n      - name:", 1)[0]
+        self.assertIn("if: always()", head)
+        self.assertIn("/shard-out/watchdog/", head)
+        # every uploaded path stays under shard-out/ (a path elsewhere moves the archive root and breaks the exactly-once proof)
+        paths = re.findall(r"^\s+(\$\{\{ env\.APP_DIR \}\}/\S+)$", head, flags=re.M)
+        self.assertTrue(paths)
+        self.assertTrue(all("/shard-out/" in p for p in paths), paths)
+
+    def test_role_and_watchdog_tests_run_before_the_suite_in_the_shard_job(self):
+        role = self.job.index("CREATE ROLE awj_ci_watchdog")
+        tests = self.job.index("unittest discover -s scripts/ci-watchdog")
+        self.assertLess(role, tests)
+        self.assertLess(tests, self.job.index("- name: تشغيل اختبارات الشريحة"))
+        self.assertIn("AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER: ancestor=postgres:16", self.job)
+        for need in ("NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "IN ROLE pg_monitor"):
+            self.assertIn(need, self.job[role:role + 250])
+        self.assertIn("--pg-user awj_ci_watchdog", self.step)
+
+
 @unittest.skipUnless(os.environ.get("AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER") or os.environ.get("AWJ_WATCHDOG_TEST_PSQL_CMD"),
                      "set AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER (CI) or AWJ_WATCHDOG_TEST_PSQL_CMD (local)")
 class RealPostgres(WatchdogCase):
