@@ -127,5 +127,31 @@ class AdditiveToSuperseding(Base):
         self.has(e, f"[{S1}] blocking check removed")
 
 
+class TakeoverPredicate(unittest.TestCase):
+    """`_additive_proof_taken_over` is pure: each clause is tested on its own (the manifest loader enforces some of them too; the predicate does not rely on that)."""
+
+    BC = {"_role": "proof", "_status": "additive", "_supersedes": LEGACY, "job": "test-pg-shards-proof", "workflow": ".github/workflows/ci.yml", "name": PROOF}
+    HG = {"status": "superseding", "workflow": ".github/workflows/ci.yml", "proof": {"job": "test-pg-shards-proof", "name": LEGACY}}
+    BLOCKING = {LEGACY, PROOF}
+
+    def call(self, bc=None, hg=..., blocking=None):
+        return g._additive_proof_taken_over({**self.BC, **(bc or {})}, self.HG if hg is ... else hg, self.BLOCKING if blocking is None else blocking)
+
+    def test_the_exact_transition_is_accepted(self):
+        self.assertTrue(self.call())
+
+    def test_each_clause_is_necessary(self):
+        self.assertFalse(self.call(bc={"_role": "shard"}))
+        self.assertFalse(self.call(bc={"_role": None}))
+        self.assertFalse(self.call(bc={"_status": "superseding"}))
+        self.assertFalse(self.call(hg=None))
+        self.assertFalse(self.call(hg={**self.HG, "status": "additive"}))
+        self.assertFalse(self.call(hg={**self.HG, "proof": {**self.HG["proof"], "job": "another-job"}}))
+        self.assertFalse(self.call(hg={**self.HG, "workflow": ".github/workflows/other.yml"}))
+        self.assertFalse(self.call(hg={**self.HG, "proof": {**self.HG["proof"], "name": "php artisan test (L11, pgsql, v2)"}}))
+        self.assertFalse(self.call(blocking={PROOF}))  # the superseded name was not a blocking check on main
+        self.assertFalse(self.call(blocking=set()))
+
+
 if __name__ == "__main__":
     unittest.main()
