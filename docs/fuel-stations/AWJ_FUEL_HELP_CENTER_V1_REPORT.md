@@ -107,7 +107,7 @@
 | محرك الجولة + اللوحة | `station-ops/guide/guide.integration.test.tsx` | 18 ✔ |
 | متصفح — مركز المساعدة (Chromium: سطح مكتب + جوال 390×844، ar/en، فاتح/داكن، ERP) | `e2e/fuel-help-center.spec.ts` | 20 ✔ |
 | متصفح — المرشد الذكي (الجوال/المكتب، ar/en، تقليل الحركة، الصلاحيات، موظفان) | `e2e/fuel-smart-guide.spec.ts` | 30 ✔ |
-| الحزمة الكاملة `vitest run` | web | انظر ملخص الـPR |
+| الحزمة الكاملة `vitest run` (941 ملفاً / 12268 اختباراً) | web | 12261 ✔ · 7 ✘ خارج النطاق: `confirm-dialog.test.tsx` (حبس Tab) **يفشل على commit الأساس نفسه** قبل أي تعديل؛ وخمسة اختبارات مرتبطة بالتمرير/التركيز (`CanvasContentBlocks`، `CanvasGallery`، `section-selection`×2، `ui/confirm-dialog`) تنجح منفردةً وتفشل تحت حمل الحزمة الكاملة. فشل حارس `capabilities.guard` (ملف `permissions.ts` الجديد طابق نمطه) **أُصلح** بإعادة تسميته `permission-labels.ts` |
 | `next build` | web | ✔ |
 اللقطات: `docs/fuel-stations/help-center-shots/` و`docs/fuel-stations/smart-guide-shots/` (جوال وسطح مكتب، ar/en، فاتح/داكن).
 

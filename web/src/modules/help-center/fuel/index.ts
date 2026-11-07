@@ -7,7 +7,7 @@ import type { FuelAudience, FuelHelpArticle, FuelHelpArticleSlug, FuelHelpCatego
 export { helpLocale };
 export type { FuelAudience, FuelHelpArticle, FuelHelpCategoryKey, FuelSurface, HelpLocale };
 export * from './types';
-export { FUEL_PERMISSION_LABELS, permissionLabel } from './permissions';
+export { FUEL_PERMISSION_LABELS, permissionLabel } from './permission-labels';
 
 /**
  * مركز مساعدة محطات الوقود: مصدر محتوى واحد يخدم تطبيق «محطات أَوْج» ووحدة المحطات في ERP.
