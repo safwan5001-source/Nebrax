@@ -7,15 +7,12 @@ Run: python3 -I -m unittest discover -s scripts/horizon-eval -v"""
 from __future__ import annotations
 
 import copy
-import json
 import unittest
-from pathlib import Path
 
 import collect_snapshot as cs
 import contract_runner as cr
 import horizon_eval as he
 
-REPO = Path(__file__).resolve().parents[2]
 LEGACY = "php artisan test (L11, pgsql)"
 SQLITE = "php artisan test (L11, sqlite)"
 PROOF = "php artisan test (L11, pgsql, shards proven)"
@@ -23,7 +20,21 @@ S1, S2 = "php artisan test (L11, pgsql, shard 1)", "php artisan test (L11, pgsql
 
 
 def live_manifest():
-    return json.loads((REPO / ".github" / "ci-gate" / "required-checks.json").read_text(encoding="utf-8"))
+    """A self-contained ADDITIVE manifest (the shape main had when this fix landed). It deliberately does not read the repository's manifest, whose state
+    changes over time (additive today, superseding later): these tests must hold in both. The live manifest vs the gate is checked by
+    scripts/ci-gate/test_collect_snapshot_parity.py."""
+    def chk(name, tier="always"):
+        return {"name": name, "workflow": ".github/workflows/ci.yml", "job": "test", "tier": tier, "covers": []}
+    return {
+        "version": 1, "gate_check_name": "CI Gate", "grace_minutes_no_run": 10,
+        "checks": [chk(SQLITE), chk(LEGACY), chk("PostgreSQL feed-lock performance (COPS-H1-1)"), chk("web build (Next.js)", "paths")],
+        "shard_groups": [{
+            "id": "pgsql-suite", "status": "additive", "supersedes": LEGACY, "workflow": ".github/workflows/ci.yml", "job": "test-pg-shards",
+            "axis": "shard", "count": 2, "shard_name": "php artisan test (L11, pgsql, shard {i})",
+            "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter"]},
+            "proof": {"name": PROOF, "job": "test-pg-shards-proof", "guard": {"step_run_contains": "shard_proof.py", "require": ["set -euo pipefail"], "forbidden": ["|| true"]}},
+        }],
+    }
 
 
 def superseding(m):
