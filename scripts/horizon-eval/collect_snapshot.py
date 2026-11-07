@@ -94,6 +94,31 @@ def names_of(f) -> list[str]:
     return [f["filename"]] + ([f["previous_filename"]] if f.get("previous_filename") else [])
 
 
+def required_check_names(manifest: dict) -> tuple[list[str], list[str]]:
+    """(always_names, path_names) of the blocking checks CI Gate requires, read from main's manifest (pure, no I/O).
+
+    `checks` lists the declared checks; a `shard_groups` entry adds one always-tier check per shard plus its proof check (CI Gate expands them the same way,
+    scripts/ci-gate/ci_gate.py::expand_groups, and test_collect_snapshot_parity.py keeps the two in step). A `superseding` group takes over the name of the
+    check it replaces and removes that check from `checks`; without this expansion the replaced name would vanish from `always_names` and the evaluator
+    would report MANIFEST_BELOW_POLICY_FLOOR for a check that is still required (through the group's proof job).
+    """
+    always = {c["name"] for c in manifest["checks"] if c["tier"] == "always"}
+    paths = {c["name"] for c in manifest["checks"] if c["tier"] == "paths"}
+    groups = manifest.get("shard_groups") or []
+    if not isinstance(groups, list):
+        raise CollectError("shard_groups must be a list")
+    for grp in groups:
+        try:
+            count, template, proof = grp["count"], grp["shard_name"], grp["proof"]["name"]
+        except (KeyError, TypeError) as e:
+            raise CollectError(f"malformed shard group: missing {e}") from e
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1 or not isinstance(template, str) or not isinstance(proof, str):
+            raise CollectError("malformed shard group: count/shard_name/proof.name")
+        always.update(template.replace("{i}", str(i)).replace("{n}", str(count)) for i in range(1, count + 1))
+        always.add(proof)
+    return sorted(always), sorted(paths)
+
+
 def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT) -> dict:
     base = f"repos/{repo}"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -186,8 +211,8 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
                        for c in check_runs],
             "required_checks": {
                 "source_ref": "main", "source_sha": main_sha, "gate_name": manifest["gate_check_name"],
-                "always_names": sorted({c["name"] for c in manifest["checks"] if c["tier"] == "always"}),
-                "path_names": sorted({c["name"] for c in manifest["checks"] if c["tier"] == "paths"}),
+                "always_names": required_check_names(manifest)[0],
+                "path_names": required_check_names(manifest)[1],
                 "grace_minutes_no_run": manifest["grace_minutes_no_run"],
             },
             "attestations": [],
