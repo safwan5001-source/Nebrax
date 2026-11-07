@@ -35,7 +35,7 @@ class FuelLockOrderPostgresTest extends TestCase
     /** @var list<string> */
     private array $tenants = [];
 
-    private string $dir;
+    private string $dir = '';
 
     protected function setUp(): void
     {
@@ -50,10 +50,12 @@ class FuelLockOrderPostgresTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->dir . '/*') ?: [] as $file) {
-            @unlink($file);
+        if ($this->dir !== '') {
+            foreach (glob($this->dir . '/*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($this->dir);
         }
-        @rmdir($this->dir);
         if (DB::connection()->getDriverName() === 'pgsql') {
             foreach ($this->tenants as $id) {
                 DB::table('tenants')->where('id', $id)->delete();
