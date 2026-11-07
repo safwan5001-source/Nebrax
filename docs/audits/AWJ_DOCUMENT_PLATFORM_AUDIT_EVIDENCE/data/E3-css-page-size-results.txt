@@ -1,0 +1,9 @@
+Chromium (headless, /opt/pw-browsers chromium-1243) page.pdf({preferCSSPageSize:true}) with the app's global rule + injected @page strings
+(global:  @media print { @page { size: A4; margin: 14mm } })
+thermal80_injected_auto  (size: 80mm auto; margin: 4mm) -> 1 page, A4  (size declaration dropped, margin 4mm applied; text minX 18.7pt vs 47.2pt without it)
+thermal58_injected_auto  (size: 58mm auto; margin: 4mm) -> 1 page, A4
+a4_injected              (size: 210mm 297mm)            -> A4  (inherits global margin 14mm)
+letter_injected          (size: 216mm 279mm)            -> Letter
+a5_hypothetical          (size: 148mm 210mm)            -> A5
+a6_hypothetical          (size: 105mm 148mm)            -> A6
+no_injection                                            -> A4

@@ -1,0 +1,186 @@
+[
+  {
+    "tag": "tax_invoice__tax-invoice-erp-v2__single__rtl",
+    "dom": {
+      "w": 794,
+      "h": 1047
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "1",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 1,
+      "fonts": 14,
+      "bytes": 6663403
+    },
+    "printPdf": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 4823,
+      "fonts": 16,
+      "bytes": 64611
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "tax_invoice__tax-invoice-erp-v2__multipage__rtl",
+    "dom": {
+      "w": 794,
+      "h": 2552
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "4",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 4,
+      "fonts": 14,
+      "bytes": 24329906
+    },
+    "printPdf": {
+      "pages": "3",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 45026,
+      "fonts": 16,
+      "bytes": 92410
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "tax_invoice__tax-invoice-classic-v2__twenty__ltr",
+    "dom": {
+      "w": 794,
+      "h": 2250
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "3",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 3,
+      "fonts": 14,
+      "bytes": 21442393
+    },
+    "printPdf": {
+      "pages": "3",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 13356,
+      "fonts": 8,
+      "bytes": 47248
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "tax_invoice__tax-invoice-modern-v2__long_content__rtl",
+    "dom": {
+      "w": 794,
+      "h": 1092
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "1",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 1,
+      "fonts": 14,
+      "bytes": 10407907
+    },
+    "printPdf": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 10016,
+      "fonts": 16,
+      "bytes": 74229
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "simplified_tax_invoice__tax-invoice-retail-v2__three__rtl",
+    "dom": {
+      "w": 794,
+      "h": 1047
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "1",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 1,
+      "fonts": 14,
+      "bytes": 7797236
+    },
+    "printPdf": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 6320,
+      "fonts": 16,
+      "bytes": 67715
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "quotation__quotation-proposal__five__rtl",
+    "dom": {
+      "w": 794,
+      "h": 1450
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "3",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 3,
+      "fonts": 14,
+      "bytes": 13819992
+    },
+    "printPdf": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 5907,
+      "fonts": 16,
+      "bytes": 71826
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "purchase_order__purchase-order-formal__twenty__ltr",
+    "dom": {
+      "w": 794,
+      "h": 2044
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "3",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 3,
+      "fonts": 14,
+      "bytes": 19479622
+    },
+    "printPdf": {
+      "pages": "3",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 12895,
+      "fonts": 8,
+      "bytes": 41512
+    },
+    "pageErrors": []
+  },
+  {
+    "tag": "delivery_note__tax-invoice-minimal-v2__three__rtl",
+    "dom": {
+      "w": 794,
+      "h": 1047
+    },
+    "pdfButtons": 1,
+    "appPdf": {
+      "pages": "1",
+      "size": "595.276 x 841.89 pts (A4)",
+      "textChars": 1,
+      "fonts": 14,
+      "bytes": 8273636
+    },
+    "printPdf": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)",
+      "textChars": 3390,
+      "fonts": 11,
+      "bytes": 45841
+    },
+    "pageErrors": []
+  }
+]

@@ -1,0 +1,70 @@
+   PASS  Tests\Feature\InvoiceDocumentLanguageTest
+  ✓ contract publishes v1 languages and asserts them                    13.56s  
+  ✓ assert language rejects unknown values with arabic message           0.06s  
+  ✓ effective language resolution prefers frozen then draft then tenant… 0.05s  
+  ✓ creating without language leaves columns null and effective falls b… 0.07s  
+  ✓ creating with language saves it on the draft                         0.05s  
+  ✓ creating with invalid language is rejected by the service            0.05s  
+  ✓ update omits language keeps it and null clears it                    0.06s  
+  ✓ posting freezes the draft language choice                            0.08s  
+  ✓ posting without draft language freezes tenant default                0.09s  
+  ✓ posting without draft or tenant default freezes ar                   0.13s  
+  ✓ posted invoice ignores later tenant default change                   0.08s  
+  ✓ changing tenant default does not touch existing drafts               0.06s  
+  ✓ updating a single draft language does not change tenant default      0.06s  
+  ✓ posted language frozen survives reposting attempts                   0.10s  
+  ✓ duplicate does not copy frozen language and language defaults to nu… 0.08s  
+   PASS  Tests\Feature\InvoiceTemplateOverrideTest
+  ✓ creating without override leaves both columns null                   0.07s  
+  ✓ a compatible override is saved on print and pdf without changing as… 0.07s  
+  ✓ update can reset override to null and omit keeps the saved choice    0.07s  
+  ✓ posting without override follows the live assignment including late… 0.09s  
+  ✓ posting with override freezes it and ignores a later assignment      0.10s  
+  ✓ posting rejects an unpublished override and rolls back               0.09s  
+  ✓ create rejects thermal incompatible and missing overrides            0.07s  
+  ✓ duplicate does not copy the override                                 0.07s  
+  ✓ simplified invoice accepts a tax invoice override                    0.06s  
+  ✓ api create and show expose override fields                           0.19s  
+  ✓ api rejects a cross tenant override revision                         0.18s  
+  ✓ staff cannot write an invoice override                               0.11s  
+  ✓ accountant can create an invoice with an override                    0.18s  
+  ✓ contract helpers reject thermal and accept simplified fallback       0.05s  
+   PASS  Tests\Feature\PrintTemplateTest
+  ✓ owner creates a draft template with a versioned revision             0.10s  
+  ✓ staff cannot create or publish print templates                       0.09s  
+  ✓ publishing freezes the revision and a later edit creates a new draf… 0.10s  
+  ✓ template details return the full revision history in descending ver… 0.11s  
+  ✓ duplicating a template creates an independent draft from the publis… 0.13s  
+  ✓ only published revisions can be assigned and the service resolves c… 0.10s  
+  ✓ thermal assignment rejects a non thermal revision and can return to… 0.14s  
+  ✓ a branch assignment overrides the company default and other branche… 0.13s  
+  ✓ templates are tenant isolated                                        0.19s  
+  ✓ thermal assignment rejects a published revision from another tenant  0.16s  
+  ✓ template layout rejects unsupported duplicate and hidden required b… 0.11s  
+  ✓ template layout persists supported advanced block properties and re… 0.14s  
+  ✓ legacy sales design is copied without removing the legacy setting    0.13s  
+  ✓ migrated legacy design is upgraded to current revisions without mut… 0.10s  
+  ✓ migrated upgrade preserves an existing company assignment for a com… 0.13s  
+  ✓ live resolution endpoint prefers branch then falls back to company…  0.18s  
+  ✓ invoice document type maps zatca simplified independently            0.03s  
+  ✓ live resolution endpoint resolves pdf independently from print       0.18s  
+  ✓ live resolution endpoint returns null when no assignment exists      0.12s  
+  ✓ live resolution endpoint rejects an unknown or foreign branch        0.10s  
+   PASS  Tests\Feature\PurchaseDocumentLanguageTest
+  ✓ creating without language leaves columns null                        0.12s  
+  ✓ creating with language saves it on the draft                         0.10s  
+  ✓ creating with invalid language is rejected by the service            0.06s  
+  ✓ update omits language keeps it and null clears it                    0.09s  
+  ✓ update can set an explicit override                                  0.07s  
+  ✓ posting freezes the draft language choice                            0.10s  
+  ✓ posting without draft language freezes tenant default                0.08s  
+  ✓ posting without draft or tenant default freezes ar                   0.10s  
+  ✓ posted purchase ignores later tenant default change                  0.09s  
+  ✓ changing tenant default does not touch existing drafts               0.08s  
+  ✓ updating a single draft language does not change tenant default      0.07s  
+  ✓ posted language frozen survives reposting attempts                   0.13s  
+  ✓ posted purchase cannot be updated so language stays frozen           0.09s  
+  ✓ duplicate does not copy frozen language and language defaults to nu… 0.10s  
+  ✓ legacy purchase without language columns resolves to ar by default   0.08s  
+  Tests:    64 passed (304 assertions)
+  Duration: 23.82s

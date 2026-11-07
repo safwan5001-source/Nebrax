@@ -1,0 +1,290 @@
+[
+  {
+    "f": "thermal_58_ar_five.html",
+    "wPx": 219,
+    "hPx": 638,
+    "wMm": 58,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_ar_long_content.html",
+    "wPx": 219,
+    "hPx": 747,
+    "wMm": 58,
+    "truncatedLines": 5,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_ar_single.html",
+    "wPx": 219,
+    "hPx": 484,
+    "wMm": 58,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_ar_twenty.html",
+    "wPx": 219,
+    "hPx": 1152,
+    "wMm": 58,
+    "truncatedLines": 20,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "2",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_en_five.html",
+    "wPx": 219,
+    "hPx": 619,
+    "wMm": 58,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_en_long_content.html",
+    "wPx": 219,
+    "hPx": 743,
+    "wMm": 58,
+    "truncatedLines": 5,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_en_single.html",
+    "wPx": 219,
+    "hPx": 482,
+    "wMm": 58,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_58_en_twenty.html",
+    "wPx": 219,
+    "hPx": 1133,
+    "wMm": 58,
+    "truncatedLines": 20,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 219,
+    "a4default": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "2",
+      "size": "165.12 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_ar_five.html",
+    "wPx": 302,
+    "hPx": 592,
+    "wMm": 80,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_ar_long_content.html",
+    "wPx": 302,
+    "hPx": 652,
+    "wMm": 80,
+    "truncatedLines": 5,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_ar_single.html",
+    "wPx": 302,
+    "hPx": 455,
+    "wMm": 80,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_ar_twenty.html",
+    "wPx": 302,
+    "hPx": 1105,
+    "wMm": 80,
+    "truncatedLines": 20,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "2",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_en_five.html",
+    "wPx": 302,
+    "hPx": 605,
+    "wMm": 80,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_en_long_content.html",
+    "wPx": 302,
+    "hPx": 684,
+    "wMm": 80,
+    "truncatedLines": 5,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_en_single.html",
+    "wPx": 302,
+    "hPx": 468,
+    "wMm": 80,
+    "truncatedLines": 0,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "1",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "1",
+      "size": "227.04 x 1700.88 pts"
+    }
+  },
+  {
+    "f": "thermal_80_en_twenty.html",
+    "wPx": 302,
+    "hPx": 1119,
+    "wMm": 80,
+    "truncatedLines": 20,
+    "overflowRight": 0,
+    "qrPx": 88,
+    "scrollW": 302,
+    "a4default": {
+      "pages": "2",
+      "size": "594.96 x 841.92 pts (A4)"
+    },
+    "roll": {
+      "pages": "2",
+      "size": "227.04 x 1700.88 pts"
+    }
+  }
+]
