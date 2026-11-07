@@ -43,6 +43,8 @@ export function FuelContextualHelp({ basePath, surface, buttonClassName }: { bas
           <SheetContent
             closeLabel={t('closeContextual')}
             dir={locale === 'ar' ? 'rtl' : 'ltr'}
+            // الورقة تُرسم في بوابة خارج الجذر؛ داخل التطبيق تحمل رموز تصميمه (اللون البرتقالي) كي لا يتبدّل الطابع.
+            {...(surface === 'app' ? { 'data-fuel-ops': '' } : {})}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               triggerRef.current?.focus();

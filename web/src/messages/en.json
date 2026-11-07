@@ -7891,7 +7891,7 @@
     "title": "Fuel Stations Help Center",
     "description": "Step-by-step operating guides for attendants, supervisors, and station managers — one content source shared by the app and the Stations module.",
     "searchTitle": "Find a task",
-    "searchPlaceholder": "Search: open a shift, meter reading, PIN, receiving, cash variance…",
+    "searchPlaceholder": "Search: shift, meter, PIN…",
     "audienceLabel": "Guides for",
     "audienceAll": "All",
     "recommended": "For you",
