@@ -1,0 +1,32 @@
+import { newPhone, dump, layout, WEB } from './lib.mjs';
+import fs from 'node:fs';
+const seed = JSON.parse(fs.readFileSync('/tmp/claude-0/e2e/seed.json', 'utf8'));
+const { shift } = JSON.parse(fs.readFileSync('/tmp/claude-0/e2e/live-shift.json', 'utf8'));
+const shot = (page, n) => page.screenshot({ path: `/tmp/claude-0/e2e/shots/${n}.png`, fullPage: true });
+const s = await newPhone('ar'); const { page, errors } = s;
+await page.goto(WEB + '/fuel-stations/ops/login', { waitUntil: 'networkidle' });
+await page.locator('input[name=employee_no]').fill(seed.pins.seller.employee_no);
+await page.locator('input[name=pin]').fill(seed.pins.seller.pin);
+await page.getByRole('button', { name: 'دخول' }).last().click();
+await page.waitForFunction(() => document.body.innerText.includes('مساحة عمل'), null, { timeout: 20000 });
+await page.waitForTimeout(1500);
+async function readings(stage, nozzle, tank) {
+  await page.goto(`${WEB}/fuel-stations/ops/shifts/${shift}/readings/${stage}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
+  const inputs = page.locator('[data-entry-input]');
+  await inputs.nth(0).fill(nozzle); await inputs.nth(1).fill(tank);
+  await shot(page, `21-${stage}-filled`);
+  await page.getByRole('button', { name: /مراجعة وحفظ/ }).click();
+  await page.getByRole('dialog').waitFor();
+  await shot(page, `22-${stage}-review`);
+  console.log(stage, 'review dialog:', (await page.getByRole('dialog').innerText()).replace(/\s+/g,' ').slice(0, 300));
+  console.log(stage, 'dialog buttons', await page.getByRole('dialog').getByRole('button').allInnerTexts());
+}
+await readings('opening', '1000', '10000');
+await page.getByRole('dialog').getByRole('button').filter({ hasText: /تأكيد|حفظ/ }).last().click();
+await page.waitForTimeout(3500);
+await shot(page, '23-opening-saved');
+console.log('after save:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').slice(0, 400));
+console.log(await dump(page));
+console.log('ERRORS', errors.filter(e=>!/reqfailed/.test(e)));
+await s.b.close();

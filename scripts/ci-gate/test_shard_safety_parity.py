@@ -7,6 +7,7 @@ import copy
 import json
 import re
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -69,18 +70,21 @@ class Base(unittest.TestCase):
 
 
 class LiveTreeIsCompliant(Base):
-    def test_live_tree_validates_clean_and_still_additive(self):
+    def test_live_tree_validates_clean_and_the_group_is_superseding(self):
         self.assertEqual(g.validate()[0], [])
         grp = g.load_manifest(REAL / MF)["shard_groups"][0]
-        self.assertEqual(grp["status"], "additive")
+        self.assertEqual(grp["status"], "superseding")
         self.assertEqual({r["label"] for r in grp["required_steps"]}, LABELS)
         self.assertEqual(grp["max_timeout_minutes"], 60)
 
-    def test_full_pgsql_check_is_still_a_blocking_required_check(self):
+    def test_the_pgsql_context_is_a_blocking_check_owned_by_the_proof_job(self):
         m = g.load_manifest(REAL / MF)
         names = {c["name"]: c for c in m["checks"]}
-        self.assertEqual(names["php artisan test (L11, pgsql)"]["tier"], "always")
-        self.assertEqual(names["php artisan test (L11, pgsql)"]["job"], "test")
+        legacy = names["php artisan test (L11, pgsql)"]
+        self.assertEqual((legacy["tier"], legacy["job"], legacy["_role"], legacy["_status"]), ("always", "test-pg-shards-proof", "proof", "superseding"))
+        for i in (1, 2):
+            shard = names[f"php artisan test (L11, pgsql, shard {i})"]
+            self.assertEqual((shard["tier"], shard["job"]), ("always", SHARD))
 
     def test_the_gate_requires_every_safeguard_label_for_a_future_superseding(self):
         self.assertEqual(set(g.SUPERSEDE_REQUIRED_LABELS), LABELS)  # live group carries exactly the labels a superseding group needs
@@ -209,9 +213,12 @@ class N17_N18_BaselineCannotRegress(Base):
         self.assertTrue(any(needle in e for e in errs), (needle, errs))
 
     def test_n17_remove_all_or_one_required_step(self):
-        self.has(self.compare(lambda gr: gr.pop("required_steps")), "removed")
+        # a superseding group must carry every safeguard label: removing any (or all) is refused outright when the manifest is loaded
+        with self.assertRaises(g.GateError):
+            self.compare(lambda gr: gr.pop("required_steps"))
         for label in LABELS:
-            self.has(self.compare(lambda gr, l=label: gr.update(required_steps=[r for r in gr["required_steps"] if r["label"] != l])), f"required step {label!r} removed")
+            with self.assertRaises(g.GateError):
+                self.compare(lambda gr, l=label: gr.update(required_steps=[r for r in gr["required_steps"] if r["label"] != l]))
 
     def test_n18_drop_markers_or_widen_conditions(self):
         def drop_marker(gr):
@@ -241,10 +248,10 @@ class N17_N18_BaselineCannotRegress(Base):
 
 
 class ParityOfTheLiveWorkflow(unittest.TestCase):
-    def test_the_full_job_is_untouched_by_this_change(self):
+    def test_the_full_job_only_lost_its_pgsql_leg(self):
         doc = yaml.safe_load((REAL / CI).read_text(encoding="utf-8"))
         full = doc["jobs"]["test"]
-        self.assertEqual(full["strategy"]["matrix"]["db"], ["sqlite", "pgsql"])
+        self.assertEqual(full["strategy"]["matrix"]["db"], ["sqlite"])  # the single intended workflow change besides the proof job's name
         names = [s.get("name", "") for s in full["steps"]]
         for n in ("دور مراقبة PostgreSQL للقراءة فقط (pgsql فقط)", "اختبارات مراقب تعليق الاختبارات (pgsql فقط)",
                   "AIA-0.4 — قبول سقف صلاحيات المفاتيح (صارم، بلا skip/incomplete)", "حفظ مخرجات الاختبارات للتشخيص"):
@@ -263,18 +270,21 @@ class HorizonEvaluationCompatibility(unittest.TestCase):
 
     HE = REAL / "scripts" / "horizon-eval"
 
-    def test_policy_floor_is_met_by_the_raw_manifest_while_additive(self):
+    def test_policy_floor_is_met_through_the_collectors_group_expansion(self):
+        sys.path.insert(0, str(self.HE))
+        import collect_snapshot as cs
         m = json.loads((REAL / MF).read_text(encoding="utf-8"))
         floor = json.loads((self.HE / "policy" / "zone_policy.v1.json").read_text(encoding="utf-8"))["ci_floor"]
-        always = {c["name"] for c in m["checks"] if c["tier"] == "always"}
+        raw = {c["name"] for c in m["checks"] if c["tier"] == "always"}
+        always = set(cs.required_check_names(m)[0])
+        self.assertTrue(set(floor["always"]) - raw, "this tripwire is about the superseded name having left the raw checks")  # the very reason the collector must expand
         self.assertFalse(set(floor["always"]) - always, "the live manifest dropped an always-tier check required by Horizon's policy floor")
-        self.assertTrue(all(grp["status"] == "additive" for grp in m.get("shard_groups") or []))
 
-    def test_superseding_requires_the_collector_to_expand_groups(self):
+    def test_a_superseding_group_requires_the_collector_to_expand_groups(self):
         m = json.loads((REAL / MF).read_text(encoding="utf-8"))
         if any(grp["status"] == "superseding" for grp in m.get("shard_groups") or []):
             src = (self.HE / "collect_snapshot.py").read_text(encoding="utf-8")
-            self.assertIn("shard_groups", src, "a superseding group needs collect_snapshot.py to expand shard_groups (else Horizon blocks on the policy floor)")
+            self.assertIn("def required_check_names", src, "a superseding group needs collect_snapshot.py to expand shard_groups (else Horizon blocks on the policy floor)")
 
 
 if __name__ == "__main__":

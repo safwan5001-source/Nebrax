@@ -1,0 +1,44 @@
+import { newPhone, dump, layout, WEB } from './lib.mjs';
+import fs from 'node:fs';
+const seed = JSON.parse(fs.readFileSync('/tmp/claude-0/e2e/seed.json', 'utf8'));
+const { shift } = JSON.parse(fs.readFileSync('/tmp/claude-0/e2e/live-shift2.json', 'utf8'));
+const shot = (page, n) => page.screenshot({ path: `/tmp/claude-0/e2e/shots/${n}.png`, fullPage: true });
+const [CARD, CASH, COUNTED, CLOSENOTE] = (process.argv[2] ?? '29,40,540,').split(',');
+const s = await newPhone('ar'); const { page, errors } = s;
+await page.goto(WEB + '/fuel-stations/ops/login', { waitUntil: 'networkidle' });
+await page.locator('input[name=employee_no]').fill(seed.pins.seller.employee_no);
+await page.locator('input[name=pin]').fill(seed.pins.seller.pin);
+await page.getByRole('button', { name: 'دخول' }).last().click();
+await page.waitForFunction(() => document.body.innerText.includes('مساحة عمل'), null, { timeout: 20000 });
+await page.waitForTimeout(1500);
+await page.goto(`${WEB}/fuel-stations/ops/shifts/${shift}/handover`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(3000);
+const amounts = page.locator('[data-testid^="collection-amount-"]');
+console.log('collection inputs:', await amounts.count());
+// الترتيب في الصفحة: بطاقة (شبكة) ثم نقدي
+await amounts.nth(0).fill(CARD); await amounts.nth(1).fill(CASH);
+await page.waitForTimeout(600);
+await shot(page, '41-collection-filled');
+console.log('RECON:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').match(/المطابقة التشغيلية.*?النقد في الدرج/)?.[0]);
+await page.getByRole('button', { name: 'حفظ توزيع التحصيل' }).click();
+await page.waitForTimeout(3000);
+await shot(page, '42-collection-saved');
+console.log('SAVED TEXT:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').match(/المبيعات والتحصيل.*?الخطوة 2/)?.[0].slice(0, 900));
+await page.getByTestId('counted-cash').fill(COUNTED);
+if (CLOSENOTE) await page.locator('textarea').fill(CLOSENOTE);
+await page.waitForTimeout(800);
+await shot(page, '43-handover-ready');
+console.log('STEP3:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').match(/الخطوة 3.*/)?.[0].slice(0, 600));
+const go = page.getByRole('button', { name: 'مراجعة وتسليم الوردية' });
+console.log('handover disabled:', await go.isDisabled());
+if (!(await go.isDisabled())) {
+  await go.click();
+  await page.getByRole('dialog').getByRole('checkbox').check();
+  await page.getByRole('dialog').getByRole('button', { name: 'تأكيد التسليم' }).click();
+  await page.waitForTimeout(3500);
+  await shot(page, '44-handover-done');
+  console.log('DONE:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g,' ').match(/تم تسليم.*/)?.[0].slice(0, 500));
+}
+console.log('LAYOUT', await layout(page));
+console.log('ERRORS', errors.filter(e=>!/reqfailed/.test(e)));
+await s.b.close();

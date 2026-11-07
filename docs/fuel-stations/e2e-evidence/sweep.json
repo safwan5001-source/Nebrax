@@ -1,0 +1,299 @@
+[
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "home",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "products",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "shifts-list",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "tanks",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "profile",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "shift-open-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "readings-closing",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "handover",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "shift-approved-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "open-form",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "390x844",
+  "route": "review-shortage",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "home",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "products",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "shifts-list",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "tanks",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "profile",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "shift-open-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "readings-closing",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "handover",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "shift-approved-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "open-form",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "en",
+  "vp": "390x844",
+  "route": "review-shortage",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "home",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "products",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "shifts-list",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "tanks",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "profile",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "shift-open-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "readings-closing",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "handover",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "shift-approved-detail",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "open-form",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ },
+ {
+  "locale": "ar",
+  "vp": "375x667",
+  "route": "review-shortage",
+  "dir": "rtl",
+  "problems": [],
+  "easternDigits": 0,
+  "pageErrors": []
+ }
+]

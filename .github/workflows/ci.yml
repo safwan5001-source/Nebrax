@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        db: [sqlite, pgsql]
+        db: [sqlite]
 
     env:
       COMPOSER_NO_INTERACTION: '1'
@@ -695,7 +695,7 @@ jobs:
           retention-days: 7
 
   test-pg-shards-proof:
-    name: php artisan test (L11, pgsql, shards proven)
+    name: php artisan test (L11, pgsql)
     needs: [test-pg-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 10
