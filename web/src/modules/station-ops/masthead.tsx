@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ChevronRight, Settings } from 'lucide-react';
+import { FuelContextualHelp } from '@/components/fuel-help/fuel-contextual-help';
 import { useCompany } from '@/lib/company';
 import { useStationOps } from './context';
 import { OPS_BASE, deriveOpsMode } from './nav';
@@ -64,6 +65,10 @@ function greetingKey(hour: number): 'morning' | 'afternoon' | 'evening' {
   return hour < 18 ? 'afternoon' : 'evening';
 }
 
+/** زر المساعدة السياقية في الرأس الكحلي: يطابق زر الإعدادات (44px، حد، تركيز مرئي). */
+const HELP_BUTTON = 'grid h-11 w-11 shrink-0 place-items-center rounded-[11px] border border-[color:var(--fo-outline)] text-[color:var(--fo-on-navy)] hover:bg-[color:var(--fo-header-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fo-on-navy)]';
+const HELP_BASE = `${OPS_BASE}/help`;
+
 const MASTHEAD = 'bg-[var(--fo-navy)] text-[color:var(--fo-on-navy)] [padding-top:max(1.25rem,env(safe-area-inset-top))]';
 
 export function HomeMasthead() {
@@ -83,6 +88,8 @@ export function HomeMasthead() {
               <p className="truncate text-xs leading-5 text-[color:var(--fo-on-navy-muted)]">{company?.name ?? t('workspaceName')}</p>
             </div>
           </div>
+          <div className="flex shrink-0 items-center gap-2">
+          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} />
           <Link
             href={`${OPS_BASE}/settings`}
             aria-label={t('navSettings')}
@@ -90,6 +97,7 @@ export function HomeMasthead() {
           >
             <Settings aria-hidden="true" className="h-5 w-5" strokeWidth={1.7} />
           </Link>
+          </div>
         </div>
 
         <div className="mt-6">
@@ -118,6 +126,7 @@ export function PageMasthead({ title, subtitle, raised = false, backHref = OPS_B
             <ChevronRight aria-hidden="true" className="h-5 w-5 ltr:rotate-180" strokeWidth={1.8} />
           </Link>
           <StationSelect compact />
+          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} />
         </div>
         <h1 className="mt-5 text-xl font-semibold leading-7">{title}</h1>
         {subtitle ? <p className="mt-1 text-[13px] leading-5 text-[color:var(--fo-on-navy-muted)]">{subtitle}</p> : null}

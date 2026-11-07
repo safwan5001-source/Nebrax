@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { Cylinder, Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
+import { CircleHelp, Cylinder, Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
 import { isStationSession } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { StationOpsProvider, useStationOps } from './context';
 import { isNavActive, visibleOpsNav, type OpsNavId } from './nav';
 
-const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, receiving: Truck, tanks: Cylinder, manage: ShieldCheck, profile: UserRound };
+const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, receiving: Truck, tanks: Cylinder, manage: ShieldCheck, help: CircleHelp, profile: UserRound };
 
 function subscribeOnline(onChange: () => void): () => void {
   window.addEventListener('online', onChange);
