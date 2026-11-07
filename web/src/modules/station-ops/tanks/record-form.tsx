@@ -257,10 +257,13 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
         </dl>
 
         {pendingSent ? (
-          <p role="status" data-pending-sent="" className="flex items-start gap-2 rounded-[11px] bg-[color:var(--fo-warning-tint)] px-3 py-2.5 text-sm font-semibold text-warning">
-            <Hourglass aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
-            <span>{t('tanks.late.pendingSent')} <Link href={`${TANKS_BASE}/requests`} className="underline">{t('tanks.late.viewRequests')}</Link></span>
-          </p>
+          <div data-pending-sent="" role="status" className="space-y-2 rounded-[11px] bg-[color:var(--fo-warning-tint)] px-3 py-2.5 text-sm font-semibold text-warning">
+            <p className="flex items-start gap-2">
+              <Hourglass aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+              <span>{t('tanks.late.pendingSent')}</span>
+            </p>
+            <Link href={`${TANKS_BASE}/requests`} className="inline-flex min-h-11 items-center rounded-lg border border-current px-3 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('tanks.late.viewRequests')}</Link>
+          </div>
         ) : null}
         {saved ? (
           <p role="status" data-saved="" className="flex items-center gap-2 rounded-[11px] bg-[color:var(--fo-positive-tint)] px-3 py-2.5 text-sm font-semibold text-positive">
