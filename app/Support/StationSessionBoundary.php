@@ -48,24 +48,39 @@ final class StationSessionBoundary
     /** مسارات تُستثنى حتى لو وقعت تحت بادئة مسموحة. */
     private const DENIED_URI_SUFFIXES = ['/pin'];
 
-    /** هل الطلب بجلسة محطات؟ (توكن مستخدم لا يحمل `*`). */
+    /**
+     * هل الطلب بتوكن مستخدم **مقيَّد القدرات** (لا يحمل `*`)؟ يُقرأ من قدرات التوكن المخزَّنة (مصفوفة حقيقية)، لا من `can()`:
+     * توكن اختبار `Sanctum::actingAs($user)` بلا قدرات (محاكاة) لا يحمل مصفوفة فلا يُعدّ مقيَّداً، فيبقى سلوك الاختبارات القائمة كما هو،
+     * بينما كل توكن حقيقي يُصدره التطبيق إما `['*']` (دخول عادي) أو `['station-ops']` (جلسة محطة).
+     */
     public static function isRestricted(Request $request): bool
     {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            return false;
-        }
-        $token = $user->currentAccessToken();
+        $abilities = self::abilities($request);
 
-        return $token instanceof PersonalAccessToken && ! $token->can('*');
+        return $abilities !== null && ! in_array('*', $abilities, true);
     }
 
     public static function isStationSession(Request $request): bool
     {
-        $user = $request->user();
-        $token = $user instanceof User ? $user->currentAccessToken() : null;
+        $abilities = self::abilities($request);
 
-        return $token instanceof PersonalAccessToken && ! $token->can('*') && $token->can(self::ABILITY);
+        return $abilities !== null && ! in_array('*', $abilities, true) && in_array(self::ABILITY, $abilities, true);
+    }
+
+    /** @return list<string>|null null = ليس توكناً مخزَّناً بقدرات (جلسة عادية/محاكاة) */
+    private static function abilities(Request $request): ?array
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+        $token = $user->currentAccessToken();
+        if (! $token instanceof PersonalAccessToken) {
+            return null;
+        }
+        $abilities = $token->getAttribute('abilities');
+
+        return is_array($abilities) ? array_values($abilities) : null;
     }
 
     /** هل يُسمح لهذا الطلب (المقيَّد) بالمرور؟ */
