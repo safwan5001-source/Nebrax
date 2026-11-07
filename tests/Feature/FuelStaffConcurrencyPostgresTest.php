@@ -76,7 +76,12 @@ class FuelStaffConcurrencyPostgresTest extends TestCase
         $this->enter($scene);
         $service = app(FuelStaffAccessService::class);
         $revision = $service->update(User::findOrFail($scene['actor']), $scene['target'], ['template' => 'seller', 'station_ids' => [$this->fx['s1']->id]])['revision'];
-        $templates = ['seller', 'supervisor', 'station_manager', 'supervisor', 'station_manager', 'seller'];
+        // كل متسابق يغيّر الحالة فعلاً عن الابتدائية (seller على s1): `revision` مشتق من المحتوى، فمتسابق يطابقها لا يغيّره
+        // ولو فاز أولاً، فيُقبل معه متسابق ثانٍ بالنسخة نفسها (الفهرس الزوجي = s1، الفردي = s2).
+        $templates = ['supervisor', 'supervisor', 'station_manager', 'supervisor', 'station_manager', 'seller'];
+        foreach ($templates as $i => $template) {
+            $this->assertNotSame('seller:s1', $template . ':' . ($i % 2 === 0 ? 's1' : 's2'), "المتسابق {$i} يطابق الحالة الابتدائية فلا يقدّم revision");
+        }
 
         $jobs = [];
         foreach ($templates as $i => $template) {
