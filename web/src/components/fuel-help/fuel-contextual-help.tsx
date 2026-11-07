@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -14,7 +14,21 @@ import { FuelHelpArticleBody, type FuelHelpSurface } from './fuel-help-article-b
  * زر «؟» السياقي: يفتح ورقة بمقتطف الدليل المرتبط بالشاشة الحالية ثم الدليل الكامل. لا شاشة مرتبطة ⇒ يذهب إلى المركز.
  * مصدر الربط الوحيد `resolveFuelContextualHelp`؛ لا شروط مسارات هنا. `buttonClassName` يلائم الرأس الكحلي في التطبيق أو شريط ERP.
  */
-export function FuelContextualHelp({ basePath, surface, buttonClassName }: { basePath: string; surface: FuelHelpSurface; buttonClassName: string }) {
+export function FuelContextualHelp({
+  basePath,
+  surface,
+  buttonClassName,
+  guideId,
+  renderExtra,
+}: {
+  basePath: string;
+  surface: FuelHelpSurface;
+  buttonClassName: string;
+  /** مرساة لجولة AWJ Smart Guide (تطبيق المحطات فقط): تُكتب سمة `data-guide`. */
+  guideId?: string;
+  /** إجراء إضافي في تذييل الورقة (مثل «ابدأ جولة هذه الشاشة» في التطبيق). */
+  renderExtra?: (close: () => void) => ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('fuelHelp');
@@ -32,6 +46,7 @@ export function FuelContextualHelp({ basePath, surface, buttonClassName }: { bas
         type="button"
         aria-label={label}
         title={label}
+        {...(guideId ? { 'data-guide': guideId } : {})}
         onClick={() => (resolved ? setOpen(true) : router.push(basePath))}
         className={buttonClassName}
       >
@@ -63,6 +78,7 @@ export function FuelContextualHelp({ basePath, surface, buttonClassName }: { bas
               <FuelHelpArticleBody article={resolved.article} locale={locale} surface={surface} compact />
             </div>
             <footer className="shrink-0 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {renderExtra?.(() => setOpen(false))}
               <Link
                 href={`${basePath}/${resolved.article.slug}`}
                 onClick={() => setOpen(false)}

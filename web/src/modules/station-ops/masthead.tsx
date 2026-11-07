@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ChevronRight, Settings } from 'lucide-react';
 import { FuelContextualHelp } from '@/components/fuel-help/fuel-contextual-help';
+import { GuideScreenShortcut } from './guide/tours-panel';
 import { useCompany } from '@/lib/company';
 import { useStationOps } from './context';
 import { OPS_BASE, deriveOpsMode } from './nav';
@@ -89,7 +90,7 @@ export function HomeMasthead() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} />
+          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} guideId="help-button" renderExtra={(close) => <GuideScreenShortcut close={close} />} />
           <Link
             href={`${OPS_BASE}/settings`}
             aria-label={t('navSettings')}
@@ -126,7 +127,7 @@ export function PageMasthead({ title, subtitle, raised = false, backHref = OPS_B
             <ChevronRight aria-hidden="true" className="h-5 w-5 ltr:rotate-180" strokeWidth={1.8} />
           </Link>
           <StationSelect compact />
-          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} />
+          <FuelContextualHelp basePath={HELP_BASE} surface="app" buttonClassName={HELP_BUTTON} guideId="help-button" renderExtra={(close) => <GuideScreenShortcut close={close} />} />
         </div>
         <h1 className="mt-5 text-xl font-semibold leading-7">{title}</h1>
         {subtitle ? <p className="mt-1 text-[13px] leading-5 text-[color:var(--fo-on-navy-muted)]">{subtitle}</p> : null}

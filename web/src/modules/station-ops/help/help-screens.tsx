@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { FuelHelpArticleView } from '@/components/fuel-help/fuel-help-article-view';
 import { FuelHelpCenter } from '@/components/fuel-help/fuel-help-center';
 import { useStationOps } from '../context';
+import { GuideToursPanel } from '../guide/tours-panel';
 import { OPS_BASE, deriveOpsMode } from '../nav';
 import { PageMasthead, ScreenBody } from '../masthead';
 
@@ -22,7 +23,7 @@ export function HelpHomeScreen() {
     <>
       <PageMasthead title={t('title')} subtitle={t('description')} />
       <ScreenBody>
-        <FuelHelpCenter basePath={OPS_HELP_BASE} surface="app" defaultAudience={defaultAudience} />
+        <FuelHelpCenter basePath={OPS_HELP_BASE} surface="app" defaultAudience={defaultAudience} extraSection={<GuideToursPanel />} />
       </ScreenBody>
     </>
   );

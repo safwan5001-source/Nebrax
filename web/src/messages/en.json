@@ -14794,6 +14794,161 @@
     "navTanks": "Tanks",
     "navProfile": "Profile",
     "navHelp": "Help",
+    "guide": {
+      "ui": {
+        "stepOf": "Step {current} of {total}",
+        "next": "Next",
+        "previous": "Back",
+        "skip": "Skip tour",
+        "done": "Finish tour",
+        "progress": "Tour progress"
+      },
+      "panel": {
+        "title": "Interactive tours",
+        "hint": "Short tours that highlight the real buttons on screen and explain them. They never press anything for you or change any data.",
+        "none": "No tours are available for your permissions right now.",
+        "start": "Start tour",
+        "resume": "Resume",
+        "replay": "Replay tour",
+        "openScreen": "Open Shifts",
+        "startHere": "Start this screen’s tour",
+        "notReady": "The tour could not start now: the screen is not ready. Try again once it has loaded.",
+        "persistNote": "Your progress is saved on this device for your account only. Switching employee starts with their own tours.",
+        "status": {
+          "new": "Not started",
+          "in_progress": "In progress",
+          "completed": "Completed",
+          "skipped": "Skipped"
+        }
+      },
+      "tour": {
+        "welcome": {
+          "name": "Welcome tour",
+          "summary": "Station, next step, prices, navigation, and help.",
+          "intro": {
+            "title": "Welcome to AWJ Stations",
+            "body": "A short tour (under a minute) of the home screen. You can skip it now and replay it any time from Help."
+          },
+          "station": {
+            "title": "Your station",
+            "body": "Check the station name before any work. If you have more than one, pick it here."
+          },
+          "nextStep": {
+            "title": "Next step",
+            "body": "Shows what to do now in the station’s shift, based on its state and your permissions."
+          },
+          "primaryAction": {
+            "title": "The main button",
+            "body": "Takes you to the required step. The tour never presses it for you; you decide when to start."
+          },
+          "products": {
+            "title": "Fuel and prices",
+            "body": "The fuel types ready to dispense at your station and each one’s approved price per litre."
+          },
+          "nav": {
+            "title": "Navigation",
+            "body": "Only the screens your permissions allow are listed. What you do not see here was not granted to your account."
+          },
+          "help": {
+            "title": "Help any time",
+            "body": "The “?” button explains the screen you are on and starts its tour. Help in the navigation opens the full guides."
+          },
+          "done": {
+            "title": "You’re ready",
+            "body": "Replay this and the other tours from Help → Interactive tours."
+          }
+        },
+        "shifts": {
+          "name": "Shifts tour",
+          "summary": "Filtering shifts, a shift card, and how a new shift starts.",
+          "filters": {
+            "title": "Filter shifts",
+            "body": "Show all, open, awaiting approval, or approved. A closed shift waits for an authorised supervisor."
+          },
+          "card": {
+            "title": "Shift card",
+            "body": "Its number, status, and litres. Tap it to see its details and next step."
+          },
+          "howToOpen": {
+            "title": "How do I open a shift?",
+            "body": "It starts from Home through the next-step button, then opening readings, then handover at the end. Nothing is opened by this tour."
+          }
+        },
+        "sales": {
+          "name": "Sales and prices tour",
+          "summary": "How fuel types and prices appear, and where sales come from.",
+          "dispensable": {
+            "title": "Dispensable products",
+            "body": "A fuel type shows here only when an active nozzle links it to a pump and a tank. Anything else is set by the station manager."
+          },
+          "price": {
+            "title": "Effective price per litre",
+            "body": "The approved price, its source, and start date. With no price it says “Price not set”, never zero."
+          },
+          "pumps": {
+            "title": "Pumps and nozzles",
+            "body": "Each nozzle is tied to a pump and a tank of the same fuel type. Meter readings are recorded per nozzle."
+          },
+          "tanks": {
+            "title": "Tanks",
+            "body": "Each tank’s capacity and its book balance. The balance shown is not a physical measurement; physical readings are on the Tanks screen."
+          },
+          "salesFromMeters": {
+            "title": "Where do sales come from?",
+            "body": "Litres = closing − opening reading per nozzle, and value = litres × effective price per litre. These are operating figures for the supervisor’s review."
+          }
+        },
+        "collection": {
+          "name": "Handover and collection tour",
+          "summary": "Readings readiness, cash, collection split, and confirming handover.",
+          "where": "It starts on a shift handover screen: open an open shift, then “Hand over shift”, then tap “?” → “Start this screen’s tour”.",
+          "readiness": {
+            "title": "Readings readiness",
+            "body": "Every required reading is listed. A missing line has a “Record now” button, and handover waits until all are in."
+          },
+          "cashMovement": {
+            "title": "Cash movements",
+            "body": "Record a cash addition, withdrawal, or cash expense here with its reason. A movement cannot be deleted or edited once recorded."
+          },
+          "variance": {
+            "title": "Variance",
+            "body": "The difference between the cash you counted and what is expected in the drawer. It is saved for the supervisor and never settled automatically."
+          },
+          "collectionEntry": {
+            "title": "Collection per payment method",
+            "body": "Enter what you collected with each method (0 if none). This section appears when your company enables it, and must be saved before handover."
+          },
+          "network": {
+            "title": "Network and cards",
+            "body": "Entering and matching the network total is not available in the app yet."
+          },
+          "confirm": {
+            "title": "Confirm handover",
+            "body": "After confirming, readings and cash are frozen and cannot be edited. This tour never presses it; review everything and confirm yourself."
+          }
+        },
+        "stock": {
+          "name": "Tanks and receiving tour",
+          "summary": "Monitoring tank levels and where to record a reading or receive fuel.",
+          "levels": {
+            "title": "Tank summary",
+            "body": "Shows how many tanks need review. Alerts are operational only and create no stock movement."
+          },
+          "tank": {
+            "title": "Tank card",
+            "body": "Last measurement, fill percentage, and available volume. Tap “Open tank” to record a stand-alone reading or view the history."
+          },
+          "receiving": {
+            "title": "Receiving fuel",
+            "body": "Create a receiving draft from a supplier here. The quantity enters stock only when an authorised user approves it, not when you save."
+          },
+          "recordReading": {
+            "title": "Record a tank reading",
+            "body": "A reading cannot be edited after saving, so it goes through a review first. A back-dated reading follows the station policy."
+          }
+        }
+      }
+    },
     "navManage": "Manage",
     "navSettings": "Settings",
     "offlineBanner": "You are offline. What you see may be out of date, and nothing will be saved.",

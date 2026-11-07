@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { BookOpen, ChevronLeft, CircleHelp, ClipboardCheck, Fuel, Gauge, PackageCheck, Search, Settings2, ShieldCheck, Users, X, type LucideIcon } from 'lucide-react';
@@ -32,7 +32,7 @@ const AUDIENCES: readonly FuelAudience[] = ['operator', 'supervisor', 'manager']
  * مركز المساعدة الواحد لمحطات الوقود. يُعرض داخل غلاف التطبيق (`surface="app"`) أو غلاف وحدة ERP (`surface="erp"`)
  * بالمحتوى نفسه. `basePath` أساس روابط المقالات في ذلك السطح؛ `defaultAudience` تفضيل ابتدائي مشتق من الصلاحيات.
  */
-export function FuelHelpCenter({ basePath, surface, defaultAudience }: { basePath: string; surface: FuelHelpSurface; defaultAudience?: FuelAudience }) {
+export function FuelHelpCenter({ basePath, surface, defaultAudience, extraSection }: { basePath: string; surface: FuelHelpSurface; defaultAudience?: FuelAudience; /** قسم يضيفه السطح (الجولات التفاعلية في التطبيق فقط) بين البحث والأقسام. */ extraSection?: ReactNode }) {
   const t = useTranslations('fuelHelp');
   const common = useTranslations('helpCenter');
   const locale = helpLocale(useLocale());
@@ -93,6 +93,8 @@ export function FuelHelpCenter({ basePath, surface, defaultAudience }: { basePat
           </div>
         </div>
       </section>
+
+      {!filtered ? extraSection : null}
 
       {!filtered ? (
         <section aria-labelledby="fh-cats-h" className="space-y-3">
