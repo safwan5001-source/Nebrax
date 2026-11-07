@@ -21,7 +21,6 @@ class FuelTankReadingBackdatingTest extends TestCase
     use BuildsFuelStaffFixture;
 
     private const BASE = '/api/fuel-stations';
-    private const NOW = '2026-11-07 12:00:00';
 
     protected function tearDown(): void
     {
@@ -31,7 +30,9 @@ class FuelTankReadingBackdatingTest extends TestCase
 
     private function freeze(): CarbonImmutable
     {
-        $now = CarbonImmutable::parse(self::NOW, 'UTC');
+        // الساعة المجمَّدة تُشتق من الساعة الحقيقية (بعد بناء الـfixture) لا من تاريخ ثابت: الـfixture
+        // (مستأجر/استحقاقات) يُنشأ بالساعة الحقيقية، وتاريخ ثابت يصير «قبله» فيعيد 403 بمرور الوقت.
+        $now = CarbonImmutable::now('UTC')->addDay()->startOfMinute();
         $this->travelTo($now);
 
         return $now;
