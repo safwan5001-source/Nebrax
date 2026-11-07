@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { LogOut, ShieldCheck } from 'lucide-react';
-import { logout } from '@/lib/auth';
+import { LogOut, RefreshCw, ShieldCheck } from 'lucide-react';
+import { STATION_LOGIN_PATH, isStationSession, logout } from '@/lib/auth';
 import { useStationOps } from './context';
 import { OPS_BASE, deriveOpsMode } from './nav';
 import { PageMasthead, ScreenBody } from './masthead';
@@ -32,10 +32,19 @@ export function ProfileScreen() {
   const mode = deriveOpsMode(can);
   const unrestricted = viewer.branch_ids !== undefined && viewer.branch_ids.length === 0;
 
+  /** الخروج يُبطل التوكن في الخادم أولاً. جلسة PIN ترجع إلى شاشة دخول التطبيق؛ جلسة البريد ترجع إلى دخول أَوْج كما كانت. */
   async function signOut() {
+    const station = isStationSession();
     setLeaving(true);
     await logout();
-    router.replace('/login');
+    router.replace(station ? STATION_LOGIN_PATH : '/login');
+  }
+
+  /** تبديل الموظف على جهاز مشترك: إنهاء الجلسة الحالية ثم شاشة الدخول للموظف التالي (لا يبقى شيء من الأول). */
+  async function switchEmployee() {
+    setLeaving(true);
+    await logout();
+    router.replace(STATION_LOGIN_PATH);
   }
 
   return (
@@ -98,6 +107,16 @@ export function ProfileScreen() {
         <Link href={`${OPS_BASE}/settings`} className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-surface px-4 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           {t('navSettings')}
         </Link>
+        <button
+          type="button"
+          onClick={switchEmployee}
+          disabled={leaving}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--fo-control)] bg-surface px-4 text-base font-semibold text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+        >
+          <RefreshCw aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+          {t('profile.switchEmployee')}
+        </button>
+        <p className="text-sm text-muted">{t('profile.switchEmployeeHint')}</p>
         <button
           type="button"
           onClick={signOut}

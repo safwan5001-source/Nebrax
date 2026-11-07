@@ -28,17 +28,17 @@ class StationAuthController extends ApiController
         $data = $request->validated();
 
         if (app(HostnameTenantContext::class)->id() === null) {
-            abort(422, 'افتح التطبيق من رابط مؤسستك لتسجيل الدخول.');
+            return response()->json(['message' => 'افتح التطبيق من رابط مؤسستك لتسجيل الدخول.', 'reason' => 'tenant_required'], 422);
         }
 
         $user = $credentials->verify($data['employee_no'], $data['pin']);
         if (! $user) {
-            abort(422, self::FAILURE);
+            return response()->json(['message' => self::FAILURE, 'reason' => 'invalid_credentials'], 422);
         }
 
         $tenant = Tenant::find($user->tenant_id);
         if (! $tenant || ! $tenant->is_active || ! PlanGate::subscriptionActive($tenant)) {
-            abort(403, 'اشتراك المؤسسة غير نشط أو منتهٍ.');
+            return response()->json(['message' => 'اشتراك المؤسسة غير نشط أو منتهٍ.', 'reason' => 'subscription_inactive'], 403);
         }
 
         return response()->json([

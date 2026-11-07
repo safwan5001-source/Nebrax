@@ -132,7 +132,7 @@ class StationPinLoginTest extends TestCase
             [$ok['employee']->employee_no, 'abcdef'],
         ] as [$no, $pin]) {
             $res = $this->stationLogin($no, $pin);
-            $res->assertStatus(422)->assertJsonMissingPath('token');
+            $res->assertStatus(422)->assertJsonMissingPath('token')->assertJsonPath('reason', 'invalid_credentials');
             $bodies[] = $res->json('message');
         }
         $this->assertCount(1, array_unique($bodies), 'لا يتمايز الرد بين الأسباب');
@@ -155,7 +155,7 @@ class StationPinLoginTest extends TestCase
 
         // مضيف بلا مستأجر (نطاق مشترك) ⇒ لا بحث عابر للمستأجرين.
         $this->postJson('/api/station/login', ['employee_no' => $w['employee']->employee_no, 'pin' => self::PIN, 'tenant_id' => $this->tenantId])
-            ->assertStatus(422)->assertJsonMissingPath('token');
+            ->assertStatus(422)->assertJsonPath('reason', 'tenant_required')->assertJsonMissingPath('token');
         // مضيف مستأجر غير موجود ⇒ 404 مغلق.
         $this->stationLogin($w['employee']->employee_no, self::PIN, 'http://nobody.awj.app/api/')->assertNotFound();
     }

@@ -208,13 +208,13 @@ class FuelStaffAccessService
                 }
             }
 
-            $before = $this->pinState($target);
+            $before = $this->auditPinState($target, null);
             $target->forceFill(['station_pin_hash' => Hash::make($pin), 'station_pin_set_at' => now()])->save();
             app(StationPinCredentialService::class)->revokeSessions($target);
 
             $this->auditor->record(
                 'fuel_staff.station_pin_set', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $target->id, $target->id,
-                $before + ['change' => null], $this->pinState($target->refresh()) + ['change' => 'set'], $actor, $reason,
+                $before, $this->auditPinState($target->refresh(), 'set'), $actor, $reason,
             );
 
             return $this->view($target) + ['station_pin' => $this->pinState($target)] + ($generated ? ['generated_pin' => $pin] : []);
@@ -228,13 +228,13 @@ class FuelStaffAccessService
             $target = $this->find($actor, $userId, lock: true);
             $this->assertManageable($actor, $target);
 
-            $before = $this->pinState($target);
+            $before = $this->auditPinState($target, null);
             $target->forceFill(['station_pin_hash' => null, 'station_pin_set_at' => null])->save();
             app(StationPinCredentialService::class)->revokeSessions($target);
 
             $this->auditor->record(
                 'fuel_staff.station_pin_cleared', AccessChangeAuditor::SUBJECT_FUEL_STAFF, $target->id, $target->id,
-                $before + ['change' => null], $this->pinState($target->refresh()) + ['change' => 'cleared'], $actor, $reason,
+                $before, $this->auditPinState($target->refresh(), 'cleared'), $actor, $reason,
             );
 
             return $this->view($target) + ['station_pin' => $this->pinState($target)];
@@ -257,6 +257,16 @@ class FuelStaffAccessService
         if ($employee === null || ! $employee->is_active || ! $target->is_active) {
             throw new RuntimeException('الموظف غير نشط أو غير مرتبط بحساب مستخدم؛ لا يمكن تعيين PIN.');
         }
+    }
+
+    /**
+     * لقطة التدقيق: وجود PIN فقط + نوع الحدث (يضمن تسجيل إعادة التعيين حتى حين تبقى الحالة «موجود»). لا تجزئة ولا رمز.
+     *
+     * @return array{station_pin: bool, station_pin_event: string|null}
+     */
+    private function auditPinState(User $target, ?string $event): array
+    {
+        return ['station_pin' => is_string($target->station_pin_hash) && $target->station_pin_hash !== '', 'station_pin_event' => $event];
     }
 
     /** @return array{has_pin: bool, set_at: string|null} */

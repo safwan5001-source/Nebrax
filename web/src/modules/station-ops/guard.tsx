@@ -3,11 +3,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
-import { currentUser, isAuthenticated } from '@/lib/auth';
+import { STATION_LOGIN_PATH, currentUser, isAuthenticated } from '@/lib/auth';
 import { StationOpsShell } from './shell';
 
 /**
- * حارس الدخول لمساحة تشغيل المحطات — نفس سلوك `(fuel)/layout.tsx`: بلا جلسة ⇒ /login، والخدمة الذاتية ⇒ /me.
+ * حارس الدخول لمساحة تشغيل المحطات: بلا جلسة ⇒ شاشة دخول التطبيق (رقم الموظف + PIN)، والخدمة الذاتية ⇒ /me.
+ * مدير يدخل بالبريد وكلمة المرور يعمل هنا أيضاً (توكن عادي)؛ جلسة PIN مقيَّدة خادمياً بمسارات المحطات.
  * هذا تنقّل عرض فقط؛ التفويض الحقيقي في كل طلب على الخادم (RBAC + نطاق المستأجر/الفرع/المحطة).
  */
 export function StationOpsGuard({ children }: { children: ReactNode }) {
@@ -16,7 +17,7 @@ export function StationOpsGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/login');
+      router.replace(STATION_LOGIN_PATH);
     } else if (currentUser()?.role === 'self_service') {
       router.replace('/me');
     } else {

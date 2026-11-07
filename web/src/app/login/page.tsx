@@ -12,7 +12,7 @@ import { AuthShell } from '@/components/auth/auth-shell';
 import { DemoLoginButton } from '@/components/auth/demo-login-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { checkStoredSession, landingPathFor, login } from '@/lib/auth';
+import { checkStoredSession, landingPathForUser, login } from '@/lib/auth';
 import { isDemo } from '@/lib/demo';
 import { ApiError } from '@/lib/api';
 import { startDemoSession } from '@/lib/demo-session';
@@ -50,7 +50,7 @@ export default function LoginPage() {
     setRestoring(true);
     checkStoredSession().then((result) => {
       if (cancelled || interactedRef.current) return;
-      if (result.status === 'valid') routerRef.current.replace(landingPathFor(result.user.role));
+      if (result.status === 'valid') routerRef.current.replace(landingPathForUser(result.user));
       else setRestoring(false);
     });
     return () => { cancelled = true; };
@@ -75,7 +75,7 @@ export default function LoginPage() {
         return;
       }
       // دور الخدمة الذاتية بلا صلاحياتٍ على شاشات الإدارة — بوابته المخصَّصة.
-      router.replace(landingPathFor(user.role));
+      router.replace(landingPathForUser(user));
     } catch (error) {
       if (demoStartedRef.current) return; // فشل طلب متأخر لا يُظهر خطأً فوق المعاينة
       setServerError(error instanceof ApiError ? error.message : t('error'));

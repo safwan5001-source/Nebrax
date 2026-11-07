@@ -80,8 +80,11 @@ function handleUnauthorized(sentToken: string | null): void {
   if (typeof window === 'undefined') return;
   if (getToken() !== sentToken) return;
   clearToken();
-  // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل
-  if (!window.location.pathname.startsWith('/login')) window.location.assign('/login');
+  // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل.
+  // داخل تطبيق المحطات يعود إلى دخول رقم الموظف + PIN لا إلى دخول البريد.
+  const inStationApp = window.location.pathname.startsWith('/fuel-stations/ops');
+  const target = inStationApp ? '/fuel-stations/ops/login' : '/login';
+  if (!window.location.pathname.startsWith(target)) window.location.assign(target);
 }
 
 type Options = Omit<RequestInit, 'body'> & { body?: unknown };

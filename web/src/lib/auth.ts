@@ -19,6 +19,8 @@ export interface AuthUser {
   permissions?: string[];
   employee_id?: string | null;
   tenant_id: string;
+  /** STATION-PIN: جلسة تطبيق المحطات (رقم موظف + PIN) — مقيَّدة خادمياً بمسارات تشغيل المحطات، لا تفتح واجهات أَوْج الإدارية. */
+  station_session?: boolean;
   /**
    * نطاق المستخدم نفسه من `/me` (AC-UX-11): **الفراغ = غير مقيَّد**. غيابُ الحقل = لم يُقرأ بعد (تخزين أقدم) لا «غير مقيَّد».
    * للعرض فقط — الخادم هو السلطة.
@@ -57,6 +59,38 @@ export async function login(email: string, password: string, remember = false): 
   persistUser(res.user);
   notifyAuthSessionChanged();
   return res.user;
+}
+
+/** مسار دخول تطبيق «محطات أَوْج» (رقم الموظف + PIN). */
+export const STATION_LOGIN_PATH = '/fuel-stations/ops/login';
+/** مدخل تطبيق المحطات بعد الدخول. */
+export const STATION_HOME_PATH = '/fuel-stations/ops';
+
+/**
+ * STATION-PIN: دخول تطبيق المحطات برقم الموظف و PIN من 6 أرقام. المستأجر يُحسم في الخادم من مضيف الصفحة وحده (لا يُرسَل من هنا).
+ * الجلسة الناتجة مقيَّدة خادمياً بمسارات المحطات؛ تُخزَّن في المفتاحين نفسيهما (`token`/`user`) فتعمل طبقة `api` دون تغيير.
+ * الـPIN لا يُخزَّن ولا يُسجَّل.
+ */
+export async function stationLogin(employeeNo: string, pin: string): Promise<AuthUser> {
+  const res = await api<{ token: string; user: AuthUser }>('/station/login', {
+    method: 'POST',
+    body: { employee_no: employeeNo, pin },
+  });
+  clearSessionPreferences();
+  setToken(res.token);
+  persistUser({ ...res.user, station_session: true });
+  notifyAuthSessionChanged();
+  return { ...res.user, station_session: true };
+}
+
+/** هل الجلسة المخزَّنة جلسة تطبيق المحطات؟ (للعرض والتوجيه فقط — التقييد الحقيقي في الخادم). */
+export function isStationSession(): boolean {
+  return currentUser()?.station_session === true;
+}
+
+/** وجهة الهبوط بعد دخول موثَّق لمستخدم بعينه: جلسة المحطات تهبط على التطبيق مباشرة. */
+export function landingPathForUser(user: Pick<AuthUser, 'role' | 'station_session'>): string {
+  return user.station_session === true ? STATION_HOME_PATH : landingPathFor(user.role);
 }
 
 export interface RegisterPayload {

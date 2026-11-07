@@ -15,7 +15,7 @@ const read = (base: string, prefix: string) => readdirSync(join(dir, base))
   .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file) && !file.startsWith('__'))
   .map((file) => ({ file: `${prefix}${file}`, text: readFileSync(join(dir, base, file), 'utf8') }));
 // FUEL-B4/B5/B6: مساحات الإدارة (`admin/`) والاستلام (`receiving/`) والخزانات (`tanks/`) جزء من التطبيق نفسه وتخضع للقواعد نفسها.
-const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/')];
+const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/'), ...read('login', 'login/'), ...read('pin', 'pin/')];
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
 type Tree = { [key: string]: string | Tree };

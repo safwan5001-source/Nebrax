@@ -21,6 +21,7 @@ import { usePermissionLabel } from './labels';
 import { MANAGE_BASE } from './manage-screen';
 import { staffOneResponse, type StaffView, type TemplatesPayload } from './schemas';
 import { templateLabelKey } from './staff-list-screen';
+import { StationPinSection } from '../pin/pin-section';
 import { Badge, SwitchRow } from './ui';
 
 type Notice =
@@ -409,6 +410,8 @@ function Editor({ initial, templates }: { initial: StaffView; templates: Templat
         </section>
 
         {isSelf ? <p role="status" className="rounded-[12px] bg-[color:var(--fo-warning-tint)] p-3 text-sm leading-6 text-warning">{t('manage.editor.selfLocked')}</p> : null}
+
+        <StationPinSection staff={base} isSelf={isSelf} />
 
         <NoticeBar notice={notice} busy={checking} onRebase={() => void rebase()} onDiscard={() => void discard()} onCheck={() => void check()} />
 

@@ -28,6 +28,10 @@ export default function SelfServiceLayout({ children }: { children: React.ReactN
       router.replace('/login');
       return;
     }
+    if (currentUser()?.station_session === true) {
+      router.replace('/fuel-stations/ops');
+      return;
+    }
     setName(currentUser()?.name ?? '');
     setReady(true);
   }, [router]);
