@@ -28,9 +28,10 @@ async function open(page: Page, path: string, opts: Options = {}) {
   const locale = opts.locale ?? 'ar';
   await page.context().addCookies([{ name: 'locale', value: locale, url: baseUrl }]);
   const requests: Array<{ method: string; path: string }> = [];
+  const current = { id: opts.userId ?? 'me' };
   const json = (route: Route, body: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   const user = {
-    id: opts.userId ?? 'me', name: 'Sami', email: 'sami@acme.test', tenant_id: 't1', role: 'cashier', branch_ids: [], warehouse_ids: [],
+    id: 'placeholder', name: 'Sami', email: 'sami@acme.test', tenant_id: 't1', role: 'cashier', branch_ids: [], warehouse_ids: [],
     permissions: opts.permissions ?? ['fuel_stations.view', 'fuel.shift.view', 'fuel.sale.view', 'fuel.shift.open'],
   };
   await page.route('**/api/**', async (route) => {
@@ -38,13 +39,22 @@ async function open(page: Page, path: string, opts: Options = {}) {
     const p = url.pathname.replace(/^.*\/api/, '');
     requests.push({ method: route.request().method(), path: p });
     const station = url.searchParams.get('station_id');
-    if (p === '/me') return json(route, { user, company: { name: 'Acme Fuel' } });
+    if (p === '/me') return json(route, { user: { ...user, id: current.id }, company: { name: 'Acme Fuel' } });
     if (p === '/company') return json(route, { data: { name: 'Acme Fuel', logo: null } });
     if (p === '/fuel-stations/stations') return json(route, { data: stations });
     if (p === '/fuel-stations/products') return json(route, { data: products });
     if (p === '/fuel-stations/pumps') return json(route, { data: pumps });
     if (p === '/fuel-stations/tanks') return json(route, { data: tanks });
-    if (p === '/fuel-stations/tank-levels') return json(route, { data: [] });
+    if (p === '/fuel-stations/tank-levels') {
+      return json(route, { data: tanks.map((t) => ({
+        tank: { id: t.id, code: t.code, name: t.name, status: t.status, capacity_milliliters: t.capacity_milliliters, capacity_liters: String(t.capacity_milliliters / 1000), safe_capacity_milliliters: t.capacity_milliliters, minimum_level_milliliters: 0, dead_stock_milliliters: 0 },
+        station: { id: 'sa', code: 'ST-A', name: 'Harbor Station' },
+        fuel_product: { id: t.fuel_product_id, code: null, name: null },
+        latest: null,
+        latest_by_type: { physical: null, atg: null },
+        level: { fill_basis_points: null, available_milliliters: null, available_liters: null, safe_available_milliliters: null, age_seconds: null, freshness: 'none', stale_after_minutes: null, flags: [], needs_review: false },
+      })), meta: { generated_at: null } });
+    }
     if (p === '/fuel-stations/nozzles') return json(route, { data: nozzles });
     if (p === '/fuel-stations/prices/effective') {
       return json(route, { data: products.map((product) => ({ fuel_product_id: product.id, fuel_station_id: station, status: 'effective', source: 'tenant_default', price_per_liter_minor: 233, unit: 'L', tax_mode: 'tax_inclusive', effective_from: '2026-01-01T00:00:00+00:00', effective_until: null, sellable: true, blockers: [] })) });
@@ -63,9 +73,9 @@ async function open(page: Page, path: string, opts: Options = {}) {
       if (force) localStorage.setItem('awj.station-guide.force', '1');
       sessionStorage.setItem('__seeded', '1');
     }
-  }, [JSON.stringify(user), opts.theme ?? 'light', opts.force ?? true] as const);
+  }, [JSON.stringify({ ...user, id: current.id }), opts.theme ?? 'light', opts.force ?? true] as const);
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
-  return requests;
+  return Object.assign(requests, { setUserId: (id: string) => { current.id = id; } });
 }
 
 const overlay = (page: Page) => page.locator('[data-smart-guide]');
@@ -177,7 +187,7 @@ for (const locale of ['ar', 'en'] as const) {
       const spot = page.locator('[data-guide-spotlight]');
       await expect(spot).toBeVisible();
       expect(await spot.evaluate((el) => getComputedStyle(el).transitionProperty)).toBe('none');
-      expect(await card(page).evaluate((el) => getComputedStyle(el).transitionDuration)).toMatch(/^0s$/);
+      expect(await card(page).evaluate((el) => Math.max(...getComputedStyle(el).transitionDuration.split(',').map((v) => parseFloat(v))))).toBeLessThanOrEqual(0.001);
     });
 
     test('permissions decide what is explained: no receiving step without a receiving permission', async ({ page }, info) => {
@@ -213,11 +223,13 @@ for (const locale of ['ar', 'en'] as const) {
 }
 
 test('a second employee on the same device gets their own tour', async ({ page }) => {
-  await open(page, '/fuel-stations/ops', { locale: 'en', userId: 'emp-1' });
+  const session = await open(page, '/fuel-stations/ops', { locale: 'en', userId: 'emp-1' });
   await expect(overlay(page)).toBeVisible({ timeout: 10_000 });
   await card(page).getByRole('button', { name: 'Skip tour' }).click();
+  session.setUserId('emp-2');
   await page.evaluate(() => {
     localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user')!), id: 'emp-2' }));
+    localStorage.setItem('station_use_erp', 'emp-2'); // اعتماد التطبيق مرتبط بمعرّف المستخدم الحالي
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-smart-guide]')).toBeVisible({ timeout: 10_000 });

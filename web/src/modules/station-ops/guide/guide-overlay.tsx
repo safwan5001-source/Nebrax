@@ -20,6 +20,7 @@ const DIM = 'rgba(12, 22, 38, 0.66)';
 const PAD = 8;
 const GAP = 14;
 const MARGIN = 12;
+const EDGE = 4;
 
 interface Box { top: number; left: number; width: number; height: number }
 
@@ -90,7 +91,9 @@ export function GuideOverlay({
     setViewport({ width: window.innerWidth, height: window.innerHeight });
     if (!element || !element.isConnected) return;
     const rect = element.getBoundingClientRect();
-    setBox({ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 });
+    // عنصر ملاصق لحافة الشاشة (أيقونات الرأس): لا يُقصّ إطار الـSpotlight عند الحافة.
+    const top = Math.max(rect.top - PAD, EDGE);
+    setBox({ top, left: Math.max(rect.left - PAD, EDGE), width: rect.width + PAD * 2, height: rect.height + PAD * 2 - (top - (rect.top - PAD)) });
   }, []);
 
   // موضع العنصر: ابحث عنه، مرّره إلى الشاشة، ثم تابع تغيّر التخطيط والتمرير.
