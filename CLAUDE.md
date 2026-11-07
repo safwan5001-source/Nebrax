@@ -965,6 +965,12 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **اعتماد المشرف (`/fuel-stations/ops/shifts/{id}/review`، `review-screen.tsx`):** فوق `POST …/collection/review` و`…/cash-variance/review` و`…/approve` القائمة؛ كتابات ثلاث إضافية في `write-client.ts` (لا يستعملها غير الشاشة). `approve()` يرفض والبوابة مفتوحة: `FUEL_COLLECTION_REVIEW_REQUIRED` و`FUEL_CASH_VARIANCE_REVIEW_REQUIRED` (OFF ⇒ كما كان). «المطابقة التشغيلية» و«ملخص نقد الدرج» قسمان منفصلان بمبالغهما بلا خلط ولا أثر حسابي؛ المجمَّد لا يُعدَّل.
 - **الواجهة (`web/src/modules/station-ops/collection*.ts*`):** قسم «المبيعات والتحصيل» في شاشة التسليم والقراءة فقط في تفاصيل الوردية؛ الكتابة السابعة الوحيدة الجديدة في `write-client.ts` (`opsWriteCollection`)؛ القائمة تتحدث تلقائياً (تركيز/دقيقة)؛ 404 ⇒ لا قسم.
 
+## مركز مساعدة محطات الوقود + AWJ Smart Guide
+
+**مركز المساعدة (موحَّد):** مصدر محتوى واحد ثابت وثنائي اللغة في `web/src/modules/help-center/fuel/` (20 دليلاً: وصف، خطوات مرقَّمة، حقول، صلاحيات، أخطاء وحلول، **وظائف غير متاحة موثَّقة صراحةً**، شاشات مرتبطة). يُعرض بالمكوّنات المشتركة `components/fuel-help/` في تطبيق «محطات أَوْج» (`/fuel-stations/ops/help`) وفي وحدة ERP (`/fuel-stations/help`) — **لا نسخة ثانية ولا ارتباط بمستأجر**. التطبيق لا يربط إلا بروابط `/fuel-stations/ops` (قاعدة «التطبيق وحده»). `modules/help-center/fuel/context.ts` مصدر ربط الشاشات بالأدلة. كل مفتاح صلاحية مذكور في دليل يُتحقق من وجوده في `Rbac.php`. لا تُضف دليلاً يشرح ما لا تدعمه الشاشة؛ ما لا يُدعم يُسجَّل في `unavailable`. المرجع: `docs/fuel-stations/AWJ_FUEL_HELP_CENTER_V1_REPORT.md`.
+
+**AWJ Smart Guide (التطبيق المستقل فقط — لا يُستورد من ERP):** جولات تفاعلية بمحرك مخصَّص بلا تبعية (`web/src/modules/station-ops/guide/`). ثوابت: الـSpotlight والتعتيم `pointer-events:none` (لا يعطّل تشغيلاً)؛ **لا ضغط ولا إرسال ولا شبكة** من ملفات المرشد (اختبار ساكن يحرسه)؛ الخطوات من عناصر موجودة فعلاً (مرساة بسمات/معرّفات في المصدر يتحقق منها `tours.test.ts`)؛ الخطة تُرشَّح بالصلاحيات وبالعناصر الظاهرة وقت التشغيل؛ التقدّم محلي لكل (مؤسسة، مستخدم) في `localStorage`؛ يبدأ `welcome` تلقائياً عند أول دخول (معطَّل تحت الأتمتة إلا بمفتاح `awj.station-guide.force`)؛ يحترم `prefers-reduced-motion`. جولة جديدة = تعريف في `tours.ts` + نصوص `stationOps.guide.tour.<id>` (ar/en) ولا شيء آخر.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

@@ -231,7 +231,8 @@ class FuelOpeningBalanceService
                 return ['document' => $document->load('lines'), 'replayed' => true];
             }
 
-            $station = FuelStation::lockForUpdate()->findOrFail($document->fuel_station_id);
+            // FUEL-LOCK-ORDER: NO KEY UPDATE (لا يتعارض مع KEY SHARE من FK صفوف الخزان/القراءات) — يمنع جموداً مع recordReading؛ انظر FuelSaleService::lockStation.
+            $station = FuelStation::query()->lock('for no key update')->findOrFail($document->fuel_station_id);
             if (! $actor->canAccessFuelStation($station)) {
                 throw new RuntimeException('محطة الرصيد الافتتاحي خارج نطاق صلاحياتك.');
             }

@@ -149,11 +149,18 @@ trait GeneratesDocumentNumbers
      * فالقفل هنا على صفّ الفرع (أو المستأجر للسلاسل المؤسسية): موجودٌ دائماً،
      * فيتسلسل التوليد فعلاً. هو نفسه نمط `lockForUpdate` المطبَّق في ترحيل
      * الفواتير والمشتريات وتخصيص المدفوعات.
+     *
+     * **`FOR NO KEY UPDATE` لا `FOR UPDATE`:** المِرساة لا يُعدَّل مفتاحها قط، وما نحتاجه هو
+     * أن يُقصي كلُّ مولِّدٍ مولِّداً آخر — وهذا يحققه النمطان (كلاهما يتعارض مع نفسه ومع
+     * `FOR UPDATE`). الفرق أن `FOR UPDATE` يتعارض أيضاً مع `FOR KEY SHARE` الذي يأخذه كل
+     * إدراجٍ في جدولٍ له مفتاح أجنبي إلى الفرع/المستأجر، فتنشأ حلقةُ جمود
+     * (إدراج يحمل KEY SHARE على المستأجر ثم ينتظر الفرع ↔ مولِّد يحمل الفرع ثم ينتظر المستأجر).
+     * `NO KEY UPDATE` يزيل تلك الحلقة دون المساس بالتسلسل. يحرسه `FuelLockOrderPostgresTest`.
      */
     protected static function lockNumberingAnchor(?string $branchId): void
     {
         if ($branchId !== null) {
-            Branch::whereKey($branchId)->lockForUpdate()->first();
+            Branch::whereKey($branchId)->lock('for no key update')->first();
 
             return;
         }
@@ -161,7 +168,7 @@ trait GeneratesDocumentNumbers
         $tenantId = app(TenantContext::class)->id();
 
         if ($tenantId !== null) {
-            Tenant::whereKey($tenantId)->lockForUpdate()->first();
+            Tenant::whereKey($tenantId)->lock('for no key update')->first();
         }
     }
 }

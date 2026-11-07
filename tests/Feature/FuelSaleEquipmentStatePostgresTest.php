@@ -4,17 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\FuelSale;
 use App\Services\FuelSaleService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * FUEL-P1-1 على PostgreSQL حقيقي — فحص حالة المضخة/الخزان في `finalize` **قراءة بلا قفل صفّ**، فلا يضيف حافة إلى دورات الأقفال:
- *  - لا عبارة `FOR SHARE/FOR UPDATE` على `fuel_pumps`/`fuel_tanks` من الفحص (النسخة ذات القفل المشترك رُفضت: تتعاكس مع `updatePump`/`updateTank`).
- *  - معاملة تحمل `FOR UPDATE` على **المضخة** (تعديل حالة جارٍ) لا تحجب الإنهاء.
- * تنبيه موثَّق: تعارض الإنهاء مع معاملة تقفل **الخزان** (مثل `recordReading`) قائم أصلاً على `main` عبر FK إدراج صف الدفتر التشغيلي (KEY SHARE على الخزان)
- * ويُنتج 40P01 — خارج نطاق هذا الإصلاح ومُبلَّغ عنه كبند منفصل. يُتخطّى على SQLite.
+ * FUEL-P1-1 على PostgreSQL حقيقي — فحص حالة المضخة/الخزان في `finalize` **قراءة بلا قفل صفّ**:
+ *  - لا عبارة `FOR SHARE/FOR UPDATE` على `fuel_pumps`/`fuel_tanks` من الفحص نفسه (النسخة ذات القفل المشترك رُفضت: تتعاكس مع `updatePump`/`updateTank`).
+ *  - الترتيب مع تعديل حالة جارٍ تحكمه حماية الأقفال المبكرة (FUEL-LOCK-ORDER): `FOR KEY SHARE` على المضخة/الخزان/الوردية يُؤخذ **قبل** الفحص،
+ *    فيتسلسل الإنهاء بعد تعديل حالة جارٍ للمضخة بدل أن يسبقه ويُنهي مبيعةً عبر مضخة صارت في الصيانة — وبلا جمود (انظر `FuelLockOrderPostgresTest`).
+ * يُتخطّى على SQLite.
  */
 class FuelSaleEquipmentStatePostgresTest extends TestCase
 {
@@ -75,16 +76,22 @@ class FuelSaleEquipmentStatePostgresTest extends TestCase
     }
 
     #[Test]
-    public function an_in_flight_pump_status_change_does_not_block_finalization(): void
+    public function an_in_flight_pump_status_change_orders_finalization_after_it(): void
     {
-        [$f, $draft] = $this->draft('no-block');
+        [$f, $draft] = $this->draft('ordered');
         $c = config('database.connections.pgsql');
         $this->other = new PDO(sprintf('pgsql:host=%s;port=%s;dbname=%s', $c['host'], $c['port'], DB::connection()->getDatabaseName()), $c['username'], $c['password'] ?: null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $this->other->exec('BEGIN');
-        $this->other->exec("SELECT 1 FROM fuel_pumps WHERE id = '{$f['a']['pump']->id}' FOR UPDATE"); // تعديل حالة المضخة جارٍ ولم يلتزم
+        $this->other->exec("SELECT 1 FROM fuel_pumps WHERE id = '{$f['a']['pump']->id}' FOR UPDATE"); // كما يفعل updatePump: قفل صريح ثم تعديل
+        $this->other->exec("UPDATE fuel_pumps SET status = 'maintenance' WHERE id = '{$f['a']['pump']->id}'"); // تعديل حالة المضخة جارٍ ولم يلتزم
         DB::statement("SET lock_timeout = '500ms'");
 
-        $sale = app(FuelSaleService::class)->finalize(FuelSale::findOrFail($draft->id), $f['actor']);
-        $this->assertSame('finalized', $sale->status, 'الفحص قراءة عادية: لا ينتظر قفل صف المضخة');
+        $waited = $this->thrown(fn () => app(FuelSaleService::class)->finalize(FuelSale::findOrFail($draft->id), $f['actor']), 'الإنهاء ينتظر التعديل الجاري على المضخة ولا يسبقه', QueryException::class);
+        $this->assertStringContainsString('55P03', (string) $waited->getMessage());
+
+        $this->other->exec('COMMIT');
+        DB::statement('SET lock_timeout = 0');
+        $this->thrown(fn () => app(FuelSaleService::class)->finalize(FuelSale::findOrFail($draft->id), $f['actor']), 'بعد التزام التعديل يرى الإنهاء الحالة الجديدة ويرفض');
+        $this->assertSame('draft', FuelSale::findOrFail($draft->id)->status);
     }
 }

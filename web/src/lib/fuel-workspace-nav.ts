@@ -55,6 +55,11 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
     labelKey: 'settings',
     items: [{ href: '/fuel-stations/settings', labelKey: 'settings', permissions: ['fuel_stations.view'] }],
   },
+  {
+    labelKey: 'support',
+    // مركز المساعدة (محتوى ثابت مشترك مع تطبيق المحطات): لكل مستخدم وحدة المحطات، بلا استدعاء خادم.
+    items: [{ href: '/fuel-stations/help', labelKey: 'help', permissions: ['fuel_stations.view'] }],
+  },
 ];
 
 export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>): FuelWorkspaceNavGroup[] {

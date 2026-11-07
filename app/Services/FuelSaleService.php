@@ -63,13 +63,14 @@ class FuelSaleService
 
         try {
             return DB::transaction(function () use ($attributes, $actor, $stationId, $nozzleId, $idempotencyKey, $quantity) {
-                $station = FuelStation::lockForUpdate()->findOrFail($stationId);
+                $station = $this->lockStation($stationId);
                 $this->assertStationBranch($station);
                 // #2016: نطاق الفاعل قبل أي قفل/قراءة لتفويض AVI أو فوهة أو وردية (ترتيب الأقفال: المحطة ← AVI كما في finalize).
                 $this->assertActorStationScope($actor, $station);
                 $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
                 $this->assertNozzleForStation($nozzle, $station);
+                $this->lockReferencedRows($nozzle, $attributes['fuel_shift_id'] ?? null);
                 $this->assertNozzleEquipmentOperational($nozzle, $station);
                 $warehouse = $this->warehouse($station);
                 $fuelProduct = FuelProduct::findOrFail($nozzle->fuel_product_id);
@@ -143,7 +144,7 @@ class FuelSaleService
                 throw new RuntimeException('يتطلب إنهاء بيع الوقود عميلاً صريحاً للفواتير والذمم الرسمية.');
             }
 
-            $station = FuelStation::lockForUpdate()->findOrFail($sale->fuel_station_id);
+            $station = $this->lockStation($sale->fuel_station_id);
             $this->assertStationBranch($station);
             $this->assertActorStationScope($actor, $station);
             $warehouse = $this->warehouse($station);
@@ -155,6 +156,7 @@ class FuelSaleService
             if ($nozzle->fuel_product_id !== $sale->fuel_product_id || $nozzle->fuel_tank_id !== $sale->fuel_tank_id || $nozzle->fuel_pump_id !== $sale->fuel_pump_id) {
                 throw new RuntimeException('تغير ربط الفوهة بالمنتج أو الخزان أو المضخة؛ لا يمكن إنهاء مسودة البيع الحالية.');
             }
+            $this->lockReferencedRows($nozzle);
             // FUEL-P1-1: المضخة والخزان يجب أن يكونا نشطين وقت الإنهاء أيضاً (قراءة بلا قفل — انظر الدالة).
             $this->assertNozzleEquipmentOperational($nozzle, $station);
             $this->assertFinalizationShift($sale, $station);
@@ -307,10 +309,23 @@ class FuelSaleService
         $amount = $this->positiveInteger($attributes['amount_minor'] ?? null, 'amount_minor');
 
         return DB::transaction(function () use ($sale, $attributes, $actor, $idempotencyKey, $paymentMethodId, $amount) {
-            $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
-            $station = FuelStation::findOrFail($sale->fuel_station_id);
+            // FUEL-LOCK-ORDER: الترتيب الموحَّد [المحطة] ← الوردية ← البيع ← الفاتورة. كان هنا البيع ثم الفاتورة ثم الوردية (FOR SHARE) فيعاكس
+            // الإغلاق/التسوية (الوردية ثم البيع) ⇒ دورة. الآن: قراءة عادية للبيع والمحطة (بلا قفل) ← قفل الوردية المعنية FOR SHARE ← ثم البيع والفاتورة.
+            $peek = FuelSale::findOrFail($sale->id);
+            $station = FuelStation::findOrFail($peek->fuel_station_id);
             // #2016: نطاق الفاعل قبل كل شيء — بما فيه إعادة إرسال مفتاح التحصيل (لا يُرجَع سند محطة خارج النطاق).
             $this->assertActorStationScope($actor, $station);
+            // بيع غير منتهٍ (كما تراه القراءة العادية) يُرفض **قبل أي قفل**: لا يمسك المحصِّل الوردية ثم ينتظر بيعاً يُنهيه `finalize` (البيع ← … ← الوردية FOR UPDATE).
+            if (! $peek->isFinalized() || $peek->invoice_id === null || $peek->partner_id === null) {
+                throw new RuntimeException('لا يمكن تحصيل سند قبل إنهاء بيع الوقود وفاتورته الرسمية.');
+            }
+            $stampReceipt = $this->cashExpectation->effectiveBasis($station) === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
+            // الوردية المعنية بالأثر: تحت الأساس الجديد وردية المحطة المفتوحة (تستلم النقد)، وإلا وردية البيع (حدث المقارنة). قفل مشترك مبكر.
+            $lockedShift = $stampReceipt
+                ? FuelShift::where('fuel_station_id', $station->id)->where('status', FuelShift::STATUS_OPEN)->sharedLock()->first()
+                : ($peek->fuel_shift_id !== null ? FuelShift::whereKey($peek->fuel_shift_id)->sharedLock()->first() : null);
+
+            $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
             if (! $sale->isFinalized() || $sale->invoice_id === null || $sale->partner_id === null) {
                 throw new RuntimeException('لا يمكن تحصيل سند قبل إنهاء بيع الوقود وفاتورته الرسمية.');
             }
@@ -347,8 +362,7 @@ class FuelSaleService
 
             // #2021 (D1): تحت الأساس receiving_shift_receipts يُختم الإيصال بالوردية المفتوحة وقت التحصيل (لا وردية إنشاء البيع).
             // مغلقاً (الافتراضي) $stampReceipt = false فيعمل المسار القديم حرفياً. ترتيب الأقفال: البيع ← الفاتورة ← الوردية.
-            $stampReceipt = $this->cashExpectation->effectiveBasis($station) === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
-            $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor) : null;
+            $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor, $lockedShift) : null;
 
             $payment = $this->payments->post($this->payments->create([
                 'partner_id' => $sale->partner_id,
@@ -429,17 +443,14 @@ class FuelSaleService
      * نقدي بلا وردية مفتوحة، أو بيع بعقد شركة (سداد آجل = D4 غير معتمد) ⇒ BLOCKED برفض كامل قبل أي سند.
      * الشبكة تُختم بالوردية إن وُجدت (للعرض) ولا تُرفض بغيابها ولا تدخل المتوقع.
      */
-    private function resolveReceivingShift(FuelSale $sale, FuelStation $station, PaymentMethod $method, User $actor): ?FuelShift
+    /** الوردية المفتوحة تُمرَّر مقفولة مسبقاً (FOR SHARE) من `collectPayment` ضمن الترتيب الموحَّد؛ لا استعلام ولا قفل هنا. */
+    private function resolveReceivingShift(FuelSale $sale, FuelStation $station, PaymentMethod $method, User $actor, ?FuelShift $shift): ?FuelShift
     {
         // نطاق الفاعل (فرع + مخزن) يُفحص في `collectPayment` نفسه (#2016) قبل هذه الدالة.
         $isCash = $method->settlement_type === 'cash';
         if ($isCash && $sale->corporate_fuel_contract_id !== null) {
             throw new RuntimeException('FUEL_CASH_CORPORATE_SETTLEMENT_UNDECIDED: تحصيل نقدي لبيع بعقد شركة/أسطول غير معتمد بعد (سداد الآجل نقداً)؛ لا يُنسب لدرج الوردية.');
         }
-        $shift = FuelShift::where('fuel_station_id', $station->id)
-            ->where('status', FuelShift::STATUS_OPEN)
-            ->sharedLock()
-            ->first();
         if ($isCash && $shift === null) {
             throw new RuntimeException('FUEL_CASH_RECEIPT_NO_OPEN_SHIFT: لا توجد وردية مفتوحة للمحطة لاستلام التحصيل النقدي؛ افتح وردية أولاً.');
         }
@@ -533,6 +544,35 @@ class FuelSaleService
         if ($nozzle->fuel_station_id !== $station->id || $nozzle->branch_id !== $station->branch_id || $nozzle->status !== FuelNozzle::STATUS_ACTIVE) {
             throw new RuntimeException('الفوهة لا تخص محطة/فرع البيع أو ليست نشطة.');
         }
+    }
+
+    /**
+     * FUEL-LOCK-ORDER: `FOR KEY SHARE` على الصفوف الأب التي سيُدرَج بيع/فاتورة/حركة بمفتاح أجنبي إليها (المضخة، الخزان، الوردية)
+     * **قبل** مِرساة ترقيم المستندات (`FOR UPDATE` على صف الفرع داخل `nextDocumentNumber`) لا بعدها.
+     * السبب (مُثبَت بتزاحم فعلي على PostgreSQL): `recordReading`/`updateTank`/`updatePump`/الإغلاق تمسك الصف الأب `FOR UPDATE` ثم تحتاج `KEY SHARE` على الفرع
+     * (FK صف الحدث/القراءة)، بينما البيع يمسك المِرساة `FOR UPDATE` ثم يحتاج `KEY SHARE` على الأب ⇒ دورة. بأخذه مبكراً يتسلسل الطرفان عند الصف الأب قبل أن يمسك أيٌّ منهما المِرساة.
+     * `KEY SHARE` لا يتعارض إلا مع `FOR UPDATE`، فلا يحجب قارئاً آخر ولا بيعاً آخر.
+     */
+    private function lockReferencedRows(FuelNozzle $nozzle, mixed $shiftId = null): void
+    {
+        FuelPump::whereKey($nozzle->fuel_pump_id)->lock('for key share')->first();
+        FuelTank::whereKey($nozzle->fuel_tank_id)->lock('for key share')->first();
+        if (is_string($shiftId) && $shiftId !== '') {
+            FuelShift::whereKey($shiftId)->lock('for key share')->first();
+        }
+    }
+
+    /**
+     * FUEL-LOCK-ORDER: قفل المحطة لمسارات البيع بنمط `FOR NO KEY UPDATE` لا `FOR UPDATE`.
+     * أي `INSERT` بمفتاح أجنبي إلى المحطة (قراءة خزان، حركة…) يأخذ `FOR KEY SHARE` عليها، وهو يتعارض مع `FOR UPDATE` لا مع `NO KEY UPDATE`.
+     * فبقاء `FOR UPDATE` هنا كان يُنتج جموداً مع `FuelReconciliationService::recordReading` (الخزان ثم المحطة) — مُثبَت على PostgreSQL.
+     * يبقى النمط متعارضاً مع نفسه ومع `FOR UPDATE` فيستمر التسلسل بين مسارات المحطة المتنافسة.
+     * الترتيب الموحَّد: [المحطة NO KEY UPDATE] ← الوردية ← البيع ← الفاتورة ← السند ← مِرساة المستأجر
+     * (انحراف معلن: `finalize` يقفل البيع أولاً ثم المحطة؛ آمن لأنه يعود فور قراءة بيع منتهٍ و`collectPayment` يرفض غير المنتهي قبل أي قفل).
+     */
+    private function lockStation(string $stationId): FuelStation
+    {
+        return FuelStation::query()->lock('for no key update')->findOrFail($stationId);
     }
 
     /**
