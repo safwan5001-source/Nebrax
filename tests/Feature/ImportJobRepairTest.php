@@ -162,7 +162,21 @@ class ImportJobRepairTest extends TestCase
         $this->assertSame(250, Product::query()->count(), 'لا تكرار: الطفل الثاني لم يكتب شيئاً.');
         $this->assertSame([$a], ImportJobUnit::query()->where('import_job_id', $parent)->pluck('repaired_by_job_id')->unique()->values()->all());
         $this->assertSame('failed', ImportJob::query()->whereKey($b)->value('status'));
-        $this->assertSame('repair_ref_already_used', ImportJobUnit::query()->where('import_job_id', $b)->value('error_code'));
+        // وحدات الطفل الثاني: نافذته الأولى (100) كلها `repair_ref_already_used` لأن الأول انتزعها، وما بعدها (50) `not_attempted`. القراءة مرتَّبة
+        // بالترتيب الترتيبي: `value()` بلا ORDER BY يعيد أول صف تختاره PostgreSQL بحسب الخطة والترتيب المادي، فلا يصحّ أن يحكم عليه تأكيد.
+        $units = ImportJobUnit::query()->where('import_job_id', $b)->orderBy('unit_ordinal')->get(['unit_ordinal', 'error_code']);
+        $this->assertSame('repair_ref_already_used', $units->first()->error_code);
+        $this->assertSame(range(0, 149), $units->pluck('unit_ordinal')->map(fn ($o) => (int) $o)->all(), 'كل وحدات الطفل الثاني مسجَّلة بترتيب متصل.');
+        $this->assertSame(
+            ['not_attempted' => 50, 'repair_ref_already_used' => 100],
+            $units->pluck('error_code')->countBy()->sortKeys()->all(),
+            'التوزيع الكامل لرموز الفشل: النافذة الأولى مرفوضة والباقي لم يُعالَج.',
+        );
+        $this->assertSame(
+            array_fill(0, 100, 'repair_ref_already_used'),
+            $units->take(100)->pluck('error_code')->all(),
+            'الرمز يتبع الترتيب لا الصف الأول المصادف.',
+        );
     }
 
     /** @test */
