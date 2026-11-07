@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { Badge } from '../admin/ui';
 import { PageMasthead, ScreenBody } from '../masthead';
 import { StationOpsError } from '../read-client';
 import { EmptyState, ErrorState, LoadingBlock } from '../state-views';
@@ -33,6 +34,12 @@ function HistoryItem({ row, timeZone }: { row: HistoryRow; timeZone: string | nu
         {method && ['dipstick', 'gauge', 'atg_console', 'other'].includes(method) ? <> · {t(`tanks.method.${method}`)}</> : null}
         {row.recorder?.name ? <> · {t('tanks.history.by', { name: row.recorder.name })}</> : null}
       </p>
+      {row.late_entry ? (
+        <div className="space-y-1" data-late-entry="">
+          <Badge tone="info">{t('tanks.history.late')}</Badge>
+          {row.late_reason ? <p className="break-words text-sm leading-6 text-muted">{t('tanks.history.lateReason', { reason: row.late_reason })}</p> : null}
+        </div>
+      ) : null}
       {note ? <p className="break-words text-sm leading-6 text-text">{note}</p> : null}
       {row.flags && row.flags.length > 0 ? <div className="flex flex-wrap gap-1.5">{row.flags.map((flag) => <FlagBadge key={flag} flag={flag} />)}</div> : null}
     </li>

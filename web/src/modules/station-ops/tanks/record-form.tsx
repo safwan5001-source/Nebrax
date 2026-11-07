@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Hourglass } from 'lucide-react';
 import { millilitersToLiters } from '@/lib/fuel-quantity';
 import { createIntentStore } from '../intents';
 import { useStationOps } from '../context';
@@ -10,10 +11,11 @@ import type { Station } from '../schemas';
 import { ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard } from '../write-ui';
 import { FailureNotice, type AnyFailure } from '../receiving/parts';
 import { recordReading, type WriteFailure } from '../receiving/receiving-client';
-import { formatLitersFixedFromMl } from '../format';
-import { evaluateReading, evidenceBody, methodsFor, percentText, readingIntent, type Method } from './logic';
-import { Liters } from './parts';
-import { historyResponse, type ReadingKind, type TankLevel } from './schemas';
+import { SwitchRow } from '../admin/ui';
+import { formatLitersFixedFromMl, formatStampInZone } from '../format';
+import { evaluateLateTime, evaluateReading, evidenceBody, methodsFor, percentText, readingIntent, type Method } from './logic';
+import { Liters, TANKS_BASE } from './parts';
+import { historyResponse, lateRequestsResponse, type ReadingKind, type TankLevel } from './schemas';
 import { levelsGet } from './levels-client';
 
 /**
@@ -42,7 +44,17 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
   const [checking, setChecking] = useState(false);
   const [checkedMissing, setCheckedMissing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pendingSent, setPendingSent] = useState(false);
+  const [late, setLate] = useState(false);
+  const [lateLocal, setLateLocal] = useState('');
+  const [lateReason, setLateReason] = useState('');
   const sending = useRef(false);
+  const policy = row.backdating;
+  const canLate = policy?.can_submit === true;
+  const maxHours = policy?.max_hours ?? 24;
+  const reasonRequired = policy?.reason_required ?? true;
+  const lateWindow = late ? evaluateLateTime(lateLocal, station.timezone, maxHours, Date.now()) : null;
+  const lateOk = !late || (lateWindow?.kind === 'ok' && (!reasonRequired || lateReason.trim() !== ''));
 
   const limits = useMemo(() => ({
     capacityMl: row.tank.capacity_milliliters,
@@ -52,16 +64,18 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
   }), [row.tank]);
   const previous = row.latest_by_type[type]?.quantity_milliliters ?? null;
   const evaluation = evaluateReading(raw, limits, previous);
-  const valid = evaluation.kind === 'ok';
+  const valid = evaluation.kind === 'ok' && lateOk;
 
-  const reset = () => { setFailure(null); setCheckedMissing(false); setSaved(false); };
+  const reset = () => { setFailure(null); setCheckedMissing(false); setSaved(false); setPendingSent(false); };
   const changeType = (next: ReadingKind) => { setType(next); setMethod(methodsFor(next)[0]); reset(); };
 
-  const intentPayload = () => (evaluation.kind === 'ok' ? readingIntent({ stationId: station.id, tankId: row.tank.id, type, ml: evaluation.ml, method, note }) : null);
+  const lateIso = late && lateWindow?.kind === 'ok' ? lateWindow.iso : null;
+  const intentPayload = () => (evaluation.kind === 'ok' ? readingIntent({ stationId: station.id, tankId: row.tank.id, type, ml: evaluation.ml, method, note, at: lateIso, reason: lateIso ? lateReason : '' }) : null);
 
-  const finish = () => {
+  const finish = (asRequest = false) => {
     intents.clear(INTENT);
-    setRaw(''); setNote(''); setPhase('edit'); setFailure(null); setCheckedMissing(false); setSaved(true);
+    setRaw(''); setNote(''); setLate(false); setLateLocal(''); setLateReason('');
+    setPhase('edit'); setFailure(null); setCheckedMissing(false); setSaved(!asRequest); setPendingSent(asRequest);
     onSaved();
   };
 
@@ -79,11 +93,18 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
       const result = await recordReading({
         fuel_station_id: station.id, fuel_tank_id: row.tank.id, reading_type: type,
         quantity_liters: millilitersToLiters(evaluation.ml), evidence_key: key, evidence: evidenceBody(method, note),
+        // وقت القياس والسبب يُرسلان **فقط** من إدخال المستخدم الصريح لقراءة متأخرة؛ بغيرهما يختم الخادم الوقت.
+        ...(lateIso ? { measured_at: lateIso, ...(lateReason.trim() !== '' ? { late_reason: lateReason.trim() } : {}) } : {}),
       }, { branchId: station.branch_id });
 
       // النجاح يُعلَن فقط حين يطابق ردّ الخادم ما أُرسل (الخزان والكمية).
       if (result.kind === 'ok' && result.reading.fuel_tank_id === row.tank.id && result.reading.quantity_milliliters === evaluation.ml) {
         finish();
+        return;
+      }
+      // طلب قراءة متأخرة قُبل وبانتظار موافقة المشرف (ليس قراءة تشغيلية): نعلن ذلك صراحةً، لا «تم الحفظ».
+      if (result.kind === 'pending' && result.request.fuel_tank_id === row.tank.id && result.request.quantity_milliliters === evaluation.ml) {
+        finish(true);
         return;
       }
       if (result.kind === 'rejected' || result.kind === 'not_sent') {
@@ -93,7 +114,7 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
         return;
       }
       setPhase('edit');
-      setFailure(result.kind === 'ok' ? { kind: 'unverified' } : (result as WriteFailure));
+      setFailure(result.kind === 'ok' || result.kind === 'pending' ? { kind: 'unverified' } : (result as WriteFailure));
     } finally {
       sending.current = false;
     }
@@ -111,6 +132,10 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
         query: { fuel_station_id: station.id, fuel_tank_id: row.tank.id, per_page: 20 },
       });
       if (page.data.some((reading) => reading.evidence_key === key)) { finish(); return; }
+      if (lateIso) {
+        const requests = await levelsGet('/fuel-stations/reading-requests', lateRequestsResponse, { branchId: station.branch_id, query: { station_id: station.id, per_page: 20 } });
+        if (requests.data.some((request) => request.evidence_key === key)) { finish(true); return; }
+      }
       setCheckedMissing(true);
     } catch {
       setCheckedMissing(false);
@@ -172,6 +197,47 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
           </p>
         ) : null}
 
+        {canLate ? (
+          <div className="space-y-3 rounded-[12px] border border-border p-3" data-late-section="">
+            <SwitchRow id="tank-late" label={t('tanks.late.toggle')} checked={late} onChange={() => { setLate((value) => !value); reset(); }} disabled={phase !== 'edit'} note={t(policy?.policy === 'supervisor_approval' ? 'tanks.late.toggleHintApproval' : 'tanks.late.toggleHintDirect', { hours: String(maxHours) })} />
+            {late ? (
+              <>
+                <label className="block text-sm font-medium text-text">
+                  {t('tanks.late.timeLabel')}
+                  <input
+                    type="datetime-local"
+                    lang="en"
+                    dir="ltr"
+                    value={lateLocal}
+                    onChange={(event) => { setLateLocal(event.target.value); reset(); }}
+                    disabled={phase !== 'edit'}
+                    data-late-time=""
+                    className="mt-1.5 h-12 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+                <p className="text-xs leading-5 text-muted">{t('tanks.late.timeHint', { hours: String(maxHours) })}</p>
+                {lateWindow && lateWindow.kind !== 'empty' && lateWindow.kind !== 'ok' ? (
+                  <p role="alert" data-late-error={lateWindow.kind} className="text-sm leading-5 text-negative">{t(`tanks.late.error.${lateWindow.kind}`, { hours: String(maxHours) })}</p>
+                ) : null}
+                <label className="block text-sm font-medium text-text">
+                  {reasonRequired ? t('tanks.late.reasonRequired') : t('tanks.late.reasonOptional')}
+                  <textarea
+                    value={lateReason}
+                    onChange={(event) => { setLateReason(event.target.value.slice(0, 500)); reset(); }}
+                    placeholder={t('tanks.late.reasonPlaceholder')}
+                    rows={2}
+                    maxLength={500}
+                    disabled={phase !== 'edit'}
+                    data-late-reason=""
+                    aria-required={reasonRequired}
+                    className="mt-1.5 w-full rounded-[11px] border border-[color:var(--fo-control)] bg-surface px-3 py-2.5 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
         <label className="block text-sm font-medium text-text">
           {t('tanks.detail.noteLabel')}
           <textarea
@@ -190,6 +256,12 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
           <div className="flex flex-wrap gap-x-2"><dt className="text-muted">{t('tanks.detail.recorderLabel')}:</dt><dd className="text-text">{t('tanks.detail.recorderValue', { name: viewer.name })}</dd></div>
         </dl>
 
+        {pendingSent ? (
+          <p role="status" data-pending-sent="" className="flex items-start gap-2 rounded-[11px] bg-[color:var(--fo-warning-tint)] px-3 py-2.5 text-sm font-semibold text-warning">
+            <Hourglass aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+            <span>{t('tanks.late.pendingSent')} <Link href={`${TANKS_BASE}/requests`} className="underline">{t('tanks.late.viewRequests')}</Link></span>
+          </p>
+        ) : null}
         {saved ? (
           <p role="status" data-saved="" className="flex items-center gap-2 rounded-[11px] bg-[color:var(--fo-positive-tint)] px-3 py-2.5 text-sm font-semibold text-positive">
             <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0" strokeWidth={1.9} />{t('tanks.detail.saved')}
@@ -199,7 +271,7 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
         {checkedMissing ? <p role="status" data-check-missing="" className="text-sm leading-6 text-muted">{t('tanks.detail.checkMissing')}</p> : null}
 
         <PrimaryButton onClick={() => { setFailure(null); setPhase('review'); }} disabled={!valid || phase !== 'edit'} data-review-button="">
-          {t('tanks.detail.review')}
+          {late ? t(policy?.policy === 'supervisor_approval' ? 'tanks.late.reviewApproval' : 'tanks.late.review') : t('tanks.detail.review')}
         </PrimaryButton>
         <p className="text-xs leading-5 text-muted">{t('tanks.detail.operationalNote')}</p>
       </div>
@@ -210,7 +282,14 @@ export function RecordForm({ station, row, onSaved }: { station: Station; row: T
             <div className="flex justify-between gap-3"><dt className="text-muted">{row.tank.name}</dt><dd className="text-text">{row.fuel_product.name ?? ''}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-muted">{t(`tanks.type.${type}`)}</dt><dd className="text-text">{t(`tanks.method.${method}`)}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-muted">{t('tanks.detail.quantityLabel')}</dt><dd className="text-lg font-bold text-text">{evaluation.kind === 'ok' ? <Liters ml={evaluation.ml} /> : null}</dd></div>
+            {lateIso ? (
+              <>
+                <div className="flex justify-between gap-3"><dt className="text-muted">{t('tanks.late.timeLabel')}</dt><dd className="num text-text">{formatStampInZone(lateIso, locale, station.timezone)}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="shrink-0 text-muted">{t('tanks.late.reasonShort')}</dt><dd className="min-w-0 break-words text-end text-text">{lateReason.trim() || '—'}</dd></div>
+              </>
+            ) : null}
           </dl>
+          {lateIso && policy?.policy === 'supervisor_approval' ? <p className="rounded-[11px] bg-[color:var(--fo-warning-tint)] px-3 py-2.5 text-sm leading-6 text-warning" data-approval-note="">{t('tanks.late.approvalNote')}</p> : null}
           <p className="text-sm leading-6 text-muted">{t('tanks.detail.confirmBody')}</p>
           <PrimaryButton onClick={submit} disabled={phase === 'saving'} data-confirm-save="">{phase === 'saving' ? t('tanks.detail.saving') : t('tanks.detail.confirmSave')}</PrimaryButton>
           <SecondaryButton onClick={() => setPhase('edit')} disabled={phase === 'saving'}>{t('tanks.detail.confirmBack')}</SecondaryButton>

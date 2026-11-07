@@ -27,7 +27,7 @@ class FuelTankLevelController extends ApiController
             ->when($data['station_id'] ?? null, fn ($q, $id) => $q->where('fuel_station_id', $id));
 
         return response()->json([
-            'data' => $this->monitor->snapshot($tanks),
+            'data' => $this->monitor->snapshot($tanks, $request->user()),
             'meta' => ['generated_at' => now()->toIso8601String()],
         ]);
     }

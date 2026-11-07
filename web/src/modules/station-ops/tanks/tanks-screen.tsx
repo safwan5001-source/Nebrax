@@ -1,23 +1,27 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { RefreshCw } from 'lucide-react';
+import { Hourglass, RefreshCw } from 'lucide-react';
+import { LinkCard } from '../admin/ui';
 import { PageMasthead, ScreenBody } from '../masthead';
 import { EmptyState, ErrorState, LoadingBlock } from '../state-views';
 import { StationGate } from '../station-gate';
 import type { Station } from '../schemas';
 import { SecondaryButton } from '../write-ui';
-import { useTankLevels } from './data';
+import { useTankLevels, useTanksAccess } from './data';
+import { TANKS_BASE } from './parts';
 import { TankCard } from './tank-card';
 
 function List({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
   const levels = useTankLevels(station);
+  const access = useTanksAccess();
   const { state } = levels;
   const review = state.status === 'success' ? state.data.filter((row) => row.level.needs_review).length : 0;
 
   return (
     <>
+      {access.seeRequests ? <LinkCard href={`${TANKS_BASE}/requests`} icon={<Hourglass className="h-5 w-5" strokeWidth={1.8} />} title={t('tanks.requests.open')} /> : null}
       {state.status === 'loading' ? <LoadingBlock rows={3} /> : null}
       {state.status === 'error' ? <ErrorState error={state.error} onRetry={levels.reload} /> : null}
       {state.status === 'success' && state.data.length === 0 ? <EmptyState title={t('tanks.list.empty')} body={t('tanks.list.emptyBody')} /> : null}

@@ -24,6 +24,8 @@ class StoreFuelTankReadingRequest extends FormRequest
             'evidence.method' => ['nullable', 'string', 'in:dipstick,gauge,atg_console,other'],
             'evidence.note' => ['nullable', 'string', 'max:500'],
             'measured_at' => ['nullable', 'date'],
+            // FUEL-B6 (تعديل): سبب القراءة المتأخرة (يُفرض خادمياً حين تلزمه السياسة).
+            'late_reason' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

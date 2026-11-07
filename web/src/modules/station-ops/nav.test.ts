@@ -25,6 +25,7 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.approve'])).not.toContain('manage'); // مشرف وردية بلا إدارة
     expect(ids(['fuel.staff.manage'])).toEqual(['manage', 'profile']);
     expect(ids(['fuel.sale.price.manage'])).toEqual(['manage', 'profile']);
+    expect(ids(['fuel.governance.manage'])).toEqual(['manage', 'profile']); // سياسة القراءات المتأخرة (B6) تتبع الحوكمة
     expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'tanks', 'manage', 'profile']);
   });
 

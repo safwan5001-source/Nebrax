@@ -106,6 +106,7 @@ use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
 use App\Http\Controllers\Api\FuelSaleController;
+use App\Http\Controllers\Api\FuelReadingRequestController;
 use App\Http\Controllers\Api\FuelReconciliationController;
 use App\Http\Controllers\Api\FuelTankLevelController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
@@ -1645,6 +1646,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/readings', [FuelReconciliationController::class, 'storeReading'])->middleware([$permAny('fuel_stations.manage', 'fuel.reading.record'), $commercialApp('fuel_stations.core', 'write')]);
         // FUEL-B6: مراقبة مستويات الخزانات (قراءة فقط) — آخر قياس لكل خزان ونسبة الامتلاء وحداثته؛ لا مخزون ولا قيد ولا تسوية.
         Route::get('fuel-stations/tank-levels', [FuelTankLevelController::class, 'index'])->middleware([$permAny('fuel_stations.view', 'fuel.reading.view'), $commercialApp('fuel_stations.core')]);
+        // FUEL-B6 (تعديل): طلبات القراءات المتأخرة. القراءة لمن يسجّل القراءات (طلباته) أو يعتمدها (نطاقه)؛ القرار بالصلاحية الدقيقة وحدها (لا `fuel_stations.manage` القديمة).
+        Route::get('fuel-stations/reading-requests', [FuelReadingRequestController::class, 'index'])->middleware([$permAny('fuel.reading.record', 'fuel.reading.late.approve'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/reading-requests/{id}/approve', [FuelReadingRequestController::class, 'approve'])->whereUuid('id')->middleware([$perm('fuel.reading.late.approve'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/reading-requests/{id}/reject', [FuelReadingRequestController::class, 'reject'])->whereUuid('id')->middleware([$perm('fuel.reading.late.approve'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/reconciliations', [FuelReconciliationController::class, 'index'])->middleware([$permAny('fuel_stations.view', 'fuel.reconciliation.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/reconciliations', [FuelReconciliationController::class, 'store'])->middleware([$permAny('fuel_stations.manage', 'fuel.reconciliation.create'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/reconciliations/{id}/approve', [FuelReconciliationController::class, 'approve'])->middleware([$permAny('fuel_stations.manage', 'fuel.reconciliation.approve'), $commercialApp('fuel_stations.core', 'write')]);

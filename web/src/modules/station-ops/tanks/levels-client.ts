@@ -4,21 +4,31 @@ import { isDemo } from '@/lib/demo';
 import { StationOpsError, isAbort, toStationOpsError } from '../read-client';
 
 /**
- * FUEL-B6 — عميل قراءة «مستويات الخزانات» (قراءة فقط، بقائمة بيضاء من مسارين).
+ * FUEL-B6 — عميل قراءة «مستويات الخزانات» (قراءة فقط، بقائمة بيضاء من أربعة مسارات).
  *
- * - `GET /fuel-stations/tank-levels` (مراقبة: آخر قياس لكل خزان) و`GET /fuel-stations/readings` (سجل القراءات المرقَّم). لا مسار غيرهما.
+ * - `GET /fuel-stations/tank-levels` (مراقبة: آخر قياس لكل خزان) و`GET /fuel-stations/readings` (سجل القراءات المرقَّم)، وللتعديل: `GET …/reading-requests`
+ *   (طلبات القراءات المتأخرة) و`GET …/stations/{uuid}/settings` (سياسة المحطة الفعّالة لمحرر السياسة). لا مسار غيرها.
  * - **الكتابة ليست هنا**: تسجيل القراءة يمرّ عبر `recordReading` القائم في `../receiving/receiving-client` (الكاتب الوحيد لـ`POST /fuel-stations/readings` في التطبيق)
  *   فلا نظام قراءات موازٍ ولا مسار كتابة ثانٍ.
  * - يمرّ عبر `api()` المشترك (نفس Bearer و`X-Branch-Id` ومعالجة 401). السلطة كلها للخادم (الصلاحيات الدقيقة، نطاق المحطة/الفرع/المخزن، 404 موحّد).
  */
 
-const READ_PATHS: RegExp[] = [/^\/fuel-stations\/tank-levels$/, /^\/fuel-stations\/readings$/];
+const READ_PATHS: RegExp[] = [
+  /^\/fuel-stations\/tank-levels$/,
+  /^\/fuel-stations\/readings$/,
+  /^\/fuel-stations\/reading-requests$/,
+  /^\/fuel-stations\/stations\/[0-9a-fA-F-]{36}\/settings$/,
+];
 
 export function isAllowedLevelsPath(path: string): boolean {
   return READ_PATHS.some((pattern) => pattern.test(path));
 }
 
 const UUID = /^[0-9a-fA-F-]{36}$/;
+export function isValidStationId(id: string): boolean {
+  return UUID.test(id);
+}
+
 export function isValidTankId(id: string): boolean {
   return UUID.test(id);
 }

@@ -9,6 +9,7 @@ use App\Models\FuelReconciliation;
 use App\Models\FuelStation;
 use App\Models\FuelTank;
 use App\Models\FuelTankReading;
+use App\Models\FuelTankReadingRequest;
 use App\Models\ProductWarehouseStock;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -37,23 +38,27 @@ class FuelReconciliationService
         private LedgerService $ledger,
         private AccountRoleResolver $roles,
         private FuelStationAuditTrail $audit,
+        private FuelTankReadingRequestService $requests,
     ) {}
 
     /**
      * FUEL-B6: تسجيل قراءة خزان مستقلة (دليل تشغيلي) — الكاتب الوحيد لـ`fuel_tank_readings`.
      *
-     * **لا أثر مخزني أو محاسبي أبداً:** لا حركة مخزون ولا متوسط تكلفة ولا قيد ولا تسوية (يحرسه اختبار ساكن). التحويل إلى فروق = دورة التسوية.
+     * **لا أثر مخزني أو محاسبي أبداً:** لا حركة مخزون ولا متوسط تكلفة ولا قيد ولا تسوية (يحرسه اختبار ساكن). التحويل إلى فروق = دورة التسوية (B7).
      *
      * التحقق (بعد قفل صف الخزان `FOR UPDATE` فيتسلسل ما يخص الخزان الواحد):
-     *  1) الخزان ضمن المحطة وفرعها وغير معطَّل؛  2) الكمية ≤ سعة الخزان (لا سياسة معتمدة تسمح بالأكثر ⇒ رفض)؛
-     *  3) `measured_at` المرسَل صراحةً: ليس في المستقبل (بسماحية انحراف الساعة `device_max_future_skew_seconds`) وليس أقدم من آخر قراءة
-     *     من النوع نفسه للخزان (لا سياسة تأريخ معتمدة ⇒ رفض صريح لا قبول صامت)؛ غيابه ⇒ ساعة الخادم (وهو المسار المعتمد للتطبيق)؛
-     *  4) idempotency بمفتاح الدليل: نفس المفتاح مع نفس (المحطة، الخزان، النوع، الكمية، الفاعل) يعيد القراءة الأولى بلا إنشاء؛ أي اختلاف ⇒ رفض.
-     * يُسجَّل الإنشاء بحدث تدقيق داخل المعاملة نفسها. `wasRecentlyCreated` يميّز الإنشاء (201) من الإعادة (200).
+     *  1) idempotency بمفتاح الدليل على **بصمة النية الكاملة** (المحطة/الخزان/النوع/الكمية/الفاعل/الوقت الصريح/الأدلة/السبب): المفتاح نفسه والنية نفسها
+     *     ⇒ الأثر الأول بلا إنشاء؛ أي اختلاف ⇒ `FUEL_READING_EVIDENCE_MISMATCH`. غياب الوقت الصريح = «وقت الخادم عند الإنشاء» ولا يُقارَن فلا تعارض زائف عند الإعادة؛
+     *  2) الخزان ضمن المحطة وفرعها وغير معطَّل؛  3) الكمية ≤ سعة الخزان؛
+     *  4) الوقت: صريح في المستقبل (بعد سماحية انحراف الساعة) مرفوض؛ **صريح في الماضي بأكثر من السماحية = قراءة متأخرة** تحكمها سياسة المحطة
+     *     (`tank_reading_backdating_policy`، الافتراضي `deny`): `deny` يرفض، `authorized_user` يسجّلها مباشرة لمن يملك `fuel.reading.late.record`،
+     *     و`supervisor_approval` يحفظها **طلباً بانتظار الموافقة** (لا قراءة تشغيلية) لمشرف مخوَّل (`FuelTankReadingRequestService`). الحدّ الأقصى للتأخير والسبب
+     *     الإلزامي يُفرضان قبل أي مسار؛ والقراءة المتأخرة لا تُعيد ترتيب السجلات القائمة (آخر قراءة = الأحدث قياساً دائماً).
+     * يُسجَّل كل إنشاء بحدث تدقيق داخل المعاملة نفسها. `wasRecentlyCreated` يميّز الإنشاء (201) من الإعادة (200).
      *
      * @param array<string, mixed> $data
      */
-    public function recordReading(array $data): FuelTankReading
+    public function recordReading(array $data): FuelTankReading|FuelTankReadingRequest
     {
         try {
             return DB::transaction(function () use ($data) {
@@ -69,13 +74,21 @@ class FuelReconciliationService
                     throw new RuntimeException('مفتاح دليل القياس مطلوب.');
                 }
                 $actorId = $data['recorded_by'] ?? null;
+                $evidence = $this->normalizedEvidence($data['evidence'] ?? null);
+                $explicitAt = $this->explicitTime($data['measured_at'] ?? null);
+                $reason = $this->cleanReason($data['late_reason'] ?? null);
+                $hash = $this->intentHash($station->id, $tank->id, $type, $milliliters, $actorId, $explicitAt, $evidence, $reason);
 
-                // تسلسل كل ما يخص هذا الخزان (فحص الترتيب + الإدراج) — لا يمسّ بقية الجداول.
+                // تسلسل كل ما يخص هذا الخزان (فحص السياسة + الإدراج) — لا يمسّ بقية الجداول.
                 $tank = FuelTank::whereKey($tank->id)->lockForUpdate()->firstOrFail();
 
+                $request = FuelTankReadingRequest::where('evidence_key', $evidenceKey)->first();
+                if ($request !== null) {
+                    return $this->replay($request->intent_hash === $hash, $request);
+                }
                 $existing = FuelTankReading::where('evidence_key', $evidenceKey)->first();
                 if ($existing !== null) {
-                    return $this->replayOrReject($existing, $station, $tank, $type, $milliliters, $actorId);
+                    return $this->replay($this->sameReadingIntent($existing, $hash, $station, $tank, $type, $milliliters, $actorId, $evidence), $existing);
                 }
 
                 if ($tank->status === FuelTank::STATUS_INACTIVE) {
@@ -84,31 +97,42 @@ class FuelReconciliationService
                 if ($milliliters > (int) $tank->capacity_milliliters) {
                     throw new RuntimeException('FUEL_READING_EXCEEDS_CAPACITY: الكمية المقاسة تتجاوز سعة الخزان المعتمدة ولا تُقبل.');
                 }
-                $measuredAt = $this->measuredAt($data['measured_at'] ?? null, $station, $tank, $type);
 
-                $reading = FuelTankReading::create([
-                    'branch_id' => $station->branch_id,
-                    'fuel_station_id' => $station->id,
-                    'fuel_tank_id' => $tank->id,
-                    'reading_type' => $type,
-                    'quantity_milliliters' => $milliliters,
-                    'measured_at' => $measuredAt,
-                    'evidence_key' => $evidenceKey,
-                    'evidence' => $data['evidence'] ?? null,
-                    'recorded_by' => $actorId,
-                ]);
-                $this->audit->record(
-                    'tank_reading.recorded',
-                    $reading,
-                    null,
-                    $this->audit->snapshot($reading),
-                    $actorId === null ? null : User::query()->find($actorId),
-                );
+                $now = CarbonImmutable::now();
+                $skew = (int) $this->settings->get($station, 'device_max_future_skew_seconds');
+                if ($explicitAt !== null && $explicitAt->getTimestamp() > $now->getTimestamp() + $skew) {
+                    throw new RuntimeException('FUEL_READING_FUTURE_TIME: وقت القياس في المستقبل ولا يُقبل.');
+                }
+                $backdated = $explicitAt !== null && $explicitAt->getTimestamp() < $now->getTimestamp() - $skew;
+                if (! $backdated) {
+                    return $this->insertReading($station, $tank, $type, $milliliters, $explicitAt ?? $now, $evidenceKey, $hash, $evidence, $actorId, 'tank_reading.recorded', null);
+                }
 
-                return $reading;
+                $policy = $this->settings->tankReadingBackdating($station);
+                if ($policy['policy'] === 'deny') {
+                    throw new RuntimeException('FUEL_READING_BACKDATING_DENIED: سياسة المحطة لا تسمح بتسجيل قراءات بتاريخ سابق.');
+                }
+                if ($now->getTimestamp() - $explicitAt->getTimestamp() > $policy['max_hours'] * 3600) {
+                    throw new RuntimeException('FUEL_READING_BACKDATING_TOO_OLD: القراءة أقدم من الحد الأقصى المسموح لتأخير التسجيل في سياسة المحطة ولا تُقبل حتى بموافقة.');
+                }
+                if ($policy['reason_required'] && $reason === null) {
+                    throw new RuntimeException('FUEL_READING_BACKDATING_REASON_REQUIRED: سبب القراءة المتأخرة إلزامي.');
+                }
+
+                if ($policy['policy'] === 'authorized_user') {
+                    $actor = $actorId === null ? null : User::query()->find($actorId);
+                    if ($actor === null || ! $actor->hasPermission(self::LATE_RECORD_PERMISSION)) {
+                        throw new RuntimeException('FUEL_READING_BACKDATING_NOT_AUTHORIZED: تسجيل قراءة بتاريخ سابق يتطلب صلاحية مخصَّصة لذلك.');
+                    }
+                    $late = $evidence + ['late_reason' => $reason];
+
+                    return $this->insertReading($station, $tank, $type, $milliliters, $explicitAt, $evidenceKey, $hash, $late, $actorId, 'tank_reading.recorded_late', $reason);
+                }
+
+                return $this->requests->create($station, $tank, $type, $milliliters, $explicitAt, $evidenceKey, $hash, $evidence, $reason, $actorId);
             });
         } catch (QueryException $exception) {
-            if (str_contains($exception->getMessage(), 'fuel_reading_evidence_unique')) {
+            if (str_contains($exception->getMessage(), 'fuel_reading_evidence_unique') || str_contains($exception->getMessage(), 'fuel_reading_request_evidence_unique')) {
                 throw new RuntimeException('FUEL_READING_EVIDENCE_MISMATCH: مفتاح دليل القياس مستخدم مسبقاً ولا يمكن تسجيل القياس مرتين.', previous: $exception);
             }
 
@@ -116,13 +140,57 @@ class FuelReconciliationService
         }
     }
 
-    private function replayOrReject(FuelTankReading $existing, FuelStation $station, FuelTank $tank, string $type, int $milliliters, mixed $actorId): FuelTankReading
+    public const LATE_RECORD_PERMISSION = 'fuel.reading.late.record';
+
+    /**
+     * يُنشئ القراءة المعتمدة من طلب متأخر (يُستدعى من `FuelTankReadingRequestService::decide` داخل معاملته بعد قفل الخزان ثم الطلب).
+     * وقت القياس الأصلي محفوظ كما هو؛ وقت الاعتماد = `created_at` للقراءة و`decided_at` للطلب. لا إعادة ترتيب ولا تعديل لقراءة قائمة.
+     */
+    public function materializeLateRequest(FuelTankReadingRequest $request, FuelStation $station, FuelTank $tank, User $approver): FuelTankReading
     {
-        $same = $existing->fuel_station_id === $station->id
-            && $existing->fuel_tank_id === $tank->id
-            && $existing->reading_type === $type
-            && (int) $existing->quantity_milliliters === $milliliters
-            && $existing->recorded_by === $actorId;
+        if ($tank->status === FuelTank::STATUS_INACTIVE) {
+            throw new RuntimeException('FUEL_READING_TANK_INACTIVE: الخزان معطَّل ولا تُسجَّل له قراءات.');
+        }
+        if ((int) $request->quantity_milliliters > (int) $tank->capacity_milliliters) {
+            throw new RuntimeException('FUEL_READING_EXCEEDS_CAPACITY: الكمية المقاسة تتجاوز سعة الخزان المعتمدة ولا تُقبل.');
+        }
+        $evidence = $this->normalizedEvidence($request->evidence) + ['late_reason' => $request->reason, 'late_request_id' => $request->id];
+
+        return $this->insertReading(
+            $station, $tank, $request->reading_type, (int) $request->quantity_milliliters, CarbonImmutable::instance($request->measured_at),
+            $request->evidence_key, $request->intent_hash, $evidence, $request->requested_by, 'tank_reading.recorded_late', 'late_request:' . $request->id, $approver,
+        );
+    }
+
+    /** @param array<string,mixed>|null $evidence */
+    private function insertReading(FuelStation $station, FuelTank $tank, string $type, int $milliliters, CarbonImmutable $measuredAt, string $key, string $hash, ?array $evidence, mixed $actorId, string $auditAction, ?string $auditReason, ?User $auditActor = null): FuelTankReading
+    {
+        $reading = FuelTankReading::create([
+            'branch_id' => $station->branch_id,
+            'fuel_station_id' => $station->id,
+            'fuel_tank_id' => $tank->id,
+            'reading_type' => $type,
+            'quantity_milliliters' => $milliliters,
+            'measured_at' => $measuredAt,
+            'evidence_key' => $key,
+            'intent_hash' => $hash,
+            'evidence' => $evidence === [] ? null : $evidence,
+            'recorded_by' => $actorId,
+        ]);
+        $this->audit->record(
+            $auditAction,
+            $reading,
+            null,
+            $this->audit->snapshot($reading),
+            $auditActor ?? ($actorId === null ? null : User::query()->find($actorId)),
+            $auditReason,
+        );
+
+        return $reading;
+    }
+
+    private function replay(bool $same, FuelTankReading|FuelTankReadingRequest $existing): FuelTankReading|FuelTankReadingRequest
+    {
         if (! $same) {
             throw new RuntimeException('FUEL_READING_EVIDENCE_MISMATCH: مفتاح دليل القياس مستخدم مسبقاً ولا يمكن تسجيل القياس مرتين.');
         }
@@ -130,27 +198,80 @@ class FuelReconciliationService
         return $existing; // إعادة إرسال مقصودة/منقطعة: الأثر الأول نفسه بلا إنشاء ولا تدقيق ثانٍ.
     }
 
-    private function measuredAt(mixed $given, FuelStation $station, FuelTank $tank, string $type): CarbonImmutable
+    /**
+     * مطابقة النية لقراءة قائمة. ذات بصمة ⇒ مقارنة البصمة الكاملة. قراءة سابقة للبصمة (`NULL`) ⇒ حقولها الظاهرة (المحطة/الخزان/النوع/الكمية/الفاعل/الأدلة)
+     * دون الوقت (غير قابل للمقارنة بدقة بلا معرفة إن كان صريحاً).
+     *
+     * @param array<string,mixed>|null $evidence
+     */
+    private function sameReadingIntent(FuelTankReading $existing, string $hash, FuelStation $station, FuelTank $tank, string $type, int $milliliters, mixed $actorId, ?array $evidence): bool
     {
-        $now = CarbonImmutable::now();
+        if ($existing->intent_hash !== null) {
+            return hash_equals((string) $existing->intent_hash, $hash);
+        }
+
+        return $existing->fuel_station_id === $station->id
+            && $existing->fuel_tank_id === $tank->id
+            && $existing->reading_type === $type
+            && (int) $existing->quantity_milliliters === $milliliters
+            && $existing->recorded_by === $actorId
+            && $this->normalizedEvidence($existing->evidence) === ($evidence ?? []);
+    }
+
+    /** @param array<string,mixed>|null $evidence */
+    private function intentHash(string $stationId, string $tankId, string $type, int $ml, mixed $actorId, ?CarbonImmutable $explicitAt, ?array $evidence, ?string $reason): string
+    {
+        return hash('sha256', json_encode([
+            's' => $stationId, 'k' => $tankId, 't' => $type, 'q' => $ml, 'a' => $actorId,
+            'at' => $explicitAt?->utc()->format('Y-m-d\TH:i:s'), // غياب الوقت الصريح = null = «وقت الخادم»
+            'e' => $evidence ?? [], 'r' => $reason,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    }
+
+    /** @return array<string,mixed> أدلة مرتّبة المفاتيح تكرارياً، فارغة ⇒ []. */
+    private function normalizedEvidence(mixed $evidence): array
+    {
+        if (! is_array($evidence) || $evidence === []) {
+            return [];
+        }
+        $sort = function (array $values) use (&$sort): array {
+            foreach ($values as $key => $value) {
+                if (is_array($value)) {
+                    $values[$key] = $sort($value);
+                } elseif (is_string($value)) {
+                    $values[$key] = trim($value);
+                }
+            }
+            if (! array_is_list($values)) {
+                ksort($values);
+            }
+
+            return $values;
+        };
+
+        return $sort($evidence);
+    }
+
+    private function explicitTime(mixed $given): ?CarbonImmutable
+    {
         if ($given === null || $given === '') {
-            return $now;
+            return null;
         }
         try {
-            $measuredAt = CarbonImmutable::parse($given);
+            return CarbonImmutable::parse($given)->utc()->startOfSecond();
         } catch (\Throwable $exception) {
             throw new RuntimeException('وقت القياس غير صالح.', previous: $exception);
         }
-        $skew = (int) $this->settings->get($station, 'device_max_future_skew_seconds');
-        if ($measuredAt->greaterThan($now->addSeconds($skew))) {
-            throw new RuntimeException('FUEL_READING_FUTURE_TIME: وقت القياس في المستقبل ولا يُقبل.');
-        }
-        $latest = FuelTankReading::where('fuel_tank_id', $tank->id)->where('reading_type', $type)->max('measured_at');
-        if ($latest !== null && $measuredAt->lessThan(CarbonImmutable::parse($latest))) {
-            throw new RuntimeException('FUEL_READING_OLDER_THAN_LATEST: وقت القياس أقدم من آخر قراءة مسجَّلة لهذا الخزان ونوع القراءة، ولا سياسة معتمدة لقبول التأريخ الرجعي.');
-        }
+    }
 
-        return $measuredAt;
+    private function cleanReason(mixed $reason): ?string
+    {
+        if (! is_string($reason)) {
+            return null;
+        }
+        $clean = trim($reason);
+
+        return $clean === '' ? null : mb_substr($clean, 0, 500);
     }
 
     /** @param array<string, mixed> $data */

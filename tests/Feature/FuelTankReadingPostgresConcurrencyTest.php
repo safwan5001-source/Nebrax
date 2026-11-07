@@ -10,7 +10,9 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\EntitlementGrantService;
+use App\Services\FuelReadingRequestDecidedException;
 use App\Services\FuelReconciliationService;
+use App\Services\FuelTankReadingRequestService;
 use App\Support\EntitlementAccessMode;
 use App\Support\EntitlementSourceType;
 use App\Tenancy\BranchContext;
@@ -162,6 +164,178 @@ class FuelTankReadingPostgresConcurrencyTest extends TestCase
         $this->assertAllCompleted($results);
         $this->assertSame(1, (int) DB::table('fuel_tank_readings')->where('tenant_id', $f['tenant_id'])->count());
         $this->assertSame(0, count(array_filter($results, fn ($r) => str_starts_with((string) $r['value'], 'other:'))), json_encode($results));
+    }
+
+    /** @test */
+    public function concurrent_identical_late_requests_yield_one_pending_request(): void
+    {
+        $f = $this->lateFixture();
+        $jobs = [];
+        foreach (range(1, 6) as $i) {
+            $jobs[] = function () use ($f) {
+                $this->enter($f);
+
+                return app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-conc-same', '40.000'))->id;
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $this->assertCount(1, array_unique(array_map(fn ($r) => $r['value'], $results)));
+        $this->assertSame(1, (int) DB::table('fuel_tank_reading_requests')->where('tenant_id', $f['tenant_id'])->count());
+        $this->assertSame(0, (int) DB::table('fuel_tank_readings')->where('tenant_id', $f['tenant_id'])->count());
+    }
+
+    /** @test */
+    public function concurrent_late_requests_with_one_key_but_different_intent_yield_one_winner_and_clear_rejections(): void
+    {
+        $f = $this->lateFixture();
+        $jobs = [];
+        foreach (range(1, 6) as $i) {
+            $jobs[] = function () use ($f, $i) {
+                $this->enter($f);
+                try {
+                    app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-conc-diff', (string) (10 + $i) . '.000'));
+
+                    return 'ok';
+                } catch (RuntimeException $e) {
+                    return str_contains($e->getMessage(), 'FUEL_READING_EVIDENCE_MISMATCH') ? 'mismatch' : 'other:' . $e->getMessage();
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $this->assertSame(1, count(array_filter($results, fn ($r) => $r['value'] === 'ok')), json_encode($results));
+        $this->assertSame(5, count(array_filter($results, fn ($r) => $r['value'] === 'mismatch')), json_encode($results));
+        $this->assertSame(1, (int) DB::table('fuel_tank_reading_requests')->where('tenant_id', $f['tenant_id'])->count());
+    }
+
+    /** @test */
+    public function concurrent_approvals_by_different_deciders_create_exactly_one_reading_and_one_decision(): void
+    {
+        $f = $this->lateFixture();
+        $this->enter($f);
+        $request = app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-conc-approve', '55.000'));
+
+        $jobs = [];
+        foreach ([$f['approver_a'], $f['approver_b'], $f['approver_a'], $f['approver_b'], $f['approver_a'], $f['approver_b']] as $approverId) {
+            $jobs[] = function () use ($f, $request, $approverId) {
+                $this->enter($f);
+                try {
+                    app(FuelTankReadingRequestService::class)->decide($request->id, User::findOrFail($approverId), 'approve', null);
+
+                    return 'ok:' . $approverId;
+                } catch (FuelReadingRequestDecidedException) {
+                    return 'decided';
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $row = DB::table('fuel_tank_reading_requests')->where('id', $request->id)->first();
+        $this->assertSame('approved', $row->status);
+        $this->assertSame(1, (int) DB::table('fuel_tank_readings')->where('tenant_id', $f['tenant_id'])->count());
+        $this->assertSame(1, (int) DB::table('fuel_station_audit_events')->where('tenant_id', $f['tenant_id'])->where('action', 'tank_reading.late_approved')->count());
+        // كل «ok» من المقرِّر الفائز نفسه؛ والآخر يستلم «قُرِّر سابقاً»
+        $oks = array_unique(array_filter(array_map(fn ($r) => str_starts_with((string) $r['value'], 'ok:') ? $r['value'] : null, $results)));
+        $this->assertSame(['ok:' . $row->decided_by], array_values($oks));
+        $this->assertSame(0, (int) DB::table('stock_movements')->where('tenant_id', $f['tenant_id'])->count());
+        $this->assertSame(0, (int) DB::table('journal_entries')->where('tenant_id', $f['tenant_id'])->count());
+    }
+
+    /** @test */
+    public function concurrent_approve_and_reject_resolve_to_a_single_consistent_decision(): void
+    {
+        $f = $this->lateFixture();
+        $this->enter($f);
+        $request = app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-conc-ar', '25.000'));
+
+        $jobs = [];
+        foreach (range(1, 6) as $i) {
+            $jobs[] = function () use ($f, $request, $i) {
+                $this->enter($f);
+                $approve = $i % 2 === 0;
+                try {
+                    app(FuelTankReadingRequestService::class)->decide($request->id, User::findOrFail($approve ? $f['approver_a'] : $f['approver_b']), $approve ? 'approve' : 'reject', 'سبب');
+
+                    return 'ok';
+                } catch (FuelReadingRequestDecidedException) {
+                    return 'decided';
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $row = DB::table('fuel_tank_reading_requests')->where('id', $request->id)->first();
+        $readings = (int) DB::table('fuel_tank_readings')->where('tenant_id', $f['tenant_id'])->count();
+        $this->assertContains($row->status, ['approved', 'rejected']);
+        $this->assertSame($row->status === 'approved' ? 1 : 0, $readings);
+        $this->assertSame(1, (int) DB::table('fuel_station_audit_events')->where('tenant_id', $f['tenant_id'])->whereIn('action', ['tank_reading.late_approved', 'tank_reading.late_rejected'])->count());
+    }
+
+    /** @test */
+    public function late_requests_normal_readings_and_decisions_on_one_tank_do_not_deadlock(): void
+    {
+        $f = $this->lateFixture();
+        $this->enter($f);
+        $pending = [];
+        foreach (range(1, 3) as $i) {
+            $pending[] = app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-mix-' . $i, (string) (10 * $i) . '.000'))->id;
+        }
+
+        $jobs = [];
+        foreach ($pending as $id) {
+            $jobs[] = function () use ($f, $id) {
+                $this->enter($f);
+
+                return app(FuelTankReadingRequestService::class)->decide($id, User::findOrFail($f['approver_a']), 'approve', null)->status;
+            };
+        }
+        foreach (range(1, 6) as $i) {
+            $jobs[] = function () use ($f, $i) {
+                $this->enter($f);
+
+                return app(FuelReconciliationService::class)->recordReading([
+                    'fuel_station_id' => $f['station_id'], 'fuel_tank_id' => $f['tank_id'], 'reading_type' => 'physical',
+                    'quantity_liters' => (string) (100 + $i) . '.000', 'evidence_key' => 'mix-normal-' . $i, 'recorded_by' => $f['actor_id'],
+                ])->id;
+            };
+        }
+        $jobs[] = function () use ($f) {
+            $this->enter($f);
+
+            return app(FuelReconciliationService::class)->recordReading($this->lateData($f, 'late-mix-new', '77.000'))->id;
+        };
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $this->assertSame(3 + 6, (int) DB::table('fuel_tank_readings')->where('tenant_id', $f['tenant_id'])->count());
+        $this->assertSame(4, (int) DB::table('fuel_tank_reading_requests')->where('tenant_id', $f['tenant_id'])->count());
+    }
+
+    /** @param array<string,string> $f @return array<string,mixed> */
+    private function lateData(array $f, string $key, string $liters): array
+    {
+        return $this->data($f, $key, $liters) + [
+            'measured_at' => $f['late_at'], 'late_reason' => 'سبب التأخير', 'evidence' => ['method' => 'dipstick', 'note' => 'ملاحظة'],
+        ];
+    }
+
+    /** @return array<string,string> الفيكستشر + سياسة supervisor_approval للمحطة + مقرِّران مختلفان عن مقدِّم الطلب */
+    private function lateFixture(): array
+    {
+        $f = $this->fixture();
+        $token = User::findOrFail($f['actor_id'])->createToken('api')->plainTextToken;
+        $this->withToken($token)->putJson(self::BASE . '/stations/' . $f['station_id'] . '/settings', [
+            'tank_reading_backdating_policy' => 'supervisor_approval', 'tank_reading_backdating_max_hours' => 24, 'reason' => 'اختبار تزامن',
+        ])->assertOk();
+        app(TenantContext::class)->set($f['tenant_id']);
+        $mk = fn (string $n) => User::create(['tenant_id' => $f['tenant_id'], 'name' => $n, 'email' => $n . '@fuel-rd-pg.test', 'password' => 'password123', 'role' => 'owner'])->id;
+
+        return $f + ['approver_a' => $mk('apr-a-' . Str::random(4)), 'approver_b' => $mk('apr-b-' . Str::random(4)), 'late_at' => CarbonImmutable::now()->subHours(3)->toIso8601String()];
     }
 
     /** @param array<string,string> $f @return array<string,mixed> */

@@ -33,6 +33,17 @@ const latestReading = z.object({
   evidence,
 });
 
+export const BACKDATING_POLICIES = ['deny', 'supervisor_approval', 'authorized_user'] as const;
+export type BackdatingPolicy = (typeof BACKDATING_POLICIES)[number];
+
+/** سياسة التأريخ الرجعي الفعّالة للمحطة كما يعلنها الخادم (عرض فقط؛ الخادم يفرضها). غيابها (خادم أقدم) = `deny`. */
+export const backdatingSchema = z.object({
+  policy: z.enum(BACKDATING_POLICIES),
+  max_hours: z.number().int().positive(),
+  reason_required: z.boolean(),
+  can_submit: z.boolean(),
+});
+
 export const tankLevelSchema = z.object({
   tank: z.object({
     id: text.min(1),
@@ -49,6 +60,7 @@ export const tankLevelSchema = z.object({
   fuel_product: z.object({ id: nullableText, code: nullableText, name: nullableText }),
   latest: latestReading.nullable(),
   latest_by_type: z.object({ physical: latestReading.nullable(), atg: latestReading.nullable() }),
+  backdating: backdatingSchema.optional(),
   level: z.object({
     fill_basis_points: z.number().int().nullable(),
     available_milliliters: ml.nullable(),
@@ -74,8 +86,53 @@ export const historyRowSchema = z.object({
   recorded_by: nullableText,
   recorder,
   flags: z.array(z.enum(FLAGS)).optional(),
+  late_entry: z.boolean().optional(),
+  late_reason: nullableText,
   measured_at: nullableText,
   created_at: nullableText,
+});
+
+export const REQUEST_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+
+/** طلب قراءة متأخرة (`FuelTankReadingRequestResource`). */
+export const lateRequestSchema = z.object({
+  id: text.min(1),
+  request_kind: z.literal('late_reading'),
+  status: z.enum(REQUEST_STATUSES),
+  fuel_station_id: text,
+  tank: z.object({ id: nullableText, code: nullableText, name: nullableText }).optional(),
+  fuel_tank_id: text.min(1),
+  reading_type: text,
+  quantity_milliliters: ml,
+  quantity_liters: text,
+  evidence_key: nullableText,
+  evidence,
+  reason: nullableText,
+  measured_at: text,
+  requested_at: nullableText,
+  late_by_seconds: z.number().int().nonnegative().nullable().optional(),
+  requested_by: nullableText,
+  requester: z.object({ id: nullableText, name: nullableText }).optional(),
+  decided_by: nullableText,
+  decider: z.object({ id: nullableText, name: nullableText }).nullable().optional(),
+  decided_at: nullableText,
+  decision_note: nullableText,
+  fuel_tank_reading_id: nullableText,
+});
+export const lateRequestResponse = z.object({ data: lateRequestSchema });
+export const lateRequestsResponse = z.object({
+  data: z.array(lateRequestSchema),
+  meta: z.object({ current_page: z.number().int().positive(), last_page: z.number().int().positive(), total: z.number().int().nonnegative() }).optional(),
+});
+
+/** إعدادات المحطة الفعّالة المعنية بسياسة التأريخ الرجعي (`GET stations/{id}/settings`، باقي المفاتيح تُتجاهل). */
+export const policySettingsResponse = z.object({
+  data: z.object({
+    tank_reading_backdating_policy: z.enum(BACKDATING_POLICIES).optional(),
+    tank_reading_backdating_max_hours: z.number().int().positive().optional(),
+    tank_reading_backdating_reason_required: z.boolean().optional(),
+  }).passthrough(),
 });
 export const historyResponse = z.object({
   data: z.array(historyRowSchema),
@@ -85,4 +142,6 @@ export const historyResponse = z.object({
 export type TankLevel = z.infer<typeof tankLevelSchema>;
 export type LatestReading = z.infer<typeof latestReading>;
 export type HistoryRow = z.infer<typeof historyRowSchema>;
+export type LateRequest = z.infer<typeof lateRequestSchema>;
+export type RequestsPage = { rows: LateRequest[]; page: number; lastPage: number; total: number };
 export type HistoryPage = { rows: HistoryRow[]; page: number; lastPage: number; total: number };

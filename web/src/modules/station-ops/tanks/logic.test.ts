@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageParts, evaluateReading, evidenceBody, fillBasisPoints, methodsFor, percentText, readingIntent } from './logic';
+import { ageParts, evaluateLateTime, evaluateReading, evidenceBody, fillBasisPoints, methodsFor, percentText, readingIntent, zonedLocalToIso } from './logic';
 
 const limits = { capacityMl: 200_000, safeCapacityMl: 190_000, minimumLevelMl: 20_000, deadStockMl: 5_000 };
 
@@ -64,5 +64,44 @@ describe('presentation helpers', () => {
     expect(methodsFor('atg')).toEqual(['atg_console', 'other']);
     expect(evidenceBody('gauge', '   ')).toEqual({ method: 'gauge' });
     expect(evidenceBody('gauge', 'x'.repeat(900)).note).toHaveLength(500);
+  });
+});
+
+describe('late-time handling uses the station time zone and only guides (the server decides)', () => {
+  it('converts a local picker value in the station zone to the exact instant', () => {
+    expect(zonedLocalToIso('2026-11-06T09:00', 'Asia/Riyadh')).toBe('2026-11-06T06:00:00.000Z'); // UTC+3 بلا توقيت صيفي
+    expect(zonedLocalToIso('2026-07-01T09:00', 'America/New_York')).toBe('2026-07-01T13:00:00.000Z'); // صيفي UTC−4
+    expect(zonedLocalToIso('2026-01-01T09:00', 'America/New_York')).toBe('2026-01-01T14:00:00.000Z'); // شتوي UTC−5
+    expect(zonedLocalToIso('2026-11-06T00:00', 'UTC')).toBe('2026-11-06T00:00:00.000Z');
+  });
+
+  it('rejects malformed values and impossible dates instead of guessing', () => {
+    for (const bad of ['', '2026-11-06', '2026-11-06 09:00', '2026-13-01T09:00', '2026-02-31T09:00', 'abc']) expect(zonedLocalToIso(bad, 'Asia/Riyadh'), bad).toBeNull();
+  });
+
+  it('falls back to the device zone for an invalid or missing station zone', () => {
+    expect(zonedLocalToIso('2026-11-06T09:00', 'Not/AZone')).toBe(new Date(2026, 10, 6, 9, 0).toISOString());
+    expect(zonedLocalToIso('2026-11-06T09:00', null)).toBe(new Date(2026, 10, 6, 9, 0).toISOString());
+  });
+
+  it('classifies the chosen time against the policy window with exact boundaries', () => {
+    const now = Date.parse('2026-11-06T12:00:00Z');
+    const at = (iso: string) => evaluateLateTime(iso, 'UTC', 24, now);
+    expect(at('')).toEqual({ kind: 'empty' });
+    expect(at('garbage')).toEqual({ kind: 'invalid' });
+    expect(at('2026-11-06T13:00')).toEqual({ kind: 'future' });
+    expect(at('2026-11-06T11:58')).toEqual({ kind: 'not_late' }); // ضمن سماحية 5 دقائق
+    expect(at('2026-11-06T11:00')).toMatchObject({ kind: 'ok', hoursAgo: 1, iso: '2026-11-06T11:00:00.000Z' });
+    expect(at('2026-11-05T12:00')).toMatchObject({ kind: 'ok', hoursAgo: 24 }); // الحد نفسه مسموح
+    expect(at('2026-11-05T11:59')).toEqual({ kind: 'too_old', hours: 24 });
+  });
+
+  it('keeps the reading intent stable per time/reason and distinct when either changes', () => {
+    const base = { stationId: 's', tankId: 't', type: 'physical', ml: 1, method: 'dipstick', note: '', at: '2026-11-06T06:00:00.000Z', reason: 'سبب' };
+    const key = JSON.stringify(readingIntent(base));
+    expect(JSON.stringify(readingIntent({ ...base, at: '2026-11-06T07:00:00.000Z' }))).not.toBe(key);
+    expect(JSON.stringify(readingIntent({ ...base, reason: 'آخر' }))).not.toBe(key);
+    expect(JSON.stringify(readingIntent({ ...base, reason: ' سبب ' }))).toBe(key);
+    expect(JSON.stringify(readingIntent({ ...base, at: null }))).not.toBe(key);
   });
 });

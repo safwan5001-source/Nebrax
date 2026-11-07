@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { Badge, type Tone } from '../admin/ui';
 import { formatLitersFixedFromMl, formatStampInZone } from '../format';
 import { ageParts, percentText } from './logic';
+import type { AnyFailure } from '../receiving/parts';
+import type { ActionFailure } from './actions-client';
 import type { Freshness, LevelFlag, LatestReading, TankLevel } from './schemas';
 
 /** FUEL-B6 — عناصر عرض مشتركة. الأرقام 0–9 دائماً، والحالة نصٌّ + شكل لا لوناً وحده. */
@@ -112,4 +114,10 @@ export function LevelSummary({ row, timeZone }: { row: TankLevel; timeZone: stri
       ) : null}
     </div>
   );
+}
+
+/** `ActionFailure` ⇒ شكل `FailureNotice` المشترك (الرسائل نفسها للرفض/غير المؤكد/لم يُرسل). */
+export function asFailure(failure: ActionFailure): AnyFailure {
+  if (failure.kind === 'rejected') return { kind: 'rejected', status: failure.status, code: failure.code, serverMessage: failure.serverMessage };
+  return failure;
 }

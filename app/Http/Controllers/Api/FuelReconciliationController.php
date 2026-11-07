@@ -8,9 +8,11 @@ use App\Http\Requests\ListFuelTankReadingsRequest;
 use App\Http\Requests\StoreFuelReconciliationRequest;
 use App\Http\Requests\StoreFuelTankReadingRequest;
 use App\Http\Resources\FuelReconciliationResource;
+use App\Http\Resources\FuelTankReadingRequestResource;
 use App\Http\Resources\FuelTankReadingResource;
 use App\Models\FuelReconciliation;
 use App\Models\FuelTankReading;
+use App\Models\FuelTankReadingRequest;
 use App\Services\FuelReconciliationService;
 use Illuminate\Http\JsonResponse;
 
@@ -46,10 +48,15 @@ class FuelReconciliationController extends ApiController
         $data = $request->validated();
         $this->accessibleStation($data['fuel_station_id']);
         $data['recorded_by'] = $request->user()->id;
-        $reading = $this->domain(fn () => $this->service->recordReading($data));
+        $result = $this->domain(fn () => $this->service->recordReading($data));
+
+        // طلب قراءة متأخرة بانتظار موافقة المشرف (لا قراءة تشغيلية): 202 للإنشاء، 200 لإعادة إرسال مطابقة.
+        if ($result instanceof FuelTankReadingRequest) {
+            return (new FuelTankReadingRequestResource($result->load(['station', 'tank', 'requester', 'decider'])))->response()->setStatusCode($result->wasRecentlyCreated ? 202 : 200);
+        }
 
         // 201 للإنشاء، 200 لإعادة إرسال مطابقة (الأثر الأول نفسه بلا إنشاء).
-        return (new FuelTankReadingResource($reading->load(['station', 'tank', 'recorder'])))->response()->setStatusCode($reading->wasRecentlyCreated ? 201 : 200);
+        return (new FuelTankReadingResource($result->load(['station', 'tank', 'recorder'])))->response()->setStatusCode($result->wasRecentlyCreated ? 201 : 200);
     }
 
     public function index(ListFuelReconciliationsRequest $request): JsonResponse

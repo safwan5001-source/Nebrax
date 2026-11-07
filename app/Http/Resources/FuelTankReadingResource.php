@@ -35,6 +35,9 @@ class FuelTankReadingResource extends JsonResource
                 (int) $this->tank?->minimum_level_milliliters,
                 (int) $this->tank?->dead_stock_milliliters,
             )),
+            // قراءة سُجِّلت بتاريخ سابق (مباشرة بصلاحية مخصَّصة أو بعد اعتماد مشرف): السبب ومعرّف الطلب من الخادم وحده.
+            'late_entry' => is_array($this->evidence) && array_key_exists('late_reason', $this->evidence),
+            'late_reason' => is_array($this->evidence) ? ($this->evidence['late_reason'] ?? null) : null,
             'measured_at' => $this->measured_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

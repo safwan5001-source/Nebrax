@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FuelStation;
 use App\Models\FuelTank;
 use App\Models\FuelTankReading;
+use App\Models\User;
 use App\Support\FuelTankLevel;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +27,7 @@ final class FuelTankLevelMonitor
      * @param  Builder<FuelTank>  $tanks  استعلام خزانات مقيَّد النطاق مسبقاً (restrictToAccessibleStations)
      * @return list<array<string,mixed>>
      */
-    public function snapshot(Builder $tanks): array
+    public function snapshot(Builder $tanks, ?User $actor = null): array
     {
         $rows = $tanks->with(['station', 'fuelProduct'])->where('status', '!=', FuelTank::STATUS_INACTIVE)->orderBy('code')->get();
         if ($rows->isEmpty()) {
@@ -36,7 +37,9 @@ final class FuelTankLevelMonitor
         $now = CarbonImmutable::now();
         $policies = [];
 
-        return $rows->map(function (FuelTank $tank) use ($latest, $now, &$policies) {
+        $backdating = [];
+
+        return $rows->map(function (FuelTank $tank) use ($latest, $now, &$policies, &$backdating, $actor) {
             $byType = $latest[$tank->id] ?? [];
             $overall = null; // الأحدث قياساً بين النوعين، وعند التعادل الأحدث تسجيلاً
             foreach ($byType as $reading) {
@@ -49,6 +52,7 @@ final class FuelTankLevelMonitor
             $stationId = $tank->fuel_station_id;
             $policies[$stationId] ??= $this->staleAfter($tank->station);
             $stale = $policies[$stationId];
+            $backdating[$stationId] ??= $this->backdating($tank->station, $actor);
 
             return [
                 'tank' => [
@@ -70,6 +74,8 @@ final class FuelTankLevelMonitor
                     FuelTankReading::TYPE_ATG => isset($byType[FuelTankReading::TYPE_ATG]) ? $this->readingRow($byType[FuelTankReading::TYPE_ATG]) : null,
                 ],
                 'level' => $this->level($tank, $overall, $now, $stale),
+                // سياسة التأريخ الرجعي الفعّالة للمحطة (عرض فقط؛ الخادم يفرضها عند التسجيل): هل يُعرض اختيار وقت القياس لهذا المستخدم؟
+                'backdating' => $backdating[$stationId],
             ];
         })->all();
     }
@@ -108,6 +114,21 @@ final class FuelTankLevelMonitor
             'recorder' => $reading->recorder === null ? null : ['id' => $reading->recorder->id, 'name' => $reading->recorder->name],
             'evidence' => $reading->evidence,
         ];
+    }
+
+    /** @return array{policy: string, max_hours: int, reason_required: bool, can_submit: bool} */
+    private function backdating(?FuelStation $station, ?User $actor): array
+    {
+        if ($station === null) {
+            return ['policy' => 'deny', 'max_hours' => 24, 'reason_required' => true, 'can_submit' => false];
+        }
+        $policy = $this->settings->tankReadingBackdating($station);
+
+        return $policy + ['can_submit' => match ($policy['policy']) {
+            'supervisor_approval' => true,
+            'authorized_user' => $actor?->hasPermission(FuelReconciliationService::LATE_RECORD_PERMISSION) === true,
+            default => false,
+        }];
     }
 
     private function staleAfter(?FuelStation $station): ?int

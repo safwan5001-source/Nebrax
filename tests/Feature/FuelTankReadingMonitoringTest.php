@@ -116,15 +116,14 @@ class FuelTankReadingMonitoringTest extends TestCase
         // ضمن سماحية انحراف الساعة (300ث افتراضياً) مقبول
         $this->withToken($sup['token'])->postJson(self::BASE . '/readings', $this->body('b6-skew', '10', ['measured_at' => $now->addSeconds(60)->toIso8601String()]))->assertCreated();
 
-        // أقدم من آخر قراءة لنفس الخزان والنوع: مرفوض بلا سياسة
+        // بتاريخ سابق (أبعد من سماحية انحراف الساعة): مرفوض افتراضياً (سياسة deny) — النوعان معاً
         $old = $this->withToken($sup['token'])->postJson(self::BASE . '/readings', $this->body('b6-old', '11', ['measured_at' => $now->subHour()->toIso8601String()]))->assertStatus(422);
-        $this->assertStringContainsString('FUEL_READING_OLDER_THAN_LATEST', (string) $old->json('message'));
-        // نوع آخر مستقل (ATG): لا يُقارن بقراءة physical
-        $this->withToken($sup['token'])->postJson(self::BASE . '/readings', $this->body('b6-atg-old', '11', ['reading_type' => 'atg', 'measured_at' => $now->subHour()->toIso8601String()]))->assertCreated();
+        $this->assertStringContainsString('FUEL_READING_BACKDATING_DENIED', (string) $old->json('message'));
+        $this->withToken($sup['token'])->postJson(self::BASE . '/readings', $this->body('b6-atg-old', '11', ['reading_type' => 'atg', 'measured_at' => $now->subHour()->toIso8601String()]))->assertStatus(422);
         // بلا measured_at: ساعة الخادم تُقبل دائماً ولو كانت آخر قراءة بوقت مستقبلي ضمن السماحية
         $this->withToken($sup['token'])->postJson(self::BASE . '/readings', $this->body('b6-server', '12'))->assertCreated();
 
-        $this->assertSame(3, FuelTankReading::count());
+        $this->assertSame(2, FuelTankReading::count());
     }
 
     /** @test */
