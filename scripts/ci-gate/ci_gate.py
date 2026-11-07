@@ -53,6 +53,13 @@ MAX_SHARDS = 16
 SHARD_GUARD_FLOOR = {"step_run_contains": "php artisan test", "require": ("set -o pipefail",),
                      "forbidden": ("--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true")}
 PROOF_GUARD_FLOOR = {"require": ("set -euo pipefail",), "forbidden": ("|| true",)}
+# `required_steps` (PG-SHARD-SAFETY-PARITY B): safeguards that live in steps OTHER than the guarded test step. Best-effort shell lint, like the
+# other guards (a shell cannot be fully analysed): a matching step may not mask failure or leave early.
+REQUIRED_STEP_FLOOR_FORBIDDEN = ("|| true", "|| :", "exit 0", "set +e", "set +o")
+REQUIRED_STEP_KEYS = frozenset({"label", "run_contains", "uses", "forbidden", "allowed_if", "if_equals", "env", "with_contains"})
+# A `superseding` group retires the full check it replaces, so it must carry every safeguard that check ran. The set lives HERE (trusted
+# base code), not in the manifest a PR edits: a PR cannot shrink it.
+SUPERSEDE_REQUIRED_LABELS = ("aia-0.4", "watchdog.role", "watchdog.tests", "lock.limit", "watchdog.upload")
 MAX_PR_FILES = 3000  # REST cap: beyond it the file list is incomplete -> require everything
 
 
@@ -186,6 +193,54 @@ def shard_name_regex(grp: dict) -> re.Pattern:
     return re.compile(r"\d+".join(re.escape(p) for p in parts))
 
 
+def _str_list(v, what: str, allow_empty: bool = True) -> list[str]:
+    if v is None:
+        v = []
+    if not isinstance(v, list) or not all(isinstance(x, str) and x for x in v) or (not allow_empty and not v):
+        raise GateError(f"{what} must be a {'non-empty ' if not allow_empty else ''}list of non-empty strings")
+    return list(v)
+
+
+def normalize_required_steps(gid, raw) -> list[dict]:
+    """Strict schema for `required_steps` (pure). An unknown key is an error: a typo such as `forbiden` would otherwise silently weaken a safeguard."""
+    if raw in (None, []):
+        return []
+    if not isinstance(raw, list):
+        raise GateError(f"shard group {gid}: required_steps must be a list")
+    out, labels = [], set()
+    for item in raw:
+        if not isinstance(item, dict):
+            raise GateError(f"shard group {gid}: every required step must be an object")
+        unknown = sorted(set(item) - REQUIRED_STEP_KEYS)
+        if unknown:
+            raise GateError(f"shard group {gid}: required step has unknown key(s) {unknown}")
+        label = item.get("label")
+        if not isinstance(label, str) or not label:
+            raise GateError(f"shard group {gid}: every required step needs a `label`")
+        if label in labels:
+            raise GateError(f"shard group {gid}: duplicate required step label {label!r}")
+        labels.add(label)
+        run_contains = _str_list(item.get("run_contains"), f"required step {label!r}: run_contains")
+        uses = item.get("uses")
+        if uses is not None and (not isinstance(uses, str) or not uses):
+            raise GateError(f"shard group {gid}: required step {label!r}: uses must be a non-empty string")
+        if not run_contains and not uses:
+            raise GateError(f"shard group {gid}: required step {label!r} must match something (run_contains and/or uses)")
+        env = item.get("env") or {}
+        if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
+            raise GateError(f"shard group {gid}: required step {label!r}: env must map strings to strings")
+        wc = item.get("with_contains") or {}
+        if not isinstance(wc, dict):
+            raise GateError(f"shard group {gid}: required step {label!r}: with_contains must be an object")
+        wc = {k: _str_list(v, f"required step {label!r}: with_contains.{k}", allow_empty=False) for k, v in wc.items()}
+        ie = item.get("if_equals")
+        if ie is not None and (not isinstance(ie, str) or not ie):
+            raise GateError(f"shard group {gid}: required step {label!r}: if_equals must be a non-empty string")
+        out.append({"label": label, "run_contains": run_contains, "uses": uses, "forbidden": _str_list(item.get("forbidden"), f"required step {label!r}: forbidden"),
+                    "allowed_if": _str_list(item.get("allowed_if"), f"required step {label!r}: allowed_if"), "if_equals": ie, "env": env, "with_contains": wc})
+    return out
+
+
 def expand_groups(m: dict) -> dict:
     """Return the manifest with `checks` = declared checks + one synthetic blocking check per shard + the proof.
     Pure (no I/O). Structural problems raise GateError; workflow-dependent ones are reported by validate()."""
@@ -194,7 +249,7 @@ def expand_groups(m: dict) -> dict:
     if not isinstance(groups, list):
         raise GateError("shard_groups must be a list")
     declared = {c["name"]: c for c in raw}
-    extra, ids = [], set()
+    extra, ids, norm_groups = [], set(), []
     for grp in groups:
         gid = grp.get("id")
         for k in ("id", "status", "supersedes", "workflow", "job", "axis", "count", "shard_name", "guard", "proof"):
@@ -237,6 +292,16 @@ def expand_groups(m: dict) -> dict:
                 raise GateError(f"shard group {gid}: superseding group owns {grp['supersedes']!r}; remove it from `checks`")
         if gaps:
             raise GateError("; ".join(gaps))
+        rs = normalize_required_steps(gid, grp.get("required_steps"))
+        if grp["status"] == "superseding":
+            missing = sorted(set(SUPERSEDE_REQUIRED_LABELS) - {x["label"] for x in rs})
+            if missing:
+                raise GateError(f"shard group {gid}: a superseding group retires the full check, so it must carry every safeguard it ran; "
+                                f"required_steps lacks {missing}")
+        mt = grp.get("max_timeout_minutes")
+        if mt is not None and (not isinstance(mt, int) or isinstance(mt, bool) or not 1 <= mt <= 360):
+            raise GateError(f"shard group {gid}: max_timeout_minutes must be an integer in 1..360")
+        norm_groups.append({**grp, "required_steps": rs})
         tag = {"_group": gid, "_status": grp["status"], "_supersedes": grp["supersedes"]}
         covers = (sup or {}).get("covers", ["shard-group"])
         for name in shard_names(grp):
@@ -248,7 +313,7 @@ def expand_groups(m: dict) -> dict:
                       "covers": covers, "guard": pg, "_role": "proof", **tag})
     out = dict(m)
     out["declared_checks"] = raw
-    out["shard_groups"] = groups
+    out["shard_groups"] = norm_groups
     out["checks"] = [*raw, *extra]
     return out
 
@@ -301,6 +366,57 @@ def validate_group(root: Path, grp: dict, docs: dict[str, dict]) -> list[str]:
         errors.append(f"[shard group {gid}] proof job must `needs` the shard job {grp['job']!r} (it would otherwise run without the shards)")
     if (pjob.get("strategy") or {}).get("matrix"):
         errors.append(f"[shard group {gid}] proof job must not use a matrix")
+    errors += check_required_steps(gid, grp, job)
+    mt = grp.get("max_timeout_minutes")
+    if mt is not None:
+        t = job.get("timeout-minutes")
+        if not isinstance(t, int) or isinstance(t, bool) or t > mt:
+            errors.append(f"[shard group {gid}] shard job timeout-minutes must be an integer <= {mt} (got {t!r}); a missing value means the 360-minute default")
+    return errors
+
+
+def _step_matches(step: dict, rs: dict) -> bool:
+    if rs["uses"] and str(step.get("uses", "")).split("@")[0] != rs["uses"]:
+        return False
+    run = str(step.get("run", ""))
+    return all(x in run for x in rs["run_contains"])
+
+
+def check_required_steps(gid: str, grp: dict, job: dict) -> list[str]:
+    """Each required step must exist exactly once in the shard job, unconditionally (bar an allowed `if`), unmasked, with its markers intact."""
+    errors, steps = [], job.get("steps") or []
+    for rs in grp.get("required_steps") or []:
+        tag = f"[shard group {gid}] required step {rs['label']!r}"
+        hit = [s for s in steps if _step_matches(s, rs)]
+        if not hit:
+            errors.append(f"{tag} not found in job {grp['job']!r} (deleted, moved or one of its markers changed)")
+            continue
+        if len(hit) > 1:
+            errors.append(f"{tag} matched {len(hit)} steps (must be exactly one)")
+            continue
+        st = hit[0]
+        cond = str(st["if"]).strip() if "if" in st else None
+        if rs["if_equals"] is not None:
+            if cond != rs["if_equals"]:
+                errors.append(f"{tag} must have `if: {rs['if_equals']}` (got {cond!r})")
+        elif cond is not None and cond not in rs["allowed_if"]:
+            errors.append(f"{tag} has a step-level `if` ({cond!r}) that is not allowed (a skipped step still reports a green job)")
+        if str(st.get("continue-on-error", False)).lower() not in ("false",):
+            errors.append(f"{tag} uses continue-on-error")
+        run = str(st.get("run", ""))
+        for bad in (*REQUIRED_STEP_FLOOR_FORBIDDEN, *rs["forbidden"]):
+            if bad in run:
+                errors.append(f"{tag} contains forbidden {bad!r}")
+        senv = st.get("env") or {}
+        for k, v in rs["env"].items():
+            if str(senv.get(k)) != v:
+                errors.append(f"{tag} must set env {k}={v!r} (got {senv.get(k)!r})")
+        swith = st.get("with") or {}
+        for k, subs in rs["with_contains"].items():
+            val = str(swith.get(k, ""))
+            for sub in subs:
+                if sub not in val:
+                    errors.append(f"{tag} `with.{k}` lacks {sub!r}")
     return errors
 
 
@@ -466,6 +582,45 @@ def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
                 lost = set()  # no filter = runs always = stricter
             if lost:
                 errors.append(f"[{bc['name']}] pull_request.paths lost {sorted(lost)}")
+    head_groups = {g["id"]: g for g in head.get("shard_groups") or []}
+    for bg in base.get("shard_groups") or []:
+        hg = head_groups.get(bg["id"])
+        if hg is not None:  # a vanished group is judged by the check-removal rules above (an additive group may go while the full check stays)
+            errors += required_steps_regressions(bg, hg)
+    return errors
+
+
+def required_steps_regressions(bg: dict, hg: dict) -> list[str]:
+    """Tighten-only: what `main` already requires of a group's steps may be neither removed nor weakened."""
+    errors, gid = [], bg["id"]
+    hmap = {x["label"]: x for x in hg.get("required_steps") or []}
+    for b in bg.get("required_steps") or []:
+        tag = f"[shard group {gid}] required step {b['label']!r}"
+        h = hmap.get(b["label"])
+        if h is None:
+            errors.append(f"{tag} removed")
+            continue
+        if b["uses"] != h["uses"]:
+            errors.append(f"{tag} now matches a different action ({b['uses']!r} -> {h['uses']!r})")
+        for key in ("run_contains", "forbidden"):
+            lost = [x for x in b[key] if x not in h[key]]
+            if lost:
+                errors.append(f"{tag} {key} lost {lost}")
+        widened = [x for x in h["allowed_if"] if x not in b["allowed_if"]]
+        if widened:
+            errors.append(f"{tag} allowed_if widened by {widened}")
+        if b["if_equals"] != h["if_equals"]:
+            errors.append(f"{tag} if_equals changed ({b['if_equals']!r} -> {h['if_equals']!r})")
+        for k, v in b["env"].items():
+            if h["env"].get(k) != v:
+                errors.append(f"{tag} env {k} weakened ({v!r} -> {h['env'].get(k)!r})")
+        for k, subs in b["with_contains"].items():
+            lost = [x for x in subs if x not in h["with_contains"].get(k, [])]
+            if lost:
+                errors.append(f"{tag} with.{k} lost {lost}")
+    bt, ht = bg.get("max_timeout_minutes"), hg.get("max_timeout_minutes")
+    if bt is not None and (ht is None or ht > bt):
+        errors.append(f"[shard group {gid}] max_timeout_minutes weakened ({bt!r} -> {ht!r})")
     return errors
 
 
