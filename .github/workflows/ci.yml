@@ -605,6 +605,18 @@ jobs:
           printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
           php artisan migrate:fresh --force
 
+      # PG-SHARD-SAFETY-PARITY (A): حقائق المشغّل للتشخيص فقط — طراز CPU والصورة والأنوية ومعيار صغير `bench_ms` (≈0.2 ث) لتفسير تفاوت أزمنة الشرائح
+      # بين المشغّلات. لا تغيّر سلوك الاختبارات ولا تدخل في أي حكم: تُطبع في ملخص الوظيفة وتُرفع مع artifact الشريحة (`env.txt`). كل أمر محميّ داخلياً
+      # (الوظيفة مطلوبة فلا يُسمح لخطواتها بتجاوز الفشل) فغيابها أو فشلها لا يُفشل الوظيفة.
+      - name: حقائق المشغّل (تسجيل فقط)
+        run: |
+          mkdir -p "$APP_DIR/shard-out" || true
+          {
+            echo "shard=${{ matrix.shard }} runner=${RUNNER_NAME:-?} image=${ImageOS:-?}/${ImageVersion:-?} arch=$(uname -m) nproc=$(nproc)"
+            echo "cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ //' || true)"
+            echo "bench_ms=$(python3 -c 'import time;t=time.perf_counter();sum(i*i for i in range(3000000));print(round((time.perf_counter()-t)*1000))' || echo '?')"
+          } | tee "$APP_DIR/shard-out/env.txt" >> "$GITHUB_STEP_SUMMARY" || true
+
       # الجرد الكامل **قبل** الاختيار (phpunit.xml الأصلي) ثم اختيار ملفات الشريحة ثم خطتها. تُرفع الثلاثة مع قوائم الملفات ليقارنها الإثبات.
       - name: اختيار الشريحة (${{ matrix.shard }}/2) وجرد الاختبارات
         working-directory: ${{ env.APP_DIR }}
@@ -639,6 +651,7 @@ jobs:
             ${{ env.APP_DIR }}/shard-out/inventory.txt
             ${{ env.APP_DIR }}/shard-out/planned.txt
             ${{ env.APP_DIR }}/shard-out/junit.xml
+            ${{ env.APP_DIR }}/shard-out/env.txt
             ${{ env.APP_DIR }}/shard-out/test-output.txt
           if-no-files-found: error
           overwrite: true
