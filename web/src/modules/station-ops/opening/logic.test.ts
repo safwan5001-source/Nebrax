@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_FORM, accountSource, bodyFingerprint, buildDraftBody, costState, draftMatchesBody, eligibleAccounts, evaluateCosts, evaluateTanks, formFromDraft, isValidDate, planAccount,
+  blockedByDistinctApprover, EMPTY_FORM, accountSource, bodyFingerprint, buildDraftBody, costState, draftMatchesBody, eligibleAccounts, evaluateCosts, evaluateTanks, formFromDraft, isValidDate, planAccount,
   productTotals, quantityState, todayLocal, type TankInfo,
 } from './logic';
 import type { OpeningAccount, OpeningDoc } from './schemas';
@@ -174,5 +174,15 @@ describe('dates', () => {
     expect(EMPTY_FORM.quantities).toEqual({});
     expect(EMPTY_FORM.costs).toEqual({});
     expect(EMPTY_FORM.accountId).toBeNull();
+  });
+});
+
+describe('blockedByDistinctApprover', () => {
+  it('blocks only when the policy is on and the viewer created the draft', () => {
+    expect(blockedByDistinctApprover(true, 'u1', 'u1')).toBe(true);
+    expect(blockedByDistinctApprover(true, 'u1', 'u2')).toBe(false);
+    expect(blockedByDistinctApprover(false, 'u1', 'u1')).toBe(false);
+    expect(blockedByDistinctApprover(null, 'u1', 'u1')).toBe(false); // غير معروفة ⇒ الخادم يحكم
+    expect(blockedByDistinctApprover(true, null, 'u1')).toBe(false);
   });
 });

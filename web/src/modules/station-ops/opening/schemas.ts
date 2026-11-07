@@ -69,7 +69,7 @@ export const docResponse = z.object({ data: openingDocSchema, meta: z.object({ r
 export const docsResponse = paged(openingDocSchema);
 export const previewResponse = z.object({ data: previewSchema });
 export const accountsResponse = z.object({ data: z.array(accountSchema) });
-export const settingsResponse = z.object({ data: z.object({ fuel_opening_balance_account_id: z.string().nullable().optional() }).passthrough() });
+export const settingsResponse = z.object({ data: z.object({ fuel_opening_balance_account_id: z.string().nullable().optional(), fuel_distinct_approver_required: z.boolean().nullable().optional() }).passthrough() });
 
 export type OpeningLine = z.infer<typeof openingLineSchema>;
 export type OpeningDoc = z.infer<typeof openingDocSchema>;

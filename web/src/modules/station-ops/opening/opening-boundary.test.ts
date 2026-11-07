@@ -47,9 +47,12 @@ describe('opening wizard writes only through opening-client.ts', () => {
   });
 
   it('the only setting key the wizard can write is the opening balance account', () => {
+    expect(client()).not.toMatch(/PUT[^\n]*fuel_distinct_approver_required|fuel_distinct_approver_required:/); // سياسة الحوكمة تُقرأ فقط
     for (const { file, text } of sources) {
       const keys = [...code(text).matchAll(/['"`]?\b(fuel_[a-z_]*account_id|[a-z_]+_account_id|shift_[a-z_]+|fuel_price_tax_mode|fuel_distinct_approver_required)\b/g)].map((m) => m[1]);
-      for (const key of keys) expect(['fuel_opening_balance_account_id'], `${file}:${key}`).toContain(key);
+      // القراءة وحدها: سياسة فصل المعتمِد تُقرأ في schemas.ts والعميل (لا تُكتب أبداً — مفتاح حوكمة).
+      const allowed = ['schemas.ts', 'opening-client.ts'].includes(file) ? ['fuel_opening_balance_account_id', 'fuel_distinct_approver_required'] : ['fuel_opening_balance_account_id'];
+      for (const key of keys) expect(allowed, `${file}:${key}`).toContain(key);
     }
   });
 
@@ -81,7 +84,7 @@ describe('opening wizard writes only through opening-client.ts', () => {
 
   it('there is no way to approve twice: the approve button is locked while posting, after an unconfirmed result, and without a ready preview', () => {
     const screen = code(sources.find((entry) => entry.file === 'opening-wizard-screen.tsx')!.text);
-    expect(screen).toMatch(/const canApprove = access\.post && !!previewData\?\.ready && !postUnsure && !busy && !!doc/);
+    expect(screen).toMatch(/const canApprove = access\.post && !creatorBlocked && !!previewData\?\.ready && !postUnsure && !busy && !!doc/);
     expect(screen).toMatch(/if \(inFlight\.current \|\| !doc \|\| postUnsure\) return/);
     expect(screen).toMatch(/if \(failed\.kind === 'unknown' \|\| failed\.kind === 'unverified'\) setPostUnsure\(true\)/);
   });

@@ -17,7 +17,7 @@ import { StationGate } from '../station-gate';
 import { ActionBar, ConfirmDialog, NumberField, PrimaryButton, SecondaryButton, SectionCard } from '../write-ui';
 import { useConfiguredAccounts, useOpeningAccess, useOpeningAccounts, useOpeningDoc, useOpeningDocs } from './data';
 import {
-  EMPTY_FORM, STEPS, accountSource, bodyFingerprint, buildDraftBody, draftMatchesBody, eligibleAccounts, evaluateCosts, evaluateTanks, formFromDraft, isValidDate, planAccount,
+  EMPTY_FORM, STEPS, accountSource, blockedByDistinctApprover, bodyFingerprint, buildDraftBody, draftMatchesBody, eligibleAccounts, evaluateCosts, evaluateTanks, formFromDraft, isValidDate, planAccount,
   productTotals, todayLocal, type StepId, type TankInfo, type WizardForm,
 } from './logic';
 import { createOpeningDraft, getOpeningDoc, getOpeningPreview, listOpeningDocs, postOpening, saveOpeningAccount, updateOpeningDraft } from './opening-client';
@@ -117,7 +117,7 @@ function StepHeader({ step }: { step: StepId }) {
 
 function Wizard({ station, initialDoc }: { station: Station; initialDoc: OpeningDoc | null }) {
   const t = useTranslations('stationOpsOpening');
-  const { scopeKey } = useStationOps();
+  const { scopeKey, viewer } = useStationOps();
   const access = useOpeningAccess();
   const assets = useStationAssets(station);
   const configured = useConfiguredAccounts(station);
@@ -276,7 +276,8 @@ function Wizard({ station, initialDoc }: { station: Station; initialDoc: Opening
 
   const busy = stage !== 'idle' || posting;
   const previewData = preview.status === 'ready' ? preview.data : null;
-  const canApprove = access.post && !!previewData?.ready && !postUnsure && !busy && !!doc;
+  const creatorBlocked = configured.state.status === 'success' && blockedByDistinctApprover(configured.state.data.distinctApprover, doc?.created_by, viewer.id);
+  const canApprove = access.post && !creatorBlocked && !!previewData?.ready && !postUnsure && !busy && !!doc;
 
   return (
     <div className="space-y-4">
@@ -295,7 +296,7 @@ function Wizard({ station, initialDoc }: { station: Station; initialDoc: Opening
       ) : null}
 
       {step === 'review' ? (
-        <ReviewStep stage={stage} doc={doc} preview={preview} reloadPreview={() => doc && void loadPreview(doc.id)} canPost={access.post} showWait={busy} />
+        <ReviewStep stage={stage} doc={doc} preview={preview} reloadPreview={() => doc && void loadPreview(doc.id)} canPost={access.post} showWait={busy} creatorBlocked={creatorBlocked} />
       ) : null}
 
       {failure && step === 'review' ? <FailureNotice failure={failure.value} onCheck={() => void check()} checking={checking} /> : null}
@@ -493,8 +494,8 @@ function AccountSection({ form, set, account }: { form: WizardForm; set: (patch:
 
 // ───────────────────────── الخطوة 3: المراجعة ─────────────────────────
 
-function ReviewStep({ stage, doc, preview, reloadPreview, canPost, showWait }: {
-  stage: Stage; doc: OpeningDoc | null; preview: PreviewState; reloadPreview: () => void; canPost: boolean; showWait: boolean;
+function ReviewStep({ stage, doc, preview, reloadPreview, canPost, showWait, creatorBlocked }: {
+  stage: Stage; doc: OpeningDoc | null; preview: PreviewState; reloadPreview: () => void; canPost: boolean; showWait: boolean; creatorBlocked: boolean;
 }) {
   const t = useTranslations('stationOpsOpening');
   if (showWait && preview.status !== 'ready') {
@@ -560,7 +561,13 @@ function ReviewStep({ stage, doc, preview, reloadPreview, canPost, showWait }: {
         </SectionCard>
       ) : !hasMoney ? <p className="rounded-[12px] bg-primary-soft p-3 text-sm leading-6 text-text">{t('review.noMoney')}</p> : null}
 
-      {!canPost ? <p className="rounded-[12px] bg-primary-soft p-3 text-sm leading-6 text-text">{t('review.needAuthority')}</p> : null}
+      {!canPost ? <p className="rounded-[12px] bg-primary-soft p-3 text-sm leading-6 text-text">{t('review.needAuthority')}</p> : creatorBlocked ? (
+        <div role="status" data-distinct-approver="" className="space-y-2 rounded-[12px] bg-[color:var(--fo-warning-tint)] p-3 text-sm leading-6 text-warning">
+          <p className="font-semibold">{t('review.distinctApprover.title')}</p>
+          <p>{t('review.distinctApprover.body')}</p>
+          <Link href={`${OPS_BASE}/manage`} className="inline-flex min-h-11 items-center font-semibold underline">{t('posted.done')}</Link>
+        </div>
+      ) : null}
     </section>
   );
 }

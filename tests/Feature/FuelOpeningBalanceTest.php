@@ -674,16 +674,21 @@ class FuelOpeningBalanceTest extends TestCase
     }
 
     #[Test]
-    public function the_gate_is_closed_by_default_in_configuration(): void
+    public function the_gate_is_open_by_default_for_beta_and_the_env_switch_closes_it(): void
     {
-        $config = require base_path('config/fuel_stations.php');
-        $this->assertArrayHasKey('opening_balance_enabled', $config);
         $previous = getenv('FUEL_OPENING_BALANCE_ENABLED');
-        putenv('FUEL_OPENING_BALANCE_ENABLED');
-        unset($_ENV['FUEL_OPENING_BALANCE_ENABLED'], $_SERVER['FUEL_OPENING_BALANCE_ENABLED']);
-        $this->assertFalse((require base_path('config/fuel_stations.php'))['opening_balance_enabled']);
-        if ($previous !== false) {
-            putenv("FUEL_OPENING_BALANCE_ENABLED={$previous}");
+        try {
+            putenv('FUEL_OPENING_BALANCE_ENABLED');
+            unset($_ENV['FUEL_OPENING_BALANCE_ENABLED'], $_SERVER['FUEL_OPENING_BALANCE_ENABLED']);
+            $this->assertTrue((require base_path('config/fuel_stations.php'))['opening_balance_enabled']);
+
+            // مفتاح الإيقاف: القيمة النصية false في بيئة النشر تُغلق البوابة.
+            putenv('FUEL_OPENING_BALANCE_ENABLED=false');
+            $_ENV['FUEL_OPENING_BALANCE_ENABLED'] = $_SERVER['FUEL_OPENING_BALANCE_ENABLED'] = 'false';
+            $this->assertFalse((require base_path('config/fuel_stations.php'))['opening_balance_enabled']);
+        } finally {
+            unset($_ENV['FUEL_OPENING_BALANCE_ENABLED'], $_SERVER['FUEL_OPENING_BALANCE_ENABLED']);
+            $previous === false ? putenv('FUEL_OPENING_BALANCE_ENABLED') : putenv("FUEL_OPENING_BALANCE_ENABLED={$previous}");
         }
     }
 

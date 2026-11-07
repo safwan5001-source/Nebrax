@@ -263,4 +263,76 @@ class FuelOpeningBalanceApiTest extends TestCase
         // الإعداد الافتراضي للنظام فارغ: لا حساب مُفترَض لأي مستأجر جديد.
         $this->assertNull(\App\Support\Settings::DEFAULTS['fuel_stations']['fuel_opening_balance_account_id']);
     }
+
+    // ───────────────────── PR-2: دورة المعالج كاملة عبر HTTP كما تستدعيها الواجهة ─────────────────────
+
+    #[Test]
+    public function a_fresh_beta_tenant_runs_the_exact_wizard_cycle_over_http_with_the_default_gate(): void
+    {
+        $w = $this->openingWorld(configureAccount: false);
+        // الافتراضي الإنتاجي: البوابة مفتوحة بلا أي ضبط (لا نُجبرها هنا).
+        config(['fuel_stations.opening_balance_enabled' => (bool) (require base_path('config/fuel_stations.php'))['opening_balance_enabled']]);
+        $t = $w['owner_token'];
+        $station = "/api/fuel-stations/stations/{$w['station']->id}/settings";
+
+        // 1) المحطة بلا حساب معيَّن ⇒ المعاينة تعلن المانع ولا تفترض 3130 (لا fallback).
+        $this->withToken($t)->getJson($station)->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', null);
+        $draft = $this->withToken($t)->postJson(self::BASE, $this->openingPayload($w))->assertCreated();
+        $id = $draft->json('data.id');
+        $blocked = $this->withToken($t)->getJson(self::BASE . "/{$id}/preview")->assertOk()->assertJsonPath('data.ready', false);
+        $this->assertContains('FUEL_OPENING_ACCOUNT_REQUIRED', array_column($blocked->json('data.blockers'), 'code'));
+        $this->assertNull($blocked->json('data.journal'));
+        $this->withToken($t)->postJson(self::BASE . "/{$id}/post")->assertStatus(422)->assertJsonPath('reason', 'opening_blocked');
+
+        // 2) حساب غير مؤهل (أصل) يُرفض عند الحفظ؛ حساب حقوق الملكية يُقبل ويصير الفعّال للمحطة.
+        $asset = \App\Models\Account::where('tenant_id', $w['tenant_id'])->where('type', 'asset')->where('is_group', false)->firstOrFail();
+        $this->withToken($t)->putJson($station, ['fuel_opening_balance_account_id' => $asset->id, 'reason' => 'fuel_opening_balance_wizard'])->assertStatus(422);
+        $this->withToken($t)->putJson($station, ['fuel_opening_balance_account_id' => $w['opening_account']->id, 'reason' => 'fuel_opening_balance_wizard'])
+            ->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', $w['opening_account']->id);
+
+        // 3) المعاينة صارت جاهزة وتعرض المدين والدائن والمبلغ؛ ثم الترحيل مرة واحدة.
+        $this->withToken($t)->getJson(self::BASE . "/{$id}/preview")->assertOk()->assertJsonPath('data.ready', true)
+            ->assertJsonPath('data.journal.credit.account_id', $w['opening_account']->id)->assertJsonPath('data.journal.credit.amount_minor', self::TOTAL_VALUE)
+            ->assertJsonPath('data.journal.debit.amount_minor', self::TOTAL_VALUE);
+        $this->withToken($t)->postJson(self::BASE . "/{$id}/post")->assertOk()->assertJsonPath('data.status', 'posted');
+        $this->withToken($t)->postJson(self::BASE . "/{$id}/post")->assertOk()->assertJsonPath('meta.replayed', true);
+        $this->assertSame(1, DB::table('journal_entries')->where('source_type', FuelOpeningBalance::class)->count());
+
+        // 4) لا مستند ثانٍ فوق مجمّع لم يعد فارغاً (المعالج يعرض «معتمد» ولا يبدأ جديداً).
+        $second = $this->withToken($t)->postJson(self::BASE, $this->openingPayload($w))->assertCreated()->json('data.id');
+        $this->withToken($t)->postJson(self::BASE . "/{$second}/post")->assertStatus(422)->assertJsonPath('reason', 'opening_blocked');
+        $this->assertSame(1, DB::table('journal_entries')->where('source_type', FuelOpeningBalance::class)->count());
+    }
+
+    #[Test]
+    public function the_organization_default_account_can_be_set_inherited_by_the_station_and_cleared(): void
+    {
+        $w = $this->openingWorld(configureAccount: false);
+        $t = $w['owner_token'];
+        $station = "/api/fuel-stations/stations/{$w['station']->id}/settings";
+        $account = $w['opening_account']->id;
+
+        $this->withToken($t)->putJson('/api/fuel-stations/settings', ['fuel_opening_balance_account_id' => $account, 'reason' => 'fuel_opening_balance_wizard'])
+            ->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', $account);
+        $this->withToken($t)->getJson($station)->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', $account); // موروث
+        // المسح (null من شاشة الإعدادات) يُفرغ فعلاً ولا يبقى القديم.
+        $this->withToken($t)->putJson('/api/fuel-stations/settings', ['fuel_opening_balance_account_id' => null])->assertOk();
+        $this->withToken($t)->getJson('/api/fuel-stations/settings')->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', fn ($value) => $value === null || $value === '');
+        $this->withToken($t)->getJson($station)->assertOk()->assertJsonPath('data.fuel_opening_balance_account_id', fn ($value) => $value === null || $value === '');
+        $draft = $this->withToken($t)->postJson(self::BASE, $this->openingPayload($w))->assertCreated()->json('data.id');
+        $this->withToken($t)->getJson(self::BASE . "/{$draft}/preview")->assertOk()->assertJsonPath('data.ready', false); // بلا fallback بعد المسح
+    }
+
+    #[Test]
+    public function a_station_manager_without_finance_authority_can_prepare_the_draft_but_not_post_it(): void
+    {
+        $w = $this->openingWorld();
+        $manager = $this->userWith($w, 'fob-mgr', ['fuel_stations.view', 'fuel_stations.manage', 'accounts.view']);
+        $body = $this->openingPayload($w);
+        unset($body['costs']);
+        $id = $this->withToken($manager['token'])->postJson(self::BASE, $body)->assertCreated()->assertJsonMissingPath('data.total_value_minor')->json('data.id');
+        $this->withToken($manager['token'])->getJson(self::BASE . "/{$id}/preview")->assertOk()->assertJsonMissingPath('data.journal');
+        $this->withToken($manager['token'])->postJson(self::BASE . "/{$id}/post")->assertForbidden();
+        $this->assertSame('draft', FuelOpeningBalance::findOrFail($id)->status);
+    }
 }

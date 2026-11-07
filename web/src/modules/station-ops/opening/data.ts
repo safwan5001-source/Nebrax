@@ -5,7 +5,7 @@ import { StationOpsError } from '../read-client';
 import type { Station } from '../schemas';
 import { useScopedQuery, type QueryState, type ScopedQuery } from '../use-scoped-query';
 import { openingAccess, type OpeningAccess } from './access';
-import { getOpeningDoc, getOpeningPreview, getStationOpeningAccount, getTenantOpeningAccount, isValidDocId, listLedgerAccounts, listOpeningDocs } from './opening-client';
+import { getOpeningDoc, getOpeningPreview, getStationOpeningSettings, getTenantOpeningAccount, isValidDocId, listLedgerAccounts, listOpeningDocs } from './opening-client';
 import type { OpeningAccount, OpeningDoc, OpeningPreview } from './schemas';
 
 /** خطّافات القراءة. المفتاح يحمل (مستأجر|مستخدم|فرع) ثم المحطة فلا تسرّب ولا سباق (`useScopedQuery`). بلا صلاحية العرض لا يُرسَل أي طلب. */
@@ -38,18 +38,18 @@ export function useOpeningAccounts(): ScopedQuery<OpeningAccount[]> & { allowed:
   return { allowed: access.accounts, state: query.state, reload: query.reload };
 }
 
-export interface ConfiguredAccounts { station: string | null; tenant: string | null }
+export interface ConfiguredAccounts { station: string | null; tenant: string | null; distinctApprover: boolean | null }
 
 /** الحساب المعيَّن فعلاً للمحطة (الفعّال) وافتراضي المؤسسة — لتمييز المصدر. فشل افتراضي المؤسسة لا يُسقط الأول (يُعامل «غير معروف» = null). */
 export function useConfiguredAccounts(station: Station): ScopedQuery<ConfiguredAccounts> {
   const { scopeKey } = useStationOps();
   const access = useOpeningAccess();
   const query = useScopedQuery<ConfiguredAccounts>(access.view ? `${scopeKey}|${station.id}|opening|settings` : null, async (signal) => {
-    const [stationAccount, tenantAccount] = await Promise.all([
-      getStationOpeningAccount(station.id, { signal, branchId: station.branch_id }),
+    const [stationSettings, tenantAccount] = await Promise.all([
+      getStationOpeningSettings(station.id, { signal, branchId: station.branch_id }),
       getTenantOpeningAccount({ signal }).catch((error: unknown) => { if ((error as { name?: string })?.name === 'AbortError') throw error; return null; }),
     ]);
-    return { station: stationAccount, tenant: tenantAccount };
+    return { station: stationSettings.account, tenant: tenantAccount, distinctApprover: stationSettings.distinctApprover };
   });
   return query;
 }

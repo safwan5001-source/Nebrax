@@ -475,6 +475,52 @@ describe('step 3 — review, preview and approval', () => {
   });
 });
 
+describe('separation of duties (distinct approver policy)', () => {
+  it('the creator is told up front that someone else must approve, cannot click Approve, and nothing is posted', async () => {
+    seedUser(FINANCE);
+    connect(build({ distinctApprover: true }));
+    const user = userEvent.setup();
+    renderOps(<OpeningWizardScreen />);
+    await toReview(user);
+    await screen.findByText('Ready to approve');
+    expect(await screen.findByText('Another person must approve')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Approve' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(writes().some((p) => p.path.endsWith('/post'))).toBe(false);
+    expect(world.docs[0].status).toBe('draft');
+  });
+
+  it('a different authorized user opens the saved draft from the same screen and approves it', async () => {
+    seedUser(FINANCE, 'u-approver');
+    connect(build({ distinctApprover: true, viewerId: 'u-approver', docs: [draftDoc({ created_by: 'u-creator' })], settings: { station: null, tenant: 'a-eq' } }));
+    const user = userEvent.setup();
+    renderOps(<OpeningWizardScreen />);
+    expect(await screen.findByText(/Continuing the saved draft/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Save draft & review' }));
+    await screen.findByText('Ready to approve');
+    expect(screen.queryByText('Another person must approve')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(await screen.findByRole('button', { name: 'Approve now' }));
+    expect(await screen.findByText('Opening balance approved')).toBeTruthy();
+    expect(world.docs[0].status).toBe('posted');
+  });
+
+  it('an unknown policy never blocks in the UI (the server decides) and a refusal is explained', async () => {
+    seedUser(FINANCE);
+    connect(build()); // المفتاح غائب من الإعدادات
+    world.distinctApprover = undefined;
+    const user = userEvent.setup();
+    renderOps(<OpeningWizardScreen />);
+    await toReview(user);
+    await screen.findByText('Ready to approve');
+    world.distinctApprover = true; // يُفعَّل بعد المعاينة: الخادم يرفض عند الاعتماد
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(await screen.findByRole('button', { name: 'Approve now' }));
+    expect(await screen.findByText(/someone other than the creator/)).toBeTruthy();
+    expect(world.docs[0].status).toBe('draft');
+  });
+});
+
 describe('resuming a saved draft', () => {
   it('prefills the quantities, costs and notes from the existing draft and continues it with PUT', async () => {
     seedUser(FINANCE);

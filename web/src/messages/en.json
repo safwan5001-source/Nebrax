@@ -10437,6 +10437,7 @@
     "varianceAccount": "Inventory variance account",
     "gainAccount": "Inventory gain account",
     "grniAccount": "Goods received not invoiced (GRNI) account",
+    "openingBalanceAccount": "Opening balance account (equity)",
     "fuelPriceTaxMode": "Fuel-price tax mode",
     "taxInclusive": "Price includes tax",
     "taxExclusive": "Price excludes tax",
@@ -16280,6 +16281,10 @@
       "blockers": "Fix these first",
       "warnings": "Notes",
       "needAuthority": "Approving needs finance permission. Your draft is saved for the approver.",
+      "distinctApprover": {
+        "title": "Another person must approve",
+        "body": "Station policy requires someone other than the creator to approve. Your draft is saved — an authorized colleague can open this screen, review it and approve."
+      },
       "confirmTitle": "Approve opening balance?",
       "confirmBody": "This adds the stock to the station and records the entry. It cannot be edited afterwards.",
       "confirmAction": "Approve now",

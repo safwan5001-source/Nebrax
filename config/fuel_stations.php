@@ -32,15 +32,17 @@ return [
     |--------------------------------------------------------------------------
     | FUEL-TANKS-V2 / PR-1: بوابة نشر مستند «رصيد افتتاحي للوقود»
     |--------------------------------------------------------------------------
-    | `false` (الافتراضي): كل مسارات `fuel-stations/opening-balances` تردّ 404، ولا يتغيّر أي سلوك قائم.
+    | `true` (الافتراضي منذ قرار تفعيل Beta — كل حسابات أَوْج الحالية تجريبية): المسارات مفتوحة لكل مستأجر مؤهَّل، أي من يملك قدرة `fuel_stations.core`
+    | والصلاحيات (`fuel_stations.view|manage`، والترحيل `fuel.governance.manage` + `products.view_cost`). **مفتاح الإيقاف:** `FUEL_OPENING_BALANCE_ENABLED=false`
+    | في بيئة النشر ⇒ كل مسارات `fuel-stations/opening-balances` تردّ 404 والخدمة ترفض، ولا يتغيّر أي سلوك قائم (الاستلام والجرد والمبيعات لا تقرأ هذا المفتاح).
     | الميزة تؤسّس رصيد وقود افتتاحياً لمجمّع (مخزن × منتج) **فارغ وبلا تاريخ** فقط، بقيد واحد
     | (مدين دور `inventory_asset` / دائن حساب الأرصدة الافتتاحية المعيَّن صراحةً في `fuel_opening_balance_account_id`
     | بلا افتراض ولا fallback) وبلا مورد ولا استلام ولا فاتورة شراء.
     |
-    | لا تُقلَب إلى `true` إلا بقرار تفعيل منسَّق مستقل بعد: (1) قرار المالك على حساب الطرف المقابل وقاعدة التقريب،
-    | (2) مراجعة المحاسب للقيد الناتج. انظر docs/fuel-stations/AWJ_FUEL_OPENING_BALANCE_PR1_REPORT.md.
+    | قبل أي إنتاج حقيقي (غير Beta) يلزم: مراجعة المحاسب للقيد الناتج بتكاليف حقيقية، وإعادة النظر في هذا الافتراضي.
+    | انظر docs/fuel-stations/AWJ_FUEL_OPENING_BALANCE_PR1_REPORT.md و…PR2_WIZARD_REPORT.md.
     */
-    'opening_balance_enabled' => (bool) env('FUEL_OPENING_BALANCE_ENABLED', false),
+    'opening_balance_enabled' => (bool) env('FUEL_OPENING_BALANCE_ENABLED', true),
 
     /*
     |--------------------------------------------------------------------------

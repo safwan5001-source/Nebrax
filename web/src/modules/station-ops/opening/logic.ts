@@ -231,3 +231,13 @@ export function draftMatchesBody(doc: OpeningDoc, body: DraftBody): boolean {
   }
   return true;
 }
+
+// ───────────────────────── فصل المعتمِد ─────────────────────────
+
+/**
+ * هل يمنع **فصل المعتمِد** (FUEL-B2) هذا المستخدم من اعتماد هذه المسودة؟ الخادم هو السلطة (`FUEL_DISTINCT_APPROVER_REQUIRED` عند الترحيل)؛ هذا إدراك مسبق يوفّر
+ * على المستخدم نقرة تُرفض حتماً. السياسة غير المعروفة (`null`) أو مسودة بلا منشئ معروف ⇒ لا حجب مسبق. لا يتجاوز المعالج هذا الضابط ولا يغيّره.
+ */
+export function blockedByDistinctApprover(policy: boolean | null, createdBy: string | null | undefined, viewerId: string): boolean {
+  return policy === true && !!createdBy && createdBy === viewerId;
+}

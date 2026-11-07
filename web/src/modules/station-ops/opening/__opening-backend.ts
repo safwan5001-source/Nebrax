@@ -23,6 +23,8 @@ export interface OpeningWorld {
   canSeeCost: boolean;
   /** منتجات مجمّعها غير فارغ (مانع POOL_NOT_EMPTY عند المعاينة والترحيل). */
   poolNotEmpty: Set<string>;
+  /** سياسة فصل المعتمِد الفعّالة للمحطة (FUEL-B2): المنشئ لا يعتمد مستنده. `undefined` ⇒ غير معروفة (المفتاح غائب من الإعدادات). */
+  distinctApprover?: boolean;
   posts: Post[];
   gets: string[];
   viewerId: string;
@@ -151,6 +153,7 @@ export function connectOpening(world: OpeningWorld, apiMock: { mockImplementatio
         const row = world.docs.find((d) => d.id === postMatch[1]);
         if (!row) throw new ApiError(404, 'not found', {});
         if (row.status === 'posted') { drop(); return { data: view(row), meta: { replayed: true } } as never; }
+        if (world.distinctApprover && row.created_by === world.viewerId) throw new ApiError(422, 'FUEL_DISTINCT_APPROVER_REQUIRED: سياسة المحطة تتطلب أن يعتمد الرصيد الافتتاحي للوقود مستخدمٌ غير الذي أنشأه.', {});
         const e = evaluate(row);
         if (e.blockers.length > 0) throw new ApiError(422, `${e.blockers[0].code}: x`, { message: 'x', reason: 'opening_blocked', blockers: e.blockers });
         row.status = 'posted'; row.total_value_minor = e.total; row.journal_entry_id = 'je-1'; row.posted_at = '2026-11-07T08:00:00+00:00';
@@ -174,7 +177,7 @@ export function connectOpening(world: OpeningWorld, apiMock: { mockImplementatio
     if (route === '/accounts') return { data: clone(world.accounts) } as never;
     if (route === '/fuel-stations/settings') return { data: { fuel_opening_balance_account_id: world.settings.tenant } } as never;
     const stationSettings = /^\/fuel-stations\/stations\/([\w-]+)\/settings$/.exec(route);
-    if (stationSettings) return { data: { fuel_opening_balance_account_id: world.settings.station ?? world.settings.tenant } } as never;
+    if (stationSettings) return { data: { fuel_opening_balance_account_id: world.settings.station ?? world.settings.tenant, ...(world.distinctApprover === undefined ? {} : { fuel_distinct_approver_required: world.distinctApprover }) } } as never;
     if (route === '/fuel-stations/opening-balances') {
       const rows = world.docs.filter((d) => !query.get('station_id') || d.station_id === query.get('station_id')).map(view);
       return { data: rows, meta: { current_page: 1, last_page: 1 } } as never;

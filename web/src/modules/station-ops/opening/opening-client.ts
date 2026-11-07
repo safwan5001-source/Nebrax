@@ -78,9 +78,10 @@ export async function getOpeningPreview(id: string, options: Omit<ReadOptions, '
   return (await openingGet(`${docPath(id)}/preview`, previewResponse, options)).data;
 }
 
-export async function getStationOpeningAccount(stationId: string, options: Omit<ReadOptions, 'query'> = {}): Promise<string | null> {
+/** إعدادات المحطة الفعّالة ذات الصلة: حساب الأرصدة الافتتاحية، وسياسة فصل المعتمِد (`null` = غير معروفة ⇒ لا حجب مسبق، والخادم يحكم). */
+export async function getStationOpeningSettings(stationId: string, options: Omit<ReadOptions, 'query'> = {}): Promise<{ account: string | null; distinctApprover: boolean | null }> {
   const data = (await openingGet(stationSettingsPath(stationId), settingsResponse, options)).data;
-  return data.fuel_opening_balance_account_id ?? null;
+  return { account: data.fuel_opening_balance_account_id ?? null, distinctApprover: typeof data.fuel_distinct_approver_required === 'boolean' ? data.fuel_distinct_approver_required : null };
 }
 
 export async function getTenantOpeningAccount(options: Omit<ReadOptions, 'query'> = {}): Promise<string | null> {
