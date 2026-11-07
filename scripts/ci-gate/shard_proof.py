@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
-"""Exactly-once proof for a sharded test suite (PG-SHARD-GATE-1).
+"""Exactly-once proof for a sharded test suite (PG-SHARD-GATE-1/2).
 
 The `proof` job of a CI Gate shard group runs this over the artifacts of every shard job. It fails (exit 1,
-every violation printed) unless the shards TOGETHER ran each test exactly once:
+every violation printed) unless the shards TOGETHER ran each test exactly once, judged by TEST IDENTITY
+(`Class::method` plus the data-set key), not by counts or file names alone.
 
   per shard k in 1..N, directory <root>/shard-k/ with
     all_files.txt   test files discovered by the selector BEFORE selection
     assigned.txt    the files assigned to this shard
     inventory.txt   `phpunit --list-tests` of the UNSHARDED configuration, as seen by this shard
     planned.txt     `phpunit --list-tests` of the SHARDED configuration of this shard
-    junit.xml       what the shard actually executed
+    junit.xml       what the shard actually executed (`--log-junit`, ParaTest-merged)
   <root>/tracked_test_files.txt   `git ls-files` test files (the tree under test)
 
+Identity formats (verified against PHPUnit 11.5 + ParaTest 7 + Laravel `artisan test --parallel`):
+  list-tests   ` - Tests\\Feature\\XTest::method`   ` - …::method#3`   ` - …::method"label"`
+  JUnit        class="Tests\\Feature\\XTest" name="method"   name="method with data set #3"   name='method with data set "label"'
+Both reduce to one canonical id: `Class::method` or `Class::method with data set #3` / `… "label"`.
+
 Invariants (each is an error when violated):
-  1. exactly N shard directories, no extra, every required file present and non-empty;
+  1. exactly N shard directories, no extra; every artifact present, non-empty and well-formed (the list header is
+     present and every entry parses; JUnit parses, has testcases, and its own `tests` summary equals the testcases);
   2. every shard discovered the same files, and they include every tracked test file;
   3. assignments are pairwise disjoint (no duplicate), their union is the discovered set (no drop), and each
      equals the pure function `assign()` (manifest entry, else sha1 mod N): nobody hand-edited a list;
   4. the unsharded inventory is identical in every shard and non-empty;
-  5. the union of the planned lists equals that inventory as a multiset (no test dropped, none duplicated);
-  6. per shard: executed test count == planned count, no failure/error, executed files are inside the assignment.
+  5. the union of the planned lists equals that inventory as a multiset of ids (none dropped, none duplicated);
+  6. per shard, the EXECUTED ids equal the PLANNED ids as a multiset: a test that did not run, ran twice, ran with a
+     different identity (same count), or ran in the wrong shard is named; no failures; executed files are inside the
+     shard's assignment.
 
-Planned lists are only ever compared with inventories (same producer, same format); executed results are compared
-by count and by file, never by re-parsing `--list-tests` text into JUnit names. Stdlib only.
+Stdlib only.
 """
 from __future__ import annotations
 
@@ -37,6 +45,10 @@ from pathlib import Path
 
 REQUIRED = ("all_files.txt", "assigned.txt", "inventory.txt", "planned.txt", "junit.xml")
 TEST_FILE = re.compile(r"(tests/(?:Feature|Unit)/.+)$")
+LIST_HEADER = "Available tests:"
+LIST_ENTRY = re.compile(r"^ - (\S.*)$")
+LIST_ID = re.compile(r"^(?P<cls>[A-Za-z_\\][A-Za-z0-9_\\]*)::(?P<m>[A-Za-z_][A-Za-z0-9_]*)(?P<ds>#.+|\".*\")?$", re.S)
+EXAMPLES = 3
 
 
 def assign(path: str, n: int, manifest: dict) -> int:
@@ -47,43 +59,71 @@ def assign(path: str, n: int, manifest: dict) -> int:
     return int(hashlib.sha1(path.encode("utf-8")).hexdigest(), 16) % n
 
 
+def canonical(cls: str, method: str, dataset: str | None) -> str:
+    return f"{cls}::{method}" + (f" with data set {dataset}" if dataset else "")
+
+
+def parse_list(text: str) -> tuple[list[str], list[str]]:
+    """(canonical ids, problems) for a `phpunit --list-tests` output. Strict after the header: truncated or
+    garbled output must not look like a smaller suite."""
+    ids, problems, seen = [], [], False
+    for raw in text.splitlines():
+        line = raw.rstrip("\r")
+        if not seen:
+            seen = line.strip() == LIST_HEADER
+            continue
+        if not line.strip():
+            continue
+        m = LIST_ENTRY.match(line)
+        idm = LIST_ID.match(m.group(1)) if m else None
+        if idm is None:
+            problems.append(f"unparseable line {line[:80]!r}")
+            continue
+        ids.append(canonical(idm["cls"], idm["m"], idm["ds"]))
+    if not seen:
+        problems.append(f"missing header {LIST_HEADER!r} (empty, truncated or not a --list-tests output)")
+    return ids, problems
+
+
+def parse_junit(p: Path) -> tuple[list[tuple[str, str, bool]], list[str]]:
+    """([(canonical id, test file, failed)], problems) from a JUnit log."""
+    root = ET.parse(p).getroot()
+    problems: list[str] = []
+    if root.tag not in ("testsuites", "testsuite"):
+        return [], [f"unexpected root element {root.tag!r}"]
+    class_file = {s.get("name"): s.get("file") for s in root.iter("testsuite") if s.get("file") and "::" not in (s.get("name") or "")}
+    rows, total = [], 0
+    for tc in root.iter("testcase"):
+        total += 1
+        cls, name = tc.get("class") or "", tc.get("name") or ""
+        if not cls or not name:
+            problems.append("a testcase lacks class or name")
+            continue
+        f = (tc.get("file") or class_file.get(cls) or "").replace("\\", "/")
+        m = TEST_FILE.search(f)
+        failed = any(ch.tag.lower() in ("failure", "error") for ch in tc)
+        rows.append((f"{cls}::{name}", m.group(1) if m else (f or "?"), failed))
+    if not rows:
+        problems.append("no testcases")
+    tops = [s for s in (root if root.tag == "testsuites" else [root]) if s.tag == "testsuite"]
+    claimed = [s.get("tests") for s in tops]
+    if claimed and all(c is not None and c.isdigit() for c in claimed) and sum(int(c) for c in claimed) != total:
+        problems.append(f"summary says {sum(int(c) for c in claimed)} tests but the log holds {total} (truncated or altered)")
+    return rows, problems
+
+
 def _lines(p: Path) -> list[str]:
     return [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
-def _tests(p: Path) -> list[str]:
-    """`--list-tests` entries (` - Class::method ...`)."""
-    out = []
-    for l in p.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^\s*-\s+(\S.*)$", l)
-        if m:
-            out.append(m.group(1).strip())
-    return out
-
-
-def _junit(p: Path) -> tuple[int, int, set[str]]:
-    """(testcases, failing testcases, test files executed)."""
-    root = ET.parse(p).getroot()
-    class_file = {}
-    for s in root.iter("testsuite"):
-        if s.get("file") and "::" not in (s.get("name") or ""):
-            class_file[s.get("name")] = s.get("file")
-    total = bad = 0
-    files: set[str] = set()
-    for tc in root.iter("testcase"):
-        total += 1
-        if any(ch.tag.lower() in ("failure", "error") for ch in tc):
-            bad += 1
-        f = class_file.get(tc.get("class") or "") or tc.get("file") or ""
-        m = TEST_FILE.search(f.replace("\\", "/"))
-        files.add(m.group(1) if m else (f or "?"))
-    return total, bad, files
+def _diff(a: collections.Counter, b: collections.Counter) -> list[str]:
+    return [f"{k!r}x{n}" if n > 1 else repr(k) for k, n in list((a - b).items())[:EXAMPLES]]
 
 
 def verify(root: Path, shards: int, manifest: dict | None = None) -> list[str]:
     manifest = manifest or {}
     errors: list[str] = []
-    if not isinstance(shards, int) or shards < 2:
+    if not isinstance(shards, int) or isinstance(shards, bool) or shards < 2:
         return [f"shard count must be an integer >= 2, got {shards!r}"]
     present = sorted(d.name for d in root.glob("shard-*") if d.is_dir())
     wanted = [f"shard-{k}" for k in range(1, shards + 1)]
@@ -96,12 +136,24 @@ def verify(root: Path, shards: int, manifest: dict | None = None) -> list[str]:
         if missing:
             errors.append(f"shard {k}: missing {missing}")
             continue
+        empty = [f for f in REQUIRED if (d / f).stat().st_size == 0]
+        if empty:
+            errors.append(f"shard {k}: empty artifact {empty}")
+            continue
         try:
-            data[k] = {"all": _lines(d / "all_files.txt"), "assigned": _lines(d / "assigned.txt"),
-                       "inventory": _tests(d / "inventory.txt"), "planned": _tests(d / "planned.txt"),
-                       "junit": _junit(d / "junit.xml")}
+            inv, p1 = parse_list((d / "inventory.txt").read_text(encoding="utf-8"))
+            pln, p2 = parse_list((d / "planned.txt").read_text(encoding="utf-8"))
+            exe, p3 = parse_junit(d / "junit.xml")
+            all_files, assigned = _lines(d / "all_files.txt"), _lines(d / "assigned.txt")
         except (ET.ParseError, OSError, UnicodeDecodeError) as e:
             errors.append(f"shard {k}: unreadable artifact ({e})")
+            continue
+        for name, probs in (("inventory.txt", p1), ("planned.txt", p2), ("junit.xml", p3)):
+            for pr in probs[:EXAMPLES]:
+                errors.append(f"shard {k}: {name}: {pr}")
+        if p1 or p2 or p3:
+            continue
+        data[k] = {"all": all_files, "assigned": assigned, "inventory": inv, "planned": pln, "executed": exe}
     tp = root / "tracked_test_files.txt"
     tracked = set(_lines(tp)) if tp.is_file() else None
     if tracked is None:
@@ -147,20 +199,33 @@ def verify(root: Path, shards: int, manifest: dict | None = None) -> list[str]:
     if not inventory:
         errors.append("the unsharded inventory is empty")
     planned_union: collections.Counter = collections.Counter()
-    for v in data.values():
+    planned_in: dict[str, set[int]] = collections.defaultdict(set)
+    for k, v in data.items():
         planned_union.update(v["planned"])
+        for t in v["planned"]:
+            planned_in[t].add(k)
     if planned_union != inventory:
-        lost = list((inventory - planned_union).items())[:3]
-        extra = list((planned_union - inventory).items())[:3]
-        errors.append(f"union of planned tests != unsharded inventory (dropped {lost}, duplicated/extra {extra})")
+        errors.append(f"union of planned tests != unsharded inventory (dropped {_diff(inventory, planned_union)}, "
+                      f"duplicated/extra {_diff(planned_union, inventory)})")
 
     for k, v in data.items():
-        total, bad, files = v["junit"]
-        if total != len(v["planned"]):
-            errors.append(f"shard {k}: executed {total} tests but planned {len(v['planned'])}")
+        planned, ran = collections.Counter(v["planned"]), collections.Counter(t for t, _, _ in v["executed"])
+        if not planned:
+            errors.append(f"shard {k}: planned no tests")
+        if ran != planned:
+            missing, extra = _diff(planned, ran), _diff(ran, planned)
+            elsewhere = [f"{t} (planned in shard {sorted(planned_in[t])})" for t in list(ran - planned)
+                         if t in planned_in and k not in planned_in[t]][:EXAMPLES]
+            msg = f"shard {k}: executed tests differ from the plan (not executed {missing}, unplanned/duplicated {extra})"
+            if elsewhere:
+                msg += f"; executed in the wrong shard: {elsewhere}"
+            errors.append(msg)
+        elif sum(ran.values()) != sum(planned.values()):  # unreachable by construction; kept as a belt for refactors
+            errors.append(f"shard {k}: executed {sum(ran.values())} tests but planned {sum(planned.values())}")
+        bad = sum(1 for _, _, failed in v["executed"] if failed)
         if bad:
             errors.append(f"shard {k}: {bad} failing test(s)")
-        outside = sorted(files - set(v["assigned"]))
+        outside = sorted({f for _, f, _ in v["executed"]} - set(v["assigned"]))
         if outside:
             errors.append(f"shard {k}: executed files outside its assignment: {outside[:3]}")
     return errors
