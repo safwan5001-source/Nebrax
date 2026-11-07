@@ -464,7 +464,9 @@ class Settings
             'fuel_sales_allowed_payment_method_ids' => [],
             'fuel_sales_allow_deferred_payment' => false,
             // #2021 (D1): أساس «النقد المتوقع» للوردية. movements_only (الافتراضي = السلوك الحالي) |
-            // receiving_shift_receipts (يضيف نقد المبيعات المحصَّل فعلاً في هذه الوردية). خلف بوابة نشر مغلقة.
+            // receiving_shift_receipts (يضيف نقد المبيعات المحصَّل فعلاً في هذه الوردية؛ خلف FUEL_SHIFT_CASH_RECEIPTS_ENABLED) |
+            // declared_collection (يعتمد النقد المُقَرّ به في إقرار تحصيل الوردية مصدراً وحيداً لنقد المبيعات؛ خلف FUEL_SHIFT_COLLECTION_DECLARATION_ENABLED).
+            // كلاهما مغلق افتراضياً، والافتراضي يحمي المستأجرين القائمين.
             'shift_expected_cash_basis' => 'movements_only',
             // Cycle 9: الصيانة والسلامة والتقارير تبقى سياسات قابلة للوراثة
             // ولا تخلق قيداً أو أمراً لجهاز أو إجراءً خلفياً تلقائياً.

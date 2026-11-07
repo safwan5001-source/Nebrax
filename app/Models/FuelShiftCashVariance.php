@@ -26,7 +26,7 @@ class FuelShiftCashVariance extends BaseModel
         'expected_operational_cash_minor', 'counted_cash_minor', 'variance_minor', 'variance_direction',
         'status', 'note', 'counted_by', 'reviewed_by', 'counted_at', 'reviewed_at',
         // #2021 (D2): مكوّنات الصورة المجمَّدة عند الإغلاق.
-        'documented_official_cash_receipts_minor', 'documented_treasury_handover_minor', 'registered_network_receipts_minor',
+        'documented_official_cash_receipts_minor', 'documented_declared_cash_minor', 'documented_treasury_handover_minor', 'registered_network_receipts_minor',
         'official_cash_basis', 'expectation_complete', 'incompleteness',
     ];
 
@@ -41,6 +41,7 @@ class FuelShiftCashVariance extends BaseModel
         'counted_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'documented_official_cash_receipts_minor' => 'integer',
+        'documented_declared_cash_minor' => 'integer',
         'documented_treasury_handover_minor' => 'integer',
         'registered_network_receipts_minor' => 'integer',
         'expectation_complete' => 'boolean',

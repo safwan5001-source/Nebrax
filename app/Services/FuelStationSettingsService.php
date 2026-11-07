@@ -470,8 +470,11 @@ class FuelStationSettingsService
         }
 
         if ($key === 'shift_expected_cash_basis') {
-            if (! is_string($value) || ! in_array($value, ['movements_only', 'receiving_shift_receipts'], true)) {
-                throw new RuntimeException('أساس النقد المتوقع يجب أن يكون movements_only أو receiving_shift_receipts.');
+            if (! is_string($value) || ! in_array($value, ['movements_only', 'receiving_shift_receipts', 'declared_collection'], true)) {
+                throw new RuntimeException('أساس النقد المتوقع يجب أن يكون movements_only أو receiving_shift_receipts أو declared_collection.');
+            }
+            if ($value === 'declared_collection' && ! (bool) config('fuel_stations.shift_collection_declaration_enabled', false)) {
+                throw new RuntimeException('إقرار تحصيل الوردية غير مفعّل في هذا النشر؛ يبقى الأساس movements_only.');
             }
             if ($value === 'receiving_shift_receipts' && ! (bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
                 throw new RuntimeException('ربط نقد المبيعات بوردية الاستلام غير مفعّل في هذا النشر؛ يبقى الأساس movements_only.');

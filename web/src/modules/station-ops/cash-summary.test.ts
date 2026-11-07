@@ -124,3 +124,52 @@ describe('cash summary copy', () => {
     for (const key of Object.keys(enFlat)) expect(placeholders(arFlat[key])).toEqual(placeholders(enFlat[key]));
   });
 });
+
+describe('declared_collection basis (P1-2)', () => {
+  const declared = (over: Partial<CashSummary> = {}) => base({
+    basis: 'declared_collection',
+    components: {
+      opening_float_minor: 20_000,
+      official_cash_receipts: { available: false, amount_minor: null, count: null, reason: 'basis_not_enabled' },
+      declared_cash: { available: true, amount_minor: 20_000, reason: null },
+      cash_in_minor: 0, cash_out_minor: 0, treasury_handover_minor: 0, expenses_minor: 0,
+    },
+    expected_cash_minor: 40_000, expected_cash_partial_minor: 40_000,
+    ...over,
+  });
+
+  it('accepts the new basis and labels the sales row as declared (never collected), using the declared amount alone', () => {
+    expect(cashSummarySchema.safeParse(declared()).success).toBe(true);
+    const view = buildCashSummaryView(declared());
+    expect(view.rows.map((r) => r.key)).toContain('declaredSales');
+    expect(view.rows.map((r) => r.key)).not.toContain('sales');
+    const amounts = Object.fromEntries(view.rows.map((row) => [row.key, row.amountMinor]));
+    expect(amounts.declaredSales).toBe(20_000);
+    expect(view.rows.reduce((sum, row) => sum + row.sign * (row.amountMinor ?? 0), 0)).toBe(40_000);
+  });
+
+  it('a missing declaration shows the row as not declared and the total as partial', () => {
+    const view = buildCashSummaryView(declared({
+      components: { ...declared().components, declared_cash: { available: false, amount_minor: null, reason: 'not_declared' } },
+      expected_complete: false, expected_cash_minor: null, expected_cash_partial_minor: 20_000, incompleteness: ['collection_not_declared'],
+    }));
+    const row = view.rows.find((r) => r.key === 'declaredSales');
+    expect(row).toMatchObject({ amountMinor: null, unavailable: 'not_declared' });
+    expect(view.expected).toEqual({ kind: 'partial', amountMinor: 20_000 });
+  });
+
+  it('an older server without the declared component still renders the receipts row', () => {
+    const view = buildCashSummaryView(base());
+    expect(view.rows.map((r) => r.key)).toContain('sales');
+  });
+
+  it('every new message key exists in both locales', () => {
+    for (const bundle of [ar, en] as const) {
+      const cs = (bundle as any).stationOps.shiftDetail.cashSummary;
+      expect(typeof cs.row.declaredSales).toBe('string');
+      expect(typeof cs.unavailable.not_declared).toBe('string');
+      expect(typeof cs.gap.collection_not_declared).toBe('string');
+      expect(typeof cs.gap.declared_cash_below_recorded_receipts).toBe('string');
+    }
+  });
+});

@@ -17,6 +17,7 @@ function rowLabel(t: Translate, key: CashRowKey): string {
   switch (key) {
     case 'opening': return t('shiftDetail.cashSummary.row.opening');
     case 'sales': return t('shiftDetail.cashSummary.row.sales');
+    case 'declaredSales': return t('shiftDetail.cashSummary.row.declaredSales');
     case 'cashIn': return t('shiftDetail.cashSummary.row.cashIn');
     case 'handover': return t('shiftDetail.cashSummary.row.handover');
     case 'otherOut': return t('shiftDetail.cashSummary.row.otherOut');
@@ -28,6 +29,7 @@ function unavailableText(t: Translate, reason: UnavailableReason): string {
   switch (reason) {
     case 'permission': return t('shiftDetail.cashSummary.unavailable.permission');
     case 'basis_not_enabled': return t('shiftDetail.cashSummary.unavailable.basis_not_enabled');
+    case 'not_declared': return t('shiftDetail.cashSummary.unavailable.not_declared');
     case 'not_recorded_legacy': return t('shiftDetail.cashSummary.unavailable.not_recorded_legacy');
     default: return t('shiftDetail.cashSummary.unavailable.unknown');
   }
@@ -36,6 +38,8 @@ function unavailableText(t: Translate, reason: UnavailableReason): string {
 function gapText(t: Translate, code: string, unattributedCount: number): string | null {
   switch (code) {
     case 'sales_cash_not_included': return t('shiftDetail.cashSummary.gap.sales_cash_not_included');
+    case 'collection_not_declared': return t('shiftDetail.cashSummary.gap.collection_not_declared');
+    case 'declared_cash_below_recorded_receipts': return t('shiftDetail.cashSummary.gap.declared_cash_below_recorded_receipts');
     case 'permission_sales_view': return t('shiftDetail.cashSummary.gap.permission_sales_view');
     case 'unattributed_cash_receipts': return t('shiftDetail.cashSummary.gap.unattributed_cash_receipts', { count: String(unattributedCount) });
     case 'multiple_cash_accounts': return t('shiftDetail.cashSummary.gap.multiple_cash_accounts');

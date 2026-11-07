@@ -51,7 +51,7 @@ class FuelShiftResource extends JsonResource
 
         // البوابة مغلقة الآن لكن الوردية أُغلقت تحت أساس يشمل نقد المبيعات: لقطتها المجمَّدة تحمله فتبقى محجوبة (لا تعتمد على
         // قيمة البوابة الحالية وحدها). الأساس المخزَّن في لقطة الفرق هو المرجع.
-        return $this->resource->cashVariance?->official_cash_basis === 'receiving_shift_receipts';
+        return in_array($this->resource->cashVariance?->official_cash_basis, ['receiving_shift_receipts', 'declared_collection'], true);
     }
 
     /** @param array<string,mixed>|null $payload @return array<string,mixed>|null */
