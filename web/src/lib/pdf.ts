@@ -12,10 +12,26 @@ const A4: PdfPaper = { widthMm: 210, heightMm: 297 };
 
 type PdfImageSlice = { top: number; height: number };
 
+/** تسامح التقريب بالبكسل: ما زاد عن الصفحة بهذا القدر لا يستحق صفحة جديدة. */
+const PAGE_FIT_TOLERANCE_PX = 2;
+/** أصغر ذيل مقبول (نسبة من ارتفاع الصفحة) حين يُختار قطع مبكّر لتفادي صفحة أخيرة هزيلة. */
+const MIN_TAIL_RATIO = 0.1;
+/** هامش أمان أسفل آخر حبر عند قصّ الفراغ الختامي (بكسل كانفاس). */
+const CONTENT_BOTTOM_PAD_PX = 16;
+/** القناة التي تُعدّ فوقها البكسل «بياضاً» عند البحث عن آخر حبر. */
+const BLANK_CHANNEL_MIN = 250;
+
 /**
- * يقسم الصورة الطويلة إلى شرائح A4، مع تفضيل آخر حد آمن قبل نهاية الصفحة.
+ * يقسم الصورة الطويلة إلى شرائح بحجم الصفحة، مع تفضيل آخر حد آمن قبل نهاية الصفحة.
  * الحد الآمن يأتي من نهاية صف جدول أو نهاية قسم مستند؛ يبقى السقوط إلى الحد
  * الحسابي للكتل الأطول من صفحة، كي لا تتعطل المخرجات عند نص استثنائي طويل.
+ *
+ * قاعدتان تمنعان الصفحات اليتيمة (AWJ-DOC-V2-PR1):
+ *  1) ما بقي من المحتوى إن اتّسع في صفحة واحدة يُؤخذ كاملاً — لا يُقطع عند آخر حد آمن
+ *     (كان ذلك يترك التذييل وحده في صفحة جديدة).
+ *  2) عند الحاجة لقطع، يُفضَّل أقرب حد آمن يترك ذيلاً لا يقل عن `MIN_TAIL_RATIO` من الصفحة
+ *     (فتنتقل كتلة الإجماليات مع التذييل معاً بدل سطر تذييل يتيم)، وإن لم يوجد حد كهذا
+ *     يُستعمل آخر حد آمن كما كان.
  */
 export function getPdfImageSlices(
   imageHeight: number,
@@ -25,18 +41,69 @@ export function getPdfImageSlices(
   const normalizedBreaks = [...new Set(safeBreaks)]
     .filter((point) => point > 0 && point < imageHeight)
     .sort((left, right) => left - right);
+  const minSlice = Math.max(pageHeight * 0.25, 48);
+  const minTail = Math.max(pageHeight * MIN_TAIL_RATIO, 48);
   const slices: PdfImageSlice[] = [];
   let top = 0;
 
   while (top < imageHeight) {
-    const nominalEnd = Math.min(top + pageHeight, imageHeight);
-    const candidate = normalizedBreaks.filter((point) => point > top && point <= nominalEnd).at(-1);
-    const end = candidate && candidate - top >= Math.max(pageHeight * 0.25, 48) ? candidate : nominalEnd;
+    if (imageHeight - top <= pageHeight + PAGE_FIT_TOLERANCE_PX) {
+      slices.push({ top, height: imageHeight - top });
+      break;
+    }
+
+    const nominalEnd = top + pageHeight;
+    const candidates = normalizedBreaks
+      .filter((point) => point > top && point <= nominalEnd && point - top >= minSlice)
+      .sort((left, right) => right - left);
+    const balanced = candidates.find((point) => {
+      const tail = imageHeight - point;
+      return tail >= minTail;
+    });
+    const end = balanced ?? candidates[0] ?? nominalEnd;
     slices.push({ top, height: end - top });
     top = end;
   }
 
   return slices;
+}
+
+/**
+ * آخر صف يحوي حبراً (غير أبيض) داخل مصفوفة RGBA، أو -1 إن كانت كلها بيضاء.
+ * دالة نقيّة للاختبار؛ `findContentHeight` تطبّقها على الكانفاس الحقيقي.
+ */
+export function findLastInkRow(data: ArrayLike<number>, width: number, rows: number): number {
+  for (let row = rows - 1; row >= 0; row -= 1) {
+    const base = row * width * 4;
+    for (let x = 0; x < width; x += 1) {
+      const i = base + x * 4;
+      if (data[i + 3] > 0 && (data[i] < BLANK_CHANNEL_MIN || data[i + 1] < BLANK_CHANNEL_MIN || data[i + 2] < BLANK_CHANNEL_MIN)) return row;
+    }
+  }
+  return -1;
+}
+
+/**
+ * ارتفاع المحتوى الفعلي بالكانفاس بعد قصّ الفراغ الأبيض الختامي (ينشأ من الارتفاع الأدنى
+ * للمستند والتذييل المثبَّت للأسفل). يعيد الارتفاع الكامل إن تعذّرت القراءة.
+ */
+export function findContentHeight(canvas: HTMLCanvasElement): number {
+  if (typeof canvas.getContext !== 'function') return canvas.height;
+  try {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return canvas.height;
+    const strip = 64;
+    for (let bottom = canvas.height; bottom > 0; bottom -= strip) {
+      const top = Math.max(0, bottom - strip);
+      const rows = bottom - top;
+      const { data } = context.getImageData(0, top, canvas.width, rows);
+      const last = findLastInkRow(data, canvas.width, rows);
+      if (last >= 0) return Math.min(canvas.height, top + last + 1 + CONTENT_BOTTOM_PAD_PX);
+    }
+  } catch {
+    /* كانفاس ملوّث أو سياق غير متاح — نُبقي الارتفاع الكامل */
+  }
+  return canvas.height;
 }
 
 function getSafeCanvasBreaks(el: HTMLElement, canvas: HTMLCanvasElement): number[] {
@@ -137,12 +204,74 @@ function revealDocumentForCapture(element: HTMLElement, restore: Array<[HTMLElem
   }
 }
 
+/** مصدر صور صفحات PDF: كانفاس حقيقي في المتصفح، أو بديل نقيّ في الاختبارات. */
+export interface PdfRaster {
+  width: number;
+  height: number;
+  /** PNG (data URL) للصفوف [top, top+height). */
+  slicePng(top: number, height: number): string;
+}
+
+export function canvasRaster(canvas: HTMLCanvasElement): PdfRaster {
+  return {
+    width: canvas.width,
+    height: canvas.height,
+    slicePng(top, height) {
+      if (top === 0 && height >= canvas.height) return canvas.toDataURL('image/png');
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = Math.ceil(height);
+      const context = pageCanvas.getContext('2d');
+      if (!context) throw new Error('تعذر إنشاء سياق رسم صفحة PDF');
+      context.drawImage(canvas, 0, top, canvas.width, height, 0, 0, canvas.width, height);
+      return pageCanvas.toDataURL('image/png');
+    },
+  };
+}
+
+type JsPdfConstructor = typeof import('jspdf').jsPDF;
+
+/**
+ * يجمّع ملف PDF من صورة المستند. `compress: true` يضغط الصور بلا فقد (Flate + مرشّح PNG) —
+ * بدونه يخزّن jsPDF البكسلات خاماً (≈5.6 MB لكل صفحة A4 بدقة scale:2).
+ * ليس ذلك علاجاً لغياب طبقة النص: الملف يبقى صورة (انظر تقرير DOC-P0-1).
+ */
+export function buildPdfBlob(
+  JsPdf: JsPdfConstructor,
+  raster: PdfRaster,
+  paper: PdfPaper,
+  safeBreaks: readonly number[],
+  contentHeight: number = raster.height,
+): Blob {
+  const pw = paper.widthMm;
+
+  // ارتفاع مفتوح (حراري): صفحة واحدة بمقاس المحتوى، بلا ترقيم صفحات.
+  if (paper.heightMm <= 0) {
+    const imgH = (raster.height * pw) / raster.width;
+    const pdf = new JsPdf({ unit: 'mm', format: [pw, imgH], orientation: 'portrait', compress: true });
+    pdf.addImage(raster.slicePng(0, raster.height), 'PNG', 0, 0, pw, imgH);
+    return pdf.output('blob');
+  }
+
+  // ورق ثابت (A4/Letter/Legal): إذا اتّسع المحتوى في صفحة واحدة يُرسَم كاملاً بلا تقطيع،
+  // وإلا يُقطَّع لشرائح بحدود آمنة عند صفوف الجدول وكتل المستند (انظر getPdfImageSlices).
+  const ph = paper.heightMm;
+  const pdf = new JsPdf({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait', compress: true });
+  const pageHeightPx = (ph * raster.width) / pw;
+  const content = Math.min(raster.height, Math.max(1, Math.ceil(contentHeight)));
+
+  getPdfImageSlices(content, pageHeightPx, safeBreaks).forEach((slice, index) => {
+    if (index > 0) pdf.addPage();
+    pdf.addImage(raster.slicePng(slice.top, slice.height), 'PNG', 0, 0, pw, (slice.height * pw) / raster.width);
+  });
+  return pdf.output('blob');
+}
+
 async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<Blob> {
   const [{ default: html2canvas }, jspdf] = await Promise.all([
     import('html2canvas'),
     import('jspdf'),
   ]);
-  const JsPDF = jspdf.jsPDF;
 
   // انتظار تحميل الخطوط (IBM Plex Sans Arabic) قبل الالتقاط — يمنع تشوّه تشكيل
   // العربية عند سقوط html2canvas إلى خطّ احتياطي لا يصل الحروف.
@@ -182,6 +311,7 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
   }
 
   let canvas: HTMLCanvasElement;
+  let safeBreaks: number[] = [];
   try {
     canvas = await html2canvas(el, {
       scale: 2,
@@ -191,49 +321,19 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
       // طبقة توافق العربية على نسخة الالتقاط وحدها — لا تمسّ المستند الحيّ.
       onclone: (_clonedDoc, clonedEl) => normalizePdfCloneForArabic(clonedEl),
     });
+    // الحدود الآمنة تُقاس والتحييد ما زال فعّالاً (قبل الاستعادة). قياسها بعد إعادة
+    // تحويل التصغير (DocumentScaler) على الجوال كان يُنتج إحداثيات مصغَّرة فتُقطع الصفوف
+    // وتختلف أعداد الصفحات بين سطح المكتب والجوال.
+    safeBreaks = getSafeCanvasBreaks(el, canvas);
   } finally {
     for (const [node, style] of restore) {
       if (style === null) node.removeAttribute('style');
       else node.setAttribute('style', style);
     }
   }
-  const img = canvas.toDataURL('image/png');
-  const pw = paper.widthMm;
-  const imgH = (canvas.height * pw) / canvas.width;
-
-  // ارتفاع مفتوح (حراري): صفحة واحدة بمقاس المحتوى، بلا ترقيم صفحات.
-  if (paper.heightMm <= 0) {
-    const pdf = new JsPDF({ unit: 'mm', format: [pw, imgH], orientation: 'portrait' });
-    pdf.addImage(img, 'PNG', 0, 0, pw, imgH);
-    return pdf.output('blob');
-  }
-
-  // ورق ثابت (A4/Letter/Legal): إذا اتّسع المحتوى في صفحة واحدة يُرسَم كاملاً
-  // بلا تقطيع (تحسين للفواتير القصيرة ومنع صفحات زائدة من أخطاء تقريب بكسل).
-  // وإلا يُقطَّع لشرائح بحدود آمنة عند صفوف الجدول وكتل المستند.
-  const ph = paper.heightMm;
-  const pdf = new JsPDF({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait' });
-  const pageHeightCanvas = (ph * canvas.width) / pw;
-
-  if (canvas.height <= pageHeightCanvas) {
-    pdf.addImage(img, 'PNG', 0, 0, pw, imgH);
-    return pdf.output('blob');
-  }
-
-  const slices = getPdfImageSlices(canvas.height, pageHeightCanvas, getSafeCanvasBreaks(el, canvas));
-
-  slices.forEach((slice, index) => {
-    if (index > 0) pdf.addPage();
-    const pageCanvas = document.createElement('canvas');
-    pageCanvas.width = canvas.width;
-    pageCanvas.height = Math.ceil(slice.height);
-    const context = pageCanvas.getContext('2d');
-    if (!context) throw new Error('تعذر إنشاء سياق رسم صفحة PDF');
-    context.drawImage(canvas, 0, slice.top, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-    const pageHeightMm = (slice.height * pw) / canvas.width;
-    pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, pw, pageHeightMm);
-  });
-  return pdf.output('blob');
+  // الحراري (ارتفاع مفتوح) يبقى بكامل ارتفاع الالتقاط؛ ورق الصفحات الثابت يُقصّ فراغه الختامي.
+  const contentHeight = paper.heightMm > 0 ? findContentHeight(canvas) : canvas.height;
+  return buildPdfBlob(jspdf.jsPDF, canvasRaster(canvas), paper, safeBreaks, contentHeight);
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

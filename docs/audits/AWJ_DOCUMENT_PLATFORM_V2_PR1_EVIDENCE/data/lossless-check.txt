@@ -1,0 +1,8 @@
+Lossless check: embedded page images stitched top-to-bottom, BEFORE (uncompressed) vs AFTER (compressed); desktop captures
+purchase-order-twenty-ltr          rows before=4088 after=4054 common rows identical=True | rows only in BEFORE are blank=True
+quotation-five-rtl                 rows before=2900 after=2854 common rows identical=True | rows only in BEFORE are blank=True
+simplified-retail-v2-three-rtl     rows before=1636 after=1613 common rows identical=True | rows only in BEFORE are blank=True
+tax-classic-v2-twenty-ltr          rows before=4500 after=4466 common rows identical=True | rows only in BEFORE are blank=True
+tax-erp-v2-multipage-rtl           rows before=5106 after=5091 common rows identical=True | rows only in BEFORE are blank=True
+tax-erp-v2-single-rtl              rows before=1398 after=1384 common rows identical=True | rows only in BEFORE are blank=True
+tax-modern-v2-long-rtl             rows before=2184 after=2144 common rows identical=True | rows only in BEFORE are blank=True
