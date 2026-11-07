@@ -86,7 +86,7 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     return json(route, { data: [] });
   });
   await page.addInitScript(([userJson, theme]) => {
-    localStorage.setItem('token', 'test-token'); localStorage.setItem('station_use_erp', '1');
+    localStorage.setItem('token', 'test-token'); localStorage.setItem('station_use_erp', JSON.parse(userJson).id);
     localStorage.setItem('user', userJson);
     localStorage.setItem('theme', theme);
   }, [JSON.stringify(user), opts.theme ?? 'light'] as const);

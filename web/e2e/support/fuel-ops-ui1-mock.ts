@@ -127,6 +127,6 @@ export async function mockOpsApi(page: Page, opts: { baseUrl: string; locale: Lo
     if (detail) return d.details[detail[1]] ? json(route, { data: d.details[detail[1]] }) : json(route, { message: 'not found' }, 404);
     return json(route, { data: [] });
   });
-  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', '1'); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
+  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', JSON.parse(u).id); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
   return { requests, issues, controls, data: d };
 }

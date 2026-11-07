@@ -177,7 +177,7 @@ export async function mockB5Api(page: Page, opts: { baseUrl: string; locale: Loc
     if (method !== 'GET') issues.push(`unexpected ${method} ${p}`);
     return json(route, { data: [] });
   });
-  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', '1'); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
+  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', JSON.parse(u).id); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
 
   return { controls, posts, requests, issues, deliveries, attachments, names: n };
 }

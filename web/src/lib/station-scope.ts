@@ -29,9 +29,19 @@ export function setStationToken(token: string): void {
   localStorage.setItem(STATION_TOKEN_KEY, token);
 }
 
-/** هل وافق المستخدم صراحةً على استعمال جلسة أَوْج داخل التطبيق (للمدير الذي يدخل بالبريد)؟ */
+/**
+ * هل وافق المستخدم صراحةً على استعمال جلسة أَوْج داخل التطبيق (للمدير الذي يدخل بالبريد)؟ الموافقة **مربوطة بمعرّف مستخدم أَوْج الذي وافق**:
+ * إن تغيّر المستخدم المسجَّل في أَوْج (دخل آخر في تبويب آخر) أو زالت جلسته فلا تصحّ الموافقة، فلا تنتقل هوية جديدة إلى التطبيق بموافقة قديمة.
+ */
 export function stationUsesErpSession(): boolean {
-  return typeof window !== 'undefined' && localStorage.getItem(STATION_USE_ERP_KEY) === '1';
+  if (typeof window === 'undefined') return false;
+  const approvedFor = localStorage.getItem(STATION_USE_ERP_KEY);
+  if (!approvedFor || getErpToken() === null) return false;
+  try {
+    return (JSON.parse(localStorage.getItem('user') ?? 'null') as { id?: unknown } | null)?.id === approvedFor;
+  } catch {
+    return false;
+  }
 }
 
 /** يمسح اعتماد المحطات وحده (توكن + مستخدم + موافقة استعمال أَوْج). جلسة أَوْج لا تُمسّ. */

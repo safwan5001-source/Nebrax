@@ -84,9 +84,19 @@ export async function stationLogin(employeeNo: string, pin: string): Promise<Aut
   return user;
 }
 
-/** موافقة صريحة على استعمال جلسة أَوْج الحالية داخل التطبيق (مدير دخل بالبريد). لا تنسخ التوكن ولا تغيّر جلسة أَوْج. */
+/**
+ * موافقة صريحة على استعمال جلسة أَوْج الحالية داخل التطبيق (مدير دخل بالبريد). لا تنسخ التوكن ولا تغيّر جلسة أَوْج، وتُربط بمعرّف مستخدم أَوْج الحالي
+ * (تبطل إن تغيّر المستخدم). دخول موظف بـPIN أو خروجه من التطبيق يمسحها (`clearStationSession`) فلا تتسرب إلى جلسة PIN ولا إلى تبديل الموظفين.
+ */
 export function continueStationWithErpSession(): void {
-  localStorage.setItem(STATION_USE_ERP_KEY, '1');
+  let userId: string | null = null;
+  try {
+    userId = (JSON.parse(localStorage.getItem('user') ?? 'null') as { id?: string } | null)?.id ?? null;
+  } catch {
+    userId = null;
+  }
+  if (userId === null || localStorage.getItem('token') === null) return;
+  localStorage.setItem(STATION_USE_ERP_KEY, userId);
   notifyAuthSessionChanged();
 }
 

@@ -163,6 +163,58 @@ describe('independent sign-out', () => {
     expect(getToken()).toBeNull();
   });
 
+  it('the ERP opt-in never bleeds into a PIN session or a later employee switch', async () => {
+    await erpSignIn();
+    setPath(OPS);
+    continueStationWithErpSession();
+    expect(ls('station_use_erp')).toBe('erp-1');
+    expect(getToken()).toBe('erp-token');
+
+    // دخول PIN يمسح الموافقة: الاعتماد الفعّال محطات فقط.
+    await stationSignIn('a', 'tok-a');
+    expect(ls('station_use_erp')).toBeNull();
+    setPath(OPS);
+    expect(getToken()).toBe('tok-a');
+    expect(currentUser()?.id).toBe('a');
+
+    // خروج الموظف (أو تبديله): لا رجوع إلى هوية أَوْج.
+    fetchSpy.mockResolvedValueOnce(res(200, { message: 'ok' }));
+    await logout();
+    expect(getToken()).toBeNull();
+    expect(currentUser()).toBeNull();
+    await stationSignIn('b', 'tok-b');
+    setPath(OPS);
+    fetchSpy.mockResolvedValueOnce(res(200, { message: 'ok' }));
+    await logout();
+    expect(getToken()).toBeNull();
+    expect(ls('token')).toBe('erp-token'); // جلسة أَوْج نفسها لم تُمسّ طوال ذلك
+  });
+
+  it('the opt-in is bound to the AWJ user who approved it: another AWJ user (or none) invalidates it', async () => {
+    await erpSignIn();
+    setPath(OPS);
+    continueStationWithErpSession();
+    expect(getToken()).toBe('erp-token');
+
+    // مستخدم أَوْج آخر دخل في تبويب آخر.
+    localStorage.setItem('user', JSON.stringify({ ...erpUser, id: 'erp-2', name: 'Someone Else' }));
+    expect(getToken()).toBeNull();
+    expect(currentUser()).toBeNull();
+    expect(isAuthenticated()).toBe(false);
+
+    // وإن زالت جلسة أَوْج كلياً.
+    localStorage.setItem('user', JSON.stringify(erpUser));
+    expect(getToken()).toBe('erp-token');
+    localStorage.removeItem('token');
+    expect(getToken()).toBeNull();
+  });
+
+  it('opting in without an AWJ session does nothing', () => {
+    setPath(OPS);
+    continueStationWithErpSession();
+    expect(ls('station_use_erp')).toBeNull();
+  });
+
   it('station logout clears the device even when the network fails (shared device is never left signed in)', async () => {
     await stationSignIn('a', 'tok-station');
     setPath(OPS);

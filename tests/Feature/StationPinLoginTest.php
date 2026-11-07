@@ -314,18 +314,164 @@ class StationPinLoginTest extends TestCase
     }
 
     /** @test */
-    public function the_allowlist_contains_only_station_operations_prefixes_and_no_pin_management(): void
+    public function the_allowlist_is_least_privilege_reads_by_prefix_and_writes_by_explicit_method_and_route(): void
     {
-        foreach (StationSessionBoundary::allowedPrefixes() as $prefix) {
+        foreach (StationSessionBoundary::readPrefixes() as $prefix) {
             $this->assertStringStartsWith('fuel-stations/', $prefix);
         }
-        $this->assertTrue(StationSessionBoundary::uriAllowed('api/me'));
-        $this->assertTrue(StationSessionBoundary::uriAllowed('api/fuel-stations/shifts/{id}/collection'));
-        $this->assertFalse(StationSessionBoundary::uriAllowed('api/fuel-stations/staff/{id}/pin'));
-        $this->assertFalse(StationSessionBoundary::uriAllowed('api/fuel-stations/settings'));
-        $this->assertFalse(StationSessionBoundary::uriAllowed('api/fuel-stations/stations-evil'));
-        $this->assertFalse(StationSessionBoundary::uriAllowed('api/invoices'));
-        $this->assertFalse(StationSessionBoundary::uriAllowed('api/platform/tenants'));
+        $this->assertNotContains('fuel-stations/staff', StationSessionBoundary::readPrefixes());
+        $this->assertTrue(StationSessionBoundary::routeAllowed('GET', 'api/me'));
+        $this->assertTrue(StationSessionBoundary::routeAllowed('POST', 'api/logout'));
+        $this->assertTrue(StationSessionBoundary::routeAllowed('GET', 'api/fuel-stations/shifts/{id}/collection'));
+        $this->assertTrue(StationSessionBoundary::routeAllowed('HEAD', 'api/fuel-stations/stations'));
+        $this->assertTrue(StationSessionBoundary::routeAllowed('POST', 'api/fuel-stations/shifts/{id}/close'));
+        foreach ([
+            ['GET', 'api/fuel-stations/staff'], ['GET', 'api/fuel-stations/staff/{id}'], ['GET', 'api/fuel-stations/staff/audit'],
+            ['PUT', 'api/fuel-stations/staff/{id}'], ['POST', 'api/fuel-stations/staff/{id}/pin'], ['DELETE', 'api/fuel-stations/staff/{id}/pin'],
+            ['GET', 'api/fuel-stations/settings'], ['PUT', 'api/fuel-stations/settings'], ['PUT', 'api/fuel-stations/stations/{id}/settings'],
+            ['POST', 'api/fuel-stations/stations'], ['PUT', 'api/fuel-stations/stations/{id}'], ['DELETE', 'api/fuel-stations/stations/{id}'],
+            ['POST', 'api/fuel-stations/pumps'], ['PUT', 'api/fuel-stations/nozzles/{id}'], ['DELETE', 'api/fuel-stations/tanks/{id}'], ['POST', 'api/fuel-stations/products'],
+            ['POST', 'api/fuel-stations/prices'], ['POST', 'api/fuel-stations/sales'], ['POST', 'api/fuel-stations/sales/{id}/finalize'], ['POST', 'api/fuel-stations/sales/{id}/payments'],
+            ['POST', 'api/fuel-stations/shifts/{id}/corrections'], ['POST', 'api/fuel-stations/opening-balances'], ['POST', 'api/fuel-stations/opening-balances/{id}/post'],
+            ['GET', 'api/fuel-stations/stations-evil'], ['POST', 'api/fuel-stations/shifts/open/extra'], ['PATCH', 'api/fuel-stations/shifts/open'],
+            ['GET', 'api/invoices'], ['GET', 'api/platform/tenants'],
+        ] as [$method, $uri]) {
+            $this->assertFalse(StationSessionBoundary::routeAllowed($method, $uri), "{$method} {$uri} must be denied for PIN sessions");
+        }
+    }
+
+    /** @test */
+    public function the_exact_set_of_fuel_mutations_reachable_by_a_pin_session_is_pinned(): void
+    {
+        // لقطة صريحة: أي مسار كتابة جديد في الوقود محجوب افتراضياً، ويظهر هنا فقط إن أُضيف عمداً إلى WRITE_RULES.
+        $reachable = [];
+        $denied = [];
+        foreach (Route::getRoutes() as $route) {
+            if (! str_starts_with($route->uri(), 'api/fuel-stations/')) {
+                continue;
+            }
+            foreach (array_diff($route->methods(), ['GET', 'HEAD']) as $method) {
+                $key = "{$method} " . substr($route->uri(), strlen('api/fuel-stations/'));
+                StationSessionBoundary::routeAllowed($method, $route->uri()) ? $reachable[] = $key : $denied[] = $key;
+            }
+        }
+        sort($reachable);
+        $this->assertSame([
+            'DELETE deliveries/{id}/attachments/{attachmentId}',
+            'POST deliveries',
+            'POST deliveries/{id}/approve',
+            'POST deliveries/{id}/attachments',
+            'POST deliveries/{id}/cost',
+            'POST reading-requests/{id}/approve',
+            'POST reading-requests/{id}/reject',
+            'POST readings',
+            'POST shifts/open',
+            'POST shifts/{id}/approve',
+            'POST shifts/{id}/cash-movements',
+            'POST shifts/{id}/cash-variance/review',
+            'POST shifts/{id}/close',
+            'POST shifts/{id}/collection',
+            'POST shifts/{id}/collection/review',
+            'POST shifts/{id}/meter-readings',
+            'POST shifts/{id}/staff',
+            'POST shifts/{id}/tank-readings',
+        ], $reachable);
+        foreach (['PUT staff/{id}', 'POST staff/{id}/pin', 'DELETE staff/{id}/pin', 'POST stations', 'PUT stations/{id}', 'DELETE stations/{id}', 'PUT stations/{id}/settings',
+            'POST pumps', 'POST nozzles', 'POST tanks', 'POST products', 'POST prices', 'POST sales', 'POST shifts/{id}/corrections'] as $mustBeDenied) {
+            $this->assertContains($mustBeDenied, $denied);
+        }
+    }
+
+    /** @return list<array{0: string, 1: string}> مسارات إدارية (طريقة، مسار حقيقي) يجب أن ترفضها جلسة PIN حتى لمالك/مدير */
+    private function adminMutations(string $stationId, string $userId): array
+    {
+        $uuid = '00000000-0000-4000-8000-0000000000ff';
+
+        return [
+            ['PUT', "/api/fuel-stations/staff/{$userId}"], ['POST', "/api/fuel-stations/staff/{$userId}/pin"], ['DELETE', "/api/fuel-stations/staff/{$userId}/pin"],
+            ['GET', '/api/fuel-stations/staff'], ['GET', '/api/fuel-stations/staff/templates'], ['GET', '/api/fuel-stations/staff/audit'],
+            ['POST', '/api/fuel-stations/stations'], ['PUT', "/api/fuel-stations/stations/{$stationId}"], ['DELETE', "/api/fuel-stations/stations/{$stationId}"],
+            ['PUT', "/api/fuel-stations/stations/{$stationId}/settings"], ['PUT', '/api/fuel-stations/settings'],
+            ['POST', '/api/fuel-stations/pumps'], ['PUT', "/api/fuel-stations/pumps/{$uuid}"], ['DELETE', "/api/fuel-stations/pumps/{$uuid}"],
+            ['POST', '/api/fuel-stations/nozzles'], ['PUT', "/api/fuel-stations/nozzles/{$uuid}"], ['POST', '/api/fuel-stations/tanks'], ['DELETE', "/api/fuel-stations/tanks/{$uuid}"],
+            ['POST', '/api/fuel-stations/products'], ['PUT', "/api/fuel-stations/products/{$uuid}"],
+            ['POST', '/api/fuel-stations/prices'], ['POST', '/api/fuel-stations/sales'], ['POST', "/api/fuel-stations/sales/{$uuid}/finalize"], ['POST', "/api/fuel-stations/sales/{$uuid}/payments"],
+            ['POST', "/api/fuel-stations/shifts/{$uuid}/corrections"], ['POST', '/api/fuel-stations/opening-balances'], ['POST', "/api/fuel-stations/opening-balances/{$uuid}/post"],
+        ];
+    }
+
+    private const BOUNDARY_MESSAGE = 'جلسة تطبيق المحطات لا تصل إلى هذا المسار.';
+
+    /** @test */
+    public function a_pin_session_of_an_owner_or_admin_still_cannot_reach_any_administrative_fuel_route_and_nothing_changes(): void
+    {
+        $this->noThrottle();
+        $this->buildFixture();
+        $station = $this->fx['s1'];
+        $victim = $this->makeStationWorker('victim', pin: null);
+        $before = [$station->fresh()->name, \App\Models\FuelStation::count(), \App\Models\AccessChangeEvent::count(), $victim['user']->fresh()->role];
+
+        foreach (['owner', 'admin'] as $role) {
+            $boss = $this->makeStationWorker("boss-{$role}", role: $role);
+            $token = $this->stationLogin($boss['employee']->employee_no, self::PIN)->assertOk()->json('token');
+            foreach ($this->adminMutations($station->id, $victim['user']->id) as [$method, $uri]) {
+                $res = $this->withToken($token)->json($method, $uri, ['name' => 'HACKED', 'template' => 'seller']);
+                $res->assertForbidden();
+                $this->assertSame(self::BOUNDARY_MESSAGE, $res->json('message'), "{$role}: {$method} {$uri} must be stopped by the station boundary, not by RBAC");
+            }
+        }
+        $this->assertSame($before, [$station->fresh()->name, \App\Models\FuelStation::count(), \App\Models\AccessChangeEvent::count(), $victim['user']->fresh()->role]);
+        $this->assertNull($victim['user']->fresh()->station_pin_hash);
+    }
+
+    /** @test */
+    public function the_same_administrative_routes_still_work_for_a_normal_erp_session(): void
+    {
+        $this->noThrottle();
+        $this->buildFixture();
+        $station = $this->fx['s1'];
+        $victim = $this->makeStationWorker('victim', pin: null);
+
+        foreach ($this->adminMutations($station->id, $victim['user']->id) as [$method, $uri]) {
+            $res = $this->withToken($this->fx['owner'])->json($method, $uri, []);
+            $this->assertNotSame(self::BOUNDARY_MESSAGE, $res->json('message'), "ERP session must never hit the station boundary: {$method} {$uri}");
+        }
+        // نتائج حقيقية على عيّنة: تعيين PIN وتعديل المحطة وقراءة الموظفين بجلسة البريد.
+        $this->withToken($this->fx['owner'])->postJson($this->pinUrl($victim['user']->id))->assertOk();
+        $this->withToken($this->fx['owner'])->getJson('/api/fuel-stations/staff')->assertOk();
+        $this->withToken($this->fx['owner'])->getJson('/api/fuel-stations/settings')->assertOk();
+        $this->withToken($this->fx['owner'])->putJson("/api/fuel-stations/staff/{$victim['user']->id}", ['template' => 'seller', 'station_ids' => [$station->id]])->assertOk();
+    }
+
+    /** @test */
+    public function every_allowed_pin_write_reaches_rbac_for_a_user_without_the_permission_and_legitimate_operations_work(): void
+    {
+        $this->noThrottle();
+        $this->buildFixture();
+        $uuid = '00000000-0000-4000-8000-0000000000ff';
+        // موظف بلا أي صلاحية وقود: كل كتابة مسموحة بالحدّ تصل إلى RBAC (رسالة مختلفة عن رسالة الحدّ) لا إلى الحدّ.
+        $none = $this->makeStationWorker('plain', role: 'staff');
+        $token = $this->stationLogin($none['employee']->employee_no, self::PIN)->assertOk()->json('token');
+        foreach ([
+            ['POST', '/api/fuel-stations/shifts/open'], ['POST', "/api/fuel-stations/shifts/{$uuid}/meter-readings"], ['POST', "/api/fuel-stations/shifts/{$uuid}/close"],
+            ['POST', "/api/fuel-stations/shifts/{$uuid}/approve"], ['POST', '/api/fuel-stations/readings'], ['POST', '/api/fuel-stations/deliveries'],
+            ['POST', "/api/fuel-stations/reading-requests/{$uuid}/approve"],
+        ] as [$method, $uri]) {
+            $res = $this->withToken($token)->json($method, $uri, []);
+            $res->assertForbidden();
+            $this->assertNotSame(self::BOUNDARY_MESSAGE, $res->json('message'), "{$method} {$uri} is a legitimate station operation");
+        }
+
+        // مشرف/بائع فعلي: يفتح ورديته عبر جلسة PIN (العملية المشروعة تنجح).
+        $seller = $this->makeStationWorker('seller9', role: 'fuel-b3-seller9', stations: [$this->fx['s1']->id]);
+        \App\Models\Role::create(['tenant_id' => $this->tenantId, 'slug' => 'fuel-b3-seller9', 'name' => 's', 'permissions' => ['fuel_stations.view', 'fuel.shift.view', 'fuel.shift.open', 'fuel.shift.cash_count'], 'is_system' => false]);
+        $sellerToken = $this->stationLogin($seller['employee']->employee_no, self::PIN)->assertOk()->json('token');
+        $res = $this->withToken($sellerToken)->postJson('/api/fuel-stations/shifts/open', [
+            'fuel_station_id' => $this->fx['s1']->id, 'opening_cash_minor' => 0, 'idempotency_key' => 'pin-open-1',
+        ]);
+        $this->assertNotSame(self::BOUNDARY_MESSAGE, $res->json('message'));
+        $this->assertContains($res->status(), [200, 201, 422], 'reached the controller (domain validation is acceptable): ' . $res->getContent());
+        $this->withToken($sellerToken)->getJson('/api/fuel-stations/stations')->assertOk();
     }
 
     // ───────────────────────── الخروج والتبديل وحياة الجلسة ─────────────────────────

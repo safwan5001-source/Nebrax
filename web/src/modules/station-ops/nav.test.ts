@@ -59,3 +59,12 @@ describe('ops navigation is derived from AWJ permissions only', () => {
   });
 
 });
+
+describe('PIN sessions never see the administrative area (the server refuses it anyway)', () => {
+  it('hides Manage for a PIN session even with every management permission, and keeps it for others', () => {
+    const all = (permissions: readonly string[]) => permissions.every(() => true);
+    expect(visibleOpsNav(all, { pinSession: true }).map((item) => item.id)).not.toContain('manage');
+    expect(visibleOpsNav(all, { pinSession: true }).map((item) => item.id)).toEqual(expect.arrayContaining(['home', 'shifts', 'receiving', 'tanks', 'profile']));
+    expect(visibleOpsNav(all).map((item) => item.id)).toContain('manage');
+  });
+});

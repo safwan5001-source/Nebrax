@@ -16,7 +16,8 @@ use Laravel\Sanctum\PersonalAccessToken;
  * - **قائمة بيضاء بمسارات** (URI المسجَّل) لا بالأسماء: كل مسار جديد خارج القائمة محجوب افتراضياً. تُحرس بـ`StationSessionBoundaryTest`.
  * - **التفويض لا يتغيّر:** داخل القائمة يطبّق كل مسار RBAC + نطاق المستأجر/الفرع/المحطة كما لو دخل صاحبه بالبريد.
  * - **حياة الجلسة:** موظف غير نشط/محذوف ⇒ 403 عند أول طلب (لا ينتظر انتهاء التوكن). تعطيل المستخدم تغطّيه `SetTenant`.
- * - تعيين/تصفير PIN لا يُسمح به من جلسة PIN (تصعيد ضعيف العامل): خارج القائمة عمداً.
+ * - **أقل امتياز:** قراءات بالبادئات، وكتابات بقائمة (طريقة+مسار) صريحة؛ الوظائف الإدارية (أصول المحطة، الأسعار، صلاحيات الموظفين وPIN، إعدادات الحوكمة،
+ *   المبيعات، التصحيح، الرصيد الافتتاحي) مرفوضة لجلسة PIN حتى لمدير/مالك — تتطلب جلسة كاملة.
  */
 final class StationSessionBoundary
 {
@@ -24,8 +25,11 @@ final class StationSessionBoundary
 
     public const TOKEN_NAME = 'station-ops';
 
-    /** بادئات مسارات الوقود التي يستهلكها تطبيق المحطات فعلاً (مقابلة لعملاء `station-ops/*` في الواجهة). */
-    private const FUEL_PREFIXES = [
+    /**
+     * قراءات (GET/HEAD) مسموحة لجلسة PIN: ما يعرضه التطبيق للبائع والمشرف فقط. **ليس منها** `staff*` (إدارة الصلاحيات) ولا `settings`
+     * على مستوى المؤسسة ولا الحسابات/التسويات/الأجهزة/الرصيد الافتتاحي…
+     */
+    private const READ_PREFIXES = [
         'fuel-stations/stations',
         'fuel-stations/products',
         'fuel-stations/pumps',
@@ -39,14 +43,28 @@ final class StationSessionBoundary
         'fuel-stations/reading-requests',
         'fuel-stations/deliveries',
         'fuel-stations/delivery-suppliers',
-        'fuel-stations/staff',
+    ];
+
+    /**
+     * كتابات مسموحة لجلسة PIN — **قائمة صريحة (طريقة + مسار)** بما يفعله تطبيق المحطات فعلاً (تشغيل الورديات والقراءات والاستلام وقرارات الطلبات)،
+     * لا بادئات. كل ما عداها يُرفض 403 مهما كانت صلاحيات RBAC لصاحب الحساب (مدير/مالك أيضاً): أصول المحطة (إنشاء/تعديل/حذف محطات ومضخات
+     * وفوهات وخزانات ومنتجات)، الأسعار، المبيعات/تحصيلها، تصحيح الورديات، إعدادات المحطة (الحوكمة)، صلاحيات الموظفين وPIN، الرصيد الافتتاحي.
+     * هذه وظائف إدارية تتطلب جلسة كاملة (بريد وكلمة مرور)؛ PIN من 6 أرقام عامل ضعيف لا يُفوَّض به تغيير صلاحيات أو إعدادات أو أصول.
+     *
+     * @var list<array{0: string, 1: string}> [طريقة، تعبير نمطي على الـURI المسجَّل]
+     */
+    private const WRITE_RULES = [
+        ['POST', '#^api/fuel-stations/shifts/open$#'],
+        ['POST', '#^api/fuel-stations/shifts/\{[a-zA-Z]+\}/(staff|meter-readings|tank-readings|cash-movements|close|collection|collection/review|cash-variance/review|approve)$#'],
+        ['POST', '#^api/fuel-stations/readings$#'],
+        ['POST', '#^api/fuel-stations/reading-requests/\{[a-zA-Z]+\}/(approve|reject)$#'],
+        ['POST', '#^api/fuel-stations/deliveries$#'],
+        ['POST', '#^api/fuel-stations/deliveries/\{[a-zA-Z]+\}/(approve|cost|attachments)$#'],
+        ['DELETE', '#^api/fuel-stations/deliveries/\{[a-zA-Z]+\}/attachments/\{[a-zA-Z]+\}$#'],
     ];
 
     /** مسارات عامة لازمة لأي جلسة (قراءة الهوية والخروج). */
-    private const SESSION_URIS = ['api/me', 'api/logout'];
-
-    /** مسارات تُستثنى حتى لو وقعت تحت بادئة مسموحة. */
-    private const DENIED_URI_SUFFIXES = ['/pin'];
+    private const SESSION_RULES = [['GET', 'api/me'], ['POST', 'api/logout']];
 
     /**
      * هل الطلب بتوكن مستخدم **مقيَّد القدرات** (لا يحمل `*`)؟ يُقرأ من قدرات التوكن المخزَّنة (مصفوفة حقيقية)، لا من `can()`:
@@ -94,27 +112,36 @@ final class StationSessionBoundary
         if ($uri === '') {
             return false;
         }
-        if (! self::uriAllowed($uri)) {
+        if (! self::routeAllowed($request->method(), $uri)) {
             return false;
         }
 
         return self::employeeStillActive($request->user());
     }
 
-    public static function uriAllowed(string $uri): bool
+    /** هل (الطريقة، المسار المسجَّل) مسموح لجلسة PIN؟ قراءات بالبادئات، وكتابات بقائمة صريحة. */
+    public static function routeAllowed(string $method, string $uri): bool
     {
+        $method = strtoupper($method) === 'HEAD' ? 'GET' : strtoupper($method);
         $uri = ltrim($uri, '/');
-        if (in_array($uri, self::SESSION_URIS, true)) {
-            return true;
-        }
-        foreach (self::DENIED_URI_SUFFIXES as $suffix) {
-            if (str_ends_with($uri, $suffix)) {
-                return false;
+
+        foreach (self::SESSION_RULES as [$m, $allowed]) {
+            if ($m === $method && $allowed === $uri) {
+                return true;
             }
         }
-        foreach (self::FUEL_PREFIXES as $prefix) {
-            $full = 'api/' . $prefix;
-            if ($uri === $full || str_starts_with($uri, $full . '/')) {
+        if ($method === 'GET') {
+            foreach (self::READ_PREFIXES as $prefix) {
+                $full = 'api/' . $prefix;
+                if ($uri === $full || str_starts_with($uri, $full . '/')) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        foreach (self::WRITE_RULES as [$m, $pattern]) {
+            if ($m === $method && preg_match($pattern, $uri) === 1) {
                 return true;
             }
         }
@@ -123,9 +150,15 @@ final class StationSessionBoundary
     }
 
     /** @return list<string> */
-    public static function allowedPrefixes(): array
+    public static function readPrefixes(): array
     {
-        return self::FUEL_PREFIXES;
+        return self::READ_PREFIXES;
+    }
+
+    /** @return list<array{0: string, 1: string}> */
+    public static function writeRules(): array
+    {
+        return self::WRITE_RULES;
     }
 
     private static function employeeStillActive(User $user): bool

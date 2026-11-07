@@ -82,7 +82,7 @@ async function open(page: Page, path: string, opts: { locale: Locale; theme: 'li
     if (p === '/fuel-stations/shifts') return json(route, { data: shifts.filter((s) => (!station || s.station_id === station) && (!url.searchParams.get('status') || s.status === url.searchParams.get('status'))), meta: { current_page: 1, last_page: 1 } });
     return json(route, { data: [] });
   });
-  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', '1'); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
+  await page.addInitScript(([u, theme]) => { localStorage.setItem('token', 'fx'); localStorage.setItem('station_use_erp', JSON.parse(u).id); localStorage.setItem('user', u); localStorage.setItem('theme', theme); }, [JSON.stringify(user), opts.theme] as const);
   await page.goto(`${baseUrl}/fuel-stations/ops${path}`, { waitUntil: 'domcontentloaded' });
   return issues;
 }

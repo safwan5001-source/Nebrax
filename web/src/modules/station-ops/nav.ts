@@ -43,8 +43,14 @@ export const OPS_NAV: readonly OpsNavItem[] = [
   { id: 'profile', href: `${OPS_BASE}/profile`, labelKey: 'navProfile', requires: [] },
 ];
 
-export function visibleOpsNav(canAll: (permissions: readonly string[]) => boolean): OpsNavItem[] {
-  return OPS_NAV.filter((item) => canAll(item.requires) && (item.requiresAny === undefined || item.requiresAny.some((permission) => canAll([permission]))));
+/** مساحات إدارية (صلاحيات الموظفين، أصول/إعدادات المحطة، الرصيد الافتتاحي…) يرفضها الخادم لجلسة PIN مهما كانت الصلاحيات — تُخفى لها بدل رابط ينتهي بـ403. */
+const ADMIN_ONLY_NAV: readonly OpsNavId[] = ['manage'];
+
+export function visibleOpsNav(canAll: (permissions: readonly string[]) => boolean, options: { pinSession?: boolean } = {}): OpsNavItem[] {
+  return OPS_NAV.filter(
+    (item) => !(options.pinSession === true && ADMIN_ONLY_NAV.includes(item.id))
+      && canAll(item.requires) && (item.requiresAny === undefined || item.requiresAny.some((permission) => canAll([permission]))),
+  );
 }
 
 export function deriveOpsMode(can: (permission: string) => boolean): OpsMode {

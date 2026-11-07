@@ -161,7 +161,7 @@ describe('station login screen', () => {
     expect(nav.replace).not.toHaveBeenCalled();
 
     await userEvent.setup().click(screen.getByRole('button', { name: /Continue with the current AWJ account \(ERP Owner\)/ }));
-    expect(localStorage.getItem('station_use_erp')).toBe('1');
+    expect(localStorage.getItem('station_use_erp')).toBe('o'); // مربوطة بمعرّف مستخدم أَوْج الذي وافق
     expect(nav.replace).toHaveBeenCalledWith('/fuel-stations/ops');
     expect(localStorage.getItem('token')).toBe('erp-token'); // لم تُنسخ ولم تُغيَّر
     expect(localStorage.getItem('station_token')).toBeNull();

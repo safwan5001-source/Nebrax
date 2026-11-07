@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Cylinder, Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
+import { isStationSession } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { StationOpsProvider, useStationOps } from './context';
 import { isNavActive, visibleOpsNav, type OpsNavId } from './nav';
@@ -41,7 +42,7 @@ function Frame({ children }: { children: ReactNode }) {
   const t = useTranslations('stationOps');
   const pathname = usePathname();
   const { can } = useStationOps();
-  const items = visibleOpsNav((permissions) => permissions.every((permission) => can(permission)));
+  const items = visibleOpsNav((permissions) => permissions.every((permission) => can(permission)), { pinSession: isStationSession() });
 
   return (
     <div data-fuel-ops="" className="fo-root min-h-screen bg-background text-text [min-height:100dvh] md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
