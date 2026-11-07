@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Eye, EyeOff, Fuel, LoaderCircle, LogIn, ShieldCheck, WifiOff } from 'lucide-react';
-import { getStationToken } from '@/lib/api';
+import { getStationToken } from '@/lib/station-scope';
 import { STATION_HOME_PATH, checkStoredSession, continueStationWithErpSession, erpSessionHint, stationLogin } from '@/lib/auth';
 import { classifyLoginFailure, sanitizeEmployeeNo, sanitizePin, validateLogin, type LoginFailure, type LoginFieldError } from './login-logic';
 
