@@ -14786,8 +14786,56 @@
       "tankProduct": "Product",
       "tankCapacity": "Capacity",
       "tankNozzles": "Linked nozzles",
-      "tankLevelNote": "Current tank levels aren't shown here yet; they will appear once tank readings are connected in a later slice.",
+      "tankLevelNote": "The balance shown is a book balance computed from approved movements, not a physical measurement of the tank; it can differ from reality until a stock count is reconciled.",
       "subtitle": "View only"
+    },
+    "tankLevel": {
+      "meterLabel": "Tank level",
+      "percentValue": "{value}%",
+      "percentStatus": "{percent} — {status}",
+      "band": {
+        "healthy": "Good",
+        "monitor": "Monitor",
+        "low": "Low"
+      },
+      "amount": "{level} of {capacity} {unit}",
+      "source": {
+        "physical": "Manual measurement",
+        "atg": "Automatic gauge (ATG)",
+        "book": "Book balance",
+        "estimated": "Estimated"
+      },
+      "updatedAt": "Last updated: {time}",
+      "bookBalance": "Book balance",
+      "belowMinimum": "Alert: the balance is below the tank's configured minimum level ({minimum} {unit}).",
+      "unavailable": {
+        "title": "Level unavailable",
+        "api": {
+          "multi_tank": "Balance isn't available per tank: more than one tank feeds the same stock.",
+          "no_stock_record": "There is no stock record for this product in the warehouse yet.",
+          "ambiguous_stock_record": "More than one stock record exists for this product; the balance can't be determined.",
+          "invalid_stock_record": "The stock record is invalid and needs review.",
+          "no_warehouse": "The station isn't linked to a warehouse.",
+          "tank_inactive": "The tank is inactive.",
+          "unit_mismatch": "The product unit doesn't match millilitres/litres.",
+          "invalid_configuration": "The tank or product setup is incomplete.",
+          "not_provided": "The server didn't send balance data.",
+          "invalid_data": "The balance data received isn't valid.",
+          "unknown_reason": "No balance is available for this tank."
+        },
+        "reason": {
+          "missing_level": "No level data for this tank.",
+          "invalid_level": "The level value is not valid.",
+          "invalid_capacity": "The tank capacity is not valid for comparison.",
+          "conflicting_unit": "The level unit does not match the capacity unit."
+        }
+      },
+      "overCapacity": {
+        "title": "Level exceeds capacity",
+        "body": "Unusual value; verify the reading before relying on it."
+      },
+      "loading": "Loading level",
+      "error": "Couldn't load the level"
     },
     "assetStatus": {
       "active": "Active",

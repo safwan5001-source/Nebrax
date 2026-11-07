@@ -14,6 +14,7 @@ use App\Models\FuelPump;
 use App\Models\FuelStation;
 use App\Models\FuelTank;
 use App\Services\FuelStationMasterDataService;
+use App\Services\FuelTankBookBalanceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,7 @@ class FuelStationMasterDataController extends ApiController
 {
     use AuthorizesFuelStationScope;
 
-    public function __construct(private FuelStationMasterDataService $masterData) {}
+    public function __construct(private FuelStationMasterDataService $masterData, private FuelTankBookBalanceReader $bookBalances) {}
 
     public function indexStations(): JsonResponse
     {
@@ -88,12 +89,17 @@ class FuelStationMasterDataController extends ApiController
 
     public function indexTanks(): JsonResponse
     {
-        return FuelTankResource::collection($this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->orderBy('code')->get())->response();
+        $tanks = $this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->orderBy('code')->get();
+
+        // TANK-BALANCE-P1: الرصيد الدفتري للقراءة فقط، لخزانات النطاق الظاهرة وحدها وبعدد استعلامات ثابت.
+        return FuelTankResource::collectionWithBookLevels($tanks, $this->bookBalances->forTanks($tanks))->response();
     }
 
     public function showTank(string $id): JsonResponse
     {
-        return (new FuelTankResource($this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->findOrFail($id)))->response();
+        $tank = $this->restrictToAccessibleStations(FuelTank::with(['station', 'fuelProduct', 'calibrationPoints']))->findOrFail($id);
+
+        return (new FuelTankResource($tank))->withBookLevel($this->bookBalances->forTanks([$tank])[$tank->id])->response();
     }
 
     public function storeTank(FuelStationMasterDataRequest $request): JsonResponse

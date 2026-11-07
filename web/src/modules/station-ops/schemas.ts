@@ -62,6 +62,12 @@ export const tankSchema = z.object({
   capacity_milliliters: z.number().int().nonnegative(),
   minimum_level_milliliters: z.number().int().nonnegative().nullable().optional(),
   status: text,
+  /**
+   * TANK-LEVEL-P2 — عقد الرصيد الدفتري (`FuelTankBookBalanceReader`). يعبران كـ`unknown` عمداً ويُتحقَّق منهما في
+   * `tank-book-level.ts`: حقل فاسد في بطاقة واحدة لا يجوز أن يرفض استجابة الخزانات كلها. الغياب (خادم أقدم) مقبول.
+   */
+  book_level: z.unknown().optional(),
+  book_level_unavailable_reason: z.unknown().optional(),
 });
 
 /**
