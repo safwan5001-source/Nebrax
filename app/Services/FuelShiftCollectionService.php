@@ -375,6 +375,10 @@ class FuelShiftCollectionService
         $now = now();
         $sales = $this->sales->compute($shift, $now);
         $difference = $sales['complete'] ? $declaration->collected_total_minor - (int) $sales['amount_minor'] : null;
+        // P1-2: إقرار نقد أقل من إيصالات النقد المسجَّلة (تصريح متناقض مع دليل رسمي) يستوجب مراجعة مشرف قبل الاعتماد حتى لو طابق مجموع
+        // الإقرار مبيعات العدادات (تعويضٌ بشبكة مضخَّمة) وطابق الدرج الإقرار؛ وإلا لما أفاد إعلان الثغرة وحده شيئاً.
+        $contradictsReceipts = in_array(FuelShiftCashExpectationService::GAP_DECLARED_BELOW_RECEIPTS, (array) ($live['gaps'] ?? []), true);
+        $reviewRequired = $difference !== 0 || $contradictsReceipts;
         $drawer = $this->drawerImplied($countedCashMinor, (int) $live['opening'], (int) $live['cash_in'], (int) $live['cash_out'], (int) $live['expenses']);
 
         $declaration->forceFill($this->salesColumns($sales, $difference) + [
@@ -388,8 +392,8 @@ class FuelShiftCollectionService
             'drawer_implied_sales_cash_minor' => $drawer,
             'cash_cross_difference_minor' => $declaration->cash_declared_minor - $drawer,
             // Q3: فرق غير صفري (أو غير نهائي لنقص المبيعات) ⇒ مراجعة مشرف قبل الاعتماد؛ السبب = ملاحظة الإغلاق إن وُجدت.
-            'review_required' => $difference !== 0,
-            'difference_reason' => $difference !== 0 && trim((string) $closingNote) !== '' ? trim((string) $closingNote) : null,
+            'review_required' => $reviewRequired,
+            'difference_reason' => $reviewRequired && trim((string) $closingNote) !== '' ? trim((string) $closingNote) : null,
             'frozen_at' => $now,
         ])->save();
 
@@ -398,7 +402,7 @@ class FuelShiftCollectionService
             'collected_total_minor' => $declaration->collected_total_minor, 'sales_complete' => $sales['complete'],
             'sales_minor' => $sales['amount_minor'], 'difference_minor' => $difference,
             'cash_cross_difference_minor' => $declaration->cash_cross_difference_minor,
-            'review_required' => $difference !== 0,
+            'review_required' => $reviewRequired,
         ]);
 
         return $declaration;

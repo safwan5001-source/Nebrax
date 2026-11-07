@@ -174,6 +174,40 @@ class FuelShiftDeclaredCashBasisTest extends TestCase
     }
 
     /** @test */
+    public function a_declaration_that_contradicts_recorded_receipts_requires_review_even_when_every_total_matches(): void
+    {
+        // نقد ERP مسجَّل R؛ البائع يُقِرّ بنقد أقل ويعوّض بشبكة مضخَّمة حتى يطابق المجموع مبيعات العدادات، ويسلّم درجاً مطابقاً للإقرار:
+        // فرق التحصيل 0 وفرق الدرج 0 — ومع ذلك التناقض مع الإيصال الرسمي يوجب مراجعة مشرف قبل الاعتماد.
+        config(['fuel_stations.shift_cash_receipts_enabled' => true]);
+        $shift = $this->open('x1');
+        $sale = $this->sale('x1-sale', $shift);
+        $receipts = (int) $this->collect($sale, 'cash', null, 'x1-pay')->amount;
+        $this->meter($shift, 'opening', 1_000_000);
+        $this->meter($shift, 'closing', 1_001_000); // لتر واحد
+        $sales = self::PRICE;
+        $cash = $receipts - 100;
+        $this->declare($shift, $cash, $sales - $cash, 'x1-decl');
+
+        app(FuelShiftService::class)->close($shift->fresh(), 20000 + $cash, 'ملاحظة', $this->f['actor']);
+
+        $cv = FuelShiftCashVariance::sole();
+        $this->assertSame(0, $cv->variance_minor);
+        $this->assertFalse((bool) $cv->expectation_complete);
+        $this->assertContains(FuelShiftCashExpectationService::GAP_DECLARED_BELOW_RECEIPTS, $cv->incompleteness);
+        $declaration = \App\Models\FuelShiftCollectionDeclaration::sole();
+        $this->assertSame(0, $declaration->difference_minor);
+        $this->assertTrue($declaration->review_required, 'التناقض مع الإيصالات يستوجب المراجعة');
+
+        $e = $this->rejects(fn () => app(FuelShiftService::class)->approve($shift->fresh(), null, $this->approver()));
+        $this->assertStringContainsString('FUEL_COLLECTION_REVIEW_REQUIRED', $e->getMessage());
+
+        $reviewer = $this->roleUser($this->f['tenant_id'], 'declared-reviewer', 'reviewer@declared-basis.test', ['fuel.shift.view', 'fuel.shift.cash_variance_review', 'fuel.sale.view']);
+        app(FuelShiftCollectionService::class)->reviewDifference($shift->fresh(), 'راجعت التناقض مع الإيصال', $reviewer);
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $this->approver());
+        $this->assertSame('approved', $shift->fresh()->status);
+    }
+
+    /** @test */
     public function the_declared_basis_never_refuses_a_collection_for_lack_of_an_open_shift_and_the_closed_gate_leaves_receipts_unstamped(): void
     {
         // بلا وردية مفتوحة: التحصيل يمرّ بلا ختم (الختم للمطابقة فقط، بخلاف أساس الإيصالات الذي يرفض).
