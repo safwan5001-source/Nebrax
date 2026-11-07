@@ -10,6 +10,14 @@ Modes
   validate   static, offline: manifest vs workflows + anti-bypass lints
   gate       online: poll the Checks API for the PR head SHA (needs GITHUB_TOKEN)
 
+Shard groups (PG-SHARD-GATE-1, inert until a manifest declares one)
+  A suite may be split into N shard jobs. A `shard_groups` entry declares the shard job, its matrix axis, the
+  count, and a `proof` job (scripts/ci-gate/shard_proof.py) that checks the shards together ran every test
+  exactly once. The group expands into ordinary blocking checks (one per shard + the proof), so every existing
+  rule (anti-bypass, guards, duplicate producers, baseline no-weakening, latest-attempt verdict) applies to it
+  unchanged. `status: additive` keeps the superseded check; `status: superseding` retires it into the group while
+  the proof job keeps its exact name (so a Branch Protection context by that name stays valid).
+
 Stdlib + PyYAML only. Fail-closed: any API error, unsupported workflow
 construct, or manifest drift is a failure, never a pass.
 """
@@ -39,6 +47,12 @@ BLOCKING = ("always", "paths")
 # Measured on 119 merged PRs: CI wall time median 24 min, p90 38, max 114 (runner queue up to 90 min).
 # 120 min covers all of them; 70 would have failed 2 healthy PRs. Keep the workflow job timeout above this.
 DEFAULT_TIMEOUT_MINUTES = 120
+GROUP_STATUSES = ("additive", "superseding")
+MAX_SHARDS = 16
+# Floors every shard group must meet regardless of what the manifest says (a group may add rules, never drop these).
+SHARD_GUARD_FLOOR = {"step_run_contains": "php artisan test", "require": ("set -o pipefail",),
+                     "forbidden": ("--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true")}
+PROOF_GUARD_FLOOR = {"require": ("set -euo pipefail",), "forbidden": ("|| true",)}
 MAX_PR_FILES = 3000  # REST cap: beyond it the file list is incomplete -> require everything
 
 
@@ -150,21 +164,144 @@ def paths_match(patterns: list[str], files: list[str]) -> bool:
 
 # ───────────────────────── manifest / validation ─────────────────────────
 
+def _guard_gaps(guard: dict, floor: dict, what: str) -> list[str]:
+    out = []
+    want = floor.get("step_run_contains")
+    if want and guard.get("step_run_contains") != want:
+        out.append(f"{what}: guard.step_run_contains must be {want!r}")
+    for key in ("require", "forbidden"):
+        lost = set(floor.get(key, ())) - set(guard.get(key, []))
+        if lost:
+            out.append(f"{what}: guard.{key} lacks the mandatory {sorted(lost)}")
+    return out
+
+
+def shard_names(grp: dict) -> list[str]:
+    return [grp["shard_name"].replace("{i}", str(i)).replace("{n}", str(grp["count"])) for i in range(1, grp["count"] + 1)]
+
+
+def shard_name_regex(grp: dict) -> re.Pattern:
+    """Matches ANY shard index of the group (including ones beyond `count`): used to catch count drift."""
+    parts = re.split(r"\{i\}|\{n\}", grp["shard_name"])
+    return re.compile(r"\d+".join(re.escape(p) for p in parts))
+
+
+def expand_groups(m: dict) -> dict:
+    """Return the manifest with `checks` = declared checks + one synthetic blocking check per shard + the proof.
+    Pure (no I/O). Structural problems raise GateError; workflow-dependent ones are reported by validate()."""
+    raw = m["checks"]
+    groups = m.get("shard_groups") or []
+    if not isinstance(groups, list):
+        raise GateError("shard_groups must be a list")
+    declared = {c["name"]: c for c in raw}
+    extra, ids = [], set()
+    for grp in groups:
+        gid = grp.get("id")
+        for k in ("id", "status", "supersedes", "workflow", "job", "axis", "count", "shard_name", "guard", "proof"):
+            if grp.get(k) in (None, "", [], {}):
+                raise GateError(f"shard group {gid!r}: missing {k!r}")
+        if gid in ids:
+            raise GateError(f"duplicate shard group id {gid!r}")
+        ids.add(gid)
+        if grp["status"] not in GROUP_STATUSES:
+            raise GateError(f"shard group {gid}: bad status {grp['status']!r}")
+        n = grp["count"]
+        if not isinstance(n, int) or isinstance(n, bool) or not 2 <= n <= MAX_SHARDS:
+            raise GateError(f"shard group {gid}: count must be an integer in 2..{MAX_SHARDS}")
+        if "{i}" not in grp["shard_name"]:
+            raise GateError(f"shard group {gid}: shard_name must contain {{i}} (equal names would let one shard mask another)")
+        proof = grp["proof"]
+        for k in ("name", "job", "guard"):
+            if not proof.get(k):
+                raise GateError(f"shard group {gid}: proof missing {k!r}")
+        if not proof["guard"].get("step_run_contains"):
+            raise GateError(f"shard group {gid}: proof.guard.step_run_contains is required")
+        gaps = _guard_gaps(grp["guard"], SHARD_GUARD_FLOOR, f"shard group {gid} (shards)")
+        gaps += _guard_gaps(proof["guard"], PROOF_GUARD_FLOOR, f"shard group {gid} (proof)")
+        sup = declared.get(grp["supersedes"])
+        if grp["status"] == "additive":
+            if sup is None or sup["tier"] != "always":
+                raise GateError(f"shard group {gid}: additive group must supersede a declared tier=always check ({grp['supersedes']!r})")
+            if proof["name"] == grp["supersedes"]:
+                raise GateError(f"shard group {gid}: additive group must not reuse the superseded name for its proof")
+            sg = sup.get("guard") or {}
+            for key in ("require", "forbidden"):
+                lost = set(sg.get(key, [])) - set(grp["guard"].get(key, []))
+                if lost:
+                    gaps.append(f"shard group {gid}: shard guard.{key} is weaker than the superseded check (lost {sorted(lost)})")
+        else:
+            if proof["name"] != grp["supersedes"]:
+                raise GateError(f"shard group {gid}: superseding group must keep the context name {grp['supersedes']!r} on its proof "
+                                f"job (renaming a required context needs an owner decision on Branch Protection)")
+            if sup is not None:
+                raise GateError(f"shard group {gid}: superseding group owns {grp['supersedes']!r}; remove it from `checks`")
+        if gaps:
+            raise GateError("; ".join(gaps))
+        tag = {"_group": gid, "_status": grp["status"], "_supersedes": grp["supersedes"]}
+        covers = (sup or {}).get("covers", ["shard-group"])
+        for name in shard_names(grp):
+            extra.append({"name": name, "workflow": grp["workflow"], "job": grp["job"], "tier": "always", "covers": covers,
+                          "guard": grp["guard"], "_role": "shard", **tag})
+        pg = dict(proof["guard"])
+        pg["require"] = [*pg.get("require", []), f"--shards {n}"]
+        extra.append({"name": proof["name"], "workflow": grp["workflow"], "job": proof["job"], "tier": "always",
+                      "covers": covers, "guard": pg, "_role": "proof", **tag})
+    out = dict(m)
+    out["declared_checks"] = raw
+    out["shard_groups"] = groups
+    out["checks"] = [*raw, *extra]
+    return out
+
+
 def load_manifest(path: Path = MANIFEST) -> dict:
     m = json.loads(path.read_text(encoding="utf-8"))
     if m.get("version") != 1:
         raise GateError("unsupported manifest version")
-    seen = set()
     for c in m["checks"]:
         for k in ("name", "workflow", "job", "tier"):
             if not c.get(k):
                 raise GateError(f"manifest check missing {k!r}: {c}")
         if c["tier"] not in (*BLOCKING, "advisory"):
             raise GateError(f"bad tier for {c['name']}")
+    m = expand_groups(m)
+    seen = set()
+    for c in m["checks"]:
         if c["name"] in seen:
             raise GateError(f"duplicate check name {c['name']!r}")
         seen.add(c["name"])
     return m
+
+
+def validate_group(root: Path, grp: dict, docs: dict[str, dict]) -> list[str]:
+    """Workflow-dependent rules for a shard group (the shard/proof jobs themselves are validated as ordinary checks)."""
+    gid, wf, errors = grp["id"], grp["workflow"], []
+    p = root / wf
+    if not p.exists():
+        return [f"[shard group {gid}] workflow file missing: {wf}"]
+    jobs = docs.setdefault(wf, load_yaml(p)).get("jobs") or {}
+    job, pjob = jobs.get(grp["job"]), jobs.get(grp["proof"]["job"])
+    if job is None or pjob is None:
+        return [f"[shard group {gid}] job {grp['job'] if job is None else grp['proof']['job']!r} not found in {wf}"]
+    matrix = (job.get("strategy") or {}).get("matrix")
+    if not isinstance(matrix, dict) or set(matrix) != {grp["axis"]}:
+        errors.append(f"[shard group {gid}] shard job must have exactly one matrix axis {grp['axis']!r}, got {matrix!r}")
+    elif matrix[grp["axis"]] != list(range(1, grp["count"] + 1)):
+        errors.append(f"[shard group {gid}] matrix.{grp['axis']} must be exactly {list(range(1, grp['count'] + 1))}, got {matrix[grp['axis']]!r}")
+    else:
+        try:
+            got = sorted(job_names(grp["job"], job))
+        except GateError as e:
+            errors.append(f"[shard group {gid}] {e}")
+        else:
+            if got != sorted(shard_names(grp)):
+                errors.append(f"[shard group {gid}] shard job produces {got}, expected {sorted(shard_names(grp))} (duplicate or drifting names)")
+    needs = pjob.get("needs") or []
+    needs = [needs] if isinstance(needs, str) else list(needs)
+    if grp["job"] not in needs:
+        errors.append(f"[shard group {gid}] proof job must `needs` the shard job {grp['job']!r} (it would otherwise run without the shards)")
+    if (pjob.get("strategy") or {}).get("matrix"):
+        errors.append(f"[shard group {gid}] proof job must not use a matrix")
+    return errors
 
 
 def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str], list[str]]:
@@ -226,6 +363,9 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                         if need not in run:
                             errors.append(f"[{c['name']}] test step lacks required {need!r}")
 
+    for grp in manifest.get("shard_groups") or []:
+        errors += validate_group(root, grp, docs)
+
     # Discovery: any PR-triggered workflow job nobody classified is a gap, not a pass.
     gate_wf = ".github/workflows/ci-gate.yml"
     producers: dict[str, list[str]] = {}
@@ -282,22 +422,33 @@ def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
     base, head = load_manifest(bp), load_manifest(head_root / ".github" / "ci-gate" / "required-checks.json")
     errors = []
     hmap = {c["name"]: c for c in head["checks"]}
+    head_group_ids = {g["id"] for g in head.get("shard_groups") or []}
+    derived = re.compile(r"--shards \d+")  # implied by the group's `count`; a count change is judged by the shard names
+    retiring = {g["supersedes"]: g for g in head.get("shard_groups") or [] if g["status"] == "superseding"}
     rank = {"advisory": 0, "paths": 1, "always": 2}
     for bc in base["checks"]:
         if bc["tier"] not in BLOCKING:
             continue
         hc = hmap.get(bc["name"])
         if hc is None:
+            legacy = hmap.get(bc.get("_supersedes", ""))
+            if (bc.get("_status") == "additive" and bc.get("_group") not in head_group_ids and legacy is not None and legacy.get("_group") is None and legacy["tier"] in BLOCKING):
+                continue  # dropping a whole additive group leaves the superseded full-suite check in force: coverage unchanged
             errors.append(f"[{bc['name']}] blocking check removed from the manifest")
             continue
         if rank[hc["tier"]] < rank[bc["tier"]]:
             errors.append(f"[{bc['name']}] tier weakened {bc['tier']} -> {hc['tier']}")
-        if (hc["workflow"], hc["job"]) != (bc["workflow"], bc["job"]):
+        hg = hc.get("guard") or {}
+        if hc.get("_role") == "proof" and hc.get("_status") == "superseding" and bc.get("_group") is None:
+            # A plain check retired into a superseding group: the proof job keeps the name; the tests now run in the
+            # shards, so the OLD guard is compared with the group's SHARD guard (the proof job runs no tests).
+            hg = retiring[bc["name"]]["guard"]
+        elif (hc["workflow"], hc["job"]) != (bc["workflow"], bc["job"]):
             errors.append(f"[{bc['name']}] now points at a different workflow/job")
-        bg, hg = bc.get("guard") or {}, hc.get("guard") or {}
+        bg = bc.get("guard") or {}
         if bg:
             for key in ("forbidden", "require"):
-                lost = set(bg.get(key, [])) - set(hg.get(key, []))
+                lost = {x for x in set(bg.get(key, [])) - set(hg.get(key, [])) if not derived.fullmatch(x)}
                 if lost:
                     errors.append(f"[{bc['name']}] guard.{key} lost {sorted(lost)}")
             if bg.get("step_run_contains") != hg.get("step_run_contains"):
@@ -421,6 +572,13 @@ def evaluate(manifest, expected, check_runs, workflow_runs, elapsed_s, deadline_
         else:
             rows.append((name, tier, why, "not reported yet", "wait"))
 
+    # Count drift: a check run that looks like a shard of a group but is not one of its declared shards (e.g. a 3rd
+    # shard appearing while the manifest says 2) means the partition changed under the gate: never a pass.
+    for grp in manifest.get("shard_groups") or []:
+        rx, allowed = shard_name_regex(grp), set(shard_names(grp))
+        for n in sorted({r["name"] for r in check_runs}):
+            if rx.fullmatch(n) and n not in allowed:
+                rows.append((n, "always", f"shard group {grp['id']}", "unexpected shard (count drift)", "bad"))
     if elapsed_s >= deadline_s:
         rows = [(n, t, w, s + " (deadline)" if st == "wait" else s, "bad" if st == "wait" else st)
                 for n, t, w, s, st in rows]
