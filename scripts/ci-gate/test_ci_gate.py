@@ -268,7 +268,9 @@ class Validation(unittest.TestCase):
         self.assertTrue(any("continue-on-error" in e for e in errs), errs)
 
     def test_test_filter_rejected(self):
-        errs = self._mutate("ci.yml", "php artisan test 2>&1", "php artisan test --filter=Ledger 2>&1")
+        # فرع SQLite صار متوازياً: نحقن --filter في سطره هو (السطر الوحيد بلا --log-teamcity)، فيجب أن يُرفض كما كان.
+        errs = self._mutate("ci.yml", 'php artisan test --parallel --processes="$PROCS" 2>&1',
+                            'php artisan test --parallel --processes="$PROCS" --filter=Ledger 2>&1')
         self.assertTrue(any("--filter" in e for e in errs), errs)
 
     def test_lost_pipefail_rejected(self):
