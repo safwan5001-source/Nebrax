@@ -10438,6 +10438,7 @@
     "varianceAccount": "Inventory variance account",
     "gainAccount": "Inventory gain account",
     "grniAccount": "Goods received not invoiced (GRNI) account",
+    "openingBalanceAccount": "Opening balance account (equity)",
     "fuelPriceTaxMode": "Fuel-price tax mode",
     "taxInclusive": "Price includes tax",
     "taxExclusive": "Price excludes tax",
@@ -16373,6 +16374,202 @@
         },
         "variance": "Transit variance"
       }
+    }
+  },
+  "stationOpsOpening": {
+    "title": "Opening fuel balance",
+    "subtitle": "Set up the starting stock for this station",
+    "link": {
+      "title": "Opening fuel balance",
+      "hint": "Set up the starting stock in each tank",
+      "done": "Approved — view the summary"
+    },
+    "steps": {
+      "label": "Setup steps",
+      "stepOf": "Step {step} of {total}",
+      "tanks": "Tanks & quantities",
+      "cost": "Cost & settings",
+      "review": "Review & approve"
+    },
+    "unavailable": {
+      "title": "Not available",
+      "body": "Opening balances are not enabled for your organization."
+    },
+    "noAccess": {
+      "title": "No access",
+      "body": "Setting up opening balances needs station management permission."
+    },
+    "posted": {
+      "title": "Opening balance approved",
+      "body": "Document {number} dated {date} has been posted. It cannot be edited.",
+      "liters": "Total quantity",
+      "value": "Total value",
+      "tanks": "Tanks",
+      "done": "Back to management",
+      "alreadyTitle": "Already set up",
+      "alreadyBody": "This station already has an approved opening balance."
+    },
+    "resume": {
+      "body": "Continuing the saved draft {number}."
+    },
+    "tanks": {
+      "heading": "Enter the quantity in each tank",
+      "hint": "Leave a tank empty if it holds no fuel — it will not be included.",
+      "noTanks": "No tanks found",
+      "noTanksBody": "This station has no tanks yet.",
+      "capacity": "Capacity {capacity} L",
+      "inactive": "Inactive",
+      "quantity": "Quantity in {name}",
+      "unit": "L",
+      "total": "Total quantity",
+      "needOne": "Enter a quantity for at least one tank.",
+      "issue": {
+        "invalid": "Enter a valid number (up to 3 decimals).",
+        "zero": "Quantity must be above zero. Leave the field empty for an empty tank.",
+        "exceeds_capacity": "Quantity exceeds the tank capacity.",
+        "tank_inactive": "This tank is inactive and cannot be included."
+      },
+      "bookBalance": "Stock already recorded for this tank. Opening balances only apply to an empty tank."
+    },
+    "cost": {
+      "heading": "Cost and settings",
+      "date": "Opening date",
+      "dateHint": "Cannot be in the future.",
+      "dateInvalid": "Enter a valid date.",
+      "costsTitle": "Cost per liter",
+      "perLiter": "Cost per liter — {name}",
+      "perLiterHint": "In riyals, up to 2 decimals. Covers {liters} L.",
+      "currency": "SAR / L",
+      "issue": {
+        "invalid": "Enter a valid cost with up to 2 decimals.",
+        "zero_needs_approval": "Zero cost needs the “allow zero cost” option under Advanced.",
+        "required": "Enter the cost per liter."
+      },
+      "noAuthority": "You can save the draft without costs. Finance records the cost per liter before approval.",
+      "account": {
+        "title": "Opening balance account",
+        "label": "Account",
+        "placeholder": "Choose an account",
+        "hint": "Only active equity accounts are listed.",
+        "source_station": "Set for this station",
+        "source_org": "Organization default",
+        "source_none": "No account is set yet — choose one to continue.",
+        "willSave": "The selected account will be saved as this station’s opening balance account.",
+        "willSaveOrg": "The selected account will be saved as the organization default.",
+        "preconfigured": "An account is already set. You can review it in the next step.",
+        "noList": "You cannot browse accounts. Ask the person responsible to set the account.",
+        "noEligible": "There is no active equity account to choose from.",
+        "ineligible": "The account currently set is not eligible. Choose another.",
+        "loadFailed": "Could not load the accounts.",
+        "saveFailed": "The account was not saved.",
+        "required": "Choose the opening balance account."
+      },
+      "advanced": {
+        "title": "Advanced options",
+        "notes": "Notes (optional)",
+        "allowZero": "Allow zero cost",
+        "allowZeroHint": "Only for fuel received free of charge. Approve with care.",
+        "scope": "Save the account for",
+        "scopeStation": "This station only",
+        "scopeOrg": "All stations (organization default)"
+      }
+    },
+    "review": {
+      "heading": "Review before approval",
+      "saving": "Saving the draft…",
+      "previewing": "Preparing the preview…",
+      "draftSaved": "Draft {number} saved. Nothing is posted yet.",
+      "quantities": "Quantities",
+      "products": "Per fuel type",
+      "costPerLiter": "Cost per liter",
+      "value": "Value",
+      "total": "Total",
+      "entryTitle": "Accounting entry",
+      "entryNote": "One entry for the whole document, balanced.",
+      "debit": "Debit",
+      "credit": "Credit",
+      "account": "Account",
+      "amount": "Amount",
+      "noMoney": "Costs and the accounting entry are shown only to users with cost access.",
+      "notChecked": "The accounting period lock is checked when you approve.",
+      "ready": "Ready to approve",
+      "notReady": "Cannot approve yet",
+      "blockers": "Fix these first",
+      "warnings": "Notes",
+      "needAuthority": "Approving needs finance permission. Your draft is saved for the approver.",
+      "distinctApprover": {
+        "title": "Another person must approve",
+        "body": "Station policy requires someone other than the creator to approve. Your draft is saved — an authorized colleague can open this screen, review it and approve."
+      },
+      "confirmTitle": "Approve opening balance?",
+      "confirmBody": "This adds the stock to the station and records the entry. It cannot be edited afterwards.",
+      "confirmAction": "Approve now",
+      "posting": "Approving…",
+      "retry": "Try again",
+      "previewFailed": "Could not load the preview."
+    },
+    "nav": {
+      "back": "Back",
+      "next": "Continue",
+      "review": "Save draft & review",
+      "approve": "Approve",
+      "cancel": "Cancel"
+    },
+    "fail": {
+      "blocked": "Approval was refused. See the points below.",
+      "date_future": "The opening date cannot be in the future.",
+      "date_invalid": "The opening date is not valid.",
+      "lines_invalid": "One of the tanks is not valid for this station.",
+      "quantity_invalid": "A quantity is not valid.",
+      "cost_invalid": "A cost is not valid.",
+      "cost_authority": "You do not have permission to record costs.",
+      "idempotency_conflict": "This request was already used with different data. Go back and review.",
+      "not_draft": "This document is already approved and cannot be edited.",
+      "account_required": "Set the opening balance account first.",
+      "account_invalid": "The chosen account is not eligible.",
+      "distinct_approver": "Station policy requires someone other than the creator to approve.",
+      "period_locked": "The accounting period for this date is closed.",
+      "station_outside_scope": "This station is outside your access.",
+      "mismatch": "Stock did not match the quantities, so nothing was posted.",
+      "unauthorized": "Your session has expired. Sign in again.",
+      "forbidden": "You do not have permission for this action.",
+      "not_found": "Not found, or opening balances are not enabled.",
+      "conflict": "The data changed. Check the status.",
+      "rate_limited": "Too many requests. Wait a moment.",
+      "validation": "The request was refused.",
+      "unverified": "The reply was not clear. Check the status before trying again.",
+      "unknown_timeout": "No reply in time. It may have gone through — check the status; do not send again.",
+      "unknown_network": "The connection dropped after sending. It may have gone through — check the status.",
+      "unknown_server": "The server failed after receiving the request. It may have gone through — check the status.",
+      "not_sent_offline": "You are offline. Nothing was sent.",
+      "not_sent_demo": "Preview mode does not send real data.",
+      "check": "Check status",
+      "checking": "Checking…",
+      "checkedPosted": "Confirmed: the opening balance is approved.",
+      "checkedDraft": "Confirmed: nothing was approved. You can approve again.",
+      "checkedSaved": "The draft was saved.",
+      "checkedNotSaved": "No draft was saved. You can try again.",
+      "serverSays": "Server message: {message}"
+    },
+    "blocker": {
+      "FUEL_OPENING_ACCOUNT_REQUIRED": "The opening balance account is not set.",
+      "FUEL_OPENING_INVENTORY_ACCOUNT_INVALID": "The fuel inventory account is not set up correctly.",
+      "FUEL_OPENING_POOL_NOT_EMPTY": "This fuel type already has stock at the station. Use stock count or receiving instead.",
+      "FUEL_OPENING_POOL_HAS_HISTORY": "This fuel type already has stock history at the station. Use stock count or receiving instead.",
+      "FUEL_OPENING_COST_MISSING": "The cost per liter is missing for a fuel type.",
+      "FUEL_OPENING_ZERO_COST_NOT_ALLOWED": "A cost of zero needs the “allow zero cost” option.",
+      "FUEL_OPENING_EXCEEDS_CAPACITY": "A quantity exceeds its tank capacity.",
+      "FUEL_OPENING_TANK_INACTIVE": "A tank in this document is inactive.",
+      "FUEL_OPENING_TANK_INVALID": "A tank does not belong to this station.",
+      "FUEL_OPENING_TANK_PRODUCT_CHANGED": "A tank’s fuel type changed after the draft was saved.",
+      "FUEL_OPENING_PRODUCT_UNAVAILABLE": "A fuel type is inactive or not tracked in stock.",
+      "FUEL_OPENING_PRODUCT_UNIT_INVALID": "A fuel type has an invalid unit setup.",
+      "FUEL_OPENING_VALUE_INVALID": "A value could not be calculated.",
+      "FUEL_OPENING_STATION_UNAVAILABLE": "The station is missing or inactive.",
+      "FUEL_OPENING_STATION_CHANGED": "The station’s branch or warehouse changed. Start a new document.",
+      "FUEL_OPENING_WAREHOUSE_UNAVAILABLE": "The station warehouse is missing or inactive.",
+      "FUEL_OPENING_NO_LINES": "The document has no tanks.",
+      "FUEL_OPENING_ABOVE_SAFE_CAPACITY": "A quantity is above the tank’s safe capacity."
     }
   }
 }
