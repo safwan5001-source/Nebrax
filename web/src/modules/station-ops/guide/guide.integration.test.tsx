@@ -20,11 +20,30 @@ vi.mock('../context', () => ({
 import { GuideProvider, useSmartGuide } from './guide-context';
 import { GuideScreenShortcut, GuideToursPanel } from './tours-panel';
 import { progressKey, readProgress } from './progress';
+import { isVisible, visibility } from './plan';
 
 const M = TEST_MESSAGES.en.stationOps;
 const tour = M.guide.tour;
 
-/** jsdom لا يحسب التخطيط: كل عنصر «ظاهر» ما لم يُعلَّم `data-test-hidden`، وله مستطيل ثابت. */
+/**
+ * jsdom لا يحسب التخطيط: كل عنصر «ظاهر» ما لم يُعلَّم `data-test-hidden`، وله مستطيل ثابت.
+ * **يجب استعادة كل ما نعدّله على النماذج الأولية والنافذة**: الحزمة الكاملة تعمل في عملية واحدة (singleFork)، وتسرّب
+ * `HTMLElement.prototype.scrollIntoView` أو `matchMedia` يكسر اختبارات ملفات أخرى (CI أحمر) رغم نجاحها منفردةً.
+ */
+const original = {
+  scrollIntoView: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView'),
+  matchMedia: Object.getOwnPropertyDescriptor(window, 'matchMedia'),
+};
+function restoreGlobals() {
+  for (const [target, key, descriptor] of [
+    [HTMLElement.prototype, 'scrollIntoView', original.scrollIntoView],
+    [window, 'matchMedia', original.matchMedia],
+  ] as const) {
+    if (descriptor) Object.defineProperty(target, key, descriptor);
+    else delete (target as unknown as Record<string, unknown>)[key];
+  }
+}
+
 beforeEach(() => {
   state.pathname = '/fuel-stations/ops';
   state.push.mockReset();
@@ -32,14 +51,11 @@ beforeEach(() => {
   state.user = { id: 'u1', tenant_id: 't1', name: 'Sami', email: 's@x.test', role: 'cashier' };
   window.localStorage.clear();
   window.localStorage.setItem('awj.station-guide.force', '1');
-  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockImplementation(function (this: HTMLElement) {
-    return (this.closest('[data-test-hidden]') ? [] : [{}]) as unknown as DOMRectList;
-  });
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ top: 100, left: 20, width: 200, height: 60, right: 220, bottom: 160, x: 20, y: 100, toJSON: () => ({}) }));
+  visibility.check = (element) => !element.closest('[data-test-hidden]');
   HTMLElement.prototype.scrollIntoView = vi.fn();
   window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), onchange: null, dispatchEvent: vi.fn() })) as unknown as typeof window.matchMedia;
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); window.localStorage.clear(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); restoreGlobals(); visibility.check = isVisible; window.localStorage.clear(); });
 
 /** شاشة رئيسية مبسّطة بالمرساة نفسها التي تعتمدها الجولة. */
 function Home({ withHelp = true, nextStepHidden = false, onPrimary = vi.fn() }: { withHelp?: boolean; nextStepHidden?: boolean; onPrimary?: () => void }) {

@@ -12,6 +12,12 @@ export function isVisible(element: Element): boolean {
   return style.visibility !== 'hidden' && style.display !== 'none';
 }
 
+/**
+ * مرساة اختبار: jsdom لا يحسب التخطيط (`getClientRects` فارغة دائماً)، والاختبارات كانت تعدّل نماذج DOM الأولية فتسرّب إلى ملفات أخرى
+ * في العملية نفسها. بدلاً من ذلك تستبدل الاختبارات هذه الدالة وتستعيدها؛ الإنتاج دائماً `isVisible`.
+ */
+export const visibility: { check: (element: Element) => boolean } = { check: isVisible };
+
 /** أول عنصر ظاهر يطابق المحدِّد (قد يطابق المحدِّد عناصر مخفية قبل الظاهر). */
 export function findTarget(selector: string, root: ParentNode = document): HTMLElement | null {
   let list: NodeListOf<Element>;
@@ -20,7 +26,7 @@ export function findTarget(selector: string, root: ParentNode = document): HTMLE
   } catch {
     return null;
   }
-  for (const element of list) if (isVisible(element)) return element as HTMLElement;
+  for (const element of list) if (visibility.check(element)) return element as HTMLElement;
   return null;
 }
 

@@ -99,7 +99,7 @@ for (const locale of ['ar', 'en'] as const) {
         await shot(page, `handover-${locale}-${info.project.name}-${String(steps.length).padStart(2, '0')}-${step}`);
         if (step === 'confirm') {
           sawConfirm = true;
-          const target = (await page.locator('[data-confirm-close]').boundingBox())!;
+          const target = (await page.locator('[data-action-bar] button').boundingBox())!;
           const c = (await card(page).boundingBox())!;
           const intersects = c.x < target.x + target.width && target.x < c.x + c.width && c.y < target.y + target.height && target.y < c.y + c.height;
           if (info.project.name === 'mobile') expect(intersects, 'the card must not sit on the confirm button').toBe(false);
@@ -169,14 +169,17 @@ for (const locale of ['ar', 'en'] as const) {
       await setup(page, locale);
       await page.goto(`${baseUrl}/fuel-stations/ops/products`, { waitUntil: 'domcontentloaded' });
       await startFromContextual(page, locale);
-      await page.waitForTimeout(600);
-      for (let i = 0; i < 2; i += 1) { await card(page).getByRole('button', { name: L.next }).click(); await page.waitForTimeout(700); }
-      const gap = async () => page.evaluate(() => {
+      await expect(overlay(page)).toHaveAttribute('data-guide-step', /.+/);
+      await page.waitForTimeout(900); // انتهاء التمرير الناعم والانتقال
+      // الخطوة الأولى المتاحة تُبرز قسماً طويلاً من الصفحة (يتخطّى المرشد ما لا يظهر): نقيس الإطار مقابله مباشرة.
+      const SECTIONS: Record<string, string> = { dispensable: 'fo-dispensable-h', pumps: 'fo-pumps-h', tanks: 'fo-tanks-h' };
+      const step = (await overlay(page).getAttribute('data-guide-step'))!;
+      expect(Object.keys(SECTIONS), step).toContain(step);
+      const gap = async () => page.evaluate((id) => {
         const s = (document.querySelector('[data-guide-spotlight]') as HTMLElement).getBoundingClientRect();
-        const t = document.querySelector('section[aria-labelledby="fo-pumps-h"]') as HTMLElement;
-        const r = t.getBoundingClientRect();
-        return Math.abs(s.top - (r.top - 8));
-      });
+        const r = (document.querySelector(`section[aria-labelledby="${id}"]`) as HTMLElement).getBoundingClientRect();
+        return Math.abs(s.top - Math.max(r.top - 8, 4));
+      }, SECTIONS[step]);
       expect(await gap()).toBeLessThan(3);
       await page.evaluate(() => window.scrollBy(0, 160));
       await page.waitForTimeout(250);
@@ -207,7 +210,7 @@ for (const locale of ['ar', 'en'] as const) {
       for (const theme of ['light', 'dark'] as const) {
         const fresh = await page.context().newPage();
         await setup(fresh, locale, { theme });
-        await fresh.addInitScript(() => localStorage.setItem('awj.station-guide.force', '1'));
+        await fresh.addInitScript(() => { for (const key of Object.keys(localStorage)) if (key.startsWith('awj.station-guide.v1.')) localStorage.removeItem(key); localStorage.setItem('awj.station-guide.force', '1'); });
         await fresh.goto(`${baseUrl}/fuel-stations/ops`, { waitUntil: 'domcontentloaded' });
         await expect(fresh.locator('[data-smart-guide]')).toBeVisible({ timeout: 10_000 });
         await fresh.waitForTimeout(700);
