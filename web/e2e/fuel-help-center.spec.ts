@@ -79,7 +79,8 @@ for (const locale of ['ar', 'en'] as const) {
 
     test('a guide page shows steps/permissions/errors and the interactive guide walks step by step', async ({ page }, info) => {
       await open(page, '/fuel-stations/ops/help/fuel-open-shift', { locale });
-      await expect(page.getByRole('heading', { level: 1 })).toContainText(L.openShiftTitle);
+      await expect(page.getByRole('heading', { level: 2 }).filter({ hasText: L.openShiftTitle }).first()).toBeVisible();
+      expect(await page.locator('h1').count()).toBe(1); // h1 واحد لكل شاشة
       await expect(page.getByText('fuel.shift.open').first()).toBeVisible();
       expect(await noHorizontalOverflow(page)).toBe(true);
       await shot(page, `help-article-${locale}-${info.project.name}`);

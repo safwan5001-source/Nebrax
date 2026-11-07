@@ -9,7 +9,7 @@ import { AudienceBadges, FuelHelpArticleBody, type FuelHelpSurface } from './fue
 import { FuelHelpGuidePlayer } from './fuel-help-guide-player';
 
 /** صفحة دليل كاملة: الجسم المشترك + الدليل التفاعلي + أدلة ذات صلة. `basePath` أساس المركز في السطح الحالي. */
-export function FuelHelpArticleView({ slug, basePath, surface }: { slug: string; basePath: string; surface: FuelHelpSurface }) {
+export function FuelHelpArticleView({ slug, basePath, surface, titleAs: Title = 'h1' }: { slug: string; basePath: string; surface: FuelHelpSurface; /** يملك التطبيق h1 في رأسه الكحلي فيُعرض عنوان الدليل h2 (h1 واحد لكل شاشة). */ titleAs?: 'h1' | 'h2' }) {
   const t = useTranslations('fuelHelp');
   const common = useTranslations('helpCenter');
   const locale = helpLocale(useLocale());
@@ -42,7 +42,7 @@ export function FuelHelpArticleView({ slug, basePath, surface }: { slug: string;
       <article className="overflow-hidden rounded-[16px] border border-border bg-surface">
         <header className="space-y-2 border-b border-border p-4 sm:p-6">
           <p className="text-xs font-semibold text-primary">{category.title[locale]}</p>
-          <h1 className="text-xl font-semibold leading-8 text-text">{article.title[locale]}</h1>
+          <Title className="text-xl font-semibold leading-8 text-text">{article.title[locale]}</Title>
           <p className="text-sm leading-6 text-muted">{article.summary[locale]}</p>
           <div className="flex flex-wrap items-center gap-3">
             <AudienceBadges article={article} locale={locale} />

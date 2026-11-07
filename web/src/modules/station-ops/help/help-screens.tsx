@@ -34,7 +34,7 @@ export function HelpArticleScreen({ slug }: { slug: string }) {
     <>
       <PageMasthead title={t('title')} backHref={OPS_HELP_BASE} backLabel={t('backToHelp')} />
       <ScreenBody>
-        <FuelHelpArticleView slug={slug} basePath={OPS_HELP_BASE} surface="app" />
+        <FuelHelpArticleView slug={slug} basePath={OPS_HELP_BASE} surface="app" titleAs="h2" />
       </ScreenBody>
     </>
   );
