@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import {
   BadgeDollarSign,
   BellRing,
+  CircleHelp,
   Database,
   Fingerprint,
   Fuel,
@@ -39,6 +40,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/alerts': BellRing,
   '/fuel-stations/readiness': Gauge,
   '/fuel-stations/settings': Settings2,
+  '/fuel-stations/help': CircleHelp,
 };
 
 /**

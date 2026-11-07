@@ -1,0 +1,481 @@
+import type { FuelHelpArticle } from './types';
+
+/** أدلة التهيئة والإدارة والتطبيق: إعدادات المحطة، المنتجات والأسعار، الخزانات/المضخات/الفوهات، الموظفون، الدخول بـPIN، المبيعات الرسمية. */
+export const FUEL_SETUP_ARTICLES: readonly FuelHelpArticle[] = [
+  {
+    slug: 'fuel-app-quickstart',
+    category: 'appBasics',
+    title: { ar: 'البدء في تطبيق محطات أَوْج', en: 'Getting started with the AWJ Stations app' },
+    summary: { ar: 'التنقل والرئيسية والمحطة المختارة واللغة والمظهر وما يعنيه شريط انقطاع الاتصال.', en: 'Navigation, home, the selected station, language, theme, and what the offline banner means.' },
+    keywords: { ar: 'بداية تطبيق محطات تنقل رئيسية محطة لغة مظهر ملف شخصي خروج تبديل موظف جهاز مشترك', en: 'start app stations navigation home station language theme profile sign out switch employee shared device' },
+    minutes: 4,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'app',
+    overview: {
+      ar: 'تطبيق «محطات أَوْج» مساحة جوال لعمل البائع والمشرف اليومي. تظهر لك عناصر التنقل السفلي بحسب صلاحياتك الفعلية، ويفرض الخادم الصلاحيات في كل طلب، فإخفاء عنصر ليس هو الحماية.',
+      en: 'The AWJ Stations app is a mobile workspace for the attendant’s and supervisor’s daily work. The bottom navigation shows items according to your actual permissions, and the server enforces permissions on every request, so hiding an item is not the protection.',
+    },
+    permissions: ['fuel_stations.view'],
+    permissionsNote: { ar: 'مفتاح كل مستخدم محطة. باقي العناصر: الورديات تحتاج fuel.shift.view، الاستلام يحتاج صلاحية استلام، الإدارة تحتاج صلاحية إدارية.', en: 'The key every station user holds. Other items: Shifts needs fuel.shift.view, Receiving needs a receiving permission, Manage needs an administrative permission.' },
+    procedures: [
+      {
+        title: { ar: 'أول استخدام', en: 'First use' },
+        steps: [
+          { ar: 'افتح رابط مؤسستك الذي زوّدتك به الإدارة، ثم سجّل الدخول (انظر دليل الدخول برمز PIN).', en: 'Open your company link provided by management, then sign in (see the PIN sign-in guide).' },
+          { ar: 'في الرأس تأكد من «المحطة». إن كانت لك أكثر من محطة اخترها من القائمة قبل أي عمل.', en: 'In the header confirm the Station. If you have more than one, pick it from the list before doing anything.' },
+          { ar: 'من «الرئيسية» اقرأ «الخطوة التالية» وملخص الفترة، ومن الشريط السفلي انتقل: المنتجات، الورديات، الاستلام، الخزانات، الإدارة، ملفي.', en: 'On Home read the "Next step" and the period summary, and use the bottom bar to move around: Products, Shifts, Receiving, Tanks, Manage, My profile.' },
+          { ar: 'لتغيير اللغة (العربية/English) أو المظهر (حسب الجهاز/فاتح/داكن) اضغط أيقونة الإعدادات في أعلى الرئيسية. التفضيل لهذا المتصفح فقط.', en: 'To change language (Arabic/English) or theme (system/light/dark) tap the settings icon at the top of Home. The preference applies to this browser only.' },
+          { ar: 'اضغط أيقونة «؟» في الرأس في أي شاشة لعرض مساعدة الشاشة الحالية، أو «المساعدة» لفتح مركز المساعدة كاملاً.', en: 'Tap the "?" icon in the header on any screen for help on the current screen, or "Help" to open the full Help Center.' },
+        ],
+      },
+      {
+        title: { ar: 'جهاز مشترك: تبديل الموظف', en: 'Shared device: switch employee' },
+        steps: [
+          { ar: 'افتح «ملفي».', en: 'Open My profile.' },
+          { ar: 'اضغط «تبديل الموظف» لإنهاء جلستك وفتح شاشة الدخول للموظف التالي، أو «تسجيل الخروج».', en: 'Press "Switch employee" to end your session and open the sign-in screen for the next person, or "Sign out".' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'نوع الواجهة', en: 'Workspace type' }, description: { ar: 'مشرف المحطة إن ملكت اعتماد الورديات، بائع المحطة إن ملكت فتحها، وإلا اطلاع فقط. تسمية عرض من صلاحياتك لا دور مخزَّن.', en: 'Station supervisor if you can approve shifts, station attendant if you can open them, otherwise view-only. A display label derived from permissions, not a stored role.' } },
+      { name: { ar: 'ما تسمح به صلاحياتك', en: 'What your permissions allow' }, description: { ar: 'في «ملفي» جدول للقراءة فقط: عرض المحطات، الورديات، الأسعار، فتح الوردية، اعتمادها.', en: 'A read-only list in My profile: view stations, shifts, prices, open a shift, approve shifts.' } },
+      { name: { ar: 'شريط «لا يوجد اتصال»', en: 'Offline banner' }, description: { ar: 'يعني أن البيانات المعروضة قد تكون قديمة. لا يعد التطبيق بمزامنة لاحقة، فأعد المحاولة عند عودة الاتصال.', en: 'Means the data shown may be stale. The app does not promise later sync, so retry when the connection returns.' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا أرى عنصراً في الشريط السفلي (مثل الاستلام أو الإدارة).', en: 'An item is missing from the bottom bar (such as Receiving or Manage).' }, fix: { ar: 'ظهوره يتبع صلاحياتك. افتح «ملفي» لترى ما يُسمح لك به واطلب الصلاحية من المسؤول. «الإدارة» تُخفى أيضاً في جلسة الدخول برمز PIN.', en: 'Visibility follows your permissions. Open My profile to see what you may do and ask the manager for permission. Manage is also hidden in a PIN session.' } },
+      { problem: { ar: 'لا تظهر أي محطة.', en: 'No station is shown.' }, fix: { ar: 'لم تُسنَد لك محطة أو محطاتك خارج الفرع الحالي. أبلغ المسؤول.', en: 'No station is assigned to you, or your stations are outside the current branch. Tell the manager.' } },
+      { problem: { ar: 'شريط انقطاع الاتصال ظاهر.', en: 'The offline banner is showing.' }, fix: { ar: 'تحقق من الإنترنت. لا تعتمد على أرقام قديمة، وأعد التحميل عند عودة الاتصال.', en: 'Check the internet. Do not rely on old numbers; reload when the connection is back.' } },
+    ],
+    screens: [
+      { label: { ar: 'الرئيسية', en: 'Home' }, appHref: '/fuel-stations/ops' },
+      { label: { ar: 'ملفي', en: 'My profile' }, appHref: '/fuel-stations/ops/profile' },
+      { label: { ar: 'الإعدادات', en: 'Settings' }, appHref: '/fuel-stations/ops/settings' },
+    ],
+    related: ['fuel-pin-login', 'fuel-shift-lifecycle', 'fuel-troubleshooting'],
+  },
+  {
+    slug: 'fuel-pin-login',
+    category: 'staffAccess',
+    title: { ar: 'الدخول برقم الموظف ورمز PIN', en: 'Signing in with employee number and PIN' },
+    summary: { ar: 'دخول موظف المحطة، وكيف يعيّن المسؤول رمز PIN أو يزيله.', en: 'How a station employee signs in, and how a manager sets or clears a PIN.' },
+    keywords: { ar: 'دخول رقم موظف PIN رمز تسجيل دخول تعيين إزالة جلسة محاولات خاطئة مشاركة', en: 'sign in employee number PIN code login set clear session wrong attempts shared' },
+    minutes: 4,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'app',
+    overview: {
+      ar: 'يدخل موظف المحطة بتطبيق «محطات أَوْج» برقم موظفه ورمز PIN من 6 أرقام. الدخول على مستخدمي أَوْج وصلاحياتهم ونطاق محطاتهم القائمة، وجلسة PIN مقيَّدة بمسارات المحطات فقط ولا تفتح أي شاشة إدارية أخرى. المدير يدخل بالبريد وكلمة المرور كالمعتاد.',
+      en: 'A station employee signs in to the AWJ Stations app with their employee number and a 6-digit PIN. Sign-in builds on existing AWJ users, permissions, and station scope, and a PIN session is limited to station routes and opens no other administrative screen. Managers sign in with email and password as usual.',
+    },
+    permissions: ['fuel.staff.manage'],
+    permissionsNote: { ar: 'الدخول نفسه لا يحتاج صلاحية خاصة. تعيين رمز PIN أو إزالته يتطلب fuel.staff.manage (صلاحية محجوزة لحاملي كل الصلاحيات)، ضمن نطاق محطات المُعيِّن.', en: 'Signing in itself needs no special permission. Setting or clearing a PIN requires fuel.staff.manage (a reserved permission, held by full-access users), within the assigner’s station scope.' },
+    procedures: [
+      {
+        title: { ar: 'تسجيل دخول الموظف', en: 'Employee sign-in' },
+        steps: [
+          { ar: 'افتح رابط مؤسستك الذي زوّدتك به الإدارة (المؤسسة تُحدَّد من الرابط).', en: 'Open your company link given by management (the company is identified from the link).' },
+          { ar: 'اكتب «رقم الموظف» (مثل EMP-00042) و«رمز PIN» المكوَّن من 6 أرقام. زر «إظهار الرمز» يساعدك على التأكد.', en: 'Enter the "Employee number" (for example EMP-00042) and the 6-digit "PIN". The "Show PIN" button helps you check.' },
+          { ar: 'اضغط «دخول». عند النجاح تصل إلى الرئيسية بصلاحياتك.', en: 'Press "Sign in". On success you land on Home with your permissions.' },
+          { ar: 'على جهاز مشترك سجّل الخروج أو بدّل الموظف قبل تسليم الجهاز.', en: 'On a shared device, sign out or switch employee before handing the device over.' },
+        ],
+      },
+      {
+        title: { ar: 'تعيين رمز PIN لموظف (المسؤول)', en: 'Set a PIN for an employee (manager)' },
+        steps: [
+          { ar: 'في جلسة كاملة (بالبريد) افتح «الإدارة» ثم «الموظفون» واختر الموظف.', en: 'In a full session (email sign-in) open Manage, then Staff, and choose the employee.' },
+          { ar: 'في قسم «رمز الدخول إلى تطبيق المحطات» تأكد من ظهور رقم الموظف؛ «غير مرتبط بسجل موظف» يعني أنه لا يستطيع الدخول.', en: 'In "Station app sign-in code" check the employee number appears; "Not linked to an employee record" means they cannot sign in.' },
+          { ar: 'اضغط «تعيين رمز» (أو «تغيير الرمز»)، واختر «توليد رمز عشوائي» أو «إدخال رمز يدوياً» (6 أرقام بلا تكرار 111111 ولا تتالٍ 123456).', en: 'Press "Set code" (or "Change code"), and choose "Generate a random code" or "Enter a code manually" (6 digits, no repeats like 111111 and no runs like 123456).' },
+          { ar: 'اضغط «تأكيد التعيين». الرمز المولَّد يظهر مرة واحدة فقط فسلّمه للموظف فوراً.', en: 'Press "Confirm". A generated code is shown only once, so give it to the employee immediately.' },
+          { ar: 'لإيقاف دخوله اضغط «إزالة الرمز» وأكّد؛ تنتهي جلسته الحالية.', en: 'To stop their access press "Clear code" and confirm; their current session ends.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'رقم الموظف', en: 'Employee number' }, description: { ar: 'الرقم المسجَّل للموظف في سجله الوظيفي. يوفره المسؤول.', en: 'The number on the employee’s HR record. Provided by the manager.' } },
+      { name: { ar: 'رمز PIN', en: 'PIN' }, description: { ar: '6 أرقام. يُخزَّن مجزَّأً فقط ولا يمكن عرضه لاحقاً. لا تشاركه.', en: '6 digits. Stored only as a hash and cannot be displayed later. Do not share it.' } },
+      { name: { ar: 'سبب (اختياري)', en: 'Reason (optional)' }, description: { ar: 'يُسجَّل في سجل التغييرات مع حالة وجود الرمز، دون الرمز نفسه.', en: 'Recorded in the change log with whether a PIN exists, never the PIN itself.' } },
+    ],
+    problems: [
+      { problem: { ar: 'رقم الموظف أو رمز PIN غير صحيح.', en: 'Employee number or PIN is incorrect.' }, fix: { ar: 'رسالة واحدة تُعرض لكل الأسباب (الرقم مجهول، لا رمز معيَّن، رمز خاطئ، موظف أو حساب غير نشط). تحقق من الرقم والرمز ثم اطلب من المسؤول مراجعة حالتك.', en: 'One message covers every cause (unknown number, no PIN set, wrong PIN, inactive employee or account). Check both, then ask the manager to review your status.' } },
+      { problem: { ar: 'محاولات خاطئة كثيرة.', en: 'Too many wrong attempts.' }, fix: { ar: 'انتظر بضع دقائق ثم حاول. الحساب غير مقفل، والحجب مؤقت. بعد 5 محاولات خاطئة خلال 5 دقائق من الجهاز نفسه يُمنع الدخول مؤقتاً.', en: 'Wait a few minutes then retry. The account is not locked; the block is temporary. After 5 wrong attempts in 5 minutes from the same device sign-in is blocked for a while.' } },
+      { problem: { ar: 'افتح التطبيق من رابط مؤسستك / تعذّر تحديد المؤسسة.', en: 'Open the app from your company link / the company could not be identified.' }, fix: { ar: 'استخدم الرابط الذي زوّدتك به الإدارة بالضبط.', en: 'Use exactly the link management gave you.' } },
+      { problem: { ar: 'اشتراك المؤسسة غير نشط.', en: 'The company subscription is inactive.' }, fix: { ar: 'راجع الإدارة.', en: 'Contact management.' } },
+      { problem: { ar: 'الرمز مرفوض (عند التعيين).', en: 'The code is rejected (when setting).' }, fix: { ar: 'اختر رمزاً غير متكرر ولا متتالٍ، أو استخدم التوليد العشوائي.', en: 'Pick a code with no repeats or runs, or use random generation.' } },
+    ],
+    notes: [
+      { ar: 'جلسة PIN تنتهي بعد مدة محددة (12 ساعة افتراضياً) وتُبطَل عند تغيير الرمز أو إزالته.', en: 'A PIN session ends after a set time (12 hours by default) and is revoked when the PIN is changed or cleared.' },
+    ],
+    screens: [
+      { label: { ar: 'شاشة الدخول', en: 'Sign-in screen' }, appHref: '/fuel-stations/ops/login' },
+      { label: { ar: 'الموظفون والصلاحيات', en: 'Staff and permissions' }, appHref: '/fuel-stations/ops/manage/staff' },
+    ],
+    related: ['fuel-staff-access', 'fuel-app-quickstart'],
+  },
+  {
+    slug: 'fuel-staff-access',
+    category: 'staffAccess',
+    title: { ar: 'الموظفون وصلاحيات المحطات', en: 'Staff and station permissions' },
+    summary: { ar: 'امنح موظفاً قالباً (بائع، مشرف، مدير محطة) ومحطاته، وراجع الفرق قبل الحفظ وتتبّع سجل التغييرات.', en: 'Give an employee a template (attendant, supervisor, station manager) and stations, review the diff before saving, and follow the change log.' },
+    keywords: { ar: 'موظفين صلاحيات قالب بائع مشرف مدير محطة إسناد محطات مراجعة سجل تغييرات تفويض محجوزة', en: 'staff permissions template attendant supervisor station manager assign stations review change log delegate reserved' },
+    minutes: 6,
+    audiences: ['manager'],
+    surface: 'app',
+    overview: {
+      ar: 'تدير «الإدارة ← الموظفون» ما يستطيعه كل موظف داخل المحطات: قالب صلاحيات جاهز (بائع ⊂ مشرف ⊂ مدير محطة، أو مخصّص) والمحطات المسموحة له. القالب وصفة تُنسخ لدور شخصي لكل موظف، فتعديل موظف لا يمسّ غيره. الوصول الفعلي هو التقاء المحطات المسندة مع فرع الموظف ومستودعاته.',
+      en: 'Manage → Staff controls what each employee can do in stations: a ready permission template (attendant ⊂ supervisor ⊂ station manager, or custom) and the stations allowed. A template is a recipe copied into a personal role per employee, so changing one person never affects others. Effective access is the intersection of assigned stations with the employee’s branch and warehouses.',
+    },
+    permissions: ['fuel.staff.manage'],
+    permissionsNote: { ar: 'صلاحية محجوزة لا تدخل أي قالب ولا «كل الصلاحيات»، ولا يمنحها إلا المالك أو المسؤول الكامل. لا تستطيع تفويض ما فوق صلاحياتك ولا تعديل حسابك.', en: 'A reserved permission that is in no template nor in "all permissions" and is granted only by the owner or a full administrator. You cannot delegate beyond your own permissions or edit your own account.' },
+    procedures: [
+      {
+        title: { ar: 'إدارة موظف', en: 'Manage an employee' },
+        steps: [
+          { ar: 'افتح «الإدارة» ثم «الموظفون». للإضافة اضغط «إضافة موظف للإدارة» واختر من القائمة (بحث بالاسم).', en: 'Open Manage, then Staff. To add, press "Add employee to management" and pick from the list (search by name).' },
+          { ar: 'اضغط «إدارة» عند الموظف واختر القالب: بائع، مشرف، مدير محطة، أو مخصّص لانتقاء صلاحيات بعينها.', en: 'Press "Manage" on the employee and choose the template: attendant, supervisor, station manager, or custom to pick specific permissions.' },
+          { ar: 'حدّد «المحطات المسموحة». موظف محدود بمحطات بلا أي محطة لا يصل إلى أي محطة.', en: 'Set the "Allowed stations". A station-limited employee with no station reaches none.' },
+          { ar: 'اضغط الحفظ لتظهر شاشة «مراجعة تعديلات»: صلاحيات تُضاف/تُسحب ومحطات تُضاف/تُسحب مع تحذير الصلاحية المحجوزة.', en: 'Press save to open the review dialog: permissions added/removed and stations added/removed, with a warning for reserved permissions.' },
+          { ar: 'اكتب «سبب التغيير» (اختياري) ثم «تأكيد الحفظ».', en: 'Enter a "Change reason" (optional) then press "Confirm save".' },
+          { ar: 'إن ظهر تعارض لأن مشرفاً آخر عدّل الموظف، يحفظ التطبيق تعديلاتك ويخيّرك بين إعادة تطبيقها فوق الأحدث أو تجاهلها.', en: 'If a conflict appears because another admin edited the employee, the app keeps your edits and lets you re-apply them on the latest version or discard them.' },
+        ],
+      },
+      {
+        title: { ar: 'مراجعة ما يمنحه كل قالب', en: 'See what each template grants' },
+        steps: [
+          { ar: 'افتح «الإدارة» ثم «الصلاحيات»: يعرض كل قالب والصلاحيات القابلة للتفويض بحسب مجموعات (الورديات، المبيعات، الاستلام والقراءات، بيانات المحطة…).', en: 'Open Manage, then Permissions: each template and the delegable permissions by group (shifts, sales, receiving and readings, station data…).' },
+          { ar: 'ما فوق صلاحياتك يظهر «فوق صلاحياتك» ولا يمكن إسناده.', en: 'Anything above your own permissions shows "Above your permissions" and cannot be assigned.' },
+        ],
+      },
+      {
+        title: { ar: 'تتبّع التغييرات', en: 'Follow changes' },
+        steps: [
+          { ar: 'افتح «الإدارة» ثم «سجل التغييرات» (قراءة فقط).', en: 'Open Manage, then Change log (read-only).' },
+          { ar: 'صفِّ حسب نتيجة العملية: الكل، نُفِّذت، مرفوضة، لمعرفة من غيّر ماذا ومتى.', en: 'Filter by outcome: all, applied, denied, to see who changed what and when.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'بائع / مشرف / مدير محطة', en: 'Attendant / supervisor / station manager' }, description: { ar: 'البائع: العرض وفتح الوردية وقراءاتها وتسليمها. المشرف يضيف الاعتماد ومراجعة الفروق وإنشاء الاستلام وتسجيل القراءات. مدير المحطة يضيف اعتماد الاستلام والمبيعات والتنبيهات.', en: 'Attendant: view, open, read, and hand over shifts. Supervisor adds approval, variance review, receiving creation, and readings. Station manager adds receiving approval, sales, and alert management.' } },
+      { name: { ar: 'صلاحيات محجوزة', en: 'Reserved permissions' }, description: { ar: 'حوكمة الوقود وإدارة الموظفين: لا تدخل قالباً ولا «اختيار الكل».', en: 'Fuel governance and staff management: never in a template or "select all".' } },
+    ],
+    problems: [
+      { problem: { ar: 'بلا محطات — لا وصول.', en: 'No stations — no access.' }, fix: { ar: 'أسند محطة واحدة على الأقل ثم احفظ.', en: 'Assign at least one station and save.' } },
+      { problem: { ar: 'ليست لديك صلاحية على هذا الموظف.', en: 'You have no authority over this employee.' }, fix: { ar: 'يتجاوز نطاق محطاتك أو صلاحياتك. اطلب من حامل صلاحية أعلى.', en: 'It exceeds your station scope or permissions. Ask someone with higher authority.' } },
+      { problem: { ar: 'الموظف لا يرى محطته رغم إسنادها.', en: 'The employee does not see their station despite assignment.' }, fix: { ar: 'الوصول التقاء المحطة المسندة مع فرع الموظف ومستودعاته؛ تحقق من الفرع والمخزن.', en: 'Access is the intersection of the assigned station with the employee’s branch and warehouses; check the branch and warehouse.' } },
+    ],
+    screens: [
+      { label: { ar: 'الموظفون', en: 'Staff' }, appHref: '/fuel-stations/ops/manage/staff' },
+      { label: { ar: 'الصلاحيات', en: 'Permissions' }, appHref: '/fuel-stations/ops/manage/permissions' },
+      { label: { ar: 'سجل التغييرات', en: 'Change log' }, appHref: '/fuel-stations/ops/manage/audit' },
+    ],
+    related: ['fuel-pin-login', 'fuel-troubleshooting'],
+  },
+  {
+    slug: 'fuel-tanks-pumps-nozzles',
+    category: 'stationSetup',
+    title: { ar: 'الخزانات والمضخات والفوهات والعلاقات بينها', en: 'Tanks, pumps, nozzles, and how they relate' },
+    summary: { ar: 'عرّف بنية الساحة بالترتيب الصحيح: محطة ← منتج وقود ← خزان ← مضخة ← فوهة.', en: 'Define the forecourt structure in the right order: station → fuel product → tank → pump → nozzle.' },
+    keywords: { ar: 'خزان مضخة فوهة منتج وقود محطة ربط خريطة سعة آمنة حد أدنى مخزون غير قابل للسحب تعطيل', en: 'tank pump nozzle fuel product station map capacity safe minimum dead stock deactivate' },
+    minutes: 6,
+    audiences: ['manager'],
+    surface: 'erp',
+    overview: {
+      ar: 'بيانات الساحة تُعرَّف من «الخزانات والمضخات والفوهات» في وحدة محطات الوقود. العلاقة: المحطة تضم خزانات ومضخات؛ لكل خزان منتج وقود واحد؛ كل فوهة تنتمي لمضخة وتسحب من خزان في المحطة نفسها، ومنتجها يُشتق من خزانها. المنتج لا يظهر «قابلاً للتعبئة» في التطبيق إلا إذا ربطته فوهة نشطة بمضخة نشطة وخزان نشط بالمنتج نفسه.',
+      en: 'Forecourt data is defined under "Tanks, pumps, and nozzles" in the Fuel Stations module. The relationship: a station holds tanks and pumps; each tank has one fuel product; each nozzle belongs to a pump and draws from a tank in the same station, and its product is derived from its tank. A product only appears as dispensable in the app when an active nozzle links an active pump and an active tank of that product.',
+    },
+    permissions: ['fuel_stations.view', 'fuel_stations.manage'],
+    permissionsNote: { ar: 'العرض: fuel_stations.view. الإنشاء والتعديل والتعطيل: fuel_stations.manage. الشاشة لا تُخفي الأزرار عمّن لا يملك الإدارة؛ يرفض الخادم بخطأ 403.', en: 'View: fuel_stations.view. Create, edit, deactivate: fuel_stations.manage. The screen does not hide buttons from non-managers; the server refuses with 403.' },
+    procedures: [
+      {
+        title: { ar: 'تهيئة الساحة بالترتيب', en: 'Set up the forecourt in order' },
+        steps: [
+          { ar: 'تبويب «المحطات» ← «إضافة»: اختر الفرع، (مخزن المحطة)، رمز المحطة واسمها والمدينة والحالة، وفي «تفاصيل التشغيل» المنطقة الزمنية.', en: 'Stations tab → Add: choose the branch, (station warehouse), code, name, city, status, and under "Operating details" the time zone.' },
+          { ar: 'تبويب «منتجات الوقود»: اربط منتج أَوْج نشطاً (وحدته الأساسية mL ووحدة العرض L) وأعطه رمزاً واسماً (والكثافة اختيارياً).', en: 'Fuel products tab: link an active AWJ product (base unit mL, display unit L) and give it a code and name (density optional).' },
+          { ar: 'تبويب «الخزانات»: اختر المحطة ومنتج الوقود ورمز الخزان واسمه، ثم السعة والسعة الآمنة والحد الأدنى والرصيد غير القابل للسحب بالليتر.', en: 'Tanks tab: choose station, fuel product, tank code and name, then capacity, safe capacity, minimum, and non-withdrawable stock in litres.' },
+          { ar: 'تبويب «المضخات»: المحطة ورقم المضخة (واسمها).', en: 'Pumps tab: station and pump number (and name).' },
+          { ar: 'تبويب «الفوهات»: اختر المضخة أولاً ثم خزاناً من المحطة نفسها؛ يُشتق المنتج تلقائياً. أدخل رقم الفوهة وقراءة العداد الافتتاحية.', en: 'Nozzles tab: pick the pump first, then a tank from the same station; the product is derived automatically. Enter the nozzle number and opening meter reading.' },
+          { ar: 'تأكد في تطبيق المحطات من صفحة «المنتجات» أن المنتج صار «قابلاً للتعبئة».', en: 'In the Stations app, check on the Products page that the product is now dispensable.' },
+        ],
+      },
+      {
+        title: { ar: 'تعطيل سجل', en: 'Deactivate a record' },
+        steps: [
+          { ar: 'اضغط «تعطيل» عند السجل وأكّد. يبقى السجل والخريطة والتاريخ التشغيلي محفوظين.', en: 'Press "Deactivate" on the record and confirm. The record, map, and operating history stay.' },
+          { ar: 'الشاشة لا تحذف أي سجل؛ التعطيل هو المسار المعتمد.', en: 'The screen never deletes a record; deactivation is the supported route.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'السعة / السعة الآمنة / الحد الأدنى / غير القابل للسحب', en: 'Capacity / safe / minimum / dead stock' }, description: { ar: 'يجب أن يتحقق: غير القابل للسحب ≤ الأدنى ≤ الآمنة ≤ السعة، والكمية الافتتاحية ضمن السعة. تُستعمل لأعلام مراقبة المستوى.', en: 'Must satisfy: dead ≤ minimum ≤ safe ≤ capacity, with the opening quantity within capacity. Used for level-monitor flags.' } },
+      { name: { ar: 'مخزن المحطة', en: 'Station warehouse' }, description: { ar: 'مخزن نشط متوافق مع فرع المحطة. بدونه تُرفض المبيعات الرسمية والاستلام والتسوية، وتظهر الشاشة تحذيراً.', en: 'An active warehouse compatible with the station’s branch. Without it official sales, receiving, and reconciliation are refused and the screen warns.' } },
+      { name: { ar: 'مرجع مصدر ATG / مرجع المتحكم الميداني', en: 'ATG source ref / field-controller ref' }, description: { ar: 'مراجع تكامل اختيارية فريدة على مستوى المؤسسة، ضمن «الإعدادات المتقدمة».', en: 'Optional integration references unique across the company, under advanced settings.' } },
+      { name: { ar: 'الحالة', en: 'Status' }, description: { ar: 'نشط، غير نشط، أو تحت الصيانة. الشاشات التشغيلية تعدّ «نشط» وحده قابلاً للاستعمال.', en: 'Active, inactive, or maintenance. Operational screens treat only Active as usable.' } },
+    ],
+    problems: [
+      { problem: { ar: 'يجب أن تنتمي المضخة والخزان ومنتج الوقود إلى خريطة محطة واحدة متطابقة.', en: 'Pump, tank, and fuel product must belong to one matching station map.' }, fix: { ar: 'اختر خزاناً من محطة المضخة نفسها؛ لا يُختار المنتج يدوياً بل يأتي من الخزان.', en: 'Pick a tank from the same station as the pump; the product is not chosen by hand, it comes from the tank.' } },
+      { problem: { ar: 'حدود الخزان غير متسقة.', en: 'Tank limits are inconsistent.' }, fix: { ar: 'رتّب القيم: الميت ≤ الأدنى ≤ الآمنة ≤ السعة، والافتتاحية ضمن السعة.', en: 'Order the values: dead ≤ minimum ≤ safe ≤ capacity, opening within capacity.' } },
+      { problem: { ar: 'كود/رقم مستخدم مسبقاً.', en: 'Code/number already used.' }, fix: { ar: 'رمز المحطة ومنتج الوقود فريدان للمؤسسة، ورمز الخزان ورقم المضخة فريدان داخل المحطة، ورقم الفوهة داخل المضخة.', en: 'Station and fuel-product codes are unique company-wide, tank code and pump number within the station, nozzle number within the pump.' } },
+      { problem: { ar: 'لا يمكن تغيير فرع محطة لها خزانات أو مضخات / مخزن محطة لها دفتر وقود.', en: 'Cannot change the branch of a station with tanks or pumps / the warehouse of a station with a fuel ledger.' }, fix: { ar: 'لا يُعدَّل بعد وجود بنية أو تاريخ. أنشئ المحطة الصحيحة من البداية؛ تغيير المخزن بحاجة نقل مخزون صريح غير متاح من هذه الشاشة.', en: 'It cannot be edited once structure or history exists. Create the right station from the start; changing warehouse needs an explicit stock transfer not available from this screen.' } },
+      { problem: { ar: 'المنتج لا يظهر قابلاً للتعبئة في التطبيق.', en: 'The product is not dispensable in the app.' }, fix: { ar: 'أنشئ فوهة نشطة بمضخة نشطة وخزان نشط بالمنتج نفسه، وتأكد أن المحطة نشطة.', en: 'Create an active nozzle with an active pump and an active tank of that product, and make sure the station is active.' } },
+      { problem: { ar: 'منتج الوقود غير مهيأ بوحدة مخزون mL ووحدة عرض L.', en: 'Fuel product is not set to stock unit mL and display unit L.' }, fix: { ar: 'اضبط وحدات المنتج في بطاقة المنتج قبل ربطه.', en: 'Fix the product’s units on its product card before linking.' } },
+    ],
+    unavailable: [
+      { ar: 'حذف السجلات ونقاط معايرة الخزان وبيانات الترخيص والعنوان ومدير المحطة ليست في هذه الشاشة اليوم.', en: 'Deleting records, tank calibration points, license and address data, and the station manager are not on this screen today.' },
+    ],
+    screens: [
+      { label: { ar: 'الخزانات والمضخات والفوهات', en: 'Tanks, pumps, and nozzles' }, erpHref: '/fuel-stations/master-data' },
+      { label: { ar: 'المنتجات والمضخات (عرض)', en: 'Products and pumps (view)' }, appHref: '/fuel-stations/ops/products' },
+    ],
+    related: ['fuel-products-prices', 'fuel-station-settings', 'fuel-tank-readings'],
+  },
+  {
+    slug: 'fuel-station-settings',
+    category: 'stationSetup',
+    title: { ar: 'إعدادات المحطة', en: 'Station settings' },
+    summary: { ar: 'سياسات الورديات والتسوية والحسابات وطرق التحصيل، على مستوى المؤسسة أو محطة بعينها.', en: 'Shift, reconciliation, account, and collection-method policies at organisation or single-station level.' },
+    keywords: { ar: 'إعدادات محطة سياسة وردية عهدة افتتاح اعتماد مشرف طرق تحصيل نمط ضريبة حسابات تسوية حد', en: 'station settings policy shift opening float supervisor approval collection methods tax mode accounts reconciliation tolerance' },
+    minutes: 6,
+    audiences: ['manager'],
+    surface: 'erp',
+    overview: {
+      ar: 'تضبط الإعدادات سلوك الورديات والتسوية والتحصيل والحسابات. اختر «نطاق الإعدادات»: المؤسسة، أو محطة بعينها (القيمة الفارغة فيها تعني «استخدم الموروث»). لكل قسم زر «حفظ القسم» مستقل. لا يوجد سلوك واحد مفروض: أغلب القرارات خيارات تضبطها مؤسستك.',
+      en: 'Settings control shift, reconciliation, collection, and account behaviour. Choose the "Settings scope": the organisation, or a specific station (an empty value there means "use inherited"). Each section has its own "Save section" button. There is no single forced behaviour: most decisions are options your company sets.',
+    },
+    permissions: ['fuel_stations.view', 'fuel_stations.manage', 'fuel.governance.manage'],
+    permissionsNote: { ar: 'العرض fuel_stations.view، والتعديل fuel_stations.manage. مفاتيح الحوكمة (فصل المعتمِد وسياسة القراءات المتأخرة) تتطلب أيضاً fuel.governance.manage ولا تظهر في هذه الشاشة؛ سياسة القراءات المتأخرة لها شاشة في تطبيق المحطات.', en: 'Viewing: fuel_stations.view; editing: fuel_stations.manage. Governance keys (distinct approver and late-reading policy) also require fuel.governance.manage and are not on this screen; the late-reading policy has a screen in the Stations app.' },
+    procedures: [
+      {
+        title: { ar: 'تعديل إعداد', en: 'Change a setting' },
+        steps: [
+          { ar: 'افتح «الإعدادات» واختر «نطاق الإعدادات»: المؤسسة أو محطة.', en: 'Open Settings and pick the "Settings scope": organisation or a station.' },
+          { ar: 'عدّل القسم المطلوب (التشغيل، التسوية، الحسابات، الأسعار والضريبة، الورديات، AVI/RFID والتحصيل).', en: 'Edit the section you need (operations, reconciliation, accounts, prices and tax, shifts, AVI/RFID and collection).' },
+          { ar: 'اكتب «سبب التغيير» (اختياري) ليدخل سجل التدقيق.', en: 'Enter a "Change reason" (optional) for the audit log.' },
+          { ar: 'اضغط «حفظ القسم». تظهر «تم حفظ الإعدادات».', en: 'Press "Save section". "Settings saved" appears.' },
+        ],
+      },
+      {
+        title: { ar: 'تفعيل طرق التحصيل لمحطة', en: 'Enable collection methods for a station' },
+        steps: [
+          { ar: 'اختر نطاق المحطة وافتح «AVI/RFID والتحصيل».', en: 'Choose station scope and open "AVI/RFID and collection".' },
+          { ar: 'في «طرق التحصيل المسموحة» فعّل مفتاح كل طريقة دفع نشطة (نقدي، بنكي…) تريدها للمحطة.', en: 'Under "Allowed collection methods" switch on each active payment method (cash, bank…) you want for the station.' },
+          { ar: 'احفظ القسم. هذه الطرق هي التي يطلب التطبيق مبالغها في توزيع التحصيل عند التسليم.', en: 'Save the section. These are the methods whose amounts the app asks for in the collection split at handover.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'الورديات', en: 'Shifts' }, description: { ar: 'مفاتيح: قراءة عداد/خزان عند الفتح والإغلاق، مبلغ بداية نقدي، تعيين موظف، عدّ النقد عند الإغلاق، اعتماد المشرف، السماح بالإغلاق مع فرق نقدي أو تشغيلي. وحدّا فرق العدادات والخزانات باللتر.', en: 'Switches: meter/tank readings at open and close, opening cash amount, staff assignment, cash count at close, supervisor approval, allowing close with a cash or operational variance. Plus meter and tank variance limits in litres.' } },
+      { name: { ar: 'التسوية', en: 'Reconciliation' }, description: { ar: 'حد مطلق باللتر وحد نسبي بالمئة. تُسجَّل الفروق دائماً للمراجعة.', en: 'An absolute limit in litres and a relative limit in percent. Variances are always logged for review.' } },
+      { name: { ar: 'الحسابات', en: 'Accounts' }, description: { ar: 'حساب المخزون والإيراد والتكلفة للمحطة، وفروق ومكاسب المخزون، والمخزون المستلم غير المفوتر، وحساب الأرصدة الافتتاحية (حقوق ملكية). يجب أن يكون الحساب نشطاً وقابلاً للترحيل وبالاتجاه الصحيح.', en: 'Station inventory, revenue, and cost accounts, inventory variance and gain, received-not-invoiced stock, and the opening-balances account (equity). The account must be active, postable, and of the right type.' } },
+      { name: { ar: 'الأسعار والضريبة', en: 'Prices and tax' }, description: { ar: 'نمط ضريبة سعر الوقود: السعر شامل أو غير شامل الضريبة. لا بيع رسمي ولا حفظ سعر بدونه.', en: 'Fuel price tax mode: price includes or excludes tax. Neither official sale nor saving a price is possible without it.' } },
+      { name: { ar: 'متقدم', en: 'Advanced' }, description: { ar: 'قيم فعّالة للقراءة فقط (مهل الأجهزة، الاحتفاظ، محاولات إعادة…).', en: 'Read-only effective values (device timeouts, retention, retries…).' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا يمكن حفظ الإعدادات.', en: 'Settings cannot be saved.' }, fix: { ar: 'تحقق من أنك تملك fuel_stations.manage. لا يعدّل غيرها.', en: 'Check you hold fuel_stations.manage. Nothing else can edit.' } },
+      { problem: { ar: 'نمط ضريبة سعر الوقود يجب أن يكون شاملاً أو غير شامل.', en: 'Fuel price tax mode must be inclusive or exclusive.' }, fix: { ar: 'اختر إحدى الخيارين في «الأسعار والضريبة».', en: 'Pick one of the two options under "Prices and tax".' } },
+      { problem: { ar: 'حساب الوقود يجب أن يكون نشطاً وقابلاً للترحيل وباتجاهه الصحيح.', en: 'The fuel account must be active, postable, and of the right type.' }, fix: { ar: 'اختر حساب أصل للمخزون وإيراد للإيراد ومصروف للتكلفة، وليس حساباً تجميعياً.', en: 'Choose an asset account for inventory, revenue for revenue, expense for cost, and not a group account.' } },
+      { problem: { ar: 'هذه القدرة غير متاحة لمؤسستك أو لدورك.', en: 'This capability is unavailable for your company or role.' }, fix: { ar: 'تواصل مع مالك الحساب لتفعيلها.', en: 'Ask the account owner to enable it.' } },
+      { problem: { ar: 'طرق الدفع غير مفعّلة فلا يحفظ البائع توزيع التحصيل.', en: 'Payment methods are not enabled so the attendant cannot save the collection split.' }, fix: { ar: 'فعّل طريقة دفع واحدة على الأقل للمحطة كما في الإجراء الثاني.', en: 'Enable at least one payment method for the station as in the second procedure.' } },
+    ],
+    notes: [
+      { ar: 'الإعدادات تغيّر السلوك من لحظة الحفظ ولا تعدّل سجلات تاريخية.', en: 'Settings change behaviour from the moment of saving and do not alter historical records.' },
+    ],
+    unavailable: [
+      { ar: 'إدارة سياسات الحوكمة (فصل المعتمِد، القراءات المتأخرة) غير معروضة هنا؛ تُدار القراءات المتأخرة من تطبيق المحطات. ولا تُعرض ساعات التشغيل للتعديل، وتظهر للقراءة فقط.', en: 'Governance policies (distinct approver, late readings) are not shown here; late readings are managed from the Stations app. Operating hours are read-only and not editable.' },
+    ],
+    screens: [{ label: { ar: 'إعدادات محطات الوقود', en: 'Fuel station settings' }, erpHref: '/fuel-stations/settings' }],
+    related: ['fuel-tanks-pumps-nozzles', 'fuel-products-prices', 'fuel-handover-shift'],
+  },
+  {
+    slug: 'fuel-products-prices',
+    category: 'stationSetup',
+    title: { ar: 'منتجات الوقود وأسعارها', en: 'Fuel products and prices' },
+    summary: { ar: 'اقرأ السعر الفعّال لكل منتج وضبط سعر جديد بتاريخ سريان، دون المساس بالمبيعات السابقة.', en: 'Read each product’s effective price and set a new price with a start date, without touching past sales.' },
+    keywords: { ar: 'سعر وقود لتر سعر فعال ضبط سعر سجل الأسعار شامل الضريبة محطة مؤسسة سريان استبدال', en: 'fuel price litre effective price set price price history tax inclusive station organisation start replace' },
+    minutes: 5,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'both',
+    overview: {
+      ar: 'السعر الفعّال هو سعر اللتر الذي تحسمه الخدمة: سعر المحطة المعتمد ثم سعر المؤسسة الافتراضي، وهو نفسه المستعمل عند إنهاء بيع الوقود. لا يُستعمل سعر بطاقة المنتج بديلاً. الأسعار الجديدة تسري من تاريخ بدايتها فقط ولا تغيّر مبيعات أو فواتير سابقة.',
+      en: 'The effective price is the per-litre price decided by the service: the station’s approved price, then the organisation default; it is the same one used when finalising a fuel sale. The product-card price is never a fallback. New prices apply from their start only and never change past sales or invoices.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.sale.view', 'fuel.sale.price.manage'],
+    permissionsNote: { ar: 'عرض السعر fuel.sale.view. ضبطه واقتراحات الأسعار fuel.sale.price.manage. سعر المؤسسة يعدّله من لا يقتصر على فرع أو مخزن فقط.', en: 'Viewing needs fuel.sale.view. Setting prices and suggestions need fuel.sale.price.manage. The organisation price can be edited only by someone not limited to a branch or warehouse.' },
+    procedures: [
+      {
+        title: { ar: 'قراءة السعر في التطبيق', en: 'Read the price in the app' },
+        steps: [
+          { ar: 'افتح «المنتجات» وتأكد من المحطة المختارة.', en: 'Open Products and confirm the selected station.' },
+          { ar: 'تحت كل منتج وقود قابل للتعبئة اقرأ السعر «/ لتر» ومصدره (سعر المحطة أو الافتراضي) وتاريخ السريان ونمط الضريبة.', en: 'Under each dispensable fuel product read the price "/ litre", its source (station or default), its start date, and tax mode.' },
+          { ar: 'إن ظهر «السعر غير مضبوط» فاطلب من المسؤول ضبطه.', en: 'If "Price not configured" shows, ask the manager to set it.' },
+        ],
+      },
+      {
+        title: { ar: 'ضبط سعر جديد (المسؤول)', en: 'Set a new price (manager)' },
+        steps: [
+          { ar: 'افتح «أسعار الوقود» في وحدة المحطات (أو الرابط من «الإدارة» في التطبيق).', en: 'Open "Fuel prices" in the Stations module (or the link from Manage in the app).' },
+          { ar: 'اختر «نطاق السعر»: المحطة أو المؤسسة، ثم اضغط «ضبط السعر» أو «تعديل السعر» على المنتج.', en: 'Choose the "Price scope": station or organisation, then press "Set price" or "Edit price" on the product.' },
+          { ar: 'اكتب «سعر اللتر» بالريال (منزلتان كحد أقصى، أكبر من صفر).', en: 'Enter the "Price per litre" in riyals (max two decimals, above zero).' },
+          { ar: 'اختر «بداية السريان»: الآن (وقت الخادم) أو «في وقت لاحق» بعد دقيقة على الأقل من الآن.', en: 'Choose the "Effective from": now (server time) or "Later", at least a minute ahead.' },
+          { ar: 'اضغط «مراجعة»، وإن كنت تستبدل سعراً ساري المفعول فعّل «أفهم أن السعر الحالي سيُغلق عند بداية السعر الجديد».', en: 'Press "Review", and if replacing an active price tick "I understand the current price will close when the new one starts".' },
+          { ar: 'اضغط «تأكيد وحفظ السعر». راجع «سجل الأسعار» للتحقق.', en: 'Press "Confirm and save price". Check "Price history" to verify.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'سعر المحطة / سعر المؤسسة', en: 'Station price / organisation price' }, description: { ar: 'سعر المحطة يتقدّم على الافتراضي. المنتجات بلا فوهة نشطة في المحطة لا تُعرض هنا.', en: 'The station price overrides the default. Products with no active nozzle in the station are not shown here.' } },
+      { name: { ar: 'شامل الضريبة / قبل الضريبة', en: 'Tax inclusive / before tax' }, description: { ar: 'يأتي من نمط الضريبة في إعدادات المحطة، ويلزم تحديده قبل حفظ أي سعر.', en: 'Comes from the tax mode in station settings, and must be set before any price can be saved.' } },
+      { name: { ar: 'مراجعة الاقتراح', en: 'Review suggestion' }, description: { ar: 'اقتراح من بطاقة المنتج يُقبل فقط لوحدة لتر صريحة، ويلزم إقرار الوحدة وأساس الضريبة قبل «اعتماد السعر».', en: 'A suggestion from the product card is accepted only for an explicit litre unit, and the unit and tax basis must be acknowledged before "Approve price".' } },
+    ],
+    problems: [
+      { problem: { ar: 'البيع الرسمي غير جاهز: نمط الضريبة غير معيَّن / وحدة المنتج غير مهيّأة باللتر / المنتج غير نشط / لا سعر معتمد.', en: 'Official sale not ready: tax mode unset / product unit not in litres / product inactive / no approved price.' }, fix: { ar: 'عالج السبب المذكور: نمط الضريبة من إعدادات المحطة، الوحدة من بطاقة المنتج، أو اضبط السعر.', en: 'Fix the stated reason: tax mode in station settings, unit on the product card, or set the price.' } },
+      { problem: { ar: 'يوجد سعر ساري أو مجدول يتعارض مع هذه الفترة.', en: 'An active or scheduled price conflicts with this period.' }, fix: { ar: 'حدّث اللوحة وراجع سجل الأسعار؛ لا يُستبدل سعر بأثر رجعي ولا مع سعر مجدول لاحق.', en: 'Refresh the board and check price history; a price cannot be replaced retroactively or while a later one is scheduled.' } },
+      { problem: { ar: 'لا تملك صلاحية إدارة أسعار هذا النطاق.', en: 'You cannot manage prices in this scope.' }, fix: { ar: 'اطلب fuel.sale.price.manage، وسعر المؤسسة لمن لا يقتصر نطاقه على فرع.', en: 'Ask for fuel.sale.price.manage; the organisation price needs someone not limited to a branch.' } },
+      { problem: { ar: 'انتهت المهلة ولم نتأكد من الحفظ.', en: 'Timed out and the save was not confirmed.' }, fix: { ar: 'أعد الضغط على التأكيد: لن يتكرر السعر لأن المفتاح نفسه يُعاد.', en: 'Press confirm again: the price will not duplicate because the same key is replayed.' } },
+    ],
+    screens: [
+      { label: { ar: 'المنتجات والأسعار', en: 'Products and prices' }, appHref: '/fuel-stations/ops/products' },
+      { label: { ar: 'أسعار الوقود', en: 'Fuel prices' }, erpHref: '/fuel-stations/prices' },
+    ],
+    related: ['fuel-sales-liters', 'fuel-station-settings', 'fuel-sales-invoicing'],
+  },
+  {
+    slug: 'fuel-sales-invoicing',
+    category: 'salesCollection',
+    title: { ar: 'مبيعات الوقود الرسمية: مسودة وإنهاء وتحصيل', en: 'Official fuel sales: draft, finalise, collect' },
+    summary: { ar: 'أنشئ مسودة بيع، أنهِها بفاتورة رسمية، ثم حصّلها بسند قبض مستقل.', en: 'Create a sale draft, finalise it into an official invoice, then collect it with a separate receipt.' },
+    keywords: { ar: 'مبيعات وقود مسودة بيع إنهاء فوترة تحصيل سند قبض عميل تفويض AVI فاتورة رسمية', en: 'fuel sales draft sale finalise invoicing collect receipt customer AVI authorisation official invoice' },
+    minutes: 5,
+    audiences: ['manager'],
+    surface: 'erp',
+    overview: {
+      ar: 'شاشة «مبيعات الوقود» في وحدة المحطات مسار البيع الرسمي: مسودة ← إنهاء وفوترة (فاتورة رسمية وصرف مخزون وتكلفة وقيد) ← تحصيل بسند قبض مستقل. السعر والإجمالي يأتيان من الخادم فقط. هذا المسار مستقل عن لترات العدادات في الوردية ولا يمسّ نقد الدرج.',
+      en: 'The Fuel sales screen in the Stations module is the official sale path: draft → finalise and invoice (official invoice, stock issue, cost, and journal entry) → collect with a separate receipt. Price and total come from the server only. This path is separate from shift meter litres and never touches drawer cash.',
+    },
+    permissions: ['fuel.sale.view', 'fuel.sale.create', 'fuel.sale.finalize', 'fuel.sale.collect'],
+    procedures: [
+      {
+        title: { ar: 'من المسودة إلى التحصيل', en: 'From draft to collection' },
+        steps: [
+          { ar: 'اضغط «مسودة بيع جديدة» واختر المحطة والفوهة والكمية (لتر).', en: 'Press "New sale draft" and choose station, nozzle, and quantity (litres).' },
+          { ar: 'اختر «العميل» أو «تفويض AVI/RFID معتمد» (أحدهما إلزامي) وراجع «الشفت المرجعي».', en: 'Choose the "Customer" or an "approved AVI/RFID authorisation" (one is mandatory) and review the "Reference shift".' },
+          { ar: 'احفظ المسودة؛ لا تنشئ مخزوناً ولا فاتورة ولا قيداً.', en: 'Save the draft; it creates no stock, invoice, or entry.' },
+          { ar: 'اضغط «إنهاء وفوترة» ثم «تأكيد الإنهاء». لا يمكن تعديل البيع بعدها.', en: 'Press "Finalise and invoice" then "Confirm finalisation". The sale cannot be edited afterwards.' },
+          { ar: 'اضغط «تحصيل رسمي»، اختر طريقة الدفع، وراجع المبلغ (افتراضه المتبقي من الفاتورة) ثم احفظ سند القبض.', en: 'Press "Official collection", choose the payment method, check the amount (defaults to the invoice remainder), and save the receipt.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'الحالة', en: 'Status' }, description: { ar: 'مسودة ← منهى وفوتر، مع غير مسدد / مسدد جزئياً / مسدد.', en: 'Draft → finalised and invoiced, with unpaid / partially paid / paid.' } },
+      { name: { ar: 'الإجمالي الرسمي', en: 'Official total' }, description: { ar: 'يحسبه الخادم من السعر المؤرخ؛ لا تُدخله الواجهة.', en: 'Computed by the server from the dated price; never entered in the UI.' } },
+    ],
+    problems: [
+      { problem: { ar: 'يتطلب إنهاء بيع الوقود شفتاً تشغيلياً مفتوحاً.', en: 'Finalising requires an open operational shift.' }, fix: { ar: 'اربط المسودة بوردية المحطة المفتوحة (الحقل اختياري في النموذج لكن الإنهاء يشترط وردية مفتوحة غير مقفلة).', en: 'Link the draft to the station’s open shift (the field is optional in the form but finalising needs an open, unlocked shift).' } },
+      { problem: { ar: 'يتطلب إنهاء بيع الوقود عميلاً صريحاً.', en: 'Finalising requires an explicit customer.' }, fix: { ar: 'اختر عميلاً مسجلاً للفواتير والذمم الرسمية.', en: 'Choose a registered customer for official invoices and receivables.' } },
+      { problem: { ar: 'لا يوجد سعر وقود فعال للمحطة أو للمستأجر.', en: 'No effective fuel price for the station or tenant.' }, fix: { ar: 'اضبط السعر (انظر دليل الأسعار) ثم أعد الإنهاء.', en: 'Set the price (see the prices guide) then finalise again.' } },
+      { problem: { ar: 'محطة الوقود تحتاج مخزناً صريحاً قبل البيع الرسمي.', en: 'The fuel station needs an explicit warehouse before an official sale.' }, fix: { ar: 'اربط مخزناً بالمحطة من بيانات المحطة.', en: 'Link a warehouse to the station in station data.' } },
+      { problem: { ar: 'لا توجد طريقة تحصيل مفعلة لهذه المحطة.', en: 'No collection method is enabled for this station.' }, fix: { ar: 'فعّلها من إعدادات المحطة.', en: 'Enable it in station settings.' } },
+      { problem: { ar: 'رموز AVI_… تظهر كما هي.', en: 'AVI_… codes appear as raw codes.' }, fix: { ar: 'الرمز يصف رفض التفويض (منتهٍ، مستخدم، لا يطابق الطلب…). أصدر قراراً جديداً من شاشة AVI/RFID.', en: 'The code describes the authorisation refusal (expired, used, mismatch…). Issue a fresh decision from the AVI/RFID screen.' } },
+    ],
+    unavailable: [
+      { ar: 'إلغاء المسودة وتعديلها واختيار عقد الشركات/البطاقة وعداد المركبة ليست في هذه الشاشة.', en: 'Cancelling or editing a draft and choosing a corporate contract, card, or vehicle odometer are not on this screen.' },
+    ],
+    screens: [{ label: { ar: 'مبيعات الوقود', en: 'Fuel sales' }, erpHref: '/fuel-stations/sales' }],
+    related: ['fuel-sales-liters', 'fuel-products-prices', 'fuel-station-settings'],
+  },
+  {
+    slug: 'fuel-reports-monitoring',
+    category: 'monitoring',
+    title: { ar: 'التقارير والرقابة والتنبيهات', en: 'Reports, oversight, and alerts' },
+    summary: { ar: 'مركز القيادة وسجل التدقيق والتنبيهات وملخص الجاهزية والصيانة والسلامة، وما هو متاح فعلاً.', en: 'The command center, audit log, alerts, readiness summary, maintenance, and safety, and what is actually available.' },
+    keywords: { ar: 'تقارير رقابة مركز القيادة تنبيهات جاهزية صيانة سلامة تدقيق أجهزة ملخص مبيعات اليوم', en: 'reports oversight command center alerts readiness maintenance safety audit devices summary sales today' },
+    minutes: 6,
+    audiences: ['supervisor', 'manager'],
+    surface: 'erp',
+    overview: {
+      ar: 'الرقابة اليومية موزعة على شاشات للقراءة: مركز القيادة (مبيعات ولترات اليوم، ورديات مفتوحة، تنبيهات)، سجل الورديات مع التدقيق، التنبيهات، ملخص الجاهزية، الصيانة، والسلامة. كلها تُظهر ما تسمح به صلاحياتك فقط. مركز القيادة لا ينشئ بيعاً ولا حركة مخزون ولا قيداً.',
+      en: 'Daily oversight is spread over read-oriented screens: the command center (today’s sales and litres, open shifts, alerts), the shift list with audit, alerts, the readiness summary, maintenance, and safety. Each shows only what your permissions allow. The command center creates no sale, stock movement, or entry.',
+    },
+    permissions: ['fuel_stations.view', 'fuel.reports.view', 'fuel.alerts.view', 'fuel.maintenance.view', 'fuel.safety.view'],
+    permissionsNote: { ar: 'مركز القيادة: fuel_stations.view، وبطاقاته تتطلب fuel.reports.view. التنبيهات fuel.alerts.view (والإدارة fuel.alerts.manage). ملخص الجاهزية fuel.reports.view. الصيانة fuel.maintenance.view. السلامة fuel.safety.view.', en: 'Command center: fuel_stations.view, its cards need fuel.reports.view. Alerts: fuel.alerts.view (management fuel.alerts.manage). Readiness: fuel.reports.view. Maintenance: fuel.maintenance.view. Safety: fuel.safety.view.' },
+    procedures: [
+      {
+        title: { ar: 'مراجعة يوم التشغيل', en: 'Review the operating day' },
+        steps: [
+          { ar: 'افتح «مركز القيادة» وراجع مبيعات اليوم ولترات اليوم والورديات المفتوحة والتنبيهات النشطة.', en: 'Open the Command Center and review today’s sales, litres, open shifts, and active alerts.' },
+          { ar: 'افتح «الورديات»: البطاقات تلخص المفتوحة واللترات التشغيلية وفروق النقد بانتظار المراجعة. «التدقيق» يعرض أحداث وردية محددة.', en: 'Open Shifts: the cards summarise open shifts, operational litres, and cash variances awaiting review. "Audit" shows a specific shift’s events.' },
+          { ar: 'في تطبيق المحطات افتح «الخزانات» للمستويات القديمة والتنبيهات، و«الورديات ← مراجعة» للفروق.', en: 'In the Stations app open Tanks for stale levels and flags, and Shifts → Review for variances.' },
+          { ar: 'افتح «التنبيهات» وصفِّ بالحالة والخطورة.', en: 'Open Alerts and filter by status and severity.' },
+          { ar: 'لمن يملك fuel.alerts.manage: «إقرار المراجعة» (ملاحظة اختيارية) أو «تعيين» لمسؤول بسبب، و«تحديث التنبيهات» لإعادة الفحص (تُغلق المنتهية تلقائياً).', en: 'With fuel.alerts.manage: "Acknowledge" (optional note) or "Assign" to a user with a reason, and "Refresh alerts" to rescan (stale ones resolve automatically).' },
+        ],
+      },
+      {
+        title: { ar: 'الصيانة والسلامة', en: 'Maintenance and safety' },
+        steps: [
+          { ar: 'الصيانة: «أمر عمل جديد» (المحطة والأصل والعنوان والأولوية) و«جدول صيانة جديد» (بالتقويم أو الاستخدام أو العداد مع فاصل موجب).', en: 'Maintenance: "New work order" (station, asset, title, priority) and "New schedule" (calendar, usage, or meter with a positive interval).' },
+          { ar: 'لنقل أمر عمل استعمل «تحديث الحالة» بالتسلسل: مبلّغ ← تم الفرز ← مجدول/قيد التنفيذ ← مكتمل (الحل المنفذ إلزامي) ← تم التحقق ← مغلق.', en: 'Move a work order with "Update status" in sequence: reported → triaged → scheduled/in progress → completed (resolution required) → verified → closed.' },
+          { ar: 'السلامة: «فحص سلامة جديد» و«تصريح أو شهادة جديدة»؛ النتائج والإجراءات التصحيحية تُعرض للقراءة.', en: 'Safety: "New safety inspection" and "New permit or certificate"; findings and corrective actions are shown read-only.' },
+        ],
+      },
+    ],
+    fields: [
+      { name: { ar: 'قاعدة التنبيه', en: 'Alert rule' }, description: { ar: 'صيانة وقائية مستحقة، أمر صيانة متأخر، إجراء تصحيحي متأخر، تصريح يقترب من الانتهاء، فشل مزامنة جهاز، جهاز متأخر.', en: 'Preventive maintenance due, overdue work order, overdue corrective action, permit nearing expiry, device sync failure, late device.' } },
+      { name: { ar: 'ملخص الجاهزية', en: 'Readiness summary' }, description: { ar: 'مؤشرات صحة فقط: ورديات مفتوحة، أوامر صيانة مفتوحة، تنبيهات مفتوحة، أجهزة متدهورة؛ كل مؤشر يظهر لمن يملك صلاحيته.', en: 'Health indicators only: open shifts, open work orders, open alerts, degraded devices; each shows for those holding its permission.' } },
+    ],
+    problems: [
+      { problem: { ar: 'لا تتوفر صلاحية عرض الملخص التشغيلي حالياً.', en: 'The operational summary is not available to you.' }, fix: { ar: 'بطاقات مركز القيادة تحتاج fuel.reports.view؛ تبقى بقية الشاشات المصرح بها متاحة.', en: 'Command center cards need fuel.reports.view; the other permitted screens remain available.' } },
+      { problem: { ar: 'لا أرى الصيانة أو السلامة أو التنبيهات في القائمة.', en: 'Maintenance, safety, or alerts are missing from the menu.' }, fix: { ar: 'تحتاج صلاحيتها وأن تكون قدرة الصيانة مفعّلة لمؤسستك (تواصل مع مالك الحساب).', en: 'They need their permission and the maintenance capability enabled for your company (ask the account owner).' } },
+      { problem: { ar: 'فشل حفظ أمر الصيانة: انتقال الحالة غير مسموح.', en: 'Work order save failed: status transition not allowed.' }, fix: { ar: 'اتبع التسلسل المذكور؛ لا يُقفز بين الحالات.', en: 'Follow the sequence above; states cannot be skipped.' } },
+    ],
+    unavailable: [
+      { ar: 'التكامل المباشر مع أجهزة المضخات وقياس الخزانات الآلي (ATG) وقارئات RFID الفعلية غير مبني؛ شاشة الأجهزة تسجيل ومحاكاة أدلة فقط.', en: 'Direct integration with pump controllers, automatic tank gauges (ATG), and physical RFID readers is not built; the Devices screen is a register and simulated evidence only.' },
+      { ar: 'إنجاز الفحص والتحقق والإجراءات التصحيحية في السلامة ليس له أزرار في الشاشة اليوم؛ تُعرض النتائج فقط. وتقارير الوقود المتقدمة عبر الـAPI بلا شاشة.', en: 'Performing and verifying inspections and corrective actions in Safety have no buttons today; only results are shown. Advanced fuel reports exist through the API with no screen.' },
+    ],
+    screens: [
+      { label: { ar: 'مركز القيادة', en: 'Command center' }, erpHref: '/fuel-stations' },
+      { label: { ar: 'التنبيهات', en: 'Alerts' }, erpHref: '/fuel-stations/alerts' },
+      { label: { ar: 'ملخص الجاهزية', en: 'Readiness summary' }, erpHref: '/fuel-stations/readiness' },
+      { label: { ar: 'الصيانة', en: 'Maintenance' }, erpHref: '/fuel-stations/maintenance' },
+      { label: { ar: 'السلامة والامتثال', en: 'Safety and compliance' }, erpHref: '/fuel-stations/safety' },
+      { label: { ar: 'مستويات الخزانات', en: 'Tank levels' }, appHref: '/fuel-stations/ops/tanks' },
+    ],
+    related: ['fuel-review-approve-shift', 'fuel-tank-readings', 'fuel-troubleshooting'],
+  },
+  {
+    slug: 'fuel-troubleshooting',
+    category: 'monitoring',
+    title: { ar: 'حل المشكلات الشائعة', en: 'Troubleshooting common problems' },
+    summary: { ar: 'تشخيص سريع للأعراض الأكثر تكراراً مع ربط كل عَرَض بدليله التفصيلي.', en: 'Quick diagnosis of the most frequent symptoms with each linked to its detailed guide.' },
+    keywords: { ar: 'مشكلة خطأ لا يعمل لا يظهر رفض غير مؤكد انقطاع صلاحية 403 تعذر حل تشخيص', en: 'problem error not working missing rejected unconfirmed offline permission 403 failed fix diagnosis' },
+    minutes: 4,
+    audiences: ['operator', 'supervisor', 'manager'],
+    surface: 'both',
+    overview: {
+      ar: 'قبل أي معالجة: حدّد المحطة والفرع الصحيحين، وحدّث الصفحة، وتأكد من الاتصال. التطبيق لا يعيد إرسال أي عملية تلقائياً؛ حين تكون النتيجة «غير مؤكدة» تحقق بالقراءة أولاً قبل المحاولة من جديد حتى لا تتكرر العملية.',
+      en: 'Before anything else: confirm the right station and branch, refresh the page, and check the connection. The app never resends an operation automatically; when the result is "Unconfirmed", verify by reading first before trying again so the operation is not duplicated.',
+    },
+    permissions: ['fuel_stations.view'],
+    procedures: [
+      {
+        title: { ar: 'تشخيص عام', en: 'General diagnosis' },
+        steps: [
+          { ar: 'تأكد من اسم المحطة في الرأس، وأن الفرع النشط هو فرعها.', en: 'Check the station name in the header and that the active branch is its branch.' },
+          { ar: 'اضغط «تحديث» أو أعد تحميل الصفحة لرؤية الحالة الفعلية على الخادم.', en: 'Press Refresh or reload to see the real state on the server.' },
+          { ar: 'افتح «ملفي» لترى ما تسمح به صلاحياتك. غياب صلاحية يفسّر الأزرار الغائبة.', en: 'Open My profile to see what your permissions allow. A missing permission explains missing buttons.' },
+          { ar: 'إن رأيت «غير مؤكدة»، افتح الشاشة المعنية وتحقق مما حُفظ قبل أي إعادة محاولة.', en: 'If you see "Unconfirmed", open the relevant screen and check what was saved before retrying.' },
+          { ar: 'إن استمر العَرَض، دوّن الرسالة كما هي وأبلغ المشرف أو مسؤول المحطة.', en: 'If the symptom persists, note the message exactly and tell your supervisor or station manager.' },
+        ],
+      },
+    ],
+    problems: [
+      { problem: { ar: 'لا أستطيع الدخول برقم الموظف.', en: 'I cannot sign in with my employee number.' }, fix: { ar: 'انظر دليل «الدخول برقم الموظف ورمز PIN»: الرقم، الرمز، حالة الموظف، وانتظار فترة الحجب المؤقت.', en: 'See "Signing in with employee number and PIN": number, PIN, employee status, and waiting out the temporary block.' } },
+      { problem: { ar: 'لا يمكنني فتح وردية.', en: 'I cannot open a shift.' }, fix: { ar: 'وردية مفتوحة قائمة، أو عهدة الافتتاح مطلوبة، أو المحطة غير نشطة أو خارج الفرع. انظر «فتح وردية جديدة».', en: 'An open shift already exists, the opening float is required, or the station is inactive or in another branch. See "Open a new shift".' } },
+      { problem: { ar: 'لا تُحفظ القراءة.', en: 'A reading will not save.' }, fix: { ar: 'نهاية أقل من البداية، أو قراءة مسجّلة سابقاً، أو فوهة غير متاحة. انظر «تسجيل قراءات العدادات والخزانات».', en: 'Closing below opening, an already recorded reading, or an unavailable nozzle. See "Record meter and tank readings".' } },
+      { problem: { ar: 'لا أستطيع تسليم الوردية.', en: 'I cannot hand over the shift.' }, fix: { ar: 'قراءات ناقصة، لا موظف مسجّل، توزيع التحصيل غير محفوظ، أو سياسة تمنع الفرق. انظر «تسليم الوردية».', en: 'Missing readings, no staff registered, unsaved collection split, or a policy blocking variances. See "Hand over the shift".' } },
+      { problem: { ar: 'لا يمكن اعتماد الوردية.', en: 'The shift cannot be approved.' }, fix: { ar: 'مراجعة فرق مطلوبة أولاً، أو سياسة معتمد مختلف. انظر «مراجعة الوردية واعتمادها».', en: 'A variance review is needed first, or a different-approver policy applies. See "Review and approve a shift".' } },
+      { problem: { ar: 'مبلغ المبيعات يظهر «غير متاح».', en: 'Sales amount shows "Not available".' }, fix: { ar: 'قراءة أو سعر أو نمط ضريبة ناقص. انظر «اللترات ومبيعات الوقود من العدادات».', en: 'A reading, price, or tax mode is missing. See "Litres and fuel sales from the meters".' } },
+      { problem: { ar: 'الاستلام لا يُعتمد.', en: 'A delivery will not approve.' }, fix: { ar: 'التكلفة غير مسجَّلة، أو معتمد مختلف مطلوب، أو لا صلاحية. انظر «استلام الوقود» و«تسجيل تكلفة الاستلام».', en: 'Cost not recorded, a different approver is required, or no permission. See "Receive fuel" and "Record a delivery’s cost".' } },
+      { problem: { ar: 'المنتج لا يظهر في المنتجات.', en: 'A product is not shown under Products.' }, fix: { ar: 'يلزم فوهة نشطة بمضخة وخزان نشطين. انظر «الخزانات والمضخات والفوهات».', en: 'It needs an active nozzle with an active pump and tank. See "Tanks, pumps, nozzles".' } },
+      { problem: { ar: 'رسالة تقول إن الميزة غير متاحة لمؤسستي.', en: 'A message says the feature is unavailable for my company.' }, fix: { ar: 'ميزات مثل الرصيد الافتتاحي أو توزيع التحصيل مضبوطة على مستوى النشر والمؤسسة. اسأل مالك الحساب.', en: 'Features like the opening balance or collection split are controlled at deployment and company level. Ask the account owner.' } },
+      { problem: { ar: 'تظهر رسالة «ليست لديك صلاحية» (403).', en: 'A "no permission" (403) message appears.' }, fix: { ar: 'الخادم يفرض الصلاحية في كل طلب. اطلب المفتاح المذكور من مسؤول إدارة الموظفين.', en: 'The server enforces permission on every request. Ask the staff manager for the named key.' } },
+    ],
+    related: ['fuel-app-quickstart', 'fuel-handover-shift', 'fuel-receiving'],
+  },
+];

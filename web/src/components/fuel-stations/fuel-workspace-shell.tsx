@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Building2, Check, ChevronDown, Menu, X } from 'lucide-react';
+import { FuelContextualHelp } from '@/components/fuel-help/fuel-contextual-help';
 import { BranchScope } from '@/components/layout/branch-scope';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
@@ -106,6 +107,11 @@ export function FuelWorkspaceShell({ children }: { children: React.ReactNode }) 
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
             <span className="hidden sm:inline">{t('backToNebrax')}</span>
           </Link>
+          <FuelContextualHelp
+            basePath="/fuel-stations/help"
+            surface="erp"
+            buttonClassName="inline-flex h-11 w-11 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
           <LangToggle />
           <ThemeToggle />
         </div>

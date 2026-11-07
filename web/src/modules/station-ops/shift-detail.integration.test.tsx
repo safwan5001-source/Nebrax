@@ -394,7 +394,9 @@ describe('read-only and app-only', () => {
     seedUser({ permissions: [...VIEW, 'fuel.shift.open', 'fuel.shift.approve'] });
     open();
     await screen.findByText('SH-100');
-    expect(screen.getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Refresh']);
+    // الزر الوحيد الآخر هو «مساعدة هذه الشاشة» (مقروء فقط: يفتح ورقة شرح ولا يكتب شيئاً).
+    const controls = screen.getAllByRole('button').filter((button) => button.getAttribute('aria-label') !== 'Help for this screen');
+    expect(controls.map((button) => button.textContent?.trim())).toEqual(['Refresh']);
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
