@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\EmployeeCustody;
 use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
+use App\Models\FuelOpeningBalance;
 use App\Models\FuelShift;
 use App\Models\FuelSale;
 use App\Models\FuelStationSafetyInspection;
@@ -221,6 +222,11 @@ class DocumentNumberingCatalog
             'model'  => FuelSale::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'FSL']],
+        ],
+        'fuel_opening_balance' => [
+            'model'  => FuelOpeningBalance::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FOB']],
         ],
         'fuel_maintenance_work_order' => [
             'model'  => FuelStationWorkOrder::class,

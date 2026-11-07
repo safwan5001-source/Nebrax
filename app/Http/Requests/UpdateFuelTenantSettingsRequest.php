@@ -19,6 +19,7 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'inventory_variance_account_id' => ['sometimes', 'nullable', 'uuid'],
             'inventory_gain_account_id' => ['sometimes', 'nullable', 'uuid'],
             'grni_account_id' => ['sometimes', 'nullable', 'uuid'],
+            'fuel_opening_balance_account_id' => ['sometimes', 'nullable', 'uuid'],
             'shift_opening_meter_reading_required' => ['sometimes', 'boolean'],
             'shift_closing_meter_reading_required' => ['sometimes', 'boolean'],
             'shift_opening_tank_reading_required' => ['sometimes', 'boolean'],
