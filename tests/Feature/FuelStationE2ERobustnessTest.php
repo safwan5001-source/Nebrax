@@ -229,16 +229,20 @@ class FuelStationE2ERobustnessTest extends TestCase
         foreach (['qty_zero' => 0, 'qty_negative' => -5, 'qty_float' => 1.5, 'qty_string' => 'abc'] as $name => $qty) {
             $cases[$name] = $this->draftSale('seller', $shift, $qty, "s10-{$name}")->status();
         }
-        $cases['oversell_draft+final'] = (function () use ($shift) {
-            $id = $this->draftSale('seller', $shift, 10000001, 's10-oversell');
-            if ($id->status() >= 400) { return 'draft:' . $id->status(); }
-            return 'final:' . $this->as('seller')->postJson('/api/fuel-stations/sales/' . $id['data']['id'] . '/finalize')->status();
-        })();
+        // بيع يفوق الرصيد، وإنهاء بلا عميل: المسودة تُنشأ (201) ثم يجب أن يُرفض الإنهاء برفض مُتحكَّم (4xx) لا 5xx.
+        $stages = [];
+        $oversell = $this->draftSale('seller', $shift, 10000001, 's10-oversell');
+        $stages['oversell'] = ['draft' => $oversell->status(), 'finalize' => $oversell->status() === 201 ? $this->as('seller')->postJson('/api/fuel-stations/sales/' . $oversell['data']['id'] . '/finalize')->status() : null];
+        $nopartner = $this->draftSale('seller', $shift, 1000, 's10-nopartner', ['partner_id' => null]);
+        $stages['no_partner'] = ['draft' => $nopartner->status(), 'finalize' => $nopartner->status() === 201 ? $this->as('seller')->postJson('/api/fuel-stations/sales/' . $nopartner['data']['id'] . '/finalize')->status() : null];
+        foreach ($stages as $name => $st) {
+            $this->assertSame(201, $st['draft'], "{$name}: المسودة تُنشأ ولا يُرفض إلا الإنهاء");
+            $this->assertGreaterThanOrEqual(400, $st['finalize'], "{$name}: الإنهاء يجب أن يُرفض");
+            $this->assertLessThan(500, $st['finalize'], "{$name}: رفض مُتحكَّم لا خطأ خادم");
+        }
+        $cases['oversell_draft+final'] = "draft:{$stages['oversell']['draft']}/final:{$stages['oversell']['finalize']}";
         $cases['unknown_nozzle'] = $this->draftSale('seller', $shift, 1000, 's10-nonoz', ['fuel_nozzle_id' => '00000000-0000-4000-8000-000000000000'])->status();
-        $cases['no_partner_finalize'] = (function () use ($shift) {
-            $id = $this->draftSale('seller', $shift, 1000, 's10-nopartner', ['partner_id' => null])->json('data.id');
-            return $id === null ? 'draft_rejected' : 'final:' . $this->as('seller')->postJson("/api/fuel-stations/sales/{$id}/finalize")->status();
-        })();
+        $cases['no_partner_finalize'] = "draft:{$stages['no_partner']['draft']}/final:{$stages['no_partner']['finalize']}";
 
         // معدات غير صالحة: فوهة/مضخة/خزان معطّلة أو صيانة.
         foreach ([['nozzles', $n, 'maintenance'], ['nozzles', $n, 'inactive']] as [$res, $id, $status]) {
@@ -273,8 +277,6 @@ class FuelStationE2ERobustnessTest extends TestCase
         $this->evidence('S10', ['cases' => $cases]);
         $expectRejected = ['qty_zero', 'qty_negative', 'qty_float', 'qty_string', 'unknown_nozzle', 'nozzle_maintenance', 'nozzle_inactive', 'pay_zero', 'pay_negative', 'pay_over', 'pay_unknown_method', 'pay_before_final', 'second_open_shift', 'open_unknown_station', 'open_negative_float'];
         foreach ($expectRejected as $k) { $this->assertGreaterThanOrEqual(400, $cases[$k], "{$k} يجب أن يُرفض"); $this->assertLessThan(500, $cases[$k], "{$k} 5xx بدل رفض مُتحكَّم"); }
-        $this->assertStringStartsNotWith('final:2', (string) $cases['oversell_draft+final'], 'بيع يفوق الرصيد لا يُنهى');
-        $this->assertStringStartsNotWith('final:2', (string) $cases['no_partner_finalize']);
         $after = $this->footprint();
         // الأثر الوحيد المسموح: بيع s10-ok (واحد) + لا شيء من المرفوضات.
         $this->assertSame($base['invoices'] + 1, $after['invoices']);
