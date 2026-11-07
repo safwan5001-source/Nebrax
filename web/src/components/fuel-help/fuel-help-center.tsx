@@ -87,7 +87,7 @@ export function FuelHelpCenter({ basePath, surface, defaultAudience, extraSectio
             {AUDIENCES.map((value) => (
               <button key={value} type="button" aria-pressed={audience === value} onClick={() => setAudience(value)} className={chip(audience === value)}>
                 {FUEL_AUDIENCE_LABELS[value][locale]}
-                {defaultAudience === value ? <span className="ms-1.5 text-[11px] opacity-80">({t('recommended')})</span> : null}
+                {defaultAudience === value ? <span className="ms-1.5 text-xs font-semibold">({t('recommended')})</span> : null}
               </button>
             ))}
           </div>

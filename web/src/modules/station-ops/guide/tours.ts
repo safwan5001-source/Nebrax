@@ -99,7 +99,7 @@ export const TOURS: readonly Tour[] = [
       { id: 'variance', target: '[data-variance-preview]' },
       { id: 'collectionEntry', target: '[data-collection-entry]' },
       { id: 'network', target: '[data-network-blocked]' },
-      { id: 'confirm', target: '[data-confirm-close]' },
+      { id: 'confirm', target: '[data-action-bar] button' },
     ],
   },
   {

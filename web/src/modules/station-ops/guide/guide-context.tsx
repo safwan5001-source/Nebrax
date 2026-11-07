@@ -36,6 +36,8 @@ export function useSmartGuide(): GuideApi | null {
 interface Active { tour: Tour; steps: readonly TourStep[]; index: number }
 
 const AUTO_DELAY_MS = 900;
+/** حاجز لمس شفّاف قصير بعد كل تغيّر في البطاقة: يمنع «النقرة الثانية» (ضغط مزدوج) من الوصول إلى زر حساس صار مكان البطاقة السابق. */
+const TAP_GUARD_MS = 450;
 
 function normalize(pathname: string): string {
   return pathname.replace(/\/+$/, '') || '/';
@@ -55,6 +57,9 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const pathRef = useRef(pathname);
   const autoTriedRef = useRef<string | null>(null);
   const directionRef = useRef<1 | -1>(1);
+  const [shield, setShield] = useState(false);
+  const activeKey = active ? `${active.tour.id}:${active.index}` : null;
+  const wasActiveRef = useRef(false);
   const canRef = useRef(can);
   canRef.current = can;
   progressRef.current = progress;
@@ -134,6 +139,15 @@ export function GuideProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => runRef.current?.abort(), []);
 
+  // حاجز اللمس: عند ظهور الجولة، وعند كل خطوة، وعند إغلاقها (البطاقة تغيّر مكانها أو تختفي فتصل النقرة الثانية إلى الصفحة).
+  useEffect(() => {
+    if (activeKey === null && !wasActiveRef.current) return;
+    wasActiveRef.current = activeKey !== null;
+    setShield(true);
+    const timer = window.setTimeout(() => setShield(false), TAP_GUARD_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeKey]);
+
   const move = useCallback((delta: 1 | -1) => {
     directionRef.current = delta;
     setActive((current) => {
@@ -191,6 +205,7 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   return (
     <GuideContext.Provider value={api}>
       {children}
+      {shield ? <div aria-hidden="true" data-guide-shield="" className="fixed inset-0 z-[69]" /> : null}
       {active ? (
         <GuideOverlay
           key={active.tour.id}

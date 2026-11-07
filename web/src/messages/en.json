@@ -14923,8 +14923,8 @@
             "body": "Entering and matching the network total is not available in the app yet."
           },
           "confirm": {
-            "title": "Confirm handover",
-            "body": "After confirming, readings and cash are frozen and cannot be edited. This tour never presses it; review everything and confirm yourself."
+            "title": "Review and hand over the shift",
+            "body": "Opens a final confirmation dialog. After confirming, readings and cash are frozen and cannot be edited. This tour never presses the button; review everything and decide yourself."
           }
         },
         "stock": {

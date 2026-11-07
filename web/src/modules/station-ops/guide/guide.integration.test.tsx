@@ -146,6 +146,21 @@ describe('AWJ Smart Guide — welcome tour', () => {
     expect(onPrimary).toHaveBeenCalledTimes(1);
   }, 25000);
 
+  it('absorbs a quick second tap right after each step and after the tour closes (ghost-tap guard), then lets everything through', async () => {
+    renderIntl(<GuideProvider><Home /></GuideProvider>, 'en');
+    await waitForGuide();
+    expect(document.querySelector('[data-guide-shield]')).not.toBeNull(); // عند ظهور الجولة
+    await waitFor(() => expect(document.querySelector('[data-guide-shield]')).toBeNull(), { timeout: 2000 });
+    next();
+    await waitFor(() => expect(within(card()).getByText('Step 2 of 8')).toBeTruthy());
+    expect(document.querySelector('[data-guide-shield]')).not.toBeNull(); // بعد تغيّر الخطوة
+    await waitFor(() => expect(document.querySelector('[data-guide-shield]')).toBeNull(), { timeout: 2000 });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[data-guide-shield]')).not.toBeNull(); // بعد الإغلاق
+    await waitFor(() => expect(document.querySelector('[data-guide-shield]')).toBeNull(), { timeout: 2000 });
+  }, 20000);
+
   it('keeps each employee’s tours separate on a shared device', async () => {
     window.localStorage.setItem(progressKey('t1', 'u1'), JSON.stringify({ welcome: { version: 1, status: 'completed', step: 7, at: 'x' } }));
     state.user = { ...state.user, id: 'u2' };
