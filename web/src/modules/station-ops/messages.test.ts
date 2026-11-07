@@ -44,6 +44,7 @@ describe('stationOps messages', () => {
       ['tankLevel.band', ['healthy', 'monitor', 'low']],
       ['tankLevel.source', ['physical', 'atg', 'book', 'estimated']],
       ['tankLevel.unavailable.reason', ['missing_level', 'invalid_level', 'invalid_capacity', 'conflicting_unit']],
+      ['tankLevel.unavailable.api', ['multi_tank', 'no_stock_record', 'ambiguous_stock_record', 'invalid_stock_record', 'no_warehouse', 'tank_inactive', 'unit_mismatch', 'invalid_configuration', 'not_provided', 'invalid_data', 'unknown_reason']],
       ['blocked', ['station_inactive', 'nozzle_inactive', 'pump_missing', 'pump_inactive', 'tank_missing', 'tank_inactive', 'product_missing', 'product_inactive', 'product_tank_mismatch']],
       ['mode', ['supervisor', 'operator', 'viewer']],
       ['shifts.filter', ['all', 'open', 'closed', 'approved']],
