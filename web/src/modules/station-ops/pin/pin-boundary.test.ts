@@ -53,7 +53,7 @@ describe('login folder', () => {
 
   it('never routes to an ERP page: success goes to the app, nothing else', () => {
     const screen = code(login.find(({ file }) => file.endsWith('login-screen.tsx'))!.text);
-    expect([...screen.matchAll(/router(?:Ref\.current)?\.(?:replace|push)\(([^)]*)\)/g)].map((m) => m[1])).toEqual(['STATION_HOME_PATH', 'STATION_HOME_PATH']);
+    expect([...screen.matchAll(/router(?:Ref\.current)?\.(?:replace|push)\(([^)]*)\)/g)].map((m) => m[1])).toEqual(['STATION_HOME_PATH', 'STATION_HOME_PATH', 'STATION_HOME_PATH']); // نجاح الدخول، استئناف جلسة محفوظة، «المتابعة بجلسة أَوْج» الصريحة
     expect(screen).not.toMatch(/['"`]\/(dashboard|login|me)['"`]/);
   });
 });

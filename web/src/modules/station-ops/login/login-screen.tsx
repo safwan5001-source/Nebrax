@@ -4,7 +4,8 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Eye, EyeOff, Fuel, LoaderCircle, LogIn, ShieldCheck, WifiOff } from 'lucide-react';
-import { STATION_HOME_PATH, checkStoredSession, stationLogin } from '@/lib/auth';
+import { getStationToken } from '@/lib/api';
+import { STATION_HOME_PATH, checkStoredSession, continueStationWithErpSession, erpSessionHint, stationLogin } from '@/lib/auth';
 import { classifyLoginFailure, sanitizeEmployeeNo, sanitizePin, validateLogin, type LoginFailure, type LoginFieldError } from './login-logic';
 
 /**
@@ -29,6 +30,9 @@ export function StationLoginScreen() {
   const [failure, setFailure] = useState<LoginFailure | null>(null);
   const [busy, setBusy] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  // جلسة أَوْج مفتوحة في المتصفح نفسه (مدير): تُعرض «المتابعة بها» بموافقة صريحة فقط؛ لا تُستعمل ضمناً.
+  const [erpHint, setErpHint] = useState<{ name: string } | null>(null);
+  useEffect(() => { setErpHint(erpSessionHint()); }, []);
   const sending = useRef(false);
   const interacted = useRef(false);
   const pinRef = useRef<HTMLInputElement>(null);
@@ -37,7 +41,7 @@ export function StationLoginScreen() {
 
   // جلسة محطة محفوظة وصالحة ⇒ لا نموذج: نتحقق عبر /me ثم نفتح التطبيق. أي تفاعل يُبطل النتيجة المتأخرة.
   useEffect(() => {
-    if (typeof window === 'undefined' || !localStorage.getItem('token')) return;
+    if (typeof window === 'undefined' || getStationToken() === null) return;
     let cancelled = false;
     setRestoring(true);
     checkStoredSession().then((result) => {
@@ -173,6 +177,16 @@ export function StationLoginScreen() {
           {busy ? <LoaderCircle aria-hidden="true" className="h-5 w-5 animate-spin" /> : <LogIn aria-hidden="true" className="h-5 w-5 rtl:-scale-x-100" strokeWidth={1.9} />}
           {busy ? t('login.submitting') : t('login.submit')}
         </button>
+
+        {erpHint ? (
+          <button
+            type="button"
+            onClick={() => { continueStationWithErpSession(); router.replace(STATION_HOME_PATH); }}
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-[13px] border border-[color:var(--fo-control)] bg-surface px-4 text-[15px] font-semibold text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('login.continueErp', { name: erpHint.name })}
+          </button>
+        ) : null}
 
         <p className="flex items-start gap-2 text-xs leading-5 text-muted">
           <ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} />

@@ -131,9 +131,13 @@ describe('station PIN section (manager)', () => {
   });
 
   it('is not rendered at all inside a PIN session (the server refuses it anyway) or for an older server', () => {
-    localStorage.setItem('user', JSON.stringify({ id: 'u', name: 'n', email: 'e', role: 'staff', tenant_id: 't', station_session: true }));
+    const realLocation = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { pathname: '/fuel-stations/ops/manage/staff', href: 'http://localhost/fuel-stations/ops/manage/staff', assign: vi.fn() } });
+    localStorage.setItem('station_token', 'tok');
+    localStorage.setItem('station_user', JSON.stringify({ id: 'u', name: 'n', email: 'e', role: 'staff', tenant_id: 't', station_session: true }));
     const { container, rerender } = renderIntl(<StationPinSection staff={base()} isSelf={false} />, 'en');
     expect(container.firstChild).toBeNull();
+    Object.defineProperty(window, 'location', { configurable: true, value: realLocation });
     localStorage.clear();
     rerender(<StationPinSection staff={base({ station_pin: undefined })} isSelf={false} />);
     expect(container.firstChild).toBeNull();

@@ -56,7 +56,7 @@ export async function mockStationLoginApi(page: Page, opts: { baseUrl: string; l
       const emp = [EMP_A, EMP_B].find((e) => e.no === String(body.employee_no).trim());
       const key = String(body.employee_no).toLowerCase();
       const tries = (failures.get(key) ?? 0);
-      if (tries >= 6) return json(route, { message: 'Too Many Attempts.' }, 429, { 'Retry-After': '60' });
+      if (tries >= 5) return json(route, { message: 'محاولات خاطئة كثيرة.', reason: 'too_many_attempts' }, 429, { 'Retry-After': '60' });
       if (!emp || emp.pin !== body.pin) {
         failures.set(key, tries + 1);
         return json(route, { message: 'رقم الموظف أو رمز PIN غير صحيح.', reason: 'invalid_credentials' }, 422);

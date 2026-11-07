@@ -14660,6 +14660,7 @@
       "submit": "Sign in",
       "submitting": "Signing in…",
       "restoring": "Restoring your session…",
+      "continueErp": "Continue with the current AWJ account ({name})",
       "sharedDevice": "On shared devices: sign out or switch employee before handing the device over.",
       "error": {
         "employee_required": "Enter your employee number.",
@@ -14668,7 +14669,7 @@
       },
       "failure": {
         "invalid": "Employee number or PIN is incorrect.",
-        "throttled": "Too many attempts in a short time. Wait a minute and try again.",
+        "throttled": "Too many incorrect attempts. Wait a few minutes and try again (your account is not locked).",
         "tenant_required": "Open the app from your company's link, then sign in.",
         "unknown_tenant": "This link doesn't match a company. Check the link your manager gave you.",
         "subscription": "The company's subscription is inactive. Contact your manager.",

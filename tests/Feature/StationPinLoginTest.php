@@ -370,44 +370,88 @@ class StationPinLoginTest extends TestCase
 
     // ───────────────────────── تحديد المعدل بلا قفل حساب ─────────────────────────
 
-    /** @test */
-    public function repeated_failures_are_throttled_per_employee_but_the_account_is_never_locked(): void
+    private function loginFrom(string $ip, string $employeeNo, string $pin)
     {
-        $this->buildFixture();
-        RateLimiter::clear('x');
-        $w = $this->makeStationWorker('sellerA');
-        $other = $this->makeStationWorker('sellerB');
-
-        for ($i = 0; $i < 6; $i++) {
-            $this->stationLogin($w['employee']->employee_no, '111111')->assertStatus(422);
-        }
-        // السابعة في الدقيقة نفسها ⇒ 429 مع Retry-After — حتى لو كان الرمز صحيحاً (لا يُستدل على صحته من الحجب).
-        $this->stationLogin($w['employee']->employee_no, '111111')->assertStatus(429)->assertHeader('Retry-After');
-        $this->stationLogin($w['employee']->employee_no, self::PIN)->assertStatus(429);
-        // موظف آخر لا يتأثر.
-        $this->stationLogin($other['employee']->employee_no, self::PIN)->assertOk();
-
-        // لا قفل: بعد انقضاء النافذة يدخل بالرمز الصحيح، ولا حالة مخزّنة على المستخدم تغيّرت.
-        $this->travel(61)->seconds();
-        $this->stationLogin($w['employee']->employee_no, self::PIN)->assertOk();
-        $fresh = $w['user']->fresh();
-        $this->assertTrue($fresh->is_active);
-        $this->assertSame(
-            ['id', 'tenant_id'],
-            array_values(array_intersect(['id', 'tenant_id', 'locked_at', 'failed_attempts', 'lockout_until'], array_keys($fresh->getAttributes()))),
-            'لا أعمدة قفل أو عدّاد فشل على المستخدم',
-        );
+        return $this->withServerVariables(['REMOTE_ADDR' => $ip])->postJson(self::HOST . 'station/login', ['employee_no' => $employeeNo, 'pin' => $pin]);
     }
 
     /** @test */
-    public function an_unknown_employee_number_is_throttled_like_a_known_one(): void
+    public function failures_are_limited_per_employee_and_address_without_locking_anyone_and_without_disrupting_other_devices(): void
+    {
+        $this->buildFixture();
+        $w = $this->makeStationWorker('sellerA');
+        $other = $this->makeStationWorker('sellerB');
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->loginFrom('10.0.0.1', $w['employee']->employee_no, '111111')->assertStatus(422);
+        }
+        // السادسة من العنوان المخمِّن نفسه ⇒ 429 + Retry-After — حتى لو كان الرمز صحيحاً (لا يُستدل على صحته من الحجب).
+        $this->loginFrom('10.0.0.1', $w['employee']->employee_no, '111111')->assertStatus(429)->assertHeader('Retry-After')->assertJsonPath('reason', 'too_many_attempts');
+        $this->loginFrom('10.0.0.1', $w['employee']->employee_no, self::PIN)->assertStatus(429);
+
+        // لا تعطيل للموظف: جهازه/عنوانه الآخر يدخل بالرمز الصحيح، وموظف آخر من العنوان نفسه لا يتأثر.
+        $this->loginFrom('10.0.0.2', $w['employee']->employee_no, self::PIN)->assertOk();
+        $this->loginFrom('10.0.0.1', $other['employee']->employee_no, self::PIN)->assertOk();
+
+        // لا قفل: بعد انقضاء النافذة يدخل العنوان نفسه، ولا حالة مخزّنة على المستخدم.
+        $this->travel(301)->seconds();
+        $this->loginFrom('10.0.0.1', $w['employee']->employee_no, self::PIN)->assertOk();
+        $fresh = $w['user']->fresh();
+        $this->assertTrue($fresh->is_active);
+        $this->assertSame([], array_values(array_intersect(['locked_at', 'failed_attempts', 'lockout_until'], array_keys($fresh->getAttributes()))), 'لا أعمدة قفل أو عدّاد فشل');
+    }
+
+    /** @test */
+    public function a_successful_sign_in_resets_that_addresss_failure_count(): void
+    {
+        $this->buildFixture();
+        $w = $this->makeStationWorker('sellerA');
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->loginFrom('10.0.0.1', $w['employee']->employee_no, '111111')->assertStatus(422);
+        }
+        $this->loginFrom('10.0.0.1', $w['employee']->employee_no, self::PIN)->assertOk();
+        for ($i = 0; $i < 4; $i++) {
+            $this->loginFrom('10.0.0.1', $w['employee']->employee_no, '111111')->assertStatus(422); // ما زال تحت الحدّ
+        }
+    }
+
+    /** @test */
+    public function distributed_guessing_hits_a_per_employee_ceiling_that_expires_by_itself(): void
+    {
+        $this->buildFixture();
+        $w = $this->makeStationWorker('sellerA');
+
+        for ($i = 1; $i <= 25; $i++) {
+            $this->loginFrom("10.9.0.{$i}", $w['employee']->employee_no, '111111')->assertStatus(422);
+        }
+        // عنوان جديد كلياً ⇒ محجوب بالسقف العالمي (حماية من الهجوم الموزَّع) حتى بالرمز الصحيح.
+        $this->loginFrom('10.8.0.1', $w['employee']->employee_no, self::PIN)->assertStatus(429);
+        $this->travel(3601)->seconds();
+        $this->loginFrom('10.8.0.1', $w['employee']->employee_no, self::PIN)->assertOk();
+    }
+
+    /** @test */
+    public function an_unknown_employee_number_is_limited_like_a_known_one(): void
     {
         $this->buildFixture();
 
-        for ($i = 0; $i < 6; $i++) {
-            $this->stationLogin('GHOST-1', self::PIN)->assertStatus(422);
+        for ($i = 0; $i < 5; $i++) {
+            $this->loginFrom('10.0.0.1', 'GHOST-1', self::PIN)->assertStatus(422);
         }
-        $this->stationLogin('GHOST-1', self::PIN)->assertStatus(429);
+        $this->loginFrom('10.0.0.1', 'GHOST-1', self::PIN)->assertStatus(429);
+    }
+
+    /** @test */
+    public function a_single_address_flooding_with_many_employee_numbers_is_cut_off(): void
+    {
+        $this->buildFixture();
+
+        for ($i = 0; $i < 30; $i++) {
+            $this->loginFrom('10.0.0.7', "NOPE-{$i}", self::PIN)->assertStatus(422);
+        }
+        $this->loginFrom('10.0.0.7', 'NOPE-31', self::PIN)->assertStatus(429);
+        $this->loginFrom('10.0.0.8', 'NOPE-1', self::PIN)->assertStatus(422); // عنوان آخر لا يتأثر
     }
 
     // ───────────────────────── التعيين والتصفير من المدير ─────────────────────────

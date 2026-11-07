@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { currentUser, isAuthenticated } from '@/lib/auth';
+import { isAuthenticated } from '@/lib/auth';
 import { applyAwjUiGate } from '@/lib/awj-ui-gate';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 
@@ -17,8 +17,6 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace('/login');
-    } else if (currentUser()?.station_session === true) {
-      router.replace('/fuel-stations/ops');
     } else {
       setReady(true);
     }

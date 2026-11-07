@@ -1,6 +1,6 @@
 'use client';
 
-import { api, setToken, clearToken, getToken, hasApiStatus } from './api';
+import { api, setToken, clearToken, getToken, hasApiStatus, inStationApp, getStationToken, setStationToken, clearStationSession, activeUserKey, STATION_LOGIN_PATH, STATION_USER_KEY, STATION_USE_ERP_KEY } from './api';
 import { isDemo } from './demo';
 import { applyAwjTheme, isAwjTheme, writeAwjThemePreference, type AwjTheme } from './awj-theme';
 import { AUTH_SESSION_CHANGED_EVENT, USER_CHANGED_EVENT } from './user-events';
@@ -61,36 +61,48 @@ export async function login(email: string, password: string, remember = false): 
   return res.user;
 }
 
-/** مسار دخول تطبيق «محطات أَوْج» (رقم الموظف + PIN). */
-export const STATION_LOGIN_PATH = '/fuel-stations/ops/login';
+export { STATION_LOGIN_PATH };
 /** مدخل تطبيق المحطات بعد الدخول. */
 export const STATION_HOME_PATH = '/fuel-stations/ops';
 
 /**
  * STATION-PIN: دخول تطبيق المحطات برقم الموظف و PIN من 6 أرقام. المستأجر يُحسم في الخادم من مضيف الصفحة وحده (لا يُرسَل من هنا).
- * الجلسة الناتجة مقيَّدة خادمياً بمسارات المحطات؛ تُخزَّن في المفتاحين نفسيهما (`token`/`user`) فتعمل طبقة `api` دون تغيير.
- * الـPIN لا يُخزَّن ولا يُسجَّل.
+ * الجلسة الناتجة مقيَّدة خادمياً بمسارات المحطات، وتُخزَّن في **مفاتيح مستقلة** (`station_token`/`station_user`): لا تستبدل جلسة أَوْج المفتوحة
+ * في المتصفح نفسه ولا تُمسّ بدخول/خروج ERP. الـPIN لا يُخزَّن ولا يُسجَّل، ولا يُمسح فرع أَوْج النشط ولا وضع المعاينة.
  */
 export async function stationLogin(employeeNo: string, pin: string): Promise<AuthUser> {
   const res = await api<{ token: string; user: AuthUser }>('/station/login', {
     method: 'POST',
     body: { employee_no: employeeNo, pin },
   });
-  clearSessionPreferences();
-  setToken(res.token);
-  persistUser({ ...res.user, station_session: true });
+  clearStationSession(); // دخول موظف جديد يستبدل اعتماد المحطات السابق (جهاز مشترك) فقط
+  setStationToken(res.token);
+  const user = { ...res.user, station_session: true };
+  writeUser(STATION_USER_KEY, user);
   notifyAuthSessionChanged();
-  return { ...res.user, station_session: true };
+  return user;
 }
 
-/** هل الجلسة المخزَّنة جلسة تطبيق المحطات؟ (للعرض والتوجيه فقط — التقييد الحقيقي في الخادم). */
+/** موافقة صريحة على استعمال جلسة أَوْج الحالية داخل التطبيق (مدير دخل بالبريد). لا تنسخ التوكن ولا تغيّر جلسة أَوْج. */
+export function continueStationWithErpSession(): void {
+  localStorage.setItem(STATION_USE_ERP_KEY, '1');
+  notifyAuthSessionChanged();
+}
+
+/** هل توجد جلسة أَوْج صالحة الشكل في المتصفح يمكن عرض «المتابعة بها»؟ (اسم للعرض فقط). */
+export function erpSessionHint(): { name: string } | null {
+  if (typeof window === 'undefined' || localStorage.getItem('token') === null || isDemo()) return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem('user') ?? 'null') as AuthUser | null;
+    return parsed && typeof parsed.name === 'string' ? { name: parsed.name } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** هل المستخدم الفعّال في النطاق الحالي جلسة تطبيق المحطات (رقم موظف + PIN)؟ للعرض فقط — التقييد الحقيقي في الخادم. */
 export function isStationSession(): boolean {
-  return currentUser()?.station_session === true;
-}
-
-/** وجهة الهبوط بعد دخول موثَّق لمستخدم بعينه: جلسة المحطات تهبط على التطبيق مباشرة. */
-export function landingPathForUser(user: Pick<AuthUser, 'role' | 'station_session'>): string {
-  return user.station_session === true ? STATION_HOME_PATH : landingPathFor(user.role);
+  return inStationApp() && getStationToken() !== null && currentUser()?.station_session === true;
 }
 
 export interface RegisterPayload {
@@ -174,6 +186,20 @@ export async function checkStoredSession(): Promise<SessionCheck> {
 }
 
 export async function logout(): Promise<void> {
+  if (inStationApp()) {
+    // خروج التطبيق: يُبطل توكن المحطات في الخادم ويمسح اعتماد المحطات وحده. إن كان الاستعمال بموافقة جلسة أَوْج (لا توكن محطات)
+    // فلا طلب خروج للخادم: تُسحب الموافقة فقط وتبقى جلسة أَوْج قائمة.
+    if (getStationToken() !== null) {
+      try {
+        await api('/logout', { method: 'POST' });
+      } catch {
+        // تجاهل أخطاء الشبكة: الجهاز يُمسح دائماً (جهاز مشترك)، والتوكن ينتهي وحده
+      }
+    }
+    clearStationSession();
+    notifyAuthSessionChanged();
+    return;
+  }
   try {
     await api('/logout', { method: 'POST' });
   } catch {
@@ -194,9 +220,14 @@ let cachedUser: AuthUser | null = null;
  * بصمتٍ لغةً أو وضعاً اختاره المستخدم من الشريط العلوي (ERP-UX-026).
  */
 export function persistUser(user: AuthUser, options: { applyDisplayPreferences?: boolean } = {}): void {
+  writeUser(activeUserKey(), user, options);
+}
+
+/** يكتب المستخدم في مفتاح نطاقه (`user` لأَوْج، `station_user` للمحطات) ويطبّق التفضيلات عند الطلب. */
+function writeUser(key: string, user: AuthUser, options: { applyDisplayPreferences?: boolean } = {}): void {
   if (typeof window === 'undefined') return;
   const raw = JSON.stringify(user);
-  localStorage.setItem('user', raw);
+  localStorage.setItem(key, raw);
   cachedUserRaw = raw;
   cachedUser = user;
   window.dispatchEvent(new Event(USER_CHANGED_EVENT));
@@ -224,7 +255,9 @@ export function persistUser(user: AuthUser, options: { applyDisplayPreferences?:
  */
 export function currentUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('user');
+  // داخل تطبيق المحطات بلا اعتماد فعّال (لا توكن محطات ولا موافقة استعمال أَوْج) لا مستخدم — لا تُقرأ هوية أَوْج ضمناً.
+  if (inStationApp() && getToken() === null) return null;
+  const raw = localStorage.getItem(activeUserKey());
   if (!raw) {
     cachedUserRaw = null;
     cachedUser = null;

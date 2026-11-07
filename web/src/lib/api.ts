@@ -56,9 +56,60 @@ export function hasApiStatus(exception: unknown, status: number): boolean {
       && (exception as { status?: unknown }).status === status;
 }
 
-export function getToken(): string | null {
+// ───────────────────────── عزل جلسة تطبيق المحطات عن أَوْج ─────────────────────────
+// مفاتيح مستقلة لاعتماد تطبيق «محطات أَوْج» (رقم الموظف + PIN) حتى لا يستبدل دخولُه جلسةَ ERP المفتوحة في المتصفح نفسه (ولا العكس):
+//  • داخل مسارات التطبيق (`/fuel-stations/ops`) الاعتماد الفعّال = `station_token` فقط. جلسة أَوْج لا تُستعمل هناك إلا بموافقة صريحة
+//    من المستخدم على شاشة الدخول (`station_use_erp = 1`)، ولا تُقرأ ضمناً — فلا يرث موظفٌ على جهاز مشترك هوية مدير سجّل دخول أَوْج.
+//  • خارج التطبيق الاعتماد الفعّال = `token` فقط كما كان حرفياً؛ لا يرى جلسة المحطات إطلاقاً.
+//  • الخروج/انتهاء الصلاحية/الاستبدال يمسّ مفاتيح نطاقه وحده. حدّ الخادم (`StationSessionBoundary`) لم يُمسّ.
+export const STATION_TOKEN_KEY = 'station_token';
+export const STATION_USER_KEY = 'station_user';
+export const STATION_USE_ERP_KEY = 'station_use_erp';
+export const STATION_APP_PREFIX = '/fuel-stations/ops';
+export const STATION_LOGIN_PATH = '/fuel-stations/ops/login';
+
+/** هل الصفحة الحالية ضمن تطبيق المحطات؟ (يحدّد أي مجموعة اعتماد تُستعمل). */
+export function inStationApp(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location?.pathname;
+  return typeof path === 'string' && (path === STATION_APP_PREFIX || path.startsWith(`${STATION_APP_PREFIX}/`));
+}
+
+export function getStationToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(STATION_TOKEN_KEY);
+}
+
+export function setStationToken(token: string): void {
+  localStorage.setItem(STATION_TOKEN_KEY, token);
+}
+
+/** هل وافق المستخدم صراحةً على استعمال جلسة أَوْج داخل التطبيق (للمدير الذي يدخل بالبريد)؟ */
+export function stationUsesErpSession(): boolean {
+  return typeof window !== 'undefined' && localStorage.getItem(STATION_USE_ERP_KEY) === '1';
+}
+
+/** يمسح اعتماد المحطات وحده (توكن + مستخدم + موافقة استعمال أَوْج). جلسة أَوْج لا تُمسّ. */
+export function clearStationSession(): void {
+  localStorage.removeItem(STATION_TOKEN_KEY);
+  localStorage.removeItem(STATION_USER_KEY);
+  localStorage.removeItem(STATION_USE_ERP_KEY);
+}
+
+export function getErpToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');
+}
+
+/** مفتاح المستخدم الفعّال في النطاق الحالي (للقراءة والكتابة). */
+export function activeUserKey(): string {
+  return inStationApp() && getStationToken() !== null ? STATION_USER_KEY : 'user';
+}
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (inStationApp()) return getStationToken() ?? (stationUsesErpSession() ? getErpToken() : null);
+  return getErpToken();
 }
 
 export function setToken(token: string): void {
@@ -66,6 +117,11 @@ export function setToken(token: string): void {
 }
 
 export function clearToken(): void {
+  if (inStationApp()) {
+    // داخل التطبيق: يُمسح اعتماد المحطات (أو موافقة استعمال أَوْج) فقط؛ جلسة أَوْج في المتصفح نفسه باقية.
+    clearStationSession();
+    return;
+  }
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('demo');
@@ -82,8 +138,7 @@ function handleUnauthorized(sentToken: string | null): void {
   clearToken();
   // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل.
   // داخل تطبيق المحطات يعود إلى دخول رقم الموظف + PIN لا إلى دخول البريد.
-  const inStationApp = window.location.pathname.startsWith('/fuel-stations/ops');
-  const target = inStationApp ? '/fuel-stations/ops/login' : '/login';
+  const target = inStationApp() ? STATION_LOGIN_PATH : '/login';
   if (!window.location.pathname.startsWith(target)) window.location.assign(target);
 }
 
@@ -91,13 +146,15 @@ type Options = Omit<RequestInit, 'body'> & { body?: unknown };
 
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {
   // وضع المعاينة: لا اتصال بأي خادم — البيانات من الموجّه الوهمي.
-  if (isDemo()) {
+  // جلسة تطبيق المحطات لا تتأثر بوضع معاينة أَوْج ولا بفرعه النشط (نطاقها يحدّده الخادم من مستخدمها).
+  const stationOwn = inStationApp() && getStationToken() !== null;
+  if (isDemo() && !stationOwn) {
     return mockApi<T>(path, options.method ?? 'GET', options.body);
   }
 
   const token = getToken();
   // الفرع النشط — يوسم به الخادمُ المستنداتِ وسطورَ قيدها (بلا ترويسة: الفرع الرئيسي).
-  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const branchId = typeof window !== 'undefined' && !stationOwn ? localStorage.getItem('nibras_active_branch') : null;
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: 'application/json',

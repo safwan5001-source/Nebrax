@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { LogOut, RefreshCw, ShieldCheck } from 'lucide-react';
-import { STATION_LOGIN_PATH, isStationSession, logout } from '@/lib/auth';
+import { STATION_LOGIN_PATH, logout } from '@/lib/auth';
 import { useStationOps } from './context';
 import { OPS_BASE, deriveOpsMode } from './nav';
 import { PageMasthead, ScreenBody } from './masthead';
@@ -32,12 +32,11 @@ export function ProfileScreen() {
   const mode = deriveOpsMode(can);
   const unrestricted = viewer.branch_ids !== undefined && viewer.branch_ids.length === 0;
 
-  /** الخروج يُبطل التوكن في الخادم أولاً. جلسة PIN ترجع إلى شاشة دخول التطبيق؛ جلسة البريد ترجع إلى دخول أَوْج كما كانت. */
+  /** الخروج يُبطل توكن المحطات في الخادم ويمسح اعتماد التطبيق وحده (جلسة أَوْج في المتصفح نفسه باقية) ثم شاشة دخول التطبيق. */
   async function signOut() {
-    const station = isStationSession();
     setLeaving(true);
     await logout();
-    router.replace(station ? STATION_LOGIN_PATH : '/login');
+    router.replace(STATION_LOGIN_PATH);
   }
 
   /** تبديل الموظف على جهاز مشترك: إنهاء الجلسة الحالية ثم شاشة الدخول للموظف التالي (لا يبقى شيء من الأول). */

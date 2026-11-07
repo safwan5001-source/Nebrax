@@ -28,9 +28,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace('/login');
-    } else if (currentUser()?.station_session === true) {
-      // جلسة تطبيق المحطات لا تصل إلى واجهات أَوْج الإدارية (الخادم يرفضها أيضاً) — تعود إلى التطبيق.
-      router.replace('/fuel-stations/ops');
     } else if (currentUser()?.role === 'self_service') {
       // دور الخدمة الذاتية بلا صلاحياتٍ هنا أصلاً — بوابته المخصَّصة.
       router.replace('/me');

@@ -104,7 +104,7 @@ for (const cell of MATRIX) {
       await audit(page, `${tag} home`);
 
       expect(mock.forbidden, 'the station session must never call an ERP endpoint').toEqual([]);
-      const stored = await page.evaluate(() => ({ user: JSON.parse(localStorage.getItem('user') ?? 'null'), dump: JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) }));
+      const stored = await page.evaluate(() => ({ user: JSON.parse(localStorage.getItem('station_user') ?? 'null'), dump: JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) }));
       expect(stored.user.station_session).toBe(true);
       expect(stored.dump).not.toContain(EMP_A.pin);
       expect(stored.dump).not.toContain('111111');
@@ -117,7 +117,7 @@ for (const cell of MATRIX) {
       await fill(page, EMP_A.no, EMP_A.pin);
       await page.getByRole('button', { name: L.submit }).click();
       await page.waitForURL(`**${HOME}`);
-      const tokenA = await page.evaluate(() => localStorage.getItem('token'));
+      const tokenA = await page.evaluate(() => localStorage.getItem('station_token'));
       expect(tokenA).toBeTruthy();
 
       await page.goto(`${baseUrl}${HOME}/profile`);
@@ -131,7 +131,7 @@ for (const cell of MATRIX) {
       // الجلسة الأولى أُبطلت في الخادم ومُسح الجهاز.
       expect(mock.tokens.has(tokenA as string)).toBe(false);
       expect(mock.calls.some((c) => c.path === '/logout' && c.auth === `Bearer ${tokenA}`)).toBe(true);
-      expect(await page.evaluate(() => [localStorage.getItem('token'), localStorage.getItem('user')])).toEqual([null, null]);
+      expect(await page.evaluate(() => [localStorage.getItem('station_token'), localStorage.getItem('station_user')])).toEqual([null, null]);
       await shot(page, `${tag}/06-after-switch`);
 
       // زر الرجوع لا يعيد الموظف الأول.
@@ -150,12 +150,42 @@ for (const cell of MATRIX) {
       await settle(page);
       await page.getByRole('button', { name: L.logout }).click();
       await page.waitForURL(`**${LOGIN}`);
-      expect(await page.evaluate(() => localStorage.getItem('token'))).toBeNull();
+      expect(await page.evaluate(() => localStorage.getItem('station_token'))).toBeNull();
       expect(mock.tokens.size).toBe(0);
       expect(mock.forbidden).toEqual([]);
     });
 
-    test('a station session cannot open the ERP: dashboard/invoices bounce back to the app', async ({ page }) => {
+    test('same browser origin: an open AWJ session is neither overwritten nor signed out by PIN login/logout, and is never used implicitly', async ({ page }) => {
+      const mock = await mockStationLoginApi(page, { baseUrl, locale: cell.locale, theme: cell.theme });
+      const erpUser = JSON.stringify({ id: 'erp-1', name: 'ERP Owner', email: 'o@example.test', role: 'owner', permissions: ['*'], tenant_id: 'FX' });
+      await page.addInitScript((u) => { localStorage.setItem('token', 'erp-token'); localStorage.setItem('user', u); localStorage.setItem('nibras_active_branch', 'br-erp'); }, erpUser);
+
+      // لا استعمال ضمني لجلسة أَوْج داخل التطبيق: تبقى شاشة الدخول، مع خيار «المتابعة» الصريح.
+      await page.goto(`${baseUrl}${HOME}`);
+      await page.waitForURL(`**${LOGIN}`);
+      await settle(page);
+      await expect(page.getByRole('button', { name: /ERP Owner/ })).toBeVisible();
+      await shot(page, `${tag}/08-with-erp-session`);
+      await audit(page, `${tag} login with erp hint`);
+      expect(mock.calls.filter((c) => c.auth === 'Bearer erp-token')).toEqual([]); // لم يُرسَل توكن أَوْج إلى أي طلب
+
+      await fill(page, EMP_A.no, EMP_A.pin);
+      await page.getByRole('button', { name: L.submit }).click();
+      await page.waitForURL(`**${HOME}`);
+      const afterLogin = await page.evaluate(() => [localStorage.getItem('token'), localStorage.getItem('nibras_active_branch'), JSON.parse(localStorage.getItem('user') ?? 'null')?.id]);
+      expect(afterLogin).toEqual(['erp-token', 'br-erp', 'erp-1']);
+      expect(mock.calls.filter((c) => c.auth === 'Bearer erp-token')).toEqual([]);
+
+      await page.goto(`${baseUrl}${HOME}/profile`);
+      await settle(page);
+      await page.getByRole('button', { name: L.logout }).click();
+      await page.waitForURL(`**${LOGIN}`);
+      const afterLogout = await page.evaluate(() => [localStorage.getItem('station_token'), localStorage.getItem('token'), JSON.parse(localStorage.getItem('user') ?? 'null')?.id]);
+      expect(afterLogout).toEqual([null, 'erp-token', 'erp-1']);
+      expect(mock.forbidden).toEqual([]);
+    });
+
+    test('a station session is not an ERP session: ERP pages see no login and never send the station token', async ({ page }) => {
       const mock = await mockStationLoginApi(page, { baseUrl, locale: cell.locale, theme: cell.theme });
       await page.goto(`${baseUrl}${LOGIN}`);
       await fill(page, EMP_A.no, EMP_A.pin);
@@ -164,9 +194,12 @@ for (const cell of MATRIX) {
 
       for (const erp of ['/dashboard', '/invoices', '/pos']) {
         await page.goto(`${baseUrl}${erp}`);
-        await page.waitForURL(`**${HOME}`);
+        await page.waitForURL('**/login');
       }
-      expect(mock.calls.filter((c) => !c.path.startsWith('/fuel-stations') && !['/me', '/logout', '/station/login'].includes(c.path) && c.auth)).toEqual([]);
+      // التوكن لم يُرسَل من أي صفحة ERP (الخادم الحقيقي يردّه 403 أيضاً)، وجلسة المحطات باقية.
+      const sent = mock.calls.filter((c) => c.auth && !c.path.startsWith('/fuel-stations') && !['/me', '/logout', '/station/login'].includes(c.path));
+      expect(sent).toEqual([]);
+      expect(await page.evaluate(() => localStorage.getItem('station_token'))).not.toBeNull();
     });
 
     test('too many wrong attempts shows a wait message — never a locked account — and the right PIN still works for another employee', async ({ page }) => {

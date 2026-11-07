@@ -16,11 +16,14 @@ import { StationLoginScreen } from './login-screen';
 const apiMock = vi.mocked(api);
 const user = { id: 'u1', name: 'Seller One', email: 's@x.test', role: 'staff', permissions: ['fuel_stations.view'], tenant_id: 'T1', station_session: true };
 
+const realLocation = window.location;
 beforeEach(() => {
+  // الشاشة تعمل داخل مسارات التطبيق: يحدّد ذلك مجموعة الاعتماد الفعّالة (محطات لا أَوْج).
+  Object.defineProperty(window, 'location', { configurable: true, value: { pathname: '/fuel-stations/ops/login', href: 'http://localhost/fuel-stations/ops/login', assign: vi.fn() } });
   Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   localStorage.clear(); sessionStorage.clear(); apiMock.mockReset(); nav.replace.mockReset();
 });
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); Object.defineProperty(window, 'location', { configurable: true, value: realLocation }); });
 
 const type = async (employee: string, pin: string) => {
   const u = userEvent.setup();
@@ -40,8 +43,9 @@ describe('station login screen', () => {
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/fuel-stations/ops'));
     expect(apiMock).toHaveBeenCalledTimes(1);
     expect(apiMock).toHaveBeenCalledWith('/station/login', { method: 'POST', body: { employee_no: 'EMP-00042', pin: '482915' } });
-    expect(localStorage.getItem('token')).toBe('tok');
-    expect(JSON.parse(localStorage.getItem('user') as string).station_session).toBe(true);
+    expect(localStorage.getItem('station_token')).toBe('tok');
+    expect(JSON.parse(localStorage.getItem('station_user') as string).station_session).toBe(true);
+    expect(localStorage.getItem('token')).toBeNull(); // جلسة أَوْج لا تُكتب
   });
 
   it('accepts Arabic-Indic digits and sends Latin 0-9', async () => {
@@ -86,7 +90,7 @@ describe('station login screen', () => {
     expect((screen.getByLabelText(/^PIN$/) as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText(/employee number/i) as HTMLInputElement).value).toBe('EMP-1');
     expect(nav.replace).not.toHaveBeenCalled();
-    expect(localStorage.getItem('token')).toBeNull();
+    expect(localStorage.getItem('station_token')).toBeNull();
     expect(JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage })).not.toMatch(/111111|EMP-1/);
   });
 
@@ -96,8 +100,8 @@ describe('station login screen', () => {
     const u = await type('EMP-1', '111111');
     await u.click(submit());
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toMatch(/Wait a minute and try again/);
-    expect(alert.textContent).not.toMatch(/lock|disabled|suspend/i);
+    expect(alert.textContent).toMatch(/Wait a few minutes and try again/);
+    expect(alert.textContent).toMatch(/not locked/);
     expect(alert.getAttribute('data-login-failure')).toBe('throttled');
   });
 
@@ -132,7 +136,7 @@ describe('station login screen', () => {
   });
 
   it('resumes a valid stored station session without showing the form', async () => {
-    localStorage.setItem('token', 'tok');
+    localStorage.setItem('station_token', 'tok');
     apiMock.mockResolvedValueOnce({ user, company: null });
     renderIntl(<StationLoginScreen />, 'en');
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/fuel-stations/ops'));
@@ -140,12 +144,27 @@ describe('station login screen', () => {
     expect(screen.queryByLabelText(/employee number/i)).toBeNull();
   });
 
-  it('shows the form when the stored session is not a station session (e.g. an email session)', async () => {
-    localStorage.setItem('token', 'tok');
-    apiMock.mockResolvedValueOnce({ user: { ...user, station_session: undefined }, company: null });
+  it('shows the form when the stored station session is no longer valid', async () => {
+    localStorage.setItem('station_token', 'tok');
+    apiMock.mockRejectedValueOnce(new ApiError(401, 'x', {}));
     renderIntl(<StationLoginScreen />, 'en');
     expect(await screen.findByLabelText(/employee number/i)).toBeTruthy();
     expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('never restores from an AWJ (email) session; it offers an explicit, separate “continue” choice instead', async () => {
+    localStorage.setItem('token', 'erp-token');
+    localStorage.setItem('user', JSON.stringify({ id: 'o', name: 'ERP Owner', email: 'o@x.test', role: 'owner', tenant_id: 'T1' }));
+    renderIntl(<StationLoginScreen />, 'en');
+    expect(await screen.findByLabelText(/employee number/i)).toBeTruthy();
+    expect(apiMock).not.toHaveBeenCalled(); // لا /me بتوكن أَوْج
+    expect(nav.replace).not.toHaveBeenCalled();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Continue with the current AWJ account \(ERP Owner\)/ }));
+    expect(localStorage.getItem('station_use_erp')).toBe('1');
+    expect(nav.replace).toHaveBeenCalledWith('/fuel-stations/ops');
+    expect(localStorage.getItem('token')).toBe('erp-token'); // لم تُنسخ ولم تُغيَّر
+    expect(localStorage.getItem('station_token')).toBeNull();
   });
 
   it('toggles PIN visibility with an accessible control', async () => {

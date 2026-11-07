@@ -6,7 +6,6 @@ use App\Http\Middleware\SlowRequestAttribution;
 use App\Models\CustomerIdentity;
 use App\Models\PreviewSession;
 use App\Services\Commerce\Edge\RailwayStorefrontEdgeClient;
-use App\Services\StationPinCredentialService;
 use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\Dns\DnsTxtResolver;
 use App\Support\Dns\NativeDnsTxtResolver;
@@ -119,18 +118,17 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
-        // STATION-PIN: PIN من 6 أرقام (مليون احتمال) ⇒ حماية من التخمين الآلي **بتحديد المعدل لا بقفل الحساب**: لا حالة تُخزَّن على المستخدم
-        // ولا تعطيل بعد عدد ثابت — النافذة تنزلق وتنتهي وحدها. أربعة مفاتيح: عنوان+مستأجر (دقيقة/ساعة)، ورقم موظف+مستأجر (دقيقة/ساعة).
-        // الرقم المجهول يُحتسب كالمعروف فلا يُستدل على وجوده من الرد. مفتاح المستأجر من مضيف الطلب (`HostnameTenantContext`) لا من الجسم.
+        // STATION-PIN: طبقة الإغراق/الروبوتات فقط (لكل عنوان+مستأجر، كل الطلبات) — سخيّة عمداً ولا تعرف رقم الموظف.
+        // الحماية من **تخمين** الـPIN (مليون احتمال) لا تُعدّ هنا الطلبات كلها بل **الفاشلة منها** داخل `StationAuthController`:
+        // (أ) لكل (مستأجر، رقم موظف، عنوان) 5 فشلات/5 دقائق، (ب) سقف عالمي لكل (مستأجر، رقم موظف) 25 فشلاً/ساعة ضد الهجوم الموزَّع.
+        // بهذا لا يُعطَّل عاملٌ بعينه بمجرد أن يطرق مهاجمٌ من عنوان آخر رقمَه، ولا تحجب المحاولةُ الصحيحة إلا من عنوانٍ استنفد فشلاته.
+        // لا قفل حساب ولا حالة على المستخدم: النوافذ تنتهي وحدها.
         RateLimiter::for('station-pin-login', function (Request $request): array {
             $tenant = app(HostnameTenantContext::class)->id() ?? 'unresolved';
-            $employee = Str::lower(trim(StationPinCredentialService::normalizeEmployeeNumber((string) $request->input('employee_no'))));
 
             return [
-                Limit::perMinute(20)->by("station-pin|{$tenant}|ip|{$request->ip()}"),
-                Limit::perHour(120)->by("station-pin-h|{$tenant}|ip|{$request->ip()}"),
-                Limit::perMinute(6)->by("station-pin|{$tenant}|emp|{$employee}"),
-                Limit::perHour(40)->by("station-pin-h|{$tenant}|emp|{$employee}"),
+                Limit::perMinute(30)->by("station-pin|{$tenant}|ip|{$request->ip()}"),
+                Limit::perHour(300)->by("station-pin-h|{$tenant}|ip|{$request->ip()}"),
             ];
         });
 
