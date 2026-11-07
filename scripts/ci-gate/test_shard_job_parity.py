@@ -43,12 +43,14 @@ class ShardJobParity(unittest.TestCase):
         for name in shared:
             self.assertEqual(norm(shard[name]), norm(full[name]), f"step drifted from the full job: {name}")
 
-    def test_the_full_job_is_still_the_complete_unfiltered_pgsql_run(self):
-        self.assertEqual(self.full["strategy"]["matrix"]["db"], ["sqlite", "pgsql"])
+    def test_the_full_job_keeps_the_unfiltered_sqlite_run_and_pgsql_now_runs_in_the_shards(self):
+        self.assertEqual(self.full["strategy"]["matrix"]["db"], ["sqlite"])  # superseding: the full pgsql leg is retired into the proven shard group
         run = steps(self.full)["تشغيل الاختبارات"]["run"]
         for bad in FORBIDDEN_RUN:
             self.assertNotIn(bad, run)
         self.assertIn("php artisan test --parallel", run)
+        # pgsql coverage is not lost: the shard run steps are the filter-free replacements, the proof job proves every test ran exactly once
+        self.assertEqual(self.proof["name"], "php artisan test (L11, pgsql)")
 
     def test_service_env_and_runner_match_the_full_job(self):
         for key in ("services", "env", "runs-on", "timeout-minutes"):
@@ -219,7 +221,7 @@ class ShardJobParity(unittest.TestCase):
         self.assertEqual({r["label"] for r in g["required_steps"]}, {"aia-0.4", "watchdog.role", "watchdog.tests", "lock.limit", "watchdog.upload"})
         for need in ("trap awj_watchdog_stop EXIT", "awj_watchdog_start", "lock_timeout=60s", "--stall-seconds 240", "--pg-user awj_ci_watchdog", "--log-junit"):
             self.assertIn(need, g["guard"]["require"])
-        self.assertEqual(g["status"], "additive")  # still additive: the full pgsql check stays mandatory
+        self.assertEqual(g["status"], "superseding")  # the proof job (named like the retired full check) is the mandatory gate for every test
 
     # ── proof job: trusted script, needs the shards, no skip ──────────────────────────────────────────────
     def test_proof_runs_the_script_from_the_trusted_base_not_the_pr(self):
@@ -254,12 +256,16 @@ class ShardJobParity(unittest.TestCase):
         self.assertTrue((ROOT / "scripts/ci-gate/pg-shards.json").is_file())
 
     # ── additive: nothing existing was removed or renamed ─────────────────────────────────────────────────
-    def test_group_is_additive_and_the_full_pgsql_check_is_still_required(self):
-        self.assertEqual(self.group["status"], "additive")
+    def test_group_is_superseding_and_its_proof_is_the_only_producer_of_the_legacy_context(self):
+        legacy_name = "php artisan test (L11, pgsql)"
+        self.assertEqual(self.group["status"], "superseding")
+        self.assertEqual(self.group["supersedes"], legacy_name)
         raw = json.loads(MANIFEST.read_text(encoding="utf-8"))["checks"]
-        legacy = next(c for c in raw if c["name"] == "php artisan test (L11, pgsql)")
-        self.assertEqual((legacy["workflow"], legacy["job"], legacy["tier"]), (".github/workflows/ci.yml", FULL, "always"))
-        self.assertNotEqual(self.group["proof"]["name"], legacy["name"])
+        self.assertNotIn(legacy_name, [c["name"] for c in raw])
+        self.assertEqual(self.group["proof"]["name"], legacy_name)
+        self.assertEqual(self.proof["name"], legacy_name)
+        # no other PR-triggered job may produce the retired context (a second producer could satisfy it without running the proof)
+        self.assertEqual([j for j, d in self.jobs.items() if d.get("name") == legacy_name], [PROOF])
 
 
 if __name__ == "__main__":

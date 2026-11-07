@@ -17,9 +17,8 @@ M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
 PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)",
        "PostgreSQL feed-lock performance (COPS-H1-1)",  # COPS-H1-1: dedicated perf job, tier=always (PHP[2])
-       # PG-SHARD-ADDITIVE-1: the additive shard group (2 shards + proof) — always-required on top of the full pgsql check
-       "php artisan test (L11, pgsql, shard 1)", "php artisan test (L11, pgsql, shard 2)",
-       "php artisan test (L11, pgsql, shards proven)"]
+       # PG-SHARD superseding: the shard group (2 shards) is always-required; its proof job carries the context name of the full pgsql check it retired
+       "php artisan test (L11, pgsql, shard 1)", "php artisan test (L11, pgsql, shard 2)"]
 HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=paths (only PRs that touch Horizon files)
 HZ_WF = ".github/workflows/horizon-eval-ci.yml"
 HZ_FILES = ["scripts/horizon-eval/horizon_eval.py"]  # a Horizon-related diff
@@ -75,7 +74,7 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 15)  # 10 previously; +1 = path-scoped storefront Docker build context check; +1 = COPS-H1-1 dedicated perf job (always); +3 = PG shard group (additive)
+        self.assertEqual(len(exp), 14)  # 10 previously; +1 = path-scoped storefront Docker build context check; +1 = COPS-H1-1 dedicated perf job (always); +2 = PG shards; the group's proof carries the retired full pgsql check's name
         self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):

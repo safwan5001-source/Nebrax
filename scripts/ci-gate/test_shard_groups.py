@@ -31,6 +31,11 @@ GROUP = {
 }
 
 
+LEGACY_CHECK = {  # the full pgsql check as it was declared before sharding (what every group-free fixture starts from)
+    "name": LEGACY, "workflow": CI, "job": "test", "tier": "always", "covers": ["financial", "security", "tenant-isolation", "api", "postgres"],
+    "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"]},
+}
+
 RS = [  # the safeguards a superseding group must carry (ci_gate.SUPERSEDE_REQUIRED_LABELS), as the real design declares them
     {"label": "aia-0.4", "run_contains": ["set -euo pipefail", "--fail-on-incomplete", "--fail-on-skipped", "--fail-on-risky",
                                           "PublicApiScopeCeilingEnforcementTest.php", "PublicApiCreateClientCommandCeilingTest.php",
@@ -83,6 +88,10 @@ class Sandbox:
         manifest.pop("shard_groups", None)
         for live_job in ("test-pg-shards", "test-pg-shards-proof"):
             doc["jobs"].pop(live_job, None)
+        # ...and from the historical group-free state of the full check: the live manifest may already have retired it into a superseding group
+        if not any(c["name"] == LEGACY for c in manifest["checks"]):
+            manifest["checks"].insert(1, copy.deepcopy(LEGACY_CHECK))
+        doc["jobs"]["test"]["strategy"]["matrix"]["db"] = ["sqlite", "pgsql"]
         grp = copy.deepcopy(group) if group else None
         if grp:
             manifest["shard_groups"] = [grp]
@@ -130,16 +139,18 @@ class Base(unittest.TestCase):
 # ───────────────────────────── backward compatibility ─────────────────────────────
 
 class BackwardCompatibility(Base):
-    def test_live_manifest_declares_only_the_approved_additive_group(self):
+    def test_live_manifest_declares_only_the_approved_superseding_group(self):
         raw = json.loads((REAL / ".github/ci-gate/required-checks.json").read_text(encoding="utf-8"))
         self.assertEqual([x["id"] for x in raw["shard_groups"]], ["pgsql-suite"])
         live = raw["shard_groups"][0]
-        self.assertEqual((live["status"], live["supersedes"], live["count"]), ("additive", LEGACY, 2))  # never superseding here
+        self.assertEqual((live["status"], live["supersedes"], live["count"]), ("superseding", LEGACY, 2))
+        self.assertEqual(live["proof"]["name"], LEGACY)  # the proof job owns the retired check's context name
         m = g.load_manifest()
         self.assertEqual([c["name"] for c in m["checks"]][: len(raw["checks"])], [c["name"] for c in raw["checks"]])
-        self.assertEqual([c["name"] for c in m["checks"] if c.get("_group")], [S1, S2, PROOF])
-        self.assertIn(LEGACY, [c["name"] for c in raw["checks"]])  # the full pgsql check is still a declared, blocking check
-        self.assertTrue(next(c for c in raw["checks"] if c["name"] == LEGACY)["tier"] == "always")
+        self.assertEqual([c["name"] for c in m["checks"] if c.get("_group")], [S1, S2, LEGACY])
+        self.assertNotIn(LEGACY, [c["name"] for c in raw["checks"]])  # no second producer of the context: only the group's proof job
+        proof = next(c for c in m["checks"] if c["name"] == LEGACY)
+        self.assertEqual((proof["tier"], proof["job"], proof["_role"]), ("always", "test-pg-shards-proof", "proof"))
 
     def test_empty_or_null_groups_equal_absent_groups(self):
         plain = self.sb()
