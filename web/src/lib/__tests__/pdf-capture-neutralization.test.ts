@@ -20,7 +20,8 @@ describe('تحييد خصائص العرض أثناء التقاط PDF (regressi
   });
 
   it('يرسم المحتوى القصير في صفحة واحدة بلا تقطيع', () => {
-    expect(pdfSource).toContain('canvas.height <= pageHeightCanvas');
+    // المحتوى الذي يتّسع في صفحة (مع تسامح التقريب) يُؤخذ شريحة واحدة بلا قطع عند حد آمن.
+    expect(pdfSource).toContain('imageHeight - top <= pageHeight + PAGE_FIT_TOLERANCE_PX');
   });
 
   it('يضيف العنصر الجذر إلى مصفوفة الاستعادة', () => {
