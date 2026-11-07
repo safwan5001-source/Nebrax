@@ -163,6 +163,8 @@ class FuelCostPoolIntegrityTest extends TestCase
 
         $this->assertSame([
             'Services' . DIRECTORY_SEPARATOR . 'Accounting' . DIRECTORY_SEPARATOR . 'InventoryService.php',
+            // FUEL-TANKS-V2/PR-1: مستند الرصيد الافتتاحي — مسار وقود معتمد جديد يمرّر الوسم نفسه (مراجَع ومحروس باختباراته).
+            'Services' . DIRECTORY_SEPARATOR . 'FuelOpeningBalanceService.php',
             'Services' . DIRECTORY_SEPARATOR . 'FuelReconciliationService.php',
             'Services' . DIRECTORY_SEPARATOR . 'FuelSaleService.php',
             'Services' . DIRECTORY_SEPARATOR . 'FuelSupplyReceivingService.php',

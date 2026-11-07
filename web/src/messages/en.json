@@ -9258,6 +9258,7 @@
     "entity_pos_investigation_case": "POS investigation case",
     "entity_fuel_shift": "Fuel shift",
     "entity_fuel_sale": "Fuel sale",
+    "entity_fuel_opening_balance": "Fuel opening balance",
     "entity_fuel_maintenance_work_order": "Station maintenance work order",
     "entity_fuel_safety_inspection": "Station safety inspection",
     "entity_corporate_fuel_contract": "Corporate fuel contract",

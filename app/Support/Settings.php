@@ -393,6 +393,9 @@ class Settings
             'inventory_gain_account_id' => null,
             // Cycle 3: لا fallback لحساب استلام غير مفوتر؛ الاعتماد يفشل حتى يعيّنه المستأجر أو المحطة صراحةً.
             'grni_account_id' => null,
+            // FUEL-TANKS-V2/PR-1: الطرف المقابل لقيد الرصيد الافتتاحي للوقود (حقوق ملكية). لا دور معتمد له في كتالوج الأدوار ولا
+            // افتراض ولا fallback إلى كود ثابت: الترحيل يفشل مغلقاً حتى يعيّنه المستأجر أو المحطة صراحةً (نمط GRNI).
+            'fuel_opening_balance_account_id' => null,
             'device_event_max_lateness_seconds' => 86400,
             'offline_event_retention_days' => 30,
             // Cycle 8: حماية منصة أجهزة الساحة. هذه القيم تضبط قبول الدليل
