@@ -293,7 +293,6 @@ class FuelStationE2ERobustnessTest extends TestCase
     /** @test */
     public function s10b_a_sale_cannot_be_drafted_or_finalized_through_a_pump_or_tank_under_maintenance(): void
     {
-        if (! getenv('E2E_RUN_KNOWN_DEFECTS')) { $this->markTestSkipped('P1-1 — عيب مؤكَّد في FUEL_STATION_E2E_REPORT.md؛ شغّله بـ E2E_RUN_KNOWN_DEFECTS=1 حتى يُصلَح.'); }
         $this->buildWorld(self::RECEIPTS);
         $shift = $this->readyShift('s10b');
         $out = [];
