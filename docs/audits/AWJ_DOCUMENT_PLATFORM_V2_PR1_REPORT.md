@@ -6,7 +6,7 @@
 | **Branch** | `claude/awj-doc-v2-pr1-pdf-export` |
 | **PR** | [#2065](https://github.com/safwan5001-source/Nebrax/pull/2065) (جاهز للمراجعة، **غير مدموج، غير منشور**) |
 | **Base SHA** | `cbc98a565fff59be84fc2fcb71512fecb113f2e2` (`origin/main`: Merge PR #2061) |
-| **Head SHA (الكود + الاختبارات)** | `ce913a30cfc30037c76d49f06b07dd4a639e88b0` — يليه commit توثيق فقط (هذا التقرير + الأدلة)؛ رأس الفرع النهائي في صفحة الـ PR |
+| **Head SHA** | كود + اختبارات: `ce913a30cfc30037c76d49f06b07dd4a639e88b0` · رأس الفرع عند كتابة التقرير (بعد commit التقرير والأدلة وإصلاح نوع في اختبار): `ecc57d0d5e3fccb317480f03f261dea00e6ce7d5` — أي commit لاحق يظهر في صفحة الـ PR |
 | **النطاق** | `web/src/lib/pdf.ts` + اختبارات. لا محرك PDF جديد. لا API/DB/محاسبة/ضرائب/ZATCA |
 
 ---
