@@ -107,6 +107,7 @@ use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
 use App\Http\Controllers\Api\FuelSaleController;
 use App\Http\Controllers\Api\FuelReconciliationController;
+use App\Http\Controllers\Api\FuelOpeningBalanceController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
@@ -1661,6 +1662,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('fuel-stations/deliveries/{id}/attachments/{attachmentId}', [FuelSupplyReceivingController::class, 'destroyAttachment'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.create'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'storeDelivery'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.create'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/deliveries/{id}/approve', [FuelSupplyReceivingController::class, 'approveDelivery'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.approve'), $commercialApp('fuel_stations.core', 'write')]);
+        // FUEL-TANKS-V2/PR-1: مستند الرصيد الافتتاحي للوقود (مغلق خلف `fuel_stations.opening_balance_enabled` ⇒ 404). الكتابة `fuel_stations.manage`،
+        // والترحيل بالحوكمة + سلطة التكلفة (`products.view_cost`)؛ تعيد الخدمة فحصهما.
+        Route::get('fuel-stations/opening-balances', [FuelOpeningBalanceController::class, 'index'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/opening-balances/{id}', [FuelOpeningBalanceController::class, 'show'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/opening-balances/{id}/preview', [FuelOpeningBalanceController::class, 'preview'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/opening-balances', [FuelOpeningBalanceController::class, 'store'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/opening-balances/{id}', [FuelOpeningBalanceController::class, 'update'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/opening-balances/{id}', [FuelOpeningBalanceController::class, 'destroy'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/opening-balances/{id}/post', [FuelOpeningBalanceController::class, 'post'])->middleware([$perm('fuel.governance.manage'), $perm('products.view_cost'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/delivery-suppliers', [FuelSupplyReceivingController::class, 'suppliers'])->middleware([$permAny('fuel_stations.manage', 'fuel.delivery.create'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'invoices'])->middleware([$permAny('fuel_stations.view', 'fuel.supplier_invoice.view'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/supplier-invoices/{id}', [FuelSupplyReceivingController::class, 'showInvoice'])->middleware([$permAny('fuel_stations.view', 'fuel.supplier_invoice.view'), $commercialApp('fuel_stations.core')]);

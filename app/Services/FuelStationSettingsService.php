@@ -477,7 +477,7 @@ class FuelStationSettingsService
             return;
         }
 
-        if (in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id'], true)) {
+        if (in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id', 'fuel_opening_balance_account_id'], true)) {
             if ($value === null || $value === '') {
                 return;
             }
@@ -498,6 +498,7 @@ class FuelStationSettingsService
             'inventory_variance_account_id' => $account->type === 'expense',
             'inventory_gain_account_id' => in_array($account->type, ['expense', 'revenue'], true),
             'grni_account_id' => $account->type === 'liability',
+            'fuel_opening_balance_account_id' => $account->type === 'equity',
             default => false,
         };
     }
@@ -511,6 +512,21 @@ class FuelStationSettingsService
         $id = $this->get($station, 'grni_account_id');
         if (! is_string($id) || $id === '' || ! $this->accountAllowedFor('grni_account_id', $id)) {
             throw new RuntimeException('لا يمكن اعتماد استلام الوقود قبل تعيين حساب GRNI / مخزون مستلم غير مفوتر صالح للمحطة أو المستأجر.');
+        }
+
+        return Account::findOrFail($id);
+    }
+
+    /**
+     * FUEL-TANKS-V2/PR-1: حساب الطرف المقابل لقيد الرصيد الافتتاحي للوقود. **بلا fallback**: لا دور معتمد له في كتالوج الأدوار
+     * (`opening_balances` خارج الكتالوج عمداً)، ولا يُسقَط إلى كود ثابت. الترحيل يفشل مغلقاً حتى يعيّنه المستأجر أو المحطة صراحةً
+     * بحساب حقوق ملكية نشط وحركي.
+     */
+    public function openingBalanceAccountFor(FuelStation $station): Account
+    {
+        $id = $this->get($station, 'fuel_opening_balance_account_id');
+        if (! is_string($id) || $id === '' || ! $this->accountAllowedFor('fuel_opening_balance_account_id', $id)) {
+            throw new RuntimeException('FUEL_OPENING_ACCOUNT_REQUIRED: لا يمكن ترحيل رصيد افتتاحي للوقود قبل تعيين حساب حقوق ملكية صالح للأرصدة الافتتاحية للمحطة أو المستأجر.');
         }
 
         return Account::findOrFail($id);

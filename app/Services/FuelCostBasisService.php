@@ -37,7 +37,10 @@ class FuelCostBasisService
             }
 
             try {
-                FuelInventoryCostState::create([
+                // FUEL-TANKS-V2/PR-1: الإنشاء داخل نقطة حفظ (savepoint) خاصة به. خطأ التفرّد داخل معاملة PostgreSQL يُفسد المعاملة كلها
+                // (25P02 عند أي استعلام لاحق، ومنه إعادة القراءة أدناه)، فكان أول استلام يتسابق مع أول عملية أخرى على المجمّع نفسه
+                // (استلام آخر أو رصيد افتتاحي) يفشل بخطأ قاعدة بدل أن يرى الحالة الفائزة. سلوك المسار المنفرد لم يتغيّر.
+                DB::transaction(fn () => FuelInventoryCostState::create([
                     'warehouse_id' => $warehouse->id,
                     'fuel_product_id' => $fuelProduct->id,
                     'quantity_milliliters' => 0,
@@ -51,7 +54,7 @@ class FuelCostBasisService
                     'allocation_posted_minor' => 0,
                     'carry_remainder_numerator' => '0',
                     'carry_remainder_denominator' => '1',
-                ]);
+                ]));
             } catch (\Throwable $exception) {
                 $state = $this->lockedState($fuelProduct, $warehouse);
                 if ($state === null) {
