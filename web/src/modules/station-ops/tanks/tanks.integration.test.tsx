@@ -156,6 +156,9 @@ describe('recording a standalone reading', () => {
     // يُحدَّث المستوى والسجل من الخادم
     await waitFor(() => expect(screen.getAllByText(/150\.500/).length).toBeGreaterThan(0));
     expect(await screen.findByText(/Recorded by Sup Visor/, { selector: '[data-history-row] p' })).toBeTruthy();
+    // إعادة الجلب لا تفكّك النموذج ولا تمحو إشعار الحفظ
+    expect(screen.getByText('The reading was saved.')).toBeTruthy();
+    expect(screen.getByTestId('tank-quantity')).toBeTruthy();
   });
 
   it('blocks malformed and over-capacity quantities before any request, and warns above the safe capacity without blocking', async () => {

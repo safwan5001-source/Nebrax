@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { PageMasthead, ScreenBody } from '../masthead';
@@ -13,7 +13,7 @@ import { SecondaryButton, SectionCard } from '../write-ui';
 import { useTankHistory, useTankLevels, useTanksAccess } from './data';
 import { FlagBadge, FreshnessBadge, LevelSummary, Liters, TANKS_BASE, TypeText } from './parts';
 import { RecordForm } from './record-form';
-import type { HistoryRow, ReadingKind } from './schemas';
+import type { HistoryRow, ReadingKind, TankLevel } from './schemas';
 
 const FILTERS = ['all', 'physical', 'atg'] as const;
 
@@ -85,9 +85,12 @@ function Detail({ station, tankId }: { station: Station; tankId: string }) {
   const levels = useTankLevels(station);
   const [version, setVersion] = useState(0);
   const { state } = levels;
-  const row = state.status === 'success' ? state.data.find((item) => item.tank.id === tankId) ?? null : null;
+  // أثناء إعادة الجلب بعد حفظ ناجح نُبقي آخر بيانات معروضة (لا يُفكَّك النموذج ولا يضيع إشعار «تم الحفظ»)؛ التحميل الأول فقط يُظهر هيكل التحميل.
+  const lastRow = useRef<TankLevel | null>(null);
+  if (state.status === 'success') lastRow.current = state.data.find((item) => item.tank.id === tankId) ?? null;
+  const row = state.status === 'success' || state.status === 'loading' ? lastRow.current : null;
 
-  if (state.status === 'loading') return <LoadingBlock rows={3} />;
+  if (state.status === 'loading' && !row) return <LoadingBlock rows={3} />;
   if (state.status === 'error') return <ErrorState error={state.error} onRetry={levels.reload} />;
   if (!row) return <ErrorState error={new StationOpsError('not_found', 404)} />;
 
