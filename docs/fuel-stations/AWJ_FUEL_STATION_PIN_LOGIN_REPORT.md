@@ -55,8 +55,10 @@ PR #2054 · مهمة #2053 · الفرع `feat/fuel-station-pin-login` · **لا
 
 ## التحقق (البند 2 و3)
 - **البيئة:** PHP 8.3.6 (NTS)، Laravel 11، SQLite للاختبار. الامتدادات: ``bcmath,dom,fileinfo,gd,intl,mbstring,pdo_pgsql,pdo_sqlite,pgsql,zip`` (تم تثبيت `php8.3-bcmath 8.3.6-0ubuntu0.24.04.13` عبر apt في هذه الجلسة؛ كانت مفقودة وسبب 171 فشلاً سابقاً). **لا PostgreSQL فعلي في هذه البيئة** (الامتداد موجود بلا خادم) فاختبارات التزامن على PostgreSQL وفحص `pgsql` يجب أن يثبتها CI.
-- **نتيجة المجموعة الكاملة:** PHPFULL_RESULT_PLACEHOLDER
-- **CI على الـPR:** لم يصدر بعد؛ يُحدَّث هنا ولا يُعدّ شيء «مزالاً» قبل نجاحه.
+- **نتيجة المجموعة الكاملة:** 
+  - **محلياً (SQLite، bcmath مثبّتة):** `php artisan test` الكامل = **11491 ناجحاً، 0 فاشل، 422 متخطّى، 1 غير مكتمل** (124193 assertion، 1794 ث). (التشغيل السابق قبل تثبيت bcmath: 171 فشلاً كلها `undefined function bc*` — لم أعدّها «مزالة» إلا بعد هذا التشغيل.) شُغّلت هذه الحزمة قبل مزامنة تعديل معدّل الدخول، فأُعيد تشغيل الاختبارات المتأثرة بعده: `StationPinLoginTest|FuelStaff|AccessChange|ApiAuth|AuthRemember|TenantSubdomain|ApiUnauthenticated` = 134 ناجحاً، 3 متخطّاة، 0 فاشل.
+  - **الواجهة:** vitest الكامل = 932 ملفاً / 12061 اختباراً ناجحاً.
+  - **CI فعلي على الـPR** (head `cc80ecc`، run 42385849893، workflow `CI`): **نجح** (sqlite + pgsql + shard 1/2 + feed-lock perf). `web build` فشل على `cc80ecc` بسبب mock جزئي لـ`@/lib/api` وأُصلح في `252de41` (نقل مساعدات النطاق إلى `lib/station-scope.ts`)، وأصبح `web build` **ناجحاً** على `252de41`. لا تعديل PHP بين الاثنين.
 - انحدارات مطلوبة (نطاق المستخدم/الموظف، الدخول بـ`employee_no`، إصدار/تصفير PIN، حدود الوصول، دخول البريد، RTL 320/390): مغطاة بـ`StationPinLoginTest` وملفات `FuelStaff*`/`AccessChange*`/`ApiAuth*`/`AuthRemember*`/`TenantSubdomain*` ضمن المجموعة الكاملة، وPlaywright (390/320 × ar/en × فاتح/داكن).
 
 ## قبول Safari/iPhone حقيقي (البند 4)
