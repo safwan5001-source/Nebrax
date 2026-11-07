@@ -1,9 +1,9 @@
 import { litersToMilliliters, millilitersToLiters } from '@/lib/fuel-quantity';
-import { parseMoney } from '../cash';
 import type { DeliveryBody, ReadingBody } from './receiving-client';
 
 /**
- * FUEL-B5 — منطق نقي لنموذج استلام الوقود (لا شبكة، لا حالة). **لا قيمة مجهولة تتحوّل إلى صفر**: الفراغ ≠ 0، والتكلفة إلزامية صريحة.
+ * FUEL-B5/B5.1 — منطق نقي لنموذج استلام الوقود (لا شبكة، لا حالة). **لا قيمة مجهولة تتحوّل إلى صفر**: الفراغ ≠ 0.
+ * B5.1: **لا تكلفة في النموذج** — موظف المحطة ينشئ المسودة بلا تكلفة، وتُسجَّل لاحقاً بإجراء مالي مستقل (`cost-card`) قبل الاعتماد.
  * لا حدود/عتبات مخترعة للفروق (عقد الخادم بلا عتبة، وقرار B2: لا عتبات مالية غير معتمدة): الفرق يُعرض بقيمته واتجاهه، وما يُحجب فقط هو
  * المستحيل (قراءة ما بعد أقل من ما قبل، كمية مستلمة ≤ 0، رقم غير صالح).
  */
@@ -20,7 +20,6 @@ export interface FormValues {
   notes: string;
   dispatched: string;
   received: string;
-  cost: string;
   readingType: ReadingType;
   before: string;
   after: string;
@@ -28,23 +27,21 @@ export interface FormValues {
 
 export const EMPTY_FORM: FormValues = {
   supplierId: '', tankId: '', deliveryNote: '', purchaseRef: '', tanker: '', driver: '', notes: '',
-  dispatched: '', received: '', cost: '', readingType: 'physical', before: '', after: '',
+  dispatched: '', received: '', readingType: 'physical', before: '', after: '',
 };
 
 export type Issue =
-  | 'supplier_required' | 'tank_required' | 'warehouse_required'
+  | 'supplier_required' | 'tank_required' | 'warehouse_required' | 'delivery_note_required'
   | 'dispatched_required' | 'dispatched_invalid' | 'received_required' | 'received_invalid' | 'received_not_positive'
-  | 'cost_required' | 'cost_invalid'
   | 'before_invalid' | 'after_invalid' | 'after_below_before';
 
-export type Warning = 'no_delivery_note' | 'cost_zero' | 'received_above_dispatched' | 'received_below_dispatched' | 'readings_incomplete' | 'no_readings' | 'tank_gain_differs';
+export type Warning = 'received_above_dispatched' | 'received_below_dispatched' | 'readings_incomplete' | 'no_readings' | 'tank_gain_differs';
 
 export interface Evaluation {
   issues: Issue[];
   warnings: Warning[];
   dispatchedMl: number | null;
   receivedMl: number | null;
-  costMinor: number | null;
   beforeMl: number | null;
   afterMl: number | null;
   /** المستلم − المرسل (موجب = زيادة، سالب = نقص) — يطابق `transit_variance_milliliters` في الخادم. */
@@ -73,6 +70,8 @@ export function evaluate(form: FormValues, context: EvaluateContext): Evaluation
   const warnings: Warning[] = [];
 
   if (form.supplierId === '') issues.push('supplier_required');
+  // FUEL-B5.1: رقم سند التسليم من المورد إلزامي لكل استلام جديد (والمرفق اختياري ولا يحلّ محله). الخادم يفرضه أيضاً.
+  if (form.deliveryNote.trim() === '') issues.push('delivery_note_required');
   if (form.tankId === '') issues.push('tank_required');
   if (!context.hasWarehouse) issues.push('warehouse_required');
 
@@ -83,11 +82,6 @@ export function evaluate(form: FormValues, context: EvaluateContext): Evaluation
   if (received.issue === 'required') issues.push('received_required');
   if (received.issue === 'invalid') issues.push('received_invalid');
   if (received.value === 0) issues.push('received_not_positive');
-
-  const cost = parseMoney(form.cost);
-  const costMinor = cost.ok ? cost.minor : null;
-  if (!cost.ok) issues.push(cost.reason === 'empty' ? 'cost_required' : 'cost_invalid');
-  if (cost.ok && cost.minor === 0) warnings.push('cost_zero');
 
   const before = form.before.trim() === '' ? null : quantity(form.before, true);
   const after = form.after.trim() === '' ? null : quantity(form.after, true);
@@ -108,18 +102,18 @@ export function evaluate(form: FormValues, context: EvaluateContext): Evaluation
   const tankGainMl = beforeMl !== null && afterMl !== null && afterMl >= beforeMl ? afterMl - beforeMl : null;
   const tankGainDiffMl = tankGainMl !== null && receivedMl !== null ? tankGainMl - receivedMl : null;
   if (tankGainDiffMl !== null && tankGainDiffMl !== 0) warnings.push('tank_gain_differs');
-  if (form.deliveryNote.trim() === '') warnings.push('no_delivery_note');
 
-  return { issues, warnings, dispatchedMl, receivedMl, costMinor, beforeMl, afterMl, transitVarianceMl, tankGainMl, tankGainDiffMl };
+  return { issues, warnings, dispatchedMl, receivedMl, beforeMl, afterMl, transitVarianceMl, tankGainMl, tankGainDiffMl };
 }
 
 /** خطوات النموذج وما يلزم لتجاوز كل خطوة. */
-export type StepId = 'who' | 'quantities' | 'readings' | 'review';
-export const STEPS: readonly StepId[] = ['who', 'quantities', 'readings', 'review'];
+export type StepId = 'who' | 'quantities' | 'readings' | 'documents' | 'review';
+export const STEPS: readonly StepId[] = ['who', 'quantities', 'readings', 'documents', 'review'];
 
 const STEP_ISSUES: Record<Exclude<StepId, 'review'>, readonly Issue[]> = {
-  who: ['supplier_required', 'tank_required', 'warehouse_required'],
-  quantities: ['dispatched_required', 'dispatched_invalid', 'received_required', 'received_invalid', 'received_not_positive', 'cost_required', 'cost_invalid'],
+  documents: [],
+  who: ['supplier_required', 'tank_required', 'warehouse_required', 'delivery_note_required'],
+  quantities: ['dispatched_required', 'dispatched_invalid', 'received_required', 'received_invalid', 'received_not_positive'],
   readings: ['before_invalid', 'after_invalid', 'after_below_before'],
 };
 
@@ -143,9 +137,9 @@ export interface BuildContext {
   readingIds: { before?: string; after?: string };
 }
 
-/** حمولة الإنشاء: لترات كنص بثلاث منازل كحدٍّ أقصى (عقد الخادم)، وتكلفة بالهللات صحيحة. تُستدعى بعد `evaluate` بلا مشكلات. */
+/** حمولة الإنشاء: لترات كنص بثلاث منازل كحدٍّ أقصى (عقد الخادم). **بلا تكلفة أبداً** (NULL في الخادم حتى تسجّلها المالية). تُستدعى بعد `evaluate` بلا مشكلات. */
 export function buildDeliveryBody(form: FormValues, evaluation: Evaluation, ctx: BuildContext): DeliveryBody {
-  if (evaluation.issues.length > 0 || evaluation.receivedMl === null || evaluation.dispatchedMl === null || evaluation.costMinor === null) {
+  if (evaluation.issues.length > 0 || evaluation.receivedMl === null || evaluation.dispatchedMl === null) {
     throw new Error('station-ops/receiving: form is not valid');
   }
   const body: DeliveryBody = {
@@ -156,7 +150,6 @@ export function buildDeliveryBody(form: FormValues, evaluation: Evaluation, ctx:
     supplier_id: form.supplierId,
     dispatched_liters: millilitersToLiters(evaluation.dispatchedMl) || '0',
     received_liters: millilitersToLiters(evaluation.receivedMl) || '0',
-    received_total_cost_minor: evaluation.costMinor,
     idempotency_key: ctx.idempotencyKey,
   };
   const optional: Array<[keyof DeliveryBody, string]> = [
@@ -174,7 +167,7 @@ export function buildReadingBody(stationId: string, tankId: string, type: Readin
 }
 
 /**
- * هل يطابق سجل الخادم ما نوينا إنشاءه؟ (للتحقق بعد نتيجة غير مؤكدة): المورد والخزان والكميات ورقم الإذن. لا نطابق التكلفة لأنها تغيب عمّن لا يراها.
+ * هل يطابق سجل الخادم ما نوينا إنشاءه؟ (للتحقق بعد نتيجة غير مؤكدة): المورد والخزان والكميات ورقم الإذن.
  * استلام بلا رقم إذن لا يُحسم بيقين بين استلامين متماثلين — لذا يطلب المستدعي مطابقة حديثة (الأحدث أولاً) ويُعلِم المستخدم عند الالتباس.
  */
 export function matchesIntent(delivery: { supplier_id: string; tank_id: string; dispatched_milliliters: number; received_milliliters: number; delivery_note_number?: string | null }, form: FormValues, evaluation: Evaluation): boolean {

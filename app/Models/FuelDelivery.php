@@ -27,6 +27,7 @@ class FuelDelivery extends BaseModel
         'evidence', 'status', 'received_unit_cost_minor', 'received_total_cost_minor', 'grni_account_id',
         'stock_movement_id', 'journal_entry_id', 'fuel_operational_ledger_id', 'idempotency_key',
         'received_at', 'created_by', 'approved_by', 'approved_at', 'notes',
+        'cost_recorded_by', 'cost_recorded_at',
     ];
 
     protected $casts = [
@@ -34,7 +35,7 @@ class FuelDelivery extends BaseModel
         'received_milliliters' => 'integer', 'transit_variance_milliliters' => 'integer',
         'temperature_milli_celsius' => 'integer', 'density_kg_per_m3' => 'integer',
         'received_unit_cost_minor' => 'integer', 'received_total_cost_minor' => 'integer',
-        'received_at' => 'datetime', 'approved_at' => 'datetime',
+        'received_at' => 'datetime', 'approved_at' => 'datetime', 'cost_recorded_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -66,4 +67,20 @@ class FuelDelivery extends BaseModel
     public function journalEntry(): BelongsTo { return $this->belongsTo(JournalEntry::class); }
     public function operationalLedger(): BelongsTo { return $this->belongsTo(FuelOperationalLedger::class, 'fuel_operational_ledger_id'); }
     public function matches(): HasMany { return $this->hasMany(FuelSupplierInvoiceMatch::class); }
+    public function attachments(): HasMany { return $this->hasMany(FuelDeliveryAttachment::class)->orderBy('created_at'); }
+
+    /**
+     * رقم الاستلام **الداخلي** في أَوْج (`FD-XXXXXXXX`، مشتق من المعرّف، مستقر وغير تسلسلي) — **غير** رقم سند التسليم من المورد (`delivery_note_number`) الذي يطبعه المورد
+     * ويُدخله موظف المحطة. لا يُخزَّن ولا يُدخله مستخدم.
+     */
+    public function reference(): string
+    {
+        return 'FD-'.strtoupper(substr((string) $this->id, 0, 8));
+    }
+
+    /** FUEL-B5.1: التكلفة NULL حتى تُسجَّل (لا صفر)؛ الاعتماد يشترط تسجيلها. */
+    public function hasCost(): bool
+    {
+        return $this->received_total_cost_minor !== null;
+    }
 }

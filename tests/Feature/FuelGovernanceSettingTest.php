@@ -36,6 +36,7 @@ use Tests\TestCase;
 class FuelGovernanceSettingTest extends TestCase
 {
     use RefreshDatabase;
+    use GivesFuelDeliveryCost;
     use InteractsWithApi;
 
     private const BASE = '/api/fuel-stations';
@@ -171,7 +172,8 @@ class FuelGovernanceSettingTest extends TestCase
         $f = $this->fixture();
         $this->cutover('2026-06-01T00:00:00Z');
 
-        $delivery = $this->withToken($f['manager'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'gov-chain-1'))->assertCreated()->json('data');
+        $delivery = $this->withToken($f['manager'])->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'gov-chain-1')))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
 
         // محاولات التعطيل بكل الطرق المتاحة له كلها تُرفض...
         $this->withToken($f['manager'])->putJson(self::BASE . '/stations/' . $f['station_new']->id . '/settings', [self::KEY => false])->assertForbidden();

@@ -45,6 +45,7 @@ class FuelStaffInteractionsTest extends TestCase
 
         // المشرف: ينشئ استلاماً ولا يعتمده.
         $delivery = $this->withToken($supervisor['token'])->postJson(self::BASE . '/deliveries', $payload('tpl-sup'))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $this->withToken($supervisor['token'])->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertForbidden();
         $this->withToken($supervisor['token'])->postJson(self::BASE . '/supplier-invoices', [])->assertForbidden();
 
@@ -68,6 +69,7 @@ class FuelStaffInteractionsTest extends TestCase
         // سياسة فصل المعتمِد تسري (المحطة «جديدة» بحدّ ماضٍ): منح مفتاح الاعتماد بقالب لا يتجاوزها.
         config(['fuel_stations.distinct_approver_cutover_at' => '2000-01-01T00:00:00Z']);
         $delivery = $this->withToken($manager['token'])->postJson(self::BASE . '/deliveries', $payload)->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $response = $this->withToken($manager['token'])->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertStatus(422);
         $this->assertStringContainsString('FUEL_DISTINCT_APPROVER_REQUIRED', (string) $response->json('message'));
         $this->assertSame('draft', DB::table('fuel_deliveries')->where('id', $delivery['id'])->value('status'));
@@ -112,6 +114,7 @@ class FuelStaffInteractionsTest extends TestCase
         $this->assertNull($legacy['user']->allowedFuelStationIds());
         $this->assertGreaterThanOrEqual(3, count($this->withToken($legacy['token'])->getJson(self::BASE . '/stations')->assertOk()->json('data')));
         $delivery = $this->withToken($legacy['token'])->postJson(self::BASE . '/deliveries', $this->deliveryPayload($s1, $this->fx['t1'], $this->fx['wA1'], 'legacy-1'))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $this->withToken($legacy['token'])->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertOk();
 
         // مدير موظفين لا يملك `fuel_stations.manage` لا يستطيع تعديله (صلاحياته فوق سقفه)؛ المالك يستطيع تحويله إلى قالب.

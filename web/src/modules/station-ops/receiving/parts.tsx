@@ -36,8 +36,8 @@ export function Liters({ ml }: { ml: number | null | undefined }) {
   return <span><span className="num" dir="ltr">{formatLitersFixedFromMl(ml, locale)}</span> {t('receiving.unit')}</span>;
 }
 
-export function Cost({ minor }: { minor: number | undefined }) {
-  if (minor === undefined) return null;
+export function Cost({ minor }: { minor: number | null | undefined }) {
+  if (minor === undefined || minor === null) return null;
   return <span className="num" dir="ltr">{formatMinorRiyal(minor)}</span>;
 }
 
@@ -45,8 +45,12 @@ export function when(value: string | null | undefined, locale: string): string {
   return value ? formatDateTime(value, locale) : '—';
 }
 
-export function deliveryTitle(row: Pick<Delivery, 'delivery_note_number' | 'id'>, fallback: string): string {
-  return row.delivery_note_number && row.delivery_note_number.trim() !== '' ? row.delivery_note_number : fallback;
+/**
+ * رقم الاستلام **الداخلي** في أَوْج `FD-XXXXXXXX` — مميَّز عن رقم سند المورد (`delivery_note_number`) الذي يطبعه المورد. هو عنوان الاستلام في كل الشاشات؛
+ * وسند المورد يظهر بتسميته الخاصة. خادم أقدم بلا `reference` ⇒ الاشتقاق نفسه (أول ثمانية من المعرّف).
+ */
+export function internalRef(row: Pick<Delivery, 'id' | 'reference'>): string {
+  return row.reference && row.reference !== '' ? row.reference : `FD-${row.id.slice(0, 8).toUpperCase()}`;
 }
 
 // ───────────────────────── إشعار نتيجة الكتابة ─────────────────────────

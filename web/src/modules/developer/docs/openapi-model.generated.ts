@@ -926,7 +926,7 @@ export const OPENAPI_MODEL: OpenApiModel = {
           "method": "get",
           "path": "/partners/{id}/statement",
           "summary": "Get a partner account statement",
-          "description": "Read-only account statement for a customer or supplier, built from posted ledger entries (positive running balance = the partner owes the tenant). Amounts are integer minor units. The response is not paginated; a statement exceeding 2000 movements is rejected with 422 — narrow the period with `from`/`to`. Requires the dedicated `statements:read` scope.",
+          "description": "Read-only account statement for a customer or supplier, built from posted ledger entries (positive running balance = the partner owes the tenant). Amounts are integer minor units. The response is not paginated; a statement exceeding 2000 movements is rejected with 422 — narrow the period with `from`/`to`. Requires the dedicated `statements:read` scope. **Verified envelope (AIA-0.1).** Besides the legacy fields (unchanged), the server returns `totals`, `row_count`, `balance_convention`, `position`, `display`, `minor_unit_exponent`, `integrity` and `report_status`. Totals are computed server-side from the source rows with integer arithmetic; clients should quote `display` and `position` rather than recompute them. Balance direction is never flipped in the legacy fields: `balance = debit - credit` for every role, so a negative balance means the tenant owes the partner (`payable`). Only a response with `report_status = final` may be presented as a final statement. **Currency (D-12).** Only `SAR` is supported (`minor_unit_exponent = 2`). For any other tenant currency `report_status = unsupported`, `display` and `position` are `null`, and the raw legacy amounts are returned unchanged for backward compatibility **without any guarantee that they are true minor units of the declared currency**; they must not be presented as reliable figures. When the optional server flag `PUBLIC_API_STATEMENT_REJECT_ON_INTEGRITY_FAILURE` is enabled, a failed integrity check returns `500` (`internal_error`, `details.reason = report_integrity_failed`) instead of an `unverified` statement.",
           "tag": "Partners",
           "scope": "statements:read",
           "requiresAuth": true,
@@ -1033,6 +1033,79 @@ export const OPENAPI_MODEL: OpenApiModel = {
                     "nullable": false,
                     "readOnly": false,
                     "description": "Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050."
+                  },
+                  {
+                    "name": "role",
+                    "type": "string · enum",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false,
+                    "description": "The requested role filter, or null when none was requested.",
+                    "constraints": "enum: customer · supplier"
+                  },
+                  {
+                    "name": "row_count",
+                    "type": "integer",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "Number of movements in `rows` (equals `totals.row_count`).",
+                    "constraints": "range 0–∞"
+                  },
+                  {
+                    "name": "totals",
+                    "type": "object",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "Computed server-side from the source rows with integer arithmetic. If a sum cannot be computed safely (a non-integer value, or a total/running balance beyond +/-(2^53-1)), `debit_minor`, `credit_minor` and `net_minor` are all `null` - never a partial or zero placeholder - and the report is never `final`."
+                  },
+                  {
+                    "name": "balance_convention",
+                    "type": "object",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "position",
+                    "type": "object",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false,
+                    "description": "Business-language direction of the opening and closing balances. Null unless the statement is verified and the currency supported."
+                  },
+                  {
+                    "name": "display",
+                    "type": "object",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false,
+                    "description": "Ready-to-quote strings (digits 0-9, dot decimal, no thousands separator), produced by the server. `opening` and `closing` are absolute values with an explicit side; `net` is signed. Null unless the statement is verified and the currency supported."
+                  },
+                  {
+                    "name": "minor_unit_exponent",
+                    "type": "integer",
+                    "required": true,
+                    "nullable": true,
+                    "readOnly": false,
+                    "description": "2 for the supported currency (SAR); null when the currency is unsupported."
+                  },
+                  {
+                    "name": "integrity",
+                    "type": "object",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false
+                  },
+                  {
+                    "name": "report_status",
+                    "type": "string · enum",
+                    "required": true,
+                    "nullable": false,
+                    "readOnly": false,
+                    "description": "`final` only when the currency is supported, every integrity check passed and the result is complete. Anything else must not be presented as a final statement.",
+                    "constraints": "enum: final · partial · unverified · unsupported"
                   }
                 ]
               }

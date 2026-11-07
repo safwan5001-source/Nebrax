@@ -187,6 +187,123 @@ class FuelReceivingPostgresConcurrencyTest extends TestCase
         $this->assertSame(5000, (int) DB::table('fuel_supplier_invoice_lines')->where('tenant_id', $f['tenant_id'])->sum('matched_quantity_milliliters'));
     }
 
+    /** @test */
+    public function concurrent_approvals_of_a_costed_draft_post_stock_and_ledger_exactly_once(): void
+    {
+        $f = $this->fixture();
+        $delivery = app(FuelSupplyReceivingService::class)->createDelivery($this->deliveryData($f, 'b51-conc-appr', 2345));
+
+        $jobs = [];
+        foreach (range(1, 6) as $i) {
+            $jobs[] = function () use ($f, $delivery) {
+                $this->enter($f);
+                try {
+                    app(FuelSupplyReceivingService::class)->approveDelivery($delivery, $f['actor_id']);
+
+                    return 'approved';
+                } catch (RuntimeException $e) {
+                    return str_contains($e->getMessage(), 'غير مسوّد') ? 'already' : 'other:'.$e->getMessage();
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $values = array_map(fn ($r) => $r['value'], $results);
+        $this->assertSame(1, count(array_keys($values, 'approved', true)), json_encode($values));
+        $this->assertSame(5, count(array_keys($values, 'already', true)), json_encode($values));
+        $this->assertSame(1, (int) DB::table('stock_movements')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->count());
+        $this->assertSame(1, (int) DB::table('journal_entries')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->count());
+        $this->assertSame(1, (int) DB::table('fuel_operational_ledgers')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->count());
+    }
+
+    /** @test */
+    public function cost_recording_racing_with_approval_never_posts_a_cost_that_differs_from_the_stored_one_or_changes_it_after_approval(): void
+    {
+        $f = $this->fixture();
+        // مسودة بلا تكلفة، ثم سباق: تسجيلات تكلفة مختلفة × محاولات اعتماد.
+        $data = $this->deliveryData($f, 'b51-conc-race', 0);
+        unset($data['received_total_cost_minor']);
+        $delivery = app(FuelSupplyReceivingService::class)->createDelivery($data);
+        $this->assertNull(DB::table('fuel_deliveries')->where('id', $delivery->id)->value('received_total_cost_minor'));
+        $actor = User::findOrFail($f['actor_id']);
+
+        $jobs = [];
+        foreach ([1001, 1002, 1003, 1004] as $cost) {
+            $jobs[] = function () use ($f, $delivery, $cost, $actor) {
+                $this->enter($f);
+                try {
+                    app(FuelSupplyReceivingService::class)->recordCost($delivery, $cost, $actor);
+
+                    return 'cost:'.$cost;
+                } catch (RuntimeException $e) {
+                    return str_contains($e->getMessage(), 'FUEL_DELIVERY_COST_LOCKED') ? 'locked' : 'other:'.$e->getMessage();
+                }
+            };
+            $jobs[] = function () use ($f, $delivery) {
+                $this->enter($f);
+                try {
+                    app(FuelSupplyReceivingService::class)->approveDelivery($delivery, $f['actor_id']);
+
+                    return 'approved';
+                } catch (RuntimeException $e) {
+                    foreach (['FUEL_DELIVERY_COST_REQUIRED' => 'no-cost', 'غير مسوّد' => 'already'] as $needle => $label) {
+                        if (str_contains($e->getMessage(), $needle)) {
+                            return $label;
+                        }
+                    }
+
+                    return 'other:'.$e->getMessage();
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $values = array_map(fn ($r) => $r['value'], $results);
+        foreach ($values as $v) {
+            $this->assertStringStartsNotWith('other:', $v, json_encode($values));
+        }
+        $row = DB::table('fuel_deliveries')->where('id', $delivery->id)->first();
+        $entries = DB::table('journal_entries')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->get();
+        if ($row->status === 'approved') {
+            $this->assertSame(1, $entries->count());
+            $this->assertSame(1, (int) DB::table('stock_movements')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->count());
+            $debit = (int) DB::table('journal_lines')->where('journal_entry_id', $entries->first()->id)->sum('debit');
+            $this->assertSame((int) $row->received_total_cost_minor, $debit, 'القيد يطابق التكلفة المخزَّنة لحظة الاعتماد، ولا تتغير بعده');
+            $this->assertSame(1, count(array_keys($values, 'approved', true)));
+        } else {
+            $this->assertSame(0, $entries->count());
+            $this->assertSame(0, (int) DB::table('stock_movements')->where('tenant_id', $f['tenant_id'])->where('source_id', $delivery->id)->count());
+        }
+    }
+
+    /** @test */
+    public function concurrent_uploads_of_the_same_document_leave_one_attachment_and_one_file(): void
+    {
+        $f = $this->fixture();
+        $delivery = app(FuelSupplyReceivingService::class)->createDelivery($this->deliveryData($f, 'b51-conc-att', 2345));
+        $actor = User::findOrFail($f['actor_id']);
+        $pdf = $this->dir.'/doc.pdf';
+        file_put_contents($pdf, "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+
+        $jobs = [];
+        foreach (range(1, 5) as $i) {
+            $jobs[] = function () use ($f, $delivery, $actor, $pdf) {
+                $this->enter($f);
+
+                return count(app(\App\Services\FuelDeliveryAttachmentService::class)->add($delivery, [new \Illuminate\Http\UploadedFile($pdf, 'doc.pdf', 'application/pdf', null, true)], $actor));
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $this->assertSame(1, (int) DB::table('fuel_delivery_attachments')->where('fuel_delivery_id', $delivery->id)->count());
+        // الخاسرون يحذفون ما كتبوه: ملف واحد فقط يبقى.
+        $this->assertCount(1, \Illuminate\Support\Facades\Storage::disk('local')->allFiles('fuel-deliveries/'.$delivery->id));
+        \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('fuel-deliveries/'.$delivery->id);
+    }
+
     /** @param array<string,string> $f */
     private function enter(array $f): void
     {

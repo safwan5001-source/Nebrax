@@ -33,6 +33,7 @@ use Tests\TestCase;
 class FuelGranularPermissionsTest extends TestCase
 {
     use RefreshDatabase;
+    use GivesFuelDeliveryCost;
     use InteractsWithApi;
 
     private const BASE = '/api/fuel-stations';
@@ -125,7 +126,8 @@ class FuelGranularPermissionsTest extends TestCase
         $this->withToken($seller)->postJson(self::BASE . '/readings', [])->assertForbidden();
 
         // المشرف: ينشئ ويسجّل القراءات ويعدّ تسوية، لا يعتمد استلاماً ولا تسوية.
-        $delivery = $this->withToken($supervisor)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'b2-sup'))->assertCreated()->json('data');
+        $delivery = $this->withToken($supervisor)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'b2-sup')))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $this->withToken($supervisor)->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertForbidden();
         $this->withToken($supervisor)->postJson(self::BASE . '/supplier-invoices', [])->assertForbidden();
         $this->assertSame('draft', FuelDelivery::findOrFail($delivery['id'])->status);
@@ -142,12 +144,14 @@ class FuelGranularPermissionsTest extends TestCase
 
         // محطة قائمة (قبل الحدّ): السلوك القديم حرفياً — الدور القديم ينشئ ويعتمد بنفسه.
         $this->useCutover(null);
-        $own = $this->withToken($legacy)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'b2-legacy-1'))->assertCreated()->json('data');
+        $own = $this->withToken($legacy)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'b2-legacy-1')))->assertCreated()->json('data');
+        $this->setCostDirectly($own['id']);
         $this->withToken($legacy)->postJson(self::BASE . '/deliveries/' . $own['id'] . '/approve')->assertOk();
 
         // المحطة نفسها صارت «جديدة» بالسياسة (الحدّ في الماضي): المفتاح القديم لا يتجاوز الفصل.
         $this->useCutover('2000-01-01T00:00:00Z');
-        $second = $this->withToken($legacy)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'b2-legacy-2'))->assertCreated()->json('data');
+        $second = $this->withToken($legacy)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'b2-legacy-2')))->assertCreated()->json('data');
+        $this->setCostDirectly($second['id']);
         $response = $this->withToken($legacy)->postJson(self::BASE . '/deliveries/' . $second['id'] . '/approve')->assertStatus(422);
         $this->assertStringContainsString('FUEL_DISTINCT_APPROVER_REQUIRED', (string) $response->json('message'));
         $this->assertSame('draft', FuelDelivery::findOrFail($second['id'])->status);
@@ -173,7 +177,7 @@ class FuelGranularPermissionsTest extends TestCase
         $this->assertSame(0, StockMovement::count());
 
         // وداخل نطاقه يعمل.
-        $this->withToken($scoped)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'b2-in'))->assertCreated();
+        $this->withToken($scoped)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'b2-in')))->assertCreated();
     }
 
     /** @test */
@@ -183,7 +187,8 @@ class FuelGranularPermissionsTest extends TestCase
         $viewer = $this->tokenWithPermissions(['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel.supplier_invoice.view']);
         $withCost = $this->tokenWithPermissions(['fuel.delivery.view', 'products.view_cost']);
 
-        $delivery = $this->withToken($viewer)->postJson(self::BASE . '/deliveries', $this->deliveryPayload($f, 'b2-cost'))->assertCreated()->json('data');
+        $delivery = $this->withToken($viewer)->postJson(self::BASE . '/deliveries', $this->withoutCost($this->deliveryPayload($f, 'b2-cost')))->assertCreated()->json('data');
+        $this->setCostDirectly($delivery['id']);
         $this->assertArrayNotHasKey('received_total_cost_minor', $delivery);
         $this->assertArrayNotHasKey('received_total_cost_minor', $this->withToken($viewer)->getJson(self::BASE . '/deliveries/' . $delivery['id'])->assertOk()->json('data'));
         $this->assertArrayNotHasKey('received_total_cost_minor', $this->withToken($viewer)->postJson(self::BASE . '/deliveries/' . $delivery['id'] . '/approve')->assertOk()->json('data'));
