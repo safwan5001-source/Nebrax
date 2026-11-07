@@ -165,7 +165,7 @@ describe('pre-paint twin', () => {
       const full = path.join(appDir, entry);
       if (!statSync(full).isDirectory()) continue;
       if (entry.startsWith('(')) {
-        if (entry === '(fuel)' || entry === '(fuel-ops)') continue; // deliberately not gated — covered by '/fuel-stations'
+        if (entry === '(fuel)' || entry === '(fuel-ops)' || entry === '(fuel-ops-auth)') continue; // deliberately not gated — covered by '/fuel-stations'
         expect(groupsThatApplyGate.has(entry), `route group ${entry} must be reviewed for the gate`).toBe(true);
         continue;
       }

@@ -21,10 +21,11 @@ class User extends Authenticatable
         'tenant_id', 'employee_id', 'name', 'email', 'phone', 'password', 'role', 'permissions', 'preferences', 'is_active',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'station_pin_hash'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'station_pin_set_at' => 'datetime',
         'password'          => 'hashed',
         'permissions'       => 'array',
         'preferences'       => 'array',

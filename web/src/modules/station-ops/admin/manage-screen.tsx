@@ -5,6 +5,7 @@ import { History, ListChecks, Tag, Users, Hourglass } from 'lucide-react';
 import { useStationOps } from '../context';
 import { useShiftHistory } from '../data';
 import { PageMasthead, ScreenBody } from '../masthead';
+import { isStationSession } from '@/lib/auth';
 import { MANAGE_PERMISSIONS, OPS_BASE, PRICES_HREF } from '../nav';
 import type { Station } from '../schemas';
 import { EmptyState } from '../state-views';
@@ -66,7 +67,8 @@ export function ManageScreen() {
   const t = useTranslations('stationOps');
   const { can, selectedStation } = useStationOps();
   const canStaff = can(STAFF_PERMISSION);
-  const canPrices = can('fuel.sale.price.manage');
+  // جلسة PIN لا تصل إلى شاشة الأسعار القائمة (واجهة أَوْج الإدارية): لا يُعرض رابط ميت.
+  const canPrices = can('fuel.sale.price.manage') && !isStationSession();
   const canPolicy = can('fuel.governance.manage'); // سياسة القراءات المتأخرة (B6): الاطلاع/التعديل بحسب الصلاحيات، والخادم السلطة
   const any = MANAGE_PERMISSIONS.some((permission) => can(permission));
 
