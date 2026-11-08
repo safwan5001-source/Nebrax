@@ -616,6 +616,77 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->rejects(fn () => $this->preview($shift));
     }
 
+    // ───────── ثوابت الحساب (خصائص) ─────────
+
+    /** @test */
+    public function allocation_conserves_money_for_many_declarations_never_overpays_and_never_goes_negative(): void
+    {
+        $shift = $this->open('prop');
+        $this->meters($shift);
+        $sale = $this->walkInSale('prop-sale', $shift, 7_000);       // 7 لتر = 1610 غير مسدَّدة
+        $targetsTotal = 1610 + 2990;                                  // + بقية 13 لتراً (20−7) = 2990
+        mt_srand(20260);
+        $revision = 0;
+        foreach (range(1, 40) as $i) {
+            [$cash, $bank] = [mt_rand(0, 6000), mt_rand(0, 6000)];
+            $this->declare($shift, $cash, $bank, "p{$i}", $revision);
+            $revision++;
+            $p = $this->preview($shift);
+
+            $allocated = $p['allocation']['allocated_total_minor'];
+            $held = array_sum(array_column($p['variances']['held_for_withheld'], 'amount_minor'));
+            $surplus = array_sum(array_column($p['variances']['surplus'], 'amount_minor'));
+            $declared = $cash + $bank;
+
+            $this->assertSame($declared, $allocated + $held + $surplus, "حفظ المال (نقد {$cash} + شبكة {$bank})");
+            $this->assertLessThanOrEqual($targetsTotal, $allocated, 'لا يتجاوز الأهداف');
+            $this->assertSame($targetsTotal - $allocated, $p['variances']['shortage_minor'], 'عجز = الأهداف − المخصَّص');
+            $this->assertSame(0, $held, 'لا محجوب هنا');
+            foreach ($p['allocation']['rows'] as $row) {
+                $this->assertGreaterThan(0, $row['amount_minor']);
+            }
+            // لا فاتورة ERP تتجاوز متبقيها (1610) ولا فاتورة التسوية قيمتها (2990).
+            $this->assertLessThanOrEqual(1610, (int) collect($p['allocation']['rows'])->where('target_kind', 'erp_walk_in')->sum('amount_minor'));
+            $this->assertLessThanOrEqual(2990, (int) collect($p['allocation']['rows'])->where('target_kind', 'settlement')->sum('amount_minor'));
+            // الفرق مع المرجع = المُقَرّ − (1610 + 3220).
+            $this->assertSame($declared - $targetsTotal, $p['declaration']['difference_vs_reference_minor']);
+        }
+    }
+
+    // ───────── حدود الشريحة: لا ترحيل عند الإغلاق ─────────
+
+    /** @test */
+    public function closing_a_shift_with_the_policy_on_still_posts_nothing_in_this_slice(): void
+    {
+        $shift = $this->readyShift('c1', 4600);
+        $before = $this->writeCounts();
+
+        app(FuelShiftService::class)->close($shift->fresh(), 24600, null, $this->f['actor']);
+
+        $after = $this->writeCounts();
+        foreach (['invoices', 'invoice_lines', 'journal_entries', 'journal_lines', 'payments', 'payment_allocations', 'stock_movements', 'fuel_sales', 'fuel_sale_payment_receipts',
+            'fuel_inventory_cost_movements', 'fuel_operational_ledgers', 'partners', 'zatca_chain_entries', 'fuel_shift_settlements', 'fuel_shift_settlement_lines',
+            'fuel_shift_settlement_collections', 'fuel_shift_settlement_variances', 'fuel_shift_settlement_resolutions', 'fuel_cost_pool_open_histories'] as $table) {
+            $this->assertSame($before[$table], $after[$table], "{$table}: الإغلاق لا يرحّل شيئاً قبل P1-3b");
+        }
+        $this->assertSame('closed', $shift->fresh()->status);
+    }
+
+    /** @test */
+    public function the_existing_close_and_sale_paths_do_not_reference_the_settlement_layer(): void
+    {
+        foreach (['FuelShiftService', 'FuelSaleService', 'FuelShiftCollectionService', 'FuelShiftCashExpectationService', 'FuelReconciliationService'] as $service) {
+            $code = (string) file_get_contents(app_path("Services/{$service}.php"));
+            $this->assertStringNotContainsString('FuelShiftSettlement', $code, "{$service} لا يستدعي طبقة التسوية في P1-3a");
+            $this->assertStringNotContainsString('FuelStationWalkInPartner', $code, $service);
+        }
+        // لا كاتب لجداول التسوية خارج الاختبارات في هذه الشريحة (الكاتب FuelShiftSettlementService يأتي مع P1-3b).
+        foreach (glob(app_path('Services/*.php')) as $file) {
+            $this->assertStringNotContainsString("DB::table('fuel_shift_settlement", (string) file_get_contents($file), basename($file));
+        }
+        $this->assertFileDoesNotExist(app_path('Services/FuelShiftSettlementService.php'));
+    }
+
     // ───────── طبقات الإفصاح ─────────
 
     /** @test */
