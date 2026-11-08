@@ -49,7 +49,7 @@ describe('settlement preview contract', () => {
       for (const code of ['METER_INCOMPLETE', 'DECLARATION_MISSING', 'SUPERVISOR_ATTENTION', 'ERP_EXCEEDS_METER', 'DECLARATION_BELOW_RECEIPTS', 'PRICE_CHANGED', 'PRICE_UNAVAILABLE',
         'INSUFFICIENT_STOCK', 'PERIOD_LOCKED', 'RECEIPTS_UNATTRIBUTED', 'WALK_IN_REQUIRED', 'WALK_IN_INACTIVE', 'POLICY_NONE', 'DEPLOYMENT_GATE_CLOSED', 'TAX_OPINION_MISSING',
         'DECLARATION_GATE_CLOSED', 'RECEIPT_STAMPING_GATE_CLOSED', 'CASH_BASIS_NOT_DECLARED', 'NO_PAYMENT_METHODS', 'PAYMENT_METHOD_TREASURY', 'TAX_MODE_UNSET',
-        'OPEN_SHIFT_INDEX_MISSING', 'COST_STATE', 'unknown']) {
+        'OPEN_SHIFT_INDEX_MISSING', 'COST_STATE', 'PRODUCT_UNAVAILABLE', 'DECLARATION_METHODS_CHANGED', 'unknown']) {
         expect(tree.blocker[code], code).toBeTruthy();
       }
       for (const state of ['posted', 'no_residual', 'withheld_cost_pool_changed', 'withheld_pool_history_open', 'withheld_period_boundary', 'blocked_erp_exceeds_meter', 'unavailable', 'unknown']) {

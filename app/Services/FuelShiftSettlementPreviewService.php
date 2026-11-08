@@ -115,8 +115,13 @@ class FuelShiftSettlementPreviewService
                     FuelShiftSalesCalculator::GAP_PRICE_CHANGED => 'FUEL_SETTLEMENT_PRICE_CHANGED',
                     FuelShiftSalesCalculator::GAP_PRICE_UNAVAILABLE => 'FUEL_SETTLEMENT_PRICE_UNAVAILABLE',
                     FuelShiftSalesCalculator::GAP_TAX_MODE_UNSET => 'FUEL_SETTLEMENT_NOT_READY_TAX_MODE_UNSET',
+                    FuelShiftSalesCalculator::GAP_PRODUCT_UNAVAILABLE => 'FUEL_SETTLEMENT_PRODUCT_UNAVAILABLE',
                     default => null,
                 };
+            }
+            if ($price === null) {
+                // بقية لا قيمة لها ولا سبب معروف لا تُستبعد صامتةً من المرجع والتخصيص: مانع صريح.
+                $blockers[] = 'FUEL_SETTLEMENT_PRICE_UNAVAILABLE';
             }
             if ($price !== null) {
                 $line['price_per_liter_minor'] = (int) $price;
@@ -334,6 +339,15 @@ class FuelShiftSettlementPreviewService
         }
         if ($declaration === null) {
             $blockers[] = 'FUEL_SETTLEMENT_DECLARATION_MISSING';
+        } else {
+            // انحراف الإعداد: طرق الإقرار المحفوظة ≠ الطرق المسموحة الآن (إزالة/تفعيل بعد الحفظ) — كما تكشفه `methods_changed` في خدمة الإقرار. لا تسوية قبل إعادة الإقرار.
+            $declaredIds = array_keys($dByMethod);
+            $currentIds = $allowed->keys()->all();
+            sort($declaredIds);
+            sort($currentIds);
+            if ($declaredIds !== $currentIds) {
+                $blockers[] = 'FUEL_SETTLEMENT_DECLARATION_METHODS_CHANGED';
+            }
         }
 
         // اتحاد طرق الإقرار والمقبوضات: طريقة فُعِّلت بعد حفظ الإقرار وسُجِّل عليها مقبوض تُعدّ مُقَرّاً بها صفراً (فيُكشف D < R) بدل أن تُتجاهل.

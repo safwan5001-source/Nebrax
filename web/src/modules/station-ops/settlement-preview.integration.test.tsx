@@ -186,6 +186,40 @@ describe('settlement preview on the handover screen', () => {
     expect(apiMock.mock.calls.some(([p, init]) => /settlement/.test(String(p)) && (init as { method?: string } | undefined)?.method === 'POST')).toBe(false);
   });
 
+  it('a failed refresh keeps the old numbers but marks them stale; a later 404 or 403 hides the section', async () => {
+    const user = userEvent.setup();
+    let mode: 'ok' | 'network' | 'closed' | 'forbidden' = 'ok';
+    connect(FINANCE, () => {
+      if (mode === 'network') throw new TypeError('network');
+      if (mode === 'closed') throw new ApiError(404, 'not found', {});
+      if (mode === 'forbidden') throw new ApiError(403, 'forbidden', {});
+      return financeLayer();
+    });
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await screen.findByText('Settlement preview');
+    expect(document.querySelector('[data-settlement-stale]')).toBeNull();
+
+    mode = 'network';
+    await act(async () => { await user.click(document.querySelector('[data-settlement-refresh]') as HTMLButtonElement); });
+    await waitFor(() => expect(document.querySelector('[data-settlement-stale]')).toBeTruthy());
+    expect(document.querySelector('[data-settlement-preview]')).toBeTruthy();
+
+    mode = 'closed';
+    await act(async () => { await user.click(document.querySelector('[data-settlement-refresh]') as HTMLButtonElement); });
+    await waitFor(() => expect(document.querySelector('[data-settlement-preview]')).toBeNull());
+  });
+
+  it('a 403 on refresh also hides the section', async () => {
+    const user = userEvent.setup();
+    let forbidden = false;
+    connect(FINANCE, () => { if (forbidden) throw new ApiError(403, 'forbidden', {}); return financeLayer(); });
+    renderOps(<HandoverScreen shiftId="s1" />);
+    await screen.findByText('Settlement preview');
+    forbidden = true;
+    await act(async () => { await user.click(document.querySelector('[data-settlement-refresh]') as HTMLButtonElement); });
+    await waitFor(() => expect(document.querySelector('[data-settlement-preview]')).toBeNull());
+  });
+
   it('a network failure shows a calm message, not a stack of blockers', async () => {
     connect(CLOSER, () => { throw new TypeError('network'); });
     renderOps(<HandoverScreen shiftId="s1" />);

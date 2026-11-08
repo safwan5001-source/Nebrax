@@ -737,6 +737,31 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->assertEquals($before, (array) DB::table('fuel_inventory_cost_states')->where('warehouse_id', $this->f['warehouse']->id)->first(), 'الحالة المخزَّنة لا تُمسّ');
     }
 
+    /** @test */
+    public function a_product_deactivated_during_the_shift_blocks_instead_of_silently_dropping_its_residual(): void
+    {
+        $shift = $this->readyShift('inactive-product', 4600);
+        $this->f['fuelProduct']->forceFill(['is_active' => false])->save();
+
+        $p = $this->preview($shift);
+        $this->assertContains('FUEL_SETTLEMENT_PRODUCT_UNAVAILABLE', $p['blockers']);
+        $this->assertFalse($p['ready']);
+        $this->assertNull($p['lines'][0]['expected_gross_minor']);
+    }
+
+    /** @test */
+    public function a_payment_method_removed_after_the_declaration_blocks_until_it_is_saved_again(): void
+    {
+        $shift = $this->readyShift('removed-method', 2000, 2600);
+        app(FuelStationSettingsService::class)->putStationValues(
+            $this->f['station'], ['fuel_sales_allowed_payment_method_ids' => [$this->f['cash']->id]], $this->f['actor'], 'إزالة الشبكة',
+        );
+
+        $p = $this->preview($shift);
+        $this->assertContains('FUEL_SETTLEMENT_DECLARATION_METHODS_CHANGED', $p['blockers']);
+        $this->assertFalse($p['ready']);
+    }
+
     // ───────── طبقات الإفصاح ─────────
 
     /** @test */

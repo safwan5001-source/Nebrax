@@ -15445,6 +15445,7 @@
       "previewOnly": "Preview only: nothing is recorded — no sale, payment or stock movement — and it may change before you close.",
       "refresh": "Refresh preview",
       "unavailable": "The preview could not be loaded right now.",
+      "stale": "The preview could not be refreshed; the numbers shown may be out of date.",
       "ready": "Ready to settle when you close",
       "notReady": "Not ready yet",
       "blockersTitle": "What blocks settlement",
@@ -15505,6 +15506,8 @@
         "PAYMENT_METHOD_TREASURY": "A payment method is not linked to an active cash or bank account.",
         "TAX_MODE_UNSET": "The price tax mode is not set.",
         "OPEN_SHIFT_INDEX_MISSING": "The single-open-shift protection is incomplete.",
+        "PRODUCT_UNAVAILABLE": "The fuel product is unavailable or inactive.",
+        "DECLARATION_METHODS_CHANGED": "Payment methods changed since the declaration was saved; save it again.",
         "COST_STATE": "A product's stock cost needs setting up.",
         "unknown": "Unknown reason."
       }

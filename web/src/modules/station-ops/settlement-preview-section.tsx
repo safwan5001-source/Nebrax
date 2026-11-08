@@ -21,19 +21,21 @@ export function SettlementPreviewSection({ station, shiftId }: { station: Statio
   const { allowed, state, retained, reload } = useSettlementPreview(station, shiftId);
   const t = useTranslations('stationOps');
   const preview = state.status === 'success' ? state.data : retained;
+  const error = state.status === 'error' ? state.error : null;
 
   if (!allowed) return null;
+  // أخطاء نهائية (ممنوع/غير موجود/انتهت الجلسة/وضع المعاينة): لا يبقى قسم قديم معروضاً حتى لو سبق نجاح (بوابة أُغلقت أو صلاحية سُحبت).
+  if (error && (error.kind === 'forbidden' || error.kind === 'not_found' || error.kind === 'unauthorized' || error.kind === 'demo')) return null;
+  const refreshFailed = error !== null;
   if (preview === null) {
-    if (state.status === 'error' && (state.error.kind === 'offline' || state.error.kind === 'server' || state.error.kind === 'invalid_shape')) {
-      return <p role="status" data-settlement-error="" className="text-sm text-warning">{t('settlement.unavailable')}</p>;
-    }
-    return null; // تحميل أو مغلقة (404) أو ممنوعة: لا قسم
+    if (refreshFailed) return <p role="status" data-settlement-error="" className="text-sm text-warning">{t('settlement.unavailable')}</p>;
+    return null; // تحميل أول مرة
   }
 
-  return <PreviewBody preview={preview} refreshing={state.status === 'loading'} onRefresh={reload} />;
+  return <PreviewBody preview={preview} refreshing={state.status === 'loading'} stale={refreshFailed} onRefresh={reload} />;
 }
 
-function PreviewBody({ preview, refreshing, onRefresh }: { preview: SettlementPreview; refreshing: boolean; onRefresh: () => void }) {
+function PreviewBody({ preview, refreshing, stale, onRefresh }: { preview: SettlementPreview; refreshing: boolean; stale: boolean; onRefresh: () => void }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
   const finance = hasFinanceLayer(preview);
@@ -52,6 +54,8 @@ function PreviewBody({ preview, refreshing, onRefresh }: { preview: SettlementPr
           <RefreshCw aria-hidden="true" className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} strokeWidth={1.8} />
         </button>
       </div>
+
+      {stale ? <p role="status" data-settlement-stale="" className="flex items-start gap-2 text-sm leading-6 text-warning"><CircleAlert aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" strokeWidth={1.8} />{t('settlement.stale')}</p> : null}
 
       <p className="flex items-center gap-2 text-sm font-semibold text-text" data-settlement-status={preview.ready ? 'ready' : 'blocked'}>
         {preview.ready
