@@ -1,0 +1,466 @@
+[
+ {
+  "tag": "58_single_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 120.3,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 123mm; margin: 0; }\n  html, body { height: 123mm !important; max-height: 123mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 123.1,
+   "bytes": 55029,
+   "textChars": 956
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 153.5,
+   "bytes": 79055,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_single_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 123.9,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 126mm; margin: 0; }\n  html, body { height: 126mm !important; max-height: 126mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 126,
+   "bytes": 39993,
+   "textChars": 512
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 153.5,
+   "bytes": 76669,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_five_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 161.3,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 164mm; margin: 0; }\n  html, body { height: 164mm !important; max-height: 164mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 164,
+   "bytes": 56851,
+   "textChars": 1321
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 194.2,
+   "bytes": 110638,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_five_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 160.2,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 163mm; margin: 0; }\n  html, body { height: 163mm !important; max-height: 163mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 163,
+   "bytes": 40977,
+   "textChars": 761
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 204,
+   "bytes": 109500,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_twenty_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 461.3,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 464mm; margin: 0; }\n  html, body { height: 464mm !important; max-height: 464mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 463.9,
+   "bytes": 61648,
+   "textChars": 5742
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 527.9,
+   "bytes": 392810,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_twenty_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 460.9,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 463mm; margin: 0; }\n  html, body { height: 463mm !important; max-height: 463mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 462.9,
+   "bytes": 43673,
+   "textChars": 3531
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 626.7,
+   "bytes": 444333,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_long_content_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 234,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 237mm; margin: 0; }\n  html, body { height: 237mm !important; max-height: 237mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 237.1,
+   "bytes": 62557,
+   "textChars": 2503
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 248.9,
+   "bytes": 178011,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_long_content_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 237.7,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 58mm 240mm; margin: 0; }\n  html, body { height: 240mm !important; max-height: 240mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 57.8,
+   "hMm": 239.9,
+   "bytes": 44165,
+   "textChars": 1426
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 237,
+   "bytes": 188481,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_single_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 120.3,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 123mm; margin: 0; }\n  html, body { height: 123mm !important; max-height: 123mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 123.1,
+   "bytes": 55818,
+   "textChars": 954
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 130.9,
+   "bytes": 81024,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_single_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 123.9,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 126mm; margin: 0; }\n  html, body { height: 126mm !important; max-height: 126mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 126,
+   "bytes": 40206,
+   "textChars": 512
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 135,
+   "bytes": 81769,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_five_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 156.5,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 159mm; margin: 0; }\n  html, body { height: 159mm !important; max-height: 159mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 159.1,
+   "bytes": 57583,
+   "textChars": 1313
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 170.4,
+   "bytes": 113461,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_five_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 160.2,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 163mm; margin: 0; }\n  html, body { height: 163mm !important; max-height: 163mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 163,
+   "bytes": 41194,
+   "textChars": 761
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 174.4,
+   "bytes": 114599,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_twenty_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 372.5,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 375mm; margin: 0; }\n  html, body { height: 375mm !important; max-height: 375mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 375,
+   "bytes": 62344,
+   "textChars": 5611
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 405.2,
+   "bytes": 397316,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_twenty_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 456.2,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 459mm; margin: 0; }\n  html, body { height: 459mm !important; max-height: 459mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 459,
+   "bytes": 43898,
+   "textChars": 3531
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 496.4,
+   "bytes": 428751,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_long_content_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 189.3,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 192mm; margin: 0; }\n  html, body { height: 192mm !important; max-height: 192mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 191.9,
+   "bytes": 63317,
+   "textChars": 2424
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 218.1,
+   "bytes": 176920,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_long_content_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 220.9,
+   "ellipsisEls": 0,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print {\n  @page { size: 80mm 223mm; margin: 0; }\n  html, body { height: 223mm !important; max-height: 223mm !important; overflow: hidden !important; }\n}",
+  "print": {
+   "pages": 1,
+   "wMm": 80.1,
+   "hMm": 222.9,
+   "bytes": 44342,
+   "textChars": 1426
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 244.9,
+   "bytes": 190025,
+   "textChars": 1
+  }
+ }
+]

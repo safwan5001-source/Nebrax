@@ -1,0 +1,466 @@
+[
+ {
+  "tag": "58_single_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 120.3,
+   "ellipsisEls": 1,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 55016,
+   "textChars": 956
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 153.5,
+   "bytes": 79293,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_single_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 123.9,
+   "ellipsisEls": 1,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 39936,
+   "textChars": 512
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 148.7,
+   "bytes": 74875,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_five_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 161.3,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 56856,
+   "textChars": 1328
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 194.2,
+   "bytes": 111062,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_five_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 160.2,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 40969,
+   "textChars": 761
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 199.3,
+   "bytes": 102999,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_twenty_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 301.2,
+   "ellipsisEls": 20,
+   "clippedByEllipsis": 20,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 2,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 59644,
+   "textChars": 3616
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 300.3,
+   "bytes": 289890,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_twenty_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 296.1,
+   "ellipsisEls": 20,
+   "clippedByEllipsis": 20,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 2,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 43644,
+   "textChars": 2089
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 295.3,
+   "bytes": 224512,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_long_content_rtl",
+  "preview": {
+   "wMm": 58,
+   "hMm": 190,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 5,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 61654,
+   "textChars": 1967
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 189.6,
+   "bytes": 151715,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "58_long_content_ltr",
+  "preview": {
+   "wMm": 58,
+   "hMm": 189.6,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 5,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 58mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 43831,
+   "textChars": 1066
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 58,
+   "hMm": 189,
+   "bytes": 139230,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_single_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 120.3,
+   "ellipsisEls": 1,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 55214,
+   "textChars": 954
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 130.9,
+   "bytes": 81030,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_single_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 123.9,
+   "ellipsisEls": 1,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 11,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 40750,
+   "textChars": 512
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 135,
+   "bytes": 80760,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_five_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 156.5,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 57093,
+   "textChars": 1313
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 170.4,
+   "bytes": 113709,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_five_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 160.2,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 0,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 41770,
+   "textChars": 761
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 174.4,
+   "bytes": 108530,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_twenty_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 292.5,
+   "ellipsisEls": 20,
+   "clippedByEllipsis": 20,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 2,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 60702,
+   "textChars": 4333
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 292,
+   "bytes": 330859,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_twenty_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 296.1,
+   "ellipsisEls": 20,
+   "clippedByEllipsis": 20,
+   "outside": 0,
+   "amounts": 49,
+   "wrappedAmounts": 0,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 2,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 44627,
+   "textChars": 2441
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 295.7,
+   "bytes": 249206,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_long_content_rtl",
+  "preview": {
+   "wMm": 80,
+   "hMm": 169.3,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 5,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 62166,
+   "textChars": 2114
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 169,
+   "bytes": 157664,
+   "textChars": 1
+  }
+ },
+ {
+  "tag": "80_long_content_ltr",
+  "preview": {
+   "wMm": 80,
+   "hMm": 180.9,
+   "ellipsisEls": 5,
+   "clippedByEllipsis": 5,
+   "outside": 0,
+   "amounts": 19,
+   "wrappedAmounts": 1,
+   "brokenTotals": 0,
+   "totalRows": 1
+  },
+  "injectedStyle": "@media print { @page { size: 80mm auto; margin: 4mm; } }",
+  "print": {
+   "pages": 1,
+   "wMm": 209.9,
+   "hMm": 297,
+   "bytes": 44697,
+   "textChars": 1154
+  },
+  "exportPdf": {
+   "pages": 1,
+   "wMm": 80,
+   "hMm": 180.6,
+   "bytes": 145272,
+   "textChars": 1
+  }
+ }
+]
