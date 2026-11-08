@@ -1,0 +1,35 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+/**
+ * حراس ساكنة لثوابت AWJ-DOC-V2-PR4 على صفحتي السند الرسمي وفاتورة المشتريات:
+ * المحرك المتجهي للسند يبقى مرجعاً عند غياب الملف، ولا يُلتقَط الجذر إلا بملف مطبَّق، ولا يُلمس الحساب.
+ */
+const read = (file: string) => readFileSync(resolve(process.cwd(), file), 'utf8');
+
+describe('/payments/[id] — ملف الإخراج', () => {
+  const source = read('src/app/(app)/payments/[id]/page.tsx');
+
+  it('المحرك المتجهي createPaymentPdf يبقى المسار الافتراضي ولا يُلتقَط الجذر إلا حين يوجد ملف مطبَّق', () => {
+    expect(source).toMatch(/pdfSpec\.profile \? captureElement\(\) : null/);
+    expect(source).toMatch(/downloadPaymentPdf\(await createPdf\(\), payment\.number\)/);
+    expect(source).toMatch(/sharePaymentPdf\(await createPdf\(\)/);
+  });
+
+  it('الملف يُقرأ من المراجعة المثبتة أولاً ثم التعيين الحي، ولا يُكتب شيء للخادم', () => {
+    expect(source).toMatch(/readOutputProfile\(frozen\)/);
+    expect(source).toMatch(/setOutputProfile\(resolved\.outputProfile\)/);
+    expect(source).not.toMatch(/method:\s*'(POST|PUT|PATCH|DELETE)'/);
+  });
+});
+
+describe('/purchases/[id] — ملف الإخراج', () => {
+  const source = read('src/app/(app)/purchases/[id]/page.tsx');
+
+  it('المقاس من resolveDocumentOutputSpec بملف المراجعة المثبتة (أو الحي) ولا يبقى supportedPaper[0] وحده', () => {
+    expect(source).toMatch(/const paper = resolveDocumentOutputSpec\(templateId, outputProfile\)\.paper/);
+    expect(source).toMatch(/setOutputProfile\(readOutputProfile\(frozen\)\)/);
+    expect(source).toMatch(/setOutputProfile\(resolved\.outputProfile\)/);
+  });
+});

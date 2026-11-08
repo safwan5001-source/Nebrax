@@ -8,6 +8,7 @@ import {
   type SourcePurchase,
 } from '@/modules/documents/builder/from-purchase';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 
 export type PurchaseDoc = SourcePurchase;
 export type PurchaseCompany = SourceCompany;
@@ -29,6 +30,7 @@ export function PurchaseDocument({
   logoUrl,
   logoHeight,
   layout,
+  outputProfile,
   rootId,
   direction,
   language,
@@ -47,6 +49,8 @@ export function PurchaseDocument({
   logoUrl?: string | null;
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
+  /** ملف الإخراج من المراجعة المطبَّقة (AWJ-DOC-V2-PR4)؛ غيابه = السلوك السابق. */
+  outputProfile?: OutputProfile | null;
   rootId?: string | null;
   direction?: Direction;
   /**
@@ -82,6 +86,7 @@ export function PurchaseDocument({
       showLogo={showLogo}
       layout={layout}
       rootId={rootId}
+      outputProfile={outputProfile}
     />
   );
 }

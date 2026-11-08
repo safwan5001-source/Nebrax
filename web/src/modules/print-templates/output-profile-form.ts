@@ -28,8 +28,8 @@ export const FORM_PAPERS: readonly Exclude<FormPaper, 'default' | 'custom'>[] = 
 
 /**
  * أنواع المستندات التي تقرأ صفحاتُها ملفَّ الإخراج فعلاً اليوم (فاتورة، عرض سعر، إشعار دائن/مدين،
- * أمر شراء). غيرها (سندات القبض/الصرف، فاتورة المشتريات، مذكرة التسليم…) لا يقرؤه مساره بعد:
- * يبقى الملف المخزَّن محفوظاً ولا يُعدَّل من المحرر ولا يُعلَن له أثر.
+ * أمر شراء، وبعد AWJ-DOC-V2-PR4: فاتورة المشتريات وسندا القبض والصرف). غيرها (أمر البيع، مذكرة
+ * التسليم، كشف الحساب…) لا يقرؤه مساره بعد: يبقى الملف المخزَّن محفوظاً ولا يُعدَّل من المحرر ولا يُعلَن له أثر.
  */
 export const OUTPUT_PROFILE_DOCUMENT_TYPES: readonly DocumentTypeId[] = [
   'tax_invoice',
@@ -38,6 +38,9 @@ export const OUTPUT_PROFILE_DOCUMENT_TYPES: readonly DocumentTypeId[] = [
   'credit_note',
   'debit_note',
   'purchase_order',
+  'purchase_invoice',
+  'receipt_voucher',
+  'payment_voucher',
 ];
 
 export function outputProfileUnwiredTypes(documentTypes: readonly DocumentTypeId[]): DocumentTypeId[] {

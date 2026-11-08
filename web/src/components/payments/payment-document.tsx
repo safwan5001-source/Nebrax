@@ -4,6 +4,7 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { buildPaymentDocumentModel, type SourcePayment } from '@/modules/documents/builder/from-payment';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 
 export type PaymentDoc = SourcePayment;
 export type PaymentCompany = SourceCompany;
@@ -35,6 +36,7 @@ export function PaymentDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  outputProfile,
   rootId,
 }: {
   payment: PaymentDoc;
@@ -49,10 +51,12 @@ export function PaymentDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  /** ملف الإخراج من المراجعة المطبَّقة (AWJ-DOC-V2-PR4)؛ غيابه = السلوك السابق. */
+  outputProfile?: OutputProfile | null;
   rootId?: string | null;
 }) {
   const model = buildPaymentDocumentModel({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={VOUCHER_LAYOUT} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={VOUCHER_LAYOUT} rootId={rootId} outputProfile={outputProfile} />
   );
 }

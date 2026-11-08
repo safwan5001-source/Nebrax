@@ -41,6 +41,8 @@ const DOCUMENT_TYPES = [
   'purchase_order',
   'purchase_invoice',
   'delivery_note',
+  'receipt_voucher',
+  'payment_voucher',
 ] as const satisfies readonly DocumentTypeId[];
 
 // AWJ-DOC-V2-PR3B: مقاسات الإخراج القابلة للاختبار من الرابط (`paper` + `orientation` + `margins`).
