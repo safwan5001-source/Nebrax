@@ -219,6 +219,37 @@ test('حراري على iPhone 13 (محاكاة Chromium): نفس الهندسة
   }
 });
 
+test('قيم كبيرة على 58mm: «كمية × سعر» لا يتداخل مع إجمالي البند ولا يخرج من الإيصال', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+  test.setTimeout(180_000);
+  for (const [width, direction] of [[58, 'rtl'], [58, 'ltr'], [80, 'rtl']] as const) {
+    const { context, page } = await openQa(browser, width, 'single', direction);
+    try {
+      const result = await page.evaluate(() => {
+        const root = document.getElementById('qa-print-root') as HTMLElement;
+        const rootRect = root.getBoundingClientRect();
+        const row = [...root.querySelectorAll('div.flex-wrap')].find((d) => d.textContent?.includes('×')) as HTMLElement;
+        const expression = row.querySelector('span[dir="ltr"]') as HTMLElement;
+        const parts = expression.querySelectorAll('span.num');
+        parts[0].textContent = '100';
+        parts[1].textContent = '10,000.00 ﷼';
+        const totals = row.querySelectorAll('span.num');
+        const total = totals[totals.length - 1] as HTMLElement;
+        total.textContent = '1,000,000.00 ﷼';
+        const a = expression.getBoundingClientRect();
+        const t = total.getBoundingClientRect();
+        const intersects = !(a.right <= t.left + 0.5 || t.right <= a.left + 0.5) && !(a.bottom <= t.top + 0.5 || t.bottom <= a.top + 0.5);
+        const outside = [a, t].some((r) => r.left < rootRect.left - 1 || r.right > rootRect.right + 1);
+        return { intersects, outside };
+      });
+      expect(result.intersects, `تداخل «كمية×سعر» مع الإجمالي (${width}mm ${direction})`).toBe(false);
+      expect(result.outside, `خروج من الإيصال (${width}mm ${direction})`).toBe(false);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test('بقية عناصر الصفحة لا تُنتج صفحات رول فارغة إضافية', async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
   test.setTimeout(120_000);

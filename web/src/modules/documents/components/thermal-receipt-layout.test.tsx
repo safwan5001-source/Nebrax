@@ -73,4 +73,18 @@ describe('الإيصال الحراري — التفاف لا اقتطاع (AWJ-
     expect(label.className).toContain('break-words');
     expect(amount.className).toContain('shrink-0');
   });
+
+  it('كمية × سعر: القيم متماسكة لكن يجوز الكسر بينها، والإجمالي ينزل لسطر خاص عند الضيق (لا تداخل على 58mm)', () => {
+    const { model, root } = renderReceipt(58, 'twenty');
+    // لا Amount واحد يضم التعبير كله: لو ضمّه لمنع nowrap الكسر وتداخل مع الإجمالي (ملاحظة مراجعة PR2)
+    for (const amount of root.querySelectorAll('span.num[dir="ltr"]')) expect(amount.textContent).not.toContain('×');
+    const rows = [...root.querySelectorAll('div.flex-wrap')].filter((row) => row.textContent?.includes('×'));
+    expect(rows).toHaveLength(model.lines.length);
+    for (const row of rows) {
+      const [expression, total] = [...row.children] as HTMLElement[];
+      expect(expression.getAttribute('dir')).toBe('ltr'); // الترتيب «1 × 125.00» في RTL
+      expect(expression.className).toContain('min-w-0');
+      expect(total.className).toContain('ms-auto');
+    }
+  });
 });

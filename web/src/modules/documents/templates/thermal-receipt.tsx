@@ -110,9 +110,11 @@ export function ThermalReceipt({
             {model.lines.map((line) => (
               <div key={line.id}>
                 <div className="break-words">{line.description || '—'}</div>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span className="min-w-0 flex-1"><Amount>{line.quantity} × {formatMoney(line.unitPrice)}</Amount></span>
-                  <span className="shrink-0 text-text"><Amount>{formatMoney(line.total)}</Amount></span>
+                {/* كمية × سعر: كل قيمة تبقى متماسكة (Amount) لكن يجوز الكسر بينهما؛ وإن ضاق السطر
+                    (58mm بقيم كبيرة) ينزل إجمالي البند إلى سطر خاص بدل التداخل. الحاوية LTR كي يبقى الترتيب «1 × 125.00». */}
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-muted">
+                  <span dir="ltr" className="min-w-0 max-w-full"><Amount>{line.quantity}</Amount> × <Amount>{formatMoney(line.unitPrice)}</Amount></span>
+                  <span className="ms-auto max-w-full shrink-0 text-text"><Amount>{formatMoney(line.total)}</Amount></span>
                 </div>
               </div>
             ))}
