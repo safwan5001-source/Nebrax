@@ -538,7 +538,7 @@ describe('role-aware navigation and honest "coming soon"', () => {
     renderOps(<HomeScreen />);
     await screen.findByText('Alpha');
     const navigation = screen.getByRole('navigation', { name: /Station Operations main navigation/ });
-    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Products', 'Tanks', 'Help', 'Profile']);
+    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Products', 'Tanks', 'Reports', 'Help', 'Profile']);
   });
 
   const withOpenShift = (readings: Parameters<typeof shiftDetail>[2] = {}) => {

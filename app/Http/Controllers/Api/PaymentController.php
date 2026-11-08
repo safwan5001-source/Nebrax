@@ -82,7 +82,7 @@ class PaymentController extends ApiController
     public function show(Request $request, string $id): JsonResponse
     {
         return (new PaymentResource(
-            $this->visiblePayment($request, $id)->load(['partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
+            $this->visiblePayment($request, $id)->load(['classification', 'partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
         ))->response();
     }
 

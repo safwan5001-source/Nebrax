@@ -138,6 +138,16 @@ export interface DocumentVoucher {
   amount: number;         // minor units
   reference?: string | null;
   allocations?: DocumentVoucherAllocation[];
+  /**
+   * تفاصيل إضافية من سجل الدفعة نفسه (AWJ-DOC-V2-PR5) — **اختيارية وفارغة ما لم يوفّرها المصدر**: لا يخترعها العارض.
+   * تقرؤها القوالب التي تعرضها (السند المدمج) وتتجاهلها بقية القوالب.
+   */
+  methodName?: string | null;
+  paymentDetails?: string | null;
+  accountName?: string | null;
+  collectorName?: string | null;
+  classificationName?: string | null;
+  branchName?: string | null;
 }
 
 /**
@@ -234,7 +244,7 @@ export interface TemplateConfig {
  * الهوية التركيبية للقالب. هذه قيمة عرضية محلية فقط؛ لا تحفظ داخل تعريف الكتلة
  * ولا تعيد تفسير المراجعات المثبتة أو نموذج المستند.
  */
-export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2' | 'quotation_proposal' | 'purchase_order_formal';
+export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2' | 'quotation_proposal' | 'purchase_order_formal' | 'voucher_compact';
 
 export interface TemplateStyle {
   /** الهوية التركيبية للقالب ضمن الأقسام المشتركة. */
@@ -355,4 +365,9 @@ export interface TemplateDescriptor {
    * غيابه يبقي السلوك التاريخي: متاح لكل الأنواع (قوالب الفاتورة).
    */
   documentTypes?: readonly DocumentTypeId[];
+  /**
+   * مقاس إخراج مفضَّل يُقترح **في المحرر فقط** عند اختيار القالب لقالب طباعة بلا Output Profile (AWJ-DOC-V2-PR5).
+   * لا يُطبَّق على المستندات ولا على قالب قائم: غياب الملف في أي مسار آخر يبقى A4 كما كان. يجب أن يكون مقاساً معلناً في `supportedPaper`.
+   */
+  preferredOutput?: { paper: 'a4' | 'a5' | 'a6'; orientation: 'portrait' | 'landscape' };
 }

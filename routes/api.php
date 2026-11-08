@@ -110,6 +110,8 @@ use App\Http\Controllers\Api\FuelStationWalkInPartnerController;
 use App\Http\Controllers\Api\FuelSaleController;
 use App\Http\Controllers\Api\FuelReadingRequestController;
 use App\Http\Controllers\Api\FuelReconciliationController;
+use App\Http\Controllers\Api\FuelReportCenterController;
+use App\Support\FuelReportCatalog;
 use App\Http\Controllers\Api\FuelOpeningBalanceController;
 use App\Http\Controllers\Api\FuelTankLevelController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
@@ -1782,6 +1784,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/alerts/scan', [FuelStationReadinessController::class, 'scanAlerts'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
         Route::post('fuel-stations/alerts/{id}/acknowledge', [FuelStationReadinessController::class, 'acknowledgeAlert'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
         Route::post('fuel-stations/alerts/{id}/assign', [FuelStationReadinessController::class, 'assignAlert'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+
+        // منظومة تقارير الوقود الموحَّدة (HORIZON-REPORTS): محرك واحد لتطبيق المحطة وأَوْج. البوابة هنا خشنة (أي صلاحية تقرير)؛ التفويض الدقيق لكل تقرير والأعمدة
+        // الحسّاسة (مبالغ/تكلفة/ائتمان) والنطاق (مستأجر/فرع/محطة) يفرضها `FuelReportEngine` من الخادم. مسارات ثابتة قبل `{key}`.
+        Route::get('fuel-stations/report-center/catalog', [FuelReportCenterController::class, 'catalog'])->middleware([$permAny(...FuelReportCatalog::routePermissions()), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/report-center/{key}/export', [FuelReportCenterController::class, 'export'])->where('key', '[a-z_]+\.[a-z_]+')->middleware([$permAny(...FuelReportCatalog::routePermissions()), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/report-center/{key}/audit', [FuelReportCenterController::class, 'audit'])->where('key', '[a-z_]+\.[a-z_]+')->middleware([$permAny(...FuelReportCatalog::routePermissions()), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/report-center/{key}', [FuelReportCenterController::class, 'show'])->where('key', '[a-z_]+\.[a-z_]+')->middleware([$permAny(...FuelReportCatalog::routePermissions()), $commercialApp('fuel_stations.core')]);
 
         Route::get('fuel-stations/dashboard', [FuelStationReadinessController::class, 'dashboard'])->middleware([$perm('fuel.reports.view'), $commercialApp('fuel_stations.maintenance')]);
         Route::get('fuel-stations/reports/{family}', [FuelStationReadinessController::class, 'report'])->middleware([$perm('fuel.reports.view'), $commercialApp('fuel_stations.maintenance')]);
