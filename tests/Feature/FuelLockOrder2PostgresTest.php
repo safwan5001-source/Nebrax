@@ -250,29 +250,106 @@ class FuelLockOrder2PostgresTest extends TestCase
         $this->assertSame('approved', DB::table('fuel_reconciliations')->where('id', $draft->id)->value('status'));
     }
 
-    #[Test]
-    public function opening_balance_posting_waits_for_the_anchor_instead_of_holding_the_pool_first(): void
+    /** مجمّع جديد فارغ (الافتتاحي يشترط مجمّعاً فارغاً) ومسودة افتتاحي جاهزة للترحيل، مع تهيئة حالات التكلفة الصفرية. @param array<string,mixed> $w @return array{0:array<string,mixed>,1:\App\Models\FuelOpeningBalance} */
+    private function freshOpeningDocument(array $w, string $suffix): array
     {
-        $w = $this->world();
-        // مجمّع جديد فارغ (الافتتاحي يشترط مجمّعاً فارغاً): مخزن ومحطة وخزانات جديدة في المستأجر نفسه.
-        $warehouse = \App\Models\Warehouse::create(['name' => 'مخزن افتتاحي جديد', 'code' => 'LO2-NEW-'.$w['slug'], 'branch_id' => $w['branch']->id]);
-        $station = \App\Models\FuelStation::create(['branch_id' => $w['branch']->id, 'warehouse_id' => $warehouse->id, 'code' => 'LO2-S-'.$w['slug'], 'name' => 'محطة افتتاحي جديدة']);
+        $warehouse = \App\Models\Warehouse::create(['name' => "مخزن افتتاحي {$suffix}", 'code' => "LO2-NEW-{$suffix}-".$w['slug'], 'branch_id' => $w['branch']->id]);
+        $station = \App\Models\FuelStation::create(['branch_id' => $w['branch']->id, 'warehouse_id' => $warehouse->id, 'code' => "LO2-S-{$suffix}-".$w['slug'], 'name' => "محطة افتتاحي {$suffix}"]);
         $tanks = [];
         foreach ($w['fuels'] as $key => $fuel) {
             $tanks[$key] = \App\Models\FuelTank::create([
                 'branch_id' => $w['branch']->id, 'fuel_station_id' => $station->id, 'fuel_product_id' => $fuel->id,
-                'code' => "LO2-T-{$key}-".$w['slug'], 'name' => "خزان {$key}", 'capacity_milliliters' => 34_000_000, 'safe_capacity_milliliters' => 33_000_000,
+                'code' => "LO2-T-{$suffix}-{$key}-".$w['slug'], 'name' => "خزان {$key}", 'capacity_milliliters' => 34_000_000, 'safe_capacity_milliliters' => 33_000_000,
             ]);
         }
         $fresh = array_replace($w, ['warehouse' => $warehouse, 'station' => $station, 'tanks' => $tanks]);
         $doc = app(FuelOpeningBalanceService::class)->createDraft($this->openingPayload($fresh), $w['actor'])['document'];
-
-        // المحاكاة تمسك المِرساة وتحاول بعدها قفل حالة تكلفة هذا المخزن (تُهيَّأ أولاً بالتهيئة الصفرية كي يوجد صف يُقفل).
         foreach ($w['fuels'] as $fuel) {
             app(FuelCostBasisService::class)->assertReady($fuel, $warehouse);
         }
+
+        return [$fresh, $doc];
+    }
+
+    #[Test]
+    public function opening_balance_posting_waits_for_the_anchor_instead_of_holding_the_pool_first(): void
+    {
+        $w = $this->world();
+        [$fresh, $doc] = $this->freshOpeningDocument($w, 'a');
         $this->assertWaitsBehindErpWithoutDeadlock($fresh, fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), $w['actor']), 'ترحيل الرصيد الافتتاحي');
         $this->assertSame('posted', DB::table('fuel_opening_balances')->where('id', $doc->id)->value('status'));
+    }
+
+    // ───────── 1b) تسجيل قراءة خزان (خزان ← KEY SHARE على المستأجر) مقابل المسارات الثلاثة ─────────
+
+    /** ترتيب `recordReading`: الخزان FOR UPDATE ثم إدراج قراءة يحتاج KEY SHARE على صف المستأجر (FK). @param array<string,mixed> $w */
+    private function readingOrderSql(array $w, string $tankId, float $sleep = 1.5): string
+    {
+        return sprintf(
+            "BEGIN; SELECT 1 FROM fuel_tanks WHERE id='%s' FOR UPDATE; SELECT pg_sleep(%s); SELECT 1 FROM tenants WHERE id='%s' FOR KEY SHARE; COMMIT;",
+            $tankId, $sleep, $w['tenant_id'],
+        );
+    }
+
+    /** يشغّل $operation بينما جلسة بترتيب recordReading تمسك الخزان ثم تطلب KEY SHARE على المستأجر: لا جمود على أي من الطرفين. */
+    private function assertNoDeadlockWithReadingOrder(array $w, string $tankId, callable $operation, string $label): void
+    {
+        $holder = $this->startHolder($this->readingOrderSql($w, $tankId));
+        usleep(500000);
+        $error = null;
+        try {
+            $operation();
+        } catch (\Throwable $e) {
+            $error = $e;
+        }
+        [$stderr, $exit] = $this->finishHolder($holder);
+        $this->assertStringNotContainsString('deadlock', $stderr, "{$label}: جلسة القراءة ضحية جمود — {$stderr}");
+        $this->assertSame(0, $exit, "{$label}: {$stderr}");
+        $this->assertNull($error, "{$label}: ".($error ? get_class($error).': '.$error->getMessage() : ''));
+    }
+
+    #[Test]
+    public function opening_balance_posting_never_deadlocks_with_a_tank_reading_on_one_of_its_tanks(): void
+    {
+        $w = $this->world();
+        [$fresh, $doc] = $this->freshOpeningDocument($w, 'r');
+        $this->assertNoDeadlockWithReadingOrder($fresh, $fresh['tanks']['91']->id, fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), $w['actor']), 'ترحيل الافتتاحي ↔ قراءة خزان');
+        $this->assertSame('posted', DB::table('fuel_opening_balances')->where('id', $doc->id)->value('status'));
+    }
+
+    #[Test]
+    public function delivery_and_reconciliation_approvals_never_deadlock_with_a_tank_reading(): void
+    {
+        $w = $this->world();
+        $delivery = $this->draftDelivery($w, 'lo2-read-recv');
+        $this->assertNoDeadlockWithReadingOrder($w, $w['tanks']['91']->id, fn () => app(FuelSupplyReceivingService::class)->approveDelivery(FuelDelivery::findOrFail($delivery->id), $w['actor']->id), 'اعتماد الاستلام ↔ قراءة خزان');
+        $draft = $this->draftReconciliation($w, 'read');
+        $this->assertNoDeadlockWithReadingOrder($w, $w['tanks']['91']->id, fn () => app(FuelReconciliationService::class)->approve(FuelReconciliation::findOrFail($draft->id), $w['actor']->id, 'اعتماد'), 'اعتماد التسوية ↔ قراءة خزان');
+    }
+
+    #[Test]
+    public function real_tank_readings_racing_opening_postings_never_deadlock(): void
+    {
+        $w = $this->world();
+        for ($round = 1; $round <= 6; $round++) {
+            [$fresh, $doc] = $this->freshOpeningDocument($w, "x{$round}");
+            $jobs = [
+                fn () => $this->attempt($fresh, fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), User::findOrFail($w['actor']->id))['replayed'] ? 'replayed' : 'posted'),
+            ];
+            foreach (range(1, 4) as $i) {
+                $jobs[] = fn () => $this->attempt($fresh, fn () => app(FuelReconciliationService::class)->recordReading([
+                    'fuel_station_id' => $fresh['station']->id, 'fuel_tank_id' => $fresh['tanks']['91']->id, 'reading_type' => 'physical',
+                    'quantity_liters' => '100.000', 'evidence_key' => "lo2-race-read-{$round}-{$i}", 'recorded_by' => $w['actor']->id,
+                ])->id);
+            }
+            if ($round % 2 === 0) {
+                $jobs = array_reverse($jobs);
+            }
+            $results = $this->runConcurrently($jobs);
+            $this->assertAllCompleted($results);
+            $this->assertSame('posted', DB::table('fuel_opening_balances')->where('id', $doc->id)->value('status'), "جولة {$round}: ".json_encode($results));
+            $this->assertSame(4, (int) DB::table('fuel_tank_readings')->where('fuel_tank_id', $fresh['tanks']['91']->id)->count(), "جولة {$round}: كل القراءات سُجّلت");
+        }
     }
 
     // ───────── 2) تزاحم فعلي بالكود الحقيقي ─────────

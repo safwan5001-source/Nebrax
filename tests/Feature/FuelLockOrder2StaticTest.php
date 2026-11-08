@@ -16,7 +16,7 @@ class FuelLockOrder2StaticTest extends TestCase
         return [
             'delivery approval' => ['Services/FuelSupplyReceivingService.php', ['costBasis->assertReady(']],
             'reconciliation approval' => ['Services/FuelReconciliationService.php', ['lockBookStock(', 'costBasis->quoteGain(', 'costBasis->quoteIssue(']],
-            'opening balance post' => ['Services/FuelOpeningBalanceService.php', ['costBasis->assertReady(']],
+            'opening balance post' => ['Services/FuelOpeningBalanceService.php', ['costBasis->assertReady(', 'this->evaluate($document, $station, true)']],
         ];
     }
 
@@ -26,6 +26,10 @@ class FuelLockOrder2StaticTest extends TestCase
         $code = (string) file_get_contents(app_path($file));
         $anchor = strpos($code, 'lockLedgerAnchor()');
         $this->assertNotFalse($anchor, "{$file}: لا يأخذ المِرساة مبكراً");
+        // الصفوف المشار إليها بمفتاح أجنبي (الخزان) تُقفل قبل المِرساة: `lock('for key share')` (استلام/تسوية) أو `lockForUpdate` للخزانات (افتتاحي).
+        $tankLock = strpos($code, "lock('for key share')") ?: strpos($code, '->orderBy(\'id\')->lockForUpdate()->get();');
+        $this->assertNotFalse($tankLock, "{$file}: لا يقفل الخزان قبل المِرساة");
+        $this->assertLessThan($anchor, $tankLock, "{$file}: قفل الخزان يجب أن يسبق المِرساة");
         foreach ($poolCalls as $call) {
             $first = strpos($code, $call);
             $this->assertNotFalse($first, "{$file}: {$call}");
