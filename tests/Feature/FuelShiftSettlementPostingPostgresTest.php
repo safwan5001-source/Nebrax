@@ -1,0 +1,195 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\FuelShift;
+use App\Services\FuelSaleService;
+use App\Services\FuelShiftCollectionService;
+use App\Services\FuelShiftService;
+use App\Services\FuelShiftSettlementPostingService;
+use App\Services\FuelStationSettingsService;
+use App\Services\FuelStationWalkInPartnerService;
+use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+/**
+ * P1-3b-2b — تزاحم محرك ترحيل التسوية على PostgreSQL حقيقي بعمليات فعلية (`pcntl_fork`):
+ *  1) N عمليات تُرحّل وردية واحدة معاً ⇒ ترحيل واحد والبقية إعادة، بلا جمود ولا ازدواج.
+ *  2) المحرك مقابل بيع ERP حيّ على الفوهة نفسها (وردية أخرى) ⇒ كلاهما ينجح بلا جمود (ترتيب أقفال موحَّد: الترقيم قبل المِرساة).
+ * يُتخطّى على SQLite؛ على PostgreSQL غياب `pcntl` فشل لا تخطٍّ. بيانات اختبار معزولة وبوابة مفتوحة داخل الاختبار فقط.
+ */
+class FuelShiftSettlementPostingPostgresTest extends TestCase
+{
+    use InteractsWithApi;
+    use CapturesThrowable;
+    use BuildsFuelCashFixture;
+    use UsesWorkerDatabaseWithoutTransaction;
+
+    /** @var list<string> */
+    private array $tenants = [];
+
+    private string $dir = '';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('يتطلب PostgreSQL حقيقياً — SQLite لا يُظهر تزاحم الأقفال بين عمليات.');
+        }
+        $this->assertTrue(function_exists('pcntl_fork'), 'pcntl مطلوب؛ غيابه فشل لا تخطٍّ.');
+        $this->dir = sys_get_temp_dir().'/fuel_settlement_engine_'.uniqid();
+        mkdir($this->dir);
+
+        config([
+            'fuel_stations.shift_settlement_enabled' => true,
+            'fuel_stations.shift_settlement_tax_opinion_ref' => 'TAX-OPINION-TEST-ENGINE-PG',
+            'fuel_stations.shift_settlement_invoice_granularity' => 'per_nozzle',
+            'fuel_stations.shift_collection_declaration_enabled' => true,
+            'fuel_stations.shift_cash_receipts_enabled' => true,
+        ]);
+        $this->f = $this->fixture('pgeng');
+        $this->tenants[] = $this->f['tenant_id'];
+        $this->tenants[] = $this->f['foreign_tenant_id'];
+        $this->setBasis('declared_collection');
+        app(FuelStationWalkInPartnerService::class)->assign($this->f['station'], $this->f['actor']);
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['shift_settlement_mode' => 'post_on_close'], $this->f['actor'], 'تفعيل اختبار');
+        $this->travel(3)->seconds();   // استلام المثبّت الأولي يسبق فتح الورديات (وإلا حُجب السطر بحدث تكلفة داخل النافذة)
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->dir !== '') {
+            foreach (glob($this->dir.'/*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($this->dir);
+        }
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            foreach ($this->tenants as $id) {
+                DB::table('tenants')->where('id', $id)->delete();
+            }
+        }
+        parent::tearDown();
+    }
+
+    private function closedShift(string $key, int $openingMeter): FuelShift
+    {
+        $shift = $this->open($key);
+        foreach (['opening' => $openingMeter, 'closing' => $openingMeter + 20_000] as $stage => $ml) {
+            app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "pgeng-{$shift->id}-{$stage}",
+            ], $this->f['actor']);
+        }
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => $shift->id.'decl', 'base_revision' => 0,
+            'lines' => [
+                ['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600],
+                ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0],
+            ],
+        ], $this->f['actor']);
+
+        return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+    }
+
+    /**
+     * @param  list<callable():mixed>  $jobs
+     * @return list<array<string,mixed>>
+     */
+    private function concurrently(array $jobs): array
+    {
+        $barrier = $this->dir.'/barrier_'.uniqid();
+        $files = [];
+        $pids = [];
+        foreach ($jobs as $i => $job) {
+            $files[$i] = $this->dir.'/result_'.uniqid()."_{$i}";
+            $pid = pcntl_fork();
+            $this->assertNotSame(-1, $pid, 'فشل pcntl_fork');
+            if ($pid === 0) {
+                DB::purge(config('database.default'));
+                $deadline = microtime(true) + 10.0;
+                while (! file_exists($barrier) && microtime(true) < $deadline) {
+                    usleep(500);
+                }
+                try {
+                    file_put_contents($files[$i], json_encode(['ok' => true, 'value' => $job()]));
+                } catch (\Throwable $e) {
+                    file_put_contents($files[$i], json_encode(['ok' => false, 'error_class' => get_class($e), 'message' => $e->getMessage()]));
+                }
+                exit(0);
+            }
+            $pids[] = $pid;
+        }
+        touch($barrier);
+        foreach ($pids as $pid) {
+            pcntl_waitpid($pid, $status);
+        }
+        $out = [];
+        foreach ($files as $i => $file) {
+            $raw = is_file($file) ? file_get_contents($file) : false;
+            $out[$i] = json_decode($raw !== false ? $raw : '{"ok":false,"message":"no output"}', true);
+        }
+
+        return $out;
+    }
+
+    #[Test]
+    public function concurrent_posts_of_one_shift_yield_one_posting_and_replays(): void
+    {
+        $shift = $this->closedShift('race1', 1_000_000);
+
+        $jobs = [];
+        foreach (range(1, 5) as $n) {
+            $jobs[] = fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($shift->id), $this->f['actor'])->outcome;
+        }
+        $results = $this->concurrently($jobs);
+
+        $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), 'لا استثناءات ولا جمود: '.json_encode($results, JSON_UNESCAPED_UNICODE));
+        $outcomes = array_count_values(array_map(fn ($r) => $r['value'], $results));
+        $this->assertSame(1, $outcomes['posted'] ?? 0, 'ترحيل واحد فقط: '.json_encode($outcomes));
+        $this->assertSame(4, $outcomes['replayed'] ?? 0);
+        $this->assertSame(1, DB::table('fuel_shift_settlements')->where('fuel_shift_id', $shift->id)->count());
+        $this->assertSame(1, DB::table('fuel_sales')->where('fuel_shift_id', $shift->id)->where('source', 'settlement')->count());
+        $this->assertSame(1, DB::table('invoices')->where('notes', 'like', '%'.$shift->number.'%')->count(), 'فاتورة واحدة للفوهة');
+    }
+
+    #[Test]
+    public function the_engine_and_a_live_erp_sale_on_the_same_nozzle_never_deadlock(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $closed = $this->closedShift("mix{$i}", 1_000_000 + $i * 100_000);
+            $live = $this->open("mix-live{$i}");
+
+            $results = $this->concurrently([
+                fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome,
+                function () use ($live, $i) {
+                    $service = app(FuelSaleService::class);
+                    $sale = $service->finalize($service->createDraft([
+                        'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $live->id,
+                        'partner_id' => $this->f['customer']->id, 'quantity_milliliters' => 1000, 'idempotency_key' => "mix-erp-{$i}",
+                    ], $this->f['actor']), $this->f['actor']);
+
+                    return $sale->status;
+                },
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $this->assertSame('posted', $results[0]['value']);
+            $this->assertSame('finalized', $results[1]['value']);
+
+            // الوردية الحيّة تُغلق ليُفتح بعدها غيرها في التكرار التالي (قراءات اصطناعية مكتملة).
+            foreach (['opening' => 5_000_000 + $i * 100_000, 'closing' => 5_000_000 + $i * 100_000 + 1_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($live->fresh(), [
+                    'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "mix-live-{$live->id}-{$stage}",
+                ], $this->f['actor']);
+            }
+            app(FuelShiftCollectionService::class)->declare($live->fresh(), [
+                'idempotency_key' => $live->id.'decl', 'base_revision' => 0,
+                'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 230], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+            ], $this->f['actor']);
+            app(FuelShiftService::class)->close($live->fresh(), self::FLOAT + 230, null, $this->f['actor']);
+        }
+        $this->assertSame(3, DB::table('fuel_sales')->where('source', 'settlement')->count());
+        $this->assertSame(3, DB::table('fuel_sales')->where('source', 'station')->count());
+    }
+}

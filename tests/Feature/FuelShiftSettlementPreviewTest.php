@@ -810,6 +810,10 @@ class FuelShiftSettlementPreviewTest extends TestCase
 
                 continue;
             }
+            if (basename($file) === 'FuelShiftSettlementPostingService.php') {
+                // الكاتب الوحيد لرأس التسوية وسطورها (P1-3b-2b): معزول وغير موصول بأي مسار إنتاجي (يحرسه FuelShiftSettlementPostingTest).
+                continue;
+            }
             $this->assertStringNotContainsString("DB::table('fuel_shift_settlement", $code, basename($file));
         }
         $this->assertFileDoesNotExist(app_path('Services/FuelShiftSettlementService.php'));
