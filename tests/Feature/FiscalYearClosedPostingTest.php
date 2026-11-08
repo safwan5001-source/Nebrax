@@ -491,8 +491,10 @@ class FiscalYearClosedPostingTest extends TestCase
         $this->assertSame(['post', 'reverse'], $public);
 
         $guard = new \ReflectionClass(AccountingDateGuard::class);
-        $this->assertSame(['activeLockFor', 'assertOpen'], collect($guard->getMethods(\ReflectionMethod::IS_PUBLIC))
+        // `lockLedgerAnchor` (FUEL-LOCK-ORDER-2) يأخذ قفل المِرساة نفسه الذي يأخذه `assertOpen` دون أي فحص أو معامل — ترتيب أقفال فقط، لا يفتح باباً حول الحارس (يحرسه الفحص التالي: بلا معاملات).
+        $this->assertSame(['activeLockFor', 'assertOpen', 'lockLedgerAnchor'], collect($guard->getMethods(\ReflectionMethod::IS_PUBLIC))
             ->reject(fn ($m) => $m->isConstructor())->map(fn ($m) => $m->getName())->sort()->values()->all());
+        $this->assertSame([], $guard->getMethod('lockLedgerAnchor')->getParameters());
         foreach (['assertOpen', 'activeLockFor'] as $method) {
             $this->assertSame(['date'] + ($method === 'assertOpen' ? [1 => 'context'] : []),
                 array_map(fn ($p) => $p->getName(), $guard->getMethod($method)->getParameters()));

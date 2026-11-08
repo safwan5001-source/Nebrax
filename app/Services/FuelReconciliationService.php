@@ -375,6 +375,13 @@ class FuelReconciliationService
             $fuelProduct = $this->fuelProduct($reconciliation->fuel_product_id);
             $product = $this->product($fuelProduct);
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
+            // FUEL-LOCK-ORDER-2: مِرساة المستأجر قبل قفل المنتج/الرصيد/حالة التكلفة (ترتيب ERP: مِرساة ← مجمّع). كان القفل بعد المجمّع ⇒ جمود مع إنهاء بيع. لا أثر محاسبي أو مخزني.
+            // الخزان `FOR KEY SHARE` قبل المِرساة (نمط #2066): صف الدفتر التشغيلي اللاحق يحتاج KEY SHARE على الخزان و`recordReading` يمسكه FOR UPDATE ثم يطلب KEY SHARE على المستأجر.
+            \App\Models\FuelTank::query()->whereKey($reconciliation->fuel_tank_id)->lock('for key share')->first();
+            // صف المنتج `FOR UPDATE` أيضاً قبل المِرساة (مراجعة #2071): تعديل بطاقة المنتج (`ProductLifecycleService::update`) يمسكه ثم يُدرج نشاطاً يحتاج KEY SHARE على المستأجر المتعارض مع المِرساة،
+            // وهذا هو ترتيب `main` الأصلي (منتج ← مِرساة) فلا نعكسه. ERP لا يقفل صف المنتج (يقفل `InventoryState`) فلا تعارض معه.
+            BranchScope::reference(\App\Models\Product::class)->lockForUpdate()->findOrFail($product->id);
+            app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
             $this->lockBookStock($warehouse->id, $product->id);
             // FS-01: قد يُضاف خزان ثانٍ بعد إنشاء المسودة؛ نعيد الفحص تحت القفل ولا نقبل فرقاً محسوباً على كتاب مشترك.
             $this->assertSingleTankPerBook($fuelProduct, $warehouse);

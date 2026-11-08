@@ -51,7 +51,7 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
 mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
-         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/print-templates contracts/flowers-journey contracts/flowers-admin-journey/responses
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Mail/"*.php     app/Mail/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Events/"*.php  app/Events/ 2>/dev/null || true
@@ -113,6 +113,8 @@ mkdir -p resources/app-builder/templates
 cp -r "$CORE_DIR/resources/app-builder/templates/"*.json resources/app-builder/templates/
 # عقد رحلة الورود والهدايا (FLOWERS-H16) — يقارنه FlowersEndToEndJourneyTest ويقرؤه اختبار واجهة المتجر.
 cp -r "$CORE_DIR/contracts/flowers-journey/"*.json contracts/flowers-journey/
+# عقد Output Profile لقوالب الطباعة (DOC-V2-PR3A): يقارن PrintOutputProfileContractTest الثوابت والحالات به.
+cp -r "$CORE_DIR/contracts/print-templates/"*.json contracts/print-templates/
 # عقد رحلة التاجر الإدارية (FLOWERS-H2-15) — يقارنه FlowersMerchantAdminJourneyTest وتقرؤه واجهة الإدارة.
 cp "$CORE_DIR/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
 cp -r "$CORE_DIR/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/

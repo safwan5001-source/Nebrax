@@ -238,7 +238,40 @@ class PrintTemplateContract
             self::assertLayout($definition['layout'], $documentTypes);
         }
 
+        // Output Profile اختياري: غيابه هو السلوك القديم ولا يمسّ التحقق شيئاً.
+        // `null` صريح = لا ملف (يُحذف المفتاح فلا يُخزَّن). عدا ذلك يُخزَّن مُطبَّعاً.
+        if (array_key_exists(PrintOutputProfile::KEY, $definition)) {
+            if ($definition[PrintOutputProfile::KEY] === null) {
+                unset($definition[PrintOutputProfile::KEY]);
+            } else {
+                $definition[PrintOutputProfile::KEY] = PrintOutputProfile::normalize($definition[PrintOutputProfile::KEY]);
+                self::assertOutputProfileMatchesThermalTemplate($definition);
+            }
+        }
+
         return self::canonicalize($definition);
+    }
+
+    /**
+     * عارض الإيصال الحراري مسجَّل بعرضه (58 أو 80): ملف إخراج بمقاس آخر يطبع
+     * إيصالاً بعرض لا يطابق تصميمه. القوالب غير الحرارية لا تُقيَّد هنا؛ ملاءمتها
+     * لمقاس غير مصممة له قرار طبقة الإخراج (PR3-B) عبر `supportedPaper`.
+     *
+     * @param array<string, mixed> $definition
+     */
+    private static function assertOutputProfileMatchesThermalTemplate(array $definition): void
+    {
+        $templateId = $definition['template_id'] ?? null;
+        if (! is_string($templateId) || ! isset(PrintOutputProfile::THERMAL_TEMPLATE_PAPERS[$templateId])) {
+            return;
+        }
+
+        if ($definition[PrintOutputProfile::KEY]['paper'] !== PrintOutputProfile::THERMAL_TEMPLATE_PAPERS[$templateId]) {
+            throw new PrintOutputProfileException(
+                'thermal_template_paper_mismatch',
+                'مقاس الإخراج لا يطابق عرض القالب الحراري المحدد.',
+            );
+        }
     }
 
     /**

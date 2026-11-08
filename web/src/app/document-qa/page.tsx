@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { downloadPdf } from '@/lib/pdf';
+import { printDocument } from '@/modules/documents/services/export';
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { makeDocumentQaModel, type DocumentQaScenario } from '@/modules/documents/qa/document-qa-fixtures';
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import type { DocumentTypeId } from '@/modules/documents/types';
@@ -25,6 +27,9 @@ const TEMPLATES = [
   { id: 'tax-invoice-retail-v2', labelKey: 'retail_v2' },
   { id: 'quotation-proposal', labelKey: 'quotation_proposal' },
   { id: 'purchase-order-formal', labelKey: 'purchase_order_formal' },
+  // AWJ-DOC-V2-PR2: الإيصال الحراري يُفحص بالمسارات نفسها (معاينة/طباعة/PDF) بمقاسه الحقيقي.
+  { id: 'tax-invoice-thermal58', labelKey: 'thermal58' },
+  { id: 'tax-invoice-thermal80', labelKey: 'thermal80' },
 ] as const;
 const DOCUMENT_TYPES = [
   'tax_invoice',
@@ -86,10 +91,17 @@ export default function DocumentQaPage() {
     window.location.search = next.toString();
   };
 
+  // الحراري: ورق رول بعرض 58/80mm وارتفاع مفتوح؛ غيره A4 كما كان.
+  const thermalPaperId = templateId === 'tax-invoice-thermal58' ? 'thermal_58' : templateId === 'tax-invoice-thermal80' ? 'thermal_80' : null;
+  const paper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : { widthMm: PAPER_SIZES.a4.widthMm, heightMm: PAPER_SIZES.a4.heightMm };
+
   const exportPdf = async () => {
     const root = document.getElementById('qa-print-root');
-    if (root) await downloadPdf(root, `nebrax-document-qa-${documentType}-${templateId}-${scenario}.pdf`);
+    if (root) await downloadPdf(root, `nebrax-document-qa-${documentType}-${templateId}-${scenario}.pdf`, paper);
   };
+  const printQa = () => printDocument(paper, 'qa-print-root');
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[color:var(--background)] p-3 sm:p-6" data-testid="document-qa-page">
@@ -143,20 +155,37 @@ export default function DocumentQaPage() {
             <button type="button" data-testid="qa-download-pdf" className="min-h-11 rounded-md bg-[color:var(--primary)] px-4 text-sm font-semibold text-[color:var(--primary-foreground)] shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]" onClick={() => void exportPdf()}>
               {t('download_pdf')}
             </button>
+            <button type="button" data-testid="qa-print" className="min-h-11 rounded-md border border-[color:var(--border)] bg-[color:var(--background)] px-4 text-sm font-semibold text-[color:var(--text)] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]" onClick={printQa}>
+              {t('print')}
+            </button>
           </div>
         </div>
       </header>
       <section className="mx-auto max-w-[1440px]" aria-label={t('preview_label')} data-testid="qa-preview-shell">
-        <DocumentScaler>
-          <DocumentView
-            model={model}
-            templateId={templateId}
-            themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
-            showLogo={showLogo}
-            layout={layout}
-            rootId="qa-print-root"
-          />
-        </DocumentScaler>
+        {thermalPaperId ? (
+          // `w-max`: يمنع انكماش الجذر (58/80mm) داخل حاوية ضيقة أثناء التقاط PDF (windowWidth = عرض الإيصال).
+          <div className="mx-auto w-max" data-testid="qa-thermal-shell">
+            <DocumentView
+              model={model}
+              templateId={templateId}
+              themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              showLogo={showLogo}
+              layout={layout}
+              rootId="qa-print-root"
+            />
+          </div>
+        ) : (
+          <DocumentScaler>
+            <DocumentView
+              model={model}
+              templateId={templateId}
+              themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              showLogo={showLogo}
+              layout={layout}
+              rootId="qa-print-root"
+            />
+          </DocumentScaler>
+        )}
       </section>
     </main>
   );
