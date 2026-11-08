@@ -211,3 +211,21 @@ export const PURCHASE_ORDER_FORMAL_STYLE: TemplateStyle = {
 export function isPurchaseOrderFormal(style: Pick<TemplateStyle, 'composition'>): boolean {
   return style.composition === 'purchase_order_formal';
 }
+
+/**
+ * Voucher Compact — سند قبض/صرف مدمج بصفحة واحدة (AWJ-DOC-V2-PR5). مربوط بـ`voucher-compact` فقط.
+ * يعرض ما يوفّره سجل الدفعة وحده؛ بلا جدول بنود ولا ضريبة ولا QR.
+ */
+export const VOUCHER_COMPACT_STYLE: TemplateStyle = {
+  composition: 'voucher_compact',
+  pagePadding: 'p-0',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-2',
+  tableHead: 'plain',
+  tableDensity: 'compact',
+  brandBar: false,
+};
+
+export function isVoucherCompact(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'voucher_compact';
+}

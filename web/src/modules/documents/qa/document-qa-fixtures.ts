@@ -204,6 +204,17 @@ function makeVoucherQaModel(options: DocumentQaOptions, type: 'receipt_voucher' 
       amount,
       reference: 'REF-QA-2026-0001',
       allocations,
+      // الحقول الإضافية (PR5): السيناريو القصير يتركها فارغة ليُقاس السند ببيانات دنيا.
+      ...(options.scenario === 'single'
+        ? {}
+        : {
+            methodName: english ? 'Bank transfer — Al Rajhi Bank' : 'تحويل بنكي — مصرف الراجحي',
+            paymentDetails: english ? 'Transfer ref 7782 / settlement' : 'حوالة رقم 7782 / تسوية',
+            accountName: english ? '1120 — Main bank account' : '1120 — الحساب البنكي الرئيسي',
+            collectorName: english ? 'Khalid Al-Otaibi' : 'خالد العتيبي',
+            classificationName: english ? 'Customer settlement' : 'تسوية عملاء',
+            branchName: english ? 'Dammam branch' : 'فرع الدمام',
+          }),
     },
   };
 }

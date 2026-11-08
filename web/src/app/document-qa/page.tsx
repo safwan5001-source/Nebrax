@@ -29,6 +29,8 @@ const TEMPLATES = [
   { id: 'tax-invoice-retail-v2', labelKey: 'retail_v2' },
   { id: 'quotation-proposal', labelKey: 'quotation_proposal' },
   { id: 'purchase-order-formal', labelKey: 'purchase_order_formal' },
+  // AWJ-DOC-V2-PR5: السند المدمج (قبض/صرف) يُفحص بمقاسات A5/A6 بالمسارات نفسها.
+  { id: 'voucher-compact', labelKey: 'voucher_compact' },
   // AWJ-DOC-V2-PR2: الإيصال الحراري يُفحص بالمسارات نفسها (معاينة/طباعة/PDF) بمقاسه الحقيقي.
   { id: 'tax-invoice-thermal58', labelKey: 'thermal58' },
   { id: 'tax-invoice-thermal80', labelKey: 'thermal80' },
