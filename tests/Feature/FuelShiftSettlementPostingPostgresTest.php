@@ -391,4 +391,63 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
             $this->assertSame('posted', $results[1]['value']);
         }
     }
+
+    #[Test]
+    public function many_workers_running_the_job_runner_for_one_shift_post_it_exactly_once(): void
+    {
+        $shift = $this->closedShift('jr1', 1_000_000);
+        $jobs = [];
+        foreach (range(1, 5) as $n) {
+            $jobs[] = fn () => app(\App\Services\FuelShiftSettlementJobRunner::class)->run(null, "w{$n}");
+        }
+        $results = $this->concurrently($jobs);
+
+        $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(1, array_sum(array_map(fn ($r) => (int) $r['value']['claimed'], $results)), 'مطالبة واحدة فقط');
+        $this->assertSame(1, array_sum(array_map(fn ($r) => (int) $r['value']['posted'], $results)));
+        $this->assertSame(1, DB::table('fuel_shift_settlements')->where('fuel_shift_id', $shift->id)->count());
+        $this->assertSame(1, DB::table('payments')->where('notes', 'like', '%'.$shift->number.'%')->count());
+        $job = DB::table('fuel_shift_settlement_jobs')->where('fuel_shift_id', $shift->id)->first();
+        $this->assertSame('completed', $job->status);
+        $this->assertSame('posted', $job->last_outcome);
+    }
+
+    #[Test]
+    public function an_eight_nozzle_shift_posts_atomically_and_its_duration_is_recorded(): void
+    {
+        $f = $this->f;
+        $nozzles = [$f['nozzle']];
+        foreach (range(2, 8) as $n) {
+            $nozzles[] = FuelNozzle::create([
+                'tenant_id' => $f['tenant_id'], 'branch_id' => $f['branch']->id, 'fuel_station_id' => $f['station']->id, 'fuel_pump_id' => $f['nozzle']->fuel_pump_id,
+                'fuel_tank_id' => $f['nozzle']->fuel_tank_id, 'fuel_product_id' => $f['fuelProduct']->id, 'nozzle_number' => 'FCN-8-'.$n,
+            ]);
+        }
+        $shift = $this->open('n8');
+        foreach ($nozzles as $i => $nozzle) {
+            foreach (['opening' => 1_000_000 + $i * 100_000, 'closing' => 1_000_000 + $i * 100_000 + 20_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                    'fuel_nozzle_id' => $nozzle->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "n8-{$shift->id}-{$i}-{$stage}",
+                ], $f['actor']);
+            }
+        }
+        $total = 8 * 4600;
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => $shift->id.'decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $f['cash']->id, 'amount_minor' => 2 * 4600], ['payment_method_id' => $f['bank']->id, 'amount_minor' => $total - 2 * 4600]],
+        ], $f['actor']);
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 2 * 4600, null, $f['actor']);
+
+        $started = microtime(true);
+        $result = app(FuelShiftSettlementPostingService::class)->post($closed, $f['actor']);
+        $elapsed = microtime(true) - $started;
+        file_put_contents(sys_get_temp_dir().'/awj_8nozzle_post_seconds.txt', sprintf("%.3f\n", $elapsed));
+
+        $this->assertSame('posted', $result->outcome, json_encode($result->reasons));
+        $this->assertSame(8, $result->postedLines);
+        $this->assertSame(8, DB::table('invoices')->where('notes', 'like', '%'.$shift->number.'%')->count());
+        $this->assertSame($total, (int) DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->sum('amount_minor'), 'كل المحصَّل مخصَّص');
+        $this->assertSame(0, DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $result->settlementId)->count());
+        $this->assertLessThan(30.0, $elapsed, 'مدة معاملة 8 فوهات ضمن حدّ معقول (الإيجار 300ث)');
+    }
 }
