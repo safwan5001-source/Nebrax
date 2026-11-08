@@ -499,4 +499,13 @@ class FuelReportCenterApiTest extends TestCase
             }
         }
     }
+
+    /** @test */
+    public function advertised_filters_are_applied_or_not_advertised(): void
+    {
+        $filters = fn (string $key) => collect(\App\Support\FuelReportCatalog::find($key)->filters);
+        $this->assertFalse($filters('management.trends')->contains('product_id'));
+        $this->assertFalse($filters('financial.exceptions')->contains('product_id'));
+        $this->assertTrue($filters('sales.by_product')->contains('product_id'));
+    }
 }

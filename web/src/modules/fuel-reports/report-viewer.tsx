@@ -19,6 +19,9 @@ import { nozzleLabel, productLabel, pumpLabel, shiftLabel, stationLabel, useOpti
 const PRESETS: PresetId[] = ['today', 'yesterday', 'last7', 'month', 'lastMonth'];
 const SHIFT_STATUSES = ['open', 'closed', 'approved'];
 const CORRECTION_STATUSES = ['requested', 'approved', 'rejected'];
+/** تقارير المخزون المبنية على سجلات بحالتَي مسودة/معتمد (استلامات، جرد، فروقات، تتبع) لا على حالات الورديات. */
+const DRAFT_APPROVED_REPORTS = ['inventory.receipts', 'inventory.supply_tracking', 'inventory.stocktake', 'inventory.variances'];
+const DRAFT_APPROVED = ['draft', 'approved'];
 const FIELD = 'mt-1.5 h-12 w-full rounded-[11px] border border-[color:var(--fo-control,var(--border))] bg-surface px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 type State = { status: 'idle' } | { status: 'loading' } | { status: 'error'; code: number | 'contract' | 'network' } | { status: 'ready'; payload: ReportPayload };
@@ -86,7 +89,7 @@ export function ReportViewer({ reportKey, defaultStationId }: { reportKey: strin
   const apply = () => { if (!localError) { setApplied({ ...draft }); setTick((n) => n + 1); } };
   const reset = () => { setDraft(initial); setApplied(initial); setTick((n) => n + 1); };
   const preset = (id: PresetId) => { const range = presetRange(id, timezone); setDraft((d) => ({ ...d, ...range })); };
-  const statuses = reportKey === 'shifts.corrections' ? CORRECTION_STATUSES : SHIFT_STATUSES;
+  const statuses = reportKey === 'shifts.corrections' ? CORRECTION_STATUSES : DRAFT_APPROVED_REPORTS.includes(reportKey) ? DRAFT_APPROVED : SHIFT_STATUSES;
   const showPeriod = definition ? (has('from') || has('to')) : false;
 
   const chart = useMemo(() => state.status === 'ready' && ['sales.daily', 'sales.period', 'sales.by_product', 'sales.by_station', 'sales.by_pump'].includes(reportKey), [state, reportKey]);

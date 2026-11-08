@@ -152,4 +152,21 @@ class FuelReportInventoryApiTest extends TestCase
         $this->assertNull($foreign['tables'][0]['rows'][0]['quantity']); // لا قراءة من مستأجرنا
         $this->withToken($token)->getJson(self::BASE.'/inventory.tank_balances?station_id='.$ours['station']->id)->assertNotFound();
     }
+
+    /** @test */
+    public function tank_balances_report_truncation_instead_of_silently_dropping_tanks_past_the_cap(): void
+    {
+        $base = $this->f['nozzle']->fuel_tank_id;
+        $tank = \App\Models\FuelTank::findOrFail($base);
+        for ($i = 0; $i < 100; $i++) {
+            \App\Models\FuelTank::create([
+                'tenant_id' => $this->f['tenant_id'], 'branch_id' => $tank->branch_id, 'fuel_station_id' => $tank->fuel_station_id, 'fuel_product_id' => $tank->fuel_product_id,
+                'code' => 'CAP-'.$i, 'name' => 'خزان '.$i, 'capacity_milliliters' => 1_000_000, 'safe_capacity_milliliters' => 900_000,
+            ]);
+        }
+        $p = $this->report('inventory.tank_balances');
+        $this->assertCount(100, $p['tables'][0]['rows']);
+        $this->assertTrue($p['truncated']);
+        $this->assertFalse($p['data_quality']['complete']);
+    }
 }

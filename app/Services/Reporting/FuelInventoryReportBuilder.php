@@ -59,7 +59,9 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         if ($context->filter('product_id') !== null) {
             $tanks->where('fuel_product_id', $context->filter('product_id'));
         }
-        $snapshot = $this->monitor->snapshot($tanks->limit(self::TANK_CAP), $context->user);
+        $snapshot = $this->monitor->snapshot($tanks->limit(self::TANK_CAP + 1), $context->user);
+        $truncated = count($snapshot) > self::TANK_CAP;
+        $snapshot = array_slice($snapshot, 0, self::TANK_CAP);
         $models = $context->scoped(FuelTank::query())->whereIn('id', array_column(array_column($snapshot, 'tank'), 'id'))->get();
         $book = $this->book->forTanks($models);
 
@@ -92,9 +94,9 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
                 T::col('freshness', 'text', 'الحداثة', 'Freshness'), T::col('flags', 'text', 'تنبيهات', 'Flags'),
                 T::col('book', 'liters', 'الرصيد الدفتري', 'Book balance'), T::col('book_difference', 'liters', 'قراءة − دفتري', 'Reading − book'),
             ], $rows)],
-            'period' => false,
+            'period' => false, 'truncated' => $truncated,
             'gaps' => $noReading > 0 ? ['tank_reading_missing'] : [],
-            'notes' => [['ar' => 'الرصيد الدفتري يظهر للخزان الوحيد المغذّي لمجمّع المخزن فقط؛ وإلا يبقى فارغاً (لا نسبة تخمينية).', 'en' => 'The book balance is shown only for a tank that is the sole feeder of its warehouse pool; otherwise it stays empty (no guessed split).']],
+            'notes' => [...($truncated ? [['ar' => 'تجاوز عدد الخزانات '.self::TANK_CAP.'؛ ضيّق بالمحطة أو المنتج.', 'en' => 'Tank count exceeds '.self::TANK_CAP.'; narrow by station or product.']] : []), ['ar' => 'الرصيد الدفتري يظهر للخزان الوحيد المغذّي لمجمّع المخزن فقط؛ وإلا يبقى فارغاً (لا نسبة تخمينية).', 'en' => 'The book balance is shown only for a tank that is the sole feeder of its warehouse pool; otherwise it stays empty (no guessed split).']],
         ];
     }
 

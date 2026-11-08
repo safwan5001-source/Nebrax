@@ -189,3 +189,22 @@ describe('الإجراءات', () => {
     expect(within(table).getByText('150.000')).toBeTruthy();
   });
 });
+
+describe('خيارات الحالة بحسب نوع التقرير', () => {
+  it('تقارير المخزون المبنية على مسودة/معتمد تعرض هاتين الحالتين لا حالات الورديات', async () => {
+    handler = (url) => {
+      if (url.endsWith('/catalog')) return { data: { families: { inventory: { ar: 'المخزون', en: 'Inventory' } }, reports: [definition({ key: 'inventory.receipts', family: 'inventory', filters: ['station_id', 'from', 'to', 'status'] }), definition({ key: 'shifts.log', family: 'shifts', filters: ['station_id', 'status'] })] } };
+      if (url.startsWith('/fuel-stations/report-center/')) return { data: payload() };
+      return { data: [] };
+    };
+    wrap(<ReportViewer reportKey="inventory.receipts" />);
+    await waitFor(() => expect(document.querySelector('[data-filter="status"]')).not.toBeNull());
+    const values = Array.from(document.querySelectorAll('[data-filter="status"] option')).map((o) => (o as HTMLOptionElement).value).filter(Boolean);
+    expect(values).toEqual(['draft', 'approved']);
+    cleanup();
+    wrap(<ReportViewer reportKey="shifts.log" />);
+    await waitFor(() => expect(document.querySelector('[data-filter="status"]')).not.toBeNull());
+    expect(Array.from(document.querySelectorAll('[data-filter="status"] option')).map((o) => (o as HTMLOptionElement).value).filter(Boolean)).toEqual(['open', 'closed', 'approved']);
+  });
+});
+
