@@ -526,6 +526,42 @@ class FuelShiftSettlementJobTest extends TestCase
     }
 
     /** @test */
+    public function a_closed_shift_whose_registration_failed_stays_visible_and_escalates(): void
+    {
+        // وردية أُغلقت والبوابة مغلقة (أو فشل تسجيلها) ⇒ بلا مهمة؛ ثم تُفتح البوابة.
+        config(['fuel_stations.shift_settlement_enabled' => false]);
+        $shift = $this->closedShift('unreg1');
+        $this->assertNull($this->jobFor($shift));
+        $pending = app(FuelShiftSettlementPendingService::class);
+        $this->assertSame([], $pending->list(), 'البوابة مغلقة ⇒ لا صفوف ولا استعلام');
+
+        $this->openGates();
+        $row = $pending->list()[0];
+        $this->assertSame('unregistered', $row['status']);
+        $this->assertNull($row['job_id']);
+        $this->assertSame($shift->id, $row['fuel_shift_id']);
+        $this->assertSame(['FUEL_SETTLEMENT_JOB_NOT_REGISTERED'], $row['reasons']);
+        $this->assertSame('none', $row['alert_level']);
+
+        $this->travel(120)->minutes();
+        $this->assertSame('alert', $pending->list()[0]['alert_level']);
+        $this->travel(1440 - 120)->minutes();
+        $this->assertSame('escalated', $pending->list()[0]['alert_level']);
+
+        // خارج نافذة الرجوع لا تظهر.
+        $this->travel(15)->days();
+        $this->assertSame([], $pending->list());
+        $this->travelBack();
+
+        // بعد التسجيل (إعادة) تُعرض كمهمة عادية لا مكرَّرة.
+        $this->travelTo(now());
+        app(FuelShiftSettlementJobService::class)->enqueue($shift->fresh());
+        $rows = $pending->list();
+        $this->assertCount(1, $rows);
+        $this->assertNotNull($rows[0]['job_id']);
+    }
+
+    /** @test */
     public function threshold_settings_default_validate_and_stay_ordered(): void
     {
         $settings = app(FuelStationSettingsService::class);

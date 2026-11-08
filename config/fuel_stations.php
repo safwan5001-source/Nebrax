@@ -56,6 +56,8 @@ return [
         'backoff_minutes' => [1, 5, 15, 60, 360],
         'recheck_minutes' => max(1, (int) env('FUEL_SETTLEMENT_JOB_RECHECK_MINUTES', 10)),
         'batch_limit' => max(1, (int) env('FUEL_SETTLEMENT_JOB_BATCH_LIMIT', 20)),
+        // نافذة رجوع (أيام) لإظهار ورديات مغلقة بلا مهمة (فشل تسجيل) في نموذج التسويات المعلقة.
+        'unregistered_lookback_days' => max(1, (int) env('FUEL_SETTLEMENT_UNREGISTERED_LOOKBACK_DAYS', 14)),
     ],
 
     /*
