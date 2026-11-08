@@ -90,6 +90,14 @@ class FuelReportFinancialApiTest extends TestCase
         $this->assertNotNull($this->table($this->report('financial.revenue', 'viewer'), 'revenue'));
         $this->assertSame([], $this->report('financial.cogs', 'viewer')['tables']);
         $this->assertSame([], $this->report('financial.gross_profit', 'viewer')['tables']);
+
+        // صلاحية التكلفة بلا المبيعات: الربح (إيراد − تكلفة) يكشف الإيراد فيُحجب كاملاً، والتكلفة وحدها تبقى
+        $costOnly = $this->roleUser($this->f['tenant_id'], 'costview', 'costview@fin.test', ['fuel.reports.view', 'products.view_cost']);
+        $this->f['costonly'] = $costOnly;
+        $p = $this->report('financial.gross_profit', 'costonly');
+        $this->assertSame([], $p['tables']);
+        $this->assertSame([], $p['summary']);
+        $this->assertNotSame([], $this->report('financial.cogs', 'costonly')['tables']);
     }
 
     /** @test */

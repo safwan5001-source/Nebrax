@@ -145,13 +145,14 @@ class FuelReportEngine
         return $stations;
     }
 
-    /** @return array{sales:bool,cost:bool,credit:bool} */
+    /** @return array<string,bool> */
     private function allowedSensitivities(User $user): array
     {
         return [
             FuelReportTable::SALES => $user->hasPermission('fuel.sale.view'),
             FuelReportTable::COST => FuelCostVisibility::canSeeCost($user),
             FuelReportTable::CREDIT => FuelCostVisibility::canSeeCredit($user),
+            FuelReportTable::SALES_COST => $user->hasPermission('fuel.sale.view') && FuelCostVisibility::canSeeCost($user),
         ];
     }
 

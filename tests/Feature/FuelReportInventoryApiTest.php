@@ -112,6 +112,25 @@ class FuelReportInventoryApiTest extends TestCase
     }
 
     /** @test */
+    public function an_unmeasured_sale_leaves_the_theoretical_balance_unknown_instead_of_a_false_shortage(): void
+    {
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2027-03-01 09:00:00'));
+        $this->reading(5000, 'u-open');
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2027-03-10 09:00:00'));
+        $shift = $this->open('unm');
+        app(FuelShiftService::class)->recordMeter($shift->fresh(), ['fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => 'opening', 'meter_milliliters' => 5_000_000, 'evidence_key' => 'unm-open'], $this->f['actor']);
+        $this->reading(4900, 'u-close');   // لا قراءة إغلاق عدّاد ⇒ استهلاك الفوهة مجهول
+        $this->travelBack();
+
+        $p = $this->report('inventory.theoretical_vs_actual', '?from=2027-03-05&to=2027-03-12');
+        $row = $p['tables'][0]['rows'][0];
+        $this->assertNull($row['sold']);
+        $this->assertNull($row['theoretical']);
+        $this->assertNull($row['difference']);
+        $this->assertFalse($p['data_quality']['complete']);
+    }
+
+    /** @test */
     public function a_missing_opening_reading_leaves_the_comparison_empty_and_flags_it(): void
     {
         $this->sale('t2', 5_000_000, 5_100_000);

@@ -191,14 +191,14 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
         $profit = in_array(null, array_column($out, 'profit'), true) ? null : array_sum(array_column($out, 'profit'));
 
         return [
-            'summary' => [T::item('profit', 'مجمل الربح', 'Gross profit', 'money', $profit, T::COST)],
+            'summary' => [T::item('profit', 'مجمل الربح', 'Gross profit', 'money', $profit, T::SALES_COST)],
             'tables' => [T::table('profit', 'مجمل الربح', 'Gross profit', [
                 T::col('product', 'text', 'المنتج', 'Product'), T::col('liters', 'liters', 'اللترات', 'Liters', ['total' => 'sum']),
-                T::col('net', 'money', 'الإيراد الصافي', 'Net revenue', ['total' => 'sum', 'sensitivity' => T::COST]),
-                T::col('cogs', 'money', 'التكلفة', 'Cost', ['total' => 'sum', 'sensitivity' => T::COST]),
-                T::col('profit', 'money', 'مجمل الربح', 'Gross profit', ['total' => 'sum', 'sensitivity' => T::COST]),
-                T::col('margin_bp', 'bp', 'الهامش', 'Margin', ['sensitivity' => T::COST]),
-            ], $out, T::COST)],
+                T::col('net', 'money', 'الإيراد الصافي', 'Net revenue', ['total' => 'sum', 'sensitivity' => T::SALES_COST]),
+                T::col('cogs', 'money', 'التكلفة', 'Cost', ['total' => 'sum', 'sensitivity' => T::SALES_COST]),
+                T::col('profit', 'money', 'مجمل الربح', 'Gross profit', ['total' => 'sum', 'sensitivity' => T::SALES_COST]),
+                T::col('margin_bp', 'bp', 'الهامش', 'Margin', ['sensitivity' => T::SALES_COST]),
+            ], $out, T::SALES_COST)],
             'gaps' => array_values(array_unique([...$gaps, ...(in_array(null, array_column($rows, 'net'), true) ? ['invoice_missing'] : [])])), 'truncated' => $truncated,
             'notes' => [...$this->notes($truncated, true), ['ar' => 'ربح تشغيلي من الإيراد الصافي وCOGS الرسمي؛ ليس نتيجة محاسبية معتمدة.', 'en' => 'An operational profit from net revenue and official COGS; not an approved accounting result.']],
         ];

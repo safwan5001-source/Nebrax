@@ -14,6 +14,8 @@ final class FuelReportTable
     public const SALES = 'sales';
     public const COST = 'cost';
     public const CREDIT = 'credit';
+    /** يتطلب صلاحيتَي المبيعات والتكلفة معاً (الربح = إيراد − تكلفة فيكشف أحدهما بمعلومية الآخر). */
+    public const SALES_COST = 'sales_cost';
 
     /**
      * @param  array{sensitivity?:?string,total?:?string,values?:array<string,array{ar:string,en:string}>}  $options

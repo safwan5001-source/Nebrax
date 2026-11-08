@@ -114,7 +114,7 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         $truncated = $tanks->count() > self::TANK_CAP;
         $tanks = $tanks->take(self::TANK_CAP);
 
-        $soldByTank = $theoretical ? $this->soldByTank($context) : ['liters' => [], 'gaps' => [], 'truncated' => false];
+        $soldByTank = $theoretical ? $this->soldByTank($context) : ['liters' => [], 'unknown' => [], 'gaps' => [], 'truncated' => false];
         $rows = [];
         $missing = false;
         foreach ($tanks as $tank) {
@@ -132,8 +132,8 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
             if ($theoretical) {
                 $received = (int) FuelDelivery::query()->where('fuel_tank_id', $tank->id)->where('status', FuelDelivery::STATUS_APPROVED)
                     ->where('received_at', '>=', $start)->where('received_at', '<', $end)->sum('received_milliliters');
-                $sold = (int) ($soldByTank['liters'][$tank->id] ?? 0);
-                $expected = $row['opening'] === null ? null : $row['opening'] + $received - $sold;
+                $sold = isset($soldByTank['unknown'][$tank->id]) ? null : (int) ($soldByTank['liters'][$tank->id] ?? 0);
+                $expected = ($row['opening'] === null || $sold === null) ? null : $row['opening'] + $received - $sold;
                 $row += ['received' => $received, 'sold' => $sold, 'theoretical' => $expected, 'difference' => ($expected === null || $row['closing'] === null) ? null : $row['closing'] - $expected];
             }
             $missing = $missing || $row['opening'] === null || $row['closing'] === null;
@@ -159,7 +159,7 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         return [
             'summary' => [T::item('tanks', 'عدد الخزانات', 'Tanks', 'int', count($rows))],
             'tables' => [T::table($theoretical ? 'theoretical' : 'opening_closing', $title[0], $title[1], $cols, $rows)],
-            'gaps' => array_values(array_unique([...($missing ? ['tank_reading_missing'] : []), ...$soldByTank['gaps']])),
+            'gaps' => array_values(array_unique([...($missing ? ['tank_reading_missing'] : []), ...$soldByTank['gaps'], ...($soldByTank['unknown'] !== [] ? [\App\Services\FuelShiftSalesCalculator::GAP_MISSING_READING] : [])])),
             'truncated' => $truncated || $soldByTank['truncated'],
             'notes' => [
                 ['ar' => 'الافتتاح/الختام = آخر قراءة خزان (يدوية ثم ATG) حتى بداية/نهاية الفترة بتوقيت المحطة؛ غيابها يترك الخانة فارغة.', 'en' => 'Opening/closing = the latest tank reading (physical, then ATG) up to the period start/end in station time; a missing reading leaves the cell empty.'],
@@ -181,19 +181,26 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         return null;
     }
 
-    /** @return array{liters:array<string,int>,gaps:list<string>,truncated:bool} لترات العدادات لكل خزان (فوهاته) في الفترة. */
+    /** @return array{liters:array<string,int>,unknown:array<string,bool>,gaps:list<string>,truncated:bool} لترات العدادات لكل خزان (فوهاته) في الفترة. */
     private function soldByTank(FuelReportContext $context): array
     {
         $loaded = $this->shifts->nozzleRows($context);
         $tankOf = \App\Models\FuelNozzle::query()->whereIn('id', array_values(array_unique(array_column($loaded['rows'], 'nozzle_id'))))->pluck('fuel_tank_id', 'id')->all();
         $liters = [];
+        $unknown = [];
         foreach ($loaded['rows'] as $r) {
-            if ($r['liters'] !== null && isset($tankOf[$r['nozzle_id']])) {
-                $liters[$tankOf[$r['nozzle_id']]] = ($liters[$tankOf[$r['nozzle_id']]] ?? 0) + $r['liters'];
+            $tankId = $tankOf[$r['nozzle_id']] ?? null;
+            if ($tankId === null) {
+                continue;
+            }
+            if ($r['liters'] === null) {
+                $unknown[$tankId] = true;      // استهلاك مجهول لفوهة ⇒ مبيعات الخزان كلها مجهولة (لا مجموع جزئي)
+            } else {
+                $liters[$tankId] = ($liters[$tankId] ?? 0) + $r['liters'];
             }
         }
 
-        return ['liters' => $liters, 'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated']];
+        return ['liters' => $liters, 'unknown' => $unknown, 'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated']];
     }
 
     // ───────── E3/E9 الاستلامات وتتبع التوريدات ─────────
