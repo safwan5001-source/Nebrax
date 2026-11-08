@@ -320,13 +320,15 @@ for (const kind of TYPES) {
       expect(print.info.pageCount, 'يجب أن ينساب على أكثر من صفحة').toBeGreaterThan(1);
       const pages = pdfPagesText(print.buffer);
       // كل تخصيص مطبوع (أرقام الفواتير 0001..0020) مرة واحدة على الأقل، بلا فقد.
-      const all = pages.join('\n');
+      // pdftotext يبدّل موضع الشدّة (المسلّم ↔ المسّلم): تُحذف علامات التشكيل قبل العدّ.
+      const strip = (value: string) => value.replace(/[\u064B-\u0652]/g, '');
+      const all = strip(pages.join('\n'));
       for (let i = 1; i <= 20; i += 1) expect(all, `تخصيص ${i} مفقود من الطباعة`).toContain(`INV-QA-${String(i).padStart(4, '0')}`);
       // خطّا التوقيع (المسلّم/المستلم) يظهران مرة واحدة بالضبط: كتلة التوقيع لا تنقسم ولا تتكرر.
-      expect(all.match(/توقيع المسلّم/g)?.length ?? 0, 'توقيع المسلّم').toBe(1);
+      expect(all.match(/توقيع المسلم/g)?.length ?? 0, 'توقيع المسلّم').toBe(1);
       expect(all.match(/توقيع المستلم/g)?.length ?? 0, 'توقيع المستلم').toBe(1);
       // وتقع على الصفحة الأخيرة (لا تُترك يتيمة في أولى).
-      expect(pages[pages.length - 1]).toContain('توقيع المستلم');
+      expect(strip(pages[pages.length - 1])).toContain('توقيع المستلم');
     });
   }
 }

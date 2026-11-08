@@ -124,9 +124,13 @@ async function printedStyle(page: Page): Promise<string | null> {
 }
 
 async function printPagePdf(page: Page) {
+  // `printDocument` يوسم وجهة الطباعة (`data-print-target`) لحظة `window.print` ثم يزيلها؛ المحاكاة تعيد الوسم ليُطبع الجذر وحده
+  // كما في الطباعة الحقيقية (وإلا ظهرت عناصر الصفحة المحيطة في `page.pdf`).
+  await page.evaluate(() => document.getElementById('print-root')?.setAttribute('data-print-target', ''));
   await page.emulateMedia({ media: 'print' });
   const buffer = await page.pdf({ preferCSSPageSize: true, printBackground: true });
   await page.emulateMedia({ media: 'screen' });
+  await page.evaluate(() => document.getElementById('print-root')?.removeAttribute('data-print-target'));
   return { buffer, info: inspectPdf(buffer) };
 }
 
@@ -186,6 +190,11 @@ for (const direction of ['received', 'paid'] as const) {
         const size = pageSizeMm(printed.info);
         expect(Math.abs(size.w - 210)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
         expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+        // وجهة الطباعة المطلقة تلتصق بأعلى الصفحة (لا فراغ علوي من عناصر الصفحة المخفية بصرياً): يقاس ذلك قبل `page.pdf`.
+        await page.evaluate(() => document.getElementById('print-root')?.setAttribute('data-print-target', ''));
+        await page.emulateMedia({ media: 'print' });
+        expect(await page.evaluate(() => Math.round(document.getElementById('print-root')!.getBoundingClientRect().top)), 'فراغ علوي في الطباعة').toBe(0);
+        await page.emulateMedia({ media: 'screen' });
         expect(printed.info.pageCount, 'صفحة واحدة').toBe(1);
         const box = await inkBox(printed.buffer, 210, 148);
         expect(box).not.toBeNull();
@@ -245,6 +254,7 @@ for (const direction of ['received', 'paid'] as const) {
       test.setTimeout(180_000);
       const { context, page } = await openPage(browser, { direction, frozen: revision({ id: 'f', profile: A5L }), allocs: 12 });
       try {
+        expect(await printedStyle(page)).toBe(marginCss(210, 148, 10));
         const printed = await printPagePdf(page);
         expect(printed.info.pageCount).toBeGreaterThan(1);
         const text = squash(await rootText(page));
