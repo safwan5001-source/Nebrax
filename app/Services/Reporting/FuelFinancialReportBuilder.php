@@ -313,8 +313,14 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
         $byId = collect($loaded['shifts'])->keyBy('id');
         $ids = $byId->keys()->all();
         $decl = $ids === [] ? collect() : FuelShiftCollectionDeclaration::query()->whereIn('fuel_shift_id', $ids)->get()->keyBy('fuel_shift_id');
-        $formal = $ids === [] ? collect() : FuelSale::query()->whereIn('fuel_shift_id', $ids)->where('status', FuelSale::STATUS_FINALIZED)
-            ->selectRaw('fuel_shift_id, COALESCE(SUM(gross_minor), 0) as gross')->groupBy('fuel_shift_id')->pluck('gross', 'fuel_shift_id');
+        // «الرسمي» = إجمالي الفواتير الرسمية (شامل الضريبة) لتتوافق قاعدته مع لقطة العدادات؛ فاتورة غائبة ⇒ مجهول.
+        $formal = [];
+        if ($ids !== []) {
+            foreach (FuelSale::query()->with('invoice:id,total')->whereIn('fuel_shift_id', $ids)->where('status', FuelSale::STATUS_FINALIZED)->get(['id', 'fuel_shift_id', 'invoice_id']) as $sale) {
+                $current = array_key_exists($sale->fuel_shift_id, $formal) ? $formal[$sale->fuel_shift_id] : 0;
+                $formal[$sale->fuel_shift_id] = ($current === null || $sale->invoice === null) ? null : $current + (int) $sale->invoice->total;
+            }
+        }
 
         $rows = [];
         $undeclared = 0;
@@ -329,11 +335,11 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
                 }
             }
             $meter = $d?->sales_minor === null ? null : (int) $d->sales_minor;
-            $official = (int) ($formal[$id] ?? 0);
+            $official = array_key_exists($id, $formal) ? $formal[$id] : 0;
             $collected = $d === null ? null : (int) $d->collected_total_minor;
             $rows[] = [
                 'shift' => $s['number'], 'station' => $s['station_name'], 'date' => $s['date'], 'meter' => $meter, 'formal' => $official, 'collected' => $collected,
-                'meter_minus_formal' => $meter === null ? null : $meter - $official, 'collected_minus_meter' => ($meter === null || $collected === null) ? null : $collected - $meter,
+                'meter_minus_formal' => ($meter === null || $official === null) ? null : $meter - $official, 'collected_minus_meter' => ($meter === null || $collected === null) ? null : $collected - $meter,
             ];
         }
 
@@ -347,7 +353,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
                 T::col('meter_minus_formal', 'money', 'عدادات − رسمي', 'Meter − formal', ['total' => 'sum', 'sensitivity' => T::SALES]),
                 T::col('collected_minus_meter', 'money', 'تحصيل − عدادات', 'Collected − meter', ['total' => 'sum', 'sensitivity' => T::SALES]),
             ], $rows, T::SALES)],
-            'gaps' => array_values(array_unique([...$loaded['gaps'], ...($undeclared > 0 ? ['collection_not_declared'] : []), ...($incompleteSnapshots > 0 ? ['declaration_sales_incomplete'] : [])])), 'truncated' => $loaded['truncated'],
+            'gaps' => array_values(array_unique([...$loaded['gaps'], ...($undeclared > 0 ? ['collection_not_declared'] : []), ...($incompleteSnapshots > 0 ? ['declaration_sales_incomplete'] : []), ...(in_array(null, array_column($rows, 'formal'), true) ? ['invoice_missing'] : [])])), 'truncated' => $loaded['truncated'],
             'notes' => [['ar' => 'ثلاثة مصادر مفصولة: لقطة مبيعات العدادات المجمَّدة، بيع الوقود الرسمي، وإقرار التحصيل؛ الفرق بينها مؤشر مراجعة لا قيد.', 'en' => 'Three separate sources: the frozen meter-sales snapshot, official fuel sales and the collection declaration; their difference is a review signal, not an entry.']],
         ];
     }

@@ -168,8 +168,16 @@ class FuelReportCollectionApiTest extends TestCase
         $this->assertSame('finalized_sales', $p['source']['kind']);
         $this->assertSame(1, $row['sales']);
         $this->assertSame(1000, $row['liters']);
-        $this->assertSame((int) $sale->gross_minor, $row['gross']);
-        $this->assertSame((int) $sale->gross_minor - (int) $sale->paid_minor, $row['outstanding']);
+        $total = (int) \App\Models\Invoice::findOrFail($sale->invoice_id)->total;
+        $this->assertSame($total, $row['gross']);   // إجمالي الفاتورة الرسمية لا gross_minor
+        $this->assertSame($total - (int) $sale->paid_minor, $row['outstanding']);
+
+        // نمط «غير شامل»: gross_minor صافٍ؛ المتبقي يتبع الفاتورة (100 + 15 − 110 = 5، لا −10)
+        \Illuminate\Support\Facades\DB::table('invoices')->where('id', $sale->invoice_id)->update(['total' => 11500]);
+        \Illuminate\Support\Facades\DB::table('fuel_sales')->where('id', $sale->id)->update(['gross_minor' => 10000, 'paid_minor' => 11000]);
+        $row = $this->table($this->report('collection.deferred'), 'deferred')['rows'][0];
+        $this->assertSame(11500, $row['gross']);
+        $this->assertSame(500, $row['outstanding']);
 
         $this->withToken($this->token('seller'))->getJson(self::BASE.'/collection.deferred')->assertNotFound(); // بلا fuel.sale.view
     }

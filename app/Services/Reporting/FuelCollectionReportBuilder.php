@@ -238,7 +238,7 @@ final class FuelCollectionReportBuilder implements FuelReportBuilder
      */
     private function deferred(FuelReportContext $context): array
     {
-        $query = $context->scoped(FuelSale::query()->with('partner:id,name')->where('status', FuelSale::STATUS_FINALIZED)->whereIn('payment_status', [FuelSale::PAYMENT_UNPAID, FuelSale::PAYMENT_PARTIAL]));
+        $query = $context->scoped(FuelSale::query()->with(['partner:id,name', 'invoice:id,total'])->where('status', FuelSale::STATUS_FINALIZED)->whereIn('payment_status', [FuelSale::PAYMENT_UNPAID, FuelSale::PAYMENT_PARTIAL]));
         $context->constrainPeriod($query, 'finalized_at');
         $sales = $query->orderBy('finalized_at')->limit(5001)->get();
         $truncated = $sales->count() > 5000;
@@ -250,16 +250,18 @@ final class FuelCollectionReportBuilder implements FuelReportBuilder
             $c ??= ['customer' => $sale->partner?->name ?? '—', 'sales' => 0, 'liters' => 0, 'gross' => 0, 'paid' => 0];
             $c['sales']++;
             $c['liters'] += (int) $sale->quantity_milliliters;
-            $c['gross'] += (int) $sale->gross_minor;
+            // قيمة البيع = إجمالي الفاتورة الرسمية (شامل الضريبة) كما يُسدَّد؛ gross_minor صافٍ في نمط «غير شامل». فاتورة غائبة ⇒ مجهول لا تقدير.
+            $c['gross'] = ($c['gross'] === null || $sale->invoice === null) ? null : $c['gross'] + (int) $sale->invoice->total;
             $c['paid'] += (int) $sale->paid_minor;
             unset($c);
         }
         usort($customers, fn ($a, $b) => strcmp($a['customer'], $b['customer']));
-        $rows = array_map(fn ($c) => $c + ['outstanding' => $c['gross'] - $c['paid']], $customers);
+        $rows = array_map(fn ($c) => $c + ['outstanding' => $c['gross'] === null ? null : $c['gross'] - $c['paid']], $customers);
+        $unknown = in_array(null, array_column($rows, 'outstanding'), true);
 
         return [
             'summary' => [
-                T::item('outstanding', 'المتبقي على العملاء', 'Outstanding from customers', 'money', array_sum(array_column($rows, 'outstanding')), T::SALES),
+                T::item('outstanding', 'المتبقي على العملاء', 'Outstanding from customers', 'money', $unknown ? null : array_sum(array_column($rows, 'outstanding')), T::SALES),
                 T::item('sales', 'عدد المبيعات الآجلة', 'Deferred sales', 'int', array_sum(array_column($rows, 'sales'))),
             ],
             'tables' => [T::table('deferred', 'المبيعات الآجلة', 'Deferred sales', [
@@ -270,6 +272,7 @@ final class FuelCollectionReportBuilder implements FuelReportBuilder
                 T::col('outstanding', 'money', 'المتبقي', 'Outstanding', ['total' => 'sum', 'sensitivity' => T::SALES]),
             ], $rows)],
             'truncated' => $truncated,
+            'gaps' => $unknown ? ['invoice_missing'] : [],
             'notes' => [['ar' => 'المبيعات الآجلة ذمم على العملاء وليست تحصيلاً نقدياً.', 'en' => 'Deferred sales are receivables, not cash collected.'], ...($truncated ? [['ar' => 'تجاوزت 5000 عملية؛ ضيّق الفترة.', 'en' => 'More than 5000 sales; narrow the period.']] : [])],
         ];
     }

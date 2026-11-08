@@ -139,7 +139,7 @@ class FuelReportFinancialApiTest extends TestCase
     {
         $sale = $this->finalizedSale();
         $rows = $this->table($this->report('financial.reconciliations'), 'reconciliation')['rows'];
-        $this->assertSame((int) $sale->gross_minor, $rows[0]['formal']);
+        $this->assertSame((int) Invoice::findOrFail($sale->invoice_id)->total, $rows[0]['formal']); // إجمالي الفاتورة (شامل الضريبة) كأساس لقطة العدادات
         $this->assertNull($rows[0]['meter']);      // لا إقرار تحصيل ⇒ لا لقطة مبيعات عدادات
         $this->assertNull($rows[0]['collected']);
         $this->assertNull($rows[0]['meter_minus_formal']);
