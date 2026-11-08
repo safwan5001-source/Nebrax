@@ -15374,6 +15374,7 @@
         "row": {
           "opening": "Starting cash",
           "sales": "Cash collected from fuel sales in this shift",
+          "declaredSales": "Cash declared from fuel sales in this shift",
           "cashIn": "Other cash in (not fuel sales)",
           "handover": "Handed over to the treasury",
           "otherOut": "Other cash out",
@@ -15394,11 +15395,14 @@
         "unavailable": {
           "permission": "Not available for your role",
           "basis_not_enabled": "Not counted at this station yet",
+          "not_declared": "Not declared yet — save the collection split first",
           "not_recorded_legacy": "Not recorded for this older shift",
           "unknown": "Not available"
         },
         "gap": {
           "sales_cash_not_included": "Expected cash counts drawer movements only — cash from fuel sales is not included.",
+          "collection_not_declared": "The collection split isn't saved yet, so the expected cash doesn't include the cash from fuel sales.",
+          "declared_cash_below_recorded_receipts": "The declared cash is lower than the cash collections already recorded in this shift — check the declaration.",
           "permission_sales_view": "Sales cash is hidden for your role, so the expected total can't be shown.",
           "unattributed_cash_receipts": "{count} cash collections made before this was enabled aren't attributed to any shift.",
           "multiple_cash_accounts": "Cash went into more than one cash box in this shift — not supported yet.",

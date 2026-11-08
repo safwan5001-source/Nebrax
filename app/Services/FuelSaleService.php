@@ -319,7 +319,12 @@ class FuelSaleService
             if (! $peek->isFinalized() || $peek->invoice_id === null || $peek->partner_id === null) {
                 throw new RuntimeException('لا يمكن تحصيل سند قبل إنهاء بيع الوقود وفاتورته الرسمية.');
             }
-            $stampReceipt = $this->cashExpectation->effectiveBasis($station) === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
+            $basis = $this->cashExpectation->effectiveBasis($station);
+            // P1-2: تحت `declared_collection` يُختم الإيصال بالوردية المفتوحة أيضاً (حين بوابة الإيصالات مفتوحة) ليعمل التحقق D ≥ R، لكن **لا يدخل E**
+            // (المصدر الوحيد للمتوقع هو الإقرار) و**لا يُرفض التحصيل** لغياب وردية أو لعقد شركة — الختم هنا للمطابقة فقط.
+            $strictStamp = $basis === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT;
+            $stampReceipt = $strictStamp
+                || ($basis === FuelShiftCashExpectationService::BASIS_DECLARED_COLLECTION && (bool) config('fuel_stations.shift_cash_receipts_enabled', false));
             // الوردية المعنية بالأثر: تحت الأساس الجديد وردية المحطة المفتوحة (تستلم النقد)، وإلا وردية البيع (حدث المقارنة). قفل مشترك مبكر.
             $lockedShift = $stampReceipt
                 ? FuelShift::where('fuel_station_id', $station->id)->where('status', FuelShift::STATUS_OPEN)->sharedLock()->first()
@@ -362,7 +367,7 @@ class FuelSaleService
 
             // #2021 (D1): تحت الأساس receiving_shift_receipts يُختم الإيصال بالوردية المفتوحة وقت التحصيل (لا وردية إنشاء البيع).
             // مغلقاً (الافتراضي) $stampReceipt = false فيعمل المسار القديم حرفياً. ترتيب الأقفال: البيع ← الفاتورة ← الوردية.
-            $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor, $lockedShift) : null;
+            $receivingShift = $stampReceipt ? $this->resolveReceivingShift($sale, $station, $method, $actor, $lockedShift, $strictStamp) : null;
 
             $payment = $this->payments->post($this->payments->create([
                 'partner_id' => $sale->partner_id,
@@ -409,8 +414,8 @@ class FuelSaleService
                             'receipt_id' => $receipt->id,
                             'amount_minor' => $amount,
                             'sale_shift_id' => $sale->fuel_shift_id,
-                            'comparison_only' => false,
-                            'counted_in_expected_cash' => true,
+                            'comparison_only' => ! $strictStamp,
+                            'counted_in_expected_cash' => $strictStamp,
                             'affects_operational_cash_movements' => false,
                         ],
                         'actor_id' => $actor->id,
@@ -444,10 +449,14 @@ class FuelSaleService
      * الشبكة تُختم بالوردية إن وُجدت (للعرض) ولا تُرفض بغيابها ولا تدخل المتوقع.
      */
     /** الوردية المفتوحة تُمرَّر مقفولة مسبقاً (FOR SHARE) من `collectPayment` ضمن الترتيب الموحَّد؛ لا استعلام ولا قفل هنا. */
-    private function resolveReceivingShift(FuelSale $sale, FuelStation $station, PaymentMethod $method, User $actor, ?FuelShift $shift): ?FuelShift
+    private function resolveReceivingShift(FuelSale $sale, FuelStation $station, PaymentMethod $method, User $actor, ?FuelShift $shift, bool $strict = true): ?FuelShift
     {
         // نطاق الفاعل (فرع + مخزن) يُفحص في `collectPayment` نفسه (#2016) قبل هذه الدالة.
         $isCash = $method->settlement_type === 'cash';
+        if (! $strict) {
+            // ختم للمطابقة فقط (declared_collection): لا رفض. نقد بعقد شركة (سداد آجل غير معتمد) لا يُنسب لدرج الوردية فيبقى بلا ختم.
+            return $isCash && $sale->corporate_fuel_contract_id !== null ? null : $shift;
+        }
         if ($isCash && $sale->corporate_fuel_contract_id !== null) {
             throw new RuntimeException('FUEL_CASH_CORPORATE_SETTLEMENT_UNDECIDED: تحصيل نقدي لبيع بعقد شركة/أسطول غير معتمد بعد (سداد الآجل نقداً)؛ لا يُنسب لدرج الوردية.');
         }

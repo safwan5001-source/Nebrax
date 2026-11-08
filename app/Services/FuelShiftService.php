@@ -357,6 +357,7 @@ class FuelShiftService
                 'counted_by' => $actor->id,
                 'counted_at' => now(),
                 'documented_official_cash_receipts_minor' => $basis === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT ? $live['receipts'] : null,
+                'documented_declared_cash_minor' => $basis === FuelShiftCashExpectationService::BASIS_DECLARED_COLLECTION ? $live['declared_cash'] : null,
                 'documented_treasury_handover_minor' => $live['handover'],
                 'registered_network_receipts_minor' => $basis === FuelShiftCashExpectationService::BASIS_RECEIVING_SHIFT ? $live['network'] : null,
                 'official_cash_basis' => $basis,

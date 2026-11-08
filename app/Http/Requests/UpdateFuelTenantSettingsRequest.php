@@ -48,7 +48,7 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'fuel_sales_allowed_payment_method_ids' => ['sometimes', 'array'],
             'fuel_sales_allowed_payment_method_ids.*' => ['uuid', 'distinct'],
             'fuel_sales_allow_deferred_payment' => ['sometimes', 'boolean'],
-            'shift_expected_cash_basis' => ['sometimes', 'in:movements_only,receiving_shift_receipts'],
+            'shift_expected_cash_basis' => ['sometimes', 'in:movements_only,receiving_shift_receipts,declared_collection'],
             'avi_rfid_enabled' => ['sometimes', 'boolean'],
             'avi_driver_identity_required' => ['sometimes', 'boolean'],
             'avi_enforce_vehicle_tank_capacity' => ['sometimes', 'boolean'],
