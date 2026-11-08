@@ -36,6 +36,7 @@ class ZatcaCreditNoteIssuanceTest extends TestCase
 {
     use CapturesThrowable;
     use RefreshDatabase;
+    use SimulatesLegacyInvoiceRows;
 
     private ZatcaRolloutControlService $controls;
 
@@ -200,7 +201,7 @@ class ZatcaCreditNoteIssuanceTest extends TestCase
             'bad_class' => $this->draft($s, 1),
         };
         if ($case === 'no_snapshot') {
-            DB::table('invoices')->where('id', $s['invoice'])->update(['party_snapshot' => null]);
+            $this->withoutInvoiceFrozenDateFences(fn () => DB::table('invoices')->where('id', $s['invoice'])->update(['party_snapshot' => null]));
         }
         if ($case === 'bad_class') {
             $this->bypassDocumentTypeCheck($s['invoice']);
