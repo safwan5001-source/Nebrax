@@ -527,6 +527,12 @@ class FiscalCloseService
             $issues[] = $this->item(self::SEVERITY_BLOCKER, 'retained_earnings', $this->retainedEarningsError ?? 'تعيين دور الأرباح المرحّلة غير صالح.');
         }
 
+        // P1-3b-2e-1: تسوية وردية وقود مؤثرة لم تُحسم (لا ترحيل أو سطر محجوب) تمنع الإقفال النهائي؛ يُرفع **بالحسم الفعلي (الترحيل) وحده** — لا تصرّفات (D-S5 مغلق).
+        $pendingSettlement = $this->fuelSettlementPendingIssue($year);
+        if ($pendingSettlement !== null) {
+            $issues[] = $pendingSettlement;
+        }
+
         // سلامة الدفتر داخل السنة: Σ مدين = Σ دائن.
         $totals = JournalLine::query()
             ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
@@ -881,5 +887,78 @@ class FiscalCloseService
     private function lockAnchor(): void
     {
         Tenant::whereKey($this->tenantId())->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * مانع `fuel_settlement_pending`. **البوابة مغلقة ⇒ لا استعلام ولا مانع** (الإقفال كما كان بايتاً ببايت).
+     *
+     * «غير محلولة» = وردية وقود مغلقة/معتمدة، يوم توريدها (إغلاقها بتقويم محطتها) ضمن السنة، لمحطة سياستها الآن `post_on_close` أو سُجِّلت لها مهمة تسوية،
+     * وإما بلا رأس تسوية، أو برأس فيه سطر محجوب (`withheld_*`) لم يُحسم. **النموذجان `BranchScoped` والإقفال مؤسسي**: الاستعلام بلا نطاق الفرع وبمستأجر صريح.
+     * القيمة المالية لا تُعرض (تُحجب عمّن لا يملك الرؤية المالية للوقود)؛ العدد وأقدم عمر فقط.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function fuelSettlementPendingIssue(FiscalYear $year): ?array
+    {
+        if (! \App\Services\FuelShiftSettlementReadiness::enabled()) {
+            return null;
+        }
+        $tenantId = $this->tenantContext->id();
+        if ($tenantId === null) {
+            return null;
+        }
+        $readiness = app(\App\Services\FuelShiftSettlementReadiness::class);
+        $settings = app(\App\Services\FuelStationSettingsService::class);
+
+        // هامش يومين حول السنة لفروق التقويم؛ التصفية الدقيقة بيوم الإغلاق بتقويم كل محطة.
+        $candidates = \App\Models\FuelShift::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)
+            ->whereIn('status', [\App\Models\FuelShift::STATUS_CLOSED, \App\Models\FuelShift::STATUS_APPROVED])
+            ->whereNotNull('closed_at')
+            ->where('closed_at', '>=', $year->start_date->copy()->subDays(2))
+            ->where('closed_at', '<=', $year->end_date->copy()->addDays(3))
+            ->orderBy('closed_at')->get();
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $stations = \App\Models\FuelStation::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('id', $candidates->pluck('fuel_station_id')->unique())->get()->keyBy('id');
+        $jobShiftIds = \App\Models\FuelShiftSettlementJob::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $candidates->pluck('id'))->pluck('fuel_shift_id')->flip();
+        $headers = \Illuminate\Support\Facades\DB::table('fuel_shift_settlements')->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $candidates->pluck('id'))->pluck('id', 'fuel_shift_id');
+        $withheldHeaders = $headers->isEmpty() ? collect() : \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_lines')
+            ->whereIn('fuel_shift_settlement_id', $headers->values())->where('state', 'like', 'withheld%')->whereNull('resolution_id')
+            ->distinct()->pluck('fuel_shift_settlement_id')->flip();
+
+        $pending = [];
+        foreach ($candidates as $shift) {
+            $station = $stations->get($shift->fuel_station_id);
+            if ($station === null) {
+                continue;
+            }
+            $day = $settings->businessDate($station, \Carbon\CarbonImmutable::instance($shift->closed_at));
+            if ($day < $year->start_date->toDateString() || $day > $year->end_date->toDateString()) {
+                continue;
+            }
+            $registered = $jobShiftIds->has($shift->id) || $readiness->mode($station) === \App\Services\FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE;
+            if (! $registered) {
+                continue;
+            }
+            $headerId = $headers->get($shift->id);
+            if ($headerId === null || $withheldHeaders->has($headerId)) {
+                $pending[] = $shift;
+            }
+        }
+        if ($pending === []) {
+            return null;
+        }
+
+        $oldest = collect($pending)->min(fn ($s) => $s->closed_at->getTimestamp());
+        $ageHours = (int) floor((now()->getTimestamp() - $oldest) / 3600);
+
+        return $this->item(self::SEVERITY_BLOCKER, 'fuel_settlement_pending', sprintf(
+            'توجد %d وردية وقود مغلقة داخل السنة لم تُحسم تسويتها (لم تُرحَّل أو فيها سطور محجوبة). أقدمها منذ %d ساعة. '
+            . 'تُحسم بترحيل التسوية فعلياً (بعد فتح الفترة المقفلة أو حسم سبب الحجب)؛ لا يُرفع المانع بتصرّف يدوي.',
+            count($pending),
+            $ageHours,
+        ), ['count' => count($pending), 'oldest_age_hours' => $ageHours, 'shift_ids' => array_slice(array_map(fn ($s) => $s->id, $pending), 0, 20)]);
     }
 }
