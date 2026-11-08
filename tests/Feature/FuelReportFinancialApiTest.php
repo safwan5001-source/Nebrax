@@ -56,9 +56,16 @@ class FuelReportFinancialApiTest extends TestCase
         $rev = $this->table($this->report('financial.revenue'), 'revenue')['rows'][0];
         $this->assertSame(1, $rev['sales']);
         $this->assertSame(1000, $rev['liters']);
-        $this->assertSame((int) $sale->gross_minor, $rev['gross']);
+        $this->assertSame((int) $invoice->total, $rev['gross']);   // الإجمالي من الفاتورة الرسمية لا من gross_minor
         $this->assertSame((int) $invoice->subtotal, $rev['net']);
         $this->assertSame((int) $invoice->tax_amount, $rev['tax']);
+
+        // نمط «غير شامل»: gross_minor = الصافي فقط؛ الإجمالي المعروض يتبع total الفاتورة (صافي + ضريبة)
+        \Illuminate\Support\Facades\DB::table('invoices')->where('id', $invoice->id)->update(['subtotal' => (int) $sale->gross_minor, 'tax_amount' => 150, 'total' => (int) $sale->gross_minor + 150]);
+        $rev = $this->table($this->report('financial.revenue'), 'revenue')['rows'][0];
+        $this->assertSame((int) $sale->gross_minor + 150, $rev['gross']);
+        $this->assertSame((int) $sale->gross_minor, $rev['net']);
+        $invoice = $invoice->fresh();
 
         $vat = $this->table($this->report('financial.vat'), 'vat');
         $this->assertSame((int) $invoice->tax_amount, $vat['totals']['tax']);

@@ -13,7 +13,7 @@ use App\Support\FuelReportTable as T;
  * العائلة المالية والمحاسبية (F): **قراءة فقط** من السجلات الرسمية — بيع الوقود النهائي (`FuelSale`) وفاتورته وإيصالات تحصيله وقيود COGS —
  * لا حساب مالي جديد ولا كتابة محاسبية. مصدرها `finalized_sales` (غير مبيعات العدادات التشغيلية) ما عدا المطابقة التي تقارن الثلاثة صراحةً.
  *
- * - الإيراد الصافي = `subtotal` الفاتورة (قبل الضريبة)؛ الإجمالي = `gross_minor`؛ الضريبة من الفاتورة نفسها (لا إعادة احتساب).
+ * - الإيراد الصافي = `subtotal` الفاتورة (قبل الضريبة)؛ الإجمالي = `total` الفاتورة (شامل الضريبة)؛ الضريبة من الفاتورة نفسها (لا إعادة احتساب).
  * - **التكلفة والربح من COGS الرسمي فقط:** بيع بلا `cogs_minor` ⇒ «بيانات التكلفة غير متاحة» (`null`) ولا تقدير؛ الإجمالي `null` إن غاب أي سطر.
  * - المبالغ حسّاسة `sales`، والتكلفة والربح حسّاسان `cost` (`products.view_cost`) فتُحذف من الحمولة لغير المخوَّل.
  */
@@ -66,12 +66,14 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
         $g ??= $init + ['sales' => 0, 'liters' => 0, 'gross' => 0, 'net' => 0, 'tax' => 0, 'cogs' => 0, 'uncosted' => 0, 'no_invoice' => 0];
         $g['sales']++;
         $g['liters'] += (int) $s->quantity_milliliters;
-        $g['gross'] += (int) $s->gross_minor;
         if ($s->invoice === null) {
             $g['no_invoice']++;
+            $g['gross'] = null;
             $g['net'] = null;
             $g['tax'] = null;
         } else {
+            // الإجمالي من الفاتورة الرسمية (شامل الضريبة)؛ gross_minor = كمية×سعر فيكون الصافي نفسه في نمط «غير شامل».
+            $g['gross'] = $g['gross'] === null ? null : $g['gross'] + (int) $s->invoice->total;
             $g['net'] = $g['net'] === null ? null : $g['net'] + (int) $s->invoice->subtotal;
             $g['tax'] = $g['tax'] === null ? null : $g['tax'] + (int) $s->invoice->tax_amount;
         }
@@ -124,7 +126,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
 
         return [
             'summary' => [
-                T::item('gross', 'إجمالي الإيراد', 'Gross revenue', 'money', array_sum(array_column($rows, 'gross')), T::SALES),
+                T::item('gross', 'إجمالي الإيراد', 'Gross revenue', 'money', $sum('gross'), T::SALES),
                 T::item('net', 'الصافي قبل الضريبة', 'Net before tax', 'money', $sum('net'), T::SALES),
                 T::item('sales', 'عدد المبيعات', 'Sales', 'int', array_sum(array_column($rows, 'sales'))),
             ],
@@ -207,7 +209,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
     {
         $rows = $sales->map(fn (FuelSale $s) => [
             'number' => $s->number, 'date' => $s->finalized_at?->toIso8601String(), 'invoice' => $s->invoice?->number, 'invoice_status' => $s->invoice?->status,
-            'gross' => (int) $s->gross_minor, 'has_invoice' => $s->invoice_id === null ? 0 : 1, 'has_entry' => ($s->invoice?->journal_entry_id === null) ? 0 : 1,
+            'gross' => $s->invoice === null ? null : (int) $s->invoice->total, 'has_invoice' => $s->invoice_id === null ? 0 : 1, 'has_entry' => ($s->invoice?->journal_entry_id === null) ? 0 : 1,
             'has_cogs' => $s->cogs_journal_entry_id === null ? 0 : 1, 'has_stock' => $s->stock_movement_id === null ? 0 : 1,
         ])->all();
         $unlinked = count(array_filter($rows, fn ($r) => $r['has_invoice'] + $r['has_entry'] + $r['has_cogs'] + $r['has_stock'] < 4));
@@ -229,7 +231,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
     {
         $rows = [];
         foreach ($sales as $s) {
-            $base = ['reference' => $s->number, 'date' => $s->finalized_at?->toIso8601String(), 'station' => $context->stationName((string) $s->fuel_station_id), 'amount' => (int) $s->gross_minor];
+            $base = ['reference' => $s->number, 'date' => $s->finalized_at?->toIso8601String(), 'station' => $context->stationName((string) $s->fuel_station_id), 'amount' => $s->invoice === null ? null : (int) $s->invoice->total];
             if ($s->invoice_id === null) {
                 $rows[] = ['type' => 'sale_without_invoice'] + $base;
             } elseif ($s->invoice?->journal_entry_id === null) {
