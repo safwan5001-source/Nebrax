@@ -550,6 +550,24 @@ class FuelShiftSettlementJobTest extends TestCase
         $this->assertSame(48, $settings->forStation($this->f['station'])['shift_settlement_escalation_after_hours']);
     }
 
+    /** @test */
+    public function a_shift_approved_by_the_supervisor_before_the_job_runs_is_still_evaluated_not_failed(): void
+    {
+        $shift = $this->closedShift('appr1');
+        $job = $this->jobFor($shift);
+        app(FuelShiftService::class)->approve($shift->fresh(), null, $this->f['supervisor']);
+        $this->assertSame('approved', $shift->fresh()->status);
+
+        app(FuelShiftSettlementJobRunner::class)->run();
+
+        $job = $this->fresh($job);
+        $this->assertNotSame('failed', $job->status);
+        $this->assertNull($job->last_error_code, 'الاعتماد لا يولّد خطأ unexpected');
+        $this->assertSame(0, $job->attempts);
+        $this->assertSame('awaiting_engine', $job->last_outcome);
+        $this->assertSame('queued', $job->status);
+    }
+
     // ═══════════ 7) الصلاحية المحجوزة (D-S1) ═══════════
 
     /** @test */

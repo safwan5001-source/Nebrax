@@ -57,7 +57,7 @@ class FuelShiftSettlementJobService
     /** idempotent: وردية مغلقة ⇒ مهمة واحدة (الموجودة تُعاد كما هي بلا أي تغيير). */
     public function enqueue(FuelShift $shift, ?User $actor = null): FuelShiftSettlementJob
     {
-        if (! $shift->isClosed()) {
+        if (! $shift->isClosed() && ! $shift->isApproved()) {
             throw new \RuntimeException('FUEL_SETTLEMENT_JOB_SHIFT_NOT_CLOSED: لا تُسجَّل مهمة تسوية إلا لوردية مغلقة.');
         }
         $existing = FuelShiftSettlementJob::query()->withoutGlobalScopes()

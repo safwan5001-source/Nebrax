@@ -33,7 +33,8 @@ class FuelShiftSettlementPrecheckHandler implements SettlementJobHandler
         if (! FuelShiftSettlementReadiness::enabled() || $this->readiness->mode($station) !== FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
             return SettlementJobOutcome::disabled();
         }
-        if (! $shift->isClosed()) {
+        // الوردية المعتمدة (closed → approved بقرار المشرف) تبقى وردية مغلقة تشغيلياً: اعتمادها قبل تشغيل المهمة لا يجوز أن يُفشلها.
+        if (! $shift->isClosed() && ! $shift->isApproved()) {
             throw new RuntimeException('FUEL_SETTLEMENT_JOB_SHIFT_NOT_CLOSED: مهمة تسوية لوردية غير مغلقة.');
         }
 
