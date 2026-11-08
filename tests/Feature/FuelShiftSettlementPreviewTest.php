@@ -667,6 +667,22 @@ class FuelShiftSettlementPreviewTest extends TestCase
     }
 
     /** @test */
+    public function an_unstamped_bank_receipt_blocks_the_preview_too(): void
+    {
+        // Codex P2: عدّاد نقد الدرج لا يرى القبض البنكي غير الموسوم، أما التسوية فتحسب كل الطرق ⇒ يجب أن تحجب.
+        config(['fuel_stations.shift_cash_receipts_enabled' => false]);
+        $shift = $this->open('b4b');
+        $sale = $this->walkInSale('b4b-sale', $shift, 1000);
+        $this->collect($sale, 'bank', null, 'b4b-pay');
+        config(['fuel_stations.shift_cash_receipts_enabled' => true]);
+        $this->meters($shift);
+        $this->declare($shift, 0, 230);
+
+        $this->assertContains('FUEL_SETTLEMENT_RECEIPTS_UNATTRIBUTED', $this->preview($shift)['blockers']);
+        $this->assertFalse($this->preview($shift)['ready']);
+    }
+
+    /** @test */
     public function a_non_open_shift_cannot_be_previewed(): void
     {
         $shift = $this->readyShift('b5', 4600);

@@ -183,7 +183,7 @@ class FuelShiftSettlementPreviewService
         if ($this->periodLocked($this->settings->businessDate($station, $now))) {
             $blockers[] = 'FUEL_SETTLEMENT_PERIOD_LOCKED';
         }
-        if ((int) ($this->expectation->live($shift, FuelShiftCashExpectationService::BASIS_DECLARED_COLLECTION)['unattributed_count'] ?? 0) > 0) {
+        if ($this->hasUnattributedReceipts($shift)) {
             $blockers[] = 'FUEL_SETTLEMENT_RECEIPTS_UNATTRIBUTED';
         }
 
@@ -262,6 +262,24 @@ class FuelShiftSettlementPreviewService
             ->exists();
 
         return $event ? 'withheld_cost_pool_changed' : null;
+    }
+
+    /**
+     * قبوض مرحَّلة على مبيعات المحطة داخل نافذة الوردية بلا وسم وردية، **بأي طريقة دفع** (Codex P2): عدّاد نقد الدرج يعدّ النقد وحده لأن اهتمامه الدرج، أما التسوية فتحسب كل طرق الدفع،
+     * وقبضٌ بنكي غير موسوم خفّض رصيد فاتورة ولم يدخل `$rByMethod` فيُظهر فائضاً وهمياً ويبقى `ready` صحيحاً. يُحجب حتى يُحسم وسمه.
+     */
+    private function hasUnattributedReceipts(FuelShift $shift): bool
+    {
+        if ($shift->opened_at === null) {
+            return false;
+        }
+        $paymentIds = FuelSalePaymentReceipt::query()->whereNull('fuel_shift_id')
+            ->where('recorded_at', '>=', $shift->opened_at)
+            ->when($shift->closed_at !== null, fn ($q) => $q->where('recorded_at', '<=', $shift->closed_at))
+            ->whereIn('fuel_sale_id', FuelSale::query()->select('id')->where('fuel_station_id', $shift->fuel_station_id))
+            ->pluck('payment_id');
+
+        return $paymentIds->isNotEmpty() && Payment::query()->whereIn('id', $paymentIds)->where('status', 'posted')->exists();
     }
 
     private function periodLocked(string $date): bool
