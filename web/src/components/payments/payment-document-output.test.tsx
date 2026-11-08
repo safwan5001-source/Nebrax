@@ -26,6 +26,8 @@ const purchase = {
   lines: [{ id: 'l1', description: 'صنف', quantity: 1, unit_price: '1250.00', line_tax: '187.50', line_total: '1437.50' }],
 };
 
+const signatureImages = (container: HTMLElement) => [...container.querySelectorAll('img')].filter((img) => (img.getAttribute('src') ?? '').includes('width="20"') || (img.getAttribute('src') ?? '').includes('width%3D%2220%22')).length;
+
 describe('PaymentDocument / PurchaseDocument تمرّر ملف الإخراج للعارض (AWJ-DOC-V2-PR4)', () => {
   it('السند: بلا ملف = لا ورقة؛ وبملف مدعوم = ورقة بمقاس الملف والجذر الافتراضي', () => {
     const none = renderIntl(<PaymentDocument payment={payment} company={null} partner={null} templateId="tax-invoice-classic-v2" />, 'ar');
@@ -57,6 +59,23 @@ describe('PaymentDocument / PurchaseDocument تمرّر ملف الإخراج ل
     const sheet = container.querySelector<HTMLElement>('[data-doc-sheet]');
     expect(sheet?.classList.contains('hidden')).toBe(true);
     expect(container.querySelector('#pdf-print-root')).not.toBeNull();
+  });
+
+  it('السند: تخطيط صريح يُحترم (بنك ظاهر وتوقيع مخفي)، وغيابه = تخطيط السند الثابت (توقيع وختم)', () => {
+    const assets = { stampUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="10" height="10"%3E%3C/svg%3E', signatureUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="20" height="10"%3E%3C/svg%3E' };
+    const base = { payment, company: null, partner: null, templateId: 'tax-invoice-classic-v2', bank: 'IBAN SA0000000000000000000000', ...assets };
+    const fixed = renderIntl(<PaymentDocument {...base} />, 'en');
+    expect(signatureImages(fixed.container)).toBeGreaterThan(0);
+    expect(fixed.container.textContent).not.toContain('IBAN SA0000000000000000000000');
+    cleanup();
+
+    const layout = [
+      { key: 'header', visible: true }, { key: 'parties', visible: true }, { key: 'voucher', visible: true },
+      { key: 'bank', visible: true }, { key: 'signature', visible: false }, { key: 'stamp', visible: false }, { key: 'footer', visible: true },
+    ] as const;
+    const custom = renderIntl(<PaymentDocument {...base} layout={[...layout]} />, 'en');
+    expect(custom.container.textContent).toContain('IBAN SA0000000000000000000000');
+    expect(signatureImages(custom.container)).toBe(0);
   });
 
   it('المشتريات: بلا ملف = لا ورقة؛ وبملف مدعوم = ورقة؛ والمبالغ كما هي', () => {

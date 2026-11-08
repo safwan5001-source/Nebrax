@@ -268,6 +268,49 @@ for (const kind of ['payment_received', 'payment_paid'] as const) {
       }
     });
 
+    test('جذر PDF الملتقَط يحترم تخطيط مراجعة PDF: بنك ظاهر وتوقيع/ختم مخفيان (لا التخطيط الثابت للطباعة)', async ({ browser }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+      test.setTimeout(180_000);
+      const layout = [
+        { key: 'header', visible: true }, { key: 'parties', visible: true }, { key: 'voucher', visible: true }, { key: 'amountWords', visible: true },
+        { key: 'bank', visible: true }, { key: 'signature', visible: false }, { key: 'stamp', visible: false }, { key: 'footer', visible: true },
+      ];
+      const { context, page } = await openPage(browser, { kind, frozen: { print: revision({ id: 'p', profile: A5L }), pdf: revision({ id: 'd', profile: A5L, layout }) } });
+      try {
+        // جذر الطباعة بتخطيط السند الثابت: ختم وتوقيع ظاهران، بلا بنك.
+        expect(await page.locator('#print-root img').count(), 'ختم وتوقيع في الطباعة').toBeGreaterThanOrEqual(2);
+        // جذر PDF (مخفي على الشاشة) بتخطيط مراجعة PDF: بنك نعم، صور لا.
+        const pdfRoot = await page.evaluate(() => {
+          const root = document.getElementById('pdf-print-root');
+          return { text: root?.textContent ?? '', images: root?.querySelectorAll('img').length ?? -1 };
+        });
+        expect(pdfRoot.text).toContain('IBAN SA0000000000000000000000');
+        expect(pdfRoot.images, 'توقيع/ختم مخفيان في مراجعة PDF').toBe(0);
+        const exported = await downloadPdf(page);
+        const size = pageSizeMm(exported.info);
+        expect(Math.abs(size.w - 210)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+        expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('سند بمراجعة PDF مثبتة فقط (بلا مراجعة طباعة): PDF من لقطته لا من التعيين الحي', async ({ browser }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+      test.setTimeout(180_000);
+      // تعيين حي للطباعة بملف A4 أفقي، بينما اللقطة المثبتة للـPDF A5 أفقي: يجب أن يتبع PDF اللقطة.
+      const live = { print_template_revision_id: 'live', revision: revision({ id: 'live', profile: A4L }) };
+      const { context, page } = await openPage(browser, { kind, frozen: { pdf: revision({ id: 'd', profile: A5L }) }, live });
+      try {
+        const exported = await downloadPdf(page);
+        const size = pageSizeMm(exported.info);
+        expect(Math.abs(size.w - 210), `PDF اتبع التعيين الحي (${size.w}×${size.h})`).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+        expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+      } finally {
+        await context.close();
+      }
+    });
+
     test('ملف غير مدعوم من القالب (A6 عمودي على classic) يُعامل كغائب', async ({ browser }, testInfo) => {
       test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
       test.setTimeout(120_000);

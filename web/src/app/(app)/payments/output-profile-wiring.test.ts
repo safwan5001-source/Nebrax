@@ -12,9 +12,17 @@ describe('/payments/[id] — ملف الإخراج', () => {
   const source = read('src/app/(app)/payments/[id]/page.tsx');
 
   it('المحرك المتجهي createPaymentPdf يبقى المسار الافتراضي ولا يُلتقَط الجذر إلا حين يوجد ملف مطبَّق', () => {
-    expect(source).toMatch(/pdfSpec\.profile \? captureElement\(\) : null/);
+    expect(source).toMatch(/capturePdf = Boolean\(pdfOutput && pdfSpec\.profile\)/);
+    expect(source).toMatch(/capturePdf \? captureElement\(\) : null/);
+    // الالتقاط من جذر PDF المخصَّص بتخطيط مراجعة PDF، لا من جذر الطباعة الثابت.
+    expect(source).toMatch(/getElementById\('pdf-print-root'\)/);
+    expect(source).toMatch(/layout=\{pdfOutput\.layout\}/);
     expect(source).toMatch(/downloadPaymentPdf\(await createPdf\(\), payment\.number\)/);
     expect(source).toMatch(/sharePaymentPdf\(await createPdf\(\)/);
+  });
+
+  it('أي لقطة مثبتة (ولو PDF وحدها) تعني مستنداً مرحَّلاً', () => {
+    expect(source).toMatch(/isPosted: Boolean\(r\.data\.print_template_revision \|\| r\.data\.pdf_template_revision \|\| r\.data\.thermal_template_revision\)/);
   });
 
   it('الملف يُقرأ من المراجعة المثبتة أولاً ثم التعيين الحي، ولا يُكتب شيء للخادم', () => {

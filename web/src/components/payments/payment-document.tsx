@@ -36,6 +36,7 @@ export function PaymentDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  layout,
   outputProfile,
   rootId,
 }: {
@@ -51,12 +52,14 @@ export function PaymentDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  /** تخطيط صريح (جذر PDF الملتقَط بتخطيط مراجعة PDF)؛ غيابه = تخطيط السند الثابت للمعاينة والطباعة كما كان. */
+  layout?: DocSectionLayoutItem[] | null;
   /** ملف الإخراج من المراجعة المطبَّقة (AWJ-DOC-V2-PR4)؛ غيابه = السلوك السابق. */
   outputProfile?: OutputProfile | null;
   rootId?: string | null;
 }) {
   const model = buildPaymentDocumentModel({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={VOUCHER_LAYOUT} rootId={rootId} outputProfile={outputProfile} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout && layout.length ? layout : VOUCHER_LAYOUT} rootId={rootId} outputProfile={outputProfile} />
   );
 }

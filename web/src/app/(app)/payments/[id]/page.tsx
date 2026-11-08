@@ -97,7 +97,6 @@ export default function PaymentDetailPage() {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [outputProfile, setOutputProfile] = useState<OutputProfile | null>(null);
   const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
-  const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
 
   // طريقة الدفع تُترجَم قبل بناء النموذج (المحرّك يستهلك نصّاً جاهزاً).
   const partnerName = partner?.name ?? '—';
@@ -123,13 +122,13 @@ export default function PaymentDetailPage() {
         // مراجعات الإخراج (طباعة/PDF) لحساب ملف الإخراج: المرحّل من لقطاته المثبتة فقط (AWJ-DOC-V2-PR4).
         const outputs = resolveDocumentOutputTemplates({
           documentType,
-          isPosted: Boolean(r.data.print_template_revision),
+          // أي لقطة مثبتة (طباعة أو PDF أو حراري) تعني مستنداً مرحَّلاً: سند له مراجعة PDF فقط يقرأ لقطته لا التعيين الحي.
+          isPosted: Boolean(r.data.print_template_revision || r.data.pdf_template_revision || r.data.thermal_template_revision),
           frozenPrint: r.data.print_template_revision,
           frozenPdf: r.data.pdf_template_revision,
           livePrint: live.status === 'fulfilled' ? live.value.data : null,
         });
         setPdfOutput(outputs.pdf);
-        setPdfSharesPrintRoot(outputs.pdfSharesPrintRoot);
         const frozen = r.data.print_template_revision?.definition;
         if (frozen) {
           setOutputProfile(readOutputProfile(frozen));
@@ -204,11 +203,13 @@ export default function PaymentDetailPage() {
 
   // ملف الإخراج يحدد مقاس الطباعة والـPDF؛ غيابه (أو ملف لا يدعمه القالب) = السلوك السابق حرفياً (A4 + PDF المتجهي).
   const printSpec = resolveDocumentOutputSpec(templateId, outputProfile);
-  const pdfSpec = !pdfSharesPrintRoot && pdfOutput ? resolveDocumentOutputSpec(pdfOutput.templateId, pdfOutput.outputProfile) : printSpec;
+  const pdfSpec = pdfOutput ? resolveDocumentOutputSpec(pdfOutput.templateId, pdfOutput.outputProfile) : printSpec;
   const paper = printSpec.paper;
   // محرك PDF المتجهي لهذا السند مرسوم بإحداثيات A4 ثابتة، فلا يحترم مقاساً آخر. عند وجود ملف إخراج مطبَّق
-  // يُلتقَط جذر المستند نفسه بمحرك الالتقاط القائم (كالفواتير)؛ وبغيابه يبقى المتجهي حرفياً.
-  const captureElement = () => document.getElementById(pdfSharesPrintRoot ? 'print-root' : 'pdf-print-root');
+  // يُلتقَط جذر PDF **مخصَّص** بمحرك الالتقاط القائم (كالفواتير) بقالب مراجعة PDF وتخطيطها (بنك/ختم/توقيع كما كان
+  // يفعل المتجهي)، لا جذر الطباعة ذو التخطيط الثابت؛ وبغيابه يبقى المتجهي حرفياً.
+  const capturePdf = Boolean(pdfOutput && pdfSpec.profile);
+  const captureElement = () => document.getElementById('pdf-print-root');
   const frozenPdfDefinition = resolveFrozenOutputDefinition(
     payment.pdf_template_revision,
     payment.print_template_revision,
@@ -269,7 +270,7 @@ export default function PaymentDetailPage() {
     if (!payment) return;
     setBusy('pdf');
     try {
-      const element = pdfSpec.profile ? captureElement() : null;
+      const element = capturePdf ? captureElement() : null;
       if (element) await documentExporter.download({ element, fileName: payment.number, paper: pdfSpec.paper });
       else downloadPaymentPdf(await createPdf(), payment.number);
       success(tPrint('downloaded_ok'));
@@ -285,7 +286,7 @@ export default function PaymentDetailPage() {
     setBusy('share');
     try {
       const shareTitle = payment.direction === 'received' ? t('receipt_title') : t('payment_title');
-      const element = pdfSpec.profile ? captureElement() : null;
+      const element = capturePdf ? captureElement() : null;
       const result = element
         ? await documentExporter.share({ element, fileName: payment.number, title: shareTitle, paper: pdfSpec.paper })
         : await sharePaymentPdf(await createPdf(), payment.number, shareTitle);
@@ -400,7 +401,7 @@ export default function PaymentDetailPage() {
         </CardContent>
       </Card>
 
-      {!pdfSharesPrintRoot && pdfOutput && (
+      {capturePdf && pdfOutput && (
         <PaymentDocument
           payment={paymentDoc}
           company={company}
@@ -414,6 +415,7 @@ export default function PaymentDetailPage() {
           showLogo={pdfOutput.showLogo}
           logoUrl={logoUrl}
           logoHeight={pdfOutput.logoHeight}
+          layout={pdfOutput.layout}
           outputProfile={pdfOutput.outputProfile}
           rootId="pdf-print-root"
         />
