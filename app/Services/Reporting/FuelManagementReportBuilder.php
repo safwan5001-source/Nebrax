@@ -213,6 +213,21 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
         }
         unset($g);
 
+        // وردية مغلقة بلا إقرار، أو بلقطة مبيعات غير مكتملة، لا تُعلَن الجودة معها مكتملة.
+        $undeclared = 0;
+        $incompleteSnapshots = 0;
+        foreach ($loaded['shifts'] as $s) {
+            if ($s['status'] === 'open') {
+                continue;
+            }
+            $d = $decl->get($s['id']);
+            if ($d === null) {
+                $undeclared++;
+            } elseif ($d->sales_minor === null || ! $d->sales_complete) {
+                $incompleteSnapshots++;
+            }
+        }
+
         $query = $context->scoped(FuelDelivery::query())->where('status', FuelDelivery::STATUS_APPROVED);
         $context->constrainPeriod($query, 'received_at');
         foreach ($query->get(['fuel_station_id', 'received_milliliters']) as $d) {
@@ -238,7 +253,7 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
                 T::col('handover', 'money', 'المسلَّم للخزنة', 'Handed to treasury', ['total' => 'sum']),
                 T::col('received', 'liters', 'وقود مستلم معتمد', 'Approved fuel received', ['total' => 'sum']),
             ], $rows)],
-            'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated'],
+            'gaps' => array_values(array_unique([...$loaded['gaps'], ...($undeclared > 0 ? ['collection_not_declared'] : []), ...($incompleteSnapshots > 0 ? ['declaration_sales_incomplete'] : [])])), 'truncated' => $loaded['truncated'],
             'notes' => [['ar' => 'اليوم بتوقيت المحطة (الورديات حسب فتحها). مبيعات العدادات من اللقطات المجمَّدة وتغيب لوردية بلا إقرار.', 'en' => 'The day in station time (shifts by opening). Meter sales come from frozen snapshots and are unavailable for a shift without a declaration.']],
         ];
     }

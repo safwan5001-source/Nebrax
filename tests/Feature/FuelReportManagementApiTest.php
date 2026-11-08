@@ -134,6 +134,21 @@ class FuelReportManagementApiTest extends TestCase
     }
 
     /** @test */
+    public function day_close_with_a_closed_shift_lacking_a_declaration_is_not_complete(): void
+    {
+        $shift = $this->open('dcg');
+        $this->meter($shift, 'opening', 5_000_000);
+        $this->meter($shift, 'closing', 5_100_000);
+        config(['fuel_stations.shift_collection_declaration_enabled' => false]); // بلا بوابة الإقرار يُغلق بلا إقرار
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT, null, $this->f['actor']);
+
+        $p = $this->report('day_close');
+        $this->assertNull($p['tables'][0]['rows'][0]['sales']);
+        $this->assertContains('collection_not_declared', $p['data_quality']['gaps']);
+        $this->assertFalse($p['data_quality']['complete']);
+    }
+
+    /** @test */
     public function the_unified_day_close_summarizes_the_station_day(): void
     {
         $shift = $this->open('dc');

@@ -152,6 +152,17 @@ class FuelReportInventoryApiTest extends TestCase
     }
 
     /** @test */
+    public function movement_unit_cost_is_derived_per_liter_from_the_official_value(): void
+    {
+        $m = new \ReflectionMethod(\App\Services\Reporting\FuelInventoryReportBuilder::class, 'costPerLiter');
+        $m->setAccessible(true);
+        $this->assertSame(200, $m->invoke(null, 1_000, 5_000));     // 200 هللة/لتر (القيمة 1000 لكمية 5 لتر)
+        $this->assertSame(200, $m->invoke(null, -1_000, -5_000));   // إشارة الحركة لا تؤثر
+        $this->assertNull($m->invoke(null, null, 5_000));
+        $this->assertNull($m->invoke(null, 1_000, 0));
+    }
+
+    /** @test */
     public function inventory_reports_respect_permissions_and_tenant_isolation(): void
     {
         // البائع (fuel.shift.view) يرى أرصدة الخزانات؟ لا: تتطلب fuel_stations.view أو fuel.reading.view؛ ولا يرى الجرد/الحركة (reconciliation.view).

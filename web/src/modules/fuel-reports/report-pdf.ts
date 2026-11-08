@@ -26,6 +26,9 @@ export interface PdfOptions { lang: Lang; paper: Paper; company?: PdfCompany; ge
 
 export const PDF_ROW_CAP = 4000;
 export const THERMAL_ROW_CAP = 80;
+/** حد ارتفاع الإيصال الحراري (jsPDF يقصّ الصفحة عند 5080مم) وهامش محجوز للإجماليات والتحذيرات. */
+export const THERMAL_MAX_MM = 4800;
+const THERMAL_RESERVE_MM = 90;
 const NAVY: [number, number, number] = [15, 39, 72];
 const MUTED: [number, number, number] = [107, 114, 128];
 
@@ -263,16 +266,21 @@ function drawThermal(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, w
   for (const item of payload.summary) pair(item.label[lang], summaryText(item, lang, tz), true);
   if (payload.summary.length > 0) rule();
 
-  // كل الجداول تُطبع (لا يُقتطع قسم بصمت)؛ عنوان القسم حين يتعدد.
+  // كل الجداول تُطبع (لا يُقتطع قسم بصمت)؛ عنوان القسم حين يتعدد. ميزانية الارتفاع تمنع تجاوز حد صفحة jsPDF (5080مم): يُوقَف الرسم بتحذير صريح لا بقصّ صامت.
+  const pairHeight = small * 0.5 + 1.4;
   for (const table of payload.tables) {
     if (payload.tables.length > 1) center(table.title[lang], small, true);
-    const rows = table.rows.slice(0, THERMAL_ROW_CAP);
-    if (rows.length === 0) center(l.empty, small);
-    for (const row of rows) {
+    const candidates = table.rows.slice(0, THERMAL_ROW_CAP);
+    if (candidates.length === 0) center(l.empty, small);
+    let printed = 0;
+    for (const row of candidates) {
+      const lines = table.columns.filter((c, i) => cellText(c, row[c.key], lang, tz) !== '—' || i === 0).length;
+      if (y + lines * pairHeight + 2 + THERMAL_RESERVE_MM > THERMAL_MAX_MM) break;
       table.columns.forEach((c, i) => { const v = cellText(c, row[c.key], lang, tz); if (v !== '—' || i === 0) pair(c.label[lang], v, i === 0); });
       rule();
+      printed++;
     }
-    if (table.rows.length > THERMAL_ROW_CAP) center(l.truncatedPdf, small - 0.5);
+    if (printed < table.rows.length) center(l.truncatedPdf, small - 0.5);
     if (table.totals) {
       pair(l.total, '', true);
       for (const c of table.columns) if (c.key in table.totals) pair(c.label[lang], cellText(c, table.totals[c.key], lang, tz), true);

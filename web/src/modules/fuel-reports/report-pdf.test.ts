@@ -12,7 +12,7 @@ vi.stubGlobal('fetch', vi.fn(async (url: string) => {
 }));
 
 import { payload, definition } from './__fixtures__';
-import { createReportPdf, PDF_ROW_CAP } from './report-pdf';
+import { createReportPdf, PDF_ROW_CAP, THERMAL_MAX_MM } from './report-pdf';
 import type { ReportPayload } from './schemas';
 
 const bytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
@@ -71,6 +71,16 @@ describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
     const a = await inspectPdf(await bytes(await createReportPdf(one, { lang: 'en', paper: 'thermal_80' })));
     const b = await inspectPdf(await bytes(await createReportPdf(two, { lang: 'en', paper: 'thermal_80' })));
     expect(b.mediaBoxes[0].heightPt).toBeGreaterThan(a.mediaBoxes[0].heightPt * 1.5);
+  });
+
+  it('الحراري لا يتجاوز حد ارتفاع الصفحة حتى مع 80 صفاً مكتملاً وعدة جداول', async () => {
+    const wide = manyRows(80);
+    const cols = Array.from({ length: 30 }, (_, i) => ({ key: `c${i}`, type: 'text' as const, label: { ar: `عمود ${i}`, en: `Col ${i}` } }));
+    const rows = Array.from({ length: 80 }, (_, r) => Object.fromEntries(cols.map((c, i) => [c.key, `v${r}-${i}`])));
+    const doc = { ...wide, report: definition({ thermal: true }), tables: [{ ...wide.tables[0], columns: cols, rows, totals: null }] };
+    const pdf = await inspectPdf(await bytes(await createReportPdf(doc, { lang: 'en', paper: 'thermal_80' })));
+    expect(pdf.mediaBoxes[0].heightPt).toBeLessThanOrEqual(THERMAL_MAX_MM * MM + 100 * MM);
+    expect(pdf.mediaBoxes[0].heightPt).toBeLessThan(14400);
   });
 
   it('بيانات ناقصة وجدول فارغ لا يكسران الرسم', async () => {

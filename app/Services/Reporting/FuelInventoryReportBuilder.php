@@ -269,6 +269,19 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
 
     // ───────── E4 حركة المخزون (الدفتر التشغيلي) ─────────
 
+    /**
+     * تكلفة اللتر من القيمة الرسمية والكمية (نصف لأعلى)؛ حقل التوافق unit_cost_minor بالمللتر ويفقد الدقة بـintdiv فلا يُستعمل.
+     */
+    private static function costPerLiter(?int $valueMinor, int $quantityMl): ?int
+    {
+        $q = abs($quantityMl);
+        if ($valueMinor === null || $q === 0) {
+            return null;
+        }
+
+        return intdiv(abs((int) $valueMinor) * 2000 + $q, 2 * $q);
+    }
+
     /** @return array<string,mixed> */
     private function movements(FuelReportContext $context): array
     {
@@ -286,7 +299,7 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         $rows = $entries->map(fn (FuelOperationalLedger $e) => [
             'at' => $e->occurred_at?->toIso8601String(), 'station' => $context->stationName((string) $e->fuel_station_id), 'tank' => $tanks[$e->fuel_tank_id] ?? null,
             'product' => $products[$e->fuel_product_id] ?? null, 'type' => $e->movement_type, 'quantity' => (int) $e->quantity_milliliters,
-            'book' => (int) $e->book_balance_milliliters, 'unit_cost' => $e->unit_cost_minor === null ? null : (int) $e->unit_cost_minor, 'value' => $e->value_minor === null ? null : (int) $e->value_minor,
+            'book' => (int) $e->book_balance_milliliters, 'unit_cost' => self::costPerLiter($e->value_minor, (int) $e->quantity_milliliters), 'value' => $e->value_minor === null ? null : (int) $e->value_minor,
         ])->all();
         $types = [];
         foreach ([
