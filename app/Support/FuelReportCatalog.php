@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Services\Reporting\FuelCollectionReportBuilder;
+use App\Services\Reporting\FuelInventoryReportBuilder;
 use App\Services\Reporting\FuelPumpReportBuilder;
 use App\Services\Reporting\FuelSalesReportBuilder;
 use App\Services\Reporting\FuelShiftReportBuilder;
@@ -33,7 +34,7 @@ final class FuelReportCatalog
     /** @return list<FuelReportDefinition> */
     public static function all(): array
     {
-        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps());
+        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps(), self::inventory());
     }
 
     /**
@@ -148,6 +149,30 @@ final class FuelReportCatalog
             new FuelReportDefinition('pumps.differences', 'pumps', ['ar' => 'فروقات العدادات', 'en' => 'Meter differences'], ['ar' => 'انقطاعات استمرارية العداد بين وردية وسابقتها.', 'en' => 'Meter continuity breaks between a shift and its predecessor.'], ['fuel.shift.view'], $eq, $b, $ops),
             new FuelReportDefinition('pumps.resets', 'pumps', ['ar' => 'إعادة ضبط العدادات وتغيير الارتباطات', 'en' => 'Meter resets & re-linking'], ['ar' => 'تغييرات إعداد المضخات والفوهات من سجل التدقيق.', 'en' => 'Pump and nozzle configuration changes from the audit trail.'], ['fuel_stations.manage'], ['station_id', 'from', 'to', 'pump_id', 'nozzle_id'], $b, $ops),
             new FuelReportDefinition('pumps.anomalies', 'pumps', ['ar' => 'القراءات والحركات غير الطبيعية', 'en' => 'Abnormal readings & movements'], ['ar' => 'قراءات ناقصة، إغلاق أقل من الافتتاح، فوهات بلا حركة.', 'en' => 'Missing readings, closing below opening, idle nozzles.'], ['fuel.shift.view'], $eq, $b, $ops),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function inventory(): array
+    {
+        $b = FuelInventoryReportBuilder::class;
+        $ops = FuelReportDefinition::SOURCE_OPERATIONS;
+        $period = ['station_id', 'from', 'to', 'product_id'];
+        $reading = ['fuel_stations.view', 'fuel.reading.view'];
+        $recon = ['fuel.reconciliation.view'];
+        $delivery = ['fuel.delivery.view', 'fuel_stations.manage'];
+
+        return [
+            new FuelReportDefinition('inventory.tank_balances', 'inventory', ['ar' => 'أرصدة الخزانات', 'en' => 'Tank balances'], ['ar' => 'آخر قراءة لكل خزان ونسبة الامتلاء والحداثة والرصيد الدفتري.', 'en' => 'Latest reading per tank, fill, freshness and book balance.'], $reading, ['station_id', 'product_id'], $b, $ops, 'landscape', true),
+            new FuelReportDefinition('inventory.opening_closing', 'inventory', ['ar' => 'الرصيد الافتتاحي والختامي', 'en' => 'Opening & closing balance'], ['ar' => 'قراءة كل خزان عند بداية الفترة ونهايتها.', 'en' => 'Each tank reading at the start and end of the period.'], $reading, $period, $b, $ops),
+            new FuelReportDefinition('inventory.receipts', 'inventory', ['ar' => 'استلام الوقود', 'en' => 'Fuel receipts'], ['ar' => 'الاستلامات بالكميات وفرق النقل (والتكلفة لمن يملك صلاحيتها).', 'en' => 'Receipts with quantities and transit variance (and cost for those allowed).'], $delivery, [...$period, 'status'], $b, $ops),
+            new FuelReportDefinition('inventory.movements', 'inventory', ['ar' => 'حركة المخزون', 'en' => 'Inventory movements'], ['ar' => 'الدفتر التشغيلي لحركات الخزانات.', 'en' => 'The operational ledger of tank movements.'], $recon, $period, $b, $ops),
+            new FuelReportDefinition('inventory.consumption', 'inventory', ['ar' => 'الاستهلاك حسب المنتج', 'en' => 'Consumption by product'], ['ar' => 'اللترات المصروفة لكل منتج من عدادات الورديات.', 'en' => 'Liters dispensed per product from shift meters.'], self::SHIFT_VIEW, ['station_id', 'from', 'to', 'product_id', 'status', 'date_basis'], $b, FuelReportDefinition::SOURCE_METER),
+            new FuelReportDefinition('inventory.stocktake', 'inventory', ['ar' => 'الجرد والمطابقة', 'en' => 'Stocktake & reconciliation'], ['ar' => 'سجلات المطابقة بين الدفتري والفعلي.', 'en' => 'Reconciliation records between book and physical.'], $recon, [...$period, 'status'], $b, $ops),
+            new FuelReportDefinition('inventory.variances', 'inventory', ['ar' => 'فروقات المخزون', 'en' => 'Inventory variances'], ['ar' => 'سجلات الجرد ذات الفرق مع نسبته وأثره المالي.', 'en' => 'Stocktake records with a variance, its percentage and financial effect.'], $recon, [...$period, 'status'], $b, $ops),
+            new FuelReportDefinition('inventory.adjustments', 'inventory', ['ar' => 'التسويات المخزنية', 'en' => 'Stock adjustments'], ['ar' => 'تسويات الجرد المعتمدة التي ولّدت حركة مخزون.', 'en' => 'Approved stocktake adjustments that produced a stock movement.'], $recon, $period, $b, $ops),
+            new FuelReportDefinition('inventory.supply_tracking', 'inventory', ['ar' => 'تتبع التوريدات', 'en' => 'Supply tracking'], ['ar' => 'عمر كل استلام ومدة اعتماده والتكلفة والمرفقات.', 'en' => 'Age and approval time of each receipt, cost and attachments.'], $delivery, [...$period, 'status'], $b, $ops),
+            new FuelReportDefinition('inventory.theoretical_vs_actual', 'inventory', ['ar' => 'مقارنة الرصيد النظري والفعلي', 'en' => 'Theoretical vs actual balance'], ['ar' => 'افتتاح + استلامات − مبيعات العدادات مقابل القراءة الختامية (إرشادي).', 'en' => 'Opening + receipts − meter sales against the closing reading (indicative).'], ['fuel.shift.view'], $period, $b, $ops),
         ];
     }
 }

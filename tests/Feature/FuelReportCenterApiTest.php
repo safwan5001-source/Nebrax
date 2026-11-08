@@ -93,7 +93,8 @@ class FuelReportCenterApiTest extends TestCase
         $keys = array_column($owner['reports'], 'key');
         $this->assertContains('sales.daily', $keys);
         $this->assertContains('shifts.detail', $keys);
-        $this->assertCount(33, $keys);
+        $this->assertCount(count(\App\Support\FuelReportCatalog::all()), $keys); // المالك يرى كل ما في السجل
+        $this->assertGreaterThanOrEqual(43, count($keys));
         $this->assertArrayHasKey('sales', $owner['families']);
 
         // مستخدم بصلاحية البيع فقط يرى عائلة المبيعات ولا يرى تقارير الورديات (تتطلب fuel.shift.view).

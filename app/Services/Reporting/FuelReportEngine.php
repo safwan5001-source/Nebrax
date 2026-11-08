@@ -39,7 +39,7 @@ class FuelReportEngine
         'nozzle_id' => ['nullable', 'uuid'],
         'user_id' => ['nullable', 'uuid'],
         'shift_id' => ['nullable', 'uuid'],
-        'status' => ['nullable', 'in:open,closed,approved,requested,rejected'],
+        'status' => ['nullable', 'in:open,closed,approved,requested,rejected,draft'],
         'group' => ['nullable', 'in:day,week,month'],
         'date_basis' => ['nullable', 'in:opened,closed'],
         'dimension' => ['nullable', 'in:product,station'],
