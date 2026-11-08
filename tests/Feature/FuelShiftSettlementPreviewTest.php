@@ -251,6 +251,19 @@ class FuelShiftSettlementPreviewTest extends TestCase
     }
 
     /** @test */
+    public function the_public_partner_search_does_not_list_the_walk_in_partner(): void
+    {
+        $service = app(\App\Services\ApiClientKeyService::class);
+        $client = $service->createClient(\App\Models\Tenant::findOrFail($this->f['tenant_id']), 'integration');
+        $key = $service->issueKey($client, 'k', ['partners:read'])->plainTextToken;
+        \Illuminate\Support\Facades\Auth::shouldUse('web'); // مسارات الـInternal تترك حارس sanctum في عملية الاختبار
+
+        $ids = collect($this->withToken($key)->getJson('/api/v1/partners?per_page=100')->assertOk()->json('data'))->pluck('id');
+        $this->assertFalse($ids->contains($this->walkIn->id));
+        $this->assertTrue($ids->contains($this->f['customer']->id));
+    }
+
+    /** @test */
     public function assigning_the_walk_in_partner_posts_no_accounting_entries(): void
     {
         $other = \App\Models\FuelStation::create([

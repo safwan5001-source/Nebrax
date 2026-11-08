@@ -32,7 +32,8 @@ class PublicPartnerController extends PublicApiController
             'per_page'  => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Partner::query();
+        // أطراف نظامية تنشئها المنصة (العميل النقدي لمحطة وقود) لا تظهر في بحث الأطراف الخارجي.
+        $query = Partner::query()->whereNull('system_kind');
 
         if (filled($filters['search'] ?? null)) {
             $like = $this->likeTerm((string) $filters['search']);
