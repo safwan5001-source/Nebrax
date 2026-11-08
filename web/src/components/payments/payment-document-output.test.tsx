@@ -78,6 +78,18 @@ describe('PaymentDocument / PurchaseDocument تمرّر ملف الإخراج ل
     expect(signatureImages(custom.container)).toBe(0);
   });
 
+  it('السند: الحالة تُمرَّر لإشعار الترويسة (مسودة/ملغى) عند طلبها فقط، وغيابها = كما كان', () => {
+    const base = { payment, company: null, partner: null, templateId: 'tax-invoice-classic-v2' } as const;
+    const plain = renderIntl(<PaymentDocument {...base} />, 'ar');
+    expect(plain.container.querySelector('[data-doc-status-notice]')).toBeNull();
+    cleanup();
+    const draft = renderIntl(<PaymentDocument {...base} status="draft" />, 'ar');
+    expect(draft.container.querySelector('[data-doc-status-notice="draft"]')).not.toBeNull();
+    cleanup();
+    const posted = renderIntl(<PaymentDocument {...base} status="posted" />, 'ar');
+    expect(posted.container.querySelector('[data-doc-status-notice]'), 'المرحَّل بلا إشعار').toBeNull();
+  });
+
   it('المشتريات: بلا ملف = لا ورقة؛ وبملف مدعوم = ورقة؛ والمبالغ كما هي', () => {
     const none = renderIntl(<PurchaseDocument purchase={purchase} company={null} supplier={null} templateId="tax-invoice-classic-v2" />, 'ar');
     expect(none.container.querySelector('[data-doc-sheet]')).toBeNull();

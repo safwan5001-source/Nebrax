@@ -55,10 +55,10 @@ const pageSizeMm = (info: ReturnType<typeof inspectPdf>, i = 0) => ({ w: info.me
 const ALLOCATIONS = Array.from({ length: 6 }, (_, i) => ({ label: `فاتورة INV-2026-${String(i + 1).padStart(4, '0')}`, amount: '24691357.80' }));
 const PAYMENT_TOTAL = '148148146.80';
 
-function paymentPayload(direction: 'received' | 'paid', revisions: { print?: unknown; pdf?: unknown }) {
+function paymentPayload(direction: 'received' | 'paid', revisions: { print?: unknown; pdf?: unknown }, status = 'posted') {
   return {
     id: 'pay1', number: direction === 'received' ? 'RCV-2026-000123' : 'PAY-2026-000123', payment_date: '2026-08-26', direction,
-    method: 'bank', amount: PAYMENT_TOTAL, reference: 'REF-2026-0007', notes: 'سداد دفعة المشروع الإقليمي.', status: 'posted', branch_id: null, partner_id: 'p1',
+    method: 'bank', amount: PAYMENT_TOTAL, reference: 'REF-2026-0007', notes: 'سداد دفعة المشروع الإقليمي.', status, branch_id: null, partner_id: 'p1',
     allocations: ALLOCATIONS,
     print_template_revision: revisions.print ?? null, pdf_template_revision: revisions.pdf ?? null, thermal_template_revision: null,
   };
@@ -81,7 +81,7 @@ function purchasePayload(posted: boolean, revisions: { print?: unknown; pdf?: un
   };
 }
 
-interface World { kind: 'payment_received' | 'payment_paid' | 'purchase'; frozen?: { print?: unknown; pdf?: unknown }; live?: unknown; draft?: boolean }
+interface World { kind: 'payment_received' | 'payment_paid' | 'purchase'; frozen?: { print?: unknown; pdf?: unknown }; live?: unknown; draft?: boolean; payStatus?: string }
 
 async function openPage(browser: Browser, world: World, opts: { locale?: 'ar' | 'en'; mobile?: boolean } = {}): Promise<{ context: BrowserContext; page: Page }> {
   const locale = opts.locale ?? 'en';
@@ -97,7 +97,7 @@ async function openPage(browser: Browser, world: World, opts: { locale?: 'ar' | 
     if (p === '/me') return json(route, { user, company: { name: 'شركة نبراكس للتجارة', vat_number: '310122393500003', cr_number: '2050123456' } });
     if (p === '/partners/p1') return json(route, { data: { id: 'p1', name: 'مؤسسة الخليج للتوريد', vat_number: '311111111100003', city: 'الخبر' } });
     if (p === '/print-templates/resolve') return json(route, { data: world.live ?? null });
-    if (p === '/payments/pay1') return json(route, { data: paymentPayload(world.kind === 'payment_paid' ? 'paid' : 'received', world.frozen ?? {}) });
+    if (p === '/payments/pay1') return json(route, { data: paymentPayload(world.kind === 'payment_paid' ? 'paid' : 'received', world.frozen ?? {}, world.payStatus) });
     if (p === '/purchases/pu1') return json(route, { data: purchasePayload(!world.draft, world.frozen ?? {}) });
     if (p === '/purchases/pu1/accounting') return json(route, { data: { purchase_entry: null } });
     return json(route, { data: [] });
@@ -288,6 +288,26 @@ for (const kind of ['payment_received', 'payment_paid'] as const) {
         expect(pdfRoot.images, 'توقيع/ختم مخفيان في مراجعة PDF').toBe(0);
         const exported = await downloadPdf(page);
         const size = pageSizeMm(exported.info);
+        expect(Math.abs(size.w - 210)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+        expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('مسودة بتعيين حي مطبَّق: جذر PDF الملتقَط يحمل إشعار «مسودة» والطباعة كما كانت', async ({ browser }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+      test.setTimeout(180_000);
+      const live = { print_template_revision_id: 'live', revision: revision({ id: 'live', profile: A5L }) };
+      const { context, page } = await openPage(browser, { kind, live, payStatus: 'draft' });
+      try {
+        const notices = await page.evaluate(() => ({
+          pdf: document.querySelector('#pdf-print-root [data-doc-status-notice]')?.getAttribute('data-doc-status-notice') ?? null,
+          print: document.querySelector('#print-root [data-doc-status-notice]')?.getAttribute('data-doc-status-notice') ?? null,
+        }));
+        expect(notices.pdf, 'إشعار المسودة في جذر PDF').toBe('draft');
+        expect(notices.print, 'الطباعة بلا إشعار كما كانت').toBeNull();
+        const size = pageSizeMm((await downloadPdf(page)).info);
         expect(Math.abs(size.w - 210)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
         expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
       } finally {

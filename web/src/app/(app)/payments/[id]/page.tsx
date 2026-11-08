@@ -416,6 +416,7 @@ export default function PaymentDetailPage() {
           logoUrl={logoUrl}
           logoHeight={pdfOutput.logoHeight}
           layout={pdfOutput.layout}
+          status={payment.status}
           outputProfile={pdfOutput.outputProfile}
           rootId="pdf-print-root"
         />

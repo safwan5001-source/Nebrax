@@ -17,6 +17,8 @@ describe('/payments/[id] — ملف الإخراج', () => {
     // الالتقاط من جذر PDF المخصَّص بتخطيط مراجعة PDF، لا من جذر الطباعة الثابت.
     expect(source).toMatch(/getElementById\('pdf-print-root'\)/);
     expect(source).toMatch(/layout=\{pdfOutput\.layout\}/);
+    // حالة السند (مسودة/ملغى) تصل جذر PDF الملتقَط كما كان المتجهي يطبعها.
+    expect(source).toMatch(/status=\{payment\.status\}/);
     expect(source).toMatch(/downloadPaymentPdf\(await createPdf\(\), payment\.number\)/);
     expect(source).toMatch(/sharePaymentPdf\(await createPdf\(\)/);
   });
