@@ -2939,6 +2939,7 @@
       "ai": "الذكاء الاصطناعي"
     },
     "perm_actions": {
+      "post": "ترحيل",
       "execution_approve": "الموافقة على التنفيذ",
       "resolve_blocked": "معالجة المحجوبة",
       "request": "طلب",
@@ -3103,6 +3104,7 @@
       "reconciliation": "تسوية المخزون",
       "supplier_invoice": "فواتير موردي الوقود",
       "governance": "حوكمة الوقود",
+      "settlement": "التسوية",
       "staff": "موظفو المحطات"
     }
   },

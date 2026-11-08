@@ -50,6 +50,8 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'fuel_sales_allow_deferred_payment' => ['sometimes', 'boolean'],
             'shift_expected_cash_basis' => ['sometimes', 'in:movements_only,receiving_shift_receipts,declared_collection'],
             'shift_settlement_mode' => ['sometimes', 'in:none,post_on_close'],
+            'shift_settlement_alert_after_hours' => ['sometimes', 'integer', 'min:1', 'max:720'],
+            'shift_settlement_escalation_after_hours' => ['sometimes', 'integer', 'min:1', 'max:2160'],
             'avi_rfid_enabled' => ['sometimes', 'boolean'],
             'avi_driver_identity_required' => ['sometimes', 'boolean'],
             'avi_enforce_vehicle_tank_capacity' => ['sometimes', 'boolean'],

@@ -20,11 +20,12 @@ final class FuelStaffTemplates
 
     /**
      * مفاتيح لا تدخل قالباً ولا «كل صلاحيات الوقود» أبداً، ولا تُمنح بإسناد فردي إلا من حامل `*` (owner/admin):
-     * بها يُفوَّض التفويض نفسه أو يُعطَّل ضابط فصل المعتمِد.
+     * بها يُفوَّض التفويض نفسه أو يُعطَّل ضابط فصل المعتمِد، أو (`fuel.settlement.post`، D-S1) يُصدَر مستند ضريبي ويُرحَّل قيد من تسوية وردية: سلطة محاسبية
+     * محدودة للمالك والمدير، مفصولة عن إغلاق الوردية واعتمادها.
      *
      * @var list<string>
      */
-    public const RESERVED = ['fuel.governance.manage', 'fuel.staff.manage'];
+    public const RESERVED = ['fuel.governance.manage', 'fuel.staff.manage', 'fuel.settlement.post'];
 
     /** @var list<string> */
     private const SELLER_KEYS = [
