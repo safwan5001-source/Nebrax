@@ -339,6 +339,8 @@ class FuelShiftSettlementPreviewService
                 ->where('created_at', '>=', $shift->opened_at)
                 ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at)))
             ->whereNotIn('id', FuelSalePaymentReceipt::query()->select('payment_id'))
+            // سندات أنشأتها تسوية وردية أخرى (P1-3b-2c) موسومة بجدول التخصيصات؛ ترحيلها أثناء وردية لاحقة ليس قبضاً غير موسوم.
+            ->whereNotIn('id', fn ($q) => $q->from('fuel_shift_settlement_collections')->select('payment_id'))
             ->exists();
     }
 
@@ -363,7 +365,7 @@ class FuelShiftSettlementPreviewService
      * @param  list<string>  $blockers
      * @return array{reference:array<string,mixed>,declaration:array<string,mixed>,allocation:array<string,mixed>,variances:array<string,mixed>,blockers:list<string>}
      */
-    private function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
+    public function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
     {
         // المبيعات النهائية بفواتيرها (كل الشرائح: عميل المحطة، مسمّون، عقود) — من المجموعة نفسها التي حُسب منها Q_erp.
         $sales = $finalizedSales->filter(fn (FuelSale $sale) => $sale->invoice_id !== null)->values();

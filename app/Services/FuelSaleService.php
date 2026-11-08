@@ -386,6 +386,20 @@ class FuelSaleService
         return ['sale' => $sale, 'invoice' => $invoice];
     }
 
+    /**
+     * أقفال صفوف التسوية الخارجية (فوهات ← مضخات/خزانات KEY SHARE) بترتيب معرّفات ثابت، **بلا أي إدراج** (يستدعيه محرك التسوية قبل المِرساة).
+     *
+     * @param  list<array<string,mixed>>  $lines
+     */
+    public function lockSettlementRows(FuelShift $shift, array $lines): void
+    {
+        $nozzleIds = collect($lines)->where('state', 'posted')->pluck('nozzle_id')->unique()->sort()->values()->all();
+        foreach ($nozzleIds as $nozzleId) {
+            $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
+            $this->lockReferencedRows($nozzle);
+        }
+    }
+
     public function postSettlementSale(FuelSale $sale, Invoice $invoice, FuelShift $shift, int $pricePerLiterMinor, ?string $taxMode, User $actor): FuelSale
     {
         $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
