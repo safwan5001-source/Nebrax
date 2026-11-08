@@ -191,6 +191,38 @@ class InvoiceFrozenDatesFenceTest extends TestCase
     }
 
     /** @test */
+    public function the_fence_triggers_exist_after_a_fresh_migration_on_the_active_engine(): void
+    {
+        // حارس ضد إسقاط صامت: أي هجرة لاحقة تعيد بناء invoices عبر منشئ المخطط تُسقط مُشغّلات SQLite بلا إنذار.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $names = DB::table('pg_trigger')->where('tgrelid', DB::raw("'invoices'::regclass"))->where('tgisinternal', false)->pluck('tgname')->all();
+            $this->assertContains('invoices_frozen_dates_fence', $names);
+
+            return;
+        }
+        $names = DB::table('sqlite_master')->where('type', 'trigger')->where('tbl_name', 'invoices')->pluck('name')->all();
+        foreach (['invoices_frozen_dates_issued_at', 'invoices_frozen_dates_party_snapshot', 'invoices_frozen_dates_invoice_date'] as $trigger) {
+            $this->assertContains($trigger, $names);
+        }
+    }
+
+    /** @test */
+    public function an_unchanged_snapshot_containing_a_nul_escape_does_not_break_other_updates_on_postgres(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('تحويل jsonb خاص بـ PostgreSQL.');
+        }
+        $invoice = $this->posted();
+        $this->withoutInvoiceFrozenDateFences(fn () => DB::table('invoices')->where('id', $invoice->id)->update(['party_snapshot' => '{"v":1,"seller":{"name":"a\\u0000b"},"buyer":{}}']));
+
+        // إعادة كتابة اللقطة نفسها نصاً لا تمرّ بتحويل jsonb فلا تفشل.
+        $same = DB::table('invoices')->where('id', $invoice->id)->value('party_snapshot');
+        $this->assertSame(1, DB::table('invoices')->where('id', $invoice->id)->update(['party_snapshot' => $same]));
+        // والتغيير الحقيقي مرفوض (فشل مغلق).
+        $this->rejects(fn () => DB::table('invoices')->where('id', $invoice->id)->update(['party_snapshot' => '{"v":1}']), 'تغيير لقطة تحوي NUL');
+    }
+
+    /** @test */
     public function the_migration_adds_no_columns_and_touches_no_rows(): void
     {
         $source = (string) file_get_contents(base_path('database/migrations/2027_01_20_010000_add_invoice_frozen_date_fences.php'));

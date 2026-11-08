@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\DB;
+
 /**
  * P1-3b-2a-0 — محاكاة صفوف فواتير تاريخية (قبل REM-13a/REM-14) أو تعديل تواريخ فاتورة مرحَّلة لأغراض اختبار فرز/نافذة.
  *
@@ -22,7 +24,8 @@ trait SimulatesLegacyInvoiceRows
         $migration = require base_path('database/migrations/2027_01_20_010000_add_invoice_frozen_date_fences.php');
         $migration->down();
         try {
-            return $operation();
+            // نقطة حفظ: فشل العملية على PostgreSQL يُجهض المعاملة، فيخفي فشلُ إعادة المُشغّلات في finally الخطأ الأصلي.
+            return DB::transaction($operation);
         } finally {
             $migration->up();
         }

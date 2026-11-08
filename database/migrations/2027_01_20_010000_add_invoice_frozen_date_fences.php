@@ -14,7 +14,10 @@ use Illuminate\Support\Facades\DB;
  *  R1  `issued_at`: متى كان مخزَّناً (ليس NULL) لا يتغيّر ولا يُمسح.
  *  R2  `issued_at`: لا يُكتب (من NULL) على فاتورة **ليست مسودة** — فلا ختم رجعي لفاتورة قديمة (لا Backfill). الكتابة الأولى تحدث في التحديث الذي يرحّل
  *      المسودة نفسه (`OLD.status = 'draft'`) وهو المسار الوحيد في `InvoiceService::post`.
- *  R3  `party_snapshot`: متى كانت مخزَّنة لا تتغيّر ولا تُمسح (مقارنة منطقية JSON على PostgreSQL، نصية على SQLite).
+ *  R3  `party_snapshot`: متى كانت مخزَّنة لا تتغيّر ولا تُمسح (نصية أولاً ثم منطقية JSON على PostgreSQL، نصية على SQLite).
+ *
+ *  حدّ معلن: `status` نفسه غير مجمَّد، فحالة `posted` ← `draft` ممكنة بتحديث مباشر؛ وصف R1/R3 يبقيان نافذين بعدها (القيمة المخزَّنة لا تتغيّر)، أما صفوف تاريخية بلا
+ *  `issued_at`/`party_snapshot` فيمكن نظرياً إعادة ختمها عبر تعديل حالة مباشر ثم ختم — وصول مباشر إلى قاعدة البيانات فقط، ولا مسار تطبيقي. تجميد الحالة خارج هذه الشريحة.
  *  R4  `party_snapshot`: لا تُكتب (من NULL) على فاتورة ليست مسودة (كالسابق).
  *  R5  `invoice_date`: لا يتغيّر بعد أن تخرج الفاتورة من حالة المسودة، ولا إن كانت لها لحظة إصدار.
  *
@@ -60,8 +63,16 @@ return new class extends Migration
                 IF OLD.issued_at IS NULL AND NEW.issued_at IS NOT NULL AND OLD.status <> 'draft' THEN
                     RAISE EXCEPTION 'invoices: issued_at cannot be stamped on an invoice that is no longer a draft';
                 END IF;
-                IF OLD.party_snapshot IS NOT NULL AND (NEW.party_snapshot IS NULL OR NEW.party_snapshot::jsonb IS DISTINCT FROM OLD.party_snapshot::jsonb) THEN
-                    RAISE EXCEPTION 'invoices: party_snapshot is write-once and cannot be changed or cleared';
+                IF OLD.party_snapshot IS NOT NULL THEN
+                    -- مقارنة نصية أولاً: لقطة لم تتغيّر لا تمرّ بتحويل jsonb (الذي يفشل على \u0000 في JSON صالح)؛ والتغيّر الحقيقي يُقارَن منطقياً.
+                    IF NEW.party_snapshot IS NULL THEN
+                        RAISE EXCEPTION 'invoices: party_snapshot is write-once and cannot be changed or cleared';
+                    END IF;
+                    IF NEW.party_snapshot::text IS DISTINCT FROM OLD.party_snapshot::text THEN
+                        IF NEW.party_snapshot::jsonb IS DISTINCT FROM OLD.party_snapshot::jsonb THEN
+                            RAISE EXCEPTION 'invoices: party_snapshot is write-once and cannot be changed or cleared';
+                        END IF;
+                    END IF;
                 END IF;
                 IF OLD.party_snapshot IS NULL AND NEW.party_snapshot IS NOT NULL AND OLD.status <> 'draft' THEN
                     RAISE EXCEPTION 'invoices: party_snapshot cannot be stamped on an invoice that is no longer a draft';
