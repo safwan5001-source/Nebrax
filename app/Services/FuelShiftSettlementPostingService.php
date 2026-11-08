@@ -109,7 +109,7 @@ class FuelShiftSettlementPostingService
         // ⑥ أقفال الصفوف الخارجية **قبل المِرساة ودون أي إدراج**: كل إدراج يأخذ KEY SHARE على صف المستأجر (مفتاح أجنبي) وهو يتعارض مع قفل المِرساة FOR UPDATE ⇒
         //    إدراج مبكر في معاملتين من فرعين مختلفين = جمود متبادل (أثبتته اختبارات PostgreSQL). لذلك: صفوف (فوهات/مضخات/خزانات) ثم بيوع وفواتير ERP المستهدفة
         //    (الترتيب نفسه لتحصيل ERP: بيع ← فاتورة) ثم ترقيم الفرع ثم المِرساة؛ وكل الإدراجات بعدها.
-        $this->sales->lockSettlementRows($shift, $first['lines']);
+        $this->sales->lockSettlementRows($shift, $first['lines'], array_values(array_unique(array_column($first['finance']['allocation']['rows'] ?? [], 'payment_method_id'))));
         $this->lockErpTargets($first['finance']['allocation']['rows'] ?? []);
         Branch::query()->whereKey($station->branch_id)->lock('for no key update')->first();
 
@@ -156,7 +156,7 @@ class FuelShiftSettlementPostingService
                 throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_INVOICE_TOTAL_MISMATCH']);
             }
             DB::table('fuel_shift_settlement_lines')->where('id', $lineIds[$line['nozzle_id']])->update(['fuel_sale_id' => $sale->id, 'updated_at' => now()]);
-            $invoiceByNozzle['nozzle:'.$line['nozzle_number']] = (string) $sale->invoice_id;
+            $invoiceByNozzle[$line['nozzle_id']] = (string) $sale->invoice_id;
             $postedLines++;
         }
 
@@ -186,28 +186,36 @@ class FuelShiftSettlementPostingService
 
     /**
      * @param  array<string,mixed>  $evaluation
-     * @param  array<string,string>  $invoiceByNozzle  'nozzle:{n}' ⇒ معرّف فاتورة التسوية
+     * @param  array<string,string>  $invoiceByNozzle  معرّف الفوهة ⇒ معرّف فاتورة التسوية (رقم الفوهة فريد لكل مضخة لا لكل محطة)
      */
     private function postCollections(string $settlementId, FuelShift $shift, FuelStation $station, string $walkInId, array $evaluation, array $invoiceByNozzle, User $actor): void
     {
         $collectionDate = $evaluation['collection']['collection_date'];
         $collectedAt = $evaluation['collection']['collected_at'];
         foreach ($evaluation['finance']['allocation']['rows'] ?? [] as $row) {
-            $invoiceId = $row['invoice_id'] ?? $invoiceByNozzle[$row['target_ref']] ?? null;
+            $invoiceId = $row['invoice_id'] ?? $invoiceByNozzle[$row['nozzle_id'] ?? ''] ?? null;
             if ($invoiceId === null || $collectionDate === null || $collectedAt === null) {
                 throw new RuntimeException('FUEL_SETTLEMENT_COLLECTION_TARGET_UNRESOLVED: تعذر تحديد فاتورة أو تاريخ تحصيل لتخصيص التسوية.');
             }
-            $payment = $this->payments->post($this->payments->create([
-                'partner_id' => $walkInId,
-                'invoice_id' => $invoiceId,
-                'branch_id' => $station->branch_id,
-                'direction' => 'received',
-                'payment_method_id' => $row['payment_method_id'],
-                'amount' => (int) $row['amount_minor'],
-                'payment_date' => $collectionDate,            // تاريخ التحصيل الفعلي — لا تاريخ التوريد ولا تاريخ الترحيل
-                'notes' => "تحصيل تسوية وردية {$shift->number}",
-                'created_by' => $actor->id,
-            ]), $actor);
+            try {
+                $payment = $this->payments->post($this->payments->create([
+                    'partner_id' => $walkInId,
+                    'invoice_id' => $invoiceId,
+                    'branch_id' => $station->branch_id,
+                    'direction' => 'received',
+                    'payment_method_id' => $row['payment_method_id'],
+                    'amount' => (int) $row['amount_minor'],
+                    'payment_date' => $collectionDate,            // تاريخ التحصيل الفعلي — لا تاريخ التوريد ولا تاريخ الترحيل
+                    'notes' => "تحصيل تسوية وردية {$shift->number}",
+                    'created_by' => $actor->id,
+                ]), $actor);
+            } catch (AccountingPeriodLockedException $e) {
+                throw $e;
+            } catch (RuntimeException $e) {
+                // رفض خدمة السندات (خزينة/تخويل إيداع/طريقة غير صالحة…): حجب مقروء برمز ثابت بدل خطأ عام يعيده الطابور بلا نهاية؛ التراجع كامل. السبب في السجل لا في الرمز.
+                report($e);
+                throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_RECEIPT_REJECTED']);
+            }
             DB::table('fuel_shift_settlement_collections')->insert([
                 'id' => (string) Str::uuid(), 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id, 'fuel_shift_settlement_id' => $settlementId,
                 'payment_method_id' => $row['payment_method_id'], 'invoice_id' => $invoiceId, 'payment_id' => $payment->id,

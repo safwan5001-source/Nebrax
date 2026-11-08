@@ -195,7 +195,7 @@ class FuelShiftSettlementEvaluator
     {
         $canonical = [
             'shift' => $shift->id, 'tax_mode' => $taxMode, 'supply' => $supply, 'blockers' => $blockers, 'collection' => $collection,
-            'allocation' => array_map(fn (array $r) => [$r['payment_method_id'], $r['target_kind'], $r['target_ref'], $r['invoice_id'], $r['amount_minor']], $finance['allocation']['rows'] ?? []),
+            'allocation' => array_map(fn (array $r) => [$r['payment_method_id'], $r['target_kind'], $r['target_ref'], $r['nozzle_id'] ?? null, $r['invoice_id'], $r['amount_minor']], $finance['allocation']['rows'] ?? []),
             'variances' => $finance['variances'] ?? [], 'reference_total' => $finance['reference']['total_minor'] ?? null,
             'lines' => array_map(fn (array $l) => [
                 $l['nozzle_id'], $l['state'], $l['metered_milliliters'], $l['erp_milliliters'], $l['residual_milliliters'], $l['price_per_liter_minor'],

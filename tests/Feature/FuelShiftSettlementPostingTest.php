@@ -483,6 +483,69 @@ class FuelShiftSettlementPostingTest extends TestCase
     }
 
     /** @test */
+    public function two_nozzles_with_the_same_number_on_different_pumps_are_collected_into_their_own_invoices(): void
+    {
+        $f = $this->f;
+        $pump2 = \App\Models\FuelPump::create(['tenant_id' => $f['tenant_id'], 'branch_id' => $f['branch']->id, 'fuel_station_id' => $f['station']->id, 'pump_number' => 'FCP-2-dup']);
+        $nozzle2 = \App\Models\FuelNozzle::create([
+            'tenant_id' => $f['tenant_id'], 'branch_id' => $f['branch']->id, 'fuel_station_id' => $f['station']->id, 'fuel_pump_id' => $pump2->id,
+            'fuel_tank_id' => $f['nozzle']->fuel_tank_id, 'fuel_product_id' => $f['fuelProduct']->id, 'nozzle_number' => $f['nozzle']->nozzle_number,   // الرقم نفسه على مضخة أخرى
+        ]);
+        $shift = $this->open('dupn');
+        foreach ([[$f['nozzle'], 1_000_000], [$nozzle2, 2_000_000]] as [$nozzle, $base]) {
+            foreach (['opening' => $base, 'closing' => $base + 20_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                    'fuel_nozzle_id' => $nozzle->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "dupn-{$nozzle->id}-{$stage}",
+                ], $f['actor']);
+            }
+        }
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'dupn-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $f['cash']->id, 'amount_minor' => 9200], ['payment_method_id' => $f['bank']->id, 'amount_minor' => 0]],
+        ], $f['actor']);
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 9200, null, $f['actor']);
+
+        $result = $this->engine()->post($closed, $f['actor']);
+
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome, json_encode($result->reasons));
+        $this->assertSame(2, $result->postedLines);
+        $rows = DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->get();
+        $this->assertCount(2, $rows);
+        $this->assertCount(2, $rows->pluck('invoice_id')->unique(), 'كل فوهة بفاتورتها');
+        foreach ($rows as $row) {
+            $this->assertSame(4600, (int) $row->amount_minor);
+            $this->assertSame(4600, (int) Invoice::findOrFail($row->invoice_id)->paid_amount);
+        }
+    }
+
+    /** @test */
+    public function an_unusable_treasury_is_blocked_at_evaluation_and_a_payment_service_rejection_maps_to_a_stable_code_with_no_write(): void
+    {
+        $shift = $this->closedShift('rej1');
+        $before = $this->counts();
+
+        // (1) خزينة غير نشطة تُكشف عند التقييم قبل أي كتابة.
+        DB::table('cash_bank_accounts')->where('tenant_id', $this->f['tenant_id'])->update(['is_active' => false]);
+        $this->assertSame(['FUEL_SETTLEMENT_NOT_READY_PAYMENT_METHOD_TREASURY'], $this->engine()->post($shift, $this->f['actor'])->reasons);
+        $this->assertSame($before, $this->counts());
+        DB::table('cash_bank_accounts')->where('tenant_id', $this->f['tenant_id'])->update(['is_active' => true]);
+
+        // (2) رفض من خدمة السندات وقت الترحيل (تخويل إيداع مثلاً) ⇒ حجب برمز ثابت وتراجع كامل بعد بناء الفواتير.
+        $real = app(\App\Services\Accounting\PaymentService::class);
+        $mock = \Mockery::mock(\App\Services\Accounting\PaymentService::class);
+        $mock->shouldReceive('create')->andReturnUsing(fn (...$args) => $real->create(...$args));
+        $mock->shouldReceive('post')->andThrow(new \RuntimeException('ليس لديك صلاحية الإيداع'));
+        $this->app->instance(\App\Services\Accounting\PaymentService::class, $mock);
+        $this->app->forgetInstance(FuelShiftSettlementPostingService::class);
+
+        $result = $this->engine()->post($shift->fresh(), $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::BLOCKED, $result->outcome);
+        $this->assertSame(['FUEL_SETTLEMENT_RECEIPT_REJECTED'], $result->reasons);
+        $this->assertSame($before, $this->counts(), 'تراجع كامل: لا فاتورة ولا قيد ولا سند');
+    }
+
+    /** @test */
     public function a_locked_period_on_the_supply_date_blocks_with_no_write_and_clears_when_opened(): void
     {
         $shift = $this->closedShift('p1');

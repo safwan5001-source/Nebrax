@@ -464,7 +464,7 @@ class FuelShiftSettlementPreviewService
             }
         }
         foreach ($postedLines as $line) {
-            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
+            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'nozzle_id' => $line['nozzle_id'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
         }
         $heldCap = $pending;
 
@@ -481,7 +481,7 @@ class FuelShiftSettlementPreviewService
                 $pay = min($left, $target['remaining']);
                 if ($pay > 0) {
                     $rows[] = ['payment_method_id' => $methodId, 'method' => $allowed->get($methodId)?->name, 'settlement_type' => $allowed->get($methodId)?->settlement_type,
-                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
+                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'nozzle_id' => $target['nozzle_id'] ?? null, 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
                     $target['remaining'] -= $pay;
                     $left -= $pay;
                 }

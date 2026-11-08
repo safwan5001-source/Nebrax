@@ -366,4 +366,29 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
             app(FuelShiftService::class)->close($live->fresh(), self::FLOAT + 230, null, $this->f['actor']);
         }
     }
+
+    #[Test]
+    public function the_engine_and_a_generic_cash_invoice_on_the_same_branch_never_deadlock(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $closed = $this->closedShift("gc{$i}", 1_000_000 + $i * 100_000);
+
+            $results = $this->concurrently([
+                fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome,
+                function () use ($i) {
+                    $service = app(\App\Services\Accounting\InvoiceService::class);
+                    $invoice = $service->post($service->create([
+                        'partner_id' => $this->f['customer']->id, 'branch_id' => $this->f['branch']->id, 'payment_type' => 'cash', 'invoice_date' => now()->toDateString(),
+                        'created_by' => $this->f['actor']->id,
+                    ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]), null, $this->f['actor']);
+
+                    return $invoice->status;
+                },
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $this->assertSame('posted', $results[0]['value']);
+            $this->assertSame('posted', $results[1]['value']);
+        }
+    }
 }
