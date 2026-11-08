@@ -24,7 +24,7 @@ const L = M;
 const R = W - M;
 /** آخر ارتفاع يبلغه المحتوى؛ بعده التذييل (خط + بيانات التوليد + ملاحظة النسخة). */
 const CONTENT_BOTTOM = 131;
-const SIGNATURE_HEIGHT = 20;
+const SIGNATURE_HEIGHT = 19;
 
 export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLabels, locale: string): Promise<Blob> {
   const pdf = await newPdf('landscape', 'a5');
@@ -37,17 +37,17 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
 
   // ───── ترويسة ─────
   const header = () => {
-    filled(pdf, L, y, R - L, 18, NAVY, 2);
-    fitText(pdf, doc.company.name ?? '—', rtl ? R - 4 : L + 4, y + 7, 105, { size: 13, bold: true, align: sa, color: [255, 255, 255] });
+    filled(pdf, L, y, R - L, 17, NAVY, 2);
+    fitText(pdf, doc.company.name ?? '—', rtl ? R - 4 : L + 4, y + 6.8, 105, { size: 13, bold: true, align: sa, color: [255, 255, 255] });
     const ids = [doc.company.vat_number ? `${labels.vat}: ${doc.company.vat_number}` : null, doc.company.cr_number ? `${labels.cr}: ${doc.company.cr_number}` : null].filter(Boolean).join('   ');
-    if (ids) fitText(pdf, ids, rtl ? R - 4 : L + 4, y + 12.5, 105, { size: 7, align: sa, color: [203, 213, 225] });
+    if (ids) fitText(pdf, ids, rtl ? R - 4 : L + 4, y + 12, 105, { size: 7, align: sa, color: [203, 213, 225] });
     const e = rtl ? L + 4 : R - 4;
-    fitText(pdf, labels.title, e, y + 6, 78, { size: 12, bold: true, align: ea, color: [255, 255, 255] });
-    fitText(pdf, `${labels.reference}: ${doc.reference}`, e, y + 10.5, 78, { size: 8, align: ea, color: [203, 213, 225] });
-    fitText(pdf, labels.status[doc.status === 'approved' ? 'approved' : 'draft'], e, y + 15, 78, { size: 8, bold: true, align: ea, color: [255, 255, 255] });
-    filled(pdf, L, y + 18, R - L, 5, financial ? [180, 83, 9] : [37, 99, 235]);
-    text(pdf, financial ? labels.variantFinancial : labels.variantOperational, (L + R) / 2, y + 21.6, { size: 7, bold: true, align: 'center', color: [255, 255, 255] });
-    y += 27;
+    fitText(pdf, labels.title, e, y + 5.8, 78, { size: 12, bold: true, align: ea, color: [255, 255, 255] });
+    fitText(pdf, `${labels.reference}: ${doc.reference}`, e, y + 10, 78, { size: 8, align: ea, color: [203, 213, 225] });
+    fitText(pdf, labels.status[doc.status === 'approved' ? 'approved' : 'draft'], e, y + 14.2, 78, { size: 8, bold: true, align: ea, color: [255, 255, 255] });
+    filled(pdf, L, y + 17, R - L, 5, financial ? [180, 83, 9] : [37, 99, 235]);
+    text(pdf, financial ? labels.variantFinancial : labels.variantOperational, (L + R) / 2, y + 20.6, { size: 7, bold: true, align: 'center', color: [255, 255, 255] });
+    y += 25.5;
   };
   /** ترويسة صفحة التتمة: شريط واحد بالمنشأة ورقم السند. */
   const continuation = () => {
@@ -82,23 +82,23 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
         const { colW } = edges(i, columns);
         return fitLinesCount(pdf, shown, colW, 8.5);
       });
-      const rowHeight = 9.5 + (Math.max(...lineCounts) - 1) * 3.6;
+      const rowHeight = 8.6 + (Math.max(...lineCounts) - 1) * 3.6;
       ensure(rowHeight + 1);
       row.forEach(([label, value], i) => {
         const { x0, x1, colW } = edges(i, columns);
         text(pdf, label, x0, y, { size: 7, color: MUTED, align: sa, maxWidth: colW });
         fitLines(pdf, value && value.trim() !== '' ? value : '—', x0, y + 4.2, colW, { size: 8.5, bold: true, align: sa }, 4);
-        line(pdf, Math.min(x0, x1), y + rowHeight - 3.2, Math.max(x0, x1), y + rowHeight - 3.2);
+        line(pdf, Math.min(x0, x1), y + rowHeight - 3, Math.max(x0, x1), y + rowHeight - 3);
       });
       y += rowHeight;
     }
-    y += 1.5;
+    y += 2;
   };
   const heading = (title: string) => {
     ensure(9);
-    filled(pdf, L, y - 3.4, R - L, 5.4, SOFT, 1);
-    text(pdf, title, start, y + 0.4, { size: 8.5, bold: true, color: NAVY, align: sa });
-    y += 5.6;
+    filled(pdf, L, y - 3.2, R - L, 5, SOFT, 1);
+    text(pdf, title, start, y + 0.3, { size: 8.5, bold: true, color: NAVY, align: sa });
+    y += 5.2;
   };
 
   grid([
@@ -117,11 +117,11 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
   boxes.forEach(([label, value], i) => {
     const { x0, x1, colW } = edges(i, 4);
     const left = Math.min(x0, x1);
-    filled(pdf, left, y - 3, colW, 11.5, SOFT, 1);
+    filled(pdf, left, y - 3, colW, 10.5, SOFT, 1);
     text(pdf, label, x0 + (rtl ? -2 : 2), y + 0.4, { size: 7, color: MUTED, align: sa, maxWidth: colW - 4 });
-    fitText(pdf, value, x0 + (rtl ? -2 : 2), y + 6, colW - 4, { size: 10.5, bold: true, align: sa, color: NAVY });
+    fitText(pdf, value, x0 + (rtl ? -2 : 2), y + 5.4, colW - 4, { size: 10.5, bold: true, align: sa, color: NAVY });
   });
-  y += 13.5;
+  y += 12;
 
   // ───── القراءات: جدول (النوع × قبل/بعد/الزيادة) ─────
   const r = doc.readings;
@@ -137,16 +137,16 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
       return rtl ? R - offset : L + offset;
     };
     cols.forEach((c, i) => { if (c.label) text(pdf, c.label, cell(i), y, { size: 7, color: MUTED, align: sa, maxWidth: c.w - 2 }); });
-    y += 4.6;
+    y += 4.2;
     readingRows.forEach(([kind, before, after]) => {
       const g = gain(before, after);
       text(pdf, kind, cell(0), y, { size: 8, bold: true, align: sa, maxWidth: 44 });
       [before, after].forEach((reading, i) => text(pdf, reading ? `${litersText(reading.liters)} ${labels.unit}` : '—', cell(i + 1), y, { size: 8.5, align: sa, maxWidth: 44 }));
       text(pdf, g === null ? '—' : `${g} ${labels.unit}`, cell(3), y, { size: 8.5, bold: true, align: sa, maxWidth: 44 });
       line(pdf, L, y + 1.6, R, y + 1.6);
-      y += 5.2;
+      y += 4.8;
     });
-    y += 1;
+    y += 0.5;
   }
 
   // ───── التكلفة (النسخة المالية فقط؛ الحمولة التشغيلية بلا cost) ─────
@@ -164,15 +164,17 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
   const names = doc.attachments.slice(0, 3).map((attachment) => attachment.name);
   const extra = doc.attachments.length - names.length;
   const attachmentsText = doc.attachments.length === 0 ? labels.noAttachments : `${names.join('  •  ')}${extra > 0 ? `  (+${extra})` : ''}`;
-  text(pdf, `${labels.attachments}:`, start, y, { size: 7.5, bold: true, color: MUTED, align: sa });
-  fitText(pdf, attachmentsText, rtl ? R - 24 : L + 24, y, R - L - 26, { size: 8, align: sa, color: doc.attachments.length === 0 ? MUTED : [17, 24, 39] });
+  const attachLabel = `${labels.attachments}:`;
+  const labelWidth = textWidth(pdf, attachLabel, 7.5, true) + 2.5;
+  text(pdf, attachLabel, start, y, { size: 7.5, bold: true, color: MUTED, align: sa });
+  fitText(pdf, attachmentsText, rtl ? R - labelWidth : L + labelWidth, y, R - L - labelWidth, { size: 8, align: sa, color: doc.attachments.length === 0 ? MUTED : [17, 24, 39] });
   y += 5.2;
 
   if (doc.notes) {
     const lines = wrapLines(pdf, doc.notes, R - L - 2, 8);
     ensure(4.4 + 3.8);
     text(pdf, `${labels.notes}:`, start, y, { size: 7.5, bold: true, color: MUTED, align: sa });
-    y += 4.2;
+    y += 4;
     lines.forEach((content) => { ensure(4); text(pdf, content, start, y, { size: 8, align: sa }); y += 3.8; });
     y += 1;
   }
@@ -186,10 +188,10 @@ export async function createReceiptPdfA5(doc: ReceiptDocument, labels: ReceiptLa
     const xl = rtl ? x0 - sigW : x0;
     const cx = x0 + (rtl ? -sigW / 2 : sigW / 2);
     text(pdf, role, cx, y, { size: 8, bold: true, align: 'center', color: NAVY, maxWidth: sigW });
-    fitText(pdf, name ?? '—', cx, y + 4.6, sigW - 2, { size: 8.5, align: 'center' });
-    if (when) text(pdf, when, cx, y + 8.6, { size: 7, align: 'center', color: MUTED });
-    line(pdf, xl, y + 16, xl + sigW, y + 16, MUTED, 0.3);
-    text(pdf, labels.signature, cx, y + 19.4, { size: 7, align: 'center', color: MUTED });
+    fitText(pdf, name ?? '—', cx, y + 4.4, sigW - 2, { size: 8.5, align: 'center' });
+    if (when) text(pdf, when, cx, y + 8.2, { size: 7, align: 'center', color: MUTED });
+    line(pdf, xl, y + 15, xl + sigW, y + 15, MUTED, 0.3);
+    text(pdf, labels.signature, cx, y + 18.4, { size: 7, align: 'center', color: MUTED });
   };
   sig(0, labels.receiver, doc.received_by, dateText(doc.received_at));
   sig(1, labels.approver, doc.approved_by ?? labels.notApproved, doc.approved_at ? dateText(doc.approved_at) : null);
