@@ -51,3 +51,7 @@
 
 ## 6) المراجعة المستقلة البديلة
 `docs/fuel-stations/reviews/AWJ_FUEL_SETTLEMENT_P1_3B_2AB_INDEPENDENT_REVIEW.md` — ليست Codex. عولجت الملاحظات 1–4 (الأولى جمود حقيقي أثبته PostgreSQL) وسُجّلت 5 شرطاً قبل 2d.
+
+
+## 6) المراجعة المستقلة البديلة
+`docs/fuel-stations/reviews/AWJ_FUEL_SETTLEMENT_P1_3B_2AB_INDEPENDENT_REVIEW.md` — ليست Codex. عولجت الملاحظات 1–4 (الأولى جمود حقيقي أثبته PostgreSQL) وسُجّلت 5 شرطاً قبل 2d.
