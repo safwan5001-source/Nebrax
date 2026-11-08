@@ -60,6 +60,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'fuel.governance.manage': 'access',
   // FUEL-B3: يفوّض صلاحيات الوقود ونطاق المحطات لموظفي المحطات — يغيّر من يصل إلى ماذا (محدود بسقف المنح والنطاق).
   'fuel.staff.manage': 'access',
+  // P1-3b-1 (D-S1): إصدار فواتير ضريبية وترحيل قيود من تسوية وردية — أثر محاسبي وضريبي مباشر.
+  'fuel.settlement.post': 'financial',
 
   // يمسّ الإقفال الضريبي والمحاسبي والامتثال
   'zatca.submit': 'compliance',

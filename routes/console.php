@@ -177,3 +177,10 @@ Schedule::command('pos:sweep-terminals')
     ->everyFiveMinutes()
     ->withoutOverlapping(10)
     ->onOneServer();
+
+// P1-3b-1 (D-S2): عامل مهام تسوية ورديات الوقود — إيجار وإعادة محاولة واسترداد بعد سقوط العامل. لا أثر محاسبي في هذه الشريحة (فحوص مسبقة فقط) ولا يفعل شيئاً ما دامت البوابة مغلقة.
+// نفس ملاحظة التفعيل أعلاه: النشر الحالي بلا cron، فالتعريف خامل حتى يوصَل `schedule:run` أو يُستدعى الأمر يدوياً.
+Schedule::command('fuel:settlement:run-jobs')
+    ->everyMinute()
+    ->withoutOverlapping(10)
+    ->onOneServer();

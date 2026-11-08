@@ -471,6 +471,9 @@ class Settings
             // P1-3a: تسوية ورديات الوقود. none (الافتراضي = السلوك الحالي حرفياً) | post_on_close (ترحيل البقية غير الموثَّقة عند الإغلاق، P1-3b). مفتاح حوكمة،
             // خلف FUEL_SHIFT_SETTLEMENT_ENABLED مع مرجع الرأي الضريبي. لا يُضبط post_on_close قبل اكتمال شروط الجاهزية.
             'shift_settlement_mode' => 'none',
+            // P1-3b-1 (D-S3): عتبتا تنبيه/تصعيد التسوية المعلقة بالساعات من لحظة **إغلاق الوردية** (افتراضيان معتمدان: 2 و24)، قابلتان للضبط. عرض وتنبيه فقط — لا تغيّر ترحيلاً.
+            'shift_settlement_alert_after_hours' => 2,
+            'shift_settlement_escalation_after_hours' => 24,
             // Cycle 9: الصيانة والسلامة والتقارير تبقى سياسات قابلة للوراثة
             // ولا تخلق قيداً أو أمراً لجهاز أو إجراءً خلفياً تلقائياً.
             'maintenance_default_calendar_interval_days' => 30,
