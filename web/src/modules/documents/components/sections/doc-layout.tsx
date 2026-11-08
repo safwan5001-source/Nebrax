@@ -6,6 +6,7 @@ import { themeCssVars } from '../../themes';
 import { resolveDirection } from '../../utils/direction';
 import { CLASSIC_STYLE } from '../../templates/template-styles';
 import { DocStyleProvider } from '../doc-style-context';
+import { isNarrowDocPageFrame, useDocPageFrame } from '../doc-page-frame-context';
 
 /**
  * غلاف المستند A4 — جذر الالتقاط (#print-root) الذي يُطبَع ويُصدَّر PDF *هو نفسه*
@@ -28,16 +29,28 @@ export function DocLayout({
   children: React.ReactNode;
 }) {
   const dir = resolveDirection(direction, directionSample);
+  // Output Profile مدعوم: عرض الجذر وأدنى ارتفاعه من الإطار. غيابه = الصنفان الثابتان
+  // `w-[210mm] max-w-[210mm] min-h-[277mm]` كما كانا (DOM مطابق للسابق).
+  const frame = useDocPageFrame();
   return (
     <DocStyleProvider value={style}>
       <div
         id={rootId ?? undefined}
         dir={dir}
-        style={themeCssVars(theme)}
+        style={frame
+          ? {
+              ...themeCssVars(theme),
+              width: `${frame.contentWidthMm}mm`,
+              maxWidth: `${frame.contentWidthMm}mm`,
+              minHeight: `${frame.contentMinHeightMm}mm`,
+            }
+          : themeCssVars(theme)}
         data-doc-composition={style.composition}
         data-doc-paper
+        data-doc-narrow={isNarrowDocPageFrame(frame) ? '' : undefined}
         className={cn(
-          'mx-auto flex min-h-[277mm] w-[210mm] max-w-[210mm] flex-col bg-white text-[12px] leading-relaxed text-black shadow-sm print:min-h-0 print:w-full print:shadow-none',
+          'mx-auto flex flex-col bg-white text-[12px] leading-relaxed text-black shadow-sm print:min-h-0 print:w-full print:shadow-none',
+          !frame && 'min-h-[277mm] w-[210mm] max-w-[210mm]',
           style.pagePadding
         )}
       >

@@ -1183,6 +1183,18 @@ html[data-awj-ui="3"] [data-awj-card-title] {
   display: none;
 }
 
+/* Output Profile ضيّق (AWJ-DOC-V2-PR3B): ضغط حشو وخط خلايا الجداول في إطار < 150mm فقط.
+   الصفة لا تُوسَم إلا حين يوجد إطار ضيّق، فلا أثر على A4 ولا على مستند بلا ملف إخراج. */
+[data-doc-narrow] table :is(th, td) {
+  padding-inline: 0.25rem !important;
+  font-size: 10px !important;
+}
+/* رؤوس الأعمدة لا تُكسر وسط الكلمة: يتّسع العمود لأطول كلمة بدل «الكم|ية». */
+[data-doc-narrow] table th {
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
 /* عناصر تظهر عند الطباعة فقط (مستند PDF مخصّص كالفاتورة الضريبية) */
 .print-only {
   display: none;

@@ -16,6 +16,8 @@ import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { resolveDocumentOutputSpec } from '@/modules/documents/services/output-spec';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { type CreditNoteTemplateDefinition } from '@/modules/credit-notes/services/credit-note-template-design';
 import {
@@ -62,6 +64,7 @@ function documentPropsFromResolved(resolved: ResolvedLiveTemplate) {
     showLogo: resolved.showLogo,
     logoHeight: resolved.logoHeight,
     layout: resolved.layout,
+    outputProfile: resolved.outputProfile,
   };
 }
 
@@ -89,6 +92,7 @@ export default function CreditNoteDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [outputProfile, setOutputProfile] = useState<OutputProfile | null>(null);
   const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
   const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
 
@@ -105,6 +109,7 @@ export default function CreditNoteDetailPage() {
       setBankText(null);
       setStampUrl(null);
       setSignatureUrl(null);
+      setOutputProfile(null);
       return;
     }
     setTemplateId(resolved.templateId);
@@ -118,6 +123,7 @@ export default function CreditNoteDetailPage() {
     setBankText(resolved.bankText);
     setStampUrl(resolved.stampUrl);
     setSignatureUrl(resolved.signatureUrl);
+    setOutputProfile(resolved.outputProfile);
   }
 
   function load() {
@@ -191,10 +197,11 @@ export default function CreditNoteDetailPage() {
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(note.total)}</span>],
   ];
 
-  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
-  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
-  const pdfPaperId = (pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
-  const pdfPaper = { widthMm: PAPER_SIZES[pdfPaperId].widthMm, heightMm: PAPER_SIZES[pdfPaperId].heightMm };
+  // Output Profile (AWJ-DOC-V2-PR3B): ملف المراجعة المطبَّقة يحدد المقاس والهوامش؛ غيابه (أو ملف لا يدعمه القالب) = السلوك السابق حرفياً.
+  const printSpec = resolveDocumentOutputSpec(templateId, outputProfile);
+  const pdfSpec = pdfOutput ? resolveDocumentOutputSpec(pdfOutput.templateId, pdfOutput.outputProfile) : printSpec;
+  const paper = printSpec.paper;
+  const pdfPaper = pdfSpec.paper;
   const pdfDoc = () => document.getElementById(pdfSharesPrintRoot ? 'print-root' : 'pdf-print-root');
   const frozenThermalDefinition = (note.thermal_template_revision?.definition as CreditNoteTemplateDefinition | undefined) ?? null;
   const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
@@ -308,6 +315,7 @@ export default function CreditNoteDetailPage() {
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}
                 layout={layout}
+                outputProfile={outputProfile}
               />
             </DocumentScaler>
           </div>

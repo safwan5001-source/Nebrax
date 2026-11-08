@@ -152,7 +152,7 @@ describe('سجل قوالب المستندات', () => {
     expect(proposal.component).toBe(QuotationProposal);
     expect(proposal.defaultTheme).toBe('blue');
     expect(proposal.documentTypes).toEqual(['quotation']);
-    expect(proposal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal']);
+    expect(proposal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal', 'a5_landscape']);
     expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
     expect(getTemplate('unknown-template-id').id).toBe('tax-invoice-classic');
     expect(getTemplate('quotation-proposal').component).not.toBe(TaxInvoiceClassic);
@@ -187,7 +187,7 @@ describe('سجل قوالب المستندات', () => {
     expect(formal.component).toBe(PurchaseOrderFormal);
     expect(formal.defaultTheme).toBe('gray');
     expect(formal.documentTypes).toEqual(['purchase_order']);
-    expect(formal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal']);
+    expect(formal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal', 'a5_landscape']);
     expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
     expect(getTemplate('unknown-template-id').id).toBe('tax-invoice-classic');
     expect(getTemplate('purchase-order-formal').component).not.toBe(TaxInvoiceClassic);
