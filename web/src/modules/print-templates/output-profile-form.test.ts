@@ -145,7 +145,9 @@ describe('outputProfileUnwiredTypes', () => {
     expect(outputProfileUnwiredTypes(['tax_invoice', 'simplified_tax_invoice', 'quotation', 'credit_note', 'debit_note', 'purchase_order'])).toEqual([]);
   });
   it('غيرها غير مربوط بعد ويُعلَن', () => {
-    expect(outputProfileUnwiredTypes(['tax_invoice', 'receipt_voucher', 'purchase_invoice'])).toEqual(['receipt_voucher', 'purchase_invoice']);
+    expect(outputProfileUnwiredTypes(['tax_invoice', 'delivery_note', 'sales_order'])).toEqual(['delivery_note', 'sales_order']);
+    // PR4: فاتورة المشتريات وسندا القبض والصرف صارت مربوطة.
+    expect(outputProfileUnwiredTypes(['purchase_invoice', 'receipt_voucher', 'payment_voucher'])).toEqual([]);
   });
 });
 

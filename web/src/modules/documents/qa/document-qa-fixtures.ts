@@ -85,6 +85,7 @@ function longEnglishText(label: string): string {
  */
 export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
   const type = options.documentType ?? 'tax_invoice';
+  if (type === 'receipt_voucher' || type === 'payment_voucher') return makeVoucherQaModel(options, type);
   const english = options.direction === 'ltr';
   const verbose = options.scenario === 'multipage' || options.scenario === 'long_content' || options.scenario === 'twenty';
   const lines = Array.from({ length: countForScenario(options.scenario) }, (_, index) => lineAt(index, options.direction, verbose));
@@ -162,5 +163,47 @@ export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
       : null,
     stampUrl: assets ? STAMP_DATA_URL : null,
     signatureUrl: assets ? SIGNATURE_DATA_URL : null,
+  };
+}
+
+/** مبلغ كل تخصيص في عينات السند (هللات) — كبير عمداً: ≈ 24.7 مليون ريال لكل تخصيص. */
+const VOUCHER_QA_ALLOCATION_MINOR = 2_469_135_780;
+
+/**
+ * عينة سند قبض/صرف (AWJ-DOC-V2-PR4): بلا بنود ولا ضريبة؛ جسم `voucher` بتخصيصات بمبالغ كبيرة
+ * يتزايد عددها بحسب السيناريو (حتى 40 تخصيصاً)، مع ملاحظات وبنك وختم وتوقيع عند `showAssets`.
+ * تعيد استعمال ترويسة/أطراف عينة الفاتورة نفسها فتُقاس القوالب بمحتوى متطابق.
+ */
+function makeVoucherQaModel(options: DocumentQaOptions, type: 'receipt_voucher' | 'payment_voucher'): DocumentModel {
+  const base = makeDocumentQaModel({ ...options, documentType: 'tax_invoice' });
+  const english = options.direction === 'ltr';
+  const received = type === 'receipt_voucher';
+  const count = countForScenario(options.scenario);
+  const longContent = options.scenario === 'multipage' || options.scenario === 'long_content';
+  const allocations = Array.from({ length: count }, (_, index) => ({
+    label: longContent
+      ? (english
+        ? `${received ? 'Invoice' : 'Purchase'} INV-QA-${String(index + 1).padStart(4, '0')} — long customer reference for the Gulf regional project delivery`
+        : `${received ? 'فاتورة' : 'مشتريات'} INV-QA-${String(index + 1).padStart(4, '0')} — مرجع طويل لمشروع الخليج الإقليمي وتسليم الخدمات`)
+      : (english ? `${received ? 'Invoice' : 'Purchase'} INV-QA-${String(index + 1).padStart(4, '0')}` : `${received ? 'فاتورة' : 'مشتريات'} INV-QA-${String(index + 1).padStart(4, '0')}`),
+    amount: VOUCHER_QA_ALLOCATION_MINOR,
+  }));
+  const amount = allocations.reduce((sum, row) => sum + row.amount, 0);
+
+  return {
+    ...base,
+    type,
+    lines: [],
+    totals: { subtotal: amount, tax: 0, total: amount },
+    qr: null,
+    terms: null,
+    meta: { ...base.meta, number: `${received ? 'RCV' : 'PAY'}-QA-${options.scenario.toUpperCase()}-2026-0001`, dueDate: null, paymentType: null },
+    voucher: {
+      direction: received ? 'received' : 'paid',
+      method: english ? 'Bank transfer' : 'تحويل بنكي',
+      amount,
+      reference: 'REF-QA-2026-0001',
+      allocations,
+    },
   };
 }

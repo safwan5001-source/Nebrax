@@ -4,6 +4,7 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { buildPaymentDocumentModel, type SourcePayment } from '@/modules/documents/builder/from-payment';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 
 export type PaymentDoc = SourcePayment;
 export type PaymentCompany = SourceCompany;
@@ -35,6 +36,9 @@ export function PaymentDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  layout,
+  status,
+  outputProfile,
   rootId,
 }: {
   payment: PaymentDoc;
@@ -49,10 +53,17 @@ export function PaymentDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  /** تخطيط صريح (جذر PDF الملتقَط بتخطيط مراجعة PDF)؛ غيابه = تخطيط السند الثابت للمعاينة والطباعة كما كان. */
+  layout?: DocSectionLayoutItem[] | null;
+  /** حالة السند لإشعار مسودة/ملغى في الترويسة؛ تُمرَّر لجذر PDF الملتقَط وحده (المتجهي كان يطبعها) وغيابها = المعاينة والطباعة كما كانتا. */
+  status?: string | null;
+  /** ملف الإخراج من المراجعة المطبَّقة (AWJ-DOC-V2-PR4)؛ غيابه = السلوك السابق. */
+  outputProfile?: OutputProfile | null;
   rootId?: string | null;
 }) {
-  const model = buildPaymentDocumentModel({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
+  const built = buildPaymentDocumentModel({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
+  const model = status ? { ...built, status } : built;
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={VOUCHER_LAYOUT} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout && layout.length ? layout : VOUCHER_LAYOUT} rootId={rootId} outputProfile={outputProfile} />
   );
 }

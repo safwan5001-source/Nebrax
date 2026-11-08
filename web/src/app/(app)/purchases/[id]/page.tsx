@@ -41,8 +41,10 @@ import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplatesForDocumentType, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { resolveDocumentOutputSpec } from '@/modules/documents/services/output-spec';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
+import { readOutputProfile, type OutputProfile } from '@/modules/print-templates/services/output-profile';
 
 interface FrozenPrintTemplateRevision {
   id: string;
@@ -59,6 +61,7 @@ interface FrozenPrintTemplateRevision {
     bank_text?: string;
     stamp?: string;
     signature?: string;
+    output_profile?: unknown;
   };
   document_types: string[];
 }
@@ -192,6 +195,7 @@ export default function PurchaseDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [outputProfile, setOutputProfile] = useState<OutputProfile | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [duplicating, setDuplicating] = useState(false);
   const v3 = useAwjUi3();
@@ -251,6 +255,8 @@ export default function PurchaseDetailPage() {
           setBankText(frozen.bank_text ?? null);
           setStampUrl(frozen.stamp ?? null);
           setSignatureUrl(frozen.signature ?? null);
+          // ملف الإخراج من المراجعة المثبتة نفسها؛ غيابه = السلوك السابق (AWJ-DOC-V2-PR4).
+          setOutputProfile(readOutputProfile(frozen));
           return;
         }
 
@@ -268,6 +274,7 @@ export default function PurchaseDetailPage() {
         setBankText(resolved.bankText);
         setStampUrl(resolved.stampUrl);
         setSignatureUrl(resolved.signatureUrl);
+        setOutputProfile(resolved.outputProfile);
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
@@ -297,8 +304,8 @@ export default function PurchaseDetailPage() {
   const receivedStatusKey = receiptKey(purchase.received_status);
   const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);
   const supplierName = supplier?.name ?? '—';
-  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
-  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  // ملف الإخراج يحدد المقاس والهوامش؛ غيابه (أو ملف لا يدعمه القالب) = `supportedPaper[0]` كما كان.
+  const paper = resolveDocumentOutputSpec(templateId, outputProfile).paper;
   const frozenThermalDefinition = purchase.thermal_template_revision?.definition ?? null;
   const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
   const thermalPaperId = thermalTemplateId
@@ -467,7 +474,7 @@ export default function PurchaseDetailPage() {
     {isDraft && <DropdownItem icon={Trash2} tone="danger" disabled={!canDeleteDraft} onClick={() => setPendingAction('delete')}>{tp('delete')}</DropdownItem>}
   </>;
 
-  const purchaseDocumentEl = <PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={templateId} themeId={themeId} footerText={footerText} terms={termsText} bank={bankText} stampUrl={stampUrl} signatureUrl={signatureUrl} showLogo={showLogo} logoHeight={logoHeight} layout={layout} />;
+  const purchaseDocumentEl = <PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={templateId} themeId={themeId} footerText={footerText} terms={termsText} bank={bankText} stampUrl={stampUrl} signatureUrl={signatureUrl} showLogo={showLogo} logoHeight={logoHeight} layout={layout} outputProfile={outputProfile} />;
 
   const documentPreview = <Card>
     <CardHeader className="no-print p-0"><button type="button" onClick={() => setDocumentOpen((value) => !value)} aria-expanded={documentOpen} aria-controls="purchase-document-content" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"><CardTitle>{t('document')}</CardTitle><ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${documentOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} /></button></CardHeader>

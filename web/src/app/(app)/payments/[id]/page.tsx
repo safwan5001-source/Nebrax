@@ -19,14 +19,17 @@ import {
 } from '@/components/payments/payment-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { printDocument } from '@/modules/documents/services/export';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { createPaymentPdf, downloadPaymentPdf, sharePaymentPdf } from '@/modules/payments/services/payment-pdf';
 import { getTemplate, listTemplatesForDocumentType, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { resolveDocumentOutputSpec } from '@/modules/documents/services/output-spec';
+import { resolveDocumentOutputTemplates } from '@/modules/print-templates/services/document-output-template';
+import { readOutputProfile, type OutputProfile } from '@/modules/print-templates/services/output-profile';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
-import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment, type ResolvedLiveTemplate } from '@/modules/print-templates/services/live-template-definition';
 
 /** دفعة من الـ API — أرقام بالريال نصّاً. */
 interface FrozenPrintTemplateRevision {
@@ -41,6 +44,7 @@ interface FrozenPrintTemplateRevision {
     bank_text?: string;
     stamp?: string;
     signature?: string;
+    output_profile?: unknown;
   };
   document_types: string[];
 }
@@ -91,6 +95,8 @@ export default function PaymentDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [outputProfile, setOutputProfile] = useState<OutputProfile | null>(null);
+  const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
 
   // طريقة الدفع تُترجَم قبل بناء النموذج (المحرّك يستهلك نصّاً جاهزاً).
   const partnerName = partner?.name ?? '—';
@@ -113,8 +119,19 @@ export default function PaymentDetailPage() {
         // السند المرحّل يقرأ مراجعته المثبتة حصراً؛ لا يعيد تعديل القالب أو
         // إعدادات التصميم الحية تفسير مستند تاريخي. المسودات والبيانات القديمة
         // تستخدم إعدادات التوافق الحية إلى أن تُرحّل.
+        // مراجعات الإخراج (طباعة/PDF) لحساب ملف الإخراج: المرحّل من لقطاته المثبتة فقط (AWJ-DOC-V2-PR4).
+        const outputs = resolveDocumentOutputTemplates({
+          documentType,
+          // أي لقطة مثبتة (طباعة أو PDF أو حراري) تعني مستنداً مرحَّلاً: سند له مراجعة PDF فقط يقرأ لقطته لا التعيين الحي.
+          isPosted: Boolean(r.data.print_template_revision || r.data.pdf_template_revision || r.data.thermal_template_revision),
+          frozenPrint: r.data.print_template_revision,
+          frozenPdf: r.data.pdf_template_revision,
+          livePrint: live.status === 'fulfilled' ? live.value.data : null,
+        });
+        setPdfOutput(outputs.pdf);
         const frozen = r.data.print_template_revision?.definition;
         if (frozen) {
+          setOutputProfile(readOutputProfile(frozen));
           setTemplateId(getTemplate(frozen.template_id ?? DEFAULT_TEMPLATE_ID).id);
           setThemeId(frozen.theme_id ?? null);
           setFooterText(frozen.footer_text ?? null);
@@ -140,6 +157,7 @@ export default function PaymentDetailPage() {
             setBankText(resolved.bankText);
             setStampUrl(resolved.stampUrl);
             setSignatureUrl(resolved.signatureUrl);
+            setOutputProfile(resolved.outputProfile);
           }
         }
       })
@@ -183,8 +201,16 @@ export default function PaymentDetailPage() {
     [tp('amount'), <span key="a" className="num font-semibold">{formatRiyal(payment.amount)}</span>],
   ];
 
-  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
-  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  // ملف الإخراج يحدد مقاس الطباعة والـPDF؛ غيابه (أو ملف لا يدعمه القالب) = السلوك السابق حرفياً (A4 + PDF المتجهي).
+  const printSpec = resolveDocumentOutputSpec(templateId, outputProfile);
+  const pdfSpec = pdfOutput ? resolveDocumentOutputSpec(pdfOutput.templateId, pdfOutput.outputProfile) : printSpec;
+  const paper = printSpec.paper;
+  // محرك PDF المتجهي لهذا السند مرسوم بإحداثيات A4 ثابتة، فلا يحترم مقاساً آخر. عند وجود ملف إخراج مطبَّق
+  // يُلتقَط جذر PDF **مخصَّص** بمحرك الالتقاط القائم (كالفواتير) بقالب مراجعة PDF وتخطيطها (بنك/ختم/توقيع كما كان
+  // يفعل المتجهي)، لا جذر الطباعة ذو التخطيط الثابت؛ وبغيابه يبقى المتجهي حرفياً.
+  const capturePdf = Boolean(pdfOutput && pdfSpec.profile);
+  // تكافؤ بيانات الجذر الملتقَط مع ما كان يطبعه المتجهي: التخطيط، حالة السند، وشعار المنشأة (`company.logo`).
+  const captureElement = () => document.getElementById('pdf-print-root');
   const frozenPdfDefinition = resolveFrozenOutputDefinition(
     payment.pdf_template_revision,
     payment.print_template_revision,
@@ -245,7 +271,9 @@ export default function PaymentDetailPage() {
     if (!payment) return;
     setBusy('pdf');
     try {
-      downloadPaymentPdf(await createPdf(), payment.number);
+      const element = capturePdf ? captureElement() : null;
+      if (element) await documentExporter.download({ element, fileName: payment.number, paper: pdfSpec.paper });
+      else downloadPaymentPdf(await createPdf(), payment.number);
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -258,7 +286,11 @@ export default function PaymentDetailPage() {
     if (!payment) return;
     setBusy('share');
     try {
-      const result = await sharePaymentPdf(await createPdf(), payment.number, payment.direction === 'received' ? t('receipt_title') : t('payment_title'));
+      const shareTitle = payment.direction === 'received' ? t('receipt_title') : t('payment_title');
+      const element = capturePdf ? captureElement() : null;
+      const result = element
+        ? await documentExporter.share({ element, fileName: payment.number, title: shareTitle, paper: pdfSpec.paper })
+        : await sharePaymentPdf(await createPdf(), payment.number, shareTitle);
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
@@ -363,11 +395,33 @@ export default function PaymentDetailPage() {
                 showLogo={showLogo}
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}
+                outputProfile={outputProfile}
               />
             </DocumentScaler>
           </div>
         </CardContent>
       </Card>
+
+      {capturePdf && pdfOutput && (
+        <PaymentDocument
+          payment={paymentDoc}
+          company={company}
+          partner={partner}
+          templateId={pdfOutput.templateId}
+          themeId={pdfOutput.themeId}
+          footerText={pdfOutput.footerText}
+          bank={pdfOutput.bankText}
+          stampUrl={pdfOutput.stampUrl}
+          signatureUrl={pdfOutput.signatureUrl}
+          showLogo={pdfOutput.showLogo}
+          logoUrl={logoUrl ?? company?.logo ?? null}
+          logoHeight={pdfOutput.logoHeight}
+          layout={pdfOutput.layout}
+          status={payment.status}
+          outputProfile={pdfOutput.outputProfile}
+          rootId="pdf-print-root"
+        />
+      )}
 
       {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
         <PaymentDocument
