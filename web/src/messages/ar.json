@@ -17114,7 +17114,11 @@
       "tax_mode_unset": "نمط الضريبة غير محدد",
       "product_unavailable": "منتج غير متاح",
       "no_nozzles": "لا فوهات",
-      "shift_cap_reached": "تجاوز الحد الأقصى للورديات"
+      "shift_cap_reached": "تجاوز الحد الأقصى للورديات",
+      "tank_reading_missing": "قراءة خزان ناقصة",
+      "invoice_missing": "بيع بلا فاتورة",
+      "cost_unavailable": "بيانات التكلفة غير متاحة",
+      "collection_not_declared": "وردية بلا إقرار تحصيل"
     }
   }
 }
