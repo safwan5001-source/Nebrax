@@ -324,7 +324,7 @@ for (const kind of TYPES) {
 // ───────────────────────── 4) مستند طويل (40 سطراً/تخصيصاً): صفحات متعددة بلا فقد ─────────────────────────
 for (const kind of TYPES) {
   for (const paper of [A4, A5L, A5, A6L]) {
-    test(`طويل · ${kind} · classic-v2 · ${paper.key}: يُقسَّم على صفحات والإجمالي في الأخيرة`, async ({ browser }, testInfo) => {
+    test(`طويل · ${kind} · classic-v2 · ${paper.key}: يُقسَّم على صفحات وكل المبالغ في الطباعة`, async ({ browser }, testInfo) => {
       test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
       test.setTimeout(300_000);
       const { g, print, exported } = await verifyProfile(browser, { template: 'tax-invoice-classic-v2', type: kind, paper, scenario: 'multipage' }, `multipage-${kind}-${paper.key}`);
@@ -338,9 +338,12 @@ for (const kind of TYPES) {
       try {
         const file = path.join(dir, 'p.pdf');
         await writeFile(file, print.buffer);
+        // لا فقد محتوى: كل بند/تخصيص والإجمالي موجود في نص PDF المطبوع عبر كل الصفحات. موضع الإجمالي يتبع تصميم النوع
+        // (السند: في كتلة السند أعلى المستند؛ المشتريات: بعد الجدول وقبل الشروط/الملاحظات الطويلة) فلا يُشترط في الصفحة الأخيرة.
+        const whole = squash(execFileSync('pdftotext', [file, '-']).toString());
+        for (const amount of amounts) expect(whole, `مبلغ مفقود من الطباعة ${money(amount)}`).toContain(squash(money(amount)));
         const last = execFileSync('pdftotext', ['-f', String(print.info.pageCount), '-l', String(print.info.pageCount), file, '-']).toString();
-        expect(squash(last), 'الإجمالي ليس في آخر صفحة طباعة').toContain(squash(money(amounts[amounts.length - 1])));
-        expect(last.trim().length).toBeGreaterThan(20);
+        expect(last.trim().length, 'صفحة أخيرة فارغة').toBeGreaterThan(20);
       } finally {
         await rm(dir, { recursive: true, force: true });
       }

@@ -318,6 +318,7 @@ test.describe('السند الرسمي · الحي والاتجاهان والج
         const text = squash(await rootText(page));
         for (const row of ALLOCATIONS) expect(text).toContain(squash(money(Number(row.amount))));
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+        expect(await printedStyle(page)).toBe(marginCss(148, 105, 8));
         const printed = await printPagePdf(page);
         const size = pageSizeMm(printed.info);
         expect(Math.abs(size.w - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
