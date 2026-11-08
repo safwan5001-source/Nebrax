@@ -1,10 +1,10 @@
+import { utcIsoToZonedWallTime } from '@/lib/timezone';
 import type { ReportFilters } from './client';
 
 /** مساعدات التواريخ للمرشحات. التواريخ سلاسل Y-m-d بتوقيت منطقة معطاة (منطقة المحطة، لا منطقة المتصفح). */
 
 export function todayIn(timezone: string, now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  return parts; // en-CA => YYYY-MM-DD
+  return utcIsoToZonedWallTime(now.toISOString(), timezone)?.date ?? now.toISOString().slice(0, 10); // مساعد المناطق المركزي (حارس تنسيق التواريخ)
 }
 
 export function addDays(ymd: string, days: number): string {

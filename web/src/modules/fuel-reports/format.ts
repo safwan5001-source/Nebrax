@@ -1,3 +1,4 @@
+import { utcIsoToZonedWallTime } from '@/lib/timezone';
 import type { Label, ReportColumn, SummaryItem } from './schemas';
 
 /**
@@ -29,15 +30,11 @@ export const litersText = (ml: number): string => group(plainLiters(ml));
 export const moneyText = (minor: number): string => group(plainMoney(minor));
 export const percentText = (bp: number): string => `${plainPercent(bp)}%`;
 
-/** لحظة ISO ← "YYYY-MM-DD HH:mm" بمنطقة التقرير (لا منطقة المتصفح). */
+/** لحظة ISO ← "YYYY-MM-DD HH:mm" بمنطقة التقرير (لا منطقة المتصفح) عبر مساعد المناطق الزمنية المركزي `lib/timezone` (حارس تنسيق التواريخ). */
 export function dateTimeText(iso: string | null | undefined, timezone: string): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    .formatToParts(date)
-    .reduce<Record<string, string>>((acc, part) => ({ ...acc, [part.type]: part.value }), {});
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+  const wall = utcIsoToZonedWallTime(iso, timezone);
+  return wall === null ? '—' : `${wall.date} ${wall.time}`;
 }
 
 export function cellText(column: Pick<ReportColumn, 'type' | 'values'>, value: unknown, lang: Lang, timezone: string): string {
