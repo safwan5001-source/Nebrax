@@ -18,10 +18,12 @@ vi.mock('next-intl', () => ({
 const theme = getTheme('blue');
 const formatMoney = (minor: number) => `M${minor}`;
 
-function model(over: Partial<DocumentModel> & { voucher?: Partial<NonNullable<DocumentModel['voucher']>> | null } = {}, type: 'receipt_voucher' | 'payment_voucher' = 'receipt_voucher', scenario: 'single' | 'three' = 'three'): DocumentModel {
+type VoucherOverride = { [K in keyof NonNullable<DocumentModel['voucher']>]?: NonNullable<DocumentModel['voucher']>[K] | null };
+
+function model(over: Omit<Partial<DocumentModel>, 'voucher'> & { voucher?: VoucherOverride | null } = {}, type: 'receipt_voucher' | 'payment_voucher' = 'receipt_voucher', scenario: 'single' | 'three' = 'three'): DocumentModel {
   const base = makeDocumentQaModel({ documentType: type, scenario, direction: 'rtl', showQr: true, showAssets: true });
   const { voucher, ...rest } = over;
-  return { ...base, language: 'ar', ...rest, voucher: voucher === null ? null : { ...base.voucher!, ...voucher } };
+  return { ...base, language: 'ar', ...rest, voucher: voucher === null ? null : ({ ...base.voucher!, ...voucher } as NonNullable<DocumentModel['voucher']>) };
 }
 
 function frame(contentWidthMm: number, contentMinHeightMm: number): DocPageFrame {
