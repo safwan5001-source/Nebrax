@@ -51,7 +51,13 @@ class FuelStationWalkInPartnerService
 
             $existing = FuelStationWalkInPartner::query()->where('fuel_station_id', $locked->id)->first();
             if ($existing !== null) {
-                return ['partner' => $this->partnerOf($existing), 'link' => $existing, 'created' => false];
+                $partner = $this->partnerOf($existing);
+                if ($partner->trashed()) {
+                    // الربط ثابت؛ طرفٌ حُذف ناعماً يُستعاد (إصلاح idempotent) بدل أن يبقى الربط على طرف محذوف.
+                    $partner->restore();
+                }
+
+                return ['partner' => $partner, 'link' => $existing, 'created' => false];
             }
 
             $code = self::codeFor((string) $locked->tenant_id, (string) $locked->id);

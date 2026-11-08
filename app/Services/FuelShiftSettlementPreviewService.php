@@ -18,6 +18,7 @@ use App\Models\ProductWarehouseStock;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\FuelCostVisibility;
+use App\Support\ReadOnlySnapshot;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -51,6 +52,13 @@ class FuelShiftSettlementPreviewService
     /** @return array<string,mixed> */
     public function preview(FuelShift $shift, User $viewer): array
     {
+        // كل قراءات المعاينة من لقطة واحدة (PostgreSQL)، بلا أقفال.
+        return ReadOnlySnapshot::run(fn () => $this->build($shift, $viewer));
+    }
+
+    /** @return array<string,mixed> */
+    private function build(FuelShift $shift, User $viewer): array
+    {
         if (! $shift->isOpen()) {
             throw new RuntimeException('FUEL_SETTLEMENT_SHIFT_NOT_OPEN: المعاينة تخص وردية مفتوحة فقط.');
         }
@@ -65,9 +73,10 @@ class FuelShiftSettlementPreviewService
         $blockers = $this->readiness->stationBlockers($station);
 
         // ───── العدّادات و ERP لكل فوهة ─────
-        $erpByNozzle = FuelSale::query()
-            ->where('fuel_shift_id', $shift->id)->where('status', FuelSale::STATUS_FINALIZED)
-            ->selectRaw('fuel_nozzle_id, SUM(quantity_milliliters) AS qty')->groupBy('fuel_nozzle_id')->pluck('qty', 'fuel_nozzle_id');
+        // مصدر واحد لكل مبيعات ERP النهائية: منه Q_erp لكل فوهة ومنه فواتير المرجع والتخصيص (لا استعلامان قد يختلفان).
+        $finalizedSales = FuelSale::query()->where('fuel_shift_id', $shift->id)->where('status', FuelSale::STATUS_FINALIZED)
+            ->orderBy('finalized_at')->orderBy('id')->get();
+        $erpByNozzle = $finalizedSales->groupBy('fuel_nozzle_id')->map(fn ($group) => (int) $group->sum('quantity_milliliters'));
         $products = collect($sales['products'])->keyBy('fuel_product_id');
         $fuelProducts = FuelProduct::query()->whereIn('id', $products->keys()->all())->get()->keyBy('id');
         $warehouse = Warehouse::query()->find($station->warehouse_id);
@@ -178,7 +187,7 @@ class FuelShiftSettlementPreviewService
         }
 
         // ───── المرجع والإقرار والتخصيص ─────
-        $finance = $this->finance($shift, $station, $walkIn?->id, $lines, $blockers);
+        $finance = $this->finance($shift, $station, $walkIn?->id, $lines, $blockers, $finalizedSales);
         $blockers = $finance['blockers'];
         $blockers = array_values(array_unique($blockers));
 
@@ -272,11 +281,10 @@ class FuelShiftSettlementPreviewService
      * @param  list<string>  $blockers
      * @return array{reference:array<string,mixed>,declaration:array<string,mixed>,allocation:array<string,mixed>,variances:array<string,mixed>,blockers:list<string>}
      */
-    private function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers): array
+    private function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
     {
-        // المبيعات النهائية للوردية (كل الشرائح: عميل المحطة، مسمّون، عقود) بفواتيرها.
-        $sales = FuelSale::query()->where('fuel_shift_id', $shift->id)->where('status', FuelSale::STATUS_FINALIZED)
-            ->whereNotNull('invoice_id')->orderBy('finalized_at')->orderBy('id')->get();
+        // المبيعات النهائية بفواتيرها (كل الشرائح: عميل المحطة، مسمّون، عقود) — من المجموعة نفسها التي حُسب منها Q_erp.
+        $sales = $finalizedSales->filter(fn (FuelSale $sale) => $sale->invoice_id !== null)->values();
         $invoices = Invoice::query()->whereIn('id', $sales->pluck('invoice_id'))->get()->keyBy('id');
 
         $walkInSales = $sales->filter(fn (FuelSale $s) => $walkInId !== null && $s->partner_id === $walkInId && $s->corporate_fuel_contract_id === null);

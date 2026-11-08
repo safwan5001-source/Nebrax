@@ -55,7 +55,8 @@ class FuelShiftSettlementReadiness
             return null;
         }
 
-        return Partner::query()->withoutGlobalScopes()
+        // يُرفع نطاق الفرع وحده (الطرف النظامي قد يكون بلا فرع)؛ نطاق الحذف الناعم يبقى فيُعدّ الطرف المحذوف غائباً (WALK_IN_REQUIRED).
+        return Partner::query()->withoutGlobalScope(\App\Tenancy\BranchScope::class)
             ->where('tenant_id', $station->tenant_id)
             ->where('id', $link->partner_id)
             ->where('system_kind', 'fuel_walk_in')

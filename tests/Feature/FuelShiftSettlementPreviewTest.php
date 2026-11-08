@@ -762,6 +762,49 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->assertFalse($p['ready']);
     }
 
+    /** @test */
+    public function a_soft_deleted_walk_in_partner_counts_as_missing_and_assignment_repairs_it_and_the_screen_cannot_delete_it(): void
+    {
+        $token = $this->f['actor']->createToken('t')->plainTextToken;
+        // الحذف من شاشة العملاء مرفوض للطرف النظامي.
+        $this->withToken($token)->deleteJson('/api/partners/'.$this->walkIn->id)->assertStatus(422);
+        $this->assertNull($this->walkIn->fresh()->deleted_at);
+
+        // حذف ناعم بتجاوز الشاشة (مثلاً SQL خام): الجاهزية تعدّه غائباً.
+        DB::table('partners')->where('id', $this->walkIn->id)->update(['deleted_at' => now()]);
+        $readiness = app(\App\Services\FuelShiftSettlementReadiness::class);
+        $this->assertContains('FUEL_SETTLEMENT_WALK_IN_REQUIRED', $readiness->stationBlockers($this->f['station']));
+
+        // التعيين المتكرر يستعيده (إصلاح idempotent) ويزول المانع.
+        $again = app(FuelStationWalkInPartnerService::class)->assign($this->f['station'], $this->f['actor']);
+        $this->assertFalse($again['created']);
+        $this->assertNull(DB::table('partners')->where('id', $this->walkIn->id)->value('deleted_at'));
+        $this->assertNotContains('FUEL_SETTLEMENT_WALK_IN_REQUIRED', $readiness->stationBlockers($this->f['station']));
+    }
+
+    /** @test */
+    public function the_preview_derives_erp_liters_and_invoices_from_one_sales_read(): void
+    {
+        $shift = $this->open('one-read');
+        $this->meters($shift);
+        $this->walkInSale('one-read-sale', $shift, 10_000);
+        $this->declare($shift, 4600);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries) {
+            if (str_contains($query->sql, 'from "fuel_sales"') && str_contains($query->sql, '"fuel_shift_id"')) {
+                $queries[] = $query->sql;
+            }
+        });
+        $p = $this->preview($shift);
+
+        $fuelSalesReads = array_values(array_filter($queries, fn ($sql) => str_contains($sql, 'select')));
+        // قراءة واحدة لمبيعات الوردية النهائية (الأخرى لجدول fuel_sales عبر الإيصالات تُقرأ بمعرّفات البيع لا بالوردية).
+        $this->assertCount(1, array_filter($fuelSalesReads, fn ($sql) => str_contains($sql, '"status"')), json_encode($fuelSalesReads));
+        $this->assertSame(10_000, $p['lines'][0]['erp_milliliters']);
+        $this->assertSame(2300, $p['reference']['components']['walk_in_erp_invoices_minor']);
+    }
+
     // ───────── طبقات الإفصاح ─────────
 
     /** @test */
@@ -833,6 +876,13 @@ class FuelShiftSettlementPreviewTest extends TestCase
             '::create(', '->create(', '->save(', '->update(', '->delete(', '->insert(', 'DB::table', 'DB::statement', 'DB::transaction', 'lockForUpdate', 'sharedLock',
             'lockAnchor', 'activeLockFor', 'assertOpen',
         ];
+        // الغلاف المسموح الوحيد للقراءة المتسقة: يصدر SET TRANSACTION للقراءة فقط ثم يُرجِع، بلا أي كتابة.
+        $snapshot = preg_replace('#/\*.*?\*/|//[^\n]*#s', '', (string) file_get_contents(app_path('Support/ReadOnlySnapshot.php')));
+        $this->assertStringContainsString("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY", $snapshot);
+        foreach (['insert', 'update', 'delete', 'DB::table', 'DB::commit', 'DB::statement', 'lockForUpdate', 'sharedLock'] as $needle) {
+            $this->assertStringNotContainsString($needle, $snapshot, "ReadOnlySnapshot: {$needle}");
+        }
+        $this->assertStringContainsString('DB::rollBack()', $snapshot);
         foreach ([
             app_path('Services/FuelShiftSettlementPreviewService.php'),
             app_path('Services/FuelShiftSettlementReadiness.php'),

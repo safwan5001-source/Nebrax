@@ -139,7 +139,10 @@ class PartnerController extends ApiController
 
     public function destroy(string $id): JsonResponse
     {
-        Partner::findOrFail($id)->delete();
+        $partner = Partner::findOrFail($id);
+        // طرف نظامي تنشئه المنصة (العميل النقدي لمحطة وقود) لا يُحذف من شاشة العملاء.
+        abort_if($partner->system_kind !== null, 422, 'لا يمكن حذف طرف نظامي تديره المنصة.');
+        $partner->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
     }

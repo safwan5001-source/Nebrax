@@ -153,6 +153,38 @@ class FuelShiftSettlementPreviewPostgresTest extends TestCase
         $this->assertSame(20000, $preview['lines'][0]['metered_milliliters']);
     }
 
+    // ───────── 2b) لقطة قراءة واحدة ─────────
+
+    /** @test */
+    public function the_read_only_snapshot_hides_a_concurrent_commit_from_every_read_inside_it(): void
+    {
+        DB::statement('CREATE TABLE IF NOT EXISTS snapshot_probe (x integer)');
+        DB::statement('TRUNCATE snapshot_probe');
+        try {
+            $seen = \App\Support\ReadOnlySnapshot::run(function () {
+                $first = (int) DB::table('snapshot_probe')->count();
+                $holder = $this->startHolder('INSERT INTO snapshot_probe VALUES (1)'); // يلتزم فوراً من جلسة أخرى
+                [$err, $exit] = $this->finishHolder($holder);
+                $this->assertSame(0, $exit, $err);
+                $second = (int) DB::table('snapshot_probe')->count();
+
+                // الجلسة نفسها للقراءة فقط: أي كتابة داخل اللقطة تُرفض.
+                try {
+                    DB::statement('INSERT INTO snapshot_probe VALUES (2)');
+                    $writeRejected = false;
+                } catch (\Throwable) {
+                    $writeRejected = true;
+                }
+
+                return [$first, $second, $writeRejected];
+            });
+            $this->assertSame([0, 0, true], $seen, 'القراءتان من اللقطة نفسها (لا ظهور للالتزام المتزامن) والكتابة مرفوضة');
+            $this->assertSame(1, (int) DB::table('snapshot_probe')->count(), 'بعد اللقطة يظهر الالتزام');
+        } finally {
+            DB::statement('DROP TABLE IF EXISTS snapshot_probe');
+        }
+    }
+
     // ───────── 3) معاينات متزامنة مع بيع/تحصيل/إقرار ─────────
 
     /** @test */
