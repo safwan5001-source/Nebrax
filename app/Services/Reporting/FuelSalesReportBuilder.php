@@ -44,7 +44,14 @@ final class FuelSalesReportBuilder implements FuelReportBuilder
             $notes[] = ['ar' => 'تجاوزت الفترة الحد الأقصى للورديات المحسوبة ('.FuelReportShiftFacts::SHIFT_CAP.'). ضيّق الفترة أو المحطة للحصول على نتيجة كاملة.', 'en' => 'The period exceeds the maximum number of computed shifts ('.FuelReportShiftFacts::SHIFT_CAP.'). Narrow the period or station for a complete result.'];
         }
 
-        return $built + ['gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated'], 'notes' => $notes];
+        // مقارنة الفترات: أعلام جودة الفترتين تُدمج (اتحاد الفجوات وOR للاقتطاع) فلا يطغى أحدهما على الآخر.
+        $gaps = array_values(array_unique([...$loaded['gaps'], ...($built['gaps'] ?? [])]));
+        $truncated = $loaded['truncated'] || ($built['truncated'] ?? false);
+        if (($built['truncated'] ?? false) && ! $loaded['truncated']) {
+            $notes[] = ['ar' => 'تجاوزت فترة المقارنة الحد الأقصى للورديات؛ ضيّق الفترة.', 'en' => 'The comparison period exceeds the maximum number of shifts; narrow the period.'];
+        }
+
+        return ['summary' => $built['summary'] ?? [], 'tables' => $built['tables'], 'gaps' => $gaps, 'truncated' => $truncated, 'notes' => $notes];
     }
 
     // ───────── مجمِّعات ─────────

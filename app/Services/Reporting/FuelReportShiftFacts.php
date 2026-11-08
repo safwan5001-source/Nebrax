@@ -78,6 +78,10 @@ final class FuelReportShiftFacts
             ];
             if ($withSales) {
                 $fact += $this->sales($shift, $ctx, $catalog, $shift->closed_at ?? $now);
+                // مرشح منتج/مضخة/فوهة لا يطابق أي معدّة في محطة هذه الوردية: ليست «بيانات مجهولة» بل خارج النطاق فتُستبعد (لا تُبطل الإجمالي).
+                if ($this->hasEquipmentFilter($ctx) && $fact['nozzles'] === []) {
+                    continue;
+                }
                 foreach ($fact['gaps'] as $gap) {
                     $gaps[$gap] = true;
                 }
@@ -89,6 +93,11 @@ final class FuelReportShiftFacts
         }
 
         return ['shifts' => $facts, 'truncated' => $truncated, 'gaps' => array_keys($gaps)];
+    }
+
+    private function hasEquipmentFilter(FuelReportContext $ctx): bool
+    {
+        return $ctx->filter('product_id') !== null || $ctx->filter('pump_id') !== null || $ctx->filter('nozzle_id') !== null;
     }
 
     /** @return \Illuminate\Support\Collection<string,FuelNozzle> */

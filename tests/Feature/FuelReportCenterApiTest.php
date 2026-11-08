@@ -398,4 +398,54 @@ class FuelReportCenterApiTest extends TestCase
         $this->assertSame(100_000, $seller['sole_liters']);
         $this->assertSame(0, $seller['shared_shifts']);
     }
+
+    // ───────── ملاحظات المراجعة (Codex #2078) ─────────
+
+    /** @test */
+    public function equipment_filters_do_not_turn_other_stations_into_unknown_amounts(): void
+    {
+        $this->twoShifts();
+        $other = FuelStation::create(['tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'warehouse_id' => $this->f['warehouse']->id, 'code' => 'OTH-2', 'name' => 'محطة بلا مضخات']);
+        app(FuelShiftService::class)->open(['fuel_station_id' => $other->id, 'opening_float_minor' => 0, 'idempotency_key' => 'shift-other'], $this->f['actor']);
+
+        $unfiltered = $this->report('sales.by_pump');
+        $this->assertNull($unfiltered['summary'][2]['value']); // وردية المحطة الأخرى بلا فوهات ⇒ غير مكتملة فعلاً
+        $p = $this->report('sales.by_pump', ['pump_id' => $this->f['nozzle']->fuel_pump_id]);
+        $this->assertSame(34_500, $this->table($p, 'pumps')['totals']['amount']); // المرشح يستبعد ما خارج المعدّة بدل إبطال الإجمالي
+        $this->assertSame(34_500, $p['summary'][2]['value']);
+        $this->assertTrue($p['data_quality']['complete']);
+    }
+
+    /** @test */
+    public function comparison_keeps_the_data_quality_flags_of_the_current_period(): void
+    {
+        $this->shiftWithSales('prev', 5_000_000, 5_040_000, '2027-03-03 09:00:00');
+        $bad = $this->open('cur-bad'); // الفترة الحالية: وردية مفتوحة بقراءة إغلاق < افتتاح
+        $this->meter($bad, 'opening', 5_000_000);
+        $this->meter($bad, 'closing', 4_000_000);
+
+        $p = $this->report('sales.comparison', ['from' => '2026-01-01', 'to' => '2026-12-31', 'compare_from' => '2027-03-01', 'compare_to' => '2027-03-05']);
+        $this->assertContains('closing_below_opening', $p['data_quality']['gaps']);
+        $this->assertFalse($p['data_quality']['complete']);
+    }
+
+    /** @test */
+    public function correction_snapshots_hide_sales_derived_cash_keys_from_users_without_sales_permission(): void
+    {
+        $shift = $this->shiftWithSales('corr', 5_000_000, 5_100_000);
+        \App\Models\FuelShiftCorrection::create([
+            'branch_id' => $shift->branch_id, 'fuel_shift_id' => $shift->id, 'target_type' => 'cash_count', 'target_id' => null,
+            'before' => ['counted_cash_minor' => 20000, 'cash_variance_minor' => -4500, 'expected_operational_cash_minor' => 24500],
+            'proposed' => ['counted_cash_minor' => 24500], 'status' => 'requested', 'reason' => 'خطأ عدّ',
+            'requested_by' => $this->f['actor']->id, 'requested_at' => now(),
+        ]);
+        $seller = $this->report('shifts.corrections', ['from' => '2026-01-01', 'to' => '2026-12-31'], 'seller');
+        $text = json_encode($seller['tables'][0]['rows'][0]);
+        $this->assertStringContainsString('counted_cash_minor', $text);
+        $this->assertStringNotContainsString('cash_variance_minor', $text);
+        $this->assertStringNotContainsString('expected_operational_cash_minor', $text);
+
+        $owner = json_encode($this->report('shifts.corrections', ['from' => '2026-01-01', 'to' => '2026-12-31'])['tables'][0]['rows'][0]);
+        $this->assertStringContainsString('cash_variance_minor', $owner);
+    }
 }

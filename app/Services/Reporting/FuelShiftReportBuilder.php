@@ -458,11 +458,12 @@ final class FuelShiftReportBuilder implements FuelReportBuilder
         $all = $query->orderBy('requested_at')->orderBy('id')->limit(1001)->get();
         $truncated = $all->count() > 1000;
 
+        $canSeeSales = $context->user->hasPermission('fuel.sale.view');
         $rows = $all->take(1000)->filter(fn (FuelShiftCorrection $c) => $context->inPeriod($c->requested_at, (string) $c->shift?->fuel_station_id))
             ->map(fn (FuelShiftCorrection $c) => [
                 'shift' => $c->shift?->number, 'station' => $context->stationName((string) $c->shift?->fuel_station_id), 'target' => $c->target_type, 'status' => $c->status,
-                'reason' => mb_substr((string) $c->reason, 0, self::TEXT_LIMIT), 'before' => mb_substr((string) json_encode($c->before, JSON_UNESCAPED_UNICODE), 0, self::TEXT_LIMIT),
-                'proposed' => mb_substr((string) json_encode($c->proposed, JSON_UNESCAPED_UNICODE), 0, self::TEXT_LIMIT),
+                'reason' => mb_substr((string) $c->reason, 0, self::TEXT_LIMIT), 'before' => $this->snapshotText($c->before, $canSeeSales),
+                'proposed' => $this->snapshotText($c->proposed, $canSeeSales),
                 'requested_by' => $c->requester?->name, 'requested_at' => $c->requested_at?->toIso8601String(),
                 'reviewed_by' => $c->reviewer?->name, 'reviewed_at' => $c->reviewed_at?->toIso8601String(),
             ])->values()->all();
@@ -486,5 +487,32 @@ final class FuelShiftReportBuilder implements FuelReportBuilder
             'truncated' => $truncated,
             'notes' => $truncated ? [['ar' => 'تجاوز عدد الطلبات 1000؛ ضيّق الفترة.', 'en' => 'More than 1000 requests; narrow the period.']] : [],
         ];
+    }
+
+    /** مفاتيح لقطة التصحيح المشتقة من المبيعات (نفس قائمة `FuelShiftResource`): تُحجب عمّن لا يملك `fuel.sale.view` (D8). */
+    private const SALE_DERIVED_KEYS = ['expected_operational_cash_minor', 'cash_variance_minor', 'variance_minor', 'direction', 'variance_direction', 'expected_cash_minor'];
+
+    /** @param array<string,mixed>|null $snapshot */
+    private function snapshotText(?array $snapshot, bool $canSeeSales): string
+    {
+        if (! $canSeeSales && $snapshot !== null) {
+            $snapshot = $this->withoutSaleKeys($snapshot);
+        }
+
+        return mb_substr((string) json_encode($snapshot, JSON_UNESCAPED_UNICODE), 0, self::TEXT_LIMIT);
+    }
+
+    /** @param array<mixed> $data @return array<mixed> */
+    private function withoutSaleKeys(array $data): array
+    {
+        foreach ($data as $key => $value) {
+            if (is_string($key) && in_array($key, self::SALE_DERIVED_KEYS, true)) {
+                unset($data[$key]);
+            } elseif (is_array($value)) {
+                $data[$key] = $this->withoutSaleKeys($value);
+            }
+        }
+
+        return $data;
     }
 }
