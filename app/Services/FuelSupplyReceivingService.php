@@ -332,6 +332,9 @@ class FuelSupplyReceivingService
             $this->assertStationTankProductWarehouse($station->id, $tank, $fuelProduct, $warehouse);
             $this->assertFuelProduct($fuelProduct, $fuelProduct->product);
             $grni = $this->settings->grniAccountFor($station);
+            // FUEL-LOCK-ORDER-2: مِرساة المستأجر **قبل** أي قفل مجمّع (الترتيب الموحَّد مع ERP: مِرساة ← حالة التكلفة ← الرصيد). كان الاعتماد يقفل حالة التكلفة والرصيد ثم ينتظر
+            // المِرساة عند القيد بينما إنهاء بيع ERP يمسكها ثم ينتظر المجمّع ⇒ جمود. لا تغيير في القيد ولا الحركة ولا الصلاحيات.
+            app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
             // هذا الحارس يرفض الرصيد التاريخي الذي لا نعرف pool تكلفته؛ لا fallback.
             $this->costBasis->assertReady($fuelProduct, $warehouse);
 

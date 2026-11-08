@@ -375,6 +375,8 @@ class FuelReconciliationService
             $fuelProduct = $this->fuelProduct($reconciliation->fuel_product_id);
             $product = $this->product($fuelProduct);
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
+            // FUEL-LOCK-ORDER-2: مِرساة المستأجر قبل قفل المنتج/الرصيد/حالة التكلفة (ترتيب ERP: مِرساة ← مجمّع). كان القفل بعد المجمّع ⇒ جمود مع إنهاء بيع. لا أثر محاسبي أو مخزني.
+            app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
             $this->lockBookStock($warehouse->id, $product->id);
             // FS-01: قد يُضاف خزان ثانٍ بعد إنشاء المسودة؛ نعيد الفحص تحت القفل ولا نقبل فرقاً محسوباً على كتاب مشترك.
             $this->assertSingleTankPerBook($fuelProduct, $warehouse);
