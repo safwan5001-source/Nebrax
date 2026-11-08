@@ -61,6 +61,14 @@ class FuelStationMasterDataService
                 throw new RuntimeException('لا يمكن تغيير فرع محطة لها خزانات أو مضخات مسجلة. أنشئ محطة جديدة أو انقل البنية بتدفق مخصص.');
             }
 
+            // P1-3a: العميل النقدي المخصّص وسجلات تسوية الورديات تحمل فرع المحطة وقت إنشائها وهي ثابتة؛ نقل المحطة لفرع آخر يُخفيها عن الجاهزية والتعيين.
+            if ($branch->id !== $station->branch_id && (
+                \App\Models\FuelStationWalkInPartner::query()->withoutGlobalScopes()->where('fuel_station_id', $station->id)->exists()
+                || \App\Models\FuelShiftSettlement::query()->withoutGlobalScopes()->where('fuel_station_id', $station->id)->exists()
+            )) {
+                throw new RuntimeException('لا يمكن تغيير فرع محطة عُيّن لها عميل نقدي أو لها تسويات ورديات. أنشئ محطة جديدة أو انقل السجلات بتدفق مخصص.');
+            }
+
             if ($next['warehouse_id'] !== $station->warehouse_id && FuelOperationalLedger::where('fuel_station_id', $station->id)->exists()) {
                 throw new RuntimeException('لا يمكن تغيير مخزن محطة لها دفتر وقود فعلي. يلزم workflow نقل مخزون صريح لحفظ التاريخ.');
             }

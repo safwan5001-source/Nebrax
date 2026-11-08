@@ -793,6 +793,29 @@ class FuelShiftSettlementPreviewTest extends TestCase
     }
 
     /** @test */
+    public function a_station_with_a_walk_in_partner_cannot_be_moved_to_another_branch(): void
+    {
+        $branchB = \App\Models\Branch::create(['code' => 'BR-MOVE-B', 'name' => 'فرع وجهة']);
+        $warehouseB = \App\Models\Warehouse::create(['name' => 'مخزن فرع وجهة', 'code' => 'WH-MOVE-B', 'branch_id' => $branchB->id]);
+        $service = app(\App\Services\FuelStationMasterDataService::class);
+        $move = fn (\App\Models\FuelStation $station) => $service->updateStation($station, [
+            'code' => $station->code, 'name' => $station->name, 'warehouse_id' => $warehouseB->id, 'branch_id' => $branchB->id,
+        ], $this->f['actor']);
+        $make = fn (string $code) => \App\Models\FuelStation::create(['tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'warehouse_id' => $this->f['warehouse']->id, 'code' => $code, 'name' => $code]);
+
+        // محطة بلا خزانات ولا مضخات (فلا يعترض الحارس القديم) لكن لها عميل نقدي: الحارس الجديد يرفض.
+        $withWalkIn = $make('FCS-MOVE-WI');
+        app(FuelStationWalkInPartnerService::class)->assign($withWalkIn, $this->f['actor']);
+        $error = $this->rejects(fn () => $move($withWalkIn));
+        $this->assertStringContainsString('عميل نقدي', $error->getMessage());
+        $this->assertSame($this->f['branch']->id, DB::table('fuel_stations')->where('id', $withWalkIn->id)->value('branch_id'));
+
+        // محطة بلا عميل نقدي ولا بنية تنتقل كما كان السلوك.
+        $moved = $move($make('FCS-MOVE-FREE'));
+        $this->assertSame($branchB->id, $moved->branch_id);
+    }
+
+    /** @test */
     public function a_soft_deleted_walk_in_partner_counts_as_missing_and_assignment_repairs_it_and_the_screen_cannot_delete_it(): void
     {
         $token = $this->f['actor']->createToken('t')->plainTextToken;
