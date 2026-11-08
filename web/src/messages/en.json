@@ -2939,6 +2939,7 @@
       "ai": "AI"
     },
     "perm_actions": {
+      "post": "Post",
       "execution_approve": "Approve execution",
       "resolve_blocked": "Resolve blocked",
       "request": "Request",
@@ -3103,6 +3104,7 @@
       "reconciliation": "Inventory reconciliation",
       "supplier_invoice": "Fuel supplier invoices",
       "governance": "Fuel governance",
+      "settlement": "Settlement",
       "staff": "Station staff"
     }
   },

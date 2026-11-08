@@ -396,6 +396,9 @@ class FuelShiftService
                     'cash_variance_id' => $cashVariance->id, 'variance_minor' => $variance, 'direction' => $direction,
                 ]);
             }
+            // P1-3b-1 (D-S2): تسجيل مهمة تسوية مسجَّلة ذرّياً مع الإغلاق — **الإغلاق تشغيلي بحت ولا يرحّل شيئاً**. البوابة مغلقة (الافتراضي) ⇒ لا استعلام ولا كتابة هنا (الإغلاق مطابق لما قبل).
+            // التسجيل لا يُفشل الإغلاق أبداً (يُبتلع داخل savepoint ويُسجَّل)؛ والمهمة تُنفَّذ لاحقاً خارج هذه المعاملة بعامل مجدول (`fuel:settlement:run-jobs`).
+            app(FuelShiftSettlementJobService::class)->enqueueIfEnabled($shift->fresh(), $actor);
 
             return $shift->fresh();
         });

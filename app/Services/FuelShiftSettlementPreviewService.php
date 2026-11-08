@@ -223,6 +223,45 @@ class FuelShiftSettlementPreviewService
         return $payload;
     }
 
+    /**
+     * فحوص مسبقة لوردية **مغلقة** (P1-3b-1) — قراءة فقط بلا أقفال، تعيد رموزاً ثابتة غير مالية لسبب بقاء التسوية معلقة. ليست المعاينة الكاملة (المبالغ والتكلفة والمخزون): تلك تُحسب
+     * على وردية مفتوحة قبل الإغلاق، وإعادة بنائها لوردية مغلقة مع نافذة التعرّض الممتدة إلى لحظة الترحيل تأتي مع محرك P1-3b-2 بموافقة جديدة.
+     * تعيد استعمال الدوال نفسها (فترة مقفلة، إيصالات غير موسومة) كي لا يتشعّب الحكم بين المعاينة وهذا الفحص.
+     *
+     * @return list<string> فارغة = اجتازت الفحوص المتاحة (لا تعني جاهزية الترحيل)
+     */
+    public function closedShiftPrechecks(FuelShift $shift): array
+    {
+        return ReadOnlySnapshot::run(function () use ($shift): array {
+            $station = FuelStation::findOrFail($shift->fuel_station_id);
+            $reasons = $this->readiness->stationBlockers($station, includePolicy: false);
+
+            if (! FuelShiftCollectionDeclaration::query()->where('fuel_shift_id', $shift->id)->exists()) {
+                $reasons[] = 'FUEL_SETTLEMENT_DECLARATION_MISSING';
+            }
+
+            $closedAt = $shift->closed_at ?? now();
+            $tz = $this->settings->operatingTimezone($station);
+            $opened = \Carbon\CarbonImmutable::instance($shift->opened_at ?? $closedAt)->setTimezone($tz);
+            $closed = \Carbon\CarbonImmutable::instance($closedAt)->setTimezone($tz);
+            if ($opened->format('Y-m') !== $closed->format('Y-m')) {
+                $reasons[] = 'FUEL_SETTLEMENT_PERIOD_BOUNDARY';
+            }
+            // تاريخ التوريد التجاري = يوم إغلاق الوردية بتقويم المحطة؛ فترة/سنة مقفلة ⇒ تنتظر (D-P: لا قيد بأثر رجعي ولا تاريخ بديل).
+            if ($this->periodLocked($this->settings->businessDate($station, $closedAt))) {
+                $reasons[] = 'FUEL_SETTLEMENT_PERIOD_LOCKED';
+            }
+            if ($this->hasUnattributedReceipts($shift)) {
+                $reasons[] = 'FUEL_SETTLEMENT_RECEIPTS_UNATTRIBUTED';
+            }
+
+            $reasons = array_values(array_unique(array_filter($reasons)));
+            sort($reasons);
+
+            return $reasons;
+        });
+    }
+
     // ═══════════ الحجب (تكلفة/فترة ضريبية) ═══════════
 
     /**

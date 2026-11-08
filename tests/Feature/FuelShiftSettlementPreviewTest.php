@@ -783,6 +783,8 @@ class FuelShiftSettlementPreviewTest extends TestCase
             $this->assertSame($before[$table], $after[$table], "{$table}: الإغلاق لا يرحّل شيئاً قبل P1-3b");
         }
         $this->assertSame('closed', $shift->fresh()->status);
+        // P1-3b-1: الأثر الوحيد المسموح هو مهمة تقنية واحدة مسجَّلة (بلا أي أثر محاسبي) حين تكون البوابة مفتوحة والسياسة post_on_close.
+        $this->assertLessThanOrEqual(1, \DB::table('fuel_shift_settlement_jobs')->count());
     }
 
     /** @test */
@@ -790,7 +792,13 @@ class FuelShiftSettlementPreviewTest extends TestCase
     {
         foreach (['FuelShiftService', 'FuelSaleService', 'FuelShiftCollectionService', 'FuelShiftCashExpectationService', 'FuelReconciliationService'] as $service) {
             $code = (string) file_get_contents(app_path("Services/{$service}.php"));
-            $this->assertStringNotContainsString('FuelShiftSettlement', $code, "{$service} لا يستدعي طبقة التسوية في P1-3a");
+            if ($service === 'FuelShiftService') {
+                // P1-3b-1: مرجع واحد فقط — تسجيل مهمة تقنية عند الإغلاق عبر الكاتب الوحيد، ولا شيء من خدمات التسوية الأخرى.
+                $this->assertSame(1, substr_count($code, 'FuelShiftSettlement'), 'FuelShiftService: مرجع واحد لخدمة المهام فقط');
+                $this->assertStringContainsString('FuelShiftSettlementJobService', $code);
+            } else {
+                $this->assertStringNotContainsString('FuelShiftSettlement', $code, "{$service} لا يستدعي طبقة التسوية");
+            }
             $this->assertStringNotContainsString('FuelStationWalkInPartner', $code, $service);
         }
         // لا كاتب لجداول التسوية خارج الاختبارات في هذه الشريحة (الكاتب FuelShiftSettlementService يأتي مع P1-3b).
