@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\FuelCostVisibility;
 use App\Support\ReadOnlySnapshot;
+use App\Tenancy\BranchScope;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -237,16 +238,19 @@ class FuelShiftSettlementPreviewService
             return 'withheld_period_boundary';
         }
 
+        // المجمّع (مخزن × منتج) على مستوى المستأجر وقد تشترك فيه محطات فروع مختلفة (مخزن مركزي بلا فرع): كل بحث على مستوى المجمّع يرفع نطاق الفرع وحده
+        // (نطاق المستأجر يبقى)، وإلا اختفت ورديات الفروع الأخرى وتواريخها المفتوحة فتُرحَّل بقية ملوَّثة.
+        $unbranched = BranchScope::class;
         $pool = fn ($query) => $query->where('warehouse_id', $station->warehouse_id)->where('fuel_product_id', $product->id);
-        if ($pool(FuelCostPoolOpenHistory::query())->whereNull('resolved_at')->exists()) {
+        if ($pool(FuelCostPoolOpenHistory::query()->withoutGlobalScope($unbranched))->whereNull('resolved_at')->exists()) {
             return 'withheld_pool_history_open';
         }
 
         $exposureStart = $shift->opened_at;
-        $sharing = FuelShift::query()
+        $sharing = FuelShift::query()->withoutGlobalScope($unbranched)
             ->where('status', FuelShift::STATUS_OPEN)->where('id', '!=', $shift->id)
-            ->whereIn('fuel_station_id', FuelStation::query()->where('warehouse_id', $station->warehouse_id)->select('id'))
-            ->whereIn('fuel_station_id', \App\Models\FuelTank::query()->where('fuel_product_id', $product->id)->select('fuel_station_id'))
+            ->whereIn('fuel_station_id', FuelStation::query()->withoutGlobalScope($unbranched)->where('warehouse_id', $station->warehouse_id)->select('id'))
+            ->whereIn('fuel_station_id', \App\Models\FuelTank::query()->withoutGlobalScope($unbranched)->where('fuel_product_id', $product->id)->select('fuel_station_id'))
             ->min('opened_at');
         if ($sharing !== null && $exposureStart !== null && \Carbon\CarbonImmutable::parse($sharing)->lt($exposureStart)) {
             $exposureStart = \Carbon\CarbonImmutable::parse($sharing);

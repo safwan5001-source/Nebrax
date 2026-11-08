@@ -550,6 +550,36 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->assertSame('withheld_cost_pool_changed', $p['lines'][0]['state']);
     }
 
+    /** @test */
+    public function an_open_shift_of_a_station_in_another_branch_sharing_the_pool_counts_in_the_exposure_window(): void
+    {
+        $branchB = \App\Models\Branch::create(['code' => 'BR-SHARED-B', 'name' => 'فرع ب']);
+        $stationB = \App\Models\FuelStation::create([
+            'tenant_id' => $this->f['tenant_id'], 'branch_id' => $branchB->id, 'warehouse_id' => $this->f['warehouse']->id,
+            'code' => 'FCS-B', 'name' => 'محطة فرع آخر تشارك المخزن',
+        ]);
+        \App\Models\FuelTank::create([
+            'tenant_id' => $this->f['tenant_id'], 'branch_id' => $branchB->id, 'fuel_station_id' => $stationB->id, 'fuel_product_id' => $this->f['fuelProduct']->id,
+            'code' => 'FCT-B', 'name' => 'خزان فرع ب', 'capacity_milliliters' => 5000000, 'safe_capacity_milliliters' => 4500000,
+        ]);
+        // وردية مفتوحة في فرع ب (خام) قبل الاستلام، ثم استلام، ثم تُفتح ورديتنا (فرع أ) بعده.
+        DB::table('fuel_shifts')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $branchB->id, 'fuel_station_id' => $stationB->id,
+            'number' => 'FSH-B-OPEN', 'idempotency_key' => 'b-open', 'status' => 'open', 'opening_float_minor' => 0, 'operational_meter_milliliters' => 0,
+            'operational_delivery_milliliters' => 0, 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->travel(2)->seconds();
+        $movement = app(InventoryService::class)->applyReceipt($this->f['product'], 500000, 100, [
+            'warehouse_id' => $this->f['warehouse']->id, 'source_type' => \App\Models\FuelProduct::class, 'source_id' => $this->f['fuelProduct']->id,
+            'notes' => 'استلام بعد فتح وردية فرع ب', InventoryService::FUEL_POOL_META => true,
+        ], 50000000);
+        app(FuelCostBasisService::class)->recordReceipt($this->f['fuelProduct'], $this->f['warehouse'], $movement, 500000, 50000000);
+        $this->travel(2)->seconds();
+        $shift = $this->readyShift('cross-branch', 4600);
+
+        $this->assertSame('withheld_cost_pool_changed', $this->preview($shift)['lines'][0]['state']);
+    }
+
     // ───────── الموانع ─────────
 
     /** @test */
