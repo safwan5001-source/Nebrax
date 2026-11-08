@@ -683,6 +683,26 @@ class FuelShiftSettlementPreviewTest extends TestCase
     }
 
     /** @test */
+    public function a_payment_posted_through_the_ordinary_payments_service_on_a_station_invoice_blocks_the_preview(): void
+    {
+        // Codex P2: السند العادي لا ينشئ إيصال محطة، فيخفّض رصيد الفاتورة ويغيب عن المقبوضات ⇒ يجب أن تحجب المعاينة حتى يُحسم.
+        $shift = $this->open('b4c');
+        $sale = $this->walkInSale('b4c-sale', $shift, 1000);
+        $payments = app(\App\Services\Accounting\PaymentService::class);
+        $payment = $payments->create([
+            'direction' => 'received', 'amount' => (int) $sale->invoice->total, 'payment_method_id' => $this->f['cash']->id,
+            'partner_id' => $this->walkIn->id, 'invoice_id' => $sale->invoice_id,
+        ]);
+        $payments->post($payment, $this->f['actor']);
+        $this->meters($shift);
+        $this->declare($shift, 230);
+
+        $preview = $this->preview($shift);
+        $this->assertContains('FUEL_SETTLEMENT_RECEIPTS_UNATTRIBUTED', $preview['blockers']);
+        $this->assertFalse($preview['ready']);
+    }
+
+    /** @test */
     public function a_non_open_shift_cannot_be_previewed(): void
     {
         $shift = $this->readyShift('b5', 4600);

@@ -279,7 +279,25 @@ class FuelShiftSettlementPreviewService
             ->whereIn('fuel_sale_id', FuelSale::query()->select('id')->where('fuel_station_id', $shift->fuel_station_id))
             ->pluck('payment_id');
 
-        return $paymentIds->isNotEmpty() && Payment::query()->whereIn('id', $paymentIds)->where('status', 'posted')->exists();
+        if ($paymentIds->isNotEmpty() && Payment::query()->whereIn('id', $paymentIds)->where('status', 'posted')->exists()) {
+            return true;
+        }
+
+        // قبضٌ عبر واجهة السندات العادية على فاتورة محطة (يخصَّص للفاتورة ويخفّض رصيدها) لا ينشئ إيصال محطة أصلاً (Codex P2): يظهر مسدَّداً في الفاتورة وغائباً عن المقبوضات ⇒ فائض وهمي.
+        // نفتّش سندات القبض المرحَّلة المخصَّصة لفواتير مبيعات هذه المحطة داخل نافذة الوردية والتي لا إيصال لها.
+        $stationInvoiceIds = FuelSale::query()->where('fuel_station_id', $shift->fuel_station_id)->whereNotNull('invoice_id')->select('invoice_id');
+        $allocated = \App\Models\PaymentAllocation::query()
+            ->where('allocatable_type', \App\Models\Invoice::class)
+            ->whereIn('allocatable_id', $stationInvoiceIds)
+            ->select('payment_id');
+
+        return Payment::query()
+            ->whereIn('id', $allocated)
+            ->where('status', 'posted')->where('direction', 'received')
+            ->where('created_at', '>=', $shift->opened_at)
+            ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at))
+            ->whereNotIn('id', FuelSalePaymentReceipt::query()->select('payment_id'))
+            ->exists();
     }
 
     private function periodLocked(string $date): bool
