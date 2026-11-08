@@ -23,16 +23,27 @@ describe('buildPrintPageCss — إعلان @page صالح (AWJ-DOC-V2-PR2)', () 
     expect(css).toMatch(/html,\s*body\s*\{\s*height:\s*102mm !important;\s*max-height:\s*102mm !important;\s*overflow:\s*hidden !important;/);
   });
 
-  it('الحراري: عند تعذّر القياس يسقط إلى ارتفاع آمن (297mm) لا إلى A4 كامل العرض', () => {
+  it('الحراري: عند تعذّر القياس يسقط إلى ارتفاع آمن (297mm) بلا تقييد لـ html/body (لا قصّ)', () => {
     for (const bad of [null, undefined, 0, -5]) {
       const css = buildPrintPageCss(T80, bad);
       expect(sizeOf(css)?.slice(1)).toEqual(['80', '297']);
+      expect(css).not.toMatch(/overflow:\s*hidden/);
     }
   });
 
-  it('الحراري: حدّا أدنى وأقصى لارتفاع الصفحة', () => {
+  it('الحراري: حدّ أدنى لارتفاع الصفحة، والأقصى 5000mm', () => {
     expect(sizeOf(buildPrintPageCss(T58, 3))?.[2]).toBe('20');
     expect(sizeOf(buildPrintPageCss(T58, 99_999))?.[2]).toBe('5000');
+  });
+
+  it('الحراري: الإيصال الأطول من الحد الأقصى لا يُقصّ — بلا overflow:hidden فيُقسَّم على صفحات (ملاحظة مراجعة PR2)', () => {
+    for (const mm of [4_999, 5_000, 99_999]) {
+      const css = buildPrintPageCss(T58, mm);
+      expect(sizeOf(css)?.[2]).toBe('5000');
+      expect(css, `${mm}mm`).not.toMatch(/overflow:\s*hidden|max-height/);
+    }
+    // ما يتّسع (≤ 5000 بعد التغذية) يحتفظ بالتقييد
+    expect(buildPrintPageCss(T58, 4_900)).toMatch(/overflow:\s*hidden/);
   });
 
   it('ورق ثابت (A4/Letter): النص حرفياً كما كان (لا تغيير في طباعة A4)', () => {

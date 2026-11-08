@@ -78,22 +78,23 @@ export function measureRollHeightMm(target: HTMLElement, widthMm: number): numbe
  *    `size: Wmm auto` غير صالح وفق CSS Paged Media (أطوال فقط) فيُسقطه Chromium ويبقى A4
  *    العام. الهامش صفر لأن القالب الحراري يحمل حشوه الداخلي؛ هامش 4mm كان يضيّق المساحة
  *    المطبوعة فيُصغَّر الإيصال. ويُقيَّد ارتفاع html/body بارتفاع الصفحة (أثناء الطباعة فقط)
- *    كي لا تنتج بقية عناصر الصفحة المخفية بصرياً صفحات رول إضافية فارغة.
+ *    كي لا تنتج بقية عناصر الصفحة المخفية بصرياً صفحات رول إضافية فارغة — وذلك فقط حين يتّسع
+ *    الإيصال في صفحة واحدة؛ الأطول من الحد الأقصى يُقسَّم على صفحات ولا يُقصّ أبداً.
  */
 export function buildPrintPageCss(paper: PdfPaper, contentHeightMm?: number | null): string {
   if (paper.heightMm > 0) {
     return `@media print { @page { size: ${paper.widthMm}mm ${paper.heightMm}mm; } }`;
   }
-  const measured = contentHeightMm && contentHeightMm > 0
-    ? Math.ceil(contentHeightMm) + ROLL_FEED_MM
-    : ROLL_FALLBACK_HEIGHT_MM;
-  const height = Math.min(ROLL_MAX_HEIGHT_MM, Math.max(ROLL_MIN_HEIGHT_MM, measured));
-  return [
-    '@media print {',
-    `  @page { size: ${paper.widthMm}mm ${height}mm; margin: 0; }`,
-    `  html, body { height: ${height}mm !important; max-height: ${height}mm !important; overflow: hidden !important; }`,
-    '}',
-  ].join('\n');
+  const needed = contentHeightMm && contentHeightMm > 0 ? Math.ceil(contentHeightMm) + ROLL_FEED_MM : null;
+  const height = Math.min(ROLL_MAX_HEIGHT_MM, Math.max(ROLL_MIN_HEIGHT_MM, needed ?? ROLL_FALLBACK_HEIGHT_MM));
+  const lines = ['@media print {', `  @page { size: ${paper.widthMm}mm ${height}mm; margin: 0; }`];
+  // تقييد html/body لا يُطبَّق إلا حين يتّسع الإيصال المقيس في صفحة واحدة. إن تجاوز الحد الأقصى
+  // أو تعذّر القياس نترك التدفق الطبيعي فيُقسَّم المحتوى على صفحات رول بدل أن يُقصّ (إجماليات/QR).
+  if (needed !== null && needed <= ROLL_MAX_HEIGHT_MM) {
+    lines.push(`  html, body { height: ${height}mm !important; max-height: ${height}mm !important; overflow: hidden !important; }`);
+  }
+  lines.push('}');
+  return lines.join('\n');
 }
 
 /**

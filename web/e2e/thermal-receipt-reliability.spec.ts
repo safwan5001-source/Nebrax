@@ -1,6 +1,8 @@
 import { devices, expect, test, webkit, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { inkRatioInRegion, inspectPdf, stitchImages } from '../src/lib/__tests__/helpers/pdf-inspect';
 import { makeDocumentQaModel } from '../src/modules/documents/qa/document-qa-fixtures';
 
@@ -247,6 +249,41 @@ test('قيم كبيرة على 58mm: «كمية × سعر» لا يتداخل م
     } finally {
       await context.close();
     }
+  }
+});
+
+test('إيصال أطول من 5000mm يُقسَّم على صفحات ولا يُقصّ (بنود + إجماليات + تذييل)', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+  test.setTimeout(180_000);
+  const { context, page } = await openQa(browser, 58, 'twenty', 'ltr');
+  try {
+    const rows = await page.evaluate(() => {
+      const root = document.getElementById('qa-print-root') as HTMLElement;
+      const items = root.querySelector('div.space-y-1') as HTMLElement;
+      while ((root.getBoundingClientRect().height * 25.4) / 96 < 5600) items.innerHTML += items.innerHTML;
+      return [...root.querySelectorAll('div.flex-wrap')].filter((d) => d.textContent?.includes('×')).length;
+    });
+    await page.getByTestId('qa-print').click();
+    const style = await page.evaluate(() => (window as unknown as { __printStyle: string | null }).__printStyle);
+    expect(style).toMatch(/size:\s*58mm\s+5000mm/);
+    expect(style, 'التقييد يقصّ ما فوق 5000mm').not.toMatch(/overflow:\s*hidden|max-height/);
+    await page.emulateMedia({ media: 'print' });
+    const buffer = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    const pdf = inspectPdf(buffer);
+    expect(pdf.pageCount).toBeGreaterThanOrEqual(2);
+    expect(pdf.mediaBoxes[0].heightPt / PT_PER_MM).toBeCloseTo(5000, 0);
+    // اكتمال المحتوى عبر الصفحات (يحتاج pdftotext؛ إن غاب يُكتفى بما سبق)
+    const file = path.join(tmpdir(), `thermal-long-${Date.now()}.pdf`);
+    await writeFile(file, buffer);
+    let text: string | null = null;
+    try { text = execFileSync('pdftotext', [file, '-'], { encoding: 'utf8' }); } catch { /* pdftotext غير متاح */ }
+    if (text !== null) {
+      expect((text.match(/×/g) ?? []).length, 'بنود ضاعت بين الصفحات').toBe(rows);
+      expect(text).toMatch(/Total\s*\(incl/);
+      expect(text).toMatch(/financial\s+record/);
+    }
+  } finally {
+    await context.close();
   }
 });
 
