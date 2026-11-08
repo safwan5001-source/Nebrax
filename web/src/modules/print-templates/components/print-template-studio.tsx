@@ -40,6 +40,7 @@ import {
 } from '@/modules/documents/registry/document-types';
 import { listTemplates, templateSupportsDocumentType } from '@/modules/documents/registry/templates';
 import { THEME_IDS } from '@/modules/documents/themes';
+import { preserveOutputProfile } from '@/modules/print-templates/services/output-profile';
 import type { DocSectionKey, DocSectionLayoutItem, DocumentTypeId, ThemeId } from '@/modules/documents/types';
 
 interface TemplateDefinition {
@@ -48,6 +49,8 @@ interface TemplateDefinition {
   show_logo?: boolean;
   layout?: DocSectionLayoutItem[];
   footer_text?: string;
+  /** ملف إخراج اختياري (PR3-A): يحفظه المحرر كما هو ولا يفسّره بعد. */
+  output_profile?: unknown;
 }
 
 interface Revision {
@@ -95,7 +98,10 @@ function activeRevision(template: PrintTemplate): Revision {
   return template.draft_revision ?? template.published_revision ?? FALLBACK.draft_revision!;
 }
 
-function normalizeDefinition(revision: Revision, type: DocumentTypeId): Required<TemplateDefinition> {
+function normalizeDefinition(
+  revision: Revision,
+  type: DocumentTypeId,
+): Required<Omit<TemplateDefinition, 'output_profile'>> & Pick<TemplateDefinition, 'output_profile'> {
   const definition = revision.definition ?? {};
   return {
     template_id: definition.template_id ?? 'tax-invoice-classic',
@@ -103,6 +109,8 @@ function normalizeDefinition(revision: Revision, type: DocumentTypeId): Required
     show_logo: definition.show_logo ?? true,
     layout: definition.layout ?? getDefaultDocumentLayout(type),
     footer_text: definition.footer_text ?? '',
+    // لا يُسقط الحفظ ملف إخراج وضعه API على المسودة (الخادم يعيد التحقق).
+    ...preserveOutputProfile(definition),
   };
 }
 

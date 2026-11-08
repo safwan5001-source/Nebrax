@@ -153,7 +153,7 @@ jobs:
           mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/print-templates contracts/flowers-journey contracts/flowers-admin-journey/responses
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
           cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
@@ -217,6 +217,8 @@ jobs:
           # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
           # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
           cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
+          # عقد Output Profile لقوالب الطباعة (DOC-V2-PR3A): يقارن PrintOutputProfileContractTest الثوابت والحالات به.
+          cp -r "$CORE/contracts/print-templates/"*.json contracts/print-templates/
           # عقد رحلة التاجر الإدارية (FLOWERS-H2-15): الطلبات تولّدها الواجهة، والاستجابات يلتقطها الخادم؛ يقارنهما FlowersMerchantAdminJourneyTest.
           cp -r "$CORE/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
           cp -r "$CORE/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/
@@ -488,7 +490,7 @@ jobs:
           mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/print-templates contracts/flowers-journey contracts/flowers-admin-journey/responses
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
           cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
@@ -552,6 +554,8 @@ jobs:
           # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
           # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
           cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
+          # عقد Output Profile لقوالب الطباعة (DOC-V2-PR3A): يقارن PrintOutputProfileContractTest الثوابت والحالات به.
+          cp -r "$CORE/contracts/print-templates/"*.json contracts/print-templates/
           # عقد رحلة التاجر الإدارية (FLOWERS-H2-15): الطلبات تولّدها الواجهة، والاستجابات يلتقطها الخادم؛ يقارنهما FlowersMerchantAdminJourneyTest.
           cp -r "$CORE/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
           cp -r "$CORE/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/
@@ -801,7 +805,7 @@ jobs:
           mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/print-templates contracts/flowers-journey contracts/flowers-admin-journey/responses
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
           cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
@@ -865,6 +869,8 @@ jobs:
           # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
           # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
           cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
+          # عقد Output Profile لقوالب الطباعة (DOC-V2-PR3A): يقارن PrintOutputProfileContractTest الثوابت والحالات به.
+          cp -r "$CORE/contracts/print-templates/"*.json contracts/print-templates/
           # عقد رحلة التاجر الإدارية (FLOWERS-H2-15): الطلبات تولّدها الواجهة، والاستجابات يلتقطها الخادم؛ يقارنهما FlowersMerchantAdminJourneyTest.
           cp -r "$CORE/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
           cp -r "$CORE/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/

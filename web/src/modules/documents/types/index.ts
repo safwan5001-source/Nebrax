@@ -40,7 +40,9 @@ export type CurrencyCode =
   | 'SAR' | 'USD' | 'EUR' | 'AED' | 'QAR'
   | 'OMR' | 'KWD' | 'BHD' | 'EGP' | 'GBP' | 'JPY';
 
-export type PaperSizeId = 'a4' | 'a4_landscape' | 'letter' | 'legal' | 'thermal_58' | 'thermal_80';
+export type PaperSizeId =
+  | 'a4' | 'a4_landscape' | 'a5' | 'a5_landscape' | 'a6' | 'a6_landscape'
+  | 'letter' | 'legal' | 'thermal_58' | 'thermal_80';
 
 export type ThemeId = 'blue' | 'green' | 'orange' | 'purple' | 'gray' | 'black' | 'custom';
 
