@@ -3508,6 +3508,7 @@
     "retail_v2": "Retail V2",
     "quotation_proposal": "Professional Proposal",
     "purchase_order_formal": "Formal Purchase Order",
+    "voucher_compact": "Compact Voucher",
     "thermal58": "Thermal 58mm",
     "thermal80": "Thermal 80mm"
   },
@@ -8174,7 +8175,15 @@
     "amount": "Amount",
     "method": "Payment method",
     "reference": "Reference",
-    "applied_to": "Applied to documents"
+    "applied_to": "Applied to documents",
+    "description": "Description",
+    "account": "Account",
+    "collector": "Collector",
+    "payment_details": "Payment details",
+    "branch": "Branch",
+    "classification": "Category",
+    "receiver_signature": "Receiver signature",
+    "payer_signature": "Deliverer signature"
   },
   "warehouses": {
     "title": "Warehouses",

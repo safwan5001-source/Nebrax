@@ -3508,6 +3508,7 @@
     "retail_v2": "تجزئة V2",
     "quotation_proposal": "عرض سعر مهني",
     "purchase_order_formal": "أمر شراء رسمي",
+    "voucher_compact": "سند مدمج",
     "thermal58": "حراري 58مم",
     "thermal80": "حراري 80مم"
   },
@@ -8174,7 +8175,15 @@
     "amount": "المبلغ",
     "method": "طريقة الدفع",
     "reference": "المرجع",
-    "applied_to": "مخصوم من المستندات"
+    "applied_to": "مخصوم من المستندات",
+    "description": "البيان",
+    "account": "الحساب",
+    "collector": "المُحصِّل",
+    "payment_details": "تفاصيل الدفع",
+    "branch": "الفرع",
+    "classification": "التصنيف",
+    "receiver_signature": "توقيع المستلم",
+    "payer_signature": "توقيع المسلّم"
   },
   "warehouses": {
     "title": "المخازن",
