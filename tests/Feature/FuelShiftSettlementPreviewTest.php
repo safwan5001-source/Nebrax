@@ -227,6 +227,21 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->rejects(fn () => app(FuelStationSettingsService::class)->putDevice($this->f['station'], 'dev-1', 'shift_settlement_mode', 'post_on_close', $this->f['actor'], 'x'));
     }
 
+    /** @test */
+    public function tenant_level_activation_is_rejected_so_no_station_inherits_the_policy_unchecked(): void
+    {
+        $settings = app(FuelStationSettingsService::class);
+        $error = $this->rejects(fn () => $settings->putTenant(['shift_settlement_mode' => 'post_on_close'], $this->f['actor'], 'تفعيل مؤسسي'));
+        $this->assertStringContainsString('FUEL_SETTLEMENT_STATION_LEVEL_ONLY', $error->getMessage());
+        $this->assertSame('none', \App\Support\Settings::group('fuel_stations')['shift_settlement_mode'] ?? 'none');
+        // مسح تجاوز المحطة لا يمنحها السياسة عبر المؤسسة: القيمة الموروثة تبقى none.
+        $settings->clearStation($this->f['station'], 'shift_settlement_mode', $this->f['actor'], 'مسح');
+        $this->assertSame('none', $settings->get($this->f['station'], 'shift_settlement_mode'));
+        // none على مستوى المؤسسة مسموح (إعادة ضبط).
+        $settings->putTenant(['shift_settlement_mode' => 'none'], $this->f['actor'], 'إعادة ضبط');
+        $this->assertSame('none', $settings->get($this->f['station'], 'shift_settlement_mode'));
+    }
+
     // ───────── العميل النقدي للمحطة ─────────
 
     /** @test */

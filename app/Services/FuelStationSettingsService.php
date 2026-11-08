@@ -218,6 +218,11 @@ class FuelStationSettingsService
         $this->assertGovernanceAuthority(array_keys($values), $actor);
         $current = Settings::group(self::GROUP);
         $known = $this->knownValues($values);
+        // P1-3a (Codex P2): تفعيل تسوية الورديات قرار **لمحطة** بعد فحص جاهزيتها (`assertSettlementReady`)؛ ضبطه على مستوى المؤسسة كان يرثه كل محطة بلا فحص (ويرثه من يمسح تجاوزه).
+        // لذلك لا يُقبل `post_on_close` هنا أبداً؛ `none` مسموح (إعادة الضبط).
+        if (($known['shift_settlement_mode'] ?? null) === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
+            throw new RuntimeException('FUEL_SETTLEMENT_STATION_LEVEL_ONLY: تفعيل تسوية الورديات يُضبط لكل محطة على حدة بعد فحص جاهزيتها، لا على مستوى المؤسسة.');
+        }
         $changed = [];
         foreach ($known as $key => $value) {
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
