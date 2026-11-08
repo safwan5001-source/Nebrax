@@ -163,7 +163,7 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
                 T::col('shift', 'text', 'الوردية', 'Shift'), T::col('station', 'text', 'المحطة', 'Station'), T::col('pump', 'text', 'المضخة', 'Pump'), T::col('nozzle', 'text', 'الفوهة', 'Nozzle'), T::col('product', 'text', 'المنتج', 'Product'),
                 T::col('opening', 'liters', 'الافتتاح', 'Opening'), T::col('closing', 'liters', 'الإغلاق', 'Closing'),
             ], $rows)],
-            'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated'],
+            'gaps' => array_values(array_diff($loaded['gaps'], ['missing_reading', 'closing_below_opening'])), 'truncated' => $loaded['truncated'], // القراءات الناقصة/المقلوبة هي موضوع التقرير نفسه لا فجوة في جودته
             'notes' => [['ar' => 'قواعد حتمية فقط (ناقصة، إغلاق<افتتاح، بلا حركة في وردية مغلقة)؛ لا عتبات إحصائية مخترعة.', 'en' => 'Deterministic rules only (missing, closing<opening, no movement in a closed shift); no invented statistical thresholds.']],
         ];
     }

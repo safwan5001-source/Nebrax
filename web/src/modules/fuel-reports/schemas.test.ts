@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { loadAll, MAX_OPTION_PAGES } from './use-options';
 import { payload } from './__fixtures__';
 import { catalogSchema, payloadSchema } from './schemas';
 
@@ -34,5 +35,27 @@ describe('عقد حمولة التقارير', () => {
     const ok = catalogSchema.safeParse({ data: { families: { sales: { ar: 'المبيعات', en: 'Sales' } }, reports: [payload().report] } });
     expect(ok.success).toBe(true);
     expect(catalogSchema.safeParse({ data: { families: {}, reports: [{ key: 'x' }] } }).success).toBe(false);
+  });
+});
+
+describe('قوائم المرشحات المرقَّمة', () => {
+  it('تجلب كل الصفحات (الورديات الأقدم من 50 لا تختفي) حتى السقف', async () => {
+    const calls: string[] = [];
+    const rows = await loadAll('/fuel-stations/shifts?station_id=s1', async (url) => {
+      calls.push(url);
+      const page = Number(new URL(`http://x${url}`).searchParams.get('page') ?? 1);
+      return { data: [{ id: `r${page}` }], meta: { last_page: 3 } };
+    });
+    expect(rows.map((r) => r.id)).toEqual(['r1', 'r2', 'r3']);
+    expect(calls).toEqual(['/fuel-stations/shifts?station_id=s1', '/fuel-stations/shifts?station_id=s1&page=2', '/fuel-stations/shifts?station_id=s1&page=3']);
+  });
+
+  it('بلا ترقيم ⇒ طلب واحد، والسقف يحمي من آلاف الصفحات', async () => {
+    let n = 0;
+    await loadAll('/fuel-stations/stations', async () => { n += 1; return { data: [{ id: 'a' }] }; });
+    expect(n).toBe(1);
+    n = 0;
+    await loadAll('/x', async () => { n += 1; return { data: [], meta: { last_page: 999 } }; });
+    expect(n).toBe(MAX_OPTION_PAGES);
   });
 });

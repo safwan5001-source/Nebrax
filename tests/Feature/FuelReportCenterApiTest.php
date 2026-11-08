@@ -355,6 +355,7 @@ class FuelReportCenterApiTest extends TestCase
         $this->assertSame(1_000_000, $row['opening']);
         $this->assertNull($row['closing']);
         $this->assertSame('in_progress', $row['status']);
+        $this->assertTrue($p['data_quality']['complete']); // وردية جارية بقراءة افتتاح: لا فجوة
     }
 
     /** @test */
@@ -447,5 +448,20 @@ class FuelReportCenterApiTest extends TestCase
 
         $owner = json_encode($this->report('shifts.corrections', ['from' => '2026-01-01', 'to' => '2026-12-31'])['tables'][0]['rows'][0]);
         $this->assertStringContainsString('cash_variance_minor', $owner);
+    }
+
+    /** @test */
+    public function reading_gaps_reach_data_quality_of_readings_and_pump_reports(): void
+    {
+        $shift = $this->open('gapq');
+        $this->meter($shift, 'opening', 5_000_000);
+        $this->meter($shift, 'closing', 4_000_000); // مقلوبة
+        foreach (['shifts.readings', 'pumps.readings', 'pumps.differences', 'pumps.meter_vs_sales'] as $key) {
+            $p = $this->report($key);
+            $this->assertFalse($p['data_quality']['complete'], $key);
+            $this->assertContains('closing_below_opening', $p['data_quality']['gaps'], $key);
+        }
+        // تقرير الشذوذ موضوعه القراءات نفسها: لا يُعدّ ناقصاً بسببها.
+        $this->assertTrue($this->report('pumps.anomalies')['data_quality']['complete']);
     }
 }

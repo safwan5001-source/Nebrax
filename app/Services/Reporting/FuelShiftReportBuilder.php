@@ -11,6 +11,7 @@ use App\Models\FuelShiftCorrection;
 use App\Models\FuelShiftMeterReading;
 use App\Models\FuelShiftTankReading;
 use App\Models\User;
+use App\Services\FuelShiftSalesCalculator;
 use App\Support\FuelReportDefinition;
 use App\Support\FuelReportTable as T;
 use Carbon\CarbonImmutable;
@@ -277,7 +278,17 @@ final class FuelShiftReportBuilder implements FuelReportBuilder
             }
         }
 
-        return ['rows' => $rows, 'shifts' => $loaded['shifts'], 'truncated' => $loaded['truncated'], 'gaps' => $loaded['gaps']];
+        // فجوات القراءات تدخل جودة البيانات: كميات الفوهات الناقصة/المقلوبة غير متاحة ولا تُعامل التقارير نتيجتها كاملة.
+        $statuses = array_column($rows, 'status');
+        $gaps = $loaded['gaps'];
+        if (in_array('missing', $statuses, true)) {
+            $gaps[] = FuelShiftSalesCalculator::GAP_MISSING_READING;
+        }
+        if (in_array('closing_below_opening', $statuses, true)) {
+            $gaps[] = FuelShiftSalesCalculator::GAP_CLOSING_BELOW_OPENING;
+        }
+
+        return ['rows' => $rows, 'shifts' => $loaded['shifts'], 'truncated' => $loaded['truncated'], 'gaps' => array_values(array_unique($gaps))];
     }
 
     // ───────── B4 التسليم والاستلام ─────────
