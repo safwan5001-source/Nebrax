@@ -54,7 +54,7 @@ export function DocumentView({
   if (!frame) return rendered;
 
   return (
-    <DocPageSheet frame={frame}>
+    <DocPageSheet frame={frame} hidden={rootId === 'pdf-print-root'}>
       <DocPageFrameProvider value={frame}>{rendered}</DocPageFrameProvider>
     </DocPageSheet>
   );

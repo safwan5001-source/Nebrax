@@ -18,13 +18,13 @@ function profile(input: Record<string, unknown>): OutputProfile {
   return result.profile;
 }
 
-function render(templateId: string, outputProfile: OutputProfile | null, documentType: 'tax_invoice' | 'quotation' = 'tax_invoice') {
+function render(templateId: string, outputProfile: OutputProfile | null, documentType: 'tax_invoice' | 'quotation' = 'tax_invoice', rootId = 'frame-root') {
   const model = makeDocumentQaModel({ documentType, scenario: 'three', direction: 'rtl', showQr: true, showAssets: false });
   const utils = renderIntl(
-    <DocumentView model={model} templateId={templateId} layout={getDefaultDocumentLayout(documentType)} rootId="frame-root" outputProfile={outputProfile} />,
+    <DocumentView model={model} templateId={templateId} layout={getDefaultDocumentLayout(documentType)} rootId={rootId} outputProfile={outputProfile} />,
     'ar',
   );
-  const root = utils.container.querySelector<HTMLElement>('#frame-root')!;
+  const root = utils.container.querySelector<HTMLElement>(`#${rootId}`)!;
   return {
     root,
     sheet: utils.container.querySelector<HTMLElement>('[data-doc-sheet]'),
@@ -90,6 +90,17 @@ describe('DocumentView + Output Profile — إطار الصفحة (AWJ-DOC-V2-PR
     const guide = sheet?.querySelector('[data-doc-sheet-guide]');
     expect(guide?.className).toContain('no-print');
     expect(guide?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('جذر PDF المستقل المخفي: غلاف الورقة يُخفى كله (لا حشو ولا ظل ولا عرض ورقي على الشاشة)، والجذر الظاهر لا يُخفى', () => {
+    const hiddenRoot = render('tax-invoice-classic', profile({ paper: 'a4' }), 'tax_invoice', 'pdf-print-root');
+    expect(hiddenRoot.sheet?.classList.contains('hidden')).toBe(true);
+    expect(hiddenRoot.sheet?.getAttribute('data-doc-sheet-hidden')).toBe('true');
+    expect(hiddenRoot.sheet?.contains(hiddenRoot.root)).toBe(true);
+
+    const visibleRoot = render('tax-invoice-classic', profile({ paper: 'a4' }));
+    expect(visibleRoot.sheet?.classList.contains('hidden')).toBe(false);
+    expect(visibleRoot.sheet?.hasAttribute('data-doc-sheet-hidden')).toBe(false);
   });
 
   it('جذر الطباعة/PDF خارج الورقة المعاينة: الجذر داخل الورقة ولا يحمل حدّها (لا تُلتقط الإرشادات)', () => {

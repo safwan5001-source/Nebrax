@@ -9,15 +9,25 @@ import type { DocPageFrame } from '../services/output-spec';
  * الإطار المنقّط `no-print`، والغلاف `print:static` كي لا يصير مرجع تموضع لوجهة الطباعة
  * المطلقة (`[data-print-target]`) ولا يحمل ظلاً أو خلفية عند الطباعة.
  */
-export function DocPageSheet({ frame, children }: { frame: DocPageFrame; children: React.ReactNode }) {
+export function DocPageSheet({
+  frame,
+  hidden = false,
+  children,
+}: {
+  frame: DocPageFrame;
+  /** جذر مخفي على الشاشة (جذر PDF المستقل): يُخفى غلافه كله؛ التقاط PDF يكشف الأجداد المخفية مؤقتاً. */
+  hidden?: boolean;
+  children: React.ReactNode;
+}) {
   const m = frame.marginsMm;
 
   return (
     <div
       data-doc-sheet
       data-doc-paper
+      data-doc-sheet-hidden={hidden ? 'true' : undefined}
       data-doc-sheet-paper={`${frame.paperWidthMm}x${frame.paperHeightMm}`}
-      className="relative mx-auto bg-surface shadow-md print:static print:!m-0 print:!w-auto print:!max-w-none print:!p-0 print:bg-transparent print:shadow-none"
+      className={`${hidden ? 'hidden ' : ''}relative mx-auto bg-surface shadow-md print:static print:!m-0 print:!w-auto print:!max-w-none print:!p-0 print:bg-transparent print:shadow-none`}
       style={{
         width: `${frame.paperWidthMm}mm`,
         maxWidth: `${frame.paperWidthMm}mm`,
