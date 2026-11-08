@@ -133,6 +133,25 @@ class FuelReportInventoryApiTest extends TestCase
     }
 
     /** @test */
+    public function stocktake_summary_stays_null_when_a_draft_has_no_physical_reading(): void
+    {
+        $tank = $this->f['nozzle']->tank ?? \App\Models\FuelTank::query()->findOrFail($this->tankId());
+        \App\Models\FuelReconciliation::query()->create([
+            'tenant_id' => $this->f['station']->tenant_id, 'branch_id' => $this->f['station']->branch_id,
+            'fuel_station_id' => $this->f['station']->id, 'fuel_tank_id' => $tank->id, 'fuel_product_id' => $tank->fuel_product_id,
+            'warehouse_id' => $this->f['station']->warehouse_id, 'status' => 'draft',
+            'opening_book_milliliters' => 1000, 'deliveries_milliliters' => 0, 'sales_milliliters' => 0, 'transfers_milliliters' => 0,
+            'prior_adjustments_milliliters' => 0, 'expected_closing_milliliters' => 1000, 'created_by' => $this->f['actor']->id,
+        ]);
+        $p = $this->report('inventory.stocktake');
+        $summary = collect($p['summary'])->keyBy('key');
+        $this->assertSame(1, $summary['count']['value']);
+        $this->assertNull($summary['variance']['value']);   // فرق غير مقيس ≠ صفر
+        $this->assertNull($summary['financial']['value']);
+        $this->assertNull($p['tables'][0]['totals']['variance']);
+    }
+
+    /** @test */
     public function inventory_reports_respect_permissions_and_tenant_isolation(): void
     {
         // البائع (fuel.shift.view) يرى أرصدة الخزانات؟ لا: تتطلب fuel_stations.view أو fuel.reading.view؛ ولا يرى الجرد/الحركة (reconciliation.view).

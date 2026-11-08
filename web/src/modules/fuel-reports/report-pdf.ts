@@ -263,7 +263,9 @@ function drawThermal(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, w
   for (const item of payload.summary) pair(item.label[lang], summaryText(item, lang, tz), true);
   if (payload.summary.length > 0) rule();
 
-  for (const table of payload.tables.slice(0, 1)) {
+  // كل الجداول تُطبع (لا يُقتطع قسم بصمت)؛ عنوان القسم حين يتعدد.
+  for (const table of payload.tables) {
+    if (payload.tables.length > 1) center(table.title[lang], small, true);
     const rows = table.rows.slice(0, THERMAL_ROW_CAP);
     if (rows.length === 0) center(l.empty, small);
     for (const row of rows) {

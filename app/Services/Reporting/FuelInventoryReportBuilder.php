@@ -364,13 +364,25 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
             'adjustments' => [[...$base, ...$var, T::col('adjusted', 'int', 'حركة مخزون (1/0)', 'Stock movement (1/0)'), T::col('posted', 'int', 'قيد (1/0)', 'Journal (1/0)'), ...$approval], 'التسويات المخزنية', 'Stock adjustments', 'adjustments'],
             default => [[...$base, ...$full, ...$var, ...$approval], 'الجرد والمطابقة', 'Stocktake and reconciliation', 'stocktake'],
         };
-        $total = array_sum(array_map(fn ($r) => (int) $r['variance'], $rows));
+        // مجهول واحد يجعل المجموع مجهولاً (لا صفر ولا مجموع جزئي).
+        $sumOrNull = static function (string $key) use ($rows): ?int {
+            $sum = 0;
+            foreach ($rows as $r) {
+                if ($r[$key] === null) {
+                    return null;
+                }
+                $sum += (int) $r[$key];
+            }
+
+            return $sum;
+        };
+        $total = $sumOrNull('variance');
 
         return [
             'summary' => [
                 T::item('count', 'عدد السجلات', 'Records', 'int', count($rows)),
                 T::item('variance', 'مجموع الفروق', 'Total variance', 'liters', $total),
-                T::item('financial', 'الأثر المالي', 'Financial effect', 'money', array_sum(array_map(fn ($r) => (int) $r['financial'], $rows)), T::COST),
+                T::item('financial', 'الأثر المالي', 'Financial effect', 'money', $sumOrNull('financial'), T::COST),
             ],
             'tables' => [T::table($key, $ar, $en, $cols, $rows)],
             'truncated' => $truncated,

@@ -125,6 +125,12 @@ class FuelReportFinancialApiTest extends TestCase
         $this->assertNull($rows[0]['meter']);      // لا إقرار تحصيل ⇒ لا لقطة مبيعات عدادات
         $this->assertNull($rows[0]['collected']);
         $this->assertNull($rows[0]['meter_minus_formal']);
+        // وردية مفتوحة لا تُحتسب «بلا إقرار»؛ بعد إغلاقها بلا إقرار تحصيل لا تُعلَن الجودة مكتملة
+        $this->assertSame([], $this->report('financial.reconciliations')['data_quality']['gaps']);
+        \Illuminate\Support\Facades\DB::table('fuel_shifts')->where('id', $sale->fuel_shift_id)->update(['status' => 'closed']);
+        $payload = $this->report('financial.reconciliations');
+        $this->assertContains('collection_not_declared', $payload['data_quality']['gaps']);
+        $this->assertFalse($payload['data_quality']['complete']);
     }
 
     /** @test */

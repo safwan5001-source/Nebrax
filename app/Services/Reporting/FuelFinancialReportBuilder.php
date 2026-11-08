@@ -314,8 +314,17 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
             ->selectRaw('fuel_shift_id, COALESCE(SUM(gross_minor), 0) as gross')->groupBy('fuel_shift_id')->pluck('gross', 'fuel_shift_id');
 
         $rows = [];
+        $undeclared = 0;
+        $incompleteSnapshots = 0;
         foreach ($byId as $id => $s) {
             $d = $decl->get($id);
+            if ($s['status'] !== 'open') {
+                if ($d === null) {
+                    $undeclared++;
+                } elseif ($d->sales_minor === null || ! $d->sales_complete) {
+                    $incompleteSnapshots++;
+                }
+            }
             $meter = $d?->sales_minor === null ? null : (int) $d->sales_minor;
             $official = (int) ($formal[$id] ?? 0);
             $collected = $d === null ? null : (int) $d->collected_total_minor;
@@ -335,7 +344,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
                 T::col('meter_minus_formal', 'money', 'عدادات − رسمي', 'Meter − formal', ['total' => 'sum', 'sensitivity' => T::SALES]),
                 T::col('collected_minus_meter', 'money', 'تحصيل − عدادات', 'Collected − meter', ['total' => 'sum', 'sensitivity' => T::SALES]),
             ], $rows, T::SALES)],
-            'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated'],
+            'gaps' => array_values(array_unique([...$loaded['gaps'], ...($undeclared > 0 ? ['collection_not_declared'] : []), ...($incompleteSnapshots > 0 ? ['declaration_sales_incomplete'] : [])])), 'truncated' => $loaded['truncated'],
             'notes' => [['ar' => 'ثلاثة مصادر مفصولة: لقطة مبيعات العدادات المجمَّدة، بيع الوقود الرسمي، وإقرار التحصيل؛ الفرق بينها مؤشر مراجعة لا قيد.', 'en' => 'Three separate sources: the frozen meter-sales snapshot, official fuel sales and the collection declaration; their difference is a review signal, not an entry.']],
         ];
     }

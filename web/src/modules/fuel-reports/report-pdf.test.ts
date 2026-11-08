@@ -65,6 +65,14 @@ describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
     expect(b.mediaBoxes[0].heightPt).toBeGreaterThan(a.mediaBoxes[0].heightPt);
   });
 
+  it('الحراري يطبع كل الجداول لا الأول فقط (الارتفاع يزيد بجدول ثانٍ)', async () => {
+    const one = payload({ report: definition({ thermal: true }) });
+    const two = { ...one, tables: [one.tables[0], { ...one.tables[0], key: 'second', title: { ar: 'قسم ثانٍ', en: 'Second section' } }] };
+    const a = await inspectPdf(await bytes(await createReportPdf(one, { lang: 'en', paper: 'thermal_80' })));
+    const b = await inspectPdf(await bytes(await createReportPdf(two, { lang: 'en', paper: 'thermal_80' })));
+    expect(b.mediaBoxes[0].heightPt).toBeGreaterThan(a.mediaBoxes[0].heightPt * 1.5);
+  });
+
   it('بيانات ناقصة وجدول فارغ لا يكسران الرسم', async () => {
     const empty = payload({ tables: [{ ...payload().tables[0], rows: [], totals: null }], summary: [], data_quality: { complete: false, gaps: ['missing_reading'], notes: [] } });
     const pdf = await inspectPdf(await bytes(await createReportPdf(empty, { lang: 'ar', paper: 'a4' })));
