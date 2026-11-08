@@ -246,10 +246,10 @@ class FuelOpeningBalanceService
             // المستأجر (المِرساة) يتعارض معه: أخذ المِرساة قبل الخزانات يعكس ترتيب القراءة فيجمد الترحيل مع تسجيل قراءة لأحد خزاناته (مراجعة Codex على #2071). فنقفل الخزانات
             // نفسها التي سيقفلها `evaluate()` بالترتيب نفسه (بالمعرّف) قبل المِرساة؛ ثم المِرساة قبل أي قفل مجمّع (ترتيب ERP: مِرساة ← حالة التكلفة ← الرصيد). لا أثر محاسبي أو مخزني.
             FuelTank::query()->whereIn('id', $document->lines->pluck('fuel_tank_id')->all())->orderBy('id')->lockForUpdate()->get();
-            // وصفوف المنتجات `FOR UPDATE` (بالمعرّف، وهي نفسها التي يقفلها `evaluate()` لاحقاً) قبل المِرساة أيضاً (مراجعة #2071): تعديل بطاقة المنتج يمسك صف المنتج ثم يطلب KEY SHARE على
-            // المستأجر المتعارض مع المِرساة، فأخذ المِرساة قبل المنتجات يعكس ترتيب `main` (منتج ← مِرساة) ويجمّد الترحيل مع تعديل المنتج.
+            // وصفوف المنتجات `FOR NO KEY UPDATE` (بالمعرّف، وهي نفسها التي يقفلها `evaluate()` لاحقاً) قبل المِرساة أيضاً: تعديل بطاقة المنتج يمسك صف المنتج `FOR UPDATE` ثم يطلب KEY SHARE على المستأجر
+            // المتعارض مع المِرساة، فنقفل المنتجات قبلها. **ليس `FOR UPDATE`**: بيع ERP يمسك المِرساة ثم يحتاج `KEY SHARE` على المنتج (FK حركة المخزون) و`FOR UPDATE` يتعارض معه ⇒ جمود (CI: 40P01).
             $lockedProductIds = FuelProduct::query()->whereIn('id', $document->lines->pluck('fuel_product_id')->unique()->all())->pluck('product_id')->all();
-            BranchScope::reference(Product::class)->whereIn('id', $lockedProductIds)->orderBy('id')->lockForUpdate()->get();
+            BranchScope::reference(Product::class)->whereIn('id', $lockedProductIds)->orderBy('id')->lock('for no key update')->get();
             app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
 
             // ترتيب الأقفال يطابق اعتماد الاستلام (حالة التكلفة ← المنتج ← الرصيد): assertReady أولاً، وإلا تعاكس مع استلام
@@ -456,7 +456,8 @@ class FuelOpeningBalanceService
         $productIds = $lines->pluck('fuel_product_id')->unique()->sort()->values()->all();
         $fuelProducts = FuelProduct::query()->whereIn('id', $productIds)->get()->keyBy('id');
         $productQuery = BranchScope::reference(Product::class)->whereIn('id', $fuelProducts->pluck('product_id')->all())->orderBy('id');
-        $products = ($lock ? $productQuery->lockForUpdate() : $productQuery)->get()->keyBy('id');
+        // `NO KEY UPDATE` (لا `FOR UPDATE`): في الترحيل تُقفل هذه الصفوف قبل المِرساة بالنمط نفسه، فلا ترقية بعدها ولا تعارض مع KEY SHARE في بيع ERP.
+        $products = ($lock ? $productQuery->lock('for no key update') : $productQuery)->get()->keyBy('id');
 
         $productResults = [];
         $totalValue = 0;

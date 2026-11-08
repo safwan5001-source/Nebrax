@@ -37,6 +37,21 @@ class FuelLockOrder2StaticTest extends TestCase
         }
     }
 
+    /**
+     * صف المنتج في هذه المسارات يُقفل `FOR NO KEY UPDATE` (تسوية/افتتاحي) أو `FOR KEY SHARE` (استلام) — **أبداً `FOR UPDATE`**: بيع ERP يمسك المِرساة ثم يحتاج `KEY SHARE` على صف المنتج
+     * (FK حركة المخزون) و`FOR UPDATE` يتعارض معه ⇒ جمود مُستنسَخ في CI (`FuelLockOrder2PostgresTest`). يحرس هذا أن لا يعود أحدٌ إلى `lockForUpdate()` على المنتج هنا.
+     */
+    public function test_product_rows_are_never_locked_for_update_in_the_fuel_cost_paths(): void
+    {
+        foreach (['Services/FuelReconciliationService.php', 'Services/FuelOpeningBalanceService.php', 'Services/FuelSupplyReceivingService.php'] as $file) {
+            $code = (string) file_get_contents(app_path($file));
+            $this->assertDoesNotMatchRegularExpression('/Product::class\)[^;]*lockForUpdate\(\)/s', $code, "{$file}: قفل FOR UPDATE على المنتج يتعارض مع KEY SHARE في بيع ERP");
+            $this->assertDoesNotMatchRegularExpression('/\$productQuery->lockForUpdate\(\)/', $code, "{$file}: \$productQuery->lockForUpdate()");
+        }
+        $this->assertStringContainsString("lock('for no key update')", (string) file_get_contents(app_path('Services/FuelReconciliationService.php')));
+        $this->assertStringContainsString("lock('for no key update')", (string) file_get_contents(app_path('Services/FuelOpeningBalanceService.php')));
+    }
+
     public function test_the_guard_exposes_the_same_anchor_lock_ledger_uses(): void
     {
         $guard = (string) file_get_contents(app_path('Services/Accounting/AccountingDateGuard.php'));

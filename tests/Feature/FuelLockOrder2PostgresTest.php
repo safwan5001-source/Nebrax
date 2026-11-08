@@ -364,6 +364,58 @@ class FuelLockOrder2PostgresTest extends TestCase
         $run(fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), $w['actor']), 'ترحيل الافتتاحي ↔ تعديل بطاقة المنتج');
     }
 
+    // ───────── 1c) بيع ERP يمسك المِرساة ثم يحتاج KEY SHARE على صف المنتج (إدراج حركة المخزون، FK) ─────────
+
+    /** ذيل ترتيب ERP الحقيقي: مِرساة المستأجر FOR UPDATE ← (نوم) ← KEY SHARE على صف المنتج. @param array<string,mixed> $w */
+    private function erpProductKeyShareSql(array $w, string $productId, float $sleep = 1.5): string
+    {
+        return sprintf(
+            "BEGIN; SELECT 1 FROM tenants WHERE id='%s' FOR UPDATE; SELECT pg_sleep(%s); SELECT 1 FROM products WHERE id='%s' FOR KEY SHARE; COMMIT;",
+            $w['tenant_id'], $sleep, $productId,
+        );
+    }
+
+    /** @param array<string,mixed> $w */
+    private function assertNoDeadlockWithErpProductKeyShare(array $w, callable $operation, string $label): void
+    {
+        $holder = $this->startHolder($this->erpProductKeyShareSql($w, (string) $w['fuels']['91']->product_id));
+        usleep(500000);
+        $error = null;
+        try {
+            $operation();
+        } catch (\Throwable $e) {
+            $error = $e;
+        }
+        [$stderr, $exit] = $this->finishHolder($holder);
+        $this->assertStringNotContainsString('deadlock', $stderr, "{$label}: جلسة ERP ضحية جمود — {$stderr}");
+        $this->assertSame(0, $exit, "{$label}: {$stderr}");
+        $this->assertNull($error, "{$label}: ".($error ? get_class($error).': '.$error->getMessage() : ''));
+    }
+
+    #[Test]
+    public function reconciliation_approval_never_deadlocks_with_an_erp_sale_that_holds_the_anchor_and_needs_the_product(): void
+    {
+        $w = $this->world();
+        $draft = $this->draftReconciliation($w, 'erpprod');
+        $this->assertNoDeadlockWithErpProductKeyShare($w, fn () => app(FuelReconciliationService::class)->approve(FuelReconciliation::findOrFail($draft->id), $w['actor']->id, 'اعتماد'), 'اعتماد التسوية ↔ بيع ERP');
+    }
+
+    #[Test]
+    public function opening_balance_posting_never_deadlocks_with_an_erp_sale_that_holds_the_anchor_and_needs_the_product(): void
+    {
+        $w = $this->world();
+        [$fresh, $doc] = $this->freshOpeningDocument($w, 'e');
+        $this->assertNoDeadlockWithErpProductKeyShare($w, fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), $w['actor']), 'ترحيل الافتتاحي ↔ بيع ERP');
+    }
+
+    #[Test]
+    public function delivery_approval_never_deadlocks_with_an_erp_sale_that_holds_the_anchor_and_needs_the_product(): void
+    {
+        $w = $this->world();
+        $delivery = $this->draftDelivery($w, 'lo2-erpprod-recv');
+        $this->assertNoDeadlockWithErpProductKeyShare($w, fn () => app(FuelSupplyReceivingService::class)->approveDelivery(FuelDelivery::findOrFail($delivery->id), $w['actor']->id), 'اعتماد الاستلام ↔ بيع ERP');
+    }
+
     #[Test]
     public function real_tank_readings_racing_opening_postings_never_deadlock(): void
     {
