@@ -208,4 +208,16 @@ class FuelReportCollectionApiTest extends TestCase
         $own = $this->withToken($foreign)->getJson(self::BASE.'/collection.by_method')->assertOk()->json('data');
         $this->assertSame(2300, $this->table($own, 'methods')['totals']['amount']); // 23.00 له فقط، لا 340.00 من المستأجر الآخر
     }
+
+    /** @test */
+    public function an_incomplete_frozen_sales_snapshot_is_a_quality_gap_even_though_a_declaration_exists(): void
+    {
+        $shift = $this->declaredShift('inc', 5_000_000, 5_100_000, 20000, 3000);
+        \Illuminate\Support\Facades\DB::statement("UPDATE fuel_shift_collection_declarations SET sales_complete = false, sales_minor = NULL, difference_minor = NULL WHERE fuel_shift_id = '{$shift->id}'");
+
+        $p = $this->report('collection.reconciliation');
+        $this->assertContains('declaration_sales_incomplete', $p['data_quality']['gaps']);
+        $this->assertFalse($p['data_quality']['complete']);
+        $this->assertNull($this->table($p, 'reconciliation')['rows'][0]['sales']);
+    }
 }

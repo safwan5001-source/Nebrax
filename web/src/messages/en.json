@@ -17120,7 +17120,8 @@
       "tank_reading_missing": "Missing tank reading",
       "invoice_missing": "Sale without invoice",
       "cost_unavailable": "Cost data unavailable",
-      "collection_not_declared": "Shift without collection declaration"
+      "collection_not_declared": "Shift without collection declaration",
+      "declaration_sales_incomplete": "Declaration sales snapshot incomplete"
     }
   }
 }

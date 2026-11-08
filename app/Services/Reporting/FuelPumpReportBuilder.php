@@ -179,15 +179,21 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
         $query = $context->scoped(FuelStationAuditEvent::query())
             ->whereIn('subject_type', [FuelNozzle::class, FuelPump::class])
             ->where('occurred_at', '>=', $start)->where('occurred_at', '<', $end);
-        if ($context->filter('nozzle_id') !== null) {
-            $query->where('subject_id', $context->filter('nozzle_id'));
-        }
-        if ($context->filter('pump_id') !== null) {
-            $query->where('subject_id', $context->filter('pump_id'));
+        // مرشح المضخة يشمل أحداث المضخة نفسها وأحداث فوهاتها (subject_id للفوهة هو معرّف الفوهة لا المضخة)؛ مرشح الفوهة يضيّق ضمنه.
+        $pump = $context->filter('pump_id');
+        $nozzle = $context->filter('nozzle_id');
+        if ($pump !== null || $nozzle !== null) {
+            $ids = $nozzle !== null
+                ? FuelNozzle::query()->where('id', $nozzle)->when($pump !== null, fn ($q) => $q->where('fuel_pump_id', $pump))->pluck('id')->all()
+                : [$pump, ...FuelNozzle::query()->where('fuel_pump_id', $pump)->pluck('id')->all()];
+            $query->whereIn('subject_id', $ids === [] ? ['-'] : $ids);
         }
         $events = $query->orderBy('occurred_at')->orderBy('id')->limit(1001)->get();
         $truncated = $events->count() > 1000;
         $names = User::query()->whereIn('id', $events->pluck('actor_id')->filter()->unique()->all())->pluck('name', 'id')->all();
+        // لقطات التدقيق تحمل الحقول المتغيّرة فقط: رقم الفوهة/المضخة يُحلّ من المعرّف (وبديل قصير مميِّز للمحذوف).
+        $subjectIds = $events->pluck('subject_id')->unique()->all();
+        $labels = FuelNozzle::query()->whereIn('id', $subjectIds)->pluck('nozzle_number', 'id')->all() + FuelPump::query()->whereIn('id', $subjectIds)->pluck('pump_number', 'id')->all();
 
         $rows = [];
         foreach ($events->take(1000) as $e) {
@@ -209,7 +215,7 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
             $subject = $e->after ?? $e->before ?? [];
             $rows[] = [
                 'at' => $e->occurred_at?->toIso8601String(), 'station' => $context->stationName($stationId), 'action' => $e->action,
-                'subject' => (string) ($subject['nozzle_number'] ?? $subject['pump_number'] ?? ''), 'changes' => mb_substr(implode('؛ ', $changes), 0, self::TEXT_LIMIT),
+                'subject' => (string) ($labels[$e->subject_id] ?? $subject['nozzle_number'] ?? $subject['pump_number'] ?? '#'.substr((string) $e->subject_id, 0, 8)), 'changes' => mb_substr(implode('؛ ', $changes), 0, self::TEXT_LIMIT),
                 'actor' => $names[$e->actor_id] ?? null,
             ];
         }

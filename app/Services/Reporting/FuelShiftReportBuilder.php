@@ -436,8 +436,8 @@ final class FuelShiftReportBuilder implements FuelReportBuilder
 
         return [
             'summary' => [
-                T::item('shifts_with_variance', 'ورديات بفروقات', 'Shifts with variances', 'int', count($rows)),
-                T::item('pending', 'بانتظار المراجعة', 'Pending review', 'int', count(array_filter($rows, fn ($r) => $r['review_status'] === FuelShiftCashVariance::STATUS_PENDING_REVIEW))),
+                T::item('shifts_with_variance', 'ورديات بفروقات', 'Shifts with variances', 'int', count($rows), T::SALES),
+                T::item('pending', 'بانتظار المراجعة', 'Pending review', 'int', count(array_filter($rows, fn ($r) => $r['review_status'] === FuelShiftCashVariance::STATUS_PENDING_REVIEW)), T::SALES),
             ],
             'tables' => [T::table('variances', 'فروقات الوردية', 'Shift variances', [
                 T::col('shift', 'text', 'الوردية', 'Shift'), T::col('station', 'text', 'المحطة', 'Station'), T::col('closed_at', 'datetime', 'الإغلاق', 'Closed'),

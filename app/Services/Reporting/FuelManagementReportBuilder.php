@@ -91,6 +91,7 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
         $decl = $byId->isEmpty() ? collect() : FuelShiftCollectionDeclaration::query()->whereIn('fuel_shift_id', $byId->keys()->all())->get()->keyBy('fuel_shift_id');
 
         $days = [];
+        $incomplete = false;
         foreach ($byId as $id => $s) {
             if ($s['date'] === null) {
                 continue;
@@ -103,6 +104,9 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
             if ($x === null || $x->sales_minor === null) {
                 $d['sales'] = null;
                 $d['undeclared']++;
+                if ($x !== null) {
+                    $incomplete = true;
+                }
             } else {
                 $d['sales'] = $d['sales'] === null ? null : $d['sales'] + (int) $x->sales_minor;
             }
@@ -126,7 +130,7 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
                 T::col('difference', 'money', 'تحصيل − مبيعات', 'Collected − sales', ['total' => 'sum', 'sensitivity' => T::SALES]),
                 T::col('undeclared', 'int', 'ورديات بلا لقطة', 'Shifts without snapshot'),
             ], $rows)],
-            'gaps' => array_values(array_unique([...$loaded['gaps'], ...(array_sum(array_column($rows, 'undeclared')) > 0 ? ['collection_not_declared'] : [])])),
+            'gaps' => array_values(array_unique([...$loaded['gaps'], ...(array_sum(array_column($rows, 'undeclared')) > 0 ? ['collection_not_declared'] : []), ...($incomplete ? ['declaration_sales_incomplete'] : [])])),
             'truncated' => $loaded['truncated'],
             'notes' => [['ar' => 'من لقطات الإقرار المجمَّدة والورديات؛ وردية بلا لقطة تجعل مبيعات يومها غير متاحة (لا تقدير).', 'en' => 'From frozen declaration snapshots and shifts; a shift without a snapshot makes its day sales unavailable (no estimate).']],
         ];

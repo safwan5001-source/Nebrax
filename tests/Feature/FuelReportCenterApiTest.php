@@ -465,4 +465,14 @@ class FuelReportCenterApiTest extends TestCase
         // تقرير الشذوذ موضوعه القراءات نفسها: لا يُعدّ ناقصاً بسببها.
         $this->assertTrue($this->report('pumps.anomalies')['data_quality']['complete']);
     }
+
+    /** @test */
+    public function variance_summary_counts_are_hidden_with_the_table_from_users_without_sales_permission(): void
+    {
+        $this->shiftWithSales('v', 5_000_000, 5_100_000);
+        $seller = $this->report('shifts.variances', [], 'seller');
+        $this->assertSame([], $seller['tables']);
+        $this->assertSame([], $seller['summary']);
+        $this->assertNotSame([], $this->report('shifts.variances')['summary']);
+    }
 }

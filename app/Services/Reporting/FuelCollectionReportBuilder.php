@@ -52,7 +52,11 @@ final class FuelCollectionReportBuilder implements FuelReportBuilder
             $notes[] = ['ar' => "{$undeclared} وردية مغلقة بلا إقرار تحصيل (لا تُحتسب في الإجماليات).", 'en' => "{$undeclared} closed shift(s) have no collection declaration (excluded from totals)."];
         }
 
-        return $built + ['notes' => $notes, 'truncated' => $loaded['truncated'], 'gaps' => $undeclared > 0 ? ['collection_not_declared'] : []];
+        // لقطة إقرار مجمَّدة بمبيعات غير مكتملة (سعر/قراءة ناقصة وقت الإغلاق) ليست «مكتملة» لمجرد وجود الإقرار.
+        $incompleteSnapshots = $declarations->filter(fn ($d) => $d->sales_minor === null || ! $d->sales_complete)->count();
+        $gaps = [...($undeclared > 0 ? ['collection_not_declared'] : []), ...($incompleteSnapshots > 0 && in_array($definition->key, ['collection.reconciliation', 'collection.variances'], true) ? ['declaration_sales_incomplete'] : [])];
+
+        return $built + ['notes' => $notes, 'truncated' => $loaded['truncated'], 'gaps' => array_values(array_merge($loaded['gaps'], $gaps))];
     }
 
     /**

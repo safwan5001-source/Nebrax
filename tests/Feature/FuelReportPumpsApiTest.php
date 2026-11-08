@@ -122,6 +122,12 @@ class FuelReportPumpsApiTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame('nozzle.updated', $rows[0]['action']);
         $this->assertStringContainsString('meter_opening_milliliters: 0 → 7000000', $rows[0]['changes']);
+        $this->assertSame((string) $nozzle->nozzle_number, $rows[0]['subject']); // الرقم يُحلّ من المعرّف لا من لقطة التغيير فقط
+        // مرشح المضخة يشمل أحداث فوهاتها، ومرشح الفوهة يضيّق، والمضخة الخاطئة لا تُرجع شيئاً.
+        $this->assertCount(1, $this->rows($this->report('pumps.resets?pump_id='.$nozzle->fuel_pump_id)));
+        $this->assertCount(1, $this->rows($this->report('pumps.resets?pump_id='.$nozzle->fuel_pump_id.'&nozzle_id='.$nozzle->id)));
+        $this->assertCount(1, $this->rows($this->report('pumps.resets?nozzle_id='.$nozzle->id)));
+        $this->assertCount(0, $this->rows($this->report('pumps.resets?pump_id='.(string) \Illuminate\Support\Str::uuid())));
         $this->withToken($this->token('seller'))->getJson(self::BASE.'/pumps.resets')->assertNotFound(); // يتطلب fuel_stations.manage
     }
 }

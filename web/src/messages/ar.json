@@ -17120,7 +17120,8 @@
       "tank_reading_missing": "قراءة خزان ناقصة",
       "invoice_missing": "بيع بلا فاتورة",
       "cost_unavailable": "بيانات التكلفة غير متاحة",
-      "collection_not_declared": "وردية بلا إقرار تحصيل"
+      "collection_not_declared": "وردية بلا إقرار تحصيل",
+      "declaration_sales_incomplete": "مبيعات لقطة الإقرار غير مكتملة"
     }
   }
 }
