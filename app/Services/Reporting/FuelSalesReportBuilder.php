@@ -345,12 +345,14 @@ final class FuelSalesReportBuilder implements FuelReportBuilder
 
         $a = $this->dimensionTotals($shifts, $dimension);
         $b = $this->dimensionTotals($other['shifts'], $dimension);
-        $names = array_unique([...array_keys($a), ...array_keys($b)]);
-        sort($names);
+        // الهوية بالمعرّف (الاسم قد يتكرر بين محطتين/منتجين)؛ الاسم تسمية عرض فقط.
+        $keys = array_values(array_unique([...array_keys($a), ...array_keys($b)]));
+        usort($keys, fn ($x, $y) => [($a[$x] ?? $b[$x])['name'], $x] <=> [($a[$y] ?? $b[$y])['name'], $y]);
         $rows = [];
-        foreach ($names as $name) {
-            $ax = $a[$name] ?? ['ml' => 0, 'amount' => 0];
-            $bx = $b[$name] ?? ['ml' => 0, 'amount' => 0];
+        foreach ($keys as $key) {
+            $ax = $a[$key] ?? ['ml' => 0, 'amount' => 0];
+            $bx = $b[$key] ?? ['ml' => 0, 'amount' => 0];
+            $name = ($a[$key] ?? $b[$key])['name'];
             $rows[] = [
                 'name' => $name,
                 'a_liters' => $ax['ml'], 'b_liters' => $bx['ml'], 'delta_liters' => $ax['ml'] - $bx['ml'], 'delta_liters_bp' => $this->deltaBp($ax['ml'], $bx['ml']),
@@ -383,14 +385,14 @@ final class FuelSalesReportBuilder implements FuelReportBuilder
         ];
     }
 
-    /** @param list<array<string,mixed>> $shifts @return array<string,array{ml:int,amount:?int}> */
+    /** @param list<array<string,mixed>> $shifts @return array<string,array{name:string,ml:int,amount:?int}> مفتاحه معرّف المحطة/المنتج */
     private function dimensionTotals(array $shifts, string $dimension): array
     {
         $out = [];
         foreach ($shifts as $shift) {
             if ($dimension === 'station') {
-                $row = &$out[$shift['station_name']];
-                $row ??= ['ml' => 0, 'amount' => 0];
+                $row = &$out[(string) $shift['station_id']];
+                $row ??= ['name' => (string) $shift['station_name'], 'ml' => 0, 'amount' => 0];
                 $row['ml'] += (int) $shift['milliliters'];
                 $row['amount'] = ($row['amount'] === null || $shift['amount_minor'] === null) ? null : $row['amount'] + (int) $shift['amount_minor'];
                 unset($row);
@@ -398,8 +400,8 @@ final class FuelSalesReportBuilder implements FuelReportBuilder
                 continue;
             }
             foreach ($shift['nozzles'] as $nozzle) {
-                $row = &$out[(string) $nozzle['product_name']];
-                $row ??= ['ml' => 0, 'amount' => 0];
+                $row = &$out[(string) ($nozzle['product_id'] ?? $nozzle['product_name'])];
+                $row ??= ['name' => (string) $nozzle['product_name'], 'ml' => 0, 'amount' => 0];
                 $row['ml'] += (int) ($nozzle['ml'] ?? 0);
                 $row['amount'] = ($row['amount'] === null || $nozzle['amount_minor'] === null) ? null : $row['amount'] + (int) $nozzle['amount_minor'];
                 unset($row);

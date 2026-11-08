@@ -117,6 +117,17 @@ class FuelReportFinancialApiTest extends TestCase
     }
 
     /** @test */
+    public function a_reversed_payment_is_not_counted_as_collected(): void
+    {
+        $sale = $this->finalizedSale();
+        $payment = $this->collect($sale, 'cash', null, 'fin-rev');
+        $this->assertSame(1, $this->table($this->report('financial.payment_methods'), 'methods')['rows'][0]['receipts']);
+
+        \Illuminate\Support\Facades\DB::table('payments')->where('id', $payment->id)->update(['status' => 'reversed']);
+        $this->assertSame([], $this->table($this->report('financial.payment_methods'), 'methods')['rows']);
+    }
+
+    /** @test */
     public function reconciliation_compares_the_three_sources_per_shift(): void
     {
         $sale = $this->finalizedSale();

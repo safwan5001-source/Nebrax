@@ -76,6 +76,7 @@ class FuelReportInventoryApiTest extends TestCase
         $before = $this->report('inventory.tank_balances');
         $this->assertContains('tank_reading_missing', $before['data_quality']['gaps']);
         $this->assertNull($before['period']);
+        $this->assertNull(collect($before['summary'])->firstWhere('key', 'quantity')['value']); // قراءة مجهولة ≠ صفر
 
         $this->reading(2500, 'inv-a');
         $p = $this->report('inventory.tank_balances');
@@ -84,6 +85,7 @@ class FuelReportInventoryApiTest extends TestCase
         $this->assertSame(2500, $row['fill_bp']); // 25% من 10000 لتر
         $this->assertSame('physical', $row['reading_type']);
         $this->assertTrue($p['data_quality']['complete']);
+        $this->assertSame(2_500_000, collect($p['summary'])->firstWhere('key', 'quantity')['value']);
     }
 
     /** @test */

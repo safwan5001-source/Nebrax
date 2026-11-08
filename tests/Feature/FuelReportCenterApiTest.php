@@ -419,6 +419,25 @@ class FuelReportCenterApiTest extends TestCase
     }
 
     /** @test */
+    public function comparison_dimensions_are_keyed_by_id_not_display_name(): void
+    {
+        $m = new \ReflectionMethod(\App\Services\Reporting\FuelSalesReportBuilder::class, 'dimensionTotals');
+        $m->setAccessible(true);
+        $builder = app(\App\Services\Reporting\FuelSalesReportBuilder::class);
+        $shifts = [
+            ['station_id' => 's1', 'station_name' => 'المحطة', 'milliliters' => 1000, 'amount_minor' => 10, 'nozzles' => [['product_id' => 'p1', 'product_name' => 'ديزل', 'ml' => 600, 'amount_minor' => 6]]],
+            ['station_id' => 's2', 'station_name' => 'المحطة', 'milliliters' => 2000, 'amount_minor' => 20, 'nozzles' => [['product_id' => 'p2', 'product_name' => 'ديزل', 'ml' => 700, 'amount_minor' => 7]]],
+        ];
+        $stations = $m->invoke($builder, $shifts, 'station');
+        $products = $m->invoke($builder, $shifts, 'product');
+        $this->assertCount(2, $stations);
+        $this->assertSame(1000, $stations['s1']['ml']);
+        $this->assertSame(2000, $stations['s2']['ml']);
+        $this->assertCount(2, $products);
+        $this->assertSame('ديزل', $products['p2']['name']);
+    }
+
+    /** @test */
     public function comparison_keeps_the_data_quality_flags_of_the_current_period(): void
     {
         $this->shiftWithSales('prev', 5_000_000, 5_040_000, '2027-03-03 09:00:00');

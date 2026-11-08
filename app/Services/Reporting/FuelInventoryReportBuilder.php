@@ -82,7 +82,7 @@ final class FuelInventoryReportBuilder implements FuelReportBuilder
         return [
             'summary' => [
                 T::item('tanks', 'عدد الخزانات', 'Tanks', 'int', count($rows)),
-                T::item('quantity', 'إجمالي آخر قراءة', 'Total of latest readings', 'liters', array_sum(array_map(fn ($r) => (int) $r['quantity'], $rows))),
+                T::item('quantity', 'إجمالي آخر قراءة', 'Total of latest readings', 'liters', $noReading > 0 ? null : array_sum(array_column($rows, 'quantity'))),
                 T::item('review', 'خزانات تحتاج مراجعة', 'Tanks needing review', 'int', count(array_filter($rows, fn ($r) => $r['flags'] !== ''))),
                 T::item('no_reading', 'بلا قراءة', 'No reading', 'int', $noReading),
             ],

@@ -274,6 +274,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
         [$start, $end] = $context->utcEnvelope();
         $inScope = $context->scoped(FuelSale::query())->select('id');
         $all = FuelSalePaymentReceipt::query()->with('payment:id,payment_method_name,method,amount')->whereIn('fuel_sale_id', $inScope)
+            ->whereIn('payment_id', \App\Models\Payment::query()->select('id')->where('status', 'posted')) // المعكوس لا يُحتسب محصَّلاً (كما FuelShiftCashExpectationService)
             ->where('recorded_at', '>=', $start)->where('recorded_at', '<', $end)->orderBy('recorded_at')->limit(self::ROW_CAP + 1)->get();
         $truncated = $all->count() > self::ROW_CAP;
         $stationOf = FuelSale::query()->whereIn('id', $all->pluck('fuel_sale_id')->unique()->all())->pluck('fuel_station_id', 'id');
