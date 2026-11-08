@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\User;
+use App\Services\Reporting\FuelCollectionReportBuilder;
+use App\Services\Reporting\FuelPumpReportBuilder;
+use App\Services\Reporting\FuelSalesReportBuilder;
+use App\Services\Reporting\FuelShiftReportBuilder;
+
+/**
+ * سجل تقارير الوقود الوحيد: كل تقرير مُعلَن هنا يُنفَّذ فعلاً في بانيه وله اختبار (لا إدخال «قريباً» ولا تقرير وهمي).
+ * يستهلكه تطبيق المحطة ووحدة أَوْج بالمسارات نفسها، فلا تختلف النتائج بين الواجهتين.
+ */
+final class FuelReportCatalog
+{
+    public const FAMILIES = [
+        'sales' => ['ar' => 'المبيعات', 'en' => 'Sales'],
+        'shifts' => ['ar' => 'الورديات', 'en' => 'Shifts'],
+        'collection' => ['ar' => 'التحصيل', 'en' => 'Collection'],
+        'pumps' => ['ar' => 'المضخات والفوهات', 'en' => 'Pumps & nozzles'],
+        'inventory' => ['ar' => 'الخزانات والمخزون', 'en' => 'Tanks & inventory'],
+        'financial' => ['ar' => 'المالية والمحاسبية', 'en' => 'Financial'],
+        'management' => ['ar' => 'الإدارية والتحليلية', 'en' => 'Management'],
+    ];
+
+    /** صلاحيات الاطلاع الدنيا لعائلة المبيعات/الورديات: كميات الوردية. المبالغ تتطلب `fuel.sale.view` (تُحذف من الحمولة). */
+    private const SHIFT_VIEW = ['fuel.shift.view', 'fuel.sale.view'];
+
+    /** @var list<FuelReportDefinition>|null */
+    private static ?array $all = null;
+
+    /** @return list<FuelReportDefinition> */
+    public static function all(): array
+    {
+        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps());
+    }
+
+    /**
+     * اتحاد صلاحيات كل التقارير: بوابة المسار الخشنة (يكفي واحدة)، والتفويض الدقيق لكل تقرير يفرضه المحرك (`allows`).
+     *
+     * @return list<string>
+     */
+    public static function routePermissions(): array
+    {
+        return array_values(array_unique(array_merge(...array_map(fn (FuelReportDefinition $d) => $d->permissionsAny, self::all()))));
+    }
+
+    public static function find(string $key): ?FuelReportDefinition
+    {
+        foreach (self::all() as $definition) {
+            if ($definition->key === $key) {
+                return $definition;
+            }
+        }
+
+        return null;
+    }
+
+    public static function allows(User $user, FuelReportDefinition $definition): bool
+    {
+        foreach ($definition->permissionsAny as $permission) {
+            if ($user->hasPermission($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<FuelReportDefinition> التقارير المسموحة لهذا المستخدم فقط. */
+    public static function visibleTo(User $user): array
+    {
+        return array_values(array_filter(self::all(), fn (FuelReportDefinition $d) => self::allows($user, $d)));
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function sales(): array
+    {
+        $b = FuelSalesReportBuilder::class;
+        $common = ['station_id', 'from', 'to', 'product_id', 'status', 'date_basis'];
+        $meter = FuelReportDefinition::SOURCE_METER;
+
+        return [
+            new FuelReportDefinition('sales.daily', 'sales', ['ar' => 'المبيعات اليومية', 'en' => 'Daily sales'], ['ar' => 'لترات وقيمة مبيعات كل يوم وكل محطة من عدادات الورديات.', 'en' => 'Liters and sales value per day and station, from shift meter readings.'], self::SHIFT_VIEW, $common, $b, $meter),
+            new FuelReportDefinition('sales.period', 'sales', ['ar' => 'المبيعات حسب الفترة', 'en' => 'Sales by period'], ['ar' => 'تجميع المبيعات يومياً أو أسبوعياً أو شهرياً.', 'en' => 'Sales grouped by day, week or month.'], self::SHIFT_VIEW, [...$common, 'group'], $b, $meter),
+            new FuelReportDefinition('sales.by_shift', 'sales', ['ar' => 'المبيعات حسب الوردية', 'en' => 'Sales by shift'], ['ar' => 'مبيعات كل وردية.', 'en' => 'Sales for each shift.'], self::SHIFT_VIEW, [...$common, 'user_id'], $b, $meter),
+            new FuelReportDefinition('sales.by_product', 'sales', ['ar' => 'المبيعات حسب المنتج', 'en' => 'Sales by product'], ['ar' => 'لترات وقيمة كل منتج وقود ومتوسط سعره وحصته.', 'en' => 'Liters and value per fuel product, average price and share.'], self::SHIFT_VIEW, $common, $b, $meter),
+            new FuelReportDefinition('sales.by_pump', 'sales', ['ar' => 'المبيعات حسب المضخة', 'en' => 'Sales by pump'], ['ar' => 'مبيعات كل مضخة.', 'en' => 'Sales for each pump.'], self::SHIFT_VIEW, [...$common, 'pump_id'], $b, $meter),
+            new FuelReportDefinition('sales.by_nozzle', 'sales', ['ar' => 'المبيعات حسب الفوهة', 'en' => 'Sales by nozzle'], ['ar' => 'مبيعات كل فوهة.', 'en' => 'Sales for each nozzle.'], self::SHIFT_VIEW, [...$common, 'pump_id', 'nozzle_id'], $b, $meter),
+            new FuelReportDefinition('sales.by_employee', 'sales', ['ar' => 'المبيعات حسب الموظف', 'en' => 'Sales by employee'], ['ar' => 'ورديات كل موظف: المنفرد منها والمشترك منفصلان (لا يُقسَّم مبلغ وردية مشتركة بالتخمين).', 'en' => 'Shifts per employee: sole and shared shifts are kept apart (shared shift totals are never split by guess).'], self::SHIFT_VIEW, [...$common, 'user_id'], $b, $meter),
+            new FuelReportDefinition('sales.by_station', 'sales', ['ar' => 'المبيعات حسب المحطة', 'en' => 'Sales by station'], ['ar' => 'مبيعات كل محطة.', 'en' => 'Sales for each station.'], self::SHIFT_VIEW, $common, $b, $meter),
+            new FuelReportDefinition('sales.comparison', 'sales', ['ar' => 'مقارنة المبيعات بين الفترات', 'en' => 'Sales period comparison'], ['ar' => 'فترة مقابل فترة (الافتراضي: الفترة السابقة بالطول نفسه).', 'en' => 'One period against another (default: the preceding period of equal length).'], self::SHIFT_VIEW, [...$common, 'compare_from', 'compare_to', 'dimension'], $b, $meter),
+            new FuelReportDefinition('sales.consolidated', 'sales', ['ar' => 'التقرير المجمّع للمبيعات', 'en' => 'Consolidated sales'], ['ar' => 'مصفوفة المحطات × المنتجات.', 'en' => 'Stations × products matrix.'], self::SHIFT_VIEW, $common, $b, $meter),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function shifts(): array
+    {
+        $b = FuelShiftReportBuilder::class;
+        $ops = FuelReportDefinition::SOURCE_OPERATIONS;
+        $list = ['station_id', 'from', 'to', 'status', 'date_basis', 'user_id'];
+
+        return [
+            new FuelReportDefinition('shifts.log', 'shifts', ['ar' => 'سجل الورديات', 'en' => 'Shift log'], ['ar' => 'كل الورديات في الفترة بحالتها ومدتها ومن فتحها وأغلقها.', 'en' => 'Every shift in the period with status, duration and who opened/closed it.'], ['fuel.shift.view'], $list, $b, $ops),
+            new FuelReportDefinition('shifts.detail', 'shifts', ['ar' => 'تقرير الوردية التفصيلي', 'en' => 'Shift detail'], ['ar' => 'قراءات الفوهات والمنتجات والطاقم والنقد والخزانات لوردية واحدة.', 'en' => 'Nozzle readings, products, staff, cash and tanks for one shift.'], ['fuel.shift.view'], ['shift_id'], $b, $ops, 'portrait', true),
+            new FuelReportDefinition('shifts.readings', 'shifts', ['ar' => 'قراءات بداية ونهاية الوردية', 'en' => 'Shift opening & closing readings'], ['ar' => 'قراءات العدادات عند الفتح والإغلاق لكل فوهة.', 'en' => 'Meter readings at open and close per nozzle.'], ['fuel.shift.view'], [...$list, 'shift_id', 'pump_id', 'nozzle_id', 'product_id'], $b, $ops, 'landscape', true),
+            new FuelReportDefinition('shifts.handover', 'shifts', ['ar' => 'تقرير تسليم واستلام الوردية', 'en' => 'Shift handover'], ['ar' => 'تسليمات الدرج للخزنة ومن استلمها.', 'en' => 'Drawer handovers to treasury and who received them.'], ['fuel.shift.view'], $list, $b, $ops, 'landscape', true),
+            new FuelReportDefinition('shifts.closing', 'shifts', ['ar' => 'تقرير إقفال الوردية', 'en' => 'Shift closing'], ['ar' => 'نقد الإقفال والمعدود وفرق الخزان لكل وردية مغلقة.', 'en' => 'Closing cash, counted cash and tank variance per closed shift.'], ['fuel.shift.view'], $list, $b, $ops, 'landscape', true),
+            new FuelReportDefinition('shifts.open_overdue', 'shifts', ['ar' => 'الورديات المفتوحة والمتأخرة', 'en' => 'Open & overdue shifts'], ['ar' => 'ورديات ما زالت مفتوحة وعمرها؛ تُعلَّم المتأخرة بعد الحد المحدد.', 'en' => 'Shifts still open and their age; those beyond the threshold are flagged.'], ['fuel.shift.view'], ['station_id', 'overdue_hours'], $b, $ops),
+            new FuelReportDefinition('shifts.variances', 'shifts', ['ar' => 'فروقات الوردية', 'en' => 'Shift variances'], ['ar' => 'عجز وزيادة النقد وحالة مراجعتها.', 'en' => 'Cash shortages/overages and their review status.'], ['fuel.shift.view'], $list, $b, $ops),
+            new FuelReportDefinition('shifts.corrections', 'shifts', ['ar' => 'سجل التعديلات والتصحيحات', 'en' => 'Corrections log'], ['ar' => 'طلبات تصحيح القراءات والنقد وقراراتها.', 'en' => 'Reading and cash correction requests and their decisions.'], ['fuel.shift.view'], ['station_id', 'from', 'to', 'status'], $b, $ops),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function collection(): array
+    {
+        $b = FuelCollectionReportBuilder::class;
+        $ops = FuelReportDefinition::SOURCE_OPERATIONS;
+        $filters = ['station_id', 'from', 'to', 'status', 'date_basis'];
+
+        return [
+            new FuelReportDefinition('collection.cash', 'collection', ['ar' => 'التحصيل النقدي', 'en' => 'Cash collection'], ['ar' => 'النقد المُقَرّ به لكل وردية من إقرار التحصيل.', 'en' => 'Declared cash per shift from the collection declaration.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.network', 'collection', ['ar' => 'تحصيل الشبكة', 'en' => 'Network collection'], ['ar' => 'مبالغ الشبكة/البنك المُقَرّ بها لكل وردية.', 'en' => 'Declared network/bank amounts per shift.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.deferred', 'collection', ['ar' => 'المبيعات الآجلة', 'en' => 'Deferred sales'], ['ar' => 'مبيعات نهائية غير مسدَّدة والمتبقي لكل عميل (ليست تحصيلاً).', 'en' => 'Unsettled finalized sales and the outstanding per customer (not collection).'], ['fuel.sale.view'], ['station_id', 'from', 'to'], $b, FuelReportDefinition::SOURCE_FORMAL),
+            new FuelReportDefinition('collection.by_method', 'collection', ['ar' => 'التحصيل حسب طريقة الدفع', 'en' => 'Collection by payment method'], ['ar' => 'مجموع المُقَرّ به لكل طريقة دفع وحصتها.', 'en' => 'Declared total per payment method and its share.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.by_employee', 'collection', ['ar' => 'التحصيل حسب الموظف', 'en' => 'Collection by employee'], ['ar' => 'ما أقرّ به كل موظف عبر ورديات الفترة.', 'en' => 'What each employee declared across the period.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.variances', 'collection', ['ar' => 'العجز والزيادة', 'en' => 'Shortages & overages'], ['ar' => 'فروق النقد والتحصيل مقابل العدادات مع إجماليات العجز والزيادة.', 'en' => 'Cash and collection-vs-meter differences with shortage/overage totals.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.reconciliation', 'collection', ['ar' => 'مطابقة المبيعات والتحصيل', 'en' => 'Sales vs collection'], ['ar' => 'مبيعات العدادات مقابل المُقَرّ به لكل وردية.', 'en' => 'Meter sales against declared collection per shift.'], self::SHIFT_VIEW, $filters, $b, $ops),
+            new FuelReportDefinition('collection.handover', 'collection', ['ar' => 'تسليم النقد', 'en' => 'Cash handover'], ['ar' => 'تسليمات الدرج للخزنة ومن استلمها.', 'en' => 'Drawer handovers to treasury and who received them.'], ['fuel.shift.view'], ['station_id', 'from', 'to', 'status', 'date_basis', 'user_id'], $b, $ops, 'landscape', true),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function pumps(): array
+    {
+        $b = FuelPumpReportBuilder::class;
+        $ops = FuelReportDefinition::SOURCE_OPERATIONS;
+        $eq = ['station_id', 'from', 'to', 'status', 'date_basis', 'pump_id', 'nozzle_id', 'product_id'];
+
+        return [
+            new FuelReportDefinition('pumps.readings', 'pumps', ['ar' => 'قراءات العدادات', 'en' => 'Meter readings'], ['ar' => 'قراءات الافتتاح والإغلاق لكل فوهة في كل وردية.', 'en' => 'Opening and closing readings per nozzle per shift.'], ['fuel.shift.view'], [...$eq, 'shift_id'], $b, $ops),
+            new FuelReportDefinition('pumps.nozzle_consumption', 'pumps', ['ar' => 'استهلاك كل فوهة', 'en' => 'Nozzle consumption'], ['ar' => 'لترات (وقيمة) كل فوهة في الفترة.', 'en' => 'Liters (and value) per nozzle in the period.'], self::SHIFT_VIEW, $eq, $b, FuelReportDefinition::SOURCE_METER),
+            new FuelReportDefinition('pumps.pump_sales', 'pumps', ['ar' => 'مبيعات كل مضخة', 'en' => 'Pump sales'], ['ar' => 'لترات وقيمة كل مضخة.', 'en' => 'Liters and value per pump.'], self::SHIFT_VIEW, $eq, $b, FuelReportDefinition::SOURCE_METER),
+            new FuelReportDefinition('pumps.meter_vs_sales', 'pumps', ['ar' => 'مقارنة القراءات بالمبيعات', 'en' => 'Meters vs sales'], ['ar' => 'لتر العداد مقابل المبيعات الرسمية لكل فوهة ووردية.', 'en' => 'Meter liters against formal sales per nozzle and shift.'], ['fuel.sale.view'], $eq, $b, FuelReportDefinition::SOURCE_FORMAL),
+            new FuelReportDefinition('pumps.differences', 'pumps', ['ar' => 'فروقات العدادات', 'en' => 'Meter differences'], ['ar' => 'انقطاعات استمرارية العداد بين وردية وسابقتها.', 'en' => 'Meter continuity breaks between a shift and its predecessor.'], ['fuel.shift.view'], $eq, $b, $ops),
+            new FuelReportDefinition('pumps.resets', 'pumps', ['ar' => 'إعادة ضبط العدادات وتغيير الارتباطات', 'en' => 'Meter resets & re-linking'], ['ar' => 'تغييرات إعداد المضخات والفوهات من سجل التدقيق.', 'en' => 'Pump and nozzle configuration changes from the audit trail.'], ['fuel_stations.manage'], ['station_id', 'from', 'to', 'pump_id', 'nozzle_id'], $b, $ops),
+            new FuelReportDefinition('pumps.anomalies', 'pumps', ['ar' => 'القراءات والحركات غير الطبيعية', 'en' => 'Abnormal readings & movements'], ['ar' => 'قراءات ناقصة، إغلاق أقل من الافتتاح، فوهات بلا حركة.', 'en' => 'Missing readings, closing below opening, idle nozzles.'], ['fuel.shift.view'], $eq, $b, $ops),
+        ];
+    }
+}

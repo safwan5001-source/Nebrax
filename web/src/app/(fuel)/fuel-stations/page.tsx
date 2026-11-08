@@ -72,6 +72,7 @@ function readWorkspace(payload: unknown): Workspace | null {
 
 export default function FuelStationsWorkspacePage() {
   const t = useTranslations('fuelStations');
+  const tReports = useTranslations('fuelReports');
   const locale = useLocale();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [summary, setSummary] = useState<Summary>({ dashboard: null, devices: [], shifts: [], summaryUnavailable: false });
@@ -136,10 +137,11 @@ export default function FuelStationsWorkspacePage() {
       { href: '/fuel-stations/sales', label: t('quickSale'), permission: 'fuel.sale.view' },
       { href: '/fuel-stations/shifts', label: t('quickShift'), permission: 'fuel.shift.view' },
       { href: '/fuel-stations/receiving', label: t('quickReceiving'), permission: 'fuel_stations.view' },
+      { href: '/fuel-stations/reports', label: tReports('title'), permission: 'fuel.shift.view' },
       { href: '/fuel-stations/master-data', label: t('quickStations'), permission: 'fuel_stations.view' },
     ];
     return values.filter((action) => canAccess(permissions ?? [], action.permission));
-  }, [permissions, t]);
+  }, [permissions, t, tReports]);
 
   const headerActions: PageAction[] = [
     {

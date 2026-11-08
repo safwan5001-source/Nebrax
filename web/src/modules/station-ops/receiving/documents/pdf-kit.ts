@@ -32,9 +32,10 @@ function arabicFontData(): Promise<string> {
   return fontDataPromise;
 }
 
-export async function newPdf(orientation: 'portrait' | 'landscape'): Promise<PdfDoc> {
+/** `format` اختياري: افتراضياً A4؛ مقاس مخصص [عرض، ارتفاع] بالمم (الإيصالات الحرارية 58/80مم، HORIZON-REPORTS). */
+export async function newPdf(orientation: 'portrait' | 'landscape', format: 'a4' | [number, number] = 'a4'): Promise<PdfDoc> {
   const [{ jsPDF }, font] = await Promise.all([import('jspdf'), arabicFontData()]);
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation, putOnlyUsedFonts: true }) as PdfDoc;
+  const pdf = new jsPDF({ unit: 'mm', format, orientation, putOnlyUsedFonts: true }) as PdfDoc;
   pdf.addFileToVFS(FONT_FILE, font);
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'normal');
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'bold');

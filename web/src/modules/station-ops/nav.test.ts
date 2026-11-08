@@ -16,7 +16,7 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
     expect(ids([])).toEqual(['help', 'profile']); // المساعدة والملف متاحان لكل مستخدم موثّق
     expect(ids(['fuel_stations.view'])).toEqual(['home', 'products', 'tanks', 'help', 'profile']);
-    expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toEqual(['home', 'products', 'shifts', 'tanks', 'help', 'profile']);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toEqual(['home', 'products', 'shifts', 'tanks', 'reports', 'help', 'profile']);
   });
 
   // FUEL-B4: «الإدارة» تظهر لمن يملك أي وظيفة إدارية فعلية، لا لاسم دور؛ والخادم يفرض كل طلب.
@@ -27,7 +27,7 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(ids(['fuel.sale.price.manage'])).toEqual(['manage', 'help', 'profile']);
     expect(ids(['fuel_stations.manage'])).toContain('manage'); // PR-2: مدير المحطة يصل إلى معالج الرصيد الافتتاحي
     expect(ids(['fuel.governance.manage'])).toEqual(['manage', 'help', 'profile']); // سياسة القراءات المتأخرة (B6) تتبع الحوكمة
-    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'tanks', 'manage', 'help', 'profile']);
+    expect(ids(['fuel_stations.view', 'fuel.shift.view', 'fuel.staff.manage'])).toEqual(['home', 'products', 'shifts', 'tanks', 'reports', 'manage', 'help', 'profile']);
   });
 
   // FUEL-B5: «الاستلام» من مفتاح الاستلام الدقيق أو القديم `fuel_stations.manage` — لا من `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة).
@@ -48,6 +48,16 @@ describe('ops navigation is derived from AWJ permissions only', () => {
     expect(ids(['fuel_stations.view', 'fuel.reading.record'])).toContain('tanks');
     expect(ids(['fuel.reading.view'])).not.toContain('tanks'); // بلا قراءة المحطات لا تطبيق
     expect(isNavActive('/fuel-stations/ops/tanks/abc', '/fuel-stations/ops/tanks')).toBe(true);
+  });
+
+  // HORIZON-REPORTS: «التقارير» تظهر لمن يملك قراءة المحطات وأي صلاحية تقرير (كميات الوردية أو مبيعاتها)؛ الخادم يصفّي الكتالوج لكل تقرير.
+  it('shows Reports only to a station user holding a report permission', () => {
+    const ids = (granted: string[]) => visibleOpsNav(canAllFrom(granted)).map((item) => item.id);
+    expect(ids(['fuel_stations.view'])).not.toContain('reports');
+    expect(ids(['fuel_stations.view', 'fuel.sale.view'])).toContain('reports');
+    expect(ids(['fuel_stations.view', 'fuel.shift.view'])).toContain('reports');
+    expect(ids(['fuel.shift.view'])).not.toContain('reports'); // بلا قراءة المحطات لا تطبيق
+    expect(isNavActive('/fuel-stations/ops/reports/sales.daily', '/fuel-stations/ops/reports')).toBe(true);
   });
 
   it('marks the active item without matching sibling prefixes', () => {
