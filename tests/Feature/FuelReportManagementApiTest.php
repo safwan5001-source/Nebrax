@@ -174,4 +174,21 @@ class FuelReportManagementApiTest extends TestCase
         $foreign = $this->withToken($token)->getJson(self::BASE.'/management.day_close')->assertOk()->json('data');
         $this->assertSame([], $foreign['tables'][0]['rows']);
     }
+
+    /** @test */
+    public function a_station_that_only_received_fuel_still_appears_in_the_day_close(): void
+    {
+        $now = now();
+        $supplier = \App\Models\Partner::create(['tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'name' => 'مورد', 'type' => 'supplier']);
+        \Illuminate\Support\Facades\DB::table('fuel_deliveries')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'fuel_station_id' => $this->f['station']->id,
+            'fuel_tank_id' => $this->f['nozzle']->fuel_tank_id, 'fuel_product_id' => $this->f['fuelProduct']->id, 'warehouse_id' => $this->f['warehouse']->id, 'supplier_id' => $supplier->id,
+            'dispatched_milliliters' => 5_000_000, 'received_milliliters' => 4_990_000, 'transit_variance_milliliters' => -10_000, 'received_unit_cost_minor' => 0, 'received_total_cost_minor' => 0,
+            'status' => 'approved', 'idempotency_key' => 'dc-delivery-only', 'received_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        $rows = $this->report('day_close')['tables'][0]['rows'];
+        $this->assertCount(1, $rows);
+        $this->assertSame(0, $rows[0]['shifts']);
+        $this->assertSame(4_990_000, $rows[0]['received']);
+    }
 }

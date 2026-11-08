@@ -170,19 +170,18 @@ class FuelReportEngine
      */
     private function redactTable(array $table, array $allowed): array
     {
-        $drop = [];
         $kept = [];
         foreach ($table['columns'] as $column) {
             if ($this->permitted($column['sensitivity'] ?? null, $allowed)) {
                 unset($column['sensitivity']);
                 $kept[] = $column;
-            } else {
-                $drop[] = $column['key'];
             }
         }
         unset($table['sensitivity']);
         $table['columns'] = $kept;
-        $table['rows'] = array_map(fn (array $row) => array_diff_key($row, array_flip($drop)), $table['rows']);
+        // قائمة سماح لا قائمة حجب: كل صف يُسقَط على مفاتيح الأعمدة المسموحة فقط، فلا يتسرّب حقل حسّاس لم يُعلَن عموداً (مثل cogs/cost في صفوف المجمِّعات).
+        $allowedKeys = array_flip(array_column($kept, 'key'));
+        $table['rows'] = array_map(fn (array $row) => array_intersect_key($row, $allowedKeys), $table['rows']);
 
         return $table;
     }

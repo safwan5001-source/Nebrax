@@ -216,12 +216,10 @@ final class FuelManagementReportBuilder implements FuelReportBuilder
         $query = $context->scoped(FuelDelivery::query())->where('status', FuelDelivery::STATUS_APPROVED);
         $context->constrainPeriod($query, 'received_at');
         foreach ($query->get(['fuel_station_id', 'received_milliliters']) as $d) {
-            $name = $context->stationName((string) $d->fuel_station_id);
-            foreach ($byStation as $k => $g) {
-                if ($g['station'] === $name) {
-                    $byStation[$k]['received'] += (int) $d->received_milliliters;
-                }
-            }
+            $stationId = (string) $d->fuel_station_id;
+            // محطة استلمت وقوداً في اليوم بلا ورديات تظهر بصفّها أيضاً (لا يُغفَل استلام لغياب وردية).
+            $byStation[$stationId] ??= ['station' => $context->stationName($stationId), 'shifts' => 0, 'open' => 0, 'liters' => 0, 'sales' => 0, 'collected' => 0, 'handover' => 0, 'received' => 0, 'ids' => []];
+            $byStation[$stationId]['received'] += (int) $d->received_milliliters;
         }
         $rows = array_values(array_map(fn ($g) => array_diff_key($g, ['ids' => 1]), $byStation));
         [$day] = $context->period();

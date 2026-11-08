@@ -475,4 +475,28 @@ class FuelReportCenterApiTest extends TestCase
         $this->assertSame([], $seller['summary']);
         $this->assertNotSame([], $this->report('shifts.variances')['summary']);
     }
+
+    /** @test */
+    public function every_row_of_every_report_contains_only_declared_column_keys_for_every_user(): void
+    {
+        $this->twoShifts();
+        $viewer = $this->roleUser($this->f['tenant_id'], 'sales-viewer', 'sales-viewer@rpt.test', ['fuel.sale.view', 'fuel.shift.view', 'fuel_stations.view', 'fuel.reading.view', 'fuel.delivery.view', 'fuel.reconciliation.view', 'fuel.reports.view']);
+        $this->f['viewer'] = $viewer;
+        foreach (['actor', 'viewer', 'seller'] as $who) {
+            $catalog = $this->withToken($this->token($who))->getJson(self::BASE.'/catalog')->assertOk()->json('data.reports');
+            foreach ($catalog as $definition) {
+                if ($definition['key'] === 'shifts.detail') {
+                    continue; // يتطلب shift_id
+                }
+                $res = $this->withToken($this->token($who))->getJson(self::BASE.'/'.$definition['key']);
+                $res->assertOk();
+                foreach ($res->json('data.tables') as $table) {
+                    $allowed = array_column($table['columns'], 'key');
+                    foreach ($table['rows'] as $row) {
+                        $this->assertSame([], array_values(array_diff(array_keys($row), $allowed)), "{$who}:{$definition['key']}:{$table['key']} leaks undeclared keys");
+                    }
+                }
+            }
+        }
+    }
 }

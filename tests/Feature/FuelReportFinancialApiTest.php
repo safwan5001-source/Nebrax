@@ -144,4 +144,17 @@ class FuelReportFinancialApiTest extends TestCase
         $foreign = $this->withToken($token)->getJson(self::BASE.'/financial.revenue')->assertOk()->json('data');
         $this->assertSame([], $this->table($foreign, 'revenue')['rows']);
     }
+
+    /** @test */
+    public function aggregated_revenue_rows_never_carry_cost_for_users_without_cost_permission(): void
+    {
+        $this->finalizedSale();
+        $viewer = $this->roleUser($this->f['tenant_id'], 'salesview2', 'salesview2@fin.test', ['fuel.sale.view']);
+        $this->f['viewer'] = $viewer;
+        foreach (['financial.revenue', 'financial.vat'] as $key) {
+            $row = $this->report($key, 'viewer')['tables'][0]['rows'][0];
+            $this->assertArrayNotHasKey('cogs', $row, $key);
+            $this->assertArrayNotHasKey('uncosted', $row, $key);
+        }
+    }
 }
