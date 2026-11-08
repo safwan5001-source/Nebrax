@@ -5,8 +5,8 @@
 | **المرجع** | `docs/audits/AWJ_DOCUMENT_PLATFORM_COMPREHENSIVE_AUDIT.md` (DOC-P0-2، DOC-P1-5/6) + أدلة E3/E5 — لم يُكرَّر الفحص الشامل |
 | **Branch** | `claude/awj-doc-v2-pr2-thermal-print` |
 | **PR** | [#2068](https://github.com/safwan5001-source/Nebrax/pull/2068) — جاهز للمراجعة، **غير مدموج، غير منشور** |
-| **Base SHA** | `010fcc15a7bb64e929422aec9d9cadd6ee4cb4de` (`main` عند بدء الفرع، بعد دمج PR #2065 و#2066). `main` تقدّم لاحقاً إلى `e3193d39e2ba9d3a631a9b713268ccd60e1d8f2c` ⇒ الفرع `behind` وسيحتاج تحديثاً بدمج `main` قبل الدمج (سياسة «الفرع محدَّث») |
-| **Head SHA** | كود + اختبارات: `862bf2f565d4a3876f5bc24c9db0665f4c2a1b20` — يليه commit توثيق (هذا التقرير + الأدلة)؛ الرأس النهائي في صفحة الـ PR |
+| **Base SHA** | `010fcc15a7bb64e929422aec9d9cadd6ee4cb4de` (`main` عند بدء الفرع، بعد دمج PR #2065 و#2066). `main` تقدّم لاحقاً إلى `e3193d39e2ba9d3a631a9b713268ccd60e1d8f2c`؛ حُدِّث الفرع بدمج `main` (commit `c4b81cab9`، دون إعادة كتابة تاريخ) تنفيذاً لسياسة «الفرع محدَّث» |
+| **Head SHA** | آخر commit كود + اختبارات: `685bcd9338cb9f42a2bcbaf3b2accef1dbd13adf`؛ ثم commits توثيق ودمج `main` (`c4b81cab9`) وهذا التحديث؛ الرأس النهائي في صفحة الـ PR |
 | **النطاق** | `printDocument` + قالب الإيصال الحراري + سطح الاختبار. لا محرك PDF جديد، لا تغيير بنية Document Platform، لا API/DB/محاسبة/ضرائب/ZATCA |
 
 ---
@@ -107,7 +107,7 @@
 
 ### Build
 - `npm run build`: **نجح** (Compiled؛ يشمل فحص الأنواع). `tsc --noEmit`: 55 خطأ = **العدد نفسه قبل الـ PR** (ملفات اختبار/e2e غير مرتبطة)؛ صفر في ملفات الـ PR.
-- **CI على الـ PR: 7/7 ناجحة على الرأس `345aa562c` (قبل إصلاح ملاحظة Codex)؛ فحوص الرأس الأحدث تُسجَّل في صفحة الـ PR** — `CI Gate`، `web build (Next.js)`، PHP على SQLite، PHP على PostgreSQL (الشريحتان والمجمّع)، `PostgreSQL feed-lock performance`. Web CI شغّل Vitest الكامل داخل `web build`. (commits التوثيق اللاحقة لا تغيّر كوداً.) مراجعة Codex: تُسجَّل في صفحة الـ PR.
+- **CI على الـ PR (الرأس النهائي):** على `739bc222a` (بعد إصلاحَي Codex P2) نجحت **8/8**: `CI Gate`، `web build (Next.js)` ×2، PHP على SQLite، PHP على PostgreSQL (المجمّع + الشريحتان)، `PostgreSQL feed-lock performance`. ثم حُدِّث الفرع بدمج `main` (دون إعادة كتابة تاريخ) فصار الكود `c4b81cab9`؛ التغييرات الواردة من `main` لا تمسّ ملفات هذا الـ PR (وحدة محطات الوقود + هجرة + اختبارات). تحقق محلي على الشجرة المدموجة: Vitest `src/modules/documents` + `pdf-real-output` = 42 ملفاً / 390 اختباراً ناجحاً. فحوص CI على الرأس النهائي بعد الدمج تُسجَّل في صفحة الـ PR وتقرير الإغلاق. Web CI شغّل Vitest الكامل داخل `web build`. (commits التوثيق اللاحقة لا تغيّر كوداً.) مراجعة Codex: تُسجَّل في صفحة الـ PR.
 
 ---
 
