@@ -209,6 +209,7 @@ export default function PaymentDetailPage() {
   // يُلتقَط جذر PDF **مخصَّص** بمحرك الالتقاط القائم (كالفواتير) بقالب مراجعة PDF وتخطيطها (بنك/ختم/توقيع كما كان
   // يفعل المتجهي)، لا جذر الطباعة ذو التخطيط الثابت؛ وبغيابه يبقى المتجهي حرفياً.
   const capturePdf = Boolean(pdfOutput && pdfSpec.profile);
+  // تكافؤ بيانات الجذر الملتقَط مع ما كان يطبعه المتجهي: التخطيط، حالة السند، وشعار المنشأة (`company.logo`).
   const captureElement = () => document.getElementById('pdf-print-root');
   const frozenPdfDefinition = resolveFrozenOutputDefinition(
     payment.pdf_template_revision,
@@ -413,7 +414,7 @@ export default function PaymentDetailPage() {
           stampUrl={pdfOutput.stampUrl}
           signatureUrl={pdfOutput.signatureUrl}
           showLogo={pdfOutput.showLogo}
-          logoUrl={logoUrl}
+          logoUrl={logoUrl ?? company?.logo ?? null}
           logoHeight={pdfOutput.logoHeight}
           layout={pdfOutput.layout}
           status={payment.status}

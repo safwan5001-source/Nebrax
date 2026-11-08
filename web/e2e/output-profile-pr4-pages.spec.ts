@@ -23,6 +23,7 @@ const PT_PER_MM = 72 / 25.4;
 const SIZE_TOLERANCE_MM = 0.8;
 const LEGACY_PRINT = '@media print { @page { size: 210mm 297mm; } }';
 
+const LOGO = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="180" height="64"%3E%3Crect width="180" height="64" fill="%231e40af"/%3E%3C/svg%3E';
 const STAMP = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120"%3E%3Ccircle cx="60" cy="60" r="50" fill="none" stroke="%231e40af" stroke-width="6"/%3E%3C/svg%3E';
 const SIGNATURE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="72"%3E%3Cpath d="M8 49 C35 14, 43 56, 70 29 S105 55, 133 28" fill="none" stroke="%23111827" stroke-width="3"/%3E%3C/svg%3E';
 
@@ -94,7 +95,7 @@ async function openPage(browser: Browser, world: World, opts: { locale?: 'ar' | 
   await page.route('**/api/**', async (route) => {
     const p = new URL(route.request().url()).pathname.replace(/^.*\/api/, '');
     if (p === '/applications/nav-state') return json(route, { data: {} });
-    if (p === '/me') return json(route, { user, company: { name: 'شركة نبراكس للتجارة', vat_number: '310122393500003', cr_number: '2050123456' } });
+    if (p === '/me') return json(route, { user, company: { name: 'شركة نبراكس للتجارة', vat_number: '310122393500003', cr_number: '2050123456', logo: LOGO } });
     if (p === '/partners/p1') return json(route, { data: { id: 'p1', name: 'مؤسسة الخليج للتوريد', vat_number: '311111111100003', city: 'الخبر' } });
     if (p === '/print-templates/resolve') return json(route, { data: world.live ?? null });
     if (p === '/payments/pay1') return json(route, { data: paymentPayload(world.kind === 'payment_paid' ? 'paid' : 'received', world.frozen ?? {}, world.payStatus) });
@@ -282,7 +283,9 @@ for (const kind of ['payment_received', 'payment_paid'] as const) {
         // جذر PDF (مخفي على الشاشة) بتخطيط مراجعة PDF: بنك نعم، صور لا.
         const pdfRoot = await page.evaluate(() => {
           const root = document.getElementById('pdf-print-root');
-          return { text: root?.textContent ?? '', images: root?.querySelectorAll('img').length ?? -1 };
+          // الشعار (عرض 180) مطلوب ظهوره؛ المقصود هنا الختم والتوقيع فقط.
+          const sealImages = [...(root?.querySelectorAll('img') ?? [])].filter((img) => !((img.getAttribute('src') ?? '').includes('width="180"') || (img.getAttribute('src') ?? '').includes('width%3D%22180%22')));
+          return { text: root?.textContent ?? '', images: root ? sealImages.length : -1 };
         });
         expect(pdfRoot.text).toContain('IBAN SA0000000000000000000000');
         expect(pdfRoot.images, 'توقيع/ختم مخفيان في مراجعة PDF').toBe(0);
@@ -310,6 +313,27 @@ for (const kind of ['payment_received', 'payment_paid'] as const) {
         const size = pageSizeMm((await downloadPdf(page)).info);
         expect(Math.abs(size.w - 210)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
         expect(Math.abs(size.h - 148)).toBeLessThanOrEqual(SIZE_TOLERANCE_MM);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('تكافؤ بيانات جذر PDF الملتقَط مع ما كان يطبعه المتجهي: المنشأة والرقم الضريبي والطرف والمرجع والملاحظات والتخصيصات والإجمالي والشعار', async ({ browser }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+      test.setTimeout(180_000);
+      const { context, page } = await openPage(browser, { kind, frozen: { print: revision({ id: 'p', profile: A5L }) } });
+      try {
+        const root = await page.evaluate(() => {
+          const el = document.getElementById('pdf-print-root');
+          return { text: el?.textContent ?? '', logos: [...(el?.querySelectorAll('img') ?? [])].filter((img) => (img.getAttribute('src') ?? '').includes('width="180"') || (img.getAttribute('src') ?? '').includes('width%3D%22180%22')).length };
+        });
+        const text = squash(root.text);
+        for (const expected of ['شركة نبراكس للتجارة', '310122393500003', '2050123456', 'مؤسسةالخليجللتوريد', '311111111100003', 'REF-2026-0007', 'سداددفعةالمشروعالإقليمي', ...(kind === 'payment_received' ? ['RCV-2026-000123'] : ['PAY-2026-000123'])]) {
+          expect(text, `ناقص في جذر PDF: ${expected}`).toContain(squash(expected));
+        }
+        for (const row of ALLOCATIONS) expect(text).toContain(squash(money(Number(row.amount))));
+        expect(text).toContain(squash(money(Number(PAYMENT_TOTAL))));
+        expect(root.logos, 'شعار المنشأة (company.logo) في جذر PDF').toBeGreaterThanOrEqual(1);
       } finally {
         await context.close();
       }

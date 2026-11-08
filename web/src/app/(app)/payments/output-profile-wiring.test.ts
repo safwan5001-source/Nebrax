@@ -19,6 +19,8 @@ describe('/payments/[id] — ملف الإخراج', () => {
     expect(source).toMatch(/layout=\{pdfOutput\.layout\}/);
     // حالة السند (مسودة/ملغى) تصل جذر PDF الملتقَط كما كان المتجهي يطبعها.
     expect(source).toMatch(/status=\{payment\.status\}/);
+    // شعار المنشأة كما كان المتجهي يرجع إلى company.logo.
+    expect(source).toMatch(/logoUrl=\{logoUrl \?\? company\?\.logo \?\? null\}/);
     expect(source).toMatch(/downloadPaymentPdf\(await createPdf\(\), payment\.number\)/);
     expect(source).toMatch(/sharePaymentPdf\(await createPdf\(\)/);
   });
