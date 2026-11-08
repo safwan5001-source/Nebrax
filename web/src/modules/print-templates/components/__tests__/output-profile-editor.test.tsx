@@ -124,7 +124,7 @@ describe('OutputProfileEditor — إعداد الصفحة في المحرر (AWJ
   });
 
   it('أنواع غير مربوطة بعد (سند قبض): العناصر معطَّلة مع إعلان صريح', () => {
-    renderIntl(<Harness documentTypes={['tax_invoice', 'receipt_voucher']} onProfile={vi.fn()} />, 'ar');
+    renderIntl(<Harness documentTypes={['tax_invoice', 'delivery_note']} onProfile={vi.fn()} />, 'ar');
     expect(screen.getByTestId('page-setup-unwired')).toBeTruthy();
     expect((screen.getByTestId('page-setup-paper') as HTMLSelectElement).disabled).toBe(true);
   });
