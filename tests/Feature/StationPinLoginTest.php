@@ -365,6 +365,7 @@ class StationPinLoginTest extends TestCase
             'POST reading-requests/{id}/approve',
             'POST reading-requests/{id}/reject',
             'POST readings',
+            'POST report-center/{key}/audit', // تدقيق الطباعة/PDF/المشاركة (يسجّل حدثاً فقط)
             'POST shifts/open',
             'POST shifts/{id}/approve',
             'POST shifts/{id}/cash-movements',

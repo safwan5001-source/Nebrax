@@ -39,7 +39,7 @@ describe('station ops is an app of its own', () => {
   it('defines every in-app route target under OPS_BASE', () => {
     const nav = sources.find((entry) => entry.file === 'nav.ts')!.text;
     expect(nav).toMatch(/OPS_BASE = '\/fuel-stations\/ops'/);
-    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(8); // مركز المساعدة، FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»، FUEL-B6: + «الخزانات»
+    expect([...code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)]).toHaveLength(9); // مركز المساعدة، FUEL-B4: + «الإدارة»، FUEL-B5: + «الاستلام»، FUEL-B6: + «الخزانات»، HORIZON-REPORTS: + «التقارير»
     for (const match of code(nav).matchAll(/\{ id: '\w+', href: ([^,]+),/g)) expect(match[1]).toMatch(/OPS_BASE/);
   });
 

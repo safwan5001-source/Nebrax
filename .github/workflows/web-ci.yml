@@ -17,6 +17,7 @@ on:
       - 'contracts/flowers-admin-journey/**'
       - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
       - 'app/Support/ApplicationCatalog.php'
+      - 'app/Support/FuelReportCatalog.php'                # station-ops/nav.test.ts: تزامن صلاحيات التقارير
       - 'app/Support/DocumentNumberingCatalog.php'
       - 'app/Support/PaymentMethodVisual.php'
       - 'app/Support/Commerce/IconRegistry.php'
@@ -39,6 +40,7 @@ on:
       - 'contracts/flowers-admin-journey/**'
       - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
       - 'app/Support/ApplicationCatalog.php'
+      - 'app/Support/FuelReportCatalog.php'                # station-ops/nav.test.ts: تزامن صلاحيات التقارير
       - 'app/Support/DocumentNumberingCatalog.php'
       - 'app/Support/PaymentMethodVisual.php'
       - 'app/Support/Commerce/IconRegistry.php'
