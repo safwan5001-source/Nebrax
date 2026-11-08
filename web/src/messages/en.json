@@ -2478,6 +2478,7 @@
     "direction": "Direction",
     "pdf": "PDF file",
     "download_pdf": "Download PDF",
+    "print": "Print",
     "preview_label": "Document preview",
     "scenario_single": "Single line",
     "scenario_three": "3 lines",
