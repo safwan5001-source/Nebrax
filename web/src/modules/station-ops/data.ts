@@ -7,7 +7,8 @@ import { resolveStationPrices, type PriceResult } from './prices';
 import { previousClosingMap } from './entry';
 import { STRICT_POLICY, toShiftPolicy, type ShiftPolicy } from './policy';
 import { collectionResponse, type CollectionView } from './collection';
-import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftCollectionPath, shiftDetailPath, stationSettingsPath } from './read-client';
+import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftCollectionPath, shiftDetailPath, shiftSettlementPreviewPath, stationSettingsPath } from './read-client';
+import { settlementPreviewResponse, type SettlementPreview } from './settlement-preview';
 import {
   fuelProductsResponse,
   nozzlesResponse,
@@ -369,4 +370,34 @@ export function useShiftCollection(station: Station | null, shiftId: string, opt
 
   const idle: QueryState<CollectionView> = useMemo(() => ({ status: 'error', error: new StationOpsError('forbidden', 403) }), []);
   return { allowed, state: key === null ? idle : query.state, retained, reload };
+}
+
+
+export interface SettlementPreviewResult {
+  /** `false` = لا صلاحية الإغلاق (لا طلب أُرسل). */
+  allowed: boolean;
+  state: QueryState<SettlementPreview>;
+  retained: SettlementPreview | null;
+  reload: () => void;
+}
+
+/**
+ * معاينة تسوية الوردية (P1-3a، قراءة فقط). تتطلب `fuel.shift.close` (من يملك الإغلاق يملك البصمة). البوابة مغلقة ⇒ 404 ⇒ `not_found` ⇒ القسم لا يُعرض
+ * (الشاشة كما كانت حرفياً). لا تحديث تلقائي: المعاينة تُحدَّث بطلب المستخدم (زر) وتبقى آخر نتيجة ناجحة معروضة أثناء إعادة الجلب.
+ */
+export function useSettlementPreview(station: Station | null, shiftId: string): SettlementPreviewResult {
+  const { scopeKey, can } = useStationOps();
+  const allowed = can('fuel.shift.close');
+  const stationId = station?.id ?? null;
+  const valid = isValidShiftId(shiftId);
+  const key = allowed && stationId && valid ? `${scopeKey}|${stationId}|shift|${shiftId}|settlement-preview` : null;
+
+  const query = useScopedQuery<SettlementPreview>(key, async (signal) => (await opsGet(shiftSettlementPreviewPath(shiftId), settlementPreviewResponse, { signal, branchId: station?.branch_id })).data);
+
+  const last = useRef<{ key: string; data: SettlementPreview } | null>(null);
+  if (key !== null && query.state.status === 'success') last.current = { key, data: query.state.data };
+  const retained = key !== null && last.current?.key === key ? last.current.data : null;
+
+  const idle: QueryState<SettlementPreview> = useMemo(() => ({ status: 'error', error: new StationOpsError('forbidden', 403) }), []);
+  return { allowed, state: key === null ? idle : query.state, retained, reload: query.reload };
 }

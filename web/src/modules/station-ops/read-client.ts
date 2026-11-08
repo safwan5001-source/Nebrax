@@ -40,6 +40,9 @@ const STATION_SETTINGS_PATH = /^\/fuel-stations\/stations\/[A-Za-z0-9_-]{1,64}\/
 /** إقرار تحصيل الوردية (قراءة فقط هنا؛ الحفظ في write-client). مغلق خلف بوابة نشر ⇒ 404 ⇒ القسم لا يظهر. */
 const SHIFT_COLLECTION_PATH = /^\/fuel-stations\/shifts\/[A-Za-z0-9_-]{1,64}\/collection$/;
 
+/** معاينة تسوية الوردية (P1-3a): قراءة فقط، مغلقة خلف بوابة نشر ⇒ 404 ⇒ القسم لا يظهر. */
+const SHIFT_SETTLEMENT_PREVIEW_PATH = /^\/fuel-stations\/shifts\/[A-Za-z0-9_-]{1,64}\/settlement-preview$/;
+
 /** `open` اسم مسار POST موجود (فتح وردية) — لا يُعامل معرّفاً حتى في القراءة. */
 export function isValidShiftId(id: string): boolean {
   return SHIFT_ID.test(id) && id !== 'open';
@@ -55,6 +58,11 @@ export function shiftCollectionPath(id: string): string {
   return `/fuel-stations/shifts/${id}/collection`;
 }
 
+export function shiftSettlementPreviewPath(id: string): string {
+  if (!isValidShiftId(id)) throw new StationOpsError('not_found', 404);
+  return `/fuel-stations/shifts/${id}/settlement-preview`;
+}
+
 export function stationSettingsPath(stationId: string): string {
   if (!SHIFT_ID.test(stationId)) throw new StationOpsError('not_found', 404);
   return `/fuel-stations/stations/${stationId}/settings`;
@@ -64,6 +72,7 @@ export function isAllowedReadPath(path: string): boolean {
   return ALLOWED_READ_PATHS.some((pattern) => pattern.test(path))
     || STATION_SETTINGS_PATH.test(path)
     || (SHIFT_COLLECTION_PATH.test(path) && isValidShiftId(path.split('/')[3] ?? ''))
+    || (SHIFT_SETTLEMENT_PREVIEW_PATH.test(path) && isValidShiftId(path.split('/')[3] ?? ''))
     || (SHIFT_DETAIL_PATH.test(path) && isValidShiftId(path.slice(path.lastIndexOf('/') + 1)));
 }
 
