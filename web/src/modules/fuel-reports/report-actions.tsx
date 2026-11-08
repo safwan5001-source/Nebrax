@@ -35,6 +35,11 @@ export function ReportActions({ payload, filters, lang }: { payload: ReportPaylo
   const makePdf = () => createReportPdf(payload, {
     lang, paper, generatedBy: currentUser()?.name ?? null,
     company: { name: company?.name ?? payload.tenant.name, vat: company?.vat_number ?? null, cr: company?.cr_number ?? null, logo: company?.logo ?? null },
+    // نفس نصوص الشاشة (لا رموز خام في الملف)
+    labels: {
+      source: t.has(`source_${payload.source.kind}`) ? t(`source_${payload.source.kind}`) : undefined,
+      gaps: Object.fromEntries(payload.data_quality.gaps.map((code) => [code, t.has(`gap.${code}`) ? t(`gap.${code}`) : code])),
+    },
   });
 
   const run = async (action: Action) => {
