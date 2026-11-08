@@ -6,14 +6,24 @@ import type { DocumentTemplateProps } from '../types';
 import { ThermalLayout } from '../components/thermal-layout';
 import { applyVatRateToLabel } from '../presentation/visual-v2';
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+/**
+ * صف «وسم: قيمة». على الورق الضيّق (58mm) يلتفّ الوسم الطويل (مثل «الإجمالي شامل الضريبة»)
+ * بدل أن يدفع المبلغ إلى سطر ثانٍ، ويبقى المبلغ + العملة معاً في سطر واحد (`amount`).
+ * القيم النصّية (اسم العميل) تلتفّ ولا تُقتطع.
+ */
+function Row({ label, value, amount = false }: { label: string; value: React.ReactNode; amount?: boolean }) {
   if (value === null || value === undefined || value === '') return null;
   return (
     <div className="flex justify-between gap-2">
-      <span className="text-muted">{label}</span>
-      <span className="font-medium">{value}</span>
+      <span className="min-w-0 flex-1 break-words text-muted">{label}</span>
+      <span className={amount ? 'shrink-0 whitespace-nowrap font-medium' : 'min-w-0 max-w-[62%] break-words text-end font-medium'}>{value}</span>
     </div>
   );
+}
+
+/** مبلغ بترتيب LTR معزول: يمنع انعكاس «125.00 SAR» إلى «SAR 125.00» داخل سياق RTL. */
+function Amount({ children }: { children: React.ReactNode }) {
+  return <span className="num whitespace-nowrap" dir="ltr">{children}</span>;
 }
 
 /**
@@ -69,9 +79,9 @@ export function ThermalReceipt({
         /* سند قبض/صرف — لا بنود/ضريبة: المبلغ + الطريقة + التخصيصات. */
         <>
           <div className={rule} />
-          <div className="flex justify-between pt-1 text-[13px] font-bold">
-            <span>{tv('amount')}</span>
-            <span className="num">{formatMoney(v.amount)}</span>
+          <div className="flex justify-between gap-2 pt-1 text-[13px] font-bold">
+            <span className="min-w-0 flex-1 break-words">{tv('amount')}</span>
+            <span className="shrink-0"><Amount>{formatMoney(v.amount)}</Amount></span>
           </div>
           <div className="mt-1 space-y-0.5">
             <Row label={tv('method')} value={v.method} />
@@ -83,9 +93,9 @@ export function ThermalReceipt({
               <div className="text-[10px] text-muted">{tv('applied_to')}</div>
               <div className="mt-1 space-y-0.5">
                 {v.allocations.map((a, i) => (
-                  <div key={i} className="flex justify-between text-muted">
-                    <span className="num">{a.label}</span>
-                    <span className="num text-text">{formatMoney(a.amount)}</span>
+                  <div key={i} className="flex justify-between gap-2 text-muted">
+                    <span className="num min-w-0 flex-1 break-words">{a.label}</span>
+                    <span className="shrink-0 text-text"><Amount>{formatMoney(a.amount)}</Amount></span>
                   </div>
                 ))}
               </div>
@@ -99,10 +109,10 @@ export function ThermalReceipt({
           <div className="space-y-1">
             {model.lines.map((line) => (
               <div key={line.id}>
-                <div className="truncate">{line.description || '—'}</div>
-                <div className="flex justify-between text-muted">
-                  <span className="num">{line.quantity} × {formatMoney(line.unitPrice)}</span>
-                  <span className="num text-text">{formatMoney(line.total)}</span>
+                <div className="break-words">{line.description || '—'}</div>
+                <div className="flex justify-between gap-2 text-muted">
+                  <span className="min-w-0 flex-1"><Amount>{line.quantity} × {formatMoney(line.unitPrice)}</Amount></span>
+                  <span className="shrink-0 text-text"><Amount>{formatMoney(line.total)}</Amount></span>
                 </div>
               </div>
             ))}
@@ -110,14 +120,14 @@ export function ThermalReceipt({
 
           <div className={rule} />
           <div className="space-y-0.5">
-            <Row label={t('subtotal')} value={<span className="num">{formatMoney(model.totals.subtotal)}</span>} />
+            <Row amount label={t('subtotal')} value={<Amount>{formatMoney(model.totals.subtotal)}</Amount>} />
             {model.totals.discount && model.totals.discount > 0 ? (
-              <Row label={tp('discount')} value={<span className="num" dir="ltr">− {formatMoney(model.totals.discount)}</span>} />
+              <Row amount label={tp('discount')} value={<Amount>− {formatMoney(model.totals.discount)}</Amount>} />
             ) : null}
-            <Row label={applyVatRateToLabel(t('vat'), model.totals.taxRate)} value={<span className="num">{formatMoney(model.totals.tax)}</span>} />
-            <div className="flex justify-between pt-1 text-[13px] font-bold">
-              <span>{t('grand_total')}</span>
-              <span className="num">{formatMoney(model.totals.total)}</span>
+            <Row amount label={applyVatRateToLabel(t('vat'), model.totals.taxRate)} value={<Amount>{formatMoney(model.totals.tax)}</Amount>} />
+            <div className="flex justify-between gap-2 pt-1 text-[13px] font-bold">
+              <span className="min-w-0 flex-1 break-words">{t('grand_total')}</span>
+              <span className="shrink-0"><Amount>{formatMoney(model.totals.total)}</Amount></span>
             </div>
           </div>
           {model.lines.some((line) => line.unitPriceRounded) && (

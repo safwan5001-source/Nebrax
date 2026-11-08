@@ -2478,6 +2478,7 @@
     "direction": "الاتجاه",
     "pdf": "ملف PDF",
     "download_pdf": "تنزيل PDF",
+    "print": "طباعة",
     "preview_label": "معاينة المستند",
     "scenario_single": "بند واحد",
     "scenario_three": "3 بنود",
