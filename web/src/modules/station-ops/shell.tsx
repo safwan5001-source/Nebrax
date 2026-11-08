@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { CircleHelp, Cylinder, Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
+import { ChartColumn, CircleHelp, Cylinder, Droplets, Gauge, House, ShieldCheck, Truck, UserRound, WifiOff, type LucideIcon } from 'lucide-react';
 import { isStationSession } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { StationOpsProvider, useStationOps } from './context';
 import { GuideProvider } from './guide/guide-context';
 import { isNavActive, visibleOpsNav, type OpsNavId } from './nav';
 
-const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, receiving: Truck, tanks: Cylinder, manage: ShieldCheck, help: CircleHelp, profile: UserRound };
+const NAV_ICONS: Record<OpsNavId, LucideIcon> = { home: House, products: Droplets, shifts: Gauge, receiving: Truck, tanks: Cylinder, reports: ChartColumn, manage: ShieldCheck, help: CircleHelp, profile: UserRound };
 
 function subscribeOnline(onChange: () => void): () => void {
   window.addEventListener('online', onChange);
@@ -56,12 +56,12 @@ function Frame({ children }: { children: ReactNode }) {
           aria-label={t('navLabel')}
           className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:static md:inset-auto md:border-e md:border-t-0 md:pb-0"
         >
-          <ul className="mx-auto flex max-w-xl justify-around px-1 pt-1.5 md:max-w-none md:flex-col md:gap-1 md:p-3">
+          <ul className="mx-auto flex max-w-xl justify-around overflow-x-auto px-1 pt-1.5 md:max-w-none md:flex-col md:gap-1 md:overflow-visible md:p-3">
             {items.map((item) => {
               const Icon = NAV_ICONS[item.id];
               const active = isNavActive(pathname, item.href);
               return (
-                <li key={item.id} className="flex-1 md:flex-none">
+                <li key={item.id} className="min-w-[3.6rem] flex-1 md:min-w-0 md:flex-none">
                   <Link
                     href={item.href}
                     aria-current={active ? 'page' : undefined}

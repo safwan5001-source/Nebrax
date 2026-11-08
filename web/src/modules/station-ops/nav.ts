@@ -8,7 +8,7 @@
 export const OPS_BASE = '/fuel-stations/ops';
 
 export type OpsMode = 'supervisor' | 'operator' | 'viewer';
-export type OpsNavId = 'home' | 'products' | 'shifts' | 'receiving' | 'tanks' | 'manage' | 'help' | 'profile';
+export type OpsNavId = 'home' | 'products' | 'shifts' | 'receiving' | 'tanks' | 'reports' | 'manage' | 'help' | 'profile';
 
 export interface OpsNavItem {
   id: OpsNavId;
@@ -22,6 +22,15 @@ export interface OpsNavItem {
 
 /** FUEL-B5: أي قدرة استلام (عرض/إنشاء/اعتماد) — المفتاح الدقيق من B2 أو `fuel_stations.manage` القديم؛ `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة) لا تكفي. */
 export const RECEIVING_PERMISSIONS = ['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel.delivery.cost.record', 'fuel_stations.manage'] as const;
+
+/**
+ * HORIZON-REPORTS: **كل** صلاحية تفتح تقريراً في الكتالوج (مرآة `FuelReportCatalog::routePermissions()`؛ يحرس تزامنها اختبار PHP).
+ * الكتالوج نفسه يصفّيه الخادم لكل مستخدم، فلا تقرير يظهر لمن لا يملك صلاحيته.
+ */
+export const REPORT_PERMISSIONS = [
+  'fuel.shift.view', 'fuel.sale.view', 'fuel_stations.manage', 'fuel_stations.view', 'fuel.reading.view',
+  'fuel.reconciliation.view', 'fuel.delivery.view', 'fuel.reports.view',
+] as const;
 
 /** FUEL-B4 (+B6: سياسة القراءات المتأخرة تتبع `fuel.governance.manage`): صلاحيات الوظائف الإدارية داخل التطبيق (القائمة الكنسية؛ منها يُشتق ظهور «الإدارة» وأقسامها، والخادم يفرضها في كل طلب). */
 export const MANAGE_PERMISSIONS = ['fuel.staff.manage', 'fuel.sale.price.manage', 'fuel.governance.manage', 'fuel_stations.manage'] as const; // + B6: الحوكمة · + PR-2: إعداد المحطة (معالج الرصيد الافتتاحي)
@@ -39,6 +48,7 @@ export const OPS_NAV: readonly OpsNavItem[] = [
   { id: 'receiving', href: `${OPS_BASE}/receiving`, labelKey: 'navReceiving', requires: ['fuel_stations.view'], requiresAny: RECEIVING_PERMISSIONS },
   // FUEL-B6: مستويات الخزانات (مراقبة + قراءات مستقلة). القراءة بمفتاح كل مستخدم محطة؛ التسجيل يتحكم به الخادم ومفتاح `fuel.reading.record`.
   { id: 'tanks', href: `${OPS_BASE}/tanks`, labelKey: 'navTanks', requires: ['fuel_stations.view'] },
+  { id: 'reports', href: `${OPS_BASE}/reports`, labelKey: 'navReports', requires: ['fuel_stations.view'], requiresAny: REPORT_PERMISSIONS },
   { id: 'manage', href: `${OPS_BASE}/manage`, labelKey: 'navManage', requires: [], requiresAny: MANAGE_PERMISSIONS },
   // مركز المساعدة (محتوى واحد مشترك مع وحدة المحطات): متاح لكل مستخدم موثّق ولا يطلب أي استدعاء للخادم.
   { id: 'help', href: `${OPS_BASE}/help`, labelKey: 'navHelp', requires: [] },

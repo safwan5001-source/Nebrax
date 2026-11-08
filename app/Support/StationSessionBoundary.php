@@ -43,6 +43,8 @@ final class StationSessionBoundary
         'fuel-stations/reading-requests',
         'fuel-stations/deliveries',
         'fuel-stations/delivery-suppliers',
+        // تقارير الوقود (قراءة + تصدير): التفويض الدقيق والأعمدة الحسّاسة والنطاق يفرضها المحرك لكل مستخدم.
+        'fuel-stations/report-center',
     ];
 
     /**
@@ -61,6 +63,8 @@ final class StationSessionBoundary
         ['POST', '#^api/fuel-stations/deliveries$#'],
         ['POST', '#^api/fuel-stations/deliveries/\{[a-zA-Z]+\}/(approve|cost|attachments)$#'],
         ['DELETE', '#^api/fuel-stations/deliveries/\{[a-zA-Z]+\}/attachments/\{[a-zA-Z]+\}$#'],
+        // تدقيق الطباعة/PDF/المشاركة من تطبيق المحطة (يسجّل حدثاً فقط، بلا أثر تشغيلي).
+        ['POST', '#^api/fuel-stations/report-center/\{[a-zA-Z]+\}/audit$#'],
     ];
 
     /** مسارات عامة لازمة لأي جلسة (قراءة الهوية والخروج). */
