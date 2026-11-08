@@ -116,6 +116,13 @@ class FuelShiftSettlementEvaluator
             }
             $line['price_per_liter_minor'] = (int) $price;
             $line['expected_gross_minor'] = $this->calculator->amountFor($residual, (int) $price, $taxMode);
+            if ($line['expected_gross_minor'] <= 0) {
+                // باقٍ ضئيل بسعر منخفض يُقرَّب إلى قيمة صفرية: لا فاتورة بقيمة صفر ولا استبعاد صامت.
+                $blockers[] = 'FUEL_SETTLEMENT_ZERO_VALUE_RESIDUAL';
+                $line['state'] = 'blocked_zero_value';
+                $lines[] = $line;
+                continue;
+            }
 
             // الحجب على مستوى السطر: عبور حدّ شهر / تاريخ مفتوح للمجمّع / حدث تكلفة داخل نافذة التعرّض الممتدة إلى لحظة الترحيل (`$now`).
             $product = $fuelProducts->get($nozzle['fuel_product_id']);

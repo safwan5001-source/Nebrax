@@ -9,6 +9,7 @@ use App\Services\Accounting\AccountingDateGuard;
 use App\Services\Accounting\AccountingPeriodLockedException;
 use App\Support\SettlementPostingBlocked;
 use App\Support\SettlementPostingResult;
+use App\Tenancy\BranchContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -68,6 +69,21 @@ class FuelShiftSettlementPostingService
         if ($shift->fuel_station_id !== $station->id) {
             throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_SHIFT_STATION_MISMATCH']);
         }
+
+        // ③ التفويض قبل أي شيء آخر (حتى الإعادة): مستخدم من المؤسسة نفسها ونطاقه يشمل المحطة، والمحطة نشطة وضمن الفرع النشط.
+        if ($actor->tenant_id !== $shift->tenant_id || ! $actor->canAccessFuelStation($station)) {
+            throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_ACTOR_OUT_OF_SCOPE']);
+        }
+        $activeBranch = app(BranchContext::class)->id();
+        if ($station->status !== FuelStation::STATUS_ACTIVE || ($activeBranch !== null && $station->branch_id !== $activeBranch)) {
+            throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_STATION_UNAVAILABLE']);
+        }
+
+        // ④ إعادة آمنة: تسوية هذه الوردية موجودة ⇒ نتيجتها الأولى بلا أي أثر (قبل فحص السياسة: تغيّر السياسة لاحقاً لا يحوّل ترحيلاً قائماً إلى «محجوب»).
+        $existing = DB::table('fuel_shift_settlements')->where('tenant_id', $shift->tenant_id)->where('fuel_shift_id', $shift->id)->first();
+        if ($existing !== null) {
+            return SettlementPostingResult::replayed((string) $existing->id, (string) $existing->status);
+        }
         if ($this->readiness->mode($station) !== FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
             throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_POLICY_NOT_POST_ON_CLOSE']);
         }
@@ -75,13 +91,7 @@ class FuelShiftSettlementPostingService
             throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_SHIFT_NOT_CLOSED']);
         }
 
-        // ③ إعادة آمنة: تسوية هذه الوردية موجودة ⇒ نتيجتها الأولى بلا أي أثر.
-        $existing = DB::table('fuel_shift_settlements')->where('tenant_id', $shift->tenant_id)->where('fuel_shift_id', $shift->id)->first();
-        if ($existing !== null) {
-            return SettlementPostingResult::replayed((string) $existing->id, (string) $existing->status);
-        }
-
-        // ④ التقييم الأول (قبل المِرساة): أي حجب ⇒ لا كتابة.
+        // ⑤ التقييم الأول (قبل المِرساة): أي حجب ⇒ لا كتابة.
         $first = $this->evaluator->evaluate($shift, now());
         if ($first['blockers'] !== []) {
             throw new SettlementPostingBlocked($first['blockers']);
@@ -91,11 +101,15 @@ class FuelShiftSettlementPostingService
             throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_WALK_IN_REQUIRED']);
         }
 
-        // ⑤ الرأس والأسطر (جداول التسوية؛ بلا أي أثر محاسبي).
-        $settlementId = $this->insertSettlement($shift, $station, $first, $actor);
-        $lineIds = $this->insertLines($settlementId, $shift, $station, $first);
+        // ⑥ معرّفات الرأس والأسطر تُولَّد الآن لكن **لا يُدرَج شيء** قبل المِرساة: كل إدراج يأخذ KEY SHARE على صف المستأجر عبر مفتاحه الأجنبي،
+        //    وهو يتعارض مع قفل المِرساة FOR UPDATE ⇒ إدراج مبكر + ترقيم فرع ثم مِرساة = جمود بين محطتين من مؤسسة واحدة (مراجعة مستقلة، أثبته اختبار PostgreSQL).
+        $settlementId = (string) Str::uuid();
+        $lineIds = [];
+        foreach ($first['lines'] as $line) {
+            $lineIds[$line['nozzle_id']] = (string) Str::uuid();
+        }
 
-        // ⑥ المرحلة 1 قبل المِرساة: مسودات البيع والفواتير (الترقيم وحده). ترتيب ثابت بحسب رقم الفوهة.
+        // ⑦ المرحلة 1 قبل المِرساة: مسودات البيع والفواتير (الترقيم وحده). ترتيب ثابت بحسب رقم الفوهة.
         $prepared = [];
         foreach ($first['lines'] as $line) {
             if ($line['state'] !== 'posted') {
@@ -108,7 +122,7 @@ class FuelShiftSettlementPostingService
             ];
         }
 
-        // ⑦ مِرساة المستأجر ثم إعادة التقييم تحت الأقفال؛ أي اختلاف ⇒ تراجع كامل وحجب (لا ترحيل على لقطة قديمة).
+        // ⑧ مِرساة المستأجر ثم إعادة التقييم تحت الأقفال؛ أي اختلاف ⇒ تراجع كامل وحجب (لا ترحيل على لقطة قديمة).
         $this->dateGuard->lockLedgerAnchor();
         $this->dateGuard->assertOpen($first['supply']['business_date'], 'ترحيل تسوية الوردية');
         $second = $this->evaluator->evaluate($shift, now());
@@ -116,15 +130,26 @@ class FuelShiftSettlementPostingService
             throw new SettlementPostingBlocked($second['blockers'] !== [] ? $second['blockers'] : ['FUEL_SETTLEMENT_STATE_CHANGED']);
         }
 
+        // الكتابة الأولى لجداول التسوية بعد المِرساة والمقارنة (الأسطر تحمل ربط البيع لاحقاً بتحديث أحادي).
+        $this->insertSettlement($settlementId, $shift, $station, $first, $actor);
+        $this->insertLines($lineIds, $settlementId, $shift, $station, $first);
         $this->insertPoolHistories($lineIds, $shift, $station, $first);
 
-        // ⑧ المرحلة 2: الترحيل. الفاتورة والقيد والتكلفة والمخزون عبر الخدمات القائمة، ثم ربط السطر بالبيع (انتقال أحادي).
+        // ⑨ المرحلة 2: الترحيل. الفاتورة والقيد والتكلفة والمخزون عبر الخدمات القائمة، ثم ربط السطر بالبيع (انتقال أحادي).
         $postedLines = 0;
         foreach ($prepared as $item) {
-            $sale = $this->sales->postSettlementSale($item['draft']['sale'], $item['draft']['invoice'], $shift, (int) $item['line']['price_per_liter_minor'], $first['tax_mode'], $actor);
+            try {
+                $sale = $this->sales->postSettlementSale($item['draft']['sale'], $item['draft']['invoice'], $shift, (int) $item['line']['price_per_liter_minor'], $first['tax_mode'], $actor);
+            } catch (RuntimeException $e) {
+                // رصيد المجمّع تغيّر بين التقييم والإخراج (إخراج ERP مواكب) ⇒ حجب مقروء بدل خطأ عام؛ التراجع كامل.
+                if (str_contains($e->getMessage(), 'أقل من المطلوب')) {
+                    throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_INSUFFICIENT_STOCK']);
+                }
+                throw $e;
+            }
             $invoiceTotal = (int) $sale->invoice->total;
             if ($invoiceTotal !== (int) $item['line']['expected_gross_minor']) {
-                throw new RuntimeException('FUEL_SETTLEMENT_INVOICE_TOTAL_MISMATCH: إجمالي الفاتورة لا يطابق قيمة التسوية المتوقعة؛ تراجع كامل.');
+                throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_INVOICE_TOTAL_MISMATCH']);
             }
             DB::table('fuel_shift_settlement_lines')->where('id', $item['line_id'])->update(['fuel_sale_id' => $sale->id, 'updated_at' => now()]);
             $postedLines++;
@@ -150,10 +175,9 @@ class FuelShiftSettlementPostingService
     }
 
     /** @param array<string,mixed> $evaluation */
-    private function insertSettlement(FuelShift $shift, FuelStation $station, array $evaluation, User $actor): string
+    private function insertSettlement(string $id, FuelShift $shift, FuelStation $station, array $evaluation, User $actor): void
     {
         $lines = $evaluation['lines'];
-        $id = (string) Str::uuid();
         DB::table('fuel_shift_settlements')->insert([
             'id' => $id, 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id, 'fuel_station_id' => $station->id, 'fuel_shift_id' => $shift->id,
             'status' => $this->headerStatus($lines), 'sales_basis' => 'per_invoice', 'preview_hash' => $evaluation['hash'], 'tax_mode' => $evaluation['tax_mode'],
@@ -169,20 +193,16 @@ class FuelShiftSettlementPostingService
             'supply_started_at' => $evaluation['supply']['started_at'], 'supply_ended_at' => $evaluation['supply']['ended_at'],
             'supply_business_date' => $evaluation['supply']['business_date'], 'accounting_date' => $evaluation['supply']['business_date'],
         ]);
-
-        return $id;
     }
 
     /**
+     * @param  array<string,string>  $lineIds  معرّف السطر لكل فوهة (مولَّد مسبقاً)
      * @param  array<string,mixed>  $evaluation
-     * @return array<string,string> معرّف السطر لكل فوهة
      */
-    private function insertLines(string $settlementId, FuelShift $shift, FuelStation $station, array $evaluation): array
+    private function insertLines(array $lineIds, string $settlementId, FuelShift $shift, FuelStation $station, array $evaluation): void
     {
-        $ids = [];
         foreach ($evaluation['lines'] as $line) {
-            $id = (string) Str::uuid();
-            $ids[$line['nozzle_id']] = $id;
+            $id = $lineIds[$line['nozzle_id']];
             DB::table('fuel_shift_settlement_lines')->insert([
                 'id' => $id, 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id, 'fuel_shift_settlement_id' => $settlementId,
                 'fuel_nozzle_id' => $line['nozzle_id'], 'fuel_product_id' => $line['fuel_product_id'], 'warehouse_id' => $station->warehouse_id,
@@ -192,8 +212,6 @@ class FuelShiftSettlementPostingService
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
-
-        return $ids;
     }
 
     /**

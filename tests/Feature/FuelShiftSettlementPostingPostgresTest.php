@@ -2,7 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\FuelNozzle;
+use App\Models\FuelPump;
 use App\Models\FuelShift;
+use App\Models\FuelStation;
+use App\Models\FuelTank;
+use App\Models\Warehouse;
+use App\Services\Accounting\InventoryService;
+use App\Services\FuelCostBasisService;
+use App\Services\FuelStationProductPriceService;
+use App\Models\FuelProduct;
 use App\Services\FuelSaleService;
 use App\Services\FuelShiftCollectionService;
 use App\Services\FuelShiftService;
@@ -90,6 +99,62 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
         ], $this->f['actor']);
 
         return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+    }
+
+
+    /**
+     * محطة ثانية بالمؤسسة والفرع نفسيهما (مخزن ومجمّع وسعر وعميل نقدي خاصة بها) ثم وردية مغلقة عليها.
+     * يستبدل `$this->f` مؤقتاً كي تعيد `closedShift()` استعمال المنطق نفسه.
+     */
+    private function closedShiftOnSecondStation(string $key, int $openingMeter): FuelShift
+    {
+        $f = $this->f;
+        $tenantId = $f['tenant_id'];
+        $branch = $f['branch'];
+        $actor = $f['actor'];
+        $warehouse = Warehouse::create(['tenant_id' => $tenantId, 'branch_id' => $branch->id, 'name' => 'مخزن محطة ثانية', 'code' => 'WH2-'.uniqid()]);
+        $station = FuelStation::create(['tenant_id' => $tenantId, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id, 'code' => 'FCS-2-'.uniqid(), 'name' => 'محطة ثانية']);
+        $fuelProduct = $f['fuelProduct'];
+        $tank = FuelTank::create([
+            'tenant_id' => $tenantId, 'branch_id' => $branch->id, 'fuel_station_id' => $station->id, 'fuel_product_id' => $fuelProduct->id,
+            'code' => 'FCT-2-'.uniqid(), 'name' => 'خزان 2', 'capacity_milliliters' => 10000000, 'safe_capacity_milliliters' => 9000000,
+        ]);
+        $pump = FuelPump::create(['tenant_id' => $tenantId, 'branch_id' => $branch->id, 'fuel_station_id' => $station->id, 'pump_number' => 'FCP-2-'.uniqid()]);
+        $nozzle = FuelNozzle::create([
+            'tenant_id' => $tenantId, 'branch_id' => $branch->id, 'fuel_station_id' => $station->id, 'fuel_pump_id' => $pump->id,
+            'fuel_tank_id' => $tank->id, 'fuel_product_id' => $fuelProduct->id, 'nozzle_number' => 'FCN-2-'.uniqid(),
+        ]);
+        app(FuelCostBasisService::class)->assertReady($fuelProduct, $warehouse);
+        $movement = app(InventoryService::class)->applyReceipt($f['product'], 1000000, 100, [
+            'warehouse_id' => $warehouse->id, 'source_type' => FuelProduct::class, 'source_id' => $fuelProduct->id,
+            'notes' => 'رصيد اختبار 2', InventoryService::FUEL_POOL_META => true,
+        ], 100000000);
+        app(FuelCostBasisService::class)->recordReceipt($fuelProduct, $warehouse, $movement, 1000000, 100000000);
+        app(FuelStationProductPriceService::class)->create([
+            'fuel_station_id' => $station->id, 'fuel_product_id' => $fuelProduct->id, 'price_per_liter_minor' => 230,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $actor);
+        app(FuelStationSettingsService::class)->putStationValues($station, [
+            'fuel_sales_allowed_payment_method_ids' => [$f['cash']->id, $f['bank']->id],
+            'fuel_sales_allow_deferred_payment' => false,
+            'shift_opening_meter_reading_required' => false, 'shift_closing_meter_reading_required' => false,
+            'shift_opening_tank_reading_required' => false, 'shift_closing_tank_reading_required' => false,
+            'shift_mandatory_staff_assignment' => false, 'shift_supervisor_approval_required' => false,
+            'shift_allow_close_with_pending_cash_variance' => true,
+            'shift_expected_cash_basis' => 'declared_collection',
+        ], $actor, 'تهيئة محطة ثانية');
+        app(FuelStationWalkInPartnerService::class)->assign($station, $actor);
+        app(FuelStationSettingsService::class)->putStationValues($station, ['shift_settlement_mode' => 'post_on_close'], $actor, 'تفعيل اختبار');
+        $this->travel(3)->seconds();
+
+        $this->f['station'] = $station;
+        $this->f['nozzle'] = $nozzle;
+        try {
+            return $this->closedShift($key, $openingMeter);
+        } finally {
+            $this->f['station'] = $f['station'];
+            $this->f['nozzle'] = $f['nozzle'];
+        }
     }
 
     /**
@@ -191,5 +256,22 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
         }
         $this->assertSame(3, DB::table('fuel_sales')->where('source', 'settlement')->count());
         $this->assertSame(3, DB::table('fuel_sales')->where('source', 'station')->count());
+    }
+
+    #[Test]
+    public function two_stations_of_one_tenant_posting_at_once_never_deadlock(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $a = $this->closedShift("two-a{$i}", 1_000_000 + $i * 100_000);
+            $b = $this->closedShiftOnSecondStation("two-b{$i}", 2_000_000 + $i * 100_000);
+
+            $results = $this->concurrently([
+                fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($a->id), $this->f['actor'])->outcome,
+                fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($b->id), $this->f['actor'])->outcome,
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $this->assertSame(['posted', 'posted'], [$results[0]['value'], $results[1]['value']]);
+        }
     }
 }

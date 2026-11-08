@@ -56,10 +56,10 @@ class FuelShiftSettlementPostingTest extends TestCase
     }
 
     /** وردية مغلقة بالمسار الحقيقي: عدّاد 20 لتراً (إغلاق − افتتاح) + إقرار نقد 46.00. */
-    private function closedShift(string $key, int $openingMeter = 1_000_000, ?callable $beforeClose = null): FuelShift
+    private function closedShift(string $key, int $openingMeter = 1_000_000, ?callable $beforeClose = null, int $deltaMl = 20_000, int $cashMinor = 4600): FuelShift
     {
         $shift = $this->open($key);
-        foreach (['opening' => $openingMeter, 'closing' => $openingMeter + 20_000] as $stage => $ml) {
+        foreach (['opening' => $openingMeter, 'closing' => $openingMeter + $deltaMl] as $stage => $ml) {
             app(FuelShiftService::class)->recordMeter($shift->fresh(), [
                 'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "eng-{$shift->id}-{$stage}",
             ], $this->f['actor']);
@@ -70,12 +70,12 @@ class FuelShiftSettlementPostingTest extends TestCase
         app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
             'idempotency_key' => $shift->id.'decl', 'base_revision' => 0,
             'lines' => [
-                ['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600],
+                ['payment_method_id' => $this->f['cash']->id, 'amount_minor' => $cashMinor],
                 ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0],
             ],
         ], $this->f['actor']);
 
-        return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+        return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + $cashMinor, null, $this->f['actor']);
     }
 
     private function engine(): FuelShiftSettlementPostingService
@@ -241,6 +241,38 @@ class FuelShiftSettlementPostingTest extends TestCase
         $this->assertSame(SettlementPostingResult::REPLAYED, $second->outcome);
         $this->assertSame($first->settlementId, $second->settlementId);
         $this->assertSame($afterFirst, $this->counts());
+    }
+
+    /** @test */
+    public function replay_wins_over_a_later_policy_change_and_an_unavailable_station_or_foreign_actor_is_blocked_first(): void
+    {
+        $shift = $this->closedShift('r2');
+        $first = $this->engine()->post($shift, $this->f['actor']);
+        $this->assertSame(SettlementPostingResult::POSTED, $first->outcome);
+
+        // تغيّر السياسة لاحقاً لا يحوّل الإعادة إلى «محجوب».
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['shift_settlement_mode' => 'none'], $this->f['actor'], 'إيقاف لاحق');
+        $replay = $this->engine()->post($shift->fresh(), $this->f['actor']);
+        $this->assertSame(SettlementPostingResult::REPLAYED, $replay->outcome);
+
+        // محطة غير نشطة ⇒ حجب مقروء (حتى للإعادة: التفويض والتوفّر أولاً) بلا أي كتابة.
+        $before = $this->counts();
+        DB::table('fuel_stations')->where('id', $this->f['station']->id)->update(['status' => 'inactive']);
+        $this->assertSame(['FUEL_SETTLEMENT_STATION_UNAVAILABLE'], $this->engine()->post($shift->fresh(), $this->f['actor'])->reasons);
+        $this->assertSame($before, $this->counts());
+    }
+
+    /** @test */
+    public function a_residual_that_rounds_to_zero_value_is_blocked_not_silently_skipped(): void
+    {
+        $shift = $this->closedShift('z1', 1_000_000, null, 1, 0);   // 1 مل × 2.30/لتر = أقل من هللة
+        $before = $this->counts();
+
+        $result = $this->engine()->post($shift, $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::BLOCKED, $result->outcome);
+        $this->assertSame(['FUEL_SETTLEMENT_ZERO_VALUE_RESIDUAL'], $result->reasons);
+        $this->assertSame($before, $this->counts());
     }
 
     /** @test */
