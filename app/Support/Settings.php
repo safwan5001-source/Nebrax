@@ -468,6 +468,9 @@ class Settings
             // declared_collection (يعتمد النقد المُقَرّ به في إقرار تحصيل الوردية مصدراً وحيداً لنقد المبيعات؛ خلف FUEL_SHIFT_COLLECTION_DECLARATION_ENABLED).
             // كلاهما مغلق افتراضياً، والافتراضي يحمي المستأجرين القائمين.
             'shift_expected_cash_basis' => 'movements_only',
+            // P1-3a: تسوية ورديات الوقود. none (الافتراضي = السلوك الحالي حرفياً) | post_on_close (ترحيل البقية غير الموثَّقة عند الإغلاق، P1-3b). مفتاح حوكمة،
+            // خلف FUEL_SHIFT_SETTLEMENT_ENABLED مع مرجع الرأي الضريبي. لا يُضبط post_on_close قبل اكتمال شروط الجاهزية.
+            'shift_settlement_mode' => 'none',
             // Cycle 9: الصيانة والسلامة والتقارير تبقى سياسات قابلة للوراثة
             // ولا تخلق قيداً أو أمراً لجهاز أو إجراءً خلفياً تلقائياً.
             'maintenance_default_calendar_interval_days' => 30,

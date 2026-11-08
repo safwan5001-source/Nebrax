@@ -32,7 +32,8 @@ class PartnerController extends ApiController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->latest();
+        // أطراف نظامية (مثل العميل النقدي لمحطة وقود) تُنشئها المنصة ولا تظهر في قائمة العملاء ولا تُختار يدوياً.
+        $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->whereNull('system_kind')->latest();
 
         match ($request->query('type')) {
             'customer' => $query->whereIn('type', ['customer', 'both']),
@@ -138,7 +139,10 @@ class PartnerController extends ApiController
 
     public function destroy(string $id): JsonResponse
     {
-        Partner::findOrFail($id)->delete();
+        $partner = Partner::findOrFail($id);
+        // طرف نظامي تنشئه المنصة (العميل النقدي لمحطة وقود) لا يُحذف من شاشة العملاء.
+        abort_if($partner->system_kind !== null, 422, 'لا يمكن حذف طرف نظامي تديره المنصة.');
+        $partner->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
     }

@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ArrowDownRight, ArrowUpRight, CircleAlert, CircleCheck, CircleDashed, Equal, Info, Plus, WifiOff } from 'lucide-react';
 import { SAUDI_RIYAL_SYMBOL, formatMinorRiyal } from '@/lib/money';
 import { CollectionDetailSection, CollectionEntrySection, type CollectionStatus } from './collection-section';
+import { SettlementPreviewSection } from './settlement-preview-section';
 import { cashTotals, closePreview, isValidReason, movementBlocker, parseMoney, MOVEMENT_TYPES, type MovementType } from './cash';
 import { useStationOps } from './context';
 import { useShiftDetail, useStationAssets, useStationPolicy } from './data';
@@ -313,6 +314,7 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
       </SectionCard>
 
       <CollectionEntrySection station={station} shiftId={shiftId} countedMinor={countedMinor} intents={intents} onStatus={setCollection} />
+      <SettlementPreviewSection station={station} shiftId={shiftId} />
 
       <SectionCard title={t('handover.step.cash')} id="handover-cash-h">
         <dl className="divide-y divide-border text-sm">

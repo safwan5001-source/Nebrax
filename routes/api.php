@@ -105,6 +105,8 @@ use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
+use App\Http\Controllers\Api\FuelShiftSettlementPreviewController;
+use App\Http\Controllers\Api\FuelStationWalkInPartnerController;
 use App\Http\Controllers\Api\FuelSaleController;
 use App\Http\Controllers\Api\FuelReadingRequestController;
 use App\Http\Controllers\Api\FuelReconciliationController;
@@ -1703,6 +1705,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'show'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'store'])->middleware([$perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/collection/review', [FuelShiftCollectionController::class, 'review'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
+        // P1-3a: معاينة تسوية الوردية (قراءة فقط) — مغلقة خلف FUEL_SHIFT_SETTLEMENT_ENABLED + مرجع الرأي الضريبي (404). لا كتابة محاسبية.
+        Route::get('fuel-stations/shifts/{id}/settlement-preview', [FuelShiftSettlementPreviewController::class, 'show'])->middleware([$perm('fuel.shift.close'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/stations/{id}/walk-in-partner', [FuelStationWalkInPartnerController::class, 'show'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/stations/{id}/walk-in-partner', [FuelStationWalkInPartnerController::class, 'assign'])->middleware([$perm('fuel.governance.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/approve', [FuelShiftController::class, 'approve'])->middleware([$perm('fuel.shift.approve'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/cash-variance/review', [FuelShiftController::class, 'reviewCashVariance'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/corrections', [FuelShiftController::class, 'requestCorrection'])->middleware([$perm('fuel.shift.correct'), $commercialApp('fuel_stations.core', 'write')]);

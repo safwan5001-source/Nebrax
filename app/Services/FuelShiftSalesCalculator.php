@@ -179,7 +179,7 @@ class FuelShiftSalesCalculator
     }
 
     /** مبلغ المنتج بالهللات: لتر×سعر بتقريب `half_up` مرة واحدة؛ وفي النمط غير الشامل تُضاف ضريبة المؤسسة الافتراضية (تقريب half_up). */
-    private function amountFor(int $milliliters, int $pricePerLiterMinor, ?string $taxMode): int
+    public function amountFor(int $milliliters, int $pricePerLiterMinor, ?string $taxMode): int
     {
         if ($milliliters === 0) {
             return 0;
