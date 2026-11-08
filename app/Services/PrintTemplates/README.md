@@ -19,3 +19,22 @@
 ## المرحلة التالية
 
 على مرحلة محرر القوالب استهلاك `PrintTemplateContract` وسجل المتغيرات الأمامي معاً. وعلى مرحلة الإصدار إضافة binding مرجعي للمستند المنشأ أو المرحّل يحفظ `print_template_revision_id`، ثم يقرأ محرك الطباعة هذا الربط قبل أي تعيين حي.
+
+## Output Profile (DOC-V2-PR3A) — مقاس الإخراج وهوامشه
+
+ملف **اختياري** يُخزَّن في `definition.output_profile` لمراجعة القالب نفسها. لا جدول ولا عمود ولا نظام إعدادات موازٍ: المراجعة المنشورة ثابتة أصلاً (نموذجها يمنع تعديل `definition`) فيثبت معها الملف تاريخياً، والبصمة `checksum` تغطيه، ويُنسخ مع النسخ والمسودة المشتقة من منشورة.
+
+- **المصدر:** `App\Support\PrintOutputProfile` (نقي) يتحقق ويعيد الصيغة القانونية؛ `PrintTemplateContract::assertDefinition` يستدعيه **فقط حين يوجد المفتاح** (فلا أثر على قالب بلا ملف). مرآة الواجهة: `web/src/modules/print-templates/services/output-profile.ts`. الاثنان يُحاكَمان بملف واحد مشترك `contracts/print-templates/output-profile.v1.json` (ثوابت + 26 حالة صالحة + 49 مرفوضة برموز سبب ثابتة).
+- **الحقول:** `paper` (`a4`·`a4_landscape`·`a5`·`a5_landscape`·`a6`·`a6_landscape`·`letter`·`legal`·`thermal_58`·`thermal_80`·`custom`) · `orientation` · `output_mode` (`page`|`roll`) · `margins_mm` (`top/right/bottom/left` أعداد صحيحة 0–50) · `custom` (`width_mm` 40–420، `height_mm` 40–600 أو غائب للفة). كل ما عدا ذلك يُرفض (`unknown_key`): **لا CSS خام ولا وحدات ولا كسور**.
+- **التطبيع:** المخزَّن دائماً الصيغة الكاملة (`version`، الاتجاه والنمط والهوامش مملوءة) فتكون البصمة حتمية ويُعاد التحقق من المخزَّن عند النشر بلا تغيير. المعرّف الأفقي القديم (`a4_landscape`) هو الصيغة القانونية للأفقي؛ `a4` + `orientation: landscape` يرتقي إليه.
+- **الغياب = السلوك القديم حرفياً**، و`null` الصريح يحذف المفتاح. لا Backfill، ولا يُعاد حل قالب منشور أو مرحَّل، ومستند مرحَّل يبقى على مراجعته المثبّتة بملفها.
+- **قيد القالب الحراري:** `tax-invoice-thermal58` يقبل `thermal_58` وحده، و`tax-invoice-thermal80` يقبل `thermal_80` وحده (`thermal_template_paper_mismatch`). القوالب الأخرى لا يقيّدها العقد: ملاءمة تصميم لمقاس لم يُصمَّم له قرار طبقة الإخراج عبر `supportedPaper` (PR3-B).
+
+### كيف يستهلكه PR3-B
+
+1. **القراءة:** من `definition` المراجعة **المثبّتة على المستند** (`print/pdf/thermal_template_revision`) أو المعيَّنة للمسودة، عبر `readOutputProfile(definition)` — `null` ⇒ المسار القديم بلا أي تغيير (A4 والقاعدة العامة). ملف غير صالح يُعامل كغائب.
+2. **الأبعاد:** `outputProfilePaper(profile)` ⇒ `{widthMm, heightMm}` بصيغة `PdfPaper` (ارتفاع 0 = لفة) تمرّ إلى `printDocument`/`downloadPdf` القائمين؛ و`margins_mm` تحلّ محل `@page` العامة للمقاسات غير الحرارية فقط (اللفة تبقى `margin: 0` كما في PR2).
+3. **الملاءمة:** قبل تطبيق مقاس لا يدعمه تصميم القالب (`getTemplate(id).supportedPaper`) يقرر PR3-B: إعادة تدفّق أو تحذير أو رفض في المحرر؛ لا قالب يدّعي A5/A6 اليوم.
+4. **الكتابة:** المحرر يرسل `output_profile` ضمن `definition` عبر المسودة نفسها (`PUT print-templates/{id}/draft`)، والخادم السلطة. المحرر الحالي يحفظ الملف كما هو (`preserveOutputProfile`) ولا يفسّره.
+5. **ثغرة معلنة:** رفض الملف يعود 422 برسالة عربية؛ رمز السبب (`reason`) متاح في `PrintOutputProfileException` لكنه لا يصل بعد إلى جسم الاستجابة — يحتاج PR3-B إن أراد المحرر ربط خطأ بحقل.
+

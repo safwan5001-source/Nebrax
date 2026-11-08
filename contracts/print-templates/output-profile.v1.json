@@ -1,0 +1,1177 @@
+{
+  "$comment": "AWJ Output Profile v1 — shared contract. PHP (PrintOutputProfile) and TS (output-profile.ts) are both tested against THIS file; change it only with a version bump. Stored at definition.output_profile of a PrintTemplateRevision.",
+  "version": 1,
+  "papers": {
+    "a4": {
+      "width_mm": 210,
+      "height_mm": 297,
+      "orientation": "portrait",
+      "output_mode": "page",
+      "default_margin_mm": 14
+    },
+    "a4_landscape": {
+      "width_mm": 297,
+      "height_mm": 210,
+      "orientation": "landscape",
+      "output_mode": "page",
+      "default_margin_mm": 14
+    },
+    "a5": {
+      "width_mm": 148,
+      "height_mm": 210,
+      "orientation": "portrait",
+      "output_mode": "page",
+      "default_margin_mm": 10
+    },
+    "a5_landscape": {
+      "width_mm": 210,
+      "height_mm": 148,
+      "orientation": "landscape",
+      "output_mode": "page",
+      "default_margin_mm": 10
+    },
+    "a6": {
+      "width_mm": 105,
+      "height_mm": 148,
+      "orientation": "portrait",
+      "output_mode": "page",
+      "default_margin_mm": 8
+    },
+    "a6_landscape": {
+      "width_mm": 148,
+      "height_mm": 105,
+      "orientation": "landscape",
+      "output_mode": "page",
+      "default_margin_mm": 8
+    },
+    "letter": {
+      "width_mm": 216,
+      "height_mm": 279,
+      "orientation": "portrait",
+      "output_mode": "page",
+      "default_margin_mm": 14
+    },
+    "legal": {
+      "width_mm": 216,
+      "height_mm": 356,
+      "orientation": "portrait",
+      "output_mode": "page",
+      "default_margin_mm": 14
+    },
+    "thermal_58": {
+      "width_mm": 58,
+      "height_mm": null,
+      "orientation": "portrait",
+      "output_mode": "roll",
+      "default_margin_mm": 0
+    },
+    "thermal_80": {
+      "width_mm": 80,
+      "height_mm": null,
+      "orientation": "portrait",
+      "output_mode": "roll",
+      "default_margin_mm": 0
+    }
+  },
+  "custom_paper_id": "custom",
+  "limits": {
+    "custom_width_mm": [
+      40,
+      420
+    ],
+    "custom_height_mm": [
+      40,
+      600
+    ],
+    "margin_mm": [
+      0,
+      50
+    ],
+    "min_printable_mm": 30,
+    "custom_default_margin_mm_page": 10,
+    "custom_default_margin_mm_roll": 0
+  },
+  "enums": {
+    "orientation": [
+      "portrait",
+      "landscape"
+    ],
+    "output_mode": [
+      "page",
+      "roll"
+    ]
+  },
+  "allowed_keys": {
+    "profile": [
+      "version",
+      "paper",
+      "orientation",
+      "output_mode",
+      "margins_mm",
+      "custom"
+    ],
+    "margins_mm": [
+      "top",
+      "right",
+      "bottom",
+      "left"
+    ],
+    "custom": [
+      "width_mm",
+      "height_mm"
+    ]
+  },
+  "thermal_template_papers": {
+    "tax-invoice-thermal58": "thermal_58",
+    "tax-invoice-thermal80": "thermal_80"
+  },
+  "reasons": [
+    "not_an_object",
+    "unknown_key",
+    "unsupported_version",
+    "paper_invalid",
+    "orientation_invalid",
+    "orientation_conflict",
+    "orientation_unsupported",
+    "output_mode_invalid",
+    "output_mode_conflict",
+    "custom_required",
+    "custom_not_allowed",
+    "custom_invalid",
+    "custom_out_of_range",
+    "margins_invalid",
+    "margins_out_of_range",
+    "printable_area_too_small"
+  ],
+  "valid": [
+    {
+      "name": "a4 minimal",
+      "input": {
+        "paper": "a4"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "a4 + landscape promotes to a4_landscape",
+      "input": {
+        "paper": "a4",
+        "orientation": "landscape"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4_landscape",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "a4_landscape explicit",
+      "input": {
+        "paper": "a4_landscape"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4_landscape",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "a4_landscape with matching orientation",
+      "input": {
+        "paper": "a4_landscape",
+        "orientation": "landscape"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4_landscape",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "a5 portrait",
+      "input": {
+        "paper": "a5"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a5",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        }
+      }
+    },
+    {
+      "name": "a5 + landscape",
+      "input": {
+        "paper": "a5",
+        "orientation": "landscape"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a5_landscape",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        }
+      }
+    },
+    {
+      "name": "a6 portrait",
+      "input": {
+        "paper": "a6"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a6",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 8,
+          "right": 8,
+          "bottom": 8,
+          "left": 8
+        }
+      }
+    },
+    {
+      "name": "a6_landscape explicit",
+      "input": {
+        "paper": "a6_landscape"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a6_landscape",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 8,
+          "right": 8,
+          "bottom": 8,
+          "left": 8
+        }
+      }
+    },
+    {
+      "name": "letter",
+      "input": {
+        "paper": "letter"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "letter",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "legal",
+      "input": {
+        "paper": "legal"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "legal",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "thermal 58",
+      "input": {
+        "paper": "thermal_58"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "thermal_58",
+        "orientation": "portrait",
+        "output_mode": "roll",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "name": "thermal 80 explicit roll",
+      "input": {
+        "paper": "thermal_80",
+        "output_mode": "roll",
+        "orientation": "portrait"
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "thermal_80",
+        "orientation": "portrait",
+        "output_mode": "roll",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "name": "a4 partial margins merge with defaults",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": 20
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 20,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "a4 zero margins",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "name": "a4 max margins (50)",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": 50,
+          "right": 50,
+          "bottom": 50,
+          "left": 50
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 50,
+          "right": 50,
+          "bottom": 50,
+          "left": 50
+        }
+      }
+    },
+    {
+      "name": "empty margins object uses defaults",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {}
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "null margins uses defaults",
+      "input": {
+        "paper": "a4",
+        "margins_mm": null
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "a4",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 14,
+          "right": 14,
+          "bottom": 14,
+          "left": 14
+        }
+      }
+    },
+    {
+      "name": "custom page portrait",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 150
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        },
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 150
+        }
+      }
+    },
+    {
+      "name": "custom page landscape derived",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 200,
+          "height_mm": 100
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        },
+        "custom": {
+          "width_mm": 200,
+          "height_mm": 100
+        }
+      }
+    },
+    {
+      "name": "custom square is portrait",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 100
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        },
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 100
+        }
+      }
+    },
+    {
+      "name": "custom roll inferred from missing height",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 72
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "roll",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "custom": {
+          "width_mm": 72,
+          "height_mm": null
+        }
+      }
+    },
+    {
+      "name": "custom roll explicit with null height",
+      "input": {
+        "paper": "custom",
+        "output_mode": "roll",
+        "custom": {
+          "width_mm": 40,
+          "height_mm": null
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "roll",
+        "margins_mm": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "custom": {
+          "width_mm": 40,
+          "height_mm": null
+        }
+      }
+    },
+    {
+      "name": "custom smallest page",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 40,
+          "height_mm": 40
+        },
+        "margins_mm": {
+          "top": 5,
+          "right": 5,
+          "bottom": 5,
+          "left": 5
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 5,
+          "right": 5,
+          "bottom": 5,
+          "left": 5
+        },
+        "custom": {
+          "width_mm": 40,
+          "height_mm": 40
+        }
+      }
+    },
+    {
+      "name": "custom largest page",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 420,
+          "height_mm": 600
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "portrait",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 10,
+          "right": 10,
+          "bottom": 10,
+          "left": 10
+        },
+        "custom": {
+          "width_mm": 420,
+          "height_mm": 600
+        }
+      }
+    },
+    {
+      "name": "printable height exactly at the minimum (30mm)",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 70
+        },
+        "margins_mm": {
+          "top": 20,
+          "right": 10,
+          "bottom": 20,
+          "left": 10
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "custom",
+        "orientation": "landscape",
+        "output_mode": "page",
+        "margins_mm": {
+          "top": 20,
+          "right": 10,
+          "bottom": 20,
+          "left": 10
+        },
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 70
+        }
+      }
+    },
+    {
+      "name": "58mm roll with margins leaving exactly 30mm",
+      "input": {
+        "paper": "thermal_58",
+        "margins_mm": {
+          "left": 14,
+          "right": 14
+        }
+      },
+      "normalized": {
+        "version": 1,
+        "paper": "thermal_58",
+        "orientation": "portrait",
+        "output_mode": "roll",
+        "margins_mm": {
+          "top": 0,
+          "right": 14,
+          "bottom": 0,
+          "left": 14
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "list instead of object",
+      "input": [
+        1,
+        2
+      ],
+      "reason": "not_an_object"
+    },
+    {
+      "name": "string",
+      "input": "a4",
+      "reason": "not_an_object"
+    },
+    {
+      "name": "number",
+      "input": 5,
+      "reason": "not_an_object"
+    },
+    {
+      "name": "missing paper",
+      "input": {},
+      "reason": "paper_invalid"
+    },
+    {
+      "name": "unknown paper",
+      "input": {
+        "paper": "a3"
+      },
+      "reason": "paper_invalid"
+    },
+    {
+      "name": "non-string paper",
+      "input": {
+        "paper": 4
+      },
+      "reason": "paper_invalid"
+    },
+    {
+      "name": "css injection in paper",
+      "input": {
+        "paper": "a4; } body{display:none"
+      },
+      "reason": "paper_invalid"
+    },
+    {
+      "name": "html in paper",
+      "input": {
+        "paper": "<script>"
+      },
+      "reason": "paper_invalid"
+    },
+    {
+      "name": "raw css key",
+      "input": {
+        "paper": "a4",
+        "css": "@page{size:1px}"
+      },
+      "reason": "unknown_key"
+    },
+    {
+      "name": "raw size key",
+      "input": {
+        "paper": "a4",
+        "size": "A4 landscape"
+      },
+      "reason": "unknown_key"
+    },
+    {
+      "name": "loose width key",
+      "input": {
+        "paper": "a4",
+        "width": "210mm"
+      },
+      "reason": "unknown_key"
+    },
+    {
+      "name": "unsupported version",
+      "input": {
+        "paper": "a4",
+        "version": 2
+      },
+      "reason": "unsupported_version"
+    },
+    {
+      "name": "string version",
+      "input": {
+        "paper": "a4",
+        "version": "1"
+      },
+      "reason": "unsupported_version"
+    },
+    {
+      "name": "unknown orientation",
+      "input": {
+        "paper": "a4",
+        "orientation": "diagonal"
+      },
+      "reason": "orientation_invalid"
+    },
+    {
+      "name": "landscape id with portrait orientation",
+      "input": {
+        "paper": "a4_landscape",
+        "orientation": "portrait"
+      },
+      "reason": "orientation_conflict"
+    },
+    {
+      "name": "letter has no landscape variant",
+      "input": {
+        "paper": "letter",
+        "orientation": "landscape"
+      },
+      "reason": "orientation_unsupported"
+    },
+    {
+      "name": "legal has no landscape variant",
+      "input": {
+        "paper": "legal",
+        "orientation": "landscape"
+      },
+      "reason": "orientation_unsupported"
+    },
+    {
+      "name": "thermal roll cannot be landscape",
+      "input": {
+        "paper": "thermal_80",
+        "orientation": "landscape"
+      },
+      "reason": "orientation_unsupported"
+    },
+    {
+      "name": "unknown output mode",
+      "input": {
+        "paper": "a4",
+        "output_mode": "sheet"
+      },
+      "reason": "output_mode_invalid"
+    },
+    {
+      "name": "a4 cannot be a roll",
+      "input": {
+        "paper": "a4",
+        "output_mode": "roll"
+      },
+      "reason": "output_mode_conflict"
+    },
+    {
+      "name": "thermal cannot be a page",
+      "input": {
+        "paper": "thermal_58",
+        "output_mode": "page"
+      },
+      "reason": "output_mode_conflict"
+    },
+    {
+      "name": "custom required",
+      "input": {
+        "paper": "custom"
+      },
+      "reason": "custom_required"
+    },
+    {
+      "name": "custom not an object",
+      "input": {
+        "paper": "custom",
+        "custom": "100x150"
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom only with paper=custom",
+      "input": {
+        "paper": "a4",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 100
+        }
+      },
+      "reason": "custom_not_allowed"
+    },
+    {
+      "name": "custom width as string",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": "100",
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom width as float",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100.5,
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom width as bool",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": true,
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom width missing",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom page needs a height",
+      "input": {
+        "paper": "custom",
+        "output_mode": "page",
+        "custom": {
+          "width_mm": 100
+        }
+      },
+      "reason": "custom_invalid"
+    },
+    {
+      "name": "custom roll cannot have a height",
+      "input": {
+        "paper": "custom",
+        "output_mode": "roll",
+        "custom": {
+          "width_mm": 80,
+          "height_mm": 200
+        }
+      },
+      "reason": "output_mode_conflict"
+    },
+    {
+      "name": "custom width below minimum",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 39,
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom width above maximum",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 421,
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom height below minimum",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 39
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom height above maximum",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 601
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom negative width",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": -80,
+          "height_mm": 150
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom roll width below minimum",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 10
+        }
+      },
+      "reason": "custom_out_of_range"
+    },
+    {
+      "name": "custom unknown inner key",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 150,
+          "depth_mm": 1
+        }
+      },
+      "reason": "unknown_key"
+    },
+    {
+      "name": "custom orientation contradicts dimensions",
+      "input": {
+        "paper": "custom",
+        "orientation": "landscape",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 150
+        }
+      },
+      "reason": "orientation_conflict"
+    },
+    {
+      "name": "custom roll cannot be landscape",
+      "input": {
+        "paper": "custom",
+        "output_mode": "roll",
+        "orientation": "landscape",
+        "custom": {
+          "width_mm": 80
+        }
+      },
+      "reason": "orientation_conflict"
+    },
+    {
+      "name": "margins not an object",
+      "input": {
+        "paper": "a4",
+        "margins_mm": "10mm"
+      },
+      "reason": "margins_invalid"
+    },
+    {
+      "name": "margins as list",
+      "input": {
+        "paper": "a4",
+        "margins_mm": [
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      "reason": "margins_invalid"
+    },
+    {
+      "name": "margin as css string",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": "10mm"
+        }
+      },
+      "reason": "margins_invalid"
+    },
+    {
+      "name": "margin as numeric string",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": "5"
+        }
+      },
+      "reason": "margins_invalid"
+    },
+    {
+      "name": "margin as float",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": 5.5
+        }
+      },
+      "reason": "margins_invalid"
+    },
+    {
+      "name": "margin negative",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "top": -1
+        }
+      },
+      "reason": "margins_out_of_range"
+    },
+    {
+      "name": "margin above maximum",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "left": 51
+        }
+      },
+      "reason": "margins_out_of_range"
+    },
+    {
+      "name": "margin unknown side",
+      "input": {
+        "paper": "a4",
+        "margins_mm": {
+          "diagonal": 1
+        }
+      },
+      "reason": "unknown_key"
+    },
+    {
+      "name": "58mm roll margins leave 29mm printable width",
+      "input": {
+        "paper": "thermal_58",
+        "margins_mm": {
+          "left": 15,
+          "right": 14
+        }
+      },
+      "reason": "printable_area_too_small"
+    },
+    {
+      "name": "page margins leave 29mm printable height",
+      "input": {
+        "paper": "custom",
+        "custom": {
+          "width_mm": 100,
+          "height_mm": 70
+        },
+        "margins_mm": {
+          "top": 21,
+          "right": 10,
+          "bottom": 20,
+          "left": 10
+        }
+      },
+      "reason": "printable_area_too_small"
+    }
+  ]
+}
