@@ -105,7 +105,7 @@
 
 ### Build
 - `npm run build`: **نجح** (Compiled؛ يشمل فحص الأنواع). `tsc --noEmit`: 55 خطأ = **العدد نفسه قبل الـ PR** (ملفات اختبار/e2e غير مرتبطة)؛ صفر في ملفات الـ PR.
-- **CI على الـ PR (الرأس \`345aa562c\`، كود + اختبارات + تقرير): 7/7 ناجحة** — \`CI Gate\`، \`web build (Next.js)\`، PHP على SQLite، PHP على PostgreSQL (الشريحتان والمجمّع)، \`PostgreSQL feed-lock performance\`. Web CI شغّل Vitest الكامل داخل \`web build\`. (commits التوثيق اللاحقة لا تغيّر كوداً.) مراجعة Codex: تُسجَّل في صفحة الـ PR.
+- **CI على الـ PR (الرأس `345aa562c`، كود + اختبارات + تقرير): 7/7 ناجحة** — `CI Gate`، `web build (Next.js)`، PHP على SQLite، PHP على PostgreSQL (الشريحتان والمجمّع)، `PostgreSQL feed-lock performance`. Web CI شغّل Vitest الكامل داخل `web build`. (commits التوثيق اللاحقة لا تغيّر كوداً.) مراجعة Codex: تُسجَّل في صفحة الـ PR.
 
 ---
 
