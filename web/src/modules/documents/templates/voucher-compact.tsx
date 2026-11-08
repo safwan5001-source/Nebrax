@@ -39,7 +39,7 @@ function Field({ label, value, ltr = false, d }: { label: ReactNode; value: Reac
  * يعرض فقط ما في `model.voucher`/`model.seller`: لا حقل بلا قيمة، ولا QR (لا مصدر QR معتمد للسند)،
  * ولا شعار/ختم/توقيع بلا صورة. قالب مستقل لا يمرّ عبر `DocumentBody` (لا تخطيط مصمّم للسند).
  */
-export function VoucherCompact({ model, theme, formatMoney, sections, rootId }: DocumentTemplateProps) {
+export function VoucherCompact({ model, theme, formatMoney, sections, layout, rootId }: DocumentTemplateProps) {
   const t = useTranslations('voucherDoc');
   const dt = useTranslations('documentTypes');
   const dtAlt = useTranslations('documentTypesAlt');
@@ -55,12 +55,16 @@ export function VoucherCompact({ model, theme, formatMoney, sections, rootId }: 
 
   const { seller, meta } = model;
   const received = v.direction === 'received';
+  // التخطيط المحفوظ (مصمّم القوالب/مراجعة PDF) يتقدّم كما في `DocumentBody`: القسم غير المدرج أو `visible:false` يُخفى؛
+  // وغياب التخطيط = الأعلام وحدها (`sections`). الأقسام الجوهرية (الترويسة والطرف والمبلغ والتفاصيل) لا تُخفى.
+  const saved = layout && layout.length > 0 ? layout : null;
+  const shown = (key: 'amountWords' | 'notes' | 'signature' | 'stamp' | 'footer') => !saved || saved.some((item) => item.key === key && item.visible);
   const showLogo = sections?.logo !== false;
-  const showWords = sections?.amountWords !== false;
-  const showNotes = sections?.notes !== false;
-  const showStamp = sections?.stamp !== false && !!model.stampUrl;
-  const showSignature = sections?.signature !== false && !!model.signatureUrl;
-  const showFooter = sections?.footer !== false;
+  const showWords = sections?.amountWords !== false && shown('amountWords');
+  const showNotes = sections?.notes !== false && shown('notes');
+  const showStamp = sections?.stamp !== false && shown('stamp') && !!model.stampUrl;
+  const showSignature = sections?.signature !== false && shown('signature') && !!model.signatureUrl;
+  const showFooter = sections?.footer !== false && shown('footer');
   const words = amountToWords(v.amount, model.currency, locale === 'en' ? 'en' : 'ar');
   const logoHeight = Math.min(seller.logoHeight && seller.logoHeight > 0 ? seller.logoHeight : d.logo, d.logo);
   const notes = model.notes?.trim() || null;

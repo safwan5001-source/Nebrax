@@ -33,12 +33,13 @@ const A5P: Profile = { paper: 'a5' };
 
 const marginCss = (w: number, h: number, m: number) => `@media print { @page { size: ${w}mm ${h}mm; margin: ${m}mm ${m}mm ${m}mm ${m}mm; } }`;
 
-function revision({ id, template = 'voucher-compact', profile }: { id: string; template?: string; profile?: Profile }) {
+function revision({ id, template = 'voucher-compact', profile, layout }: { id: string; template?: string; profile?: Profile; layout?: unknown[] }) {
   return {
     id, version: 1, document_types: [],
     definition: {
       template_id: template, theme_id: 'blue', show_logo: true, footer_text: 'تذييل المستند',
       stamp: STAMP, signature: SIGNATURE,
+      ...(layout ? { layout } : {}),
       ...(profile ? { output_profile: profile } : {}),
     },
   };
@@ -54,6 +55,8 @@ const EXTRAS = {
   collector_employee_name: 'خالد العتيبي',
   cash_account_code: '1120',
   cash_account_name: 'الحساب البنكي الرئيسي',
+  // ملاحظة: `PaymentController::show()` لا يحمّل علاقة التصنيف اليوم، فلا يصل في استجابة التفاصيل الحقيقية حتى يُضاف التحميل (قرار خلفية
+  // خارج هذه الشريحة). الحاضنة تحاكي استجابة تحمّله ليُثبَت أن القالب يعرضه متى وصل.
   classification: { id: 'c1', name: 'تسوية عملاء', scope: 'both' },
 };
 
@@ -65,6 +68,7 @@ const totalOf = (count: number) => (24691357.8 * count).toFixed(2);
 interface World {
   direction: 'received' | 'paid';
   frozen?: unknown;
+  frozenPdf?: unknown;
   extras?: boolean;
   allocs?: number;
   branch?: 'ok' | 'fail' | 'none';
@@ -78,7 +82,7 @@ function paymentPayload(world: World) {
     method: 'bank', amount: totalOf(count), reference: 'REF-2026-0007', notes: 'سداد دفعة المشروع الإقليمي.', status: world.status ?? 'posted',
     branch_id: world.branch === 'none' ? null : 'b1', partner_id: 'p1', allocations: allocations(count),
     ...(world.extras === false ? {} : EXTRAS),
-    print_template_revision: world.frozen ?? null, pdf_template_revision: null, thermal_template_revision: null,
+    print_template_revision: world.frozen ?? null, pdf_template_revision: world.frozenPdf ?? null, thermal_template_revision: null,
   };
 }
 
@@ -265,6 +269,42 @@ for (const direction of ['received', 'paid'] as const) {
           expect(box!.bottom).toBeLessThanOrEqual(148 - 10 + 1.6);
           expect(box!.right).toBeLessThanOrEqual(210 - 10 + 1.6);
         }
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('تخطيط مراجعة PDF المحفوظ يُحترم: توقيع/ختم/بيان/تفقيط مخفية في جذر PDF الملتقَط وظاهرة في الطباعة', async ({ browser }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'سطح المكتب يكفي');
+      test.setTimeout(180_000);
+      const layout = [
+        { key: 'header', visible: true }, { key: 'parties', visible: true }, { key: 'voucher', visible: true },
+        { key: 'amountWords', visible: false }, { key: 'notes', visible: false }, { key: 'signature', visible: false },
+        { key: 'stamp', visible: false }, { key: 'footer', visible: true },
+      ];
+      const { context, page } = await openPage(browser, { direction, frozen: revision({ id: 'p', profile: A5L }), frozenPdf: revision({ id: 'd', profile: A5L, layout }) });
+      try {
+        const printRoot = await page.evaluate(() => ({
+          seals: [...document.querySelectorAll('#print-root img')].filter((img) => !(img.getAttribute('src') ?? '').includes('width%3D%22180%22') && !(img.getAttribute('src') ?? '').includes('width="180"')).length,
+          words: document.querySelectorAll('#print-root [data-voucher-words]').length,
+          notes: document.querySelectorAll('#print-root [data-voucher-notes]').length,
+        }));
+        expect(printRoot.seals, 'الطباعة بتخطيط السند الثابت: ختم وتوقيع ظاهران').toBeGreaterThanOrEqual(2);
+        expect(printRoot.words).toBe(1);
+        expect(printRoot.notes).toBe(1);
+        const pdfRoot = await page.evaluate(() => {
+          const root = document.getElementById('pdf-print-root');
+          return {
+            seals: [...(root?.querySelectorAll('img') ?? [])].filter((img) => !(img.getAttribute('src') ?? '').includes('width%3D%22180%22') && !(img.getAttribute('src') ?? '').includes('width="180"')).length,
+            words: root?.querySelectorAll('[data-voucher-words]').length ?? -1,
+            notes: root?.querySelectorAll('[data-voucher-notes]').length ?? -1,
+            compact: root?.querySelectorAll('[data-voucher-compact]').length ?? -1,
+          };
+        });
+        expect(pdfRoot.compact).toBe(1);
+        expect(pdfRoot.seals, 'ختم/توقيع مخفيان في مراجعة PDF').toBe(0);
+        expect(pdfRoot.words, 'تفقيط مخفي').toBe(0);
+        expect(pdfRoot.notes, 'بيان مخفي').toBe(0);
       } finally {
         await context.close();
       }

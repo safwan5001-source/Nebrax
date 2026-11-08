@@ -33,8 +33,8 @@ function frame(contentWidthMm: number, contentMinHeightMm: number): DocPageFrame
   } as DocPageFrame;
 }
 
-function renderVoucher(m: DocumentModel, sections?: Parameters<typeof VoucherCompact>[0]['sections'], f: DocPageFrame | null = null) {
-  const ui = <VoucherCompact model={m} theme={theme} formatMoney={formatMoney} sections={sections} />;
+function renderVoucher(m: DocumentModel, sections?: Parameters<typeof VoucherCompact>[0]['sections'], f: DocPageFrame | null = null, layout?: Parameters<typeof VoucherCompact>[0]['layout']) {
+  const ui = <VoucherCompact model={m} theme={theme} formatMoney={formatMoney} sections={sections} layout={layout} />;
   return render(f ? <DocPageFrameProvider value={f}>{ui}</DocPageFrameProvider> : ui);
 }
 
@@ -133,6 +133,39 @@ describe('VoucherCompact — محتوى السند من السجلّ وحده', 
     expect(hidden.querySelector('[data-voucher-words]')).toBeNull();
     expect(hidden.textContent).not.toContain('ملاحظة الاختبار');
     expect(hidden.textContent).not.toContain('تذييل الاختبار');
+  });
+
+  it('التخطيط المحفوظ يتقدّم: القسم غير المدرج أو المخفي لا يُرسم (مسار الإنتاج عبر DocumentView)', () => {
+    const m = model({ footerText: 'تذييل الاختبار', notes: 'ملاحظة الاختبار' });
+    const all = [
+      { key: 'header', visible: true }, { key: 'parties', visible: true }, { key: 'voucher', visible: true },
+      { key: 'amountWords', visible: true }, { key: 'notes', visible: true }, { key: 'signature', visible: true },
+      { key: 'stamp', visible: true }, { key: 'footer', visible: true },
+    ] as const;
+    const full = renderVoucher(m, undefined, null, [...all]).container;
+    expect(full.querySelector('[data-voucher-words]')).not.toBeNull();
+    expect(full.textContent).toContain('ملاحظة الاختبار');
+    expect(full.querySelector('img[alt="signature"]')).not.toBeNull();
+    expect(full.querySelector('img[alt="stamp"]')).not.toBeNull();
+    expect(full.textContent).toContain('تذييل الاختبار');
+    cleanup();
+
+    const hidden = renderVoucher(m, undefined, null, all.map((item) => (['notes', 'signature', 'stamp', 'amountWords', 'footer'].includes(item.key) ? { ...item, visible: false } : item))).container;
+    expect(hidden.querySelector('[data-voucher-words]')).toBeNull();
+    expect(hidden.textContent).not.toContain('ملاحظة الاختبار');
+    expect(hidden.querySelector('img[alt="signature"]')).toBeNull();
+    expect(hidden.querySelector('img[alt="stamp"]')).toBeNull();
+    expect(hidden.textContent).not.toContain('تذييل الاختبار');
+    // الأقسام الجوهرية تبقى.
+    expect(hidden.textContent).toContain(m.buyer.name);
+    expect(hidden.textContent).toContain(`M${m.voucher!.amount}`);
+    cleanup();
+
+    // غير مدرج = مخفي (كما في DocumentBody).
+    const partial = renderVoucher(m, undefined, null, [{ key: 'header', visible: true }, { key: 'notes', visible: true }]).container;
+    expect(partial.textContent).toContain('ملاحظة الاختبار');
+    expect(partial.querySelector('img[alt="signature"]')).toBeNull();
+    expect(partial.querySelector('[data-voucher-words]')).toBeNull();
   });
 
   it('مستند بلا بيانات سند لا يرسم شيئاً', () => {
