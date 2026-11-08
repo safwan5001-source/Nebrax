@@ -72,6 +72,20 @@ Vitest كامل **955 ملفاً / 12537 اختباراً ✓** · `tsc --noEmit
 - **لم يُمسّ:** مبالغ السندات/الضرائب، القيود والترحيل والتسويات، بيانات الدفع والتحصيل، الصلاحيات، عزل المستأجر، ZATCA XML/QR/Hash، `app/` و`database/` و`routes/` (فرق الملفات = `web/` + توثيق فقط).
 - الصفحتان تقرآن فقط (لا طلب كتابة جديد؛ حارس ساكن يثبّت ذلك للسند)، فعزل المستأجر والصلاحيات في الخلفية كما اختُبرت سابقاً.
 
+### هـ) CI على GitHub (الرأس `b1d22bfff12bf7ce6ce0d3d93e5495f7e13abfe2`)
+| الفحص | النتيجة |
+|---|---|
+| `web build (Next.js)` (فحصان) | ✓ |
+| `php artisan test (L11, sqlite)` | ✓ |
+| `php artisan test (L11, pgsql)` شظية 1 / شظية 2 / المجمّع | ✓ / ✓ / ✓ |
+| `PostgreSQL feed-lock performance (COPS-H1-1)` | ✓ |
+| `CI Gate` | ✓ (بعد إعادة تشغيل واحدة، انظر أدناه) |
+| مراجعة Codex على الرأس | بلا ملاحظات جديدة |
+
+- **فشل مرحلي ليس من هذا الـPR:** شظية pgsql 2 فشلت باختبار واحد من 5954 (`FuelOpeningBalanceTest::a_posted_document_and_its_lines_are_immutable_and_audited`: حدثا تدقيق `created`/`posted` بترتيب معكوس لأن الاختبار يرتّب بـ`occurred_at` وحده). فرق الـPR لا يمسّ `app/` ولا `database/` ولا `routes/` ولا `tests/`. أُعيد تشغيل الفحص الفاشل مرة واحدة فنجح، ثم أُعيد تشغيل `CI Gate` مرة واحدة فنجح. **لم يُعدَّل اختبار الوقود ولا نطاق الـPR**؛ الهشاشة قائمة في اختبار الوقود وتحتاج إصلاحاً مستقلاً.
+- فشل `CI Gate` الأسبق كان `stale gate` (دفعتي أثناء تقييمه لرأس سابق)، لا عيباً في الكود.
+- حالة الدمج: الفرع **خلف `main`** (`mergeable_state: behind`) — لم يُحدَّث عمداً كي لا يُعاد تشغيل CI بلا طلب؛ التحديث قرارك.
+
 ## 5) متطلبات قالب سند مدمج (مؤجَّل، PR مستقل)
 على A6 أفقي تعمل القوالب الحالية بلا فقد أو تداخل لكن **ترويسة القالب (بيانات المنشأة + الأطراف) تستهلك معظم الصفحة الأولى**: سند بخمسة تخصيصات = 4 صفحات. للاستعمال العملي بالحجم الصغير يلزم قالب سند مخصص:
 1. ترويسة سطرين (الشعار + اسم المنشأة + رقم السند والتاريخ) بلا كتلة عنوان/سجل كاملة.
@@ -90,11 +104,12 @@ Vitest كامل **955 ملفاً / 12537 اختباراً ✓** · `tsc --noEmit
 
 ## 7) الملفات المتغيرة
 **معدَّل:** `web/src/app/(app)/payments/[id]/page.tsx` · `web/src/app/(app)/purchases/[id]/page.tsx` · `web/src/components/payments/payment-document.tsx` · `web/src/components/purchases/purchase-document.tsx` · `web/src/modules/print-templates/output-profile-form.ts` (+ اختباراه) · `web/src/modules/documents/qa/document-qa-fixtures.ts` (+ اختباره) · `web/src/app/document-qa/page.tsx` · `CLAUDE.md`.
-**جديد:** `web/src/components/payments/payment-document-output.test.tsx` · `web/src/app/(app)/payments/output-profile-wiring.test.ts` · `web/e2e/output-profile-pr4-harness.spec.ts` (204) · `web/e2e/output-profile-pr4-pages.spec.ts` (18) · هذا التقرير.
+**جديد:** `web/src/components/payments/payment-document-output.test.tsx` · `web/src/app/(app)/payments/output-profile-wiring.test.ts` · `web/e2e/output-profile-pr4-harness.spec.ts` (204) · `web/e2e/output-profile-pr4-pages.spec.ts` (26) · هذا التقرير.
 
 ## 8) الفرع والـPR
 - الفرع: `claude/awj-doc-v2-pr4-purchases-vouchers-output-profile`
-- أساس العمل: `b29dac6fd66f4894c77054c5399a098c03202c36` (أُعيد التأسيس على أحدث `main` قبل فتح الـPR؛ انظر وصف الـPR لـBase/Head SHA).
+- أساس العمل الأصلي: `b29dac6fd66f4894c77054c5399a098c03202c36`؛ أُعيد التأسيس على `main` عند `69f81d709a0a2003d768dbe26a6069ea71ad33d1` (قاعدة الـPR).
+- رأس الكود المُختبَر والأخضر: `b1d22bfff12bf7ce6ce0d3d93e5495f7e13abfe2`. (كومت التقرير اللاحق توثيقي فقط.)
 
 ## 9) الخطوة التالية المقترحة
 1. بوابة بصرية على iPhone/Safari وطابعة A5/A4 فعلية قبل أي تفعيل على مستأجر حي.
