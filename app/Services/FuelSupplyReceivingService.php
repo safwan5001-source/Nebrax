@@ -337,6 +337,9 @@ class FuelSupplyReceivingService
             // الخزان `FOR KEY SHARE` **قبل** المِرساة (نمط #2066): إدراج صف الدفتر التشغيلي لاحقاً يحتاج KEY SHARE على الخزان، و`recordReading` يمسكه `FOR UPDATE` ثم يطلب KEY SHARE على
             // المستأجر المتعارض مع المِرساة FOR UPDATE ⇒ جمود إن اختلف الترتيب (مُستنسَخ ضمن مراجعة #2071). لا يتعارض مع قارئ آخر ولا مع بيع.
             \App\Models\FuelTank::query()->whereKey($tank->id)->lock('for key share')->first();
+            // صف المنتج `FOR KEY SHARE` قبل المِرساة أيضاً (مراجعة #2071): إدراج حركة المخزون يحتاج KEY SHARE عليه (FK)، وتعديل بطاقة المنتج يمسكه `FOR UPDATE` ثم يطلب KEY SHARE على المستأجر
+            // المتعارض مع المِرساة ⇒ جمود إن اختلف الترتيب. كان ترتيب `main` (منتج ← مِرساة) وقد حفظناه.
+            \App\Tenancy\BranchScope::reference(Product::class)->lock('for key share')->find($fuelProduct->product_id);
             app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
             // هذا الحارس يرفض الرصيد التاريخي الذي لا نعرف pool تكلفته؛ لا fallback.
             $this->costBasis->assertReady($fuelProduct, $warehouse);

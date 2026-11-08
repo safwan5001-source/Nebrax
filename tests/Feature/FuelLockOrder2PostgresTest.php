@@ -327,6 +327,43 @@ class FuelLockOrder2PostgresTest extends TestCase
         $this->assertNoDeadlockWithReadingOrder($w, $w['tanks']['91']->id, fn () => app(FuelReconciliationService::class)->approve(FuelReconciliation::findOrFail($draft->id), $w['actor']->id, 'اعتماد'), 'اعتماد التسوية ↔ قراءة خزان');
     }
 
+    /** ترتيب تعديل بطاقة المنتج: صف المنتج FOR UPDATE ثم إدراج نشاط يحتاج KEY SHARE على المستأجر (FK). @param array<string,mixed> $w */
+    private function productUpdateOrderSql(array $w, string $productId, float $sleep = 1.5): string
+    {
+        return sprintf(
+            "BEGIN; SELECT 1 FROM products WHERE id='%s' FOR UPDATE; SELECT pg_sleep(%s); SELECT 1 FROM tenants WHERE id='%s' FOR KEY SHARE; COMMIT;",
+            $productId, $sleep, $w['tenant_id'],
+        );
+    }
+
+    #[Test]
+    public function approvals_and_opening_never_deadlock_with_a_product_card_update(): void
+    {
+        $w = $this->world();
+        $productId = (string) $w['fuels']['91']->product_id;
+        $run = function (callable $operation, string $label) use ($w, $productId): void {
+            $holder = $this->startHolder($this->productUpdateOrderSql($w, $productId));
+            usleep(500000);
+            $error = null;
+            try {
+                $operation();
+            } catch (\Throwable $e) {
+                $error = $e;
+            }
+            [$stderr, $exit] = $this->finishHolder($holder);
+            $this->assertStringNotContainsString('deadlock', $stderr, "{$label}: جلسة تعديل المنتج ضحية جمود — {$stderr}");
+            $this->assertSame(0, $exit, "{$label}: {$stderr}");
+            $this->assertNull($error, "{$label}: ".($error ? get_class($error).': '.$error->getMessage() : ''));
+        };
+
+        $draft = $this->draftReconciliation($w, 'prod');
+        $run(fn () => app(FuelReconciliationService::class)->approve(FuelReconciliation::findOrFail($draft->id), $w['actor']->id, 'اعتماد'), 'اعتماد التسوية ↔ تعديل بطاقة المنتج');
+        $delivery = $this->draftDelivery($w, 'lo2-prod-recv');
+        $run(fn () => app(FuelSupplyReceivingService::class)->approveDelivery(FuelDelivery::findOrFail($delivery->id), $w['actor']->id), 'اعتماد الاستلام ↔ تعديل بطاقة المنتج');
+        [$fresh, $doc] = $this->freshOpeningDocument($w, 'p');
+        $run(fn () => app(FuelOpeningBalanceService::class)->post(\App\Models\FuelOpeningBalance::findOrFail($doc->id), $w['actor']), 'ترحيل الافتتاحي ↔ تعديل بطاقة المنتج');
+    }
+
     #[Test]
     public function real_tank_readings_racing_opening_postings_never_deadlock(): void
     {

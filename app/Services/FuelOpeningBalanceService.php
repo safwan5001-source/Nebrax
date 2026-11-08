@@ -246,6 +246,10 @@ class FuelOpeningBalanceService
             // المستأجر (المِرساة) يتعارض معه: أخذ المِرساة قبل الخزانات يعكس ترتيب القراءة فيجمد الترحيل مع تسجيل قراءة لأحد خزاناته (مراجعة Codex على #2071). فنقفل الخزانات
             // نفسها التي سيقفلها `evaluate()` بالترتيب نفسه (بالمعرّف) قبل المِرساة؛ ثم المِرساة قبل أي قفل مجمّع (ترتيب ERP: مِرساة ← حالة التكلفة ← الرصيد). لا أثر محاسبي أو مخزني.
             FuelTank::query()->whereIn('id', $document->lines->pluck('fuel_tank_id')->all())->orderBy('id')->lockForUpdate()->get();
+            // وصفوف المنتجات `FOR UPDATE` (بالمعرّف، وهي نفسها التي يقفلها `evaluate()` لاحقاً) قبل المِرساة أيضاً (مراجعة #2071): تعديل بطاقة المنتج يمسك صف المنتج ثم يطلب KEY SHARE على
+            // المستأجر المتعارض مع المِرساة، فأخذ المِرساة قبل المنتجات يعكس ترتيب `main` (منتج ← مِرساة) ويجمّد الترحيل مع تعديل المنتج.
+            $lockedProductIds = FuelProduct::query()->whereIn('id', $document->lines->pluck('fuel_product_id')->unique()->all())->pluck('product_id')->all();
+            BranchScope::reference(Product::class)->whereIn('id', $lockedProductIds)->orderBy('id')->lockForUpdate()->get();
             app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
 
             // ترتيب الأقفال يطابق اعتماد الاستلام (حالة التكلفة ← المنتج ← الرصيد): assertReady أولاً، وإلا تعاكس مع استلام
