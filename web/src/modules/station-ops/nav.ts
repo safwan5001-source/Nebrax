@@ -23,8 +23,14 @@ export interface OpsNavItem {
 /** FUEL-B5: أي قدرة استلام (عرض/إنشاء/اعتماد) — المفتاح الدقيق من B2 أو `fuel_stations.manage` القديم؛ `fuel_stations.view` وحدها (مفتاح كل مستخدم محطة) لا تكفي. */
 export const RECEIVING_PERMISSIONS = ['fuel.delivery.view', 'fuel.delivery.create', 'fuel.delivery.approve', 'fuel.delivery.cost.record', 'fuel_stations.manage'] as const;
 
-/** HORIZON-REPORTS: أي صلاحية تقرير (كميات الوردية أو مبيعاتها). الكتالوج نفسه يصفّيه الخادم لكل مستخدم، فلا تقرير يظهر لمن لا يملك صلاحيته. */
-export const REPORT_PERMISSIONS = ['fuel.shift.view', 'fuel.sale.view'] as const;
+/**
+ * HORIZON-REPORTS: **كل** صلاحية تفتح تقريراً في الكتالوج (مرآة `FuelReportCatalog::routePermissions()`؛ يحرس تزامنها اختبار PHP).
+ * الكتالوج نفسه يصفّيه الخادم لكل مستخدم، فلا تقرير يظهر لمن لا يملك صلاحيته.
+ */
+export const REPORT_PERMISSIONS = [
+  'fuel.shift.view', 'fuel.sale.view', 'fuel_stations.manage', 'fuel_stations.view', 'fuel.reading.view',
+  'fuel.reconciliation.view', 'fuel.delivery.view', 'fuel.reports.view',
+] as const;
 
 /** FUEL-B4 (+B6: سياسة القراءات المتأخرة تتبع `fuel.governance.manage`): صلاحيات الوظائف الإدارية داخل التطبيق (القائمة الكنسية؛ منها يُشتق ظهور «الإدارة» وأقسامها، والخادم يفرضها في كل طلب). */
 export const MANAGE_PERMISSIONS = ['fuel.staff.manage', 'fuel.sale.price.manage', 'fuel.governance.manage', 'fuel_stations.manage'] as const; // + B6: الحوكمة · + PR-2: إعداد المحطة (معالج الرصيد الافتتاحي)
