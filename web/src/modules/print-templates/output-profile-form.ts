@@ -8,6 +8,7 @@ import {
   CUSTOM_DEFAULT_MARGIN_PAGE_MM,
   MARGIN_MM,
   normalizeOutputProfile,
+  readOutputProfile,
   type MarginSide,
   type OutputOrientation,
   type OutputProfile,
@@ -83,6 +84,21 @@ export function paperChoicesForTemplate(templateId: string | null | undefined): 
   });
 
   return { thermal: null, papers, custom: template.minContentWidthMm !== undefined };
+}
+
+/**
+ * ما يبقى من `output_profile` الخام بعد تبديل قالب العرض. القالب الحراري يعرض نصاً ثابتاً بلا عناصر تحكم،
+ * والخلفية ترفض ملفاً بمقاس لا يطابق عرضه (`thermal_template_paper_mismatch`)؛ فيُسقَط الملف غير المطابق
+ * عند التبديل إليه كي لا تبقى مسودة غير قابلة للحفظ بلا وسيلة لإصلاحها. الملف المطابق لعرضه يُبقى؛
+ * وغير الحراري يُبقى كما هو (لدى المحرر عندها تحذير وعناصر تحكم للمسح).
+ */
+export function outputProfileAfterTemplateChange(raw: unknown, templateId: string | null | undefined): unknown {
+  if (raw === undefined || raw === null) return undefined;
+  const { thermal } = paperChoicesForTemplate(templateId);
+  if (!thermal) return raw;
+
+  const stored = readOutputProfile({ output_profile: raw });
+  return stored && stored.paper === thermal ? raw : undefined;
 }
 
 export function defaultMarginFor(paper: FormPaper): number {

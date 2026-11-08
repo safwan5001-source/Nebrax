@@ -46,7 +46,7 @@ export interface ResolvedLiveTemplate {
 
 function isCurrentDefinition(value: unknown): value is LiveTemplateDefinition {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return ['template_id', 'theme_id', 'show_logo', 'logo_height', 'layout', 'footer_text', 'terms_text', 'bank_text', 'stamp', 'signature']
+  return ['template_id', 'theme_id', 'show_logo', 'logo_height', 'layout', 'footer_text', 'terms_text', 'bank_text', 'stamp', 'signature', 'output_profile']
     .some((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 

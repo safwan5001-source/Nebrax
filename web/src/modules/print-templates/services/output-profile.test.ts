@@ -139,6 +139,17 @@ describe('readOutputProfile — absence preserves legacy behaviour', () => {
     expect(profile?.margins_mm).toEqual({ top: 10, right: 10, bottom: 10, left: 10 });
   });
 
+  it('a revision whose definition holds only an output profile is still a current definition (default template + stored profile)', () => {
+    const resolved = resolveTemplateRevisionDefinition(
+      { id: 'r', definition: { output_profile: { paper: 'a4', orientation: 'landscape' } } },
+      'tax_invoice',
+    );
+    expect(resolved).not.toBeNull();
+    expect(resolved?.outputProfile?.paper).toBe('a4_landscape');
+    // التعريف القديم بلا أي مفتاح حديث يبقى غير معروف.
+    expect(resolveTemplateRevisionDefinition({ id: 'r', definition: { legacy_sales_designs: [] } }, 'tax_invoice')).toBeNull();
+  });
+
   it('does not change how a revision definition resolves for the document renderer', () => {
     const base = { template_id: 'tax-invoice-classic', theme_id: 'blue', footer_text: 'تذييل' };
     const without = resolveTemplateRevisionDefinition({ id: 'r', definition: base }, 'tax_invoice');

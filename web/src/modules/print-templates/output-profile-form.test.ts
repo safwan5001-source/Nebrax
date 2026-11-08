@@ -4,6 +4,7 @@ import {
   evaluateOutputProfileForm,
   formFromProfile,
   formWithPaper,
+  outputProfileAfterTemplateChange,
   outputProfileUnwiredTypes,
   paperChoicesForTemplate,
   type OutputProfileForm,
@@ -145,5 +146,30 @@ describe('outputProfileUnwiredTypes', () => {
   });
   it('غيرها غير مربوط بعد ويُعلَن', () => {
     expect(outputProfileUnwiredTypes(['tax_invoice', 'receipt_voucher', 'purchase_invoice'])).toEqual(['receipt_voucher', 'purchase_invoice']);
+  });
+});
+
+describe('outputProfileAfterTemplateChange — التبديل إلى قالب حراري لا يترك ملفاً غير قابل للحفظ', () => {
+  it('يُسقط ملف الصفحة غير المطابق عند التبديل إلى حراري (الخلفية سترفضه)', () => {
+    expect(outputProfileAfterTemplateChange({ paper: 'a5' }, 'tax-invoice-thermal80')).toBeUndefined();
+    expect(outputProfileAfterTemplateChange({ paper: 'a4', orientation: 'landscape' }, 'tax-invoice-thermal58')).toBeUndefined();
+    // حراري بعرض آخر ≠ عرض القالب الهدف
+    expect(outputProfileAfterTemplateChange({ paper: 'thermal_58' }, 'tax-invoice-thermal80')).toBeUndefined();
+  });
+
+  it('يُبقي الملف المطابق لعرض القالب الحراري كما هو', () => {
+    const raw = { paper: 'thermal_80' };
+    expect(outputProfileAfterTemplateChange(raw, 'tax-invoice-thermal80')).toBe(raw);
+  });
+
+  it('لا يمسّ التبديل بين قوالب الصفحات (التحذير وعناصر المسح في المحرر تتولّى الباقي)', () => {
+    const raw = { paper: 'a5', orientation: 'landscape' };
+    expect(outputProfileAfterTemplateChange(raw, CLASSIC)).toBe(raw);
+    expect(outputProfileAfterTemplateChange(raw, CLASSIC_V2)).toBe(raw);
+  });
+
+  it('الغياب يبقى غياباً', () => {
+    expect(outputProfileAfterTemplateChange(undefined, 'tax-invoice-thermal80')).toBeUndefined();
+    expect(outputProfileAfterTemplateChange(null, CLASSIC)).toBeUndefined();
   });
 });
