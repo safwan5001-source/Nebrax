@@ -803,7 +803,14 @@ class FuelShiftSettlementPreviewTest extends TestCase
         }
         // لا كاتب لجداول التسوية خارج الاختبارات في هذه الشريحة (الكاتب FuelShiftSettlementService يأتي مع P1-3b).
         foreach (glob(app_path('Services/*.php')) as $file) {
-            $this->assertStringNotContainsString("DB::table('fuel_shift_settlement", (string) file_get_contents($file), basename($file));
+            $code = (string) file_get_contents($file);
+            if (basename($file) === 'FuelShiftSettlementDates.php') {
+                // قارئ تواريخ فقط (P1-3b-2a): مسموح له بالقراءة من جداول التسوية دون أي فعل كتابة.
+                $this->assertDoesNotMatchRegularExpression('/->(insert|update|delete|upsert|truncate)\\(/', $code, 'FuelShiftSettlementDates قراءة فقط');
+
+                continue;
+            }
+            $this->assertStringNotContainsString("DB::table('fuel_shift_settlement", $code, basename($file));
         }
         $this->assertFileDoesNotExist(app_path('Services/FuelShiftSettlementService.php'));
     }
@@ -1042,6 +1049,8 @@ class FuelShiftSettlementPreviewTest extends TestCase
             'id' => $settlement, 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'fuel_station_id' => $this->f['station']->id,
             'fuel_shift_id' => $past, 'status' => 'withheld', 'sales_basis' => 'per_invoice', 'preview_hash' => str_repeat('c', 64),
             'policy_snapshot' => json_encode([]), 'metered_milliliters' => 1000, 'erp_milliliters' => 0, 'residual_milliliters' => 1000,
+            'supply_started_at' => now()->subDays(2), 'supply_ended_at' => now()->subDay(),
+            'supply_business_date' => now()->subDay()->toDateString(), 'accounting_date' => now()->subDay()->toDateString(),
             'settled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $line = $this->uuid();
