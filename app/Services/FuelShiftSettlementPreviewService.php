@@ -127,8 +127,10 @@ class FuelShiftSettlementPreviewService
         $blockers = array_values(array_filter($blockers));
 
         // ───── الحالة المتوقعة لكل سطر (حجب التكلفة/الفترة) والتكلفة المعاينة ─────
+        // التكلفة المعاينة بالتتابع لكل مجمّع بترتيب الفوهات (كما سيُرحَّل لاحقاً) بحالة تُحاكى في الذاكرة فيُحمل الباقي الكسري بين الفوهات.
         $stock = [];
-        foreach ($lines as &$line) {
+        $quotable = [];
+        foreach ($lines as $index => &$line) {
             if (($line['residual_milliliters'] ?? 0) <= 0 || $line['expected_gross_minor'] === null) {
                 continue;
             }
@@ -142,13 +144,18 @@ class FuelShiftSettlementPreviewService
             }
             $line['state'] = 'posted';
             if ($product !== null && $warehouse !== null) {
-                $quote = $this->costs->previewIssue($product, $warehouse, (int) $line['residual_milliliters']);
-                $line['cost_minor'] = $quote['posted_cost_minor'] ?? null;
-                $line['cost_blocked'] = $quote['blocked'] ?? null;
+                $quotable[$product->id][] = $index;
                 $stock[$product->id] = ($stock[$product->id] ?? 0) + (int) $line['residual_milliliters'];
             }
         }
         unset($line);
+        foreach ($quotable as $productId => $indexes) {
+            $quotes = $this->costs->previewIssueSequence($fuelProducts->get($productId), $warehouse, array_map(fn ($i) => (int) $lines[$i]['residual_milliliters'], $indexes));
+            foreach ($indexes as $position => $index) {
+                $lines[$index]['cost_minor'] = $quotes[$position]['posted_cost_minor'] ?? null;
+                $lines[$index]['cost_blocked'] = $quotes[$position]['blocked'] ?? null;
+            }
+        }
 
         foreach ($stock as $productId => $liters) {
             $product = $fuelProducts->get($productId);
@@ -329,8 +336,10 @@ class FuelShiftSettlementPreviewService
             $blockers[] = 'FUEL_SETTLEMENT_DECLARATION_MISSING';
         }
 
+        // اتحاد طرق الإقرار والمقبوضات: طريقة فُعِّلت بعد حفظ الإقرار وسُجِّل عليها مقبوض تُعدّ مُقَرّاً بها صفراً (فيُكشف D < R) بدل أن تُتجاهل.
         $u = [];
-        foreach ($dByMethod as $methodId => $declared) {
+        foreach (array_unique(array_merge(array_keys($dByMethod), array_map('strval', array_keys($rByMethod)))) as $methodId) {
+            $declared = (int) ($dByMethod[$methodId] ?? 0);
             $remaining = $declared - (int) ($rByMethod[$methodId] ?? 0);
             if ($remaining < 0) {
                 $blockers[] = 'FUEL_SETTLEMENT_DECLARATION_BELOW_RECEIPTS';

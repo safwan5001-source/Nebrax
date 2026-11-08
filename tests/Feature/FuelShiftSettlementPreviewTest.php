@@ -700,6 +700,43 @@ class FuelShiftSettlementPreviewTest extends TestCase
         $this->assertFileDoesNotExist(app_path('Services/FuelShiftSettlementService.php'));
     }
 
+    /** @test */
+    public function a_method_enabled_after_the_declaration_with_a_receipt_is_checked_against_a_zero_declared_amount(): void
+    {
+        $shift = $this->open('late-method');
+        $this->meters($shift);
+        $sale = $this->walkInSale('late-sale', $shift, 1000);          // 230
+        $this->declare($shift, 230, 0);
+
+        // طريقة دفع جديدة تُفعَّل بعد حفظ الإقرار ويُسجَّل عليها مقبوض مختوم.
+        $extra = \App\Models\PaymentMethod::create([
+            'name' => 'طريقة لاحقة', 'settlement_type' => 'bank', 'cash_bank_account_id' => $this->f['bank']->cash_bank_account_id, 'is_active' => true,
+        ]);
+        $settings = app(FuelStationSettingsService::class);
+        $allowed = $settings->get($this->f['station'], 'fuel_sales_allowed_payment_method_ids');
+        $settings->putStationValues($this->f['station'], ['fuel_sales_allowed_payment_method_ids' => [...$allowed, $extra->id]], $this->f['actor'], 'تفعيل طريقة لاحقة');
+        app(\App\Services\FuelSaleService::class)->collectPayment($sale->fresh(), ['payment_method_id' => $extra->id, 'amount_minor' => 230, 'idempotency_key' => 'late-pay'], $this->f['actor']);
+
+        $p = $this->preview($shift);
+        $this->assertContains('FUEL_SETTLEMENT_DECLARATION_BELOW_RECEIPTS', $p['blockers']);
+        $this->assertFalse($p['ready']);
+    }
+
+    /** @test */
+    public function simulated_cost_quotes_carry_the_fractional_remainder_between_nozzles_like_real_sequential_issues(): void
+    {
+        // 0.6 هللة لكل مل: صرف 1 مل مرتين ⇒ 0 ثم 1 (الباقي الكسري يُحمل). إعادة قراءة الحالة لكل فوهة كانت تعطي 0 و0.
+        DB::table('fuel_inventory_cost_states')->where('warehouse_id', $this->f['warehouse']->id)->update(['cost_numerator_minor' => '3', 'cost_denominator' => '5']);
+        $before = (array) DB::table('fuel_inventory_cost_states')->where('warehouse_id', $this->f['warehouse']->id)->first();
+        $costs = app(FuelCostBasisService::class);
+
+        $sequence = $costs->previewIssueSequence($this->f['fuelProduct'], $this->f['warehouse'], [1, 1, 1]);
+        // الباقي المحمول: 0.6 → 0 (يبقى 0.6) ؛ 0.6+0.6=1.2 → 1 (يبقى 0.2) ؛ 0.2+0.6=0.8 → 0 (يبقى 0.8).
+        $this->assertSame([0, 1, 0], array_map(fn ($q) => $q['posted_cost_minor'], $sequence));
+        $this->assertSame(0, $costs->previewIssue($this->f['fuelProduct'], $this->f['warehouse'], 1)['posted_cost_minor'], 'صرف منفرد');
+        $this->assertEquals($before, (array) DB::table('fuel_inventory_cost_states')->where('warehouse_id', $this->f['warehouse']->id)->first(), 'الحالة المخزَّنة لا تُمسّ');
+    }
+
     // ───────── طبقات الإفصاح ─────────
 
     /** @test */
