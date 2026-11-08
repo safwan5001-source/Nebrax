@@ -50,6 +50,8 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'fuel_sales_allow_deferred_payment' => ['sometimes', 'nullable', 'boolean'],
             'shift_expected_cash_basis' => ['sometimes', 'nullable', 'in:movements_only,receiving_shift_receipts,declared_collection'],
             'shift_settlement_mode' => ['sometimes', 'nullable', 'in:none,post_on_close'],
+            'shift_settlement_alert_after_hours' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:720'],
+            'shift_settlement_escalation_after_hours' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:2160'],
             'avi_rfid_enabled' => ['sometimes', 'nullable', 'boolean'],
             'avi_driver_identity_required' => ['sometimes', 'nullable', 'boolean'],
             'avi_enforce_vehicle_tank_capacity' => ['sometimes', 'nullable', 'boolean'],

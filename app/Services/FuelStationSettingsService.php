@@ -241,6 +241,7 @@ class FuelStationSettingsService
         if ($changed === []) {
             return $current;
         }
+        $this->assertAlertThresholdsOrdered(array_replace($current, $known));
 
         return DB::transaction(function () use ($known, $changed, $actor, $reason) {
             $saved = Settings::put(self::GROUP, $known);
@@ -263,6 +264,14 @@ class FuelStationSettingsService
 
     public function putStation(FuelStation $station, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
+        if (! $this->batching && in_array($key, ['shift_settlement_alert_after_hours', 'shift_settlement_escalation_after_hours'], true)) {
+            return DB::transaction(function () use ($station, $key, $value, $actor, $reason) {
+                $saved = $this->putOverride($station, $key, $value, null, $actor, $reason);
+                $this->assertAlertThresholdsOrdered($this->forStation($station));
+
+                return $saved;
+            });
+        }
         if ($this->batching || $key !== 'shift_settlement_mode') {
             return $this->putOverride($station, $key, $value, null, $actor, $reason);
         }
@@ -273,6 +282,16 @@ class FuelStationSettingsService
 
             return $saved;
         });
+    }
+
+    /** التنبيه يسبق التصعيد دائماً (D-S3): `alert < escalation` على القيم الفعّالة. يُفحص بعد حفظ كل مفاتيح الطلب لا لكل مفتاح (حالة وسيطة قد تخالف مؤقتاً). */
+    private function assertAlertThresholdsOrdered(array $effective): void
+    {
+        $alert = $effective['shift_settlement_alert_after_hours'] ?? null;
+        $escalation = $effective['shift_settlement_escalation_after_hours'] ?? null;
+        if (is_int($alert) && is_int($escalation) && $alert >= $escalation) {
+            throw new RuntimeException('FUEL_SETTLEMENT_THRESHOLDS_ORDER: عتبة التنبيه يجب أن تكون أقل من عتبة التصعيد.');
+        }
     }
 
     /** يمنع تكرار فحص جاهزية التسوية لكل مفتاح داخل طلب `putStationValues` (يُفحص مرة واحدة بعد حفظ كل المفاتيح). */
@@ -324,8 +343,10 @@ class FuelStationSettingsService
                 $this->batching = false;
             }
             $this->assertSettlementReady($station, $known);
+            $effective = $this->forStation($station);
+            $this->assertAlertThresholdsOrdered($effective);
 
-            return $this->forStation($station);
+            return $effective;
         });
     }
 
@@ -504,6 +525,16 @@ class FuelStationSettingsService
         if ($key === 'odometer_policy') {
             if (! is_string($value) || ! in_array($value, ['disabled', 'optional', 'required'], true)) {
                 throw new RuntimeException('سياسة عداد الأسطول يجب أن تكون disabled أو optional أو required.');
+            }
+
+            return;
+        }
+
+        if (in_array($key, ['shift_settlement_alert_after_hours', 'shift_settlement_escalation_after_hours'], true)) {
+            // عدد صحيح موجب بالساعات: التنبيه حتى 30 يوماً والتصعيد حتى 90 يوماً. القيمة الفارغة تُعالَج بالمسح/الوراثة قبل هذا الفحص.
+            $max = $key === 'shift_settlement_alert_after_hours' ? 720 : 2160;
+            if (! is_int($value) || $value < 1 || $value > $max) {
+                throw new RuntimeException("عتبة تنبيه التسوية المعلقة يجب أن تكون عدداً صحيحاً بين 1 و{$max} ساعة.");
             }
 
             return;
