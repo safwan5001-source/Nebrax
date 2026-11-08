@@ -83,7 +83,11 @@ export function measureRollHeightMm(target: HTMLElement, widthMm: number): numbe
  */
 export function buildPrintPageCss(paper: PdfPaper, contentHeightMm?: number | null): string {
   if (paper.heightMm > 0) {
-    return `@media print { @page { size: ${paper.widthMm}mm ${paper.heightMm}mm; } }`;
+    // Output Profile: الهوامش تُعلَن صراحةً (top right bottom left). غيابها = الصياغة السابقة
+    // حرفياً فيبقى هامش `@page` العام (14mm) كما كان.
+    const m = paper.marginsMm;
+    const margin = m ? ` margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;` : '';
+    return `@media print { @page { size: ${paper.widthMm}mm ${paper.heightMm}mm;${margin} } }`;
   }
   const needed = contentHeightMm && contentHeightMm > 0 ? Math.ceil(contentHeightMm) + ROLL_FEED_MM : null;
   const height = Math.min(ROLL_MAX_HEIGHT_MM, Math.max(ROLL_MIN_HEIGHT_MM, needed ?? ROLL_FALLBACK_HEIGHT_MM));

@@ -1,6 +1,7 @@
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import type { DocSectionLayoutItem, DocumentTypeId, ThemeId } from '@/modules/documents/types';
+import { readOutputProfile, type OutputProfile } from './output-profile';
 
 export interface LiveTemplateDefinition {
   template_id?: string;
@@ -36,6 +37,11 @@ export interface ResolvedLiveTemplate {
   bankText: string | null;
   stampUrl: string | null;
   signatureUrl: string | null;
+  /**
+   * ملف الإخراج المخزَّن في **المراجعة نفسها** (المثبّتة تاريخياً للمرحَّل، أو المعيَّنة للمسودة).
+   * `null` = لا ملف ⇒ السلوك السابق. لا يُعاد حلّه من إعدادات حيّة (AWJ-DOC-V2-PR3B).
+   */
+  outputProfile: OutputProfile | null;
 }
 
 function isCurrentDefinition(value: unknown): value is LiveTemplateDefinition {
@@ -73,6 +79,7 @@ export function resolveTemplateRevisionDefinition(
     bankText: definition.bank_text?.trim() || null,
     stampUrl: definition.stamp?.trim() || null,
     signatureUrl: definition.signature?.trim() || null,
+    outputProfile: readOutputProfile(definition),
   };
 }
 

@@ -9,6 +9,8 @@ import { downloadPdf } from '@/lib/pdf';
 import { printDocument } from '@/modules/documents/services/export';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { makeDocumentQaModel, type DocumentQaScenario } from '@/modules/documents/qa/document-qa-fixtures';
+import { resolveDocumentOutputSpec } from '@/modules/documents/services/output-spec';
+import { normalizeOutputProfile, type OutputProfile } from '@/modules/print-templates/services/output-profile';
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import type { DocumentTypeId } from '@/modules/documents/types';
 
@@ -41,6 +43,34 @@ const DOCUMENT_TYPES = [
   'delivery_note',
 ] as const satisfies readonly DocumentTypeId[];
 
+// AWJ-DOC-V2-PR3B: مقاسات الإخراج القابلة للاختبار من الرابط (`paper` + `orientation` + `margins`).
+const QA_PAPERS = ['default', 'a4', 'a5', 'a6', 'letter', 'legal', 'custom'] as const;
+const QA_ORIENTATIONS = ['portrait', 'landscape'] as const;
+
+/**
+ * يبني Output Profile من معاملات الرابط عبر العقد نفسه (`normalizeOutputProfile`). `default`
+ * أو أي مدخل غير صالح = بلا ملف (السلوك السابق). الهوامش: رقم واحد لكل الأضلاع أو «t,r,b,l».
+ */
+function qaOutputProfile(params: URLSearchParams): OutputProfile | null {
+  const paper = params.get('paper');
+  if (!paper || paper === 'default') return null;
+  const input: Record<string, unknown> = { paper };
+  const orientation = params.get('orientation');
+  if (orientation) input.orientation = orientation;
+  const margins = params.get('margins');
+  if (margins) {
+    const parts = margins.split(',').map((value) => Number(value));
+    if (parts.length === 1) input.margins_mm = { top: parts[0], right: parts[0], bottom: parts[0], left: parts[0] };
+    else if (parts.length === 4) input.margins_mm = { top: parts[0], right: parts[1], bottom: parts[2], left: parts[3] };
+  }
+  if (paper === 'custom') {
+    const height = params.get('custom_h');
+    input.custom = { width_mm: Number(params.get('custom_w')), ...(height ? { height_mm: Number(height) } : {}) };
+  }
+  const result = normalizeOutputProfile(input);
+  return result.ok ? result.profile : null;
+}
+
 type QaDocumentType = (typeof DOCUMENT_TYPES)[number];
 type QaTemplateId = (typeof TEMPLATES)[number]['id'];
 type QaDirection = (typeof DIRECTIONS)[number];
@@ -67,6 +97,8 @@ export default function DocumentQaPage() {
   const showQr = searchParams.get('qr') !== 'off';
   const showLogo = searchParams.get('logo') !== 'off';
   const showAssets = searchParams.get('assets') !== 'off';
+  const outputProfile = useMemo(() => qaOutputProfile(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const spec = useMemo(() => resolveDocumentOutputSpec(templateId, outputProfile), [outputProfile, templateId]);
   const model = useMemo(
     () => makeDocumentQaModel({ documentType, scenario, direction, showQr, showAssets }),
     [direction, documentType, scenario, showAssets, showQr],
@@ -77,7 +109,7 @@ export default function DocumentQaPage() {
       || (item.key === 'barcode' && (templateId === 'tax-invoice-retail' || templateId === 'tax-invoice-retail-v2')),
   })), [documentType, showAssets, templateId]);
 
-  const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction', value: string) => {
+  const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction' | 'paper' | 'orientation', value: string) => {
     const next = new URLSearchParams({
       type: documentType,
       template: templateId,
@@ -87,15 +119,17 @@ export default function DocumentQaPage() {
       logo: showLogo ? 'on' : 'off',
       assets: showAssets ? 'on' : 'off',
     });
+    for (const extra of ['paper', 'orientation', 'margins', 'custom_w', 'custom_h']) {
+      const current = searchParams.get(extra);
+      if (current) next.set(extra, current);
+    }
     next.set(key, value);
     window.location.search = next.toString();
   };
 
-  // الحراري: ورق رول بعرض 58/80mm وارتفاع مفتوح؛ غيره A4 كما كان.
+  // الحراري: رول 58/80mm وارتفاع مفتوح (من القالب)؛ غيره A4 كما كان ما لم يوجد Output Profile يدعمه القالب.
   const thermalPaperId = templateId === 'tax-invoice-thermal58' ? 'thermal_58' : templateId === 'tax-invoice-thermal80' ? 'thermal_80' : null;
-  const paper = thermalPaperId
-    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
-    : { widthMm: PAPER_SIZES.a4.widthMm, heightMm: PAPER_SIZES.a4.heightMm };
+  const paper = spec.paper;
 
   const exportPdf = async () => {
     const root = document.getElementById('qa-print-root');
@@ -121,7 +155,7 @@ export default function DocumentQaPage() {
           </p>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
           <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[color:var(--text)]" htmlFor="qa-document-type">
             {t('document_type')}
             <select id="qa-document-type" data-testid="qa-document-type-selector" className={controlClassName} value={documentType} onChange={(event) => updateQuery('type', event.target.value)}>
@@ -150,6 +184,20 @@ export default function DocumentQaPage() {
             </select>
           </label>
 
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[color:var(--text)]" htmlFor="qa-paper">
+            {t('paper')}
+            <select id="qa-paper" data-testid="qa-paper-selector" className={controlClassName} value={searchParams.get('paper') ?? 'default'} onChange={(event) => updateQuery('paper', event.target.value)}>
+              {QA_PAPERS.map((value) => <option key={value} value={value}>{t(`paper_${value}`)}</option>)}
+            </select>
+          </label>
+
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[color:var(--text)]" htmlFor="qa-orientation">
+            {t('orientation')}
+            <select id="qa-orientation" data-testid="qa-orientation-selector" className={controlClassName} value={searchParams.get('orientation') ?? 'portrait'} onChange={(event) => updateQuery('orientation', event.target.value)}>
+              {QA_ORIENTATIONS.map((value) => <option key={value} value={value}>{t(`orientation_${value}`)}</option>)}
+            </select>
+          </label>
+
           <div className="grid gap-1.5 text-sm font-medium text-[color:var(--text)]">
             <span aria-hidden="true">{t('pdf')}</span>
             <button type="button" data-testid="qa-download-pdf" className="min-h-11 rounded-md bg-[color:var(--primary)] px-4 text-sm font-semibold text-[color:var(--primary-foreground)] shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]" onClick={() => void exportPdf()}>
@@ -161,7 +209,13 @@ export default function DocumentQaPage() {
           </div>
         </div>
       </header>
-      <section className="mx-auto max-w-[1440px]" aria-label={t('preview_label')} data-testid="qa-preview-shell">
+      <section
+        className="mx-auto max-w-[1440px]"
+        aria-label={t('preview_label')}
+        data-testid="qa-preview-shell"
+        data-output-applied={spec.profile ? 'true' : 'false'}
+        data-output-paper={`${spec.paper.widthMm}x${spec.paper.heightMm}`}
+      >
         {thermalPaperId ? (
           // `w-max`: يمنع انكماش الجذر (58/80mm) داخل حاوية ضيقة أثناء التقاط PDF (windowWidth = عرض الإيصال).
           <div className="mx-auto w-max" data-testid="qa-thermal-shell">
@@ -172,6 +226,7 @@ export default function DocumentQaPage() {
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"
+              outputProfile={outputProfile}
             />
           </div>
         ) : (
@@ -183,6 +238,7 @@ export default function DocumentQaPage() {
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"
+              outputProfile={outputProfile}
             />
           </DocumentScaler>
         )}

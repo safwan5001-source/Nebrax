@@ -96,12 +96,16 @@ describe('legacy paper ids are preserved byte for byte', () => {
     expect([PAPER_SIZES.a6_landscape.widthMm, PAPER_SIZES.a6_landscape.heightMm]).toEqual([148, 105]);
   });
 
-  it('does not change which papers any registered template supports', () => {
-    // PR3-A لا يعيد تصميم القوالب: لا قالب يدّعي A5/A6 قبل أن يُصمَّم لهما.
+  it('only appends to supportedPaper: the first (default) paper of every template is unchanged', () => {
+    // الورق الافتراضي للمستند بلا ملف إخراج = `supportedPaper[0]`؛ PR3-B يُلحق فقط ولا يعيد ترتيباً.
+    const firstPaper: Record<string, string> = {
+      'tax-invoice-classic': 'a4', 'tax-invoice-classic-v2': 'a4', 'tax-invoice-modern': 'a4', 'tax-invoice-modern-v2': 'a4',
+      'tax-invoice-erp': 'a4', 'tax-invoice-erp-v2': 'a4', 'tax-invoice-minimal': 'a4', 'tax-invoice-minimal-v2': 'a4',
+      'tax-invoice-retail': 'a4', 'tax-invoice-retail-v2': 'a4', 'quotation-proposal': 'a4', 'purchase-order-formal': 'a4',
+      'tax-invoice-thermal58': 'thermal_58', 'tax-invoice-thermal80': 'thermal_80',
+    };
     for (const template of listTemplates()) {
-      for (const paper of template.supportedPaper) {
-        expect(['a5', 'a5_landscape', 'a6', 'a6_landscape'], template.id).not.toContain(paper);
-      }
+      expect(template.supportedPaper[0], template.id).toBe(firstPaper[template.id]);
     }
     expect(getTemplate('tax-invoice-thermal58').supportedPaper).toEqual(['thermal_58']);
   });
@@ -142,8 +146,10 @@ describe('readOutputProfile — absence preserves legacy behaviour', () => {
       { id: 'r', definition: { ...base, output_profile: { paper: 'a5', orientation: 'landscape' } } },
       'tax_invoice',
     );
-    expect(withProfile).toEqual(without);
-    expect(without).not.toBeNull();
+    // العرض (المعرّف/الثيم/التخطيط/النصوص) لا يتغيّر؛ الجديد حقل `outputProfile` وحده.
+    expect({ ...withProfile, outputProfile: null }).toEqual(without);
+    expect(without?.outputProfile).toBeNull();
+    expect(withProfile?.outputProfile?.paper).toBe('a5_landscape');
   });
 });
 
@@ -171,12 +177,12 @@ describe('preserveOutputProfile — the editor must not drop a profile it does n
     expect(preserveOutputProfile(undefined)).toEqual({});
   });
 
-  it('is wired into the Studio definition builder', () => {
+  it('the Studio keeps every definition key on save', () => {
     const source = readFileSync(
-      resolve(process.cwd(), 'src/modules/print-templates/components/print-template-studio.tsx'),
+      resolve(process.cwd(), 'src/modules/print-templates/template-definition.ts'),
       'utf8',
     );
-    expect(source).toContain("from '@/modules/print-templates/services/output-profile'");
-    expect(source).toMatch(/\.\.\.preserveOutputProfile\(definition\)/);
+    // PR3-B: لا يُسقط الحفظ أي مفتاح (بما فيه output_profile) — يُنشر التعريف القائم كاملاً ثم تُكتب الحقول المعروفة.
+    expect(source).toMatch(/\.\.\.definition,\s*\n\s*template_id:/);
   });
 });
