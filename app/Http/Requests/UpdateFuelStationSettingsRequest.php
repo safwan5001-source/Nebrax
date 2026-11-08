@@ -49,6 +49,7 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'fuel_sales_allowed_payment_method_ids.*' => ['uuid', 'distinct'],
             'fuel_sales_allow_deferred_payment' => ['sometimes', 'nullable', 'boolean'],
             'shift_expected_cash_basis' => ['sometimes', 'nullable', 'in:movements_only,receiving_shift_receipts,declared_collection'],
+            'shift_settlement_mode' => ['sometimes', 'nullable', 'in:none,post_on_close'],
             'avi_rfid_enabled' => ['sometimes', 'nullable', 'boolean'],
             'avi_driver_identity_required' => ['sometimes', 'nullable', 'boolean'],
             'avi_enforce_vehicle_tank_capacity' => ['sometimes', 'nullable', 'boolean'],

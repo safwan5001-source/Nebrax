@@ -231,16 +231,18 @@ class FuelShiftSettlementSchemaTest extends TestCase
             'target_kind' => 'resolved_withheld', 'amount_minor' => 230, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
+        // العجز إجماليّ بلا طريقة؛ الزيادة والمحجوز لكل طريقة.
         $variance = fn (string $kind, array $o = []) => DB::table('fuel_shift_settlement_variances')->insert($o + [
             'id' => $this->uuid(), 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'fuel_shift_settlement_id' => $settlement,
-            'payment_method_id' => $this->f['cash']->id, 'settlement_type' => 'cash', 'kind' => $kind, 'amount_minor' => 600,
-            'created_at' => now(), 'updated_at' => now(),
+            'payment_method_id' => $kind === 'shortage' ? null : $this->f['cash']->id, 'settlement_type' => $kind === 'shortage' ? null : 'cash',
+            'kind' => $kind, 'amount_minor' => 600, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $variance('held_for_withheld');
         $variance('shortage');
 
-        $this->rejectsDb(fn () => $variance('shortage'));                       // (تسوية، طريقة، نوع) فريد
-        if (DB::getDriverName() === 'pgsql') { // قيود CHECK للقيم المعدودة PostgreSQL فقط (SQLite بلا ALTER ... ADD CONSTRAINT)؛ الخدمة تفرضها هناك.
+        $this->rejectsDb(fn () => $variance('shortage'));                       // عجز واحد إجماليّ لكل تسوية (فهرس جزئي)
+        if (DB::getDriverName() === 'pgsql') { // قيود CHECK (ومنها: الزيادة تتطلب طريقة)
+            $this->rejectsDb(fn () => $variance('surplus', ['payment_method_id' => null, 'settlement_type' => null, 'id' => $this->uuid()])); // قيود CHECK للقيم المعدودة PostgreSQL فقط (SQLite بلا ALTER ... ADD CONSTRAINT)؛ الخدمة تفرضها هناك.
             $this->rejectsDb(fn () => $variance('bogus_kind'));
         }
         $this->rejectsDb(fn () => DB::table('fuel_shift_settlement_variances')->where('kind', 'held_for_withheld')->update(['amount_minor' => 1]));

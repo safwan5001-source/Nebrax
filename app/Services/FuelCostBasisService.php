@@ -106,6 +106,33 @@ class FuelCostBasisService
         return $this->quoteDecrease($state, $valueNumerator, $valueDenominator);
     }
 
+    /**
+     * P1-3a: معاينة صرف **بلا أي كتابة** (لا تُنشئ حالة تكلفة ولا تقفل صفاً ولا تفتح معاملة) — للمعاينة التشغيلية وحدها.
+     * تعيد التسعير نفسه الذي ستحسبه `quoteIssue` على الحالة الراهنة (الدالة الخاصة نفسها)، أو سبب المنع بدل الاستثناء.
+     * ليست مرجعاً للترحيل: الترحيل يعيد الحساب تحت الأقفال (P1-3b).
+     *
+     * @return array{posted_cost_minor:int}|array{blocked:string}
+     */
+    public function previewIssue(FuelProduct $fuelProduct, Warehouse $warehouse, int $quantityMilliliters): array
+    {
+        if ($quantityMilliliters <= 0) {
+            return ['blocked' => 'quantity_not_positive'];
+        }
+        $state = FuelInventoryCostState::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->where('fuel_product_id', $fuelProduct->id)
+            ->first();
+        if ($state === null) {
+            return ['blocked' => 'cost_state_missing'];
+        }
+        if ($quantityMilliliters > (int) $state->quantity_milliliters) {
+            return ['blocked' => 'exceeds_cost_pool'];
+        }
+        [$valueNumerator, $valueDenominator] = $this->portion($state, $quantityMilliliters);
+
+        return ['posted_cost_minor' => $this->quoteDecrease($state, $valueNumerator, $valueDenominator)['posted_cost_minor']];
+    }
+
     public function recordIssue(FuelProduct $fuelProduct, Warehouse $warehouse, StockMovement $movement, int $quantityMilliliters, int $postedCostMinor, ?JournalEntry $journalEntry = null): FuelInventoryCostMovement
     {
         return DB::transaction(function () use ($fuelProduct, $warehouse, $movement, $quantityMilliliters, $postedCostMinor, $journalEntry) {

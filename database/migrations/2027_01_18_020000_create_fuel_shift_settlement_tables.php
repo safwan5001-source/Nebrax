@@ -136,8 +136,10 @@ return new class extends Migration
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('branch_id')->constrained();
             $table->foreignUuid('fuel_shift_settlement_id')->constrained('fuel_shift_settlements');
-            $table->foreignUuid('payment_method_id')->constrained('payment_methods');
-            $table->string('settlement_type', 8); // cash | bank
+            // العجز إجماليّ لا يُنسب إلى طريقة (لا يوجد «متوقع لكل طريقة» يُشتقّ منه): payment_method_id/settlement_type = NULL له وحده.
+            // الزيادة والمحجوز لكل طريقة لأنهما يُشتقّان من U_m المتبقي لكل طريقة.
+            $table->foreignUuid('payment_method_id')->nullable()->constrained('payment_methods');
+            $table->string('settlement_type', 8)->nullable(); // cash | bank
             $table->string('kind', 24); // shortage | surplus | held_for_withheld
             $table->bigInteger('amount_minor');
             // held_for_withheld ← allocated: انتقال أحادي حين يُحسم الحجب ويُنشأ التخصيص.
@@ -177,6 +179,9 @@ return new class extends Migration
             $table->unique('fuel_station_id', 'fuel_station_walk_in_station_unique');
             $table->unique('partner_id', 'fuel_station_walk_in_partner_unique');
         });
+
+        // عجز واحد إجماليّ لكل تسوية (فهرس عادي لا يمنع تكراره لأن NULL ≠ NULL).
+        DB::statement("CREATE UNIQUE INDEX fuel_settlement_variances_one_shortage ON fuel_shift_settlement_variances (fuel_shift_settlement_id) WHERE kind = 'shortage'");
 
         if (DB::getDriverName() === 'pgsql') {
             $this->createPostgresChecks();
@@ -232,7 +237,9 @@ return new class extends Migration
             amount_minor > 0 AND target_kind IN ('erp_walk_in','settlement','resolved_withheld')
         )");
         DB::statement("ALTER TABLE fuel_shift_settlement_variances ADD CONSTRAINT fuel_shift_settlement_variances_check CHECK (
-            amount_minor > 0 AND kind IN ('shortage','surplus','held_for_withheld') AND settlement_type IN ('cash','bank')
+            amount_minor > 0 AND kind IN ('shortage','surplus','held_for_withheld')
+            AND (settlement_type IS NULL OR settlement_type IN ('cash','bank'))
+            AND ((kind = 'shortage') = (payment_method_id IS NULL)) AND ((kind = 'shortage') = (settlement_type IS NULL))
             AND (allocated_collection_id IS NULL OR kind = 'held_for_withheld')
         )");
         DB::statement("ALTER TABLE fuel_shift_settlement_resolutions ADD CONSTRAINT fuel_shift_settlement_resolutions_check CHECK (

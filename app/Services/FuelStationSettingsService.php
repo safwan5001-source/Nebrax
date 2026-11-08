@@ -32,7 +32,7 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode'];
 
     /** @var list<string> قيم سياسة التأريخ الرجعي لقراءات الخزانات (FUEL-B6). */
     public const BACKDATING_POLICIES = ['deny', 'supervisor_approval', 'authorized_user'];
@@ -258,7 +258,36 @@ class FuelStationSettingsService
 
     public function putStation(FuelStation $station, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
-        return $this->putOverride($station, $key, $value, null, $actor, $reason);
+        if ($this->batching || $key !== 'shift_settlement_mode') {
+            return $this->putOverride($station, $key, $value, null, $actor, $reason);
+        }
+
+        return DB::transaction(function () use ($station, $key, $value, $actor, $reason) {
+            $saved = $this->putOverride($station, $key, $value, null, $actor, $reason);
+            $this->assertSettlementReady($station, [$key => $value]);
+
+            return $saved;
+        });
+    }
+
+    /** يمنع تكرار فحص جاهزية التسوية لكل مفتاح داخل طلب `putStationValues` (يُفحص مرة واحدة بعد حفظ كل المفاتيح). */
+    private bool $batching = false;
+
+    /**
+     * P1-3a: ضبط `shift_settlement_mode = post_on_close` لمحطة يشترط اكتمال شروط الجاهزية (بوابات، أساس مُقَرّ، عميل المحطة، طرق دفع بخزائن، نمط ضريبة…)
+     * **بعد** حفظ بقية مفاتيح الطلب نفسه (فيصح ضبط الأساس والسياسة معاً). الفشل داخل المعاملة ⇒ تراجع كامل. `none` لا يُفحص.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function assertSettlementReady(FuelStation $station, array $values): void
+    {
+        if (($values['shift_settlement_mode'] ?? null) !== 'post_on_close') {
+            return;
+        }
+        $blockers = app(FuelShiftSettlementReadiness::class)->stationBlockers($station, includePolicy: false);
+        if ($blockers !== []) {
+            throw new RuntimeException('FUEL_SETTLEMENT_NOT_READY: لا يمكن تفعيل تسوية الورديات قبل استيفاء الشروط: '.implode('، ', $blockers));
+        }
     }
 
     /** @param array<string, mixed> $values @return array<string, mixed> */
@@ -277,13 +306,19 @@ class FuelStationSettingsService
         }
 
         return DB::transaction(function () use ($station, $known, $actor, $reason) {
-            foreach ($known as $key => $value) {
-                if ($value === null) {
-                    $this->clearStation($station, $key, $actor, $reason);
-                    continue;
+            $this->batching = true;
+            try {
+                foreach ($known as $key => $value) {
+                    if ($value === null) {
+                        $this->clearStation($station, $key, $actor, $reason);
+                        continue;
+                    }
+                    $this->putStation($station, $key, $value, $actor, $reason);
                 }
-                $this->putStation($station, $key, $value, $actor, $reason);
+            } finally {
+                $this->batching = false;
             }
+            $this->assertSettlementReady($station, $known);
 
             return $this->forStation($station);
         });
@@ -324,7 +359,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -478,6 +513,17 @@ class FuelStationSettingsService
             }
             if ($value === 'receiving_shift_receipts' && ! (bool) config('fuel_stations.shift_cash_receipts_enabled', false)) {
                 throw new RuntimeException('ربط نقد المبيعات بوردية الاستلام غير مفعّل في هذا النشر؛ يبقى الأساس movements_only.');
+            }
+
+            return;
+        }
+
+        if ($key === 'shift_settlement_mode') {
+            if (! is_string($value) || ! in_array($value, FuelShiftSettlementReadiness::MODES, true)) {
+                throw new RuntimeException('سياسة تسوية الورديات يجب أن تكون none أو post_on_close.');
+            }
+            if ($value === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE && ! FuelShiftSettlementReadiness::enabled()) {
+                throw new RuntimeException('تسوية ورديات الوقود غير مفعّلة في هذا النشر؛ تبقى السياسة none.');
             }
 
             return;

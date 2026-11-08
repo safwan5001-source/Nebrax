@@ -32,7 +32,8 @@ class PartnerController extends ApiController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->latest();
+        // أطراف نظامية (مثل العميل النقدي لمحطة وقود) تُنشئها المنصة ولا تظهر في قائمة العملاء ولا تُختار يدوياً.
+        $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->whereNull('system_kind')->latest();
 
         match ($request->query('type')) {
             'customer' => $query->whereIn('type', ['customer', 'both']),
