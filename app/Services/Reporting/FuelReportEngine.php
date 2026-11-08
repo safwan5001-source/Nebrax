@@ -95,7 +95,7 @@ class FuelReportEngine
         }, $summary);
 
         $gaps = array_values(array_unique($built['gaps'] ?? []));
-        $usesPeriod = $built['period'] ?? true;
+        $builtPeriod = $built['period'] ?? true; // false = بلا فترة · مصفوفة = الفترة الفعّالة التي حسمها البانٍ (افتراضي خاص بالتقرير)
 
         return [
             'report' => $definition->toArray(),
@@ -104,7 +104,7 @@ class FuelReportEngine
             'timezones' => $context->timezoneList(),
             'tenant' => ['name' => Tenant::query()->whereKey(app(TenantContext::class)->id())->value('name')],
             'stations' => $stations->map(fn (FuelStation $s) => ['id' => $s->id, 'name' => $s->name, 'code' => $s->code])->values()->all(),
-            'period' => $usesPeriod ? ['from' => $context->period()[0], 'to' => $context->period()[1]] : null,
+            'period' => $builtPeriod === false ? null : (is_array($builtPeriod) ? $builtPeriod : ['from' => $context->period()[0], 'to' => $context->period()[1]]),
             'filters' => array_filter($filters, fn ($v) => $v !== null && $v !== ''),
             'summary' => $summary,
             'tables' => $tables,

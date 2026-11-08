@@ -49,6 +49,18 @@ final class FuelReportContext
         }
     }
 
+    /** نسخة بمرشحات افتراضية لم يحدّدها المستخدم (قيم المستخدم تتقدّم دائماً) — لتقارير بفترة افتراضية خاصة (اليوم، الشهر). @param array<string,mixed> $defaults */
+    public function withDefaults(array $defaults): self
+    {
+        return new self($this->user, $this->filters + $defaults, $this->stations, $this->branchScope, $this->generatedAt, $this->settings);
+    }
+
+    /** تاريخ اليوم بتوقيت أول محطة متاحة. */
+    public function today(): string
+    {
+        return $this->generatedAt->setTimezone($this->timezoneList()[0])->toDateString();
+    }
+
     /** @return list<string> */
     public function stationIds(): array
     {

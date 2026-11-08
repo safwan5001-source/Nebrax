@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\Reporting\FuelCollectionReportBuilder;
 use App\Services\Reporting\FuelFinancialReportBuilder;
 use App\Services\Reporting\FuelInventoryReportBuilder;
+use App\Services\Reporting\FuelManagementReportBuilder;
 use App\Services\Reporting\FuelPumpReportBuilder;
 use App\Services\Reporting\FuelSalesReportBuilder;
 use App\Services\Reporting\FuelShiftReportBuilder;
@@ -35,7 +36,7 @@ final class FuelReportCatalog
     /** @return list<FuelReportDefinition> */
     public static function all(): array
     {
-        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps(), self::inventory(), self::financial());
+        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps(), self::inventory(), self::financial(), self::management());
     }
 
     /**
@@ -194,6 +195,27 @@ final class FuelReportCatalog
             new FuelReportDefinition('financial.reconciliations', 'financial', ['ar' => 'المطابقات المالية', 'en' => 'Financial reconciliation'], ['ar' => 'مبيعات العدادات مقابل المبيعات الرسمية مقابل التحصيل لكل وردية.', 'en' => 'Meter sales vs official sales vs collection per shift.'], $perm, ['station_id', 'from', 'to', 'status', 'date_basis'], $b, FuelReportDefinition::SOURCE_OPERATIONS),
             new FuelReportDefinition('financial.accounting_links', 'financial', ['ar' => 'الارتباطات المحاسبية', 'en' => 'Accounting links'], ['ar' => 'ارتباط كل بيع نهائي بالفاتورة والقيود وحركة المخزون.', 'en' => 'The link of each finalized sale to invoice, entries and stock movement.'], $perm, $f, $b, $formal),
             new FuelReportDefinition('financial.exceptions', 'financial', ['ar' => 'الفروقات والاستثناءات', 'en' => 'Differences & exceptions'], ['ar' => 'مبيعات بلا فاتورة/تكلفة وفروق نقد وتحصيل بانتظار المراجعة.', 'en' => 'Sales without invoice/cost and cash/collection differences awaiting review.'], $perm, ['station_id', 'from', 'to', 'product_id', 'status', 'date_basis'], $b, $formal),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function management(): array
+    {
+        $b = FuelManagementReportBuilder::class;
+        $m = FuelReportDefinition::SOURCE_METER;
+        $ops = FuelReportDefinition::SOURCE_OPERATIONS;
+        $f = ['station_id', 'from', 'to', 'product_id', 'status', 'date_basis'];
+
+        return [
+            new FuelReportDefinition('management.dashboard', 'management', ['ar' => 'لوحة المؤشرات اليومية', 'en' => 'Daily dashboard'], ['ar' => 'مبيعات اليوم والورديات المفتوحة والخزانات وبنود المتابعة.', 'en' => "Today's sales, open shifts, tanks and follow-up items."], self::SHIFT_VIEW, $f, $b, $m),
+            new FuelReportDefinition('management.weekly', 'management', ['ar' => 'التقرير الأسبوعي', 'en' => 'Weekly report'], ['ar' => 'مبيعات آخر 7 أيام يوماً بيوم.', 'en' => 'Sales for the last 7 days, day by day.'], self::SHIFT_VIEW, $f, $b, $m),
+            new FuelReportDefinition('management.monthly', 'management', ['ar' => 'التقرير الشهري', 'en' => 'Monthly report'], ['ar' => 'مبيعات الشهر الحالي حتى اليوم.', 'en' => 'Sales for the current month to date.'], self::SHIFT_VIEW, $f, $b, $m),
+            new FuelReportDefinition('management.station_comparison', 'management', ['ar' => 'مقارنة المحطات', 'en' => 'Station comparison'], ['ar' => 'لترات وقيمة كل محطة في الفترة.', 'en' => 'Liters and value per station in the period.'], self::SHIFT_VIEW, $f, $b, $m),
+            new FuelReportDefinition('management.product_comparison', 'management', ['ar' => 'مقارنة المنتجات', 'en' => 'Product comparison'], ['ar' => 'لترات وقيمة وحصة كل منتج.', 'en' => 'Liters, value and share per product.'], self::SHIFT_VIEW, $f, $b, $m),
+            new FuelReportDefinition('management.trends', 'management', ['ar' => 'اتجاهات المبيعات والتحصيل', 'en' => 'Sales & collection trends'], ['ar' => 'مبيعات العدادات المجمَّدة والمُقَرّ بتحصيله يوماً بيوم.', 'en' => 'Frozen meter sales and declared collection, day by day.'], self::SHIFT_VIEW, $f, $b, $ops),
+            new FuelReportDefinition('management.employee_performance', 'management', ['ar' => 'أداء الموظفين', 'en' => 'Employee performance'], ['ar' => 'ورديات ولترات وقيمة كل موظف (المنفرد والمشترك منفصلان).', 'en' => 'Shifts, liters and value per employee (sole and shared kept apart).'], self::SHIFT_VIEW, [...$f, 'user_id'], $b, $m),
+            new FuelReportDefinition('management.exceptions', 'management', ['ar' => 'تقارير الاستثناءات', 'en' => 'Exceptions report'], ['ar' => 'ملخص البنود المعلّقة: ورديات متأخرة، مسودات، مراجعات.', 'en' => 'Summary of pending items: overdue shifts, drafts, reviews.'], self::SHIFT_VIEW, ['station_id'], $b, $ops),
+            new FuelReportDefinition('management.day_close', 'management', ['ar' => 'التقرير الموحَّد لإقفال اليوم', 'en' => 'Unified day close'], ['ar' => 'ورديات اليوم ولتراته وتحصيله وتسليمه والوقود المستلم لكل محطة.', 'en' => "The day's shifts, liters, collection, handover and fuel received per station."], self::SHIFT_VIEW, ['station_id', 'from', 'to', 'status', 'date_basis'], $b, $ops, 'landscape', true),
         ];
     }
 }
