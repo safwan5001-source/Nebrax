@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Services\Reporting\FuelCollectionReportBuilder;
+use App\Services\Reporting\FuelFinancialReportBuilder;
 use App\Services\Reporting\FuelInventoryReportBuilder;
 use App\Services\Reporting\FuelPumpReportBuilder;
 use App\Services\Reporting\FuelSalesReportBuilder;
@@ -34,7 +35,7 @@ final class FuelReportCatalog
     /** @return list<FuelReportDefinition> */
     public static function all(): array
     {
-        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps(), self::inventory());
+        return self::$all ??= array_merge(self::sales(), self::shifts(), self::collection(), self::pumps(), self::inventory(), self::financial());
     }
 
     /**
@@ -173,6 +174,26 @@ final class FuelReportCatalog
             new FuelReportDefinition('inventory.adjustments', 'inventory', ['ar' => 'التسويات المخزنية', 'en' => 'Stock adjustments'], ['ar' => 'تسويات الجرد المعتمدة التي ولّدت حركة مخزون.', 'en' => 'Approved stocktake adjustments that produced a stock movement.'], $recon, $period, $b, $ops),
             new FuelReportDefinition('inventory.supply_tracking', 'inventory', ['ar' => 'تتبع التوريدات', 'en' => 'Supply tracking'], ['ar' => 'عمر كل استلام ومدة اعتماده والتكلفة والمرفقات.', 'en' => 'Age and approval time of each receipt, cost and attachments.'], $delivery, [...$period, 'status'], $b, $ops),
             new FuelReportDefinition('inventory.theoretical_vs_actual', 'inventory', ['ar' => 'مقارنة الرصيد النظري والفعلي', 'en' => 'Theoretical vs actual balance'], ['ar' => 'افتتاح + استلامات − مبيعات العدادات مقابل القراءة الختامية (إرشادي).', 'en' => 'Opening + receipts − meter sales against the closing reading (indicative).'], ['fuel.shift.view'], $period, $b, $ops),
+        ];
+    }
+
+    /** @return list<FuelReportDefinition> */
+    private static function financial(): array
+    {
+        $b = FuelFinancialReportBuilder::class;
+        $formal = FuelReportDefinition::SOURCE_FORMAL;
+        $perm = ['fuel.reports.view', 'fuel.sale.view'];
+        $f = ['station_id', 'from', 'to', 'product_id'];
+
+        return [
+            new FuelReportDefinition('financial.revenue', 'financial', ['ar' => 'إيرادات المحطات', 'en' => 'Station revenue'], ['ar' => 'إجمالي وصافي وضريبة المبيعات النهائية لكل محطة.', 'en' => 'Gross, net and tax of finalized sales per station.'], $perm, $f, $b, $formal),
+            new FuelReportDefinition('financial.vat', 'financial', ['ar' => 'ضريبة القيمة المضافة', 'en' => 'VAT'], ['ar' => 'الوعاء الضريبي والضريبة من الفواتير الرسمية.', 'en' => 'Taxable base and VAT from the official invoices.'], $perm, $f, $b, $formal),
+            new FuelReportDefinition('financial.cogs', 'financial', ['ar' => 'تكلفة الوقود المباع', 'en' => 'Cost of fuel sold'], ['ar' => 'COGS الرسمي لكل منتج؛ «غير متاحة» حيث لا تكلفة موثوقة.', 'en' => 'Official COGS per product; unavailable where there is no reliable cost.'], $perm, $f, $b, $formal),
+            new FuelReportDefinition('financial.gross_profit', 'financial', ['ar' => 'مجمل الربح', 'en' => 'Gross profit'], ['ar' => 'الإيراد الصافي − COGS الرسمي لكل منتج (لمن يملك صلاحية التكلفة).', 'en' => 'Net revenue − official COGS per product (for those with cost permission).'], $perm, $f, $b, $formal),
+            new FuelReportDefinition('financial.payment_methods', 'financial', ['ar' => 'المبيعات حسب طريقة الدفع', 'en' => 'Sales by payment method'], ['ar' => 'المقبوض مقابل بيع الوقود لكل طريقة دفع.', 'en' => 'Amounts received against fuel sales per payment method.'], $perm, ['station_id', 'from', 'to'], $b, $formal),
+            new FuelReportDefinition('financial.reconciliations', 'financial', ['ar' => 'المطابقات المالية', 'en' => 'Financial reconciliation'], ['ar' => 'مبيعات العدادات مقابل المبيعات الرسمية مقابل التحصيل لكل وردية.', 'en' => 'Meter sales vs official sales vs collection per shift.'], $perm, ['station_id', 'from', 'to', 'status', 'date_basis'], $b, FuelReportDefinition::SOURCE_OPERATIONS),
+            new FuelReportDefinition('financial.accounting_links', 'financial', ['ar' => 'الارتباطات المحاسبية', 'en' => 'Accounting links'], ['ar' => 'ارتباط كل بيع نهائي بالفاتورة والقيود وحركة المخزون.', 'en' => 'The link of each finalized sale to invoice, entries and stock movement.'], $perm, $f, $b, $formal),
+            new FuelReportDefinition('financial.exceptions', 'financial', ['ar' => 'الفروقات والاستثناءات', 'en' => 'Differences & exceptions'], ['ar' => 'مبيعات بلا فاتورة/تكلفة وفروق نقد وتحصيل بانتظار المراجعة.', 'en' => 'Sales without invoice/cost and cash/collection differences awaiting review.'], $perm, ['station_id', 'from', 'to', 'product_id', 'status', 'date_basis'], $b, $formal),
         ];
     }
 }
