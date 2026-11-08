@@ -97,11 +97,11 @@ for (const cell of MATRIX) {
       await page.goto(`${baseUrl}${BASE}/shifts.closing`);
       await page.locator('[data-report-ready]').waitFor();
       await settle(page);
-      await expect(page.locator('[data-paper]')).toHaveCount(3);
-      await page.locator('[data-paper="thermal80"]').click();
+      await expect(page.locator('[data-paper]')).toHaveCount(4);
+      await page.locator('[data-paper="thermal_80"]').click();
       await shot(page, `${tag}/03-thermal-choice`);
       const [thermal] = await Promise.all([page.waitForEvent('download'), page.locator('[data-report-action="pdf"]').click()]);
-      expect(thermal.suggestedFilename()).toContain('thermal80');
+      expect(thermal.suggestedFilename()).toContain('thermal_80');
       const body = readFileSync((await thermal.path())!).toString('latin1');
       const box = /\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(body);
       expect(box).not.toBeNull();

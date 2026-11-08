@@ -26,7 +26,7 @@ function manyRows(count: number): ReportPayload {
 
 describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
   it('A4 أفقي بالعربية: ملف PDF صالح بصفحة واحدة ومقاس A4 أفقي', async () => {
-    const pdf = await inspectPdf(await bytes(await createReportPdf(payload(), { lang: 'ar', paper: 'a4', company: { name: 'شركة أَوْج', vat: '300000000000003' }, generatedBy: 'مدير' })));
+    const pdf = await inspectPdf(await bytes(await createReportPdf(payload(), { lang: 'ar', paper: 'a4_landscape', company: { name: 'شركة أَوْج', vat: '300000000000003' }, generatedBy: 'مدير' })));
     expect(pdf.pageCount).toBe(1);
     expect(pdf.mediaBoxes[0].widthPt).toBeCloseTo(297 * MM, 0);
     expect(pdf.mediaBoxes[0].heightPt).toBeCloseTo(210 * MM, 0);
@@ -48,7 +48,7 @@ describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
     expect(PDF_ROW_CAP).toBe(4000);
   });
 
-  it.each([['thermal80', 80], ['thermal58', 58]] as const)('حراري %s: عرض الورق بالمم وصفحة واحدة بارتفاع يطابق المحتوى', async (paper, width) => {
+  it.each([['thermal_80', 80], ['thermal_58', 58]] as const)('حراري %s: عرض الورق بالمم وصفحة واحدة بارتفاع يطابق المحتوى', async (paper, width) => {
     const thermal = payload({ report: definition({ key: 'shifts.closing', thermal: true, orientation: 'portrait' }) });
     const pdf = await inspectPdf(await bytes(await createReportPdf(thermal, { lang: 'ar', paper })));
     expect(pdf.pageCount).toBe(1);
@@ -59,9 +59,9 @@ describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
 
   it('الحراري يطول بزيادة الصفوف (القياس حقيقي لا ثابت)', async () => {
     const shortDoc = payload({ report: definition({ thermal: true }) });
-    const a = await inspectPdf(await bytes(await createReportPdf(shortDoc, { lang: 'en', paper: 'thermal80' })));
+    const a = await inspectPdf(await bytes(await createReportPdf(shortDoc, { lang: 'en', paper: 'thermal_80' })));
     const longDoc = { ...manyRows(20), report: definition({ thermal: true }) };
-    const b = await inspectPdf(await bytes(await createReportPdf(longDoc, { lang: 'en', paper: 'thermal80' })));
+    const b = await inspectPdf(await bytes(await createReportPdf(longDoc, { lang: 'en', paper: 'thermal_80' })));
     expect(b.mediaBoxes[0].heightPt).toBeGreaterThan(a.mediaBoxes[0].heightPt);
   });
 

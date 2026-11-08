@@ -1,3 +1,5 @@
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import type { PaperSizeId } from '@/modules/documents/types';
 import { fitText, filled, line, newPdf, text, type PdfDoc } from '@/modules/station-ops/receiving/documents/pdf-kit';
 import { cellText, dateTimeText, summaryText, type Lang } from './format';
 import type { ReportColumn, ReportPayload, ReportTable } from './schemas';
@@ -9,9 +11,18 @@ import type { ReportColumn, ReportPayload, ReportTable } from './schemas';
  * التحمل: ترقيم الصفحات، تكرار رأس الجدول، سطر إجمالي، تذييل بالفاعل والوقت. ملف كبير: السقف 4000 صف في الـPDF (الباقي في Excel/CSV).
  */
 
-export type Paper = 'a4' | 'thermal58' | 'thermal80';
+/**
+ * معرّفات الورق وأبعاده من البنية المشتركة لمنصة المستندات (`PAPER_SIZES` / `PaperSizeId`) — لا جدول مقاسات موازٍ هنا.
+ * التقارير تدعم منها فقط: A4 عمودي/أفقي والحراري 58/80 (باقي المقاسات تحتاج تخطيط جدول مُثبَتاً لكل منها).
+ */
+export type Paper = Extract<PaperSizeId, 'a4' | 'a4_landscape' | 'thermal_58' | 'thermal_80'>;
+export const REPORT_PAPERS: readonly Paper[] = ['a4', 'a4_landscape', 'thermal_80', 'thermal_58'];
+export const isThermal = (paper: Paper): boolean => paper.startsWith('thermal');
+
+/** الورق الافتراضي من توجيه تعريف التقرير. */
+export const defaultPaper = (orientation: 'portrait' | 'landscape'): Paper => (orientation === 'landscape' ? 'a4_landscape' : 'a4');
 export interface PdfCompany { name?: string | null; vat?: string | null; cr?: string | null; logo?: string | null }
-export interface PdfOptions { lang: Lang; paper: Paper; company?: PdfCompany; generatedBy?: string | null; orientation?: 'portrait' | 'landscape' }
+export interface PdfOptions { lang: Lang; paper: Paper; company?: PdfCompany; generatedBy?: string | null }
 
 export const PDF_ROW_CAP = 4000;
 export const THERMAL_ROW_CAP = 80;
@@ -44,18 +55,23 @@ async function logoData(logo: string | null | undefined): Promise<{ data: string
   return null; // SVG/WebP غير مدعومة في jsPDF هنا: لا شعار بدل ملف تالف
 }
 
-export async function createReportPdf(payload: ReportPayload, options: PdfOptions): Promise<Blob> {
-  if (options.paper === 'a4') return createA4(payload, options);
-  return createThermal(payload, options, options.paper === 'thermal58' ? 58 : 80);
-}
+/**
+ * **نقطة التبديل الوحيدة** لرسم PDF تقرير وقود. تستهلكها `ReportActions` وحدها؛ حين تُعرّف منصة المستندات نوع مستند «تقرير إغلاق/تسليم وردية الوقود»
+ * (التدقيق الشامل §D5) يُستبدل جسم هذه الدالة بمصدّر المنصة دون المساس بالمحرك ولا بالواجهات (انظر FUEL_REPORTS_DOCUMENT_PLATFORM_INTEGRATION.md).
+ */
+export type ReportDocumentRenderer = (payload: ReportPayload, options: PdfOptions) => Promise<Blob>;
+
+export const createReportPdf: ReportDocumentRenderer = async (payload, options) => {
+  if (isThermal(options.paper)) return createThermal(payload, options, PAPER_SIZES[options.paper].widthMm);
+  return createA4(payload, options, options.paper === 'a4_landscape' ? 'landscape' : 'portrait');
+};
 
 // ───────────────────────── A4 ─────────────────────────
 
-async function createA4(payload: ReportPayload, options: PdfOptions): Promise<Blob> {
+async function createA4(payload: ReportPayload, options: PdfOptions, orientation: 'portrait' | 'landscape'): Promise<Blob> {
   const { lang } = options;
   const l = T[lang];
   const rtl = lang === 'ar';
-  const orientation = options.orientation ?? payload.report.orientation;
   const pdf = await newPdf(orientation);
   const W = orientation === 'landscape' ? 297 : 210;
   const H = orientation === 'landscape' ? 210 : 297;
@@ -207,7 +223,7 @@ function footer(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, l: (ty
  * إيصال حراري 58/80مم: عمود واحد؛ الهيدر وسطر لكل مؤشر، ثم كل صف جدول كتلة «تسمية: قيمة». الارتفاع يُقاس بتمريرة أولى على مستند مؤقت
  * ثم يُرسم المستند النهائي بالارتفاع الدقيق (صفحة واحدة بلا قص). لا ادّعاء بطابعة Bluetooth مباشرة: الطباعة عبر نافذة الطباعة/AirPrint بمقاس الورق.
  */
-async function createThermal(payload: ReportPayload, options: PdfOptions, widthMm: 58 | 80): Promise<Blob> {
+async function createThermal(payload: ReportPayload, options: PdfOptions, widthMm: number): Promise<Blob> {
   const measure = await newPdf('portrait', [widthMm, 2000]);
   const height = drawThermal(measure, payload, options, widthMm, false) + 6;
   const pdf = await newPdf('portrait', [widthMm, Math.max(40, height)]);

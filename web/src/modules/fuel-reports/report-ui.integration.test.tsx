@@ -171,7 +171,7 @@ describe('الإجراءات', () => {
   it('أحجام الورق الحرارية لا تظهر إلا للتقارير الحرارية', async () => {
     wrap(<ReportViewer reportKey="sales.daily" />);
     await waitFor(() => expect(document.querySelector('[data-report-actions]')).not.toBeNull());
-    expect(document.querySelector('[data-paper]')).toBeNull();
+    expect(Array.from(document.querySelectorAll('[data-paper]')).map((e) => e.getAttribute('data-paper'))).toEqual(['a4', 'a4_landscape']); // لا حراري لتقرير غير حراري
     cleanup();
     handler = (url) => {
       if (url.endsWith('/catalog')) return { data: { families: { shifts: { ar: 'الورديات', en: 'Shifts' } }, reports: [definition({ key: 'shifts.closing', family: 'shifts', thermal: true, filters: ['station_id', 'from', 'to'] })] } };
@@ -179,7 +179,7 @@ describe('الإجراءات', () => {
       return { data: [] };
     };
     wrap(<ReportViewer reportKey="shifts.closing" />);
-    await waitFor(() => expect(document.querySelectorAll('[data-paper]').length).toBe(3));
+    await waitFor(() => expect(document.querySelectorAll('[data-paper]').length).toBe(4));
   });
 
   it('الواجهة الإنجليزية LTR بنفس الأرقام', async () => {

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { blobFromObjectUrl, downloadBlob, openForPrint, shareBlob } from '@/modules/station-ops/receiving/documents/share';
 import { auditAction, downloadExport, exportBlobUrl, XLSX_MIME, type ReportFilters } from './client';
 import type { Lang } from './format';
-import { createReportPdf, type Paper } from './report-pdf';
+import { createReportPdf, defaultPaper, isThermal, REPORT_PAPERS, type Paper } from './report-pdf';
 import type { ReportPayload } from './schemas';
 
 /**
@@ -23,7 +23,7 @@ type Notice = { tone: 'ok' | 'error'; key: string } | null;
 export function ReportActions({ payload, filters, lang }: { payload: ReportPayload; filters: ReportFilters; lang: Lang }) {
   const t = useTranslations('fuelReports');
   const company = useCompany();
-  const [paper, setPaper] = useState<Paper>('a4');
+  const [paper, setPaper] = useState<Paper>(() => defaultPaper(payload.report.orientation));
   const [busy, setBusy] = useState<Action | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const lock = useRef(false);
@@ -45,7 +45,7 @@ export function ReportActions({ payload, filters, lang }: { payload: ReportPaylo
     try {
       if (action === 'print' || action === 'pdf' || action === 'pdf-share') {
         const blob = await makePdf();
-        const name = `${base}${paper === 'a4' ? '' : `-${paper}`}.pdf`;
+        const name = `${base}-${paper}.pdf`;
         let delivered = true;
         if (action === 'pdf') { downloadBlob(blob, name); setNotice({ tone: 'ok', key: 'downloaded' }); }
         else if (action === 'print') {
@@ -82,12 +82,13 @@ export function ReportActions({ payload, filters, lang }: { payload: ReportPaylo
     </button>
   );
 
-  const papers: Paper[] = payload.report.thermal ? ['a4', 'thermal80', 'thermal58'] : ['a4'];
+  // المقاسات من منصة المستندات؛ الحراري للتقارير الصغيرة (إقفال/تسليم/قراءات) فقط.
+  const papers: Paper[] = REPORT_PAPERS.filter((p) => !isThermal(p) || payload.report.thermal);
 
   return (
     <div className="space-y-3" data-report-actions="">
       {papers.length > 1 ? (
-        <div role="radiogroup" aria-label={t('paper')} className="grid grid-cols-3 gap-2">
+        <div role="radiogroup" aria-label={t('paper')} className="grid grid-cols-2 gap-2">
           {papers.map((value) => (
             <button key={value} type="button" role="radio" aria-checked={paper === value} data-paper={value} onClick={() => setPaper(value)}
               className={cn('min-h-12 rounded-lg border px-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', paper === value ? 'border-primary bg-primary-soft text-primary' : 'border-[color:var(--fo-control,var(--border))] text-text')}>
@@ -96,7 +97,7 @@ export function ReportActions({ payload, filters, lang }: { payload: ReportPaylo
           ))}
         </div>
       ) : null}
-      {paper !== 'a4' ? <p className="text-xs leading-5 text-muted">{t('thermalNote')}</p> : null}
+      {isThermal(paper) ? <p className="text-xs leading-5 text-muted">{t('thermalNote')}</p> : null}
 
       <div>
         <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted"><FileText aria-hidden="true" className="h-4 w-4" />PDF</p>
