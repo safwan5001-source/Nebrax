@@ -294,8 +294,11 @@ class FuelShiftSettlementPreviewService
         return Payment::query()
             ->whereIn('id', $allocated)
             ->where('status', 'posted')->where('direction', 'received')
-            ->where('created_at', '>=', $shift->opened_at)
-            ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at))
+            // وقت **الترحيل** لا وقت إنشاء المسودة (Codex P2): سند أُنشئ مسودةً قبل الوردية ورُحِّل أثناءها يخفّض رصيد الفاتورة داخل النافذة. لا عمود `posted_at` على السند؛ قيده
+            // المحاسبي يُنشأ في لحظة الترحيل نفسها ولا يتغيّر (ثابت بعد الترحيل)، فهو الطابع الصادق.
+            ->whereIn('journal_entry_id', \App\Models\JournalEntry::query()->select('id')
+                ->where('created_at', '>=', $shift->opened_at)
+                ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at)))
             ->whereNotIn('id', FuelSalePaymentReceipt::query()->select('payment_id'))
             ->exists();
     }

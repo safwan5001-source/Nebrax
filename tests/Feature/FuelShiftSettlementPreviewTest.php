@@ -703,6 +703,25 @@ class FuelShiftSettlementPreviewTest extends TestCase
     }
 
     /** @test */
+    public function a_draft_created_before_the_shift_and_posted_during_it_is_detected_by_posting_time(): void
+    {
+        // Codex P2: النافذة بوقت الترحيل لا وقت إنشاء المسودة.
+        $shift = $this->open('b4d');
+        $sale = $this->walkInSale('b4d-sale', $shift, 1000);
+        $payments = app(\App\Services\Accounting\PaymentService::class);
+        $payment = $payments->create([
+            'direction' => 'received', 'amount' => (int) $sale->invoice->total, 'payment_method_id' => $this->f['cash']->id,
+            'partner_id' => $this->walkIn->id, 'invoice_id' => $sale->invoice_id,
+        ]);
+        DB::table('payments')->where('id', $payment->id)->update(['created_at' => $shift->opened_at->copy()->subDay()]); // مسودة قديمة
+        $payments->post($payment->fresh(), $this->f['actor']);
+        $this->meters($shift);
+        $this->declare($shift, 230);
+
+        $this->assertContains('FUEL_SETTLEMENT_RECEIPTS_UNATTRIBUTED', $this->preview($shift)['blockers']);
+    }
+
+    /** @test */
     public function a_non_open_shift_cannot_be_previewed(): void
     {
         $shift = $this->readyShift('b5', 4600);
