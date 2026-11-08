@@ -6,6 +6,11 @@
 export interface PdfPaper {
   widthMm: number;
   heightMm: number;
+  /**
+   * هوامش الصفحة (مم) خارج المحتوى الملتقَط — من Output Profile حين وُجد (AWJ-DOC-V2-PR3B).
+   * غيابها = السلوك السابق حرفياً (المحتوى بعرض الورق كاملاً). تُهمل للرول (ارتفاع مفتوح).
+   */
+  marginsMm?: { top: number; right: number; bottom: number; left: number };
 }
 
 const A4: PdfPaper = { widthMm: 210, heightMm: 297 };
@@ -257,12 +262,24 @@ export function buildPdfBlob(
   // وإلا يُقطَّع لشرائح بحدود آمنة عند صفوف الجدول وكتل المستند (انظر getPdfImageSlices).
   const ph = paper.heightMm;
   const pdf = new JsPdf({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait', compress: true });
-  const pageHeightPx = (ph * raster.width) / pw;
+  // الهوامش (Output Profile): العنصر الملتقَط عرضه = عرض الورق − الهامشين، يوضع عند (يسار، أعلى)
+  // وتُقطَّع الصفحات بارتفاع المحتوى لا الورق. بلا هوامش: x=y=0 وعرض الورق كاملاً (السلوك السابق).
+  const margins = paper.marginsMm ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const contentWidthMm = pw - margins.left - margins.right;
+  const contentPageHeightMm = ph - margins.top - margins.bottom;
+  const pageHeightPx = (contentPageHeightMm * raster.width) / contentWidthMm;
   const content = Math.min(raster.height, Math.max(1, Math.ceil(contentHeight)));
 
   getPdfImageSlices(content, pageHeightPx, safeBreaks).forEach((slice, index) => {
     if (index > 0) pdf.addPage();
-    pdf.addImage(raster.slicePng(slice.top, slice.height), 'PNG', 0, 0, pw, (slice.height * pw) / raster.width);
+    pdf.addImage(
+      raster.slicePng(slice.top, slice.height),
+      'PNG',
+      margins.left,
+      margins.top,
+      contentWidthMm,
+      (slice.height * contentWidthMm) / raster.width,
+    );
   });
   return pdf.output('blob');
 }

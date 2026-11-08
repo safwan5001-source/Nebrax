@@ -378,9 +378,10 @@ class FuelReconciliationService
             // FUEL-LOCK-ORDER-2: مِرساة المستأجر قبل قفل المنتج/الرصيد/حالة التكلفة (ترتيب ERP: مِرساة ← مجمّع). كان القفل بعد المجمّع ⇒ جمود مع إنهاء بيع. لا أثر محاسبي أو مخزني.
             // الخزان `FOR KEY SHARE` قبل المِرساة (نمط #2066): صف الدفتر التشغيلي اللاحق يحتاج KEY SHARE على الخزان و`recordReading` يمسكه FOR UPDATE ثم يطلب KEY SHARE على المستأجر.
             \App\Models\FuelTank::query()->whereKey($reconciliation->fuel_tank_id)->lock('for key share')->first();
-            // صف المنتج `FOR UPDATE` أيضاً قبل المِرساة (مراجعة #2071): تعديل بطاقة المنتج (`ProductLifecycleService::update`) يمسكه ثم يُدرج نشاطاً يحتاج KEY SHARE على المستأجر المتعارض مع المِرساة،
-            // وهذا هو ترتيب `main` الأصلي (منتج ← مِرساة) فلا نعكسه. ERP لا يقفل صف المنتج (يقفل `InventoryState`) فلا تعارض معه.
-            BranchScope::reference(\App\Models\Product::class)->lockForUpdate()->findOrFail($product->id);
+            // صف المنتج `FOR NO KEY UPDATE` أيضاً قبل المِرساة: تعديل بطاقة المنتج (`ProductLifecycleService::update`) يمسكه `FOR UPDATE` ثم يُدرج نشاطاً يحتاج KEY SHARE على المستأجر المتعارض مع المِرساة
+            // (فنقفله قبلها كترتيب `main`). **ليس `FOR UPDATE`**: بيع ERP يمسك المِرساة ثم يُدرج حركة مخزون تحتاج `KEY SHARE` على صف المنتج (FK)، و`FOR UPDATE` يتعارض معه ⇒ جمود (CI: 40P01).
+            // `NO KEY UPDATE` لا يتعارض مع KEY SHARE ويُسلسل التسويات المتزامنة على المنتج نفسه.
+            BranchScope::reference(\App\Models\Product::class)->lock('for no key update')->findOrFail($product->id);
             app(\App\Services\Accounting\AccountingDateGuard::class)->lockLedgerAnchor();
             $this->lockBookStock($warehouse->id, $product->id);
             // FS-01: قد يُضاف خزان ثانٍ بعد إنشاء المسودة؛ نعيد الفحص تحت القفل ولا نقبل فرقاً محسوباً على كتاب مشترك.
@@ -536,7 +537,8 @@ class FuelReconciliationService
     {
         // يقفل المنتج حتى حين لا يوجد صف رصيد بعد، ثم يقفل صف الرصيد إن وُجد.
         // هكذا لا تعتمد تسويتان متزامنتان لقطة تكلفة/رصيد متنافرتين.
-        BranchScope::reference(\App\Models\Product::class)->lockForUpdate()->findOrFail($productId);
+        // `NO KEY UPDATE` لا `FOR UPDATE`: لا نرقّي القفل بعد المِرساة ولا نتعارض مع KEY SHARE الذي يأخذه بيع ERP على المنتج (انظر أعلاه).
+        BranchScope::reference(\App\Models\Product::class)->lock('for no key update')->findOrFail($productId);
         ProductWarehouseStock::where('warehouse_id', $warehouseId)
             ->where('product_id', $productId)
             ->lockForUpdate()

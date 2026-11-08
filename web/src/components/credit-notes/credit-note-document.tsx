@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import type { Direction, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 import { buildCreditNoteDocumentModel, type SourceCreditNote } from '@/modules/documents/builder/from-credit-note';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
 
@@ -27,6 +28,7 @@ export function CreditNoteDocument({
   logoHeight,
   layout,
   rootId,
+  outputProfile,
   direction,
 }: {
   note: CreditNoteDoc;
@@ -44,6 +46,8 @@ export function CreditNoteDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  /** ملف الإخراج من مراجعة القالب (AWJ-DOC-V2-PR3B)؛ غيابه = الإطار الثابت القديم. */
+  outputProfile?: OutputProfile | null;
   direction?: Direction;
 }) {
   const locale = useLocale();
@@ -61,6 +65,6 @@ export function CreditNoteDocument({
     direction: direction ?? (locale === 'en' ? 'ltr' : 'rtl'),
   });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} outputProfile={outputProfile} />
   );
 }

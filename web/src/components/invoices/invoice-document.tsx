@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import type { Direction, DocumentLanguage, DocumentTypeId, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 import {
   buildInvoiceDocumentModel,
   type SourceInvoice,
@@ -36,6 +37,7 @@ export function InvoiceDocument({
   logoHeight,
   layout,
   rootId,
+  outputProfile,
   documentType,
   direction,
   language,
@@ -56,6 +58,8 @@ export function InvoiceDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  /** ملف الإخراج من مراجعة القالب (AWJ-DOC-V2-PR3B)؛ غيابه = الإطار الثابت القديم. */
+  outputProfile?: OutputProfile | null;
   documentType?: DocumentTypeId;
   direction?: Direction;
   /**
@@ -88,6 +92,6 @@ export function InvoiceDocument({
     language: effectiveLanguage,
   });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} outputProfile={outputProfile} />
   );
 }
