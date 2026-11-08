@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import type { Direction, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
+import type { OutputProfile } from '@/modules/print-templates/services/output-profile';
 import {
   buildPurchaseOrderDocumentModel,
   type SourcePurchaseOrder,
@@ -31,6 +32,7 @@ export function PurchaseOrderDocument({
   logoHeight,
   layout,
   rootId,
+  outputProfile,
   direction,
 }: {
   order: PurchaseOrderDoc;
@@ -48,6 +50,8 @@ export function PurchaseOrderDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  /** ملف الإخراج من مراجعة القالب (AWJ-DOC-V2-PR3B)؛ غيابه = الإطار الثابت القديم. */
+  outputProfile?: OutputProfile | null;
   direction?: Direction;
 }) {
   const locale = useLocale();
@@ -73,6 +77,7 @@ export function PurchaseOrderDocument({
       showLogo={showLogo}
       layout={layout}
       rootId={rootId}
+      outputProfile={outputProfile}
     />
   );
 }

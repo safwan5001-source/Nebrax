@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
+import { isNarrowDocPageFrame, useDocPageFrame } from '../doc-page-frame-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
 import {
@@ -194,6 +195,9 @@ function bodyRowClassName(style: TemplateStyle, index: number): string {
   }
 }
 
+/** أعمدة تعريف لا مالية ولا ضريبية، تُخفى في الإطار الضيّق فقط. */
+const NARROW_HIDDEN_COLUMNS: ReadonlySet<DocItemsColumnId> = new Set<DocItemsColumnId>(['number', 'product_code', 'barcode']);
+
 /** جدول البنود — أعمدة معتمدة قابلة للترتيب والإخفاء والتسمية والمحاذاة. */
 export function DocItemsTable({
   model,
@@ -208,7 +212,13 @@ export function DocItemsTable({
   const { mode } = useDocumentLabelMode(model);
   const head = headRow(style);
   const padding = cellPadding(style);
-  const columns: readonly DocItemsColumn[] = properties.columns ?? getDefaultDocumentItemColumns(model.type).map((id): DocItemsColumn => ({ id }));
+  const configuredColumns: readonly DocItemsColumn[] = properties.columns ?? getDefaultDocumentItemColumns(model.type).map((id): DocItemsColumn => ({ id }));
+  // إطار ضيّق (Output Profile، AWJ-DOC-V2-PR3B): تُخفى أعمدة التعريف فقط؛ كل الأعمدة المالية
+  // والضريبية تبقى. بلا إطار ضيّق القائمة كما هي حرفياً.
+  const narrow = isNarrowDocPageFrame(useDocPageFrame());
+  const columns: readonly DocItemsColumn[] = narrow
+    ? configuredColumns.filter((column) => !NARROW_HIDDEN_COLUMNS.has(column.id))
+    : configuredColumns;
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
     product: t('product'),

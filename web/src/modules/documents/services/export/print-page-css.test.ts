@@ -143,3 +143,25 @@ describe('measureRollHeightMm / printDocument', () => {
     expect(printSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('buildPrintPageCss — هوامش Output Profile (AWJ-DOC-V2-PR3B)', () => {
+  it('بلا هوامش: الصياغة السابقة حرفياً (يبقى هامش @page العام)', () => {
+    expect(buildPrintPageCss(A4)).toBe('@media print { @page { size: 210mm 297mm; } }');
+  });
+
+  it('مع هوامش: تُعلَن top right bottom left بالمليمتر على @page', () => {
+    const css = buildPrintPageCss({ widthMm: 148, heightMm: 210, marginsMm: { top: 10, right: 11, bottom: 12, left: 13 } });
+    expect(css).toBe('@media print { @page { size: 148mm 210mm; margin: 10mm 11mm 12mm 13mm; } }');
+  });
+
+  it('الأفقي: size بالعرض×الارتفاع المقلوبين صراحةً', () => {
+    expect(buildPrintPageCss({ widthMm: 210, heightMm: 148, marginsMm: { top: 10, right: 10, bottom: 10, left: 10 } }))
+      .toContain('size: 210mm 148mm;');
+  });
+
+  it('الرول يتجاهل الهوامش (يبقى margin:0 كما أُصلح في PR2)', () => {
+    const css = buildPrintPageCss({ widthMm: 80, heightMm: 0, marginsMm: { top: 9, right: 9, bottom: 9, left: 9 } }, 100);
+    expect(css).toMatch(/margin:\s*0;/);
+    expect(css).not.toContain('9mm');
+  });
+});
