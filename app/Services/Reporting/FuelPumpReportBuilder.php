@@ -45,7 +45,7 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
         $loaded = $this->shifts->nozzleRows($context);
         $shiftIds = array_values(array_unique(array_column($loaded['rows'], 'shift_id')));
         $formal = $shiftIds === [] ? collect() : FuelSale::query()->whereIn('fuel_shift_id', $shiftIds)->where('status', FuelSale::STATUS_FINALIZED)
-            ->selectRaw('fuel_shift_id, fuel_nozzle_id, COALESCE(SUM(quantity_milliliters), 0) as ml, COUNT(*) as n')->groupBy('fuel_shift_id', 'fuel_nozzle_id')->get()
+            ->selectRaw("fuel_shift_id, fuel_nozzle_id, COALESCE(SUM(quantity_milliliters), 0) as ml, COALESCE(SUM(CASE WHEN source = 'settlement' THEN quantity_milliliters ELSE 0 END), 0) as settlement_ml, COUNT(*) as n")->groupBy('fuel_shift_id', 'fuel_nozzle_id')->get()
             ->keyBy(fn ($r) => $r->fuel_shift_id.'|'.$r->fuel_nozzle_id);
 
         $rows = [];
@@ -58,7 +58,7 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
             $diff = $r['liters'] - $sold;
             $rows[] = [
                 'shift' => $r['shift'], 'station' => $r['station'], 'pump' => $r['pump'], 'nozzle' => $r['nozzle'], 'product' => $r['product'],
-                'meter' => $r['liters'], 'formal' => $sold, 'sales_count' => $f === null ? 0 : (int) $f->n, 'difference' => $diff,
+                'meter' => $r['liters'], 'formal' => $sold, 'settlement' => $f === null ? 0 : (int) $f->settlement_ml, 'sales_count' => $f === null ? 0 : (int) $f->n, 'difference' => $diff,
                 'state' => $diff === 0 ? 'matched' : ($diff > 0 ? 'meter_higher' : 'formal_higher'),
             ];
         }
@@ -74,13 +74,14 @@ final class FuelPumpReportBuilder implements FuelReportBuilder
                 T::col('shift', 'text', 'الوردية', 'Shift'), T::col('station', 'text', 'المحطة', 'Station'), T::col('pump', 'text', 'المضخة', 'Pump'), T::col('nozzle', 'text', 'الفوهة', 'Nozzle'), T::col('product', 'text', 'المنتج', 'Product'),
                 T::col('meter', 'liters', 'لتر العداد', 'Meter liters', ['total' => 'sum']),
                 T::col('formal', 'liters', 'لتر المبيعات الرسمية', 'Formal liters', ['total' => 'sum']),
+                T::col('settlement', 'liters', 'منها بيع التسوية', 'Of which settlement', ['total' => 'sum']),
                 T::col('sales_count', 'int', 'عدد المبيعات', 'Sales'),
                 T::col('difference', 'liters', 'الفرق (عداد − مبيعات)', 'Difference (meter − sales)', ['total' => 'sum']),
                 T::col('state', 'status', 'الحالة', 'State', ['values' => ['matched' => ['ar' => 'مطابق', 'en' => 'Matched'], 'meter_higher' => ['ar' => 'العداد أعلى', 'en' => 'Meter higher'], 'formal_higher' => ['ar' => 'المبيعات أعلى', 'en' => 'Sales higher']]]),
             ], $rows)],
             'gaps' => $loaded['gaps'], 'truncated' => $loaded['truncated'],
             'notes' => [
-                ['ar' => 'المبيعات الرسمية هي بيع الوقود النهائي المسجَّل؛ الفرق لترات لم تُسجَّل كبيع رسمي (أو العكس) وليس عجزاً محاسبياً.', 'en' => 'Formal sales are the recorded finalized fuel sales; a difference is liters not recorded as a formal sale (or the reverse), not an accounting shortage.'],
+                ['ar' => 'المبيعات الرسمية هي بيع الوقود النهائي المسجَّل (بيع ERP + بيع التسوية؛ عمود «منها بيع التسوية» يبيّن حصتها ولا تُعدّ مرتين)؛ الفرق لترات لم تُسجَّل كبيع رسمي (أو العكس) وليس عجزاً محاسبياً.', 'en' => 'Formal sales (ERP + settlement; the settlement column shows its share, never counted twice) are the recorded finalized fuel sales; a difference is liters not recorded as a formal sale (or the reverse), not an accounting shortage.'],
                 ...($loaded['truncated'] ? [['ar' => 'تجاوز عدد الورديات الحد الأقصى؛ ضيّق الفترة.', 'en' => 'Shift count exceeds the maximum; narrow the period.']] : []),
             ],
         ];
