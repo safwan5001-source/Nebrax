@@ -229,6 +229,47 @@ describe('shift report model — incomplete readings in a frozen snapshot', () =
   });
 });
 
+describe('shift report model — incomplete readings WITHOUT a frozen snapshot', () => {
+  const noSnapshots: Array<CollectionView | null> = [null, frozenCollection({ state: 'declared' }), frozenCollection({ state: 'none', declaration: null })];
+  const reading = (id: string, nozzle: string, stage: 'opening' | 'closing', ml: number) => ({ id, nozzle_id: nozzle, reading_stage: stage, meter_milliliters: ml, measured_at: null });
+  const byName = (model: ShiftReportModel) => Object.fromEntries(table(model, 'sales').rows.map((row) => [row[0].text, row[1]]));
+
+  it('an opening-only nozzle: its product is "incomplete", the total is partial and a warning is shown (the server total equals the partial sum, so no mismatch)', () => {
+    const detail = closedDetail({
+      operational_meter_milliliters: 690_500 + 100_000, // الخادم يتخطى الزوج الناقص (n2 = Beta)
+      meter_readings: [reading('a', 'n1', 'opening', 125_430_000), reading('b', 'n1', 'closing', 126_120_500), reading('c', 'n2', 'opening', 0), reading('e', 'n3', 'opening', 10_000), reading('f', 'n3', 'closing', 110_000)],
+    });
+    for (const collection of noSnapshots) {
+      const model = buildShiftReport(base({ detail, collection }));
+      expect(byName(model)['Alpha'].text).toBe('790.500'); // n1 + n3 كاملتان
+      expect(byName(model)['Beta'].na).toBe(true); // لا «0.000» مؤكد
+      expect(table(model, 'sales').totals?.[1].text).toBe('790.500 (Partial)');
+      expect(section(model, 'liters-partial')).toBeDefined();
+      expect(section(model, 'mismatch')).toBeUndefined();
+    }
+  });
+
+  it('an active nozzle with NO reading at all makes its product partial (conservative: absence is not a confirmed zero)', () => {
+    const detail = closedDetail({
+      operational_meter_milliliters: 690_500 + 500_000,
+      meter_readings: [reading('a', 'n1', 'opening', 125_430_000), reading('b', 'n1', 'closing', 126_120_500), reading('c', 'n2', 'opening', 0), reading('d', 'n2', 'closing', 500_000)], // n3 بلا قراءات
+    });
+    const model = buildShiftReport(base({ detail, collection: null }));
+    expect(byName(model)['Alpha'].text).toBe('690.500 (Partial)');
+    expect(byName(model)['Beta'].text).toBe('500.000');
+    expect(table(model, 'sales').totals?.[1].text).toContain('(Partial)');
+    expect(section(model, 'liters-partial')).toBeDefined();
+  });
+
+  it('a fully recorded shift without a snapshot has no partial labels or warning', () => {
+    for (const collection of noSnapshots) {
+      const model = buildShiftReport(base({ collection }));
+      expect(JSON.stringify(table(model, 'sales'))).not.toContain('Partial');
+      expect(section(model, 'liters-partial')).toBeUndefined();
+    }
+  });
+});
+
 describe('shift report model — server cash summary rows', () => {
   const summary = (over: Partial<CashSummary> = {}): CashSummary => ({
     state: 'frozen', basis: 'declared_collection',

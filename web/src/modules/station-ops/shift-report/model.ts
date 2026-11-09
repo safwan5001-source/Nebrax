@@ -116,17 +116,35 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   const frozenProducts = frozen ? collection.sales.products : [];
   type Row = { id: string; name: string; ml: number; partial?: boolean; price: number | null | undefined; amount: number | null | undefined };
   let productRows: Row[] = [];
+  let readingGap = false;
   if (frozen) {
     productRows = frozenProducts.map((product) => ({ id: product.fuel_product_id, name: product.name ?? '', ml: product.milliliters, partial: product.gaps.some((code) => QUANTITY_GAPS.includes(code)), price: salesVisible ? product.price_per_liter_minor : null, amount: salesVisible ? product.amount_minor : null }));
   } else if (readings) {
+    // بلا لقطة مجمَّدة: الكميات من القراءات. زوج ناقص (افتتاح بلا إغلاق/العكس/ترتيب خاطئ) أو فوهة نشطة بلا أي قراءة ⇒ الكمية جزئية لا مؤكدة
+    // (الخادم نفسه يتخطى الأزواج الناقصة فيتطابق إجماليه مع المجموع الجزئي، فلا يكشفها `mismatch`).
     const byProduct = new Map<string, Row>();
-    for (const group of readings.groups) {
-      for (const row of group.rows) {
-        if (row.status !== 'complete' || row.deltaMl === null || !row.view?.product) continue;
-        const product = row.view.product;
-        const current = byProduct.get(product.id) ?? { id: product.id, name: product.name, ml: 0, price: null, amount: null };
-        current.ml += row.deltaMl;
-        byProduct.set(product.id, current);
+    const touch = (product: { id: string; name: string }): Row => {
+      const current = byProduct.get(product.id) ?? { id: product.id, name: product.name, ml: 0, price: null, amount: null };
+      byProduct.set(product.id, current);
+      return current;
+    };
+    const seen = new Set<string>();
+    for (const row of [...readings.groups.flatMap((group) => group.rows), ...readings.outsideSetup]) {
+      seen.add(row.nozzleId);
+      const product = row.view?.product ?? null;
+      if (row.status === 'complete' && row.deltaMl !== null) {
+        if (product) touch(product).ml += row.deltaMl;
+      } else {
+        readingGap = true;
+        if (product) touch(product).partial = true;
+      }
+    }
+    // فوهات نشطة حالياً بلا أي قراءة في هذه الوردية: غياب لا نعرف سببه (قد تكون أُضيفت لاحقاً) ⇒ تحذير محافظ لا صفر مؤكد.
+    for (const { nozzles } of catalog?.pumps ?? []) {
+      for (const view of nozzles) {
+        if (view.blockedBy !== null || seen.has(view.nozzle.id)) continue;
+        readingGap = true;
+        if (view.product) touch(view.product).partial = true;
       }
     }
     productRows = [...byProduct.values()];
@@ -140,7 +158,7 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   // لقطة مجمَّدة فيها فجوات (قراءة ناقصة): الكمية جزئية لا مؤكدة، والصفر مع فجوة «غير متاح» لا صفر مؤكد.
   const litersCell = (row: Row): Cell => (row.partial ? (row.ml === 0 ? { text: t('doc.reading.incomplete'), na: true } : { text: `${litersOf(row.ml)} (${t('doc.partial')})` }) : { text: litersOf(row.ml) });
   // الإجمالي من علم الخادم `milliliters_complete` وحده (فجوات التسعير لا تمسّ الكمية).
-  const litersPartial = frozen && (collection.sales.milliliters_complete === false || productRows.some((row) => row.partial === true));
+  const litersPartial = frozen ? collection.sales.milliliters_complete === false || productRows.some((row) => row.partial === true) : readingGap;
   const salesTableRows: Cell[][] = productRows.map((row) => [
     text(row.name),
     litersCell(row),
@@ -257,7 +275,7 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   else if (!frozen) notes.push({ kind: 'note', key: 'amounts-not-frozen', tone: 'warning', text: t('doc.note.amountsNotFrozen') });
   if (litersPartial) notes.push({ kind: 'note', key: 'liters-partial', tone: 'warning', text: t('doc.note.litersPartial') });
   if (readings?.summary.mismatch) notes.push({ kind: 'note', key: 'mismatch', tone: 'warning', text: t('doc.note.mismatch') });
-  else if (readings && readings.summary.invalid > 0) notes.push({ kind: 'note', key: 'readings-partial', tone: 'warning', text: t('doc.note.readingsPartial') });
+  else if (readings && readings.summary.invalid > 0 && !litersPartial) notes.push({ kind: 'note', key: 'readings-partial', tone: 'warning', text: t('doc.note.readingsPartial') });
   const namesUnavailable = closerName === null;
   if (namesUnavailable && !brief) notes.push({ kind: 'note', key: 'names-unavailable', tone: 'info', text: t('doc.note.namesUnavailable') });
   notes.push({ kind: 'note', key: 'meter-note', tone: 'info', text: t('doc.note.meterNote') });
