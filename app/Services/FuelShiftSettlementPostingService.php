@@ -114,7 +114,7 @@ class FuelShiftSettlementPostingService
         Branch::query()->whereKey($station->branch_id)->lock('for no key update')->first();
 
         // ⑦ مِرساة المستأجر ثم فحص الفترات (تاريخ التوريد وتاريخ التحصيل كلٌّ على حدة) وإعادة التقييم تحت الأقفال؛ أي اختلاف ⇒ تراجع كامل وحجب.
-        $this->dateGuard->lockLedgerAnchor();
+        $this->lockAnchorOrYield();
         $this->dateGuard->assertOpen($first['supply']['business_date'], 'ترحيل تسوية الوردية');
         $hasAllocation = ($first['finance']['allocation']['rows'] ?? []) !== [];
         if ($hasAllocation && $first['collection']['collection_date'] !== null) {
@@ -247,6 +247,32 @@ class FuelShiftSettlementPostingService
                 ]);
             }
         }
+    }
+
+    /**
+     * المِرساة بمهلة قفل قصيرة (PostgreSQL): المحرك يمسك ترقيم الفرع **ثم** يطلب المِرساة، وفاتورة نقدية عامة مدفوعة تمسك المِرساة **ثم** ترقّم سندها على الفرع نفسه (ترتيب معاكس
+     * سابق في ERP) ⇒ دورة حقيقية أثبتها اختبار PostgreSQL بخدمتين حقيقيتين (40P01). المحرك هو من يتنحّى: مهلة أقل من `deadlock_timeout` فلا يُختار مستند المستخدم ضحيةً أبداً؛
+     * يعود حجباً مقروءاً `FUEL_SETTLEMENT_LOCK_BUSY` بلا أي كتابة وتعيده المهمة لاحقاً (لا يستهلك ميزانية الأخطاء). تنافس عادي أقصر من المهلة لا يتأثر.
+     */
+    private function lockAnchorOrYield(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->dateGuard->lockLedgerAnchor();
+
+            return;
+        }
+        $previous = (string) (DB::selectOne("select current_setting('lock_timeout') as v")->v ?? '0');
+        $waitMs = max(50, (int) config('fuel_stations.settlement_job.anchor_wait_ms', 700));
+        DB::select("select set_config('lock_timeout', ?, true)", [$waitMs.'ms']);
+        try {
+            $this->dateGuard->lockLedgerAnchor();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ((string) ($e->errorInfo[0] ?? '') === '55P03') {
+                throw new SettlementPostingBlocked(['FUEL_SETTLEMENT_LOCK_BUSY']);
+            }
+            throw $e;
+        }
+        DB::select("select set_config('lock_timeout', ?, true)", [$previous]);
     }
 
     /** @param list<array<string,mixed>> $lines */
