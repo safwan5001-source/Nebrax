@@ -57,13 +57,25 @@ class FuelShiftSettlementPostingService
             return SettlementPostingResult::blocked(['FUEL_SETTLEMENT_GRANULARITY_NOT_DECLARED']);
         }
 
-        try {
-            return DB::transaction(fn () => $this->postInTransaction($shift, $actor));
-        } catch (SettlementPostingBlocked $blocked) {
-            return SettlementPostingResult::blocked($blocked->reasons);
-        } catch (AccountingPeriodLockedException) {
-            return SettlementPostingResult::blocked(['FUEL_SETTLEMENT_PERIOD_LOCKED']);
+        // تنافس عابر على المِرساة (`LOCK_BUSY`): محاولتان إضافيتان بمهلة عشوائية قصيرة داخل العملية نفسها قبل أن يعود الحجب (فلا تُرحَّل الوردية بتأخير 10 دقائق لتنافس لحظي).
+        $attempts = 3;
+        for ($i = 1; $i <= $attempts; $i++) {
+            try {
+                return DB::transaction(fn () => $this->postInTransaction($shift, $actor));
+            } catch (SettlementPostingBlocked $blocked) {
+                if ($i < $attempts && $blocked->reasons === ['FUEL_SETTLEMENT_LOCK_BUSY']) {
+                    usleep(random_int(50_000, 250_000));
+
+                    continue;
+                }
+
+                return SettlementPostingResult::blocked($blocked->reasons);
+            } catch (AccountingPeriodLockedException) {
+                return SettlementPostingResult::blocked(['FUEL_SETTLEMENT_PERIOD_LOCKED']);
+            }
         }
+
+        return SettlementPostingResult::blocked(['FUEL_SETTLEMENT_LOCK_BUSY']);
     }
 
     private function postInTransaction(FuelShift $shift, User $actor): SettlementPostingResult
@@ -262,7 +274,13 @@ class FuelShiftSettlementPostingService
             return;
         }
         $previous = (string) (DB::selectOne("select current_setting('lock_timeout') as v")->v ?? '0');
-        $waitMs = max(50, (int) config('fuel_stations.settlement_job.anchor_wait_ms', 700));
+        // المهلة لا تتجاوز نصف `deadlock_timeout` الفعلي (وإلا اختار كاشف الجمود مستند المستخدم ضحيةً) ولا تتجاوز مهلة خارجية أصرم إن وُجدت.
+        $deadlockMs = (int) (DB::selectOne("select setting::int as v from pg_settings where name = 'deadlock_timeout'")->v ?? 1000);
+        $waitMs = max(50, min((int) config('fuel_stations.settlement_job.anchor_wait_ms', 700), intdiv($deadlockMs, 2)));
+        $outerMs = (int) (DB::selectOne("select setting::int as v from pg_settings where name = 'lock_timeout'")->v ?? 0);
+        if ($outerMs > 0) {
+            $waitMs = min($waitMs, $outerMs);
+        }
         DB::select("select set_config('lock_timeout', ?, true)", [$waitMs.'ms']);
         try {
             $this->dateGuard->lockLedgerAnchor();

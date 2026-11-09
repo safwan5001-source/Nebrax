@@ -187,4 +187,21 @@ class FuelShiftSettlementEngineJobTest extends TestCase
         $this->assertSame(['FUEL_SETTLEMENT_ACTOR_UNAVAILABLE'], $this->jobOf($shift)->blocked_reasons);
         $this->assertSame($before, $this->counts());
     }
+
+    /** @test */
+    public function a_closer_whose_station_scope_was_revoked_blocks_the_job_with_a_stable_code_and_no_write(): void
+    {
+        $shift = $this->closedShift('j7');
+        DB::table('users')->where('id', $this->f['actor']->id)->update(['fuel_station_scope' => 'assigned']);   // مقيَّد بمحطات مسنَدة ولا إسناد
+        $before = $this->counts();
+
+        $summary = app(FuelShiftSettlementJobRunner::class)->run();
+
+        $this->assertSame(1, $summary['blocked']);
+        $job = $this->jobOf($shift);
+        $this->assertSame('queued', $job->status, 'تبقى في الطابور بلا استهلاك ميزانية الأخطاء');
+        $this->assertSame(0, $job->attempts);
+        $this->assertSame(['FUEL_SETTLEMENT_ACTOR_OUT_OF_SCOPE'], $job->blocked_reasons);
+        $this->assertSame($before, $this->counts());
+    }
 }
