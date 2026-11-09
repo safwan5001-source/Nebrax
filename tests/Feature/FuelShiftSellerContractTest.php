@@ -162,7 +162,7 @@ class FuelShiftSellerContractTest extends TestCase
     }
 
     /** @test */
-    public function documented_risk_R3_an_open_key_replays_the_first_shift_even_after_it_was_closed_and_whatever_the_payload(): void
+    public function documented_risk_R3_an_open_key_replays_the_first_shift_even_after_it_was_closed_but_a_different_float_is_a_conflict(): void
     {
         $f = $this->fixture();
         $seller = $this->sellerToken($f);
@@ -173,8 +173,10 @@ class FuelShiftSellerContractTest extends TestCase
         $first = $this->withToken($seller)->postJson(self::BASE . '/open', ['fuel_station_id' => $f['station']->id, 'opening_float_minor' => 100, 'idempotency_key' => 'reused'])->assertCreated()->json('data.id');
         $this->withToken($seller)->postJson(self::BASE . "/{$first}/close", ['counted_cash_minor' => 100])->assertOk();
 
-        $replay = $this->withToken($seller)->postJson(self::BASE . '/open', ['fuel_station_id' => $f['station']->id, 'opening_float_minor' => 999999, 'idempotency_key' => 'reused'])->assertCreated();
+        // FS-16 (PR #1916): الإعادة بالحمولة نفسها تُعيد الوردية الأولى حتى بعد إغلاقها؛ عهدة مختلفة بالمفتاح نفسه تضارب صريح (422) لا صمت.
+        $replay = $this->withToken($seller)->postJson(self::BASE . '/open', ['fuel_station_id' => $f['station']->id, 'opening_float_minor' => 100, 'idempotency_key' => 'reused'])->assertCreated();
         $replay->assertJsonPath('data.id', $first)->assertJsonPath('data.status', 'closed')->assertJsonPath('data.opening_float_minor', 100);
+        $this->withToken($seller)->postJson(self::BASE . '/open', ['fuel_station_id' => $f['station']->id, 'opening_float_minor' => 999999, 'idempotency_key' => 'reused'])->assertStatus(422);
         // ⇒ الواجهة: مفتاح جديد لكل نية، وتتحقق أن الردّ open وبعهدة الافتتاح المرسلة قبل إعلان النجاح.
         $this->assertSame(1, \App\Models\FuelShift::count());
     }

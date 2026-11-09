@@ -638,7 +638,9 @@ class FuelOpeningBalanceTest extends TestCase
         $this->assertInstanceOf(RuntimeException::class, $this->caught(fn () => $this->service()->deleteDraft($posted, $w['actor'])));
         $this->assertInstanceOf(RuntimeException::class, $this->caught(fn () => $this->service()->updateDraft($posted, ['opening_date' => $posted->opening_date->toDateString(), 'lines' => [['fuel_tank_id' => $w['tanks']['91']->id, 'quantity_liters' => '1']]], $w['actor'])));
 
-        $actions = DB::table('fuel_station_audit_events')->where('tenant_id', $w['tenant_id'])->where('subject_id', $doc->id)->orderBy('occurred_at')->pluck('action')->all();
+        $actions = DB::table('fuel_station_audit_events')->where('tenant_id', $w['tenant_id'])->where('subject_id', $doc->id)->pluck('action')->all();
+        // occurred_at بدقة ثانية: الحدثان قد يقعان في الثانية نفسها فلا ترتيب مضمون — نقارن المجموعة لا التسلسل.
+        sort($actions);
         $this->assertSame(['opening_balance.created', 'opening_balance.posted'], $actions);
         $event = DB::table('fuel_station_audit_events')->where('subject_id', $doc->id)->where('action', 'opening_balance.posted')->first();
         $this->assertSame($w['actor']->id, $event->actor_id);
