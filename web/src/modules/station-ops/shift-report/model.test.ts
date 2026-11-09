@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CollectionView } from '../collection';
 import { CATALOG, STATION, closedDetail, frozenCollection, translator } from './__fixtures__';
+import type { CashSummary } from '../cash-summary';
 import { buildShiftReport, isReportableShift, type ReportSection, type ShiftReportInput, type ShiftReportModel } from './model';
 
 const base = (over: Partial<ShiftReportInput> = {}): ShiftReportInput => ({
@@ -177,6 +178,35 @@ describe('shift report model — collection vs sales, honesty, permissions', () 
     const rows = Object.fromEntries(kv(noCount, 'cash').rows.map((row) => [row.label, row.value]));
     expect(rows['Counted cash'].na).toBe(true);
     expect(rows['Cash variance'].na).toBe(true);
+  });
+});
+
+describe('shift report model — server cash summary rows', () => {
+  const summary = (over: Partial<CashSummary> = {}): CashSummary => ({
+    state: 'frozen', basis: 'declared_collection',
+    components: { opening_float_minor: 20_000, official_cash_receipts: { available: false, amount_minor: null, count: 0, reason: 'not_declared' }, cash_in_minor: 500, cash_out_minor: 10_000, treasury_handover_minor: 10_000, expenses_minor: 300 },
+    expected_cash_minor: 25_000, expected_cash_partial_minor: 25_000, expected_complete: true, incompleteness: [],
+    counted_cash_minor: 25_000, variance_minor: 0, variance_final: true,
+    network_receipts: { available: false, amount_minor: null, reason: 'basis_not_enabled', information_only: true },
+    unattributed_cash_receipts: { count: 0, amount_minor: 0 },
+    post_close_adjustments: { available: true, items: [], net_effect_minor: 0 },
+    ...over,
+  } as CashSummary);
+
+  it.each([['en'], ['ar']] as const)('every row of a real cash_summary has a translated label (no raw key path) in %s, A4 and A5', (locale) => {
+    for (const paper of ['a4', 'a5'] as const) {
+      // المترجم يرمي عند أي مفتاح ناقص، فنجاح البناء = كل الصفوف لها تسمية.
+      const model = buildShiftReport(base({ t: translator(locale), paper, detail: closedDetail({ cash_summary: summary() }) }));
+      const labels = kv(model, 'cash').rows.map((row) => row.label);
+      expect(labels.some((label) => label.includes('doc.cash'))).toBe(false);
+      expect(labels).toContain(translator(locale)('doc.cash.openingFloat'));
+    }
+  });
+
+  it('the opening-float row prints the server amount', () => {
+    const model = buildShiftReport(base({ detail: closedDetail({ cash_summary: summary() }) }));
+    const cash = Object.fromEntries(kv(model, 'cash').rows.map((row) => [row.label, row.value.text]));
+    expect(cash['Opening float']).toBe('200.00 SAR');
   });
 });
 

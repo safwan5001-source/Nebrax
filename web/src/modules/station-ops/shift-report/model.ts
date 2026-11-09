@@ -231,7 +231,7 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
     const view = buildCashSummaryView(detail.cash_summary);
     for (const row of view.rows) {
       if (brief && ['otherOut', 'handover', 'cashIn'].includes(row.key)) continue;
-      cashRows.push({ label: t(`doc.cash.${row.key === 'declaredSales' ? 'declaredSales' : row.key}`), value: money(row.amountMinor) });
+      cashRows.push({ label: t(`doc.cash.${row.key === 'opening' ? 'openingFloat' : row.key}`), value: money(row.amountMinor) });
     }
     cashRows.push({ label: view.expected.kind === 'total' ? t('doc.cash.expected') : t('doc.cash.expectedPartial'), value: money(view.expected.amountMinor, true) });
     cashRows.push({ label: t('doc.cash.counted'), value: money(view.countedMinor, true) });
