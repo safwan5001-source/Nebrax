@@ -33,6 +33,12 @@ final class CommunicationProviderRegistry
         return $this;
     }
 
+    /** @return list<string> مفاتيح المزوّدين المسجَّلين. */
+    public function keys(): array
+    {
+        return array_keys($this->providers);
+    }
+
     public function isEmpty(): bool
     {
         return $this->providers === [];

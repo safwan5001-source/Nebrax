@@ -512,6 +512,13 @@ class CommunicationDispatcherTest extends TestCase
         $onlyB->dispatchDue($tenant->id);
         $this->assertCount(0, $b->received);
         $this->assertSame('retry_scheduled', $this->messageRow($id2)->status);
+
+        // ولا تُجوِّع الدفعة: رسالة جديدة مستحقة تُرسل عبر B حتى مع limit=1 رغم أن المثبَّتة على A الغائب أقدم استحقاقاً.
+        $fresh = $this->enqueueMessage($tenant->id);
+        DB::table('communication_messages')->where('id', $fresh)->update(['next_attempt_at' => now()->toDateTimeString()]);
+        $onlyB->dispatchDue($tenant->id, 1);
+        $this->assertSame('accepted', $this->messageRow($fresh)->status);
+        $this->assertSame('retry_scheduled', $this->messageRow($id2)->status);
     }
 
     #[Test]

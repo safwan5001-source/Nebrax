@@ -73,6 +73,7 @@ final class CommunicationDispatcher
             return $summary; // بلا مزوّد: لا مطالبة ولا قراءة.
         }
 
+        $providerKeys = $this->registry->keys();
         $now = CarbonImmutable::now();
         $candidates = CommunicationMessage::query()
             ->where('tenant_id', $tenantId)
@@ -81,6 +82,16 @@ final class CommunicationDispatcher
             ->where('next_attempt_at', '<=', $now)
             ->where('expires_at', '>', $now)
             ->whereColumn('attempt_count', '<', 'max_attempts')
+            // إعادة محاولة مثبَّتة على مزوّد غير مسجَّل تُستبعد قبل `limit`: وإلا سدّت رأس الدفعة وجوّعت رسائل يستطيع غيره إرسالها.
+            ->where(function ($query) use ($tenantId, $providerKeys): void {
+                $query->where('attempt_count', 0)->orWhereExists(function ($exists) use ($tenantId, $providerKeys): void {
+                    $exists->select(DB::raw('1'))->from('communication_message_attempts as pinned')
+                        ->where('pinned.tenant_id', $tenantId)
+                        ->whereColumn('pinned.message_id', 'communication_messages.id')
+                        ->whereColumn('pinned.attempt_no', 'communication_messages.attempt_count')
+                        ->whereIn('pinned.provider_key', $providerKeys);
+                });
+            })
             ->where(function ($query) use ($pairs): void {
                 foreach ($pairs as [$channel, $classification]) {
                     $query->orWhere(fn ($pair) => $pair->where('channel', $channel->value)->where('classification', $classification->value));
