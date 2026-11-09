@@ -33,7 +33,7 @@ function arabicFontData(): Promise<string> {
 }
 
 /** `format` اختياري: افتراضياً A4؛ مقاس مخصص [عرض، ارتفاع] بالمم (الإيصالات الحرارية 58/80مم، HORIZON-REPORTS). */
-export async function newPdf(orientation: 'portrait' | 'landscape', format: 'a4' | [number, number] = 'a4'): Promise<PdfDoc> {
+export async function newPdf(orientation: 'portrait' | 'landscape', format: 'a4' | 'a5' | [number, number] = 'a4'): Promise<PdfDoc> {
   const [{ jsPDF }, font] = await Promise.all([import('jspdf'), arabicFontData()]);
   const pdf = new jsPDF({ unit: 'mm', format, orientation, putOnlyUsedFonts: true }) as PdfDoc;
   pdf.addFileToVFS(FONT_FILE, font);
@@ -118,6 +118,59 @@ export function text(pdf: PdfDoc, value: string, x: number, y: number, style: Te
 
 export function fitText(pdf: PdfDoc, value: string, x: number, y: number, width: number, style: TextStyle = {}): void {
   text(pdf, value, x, y, { ...style, maxWidth: width });
+}
+
+/** عرض النص بالمم بالمقاطع نفسها التي يرسمها `text()` (عربي/لاتيني). */
+export function textWidth(pdf: PdfDoc, value: string, size: number, bold = false): number {
+  const parts = scriptRuns(value).map((run) => ({ ...run, shown: run.arabic && pdf.processArabic ? pdf.processArabic(run.text) : run.text }));
+  return measure(pdf, parts, bold, size);
+}
+
+/**
+ * يقسم نصاً إلى أسطر بعرض أقصى: القطع عند المسافات أولاً، ثم عند الشرطة/الشرطة السفلية/المائلة داخل المرجع الطويل (فلا تُكسر كلمة وسطها إن أمكن)،
+ * وبالحرف فقط إن كان المقطع وحده أعرض من السطر. ترتيب الأسطر منطقي.
+ */
+export function wrapLines(pdf: PdfDoc, value: string, width: number, size: number, bold = false): string[] {
+  const lines: string[] = [];
+  let current = '';
+  const fits = (candidate: string) => textWidth(pdf, candidate, size, bold) <= width;
+  const place = (piece: string, joiner: string) => {
+    const candidate = current === '' ? piece : `${current}${joiner}${piece}`;
+    if (fits(candidate)) { current = candidate; return; }
+    if (current !== '') { lines.push(current); current = ''; }
+    if (fits(piece)) { current = piece; return; }
+    for (const char of piece) {
+      if (current !== '' && !fits(current + char)) { lines.push(current); current = ''; }
+      current += char;
+    }
+  };
+  for (const word of value.split(/\s+/).filter(Boolean)) {
+    // مقاطع الكلمة تنتهي بفاصل مقبول (- _ /) ويلتصق بعضها ببعض بلا مسافة؛ الكلمات تُفصل بمسافة.
+    const segments = word.split(/(?<=[-_/])/);
+    segments.forEach((segment, index) => place(segment, index === 0 ? ' ' : ''));
+  }
+  if (current !== '') lines.push(current);
+  return lines.length > 0 ? lines : [''];
+}
+
+/**
+ * قيمة قد تطول (مرجع/اسم): تُصغَّر حتى `minSize` في سطر واحد، فإن لم تتسع تُلَفّ على أسطر (حتى `maxLines`، والزائد يُختم بـ«…») بالحجم الأساسي
+ * فلا يُقصّ نص ولا يتداخل مع الخلية المجاورة. يعيد عدد الأسطر المرسومة.
+ */
+export function fitLines(pdf: PdfDoc, value: string, x: number, y: number, width: number, style: TextStyle = {}, maxLines = 3, lineHeight = 3.6, minSize = 6.5): number {
+  const { size = 9, bold = false } = style;
+  let fontSize = size;
+  while (fontSize > minSize && textWidth(pdf, value, fontSize, bold) > width) fontSize -= 0.5;
+  if (textWidth(pdf, value, fontSize, bold) <= width) { text(pdf, value, x, y, { ...style, size: fontSize }); return 1; }
+  let lines = wrapLines(pdf, value, width, size, bold);
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    let last = lines[maxLines - 1];
+    while (last.length > 1 && textWidth(pdf, `${last}…`, size, bold) > width) last = last.slice(0, -1);
+    lines[maxLines - 1] = `${last}…`;
+  }
+  lines.forEach((line, index) => text(pdf, line, x, y + index * lineHeight, { ...style, size }));
+  return lines.length;
 }
 
 /** نص بعدة أسطر داخل عرض معيّن؛ يعيد الارتفاع المستهلك (مم). */
