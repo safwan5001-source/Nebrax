@@ -296,7 +296,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
             $settlementRows = \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_collections as c')
                 ->join('fuel_shift_settlements as s', 's.id', '=', 'c.fuel_shift_settlement_id')
                 ->join('payments as p', 'p.id', '=', 'c.payment_id')
-                ->where('c.tenant_id', $tenantId)->whereIn('s.fuel_station_id', $context->stationIds())->where('p.status', 'posted')
+                ->where('c.tenant_id', $tenantId)->whereNull('c.fuel_sale_payment_receipt_id')->whereIn('s.fuel_station_id', $context->stationIds())->where('p.status', 'posted')
                 ->where('c.collected_at', '>=', $start)->where('c.collected_at', '<', $end)
                 ->get(['c.amount_minor', 'c.collected_at', 's.fuel_station_id', 'p.payment_method_name', 'p.method']);
             foreach ($settlementRows as $row) {
@@ -323,7 +323,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
                 T::col('amount', 'money', 'المبلغ', 'Amount', ['total' => 'sum', 'sensitivity' => T::SALES]), T::col('share_bp', 'bp', 'الحصة', 'Share', ['sensitivity' => T::SALES]),
             ], $rows, T::SALES)],
             'truncated' => $truncated,
-            'notes' => [['ar' => 'قبوضات بيع الوقود المسجَّلة بسندات، وتحصيلات تسوية الورديات (بلا ازدواج: سندات التسوية بلا إيصال محطة)؛ المبيعات الآجلة غير المسدَّدة لا تظهر هنا.', 'en' => 'Receipts recorded against fuel sales; unpaid deferred sales do not appear here.']],
+            'notes' => [['ar' => 'قبوضات بيع الوقود المسجَّلة بسندات، وتحصيلات تسوية الورديات (بلا ازدواج: سندات التسوية بلا إيصال محطة)؛ المبيعات الآجلة غير المسدَّدة لا تظهر هنا.', 'en' => 'Receipts recorded against fuel sales plus shift-settlement collections (no double count: settlement vouchers carry no station receipt); unpaid deferred sales do not appear here.']],
         ];
     }
 

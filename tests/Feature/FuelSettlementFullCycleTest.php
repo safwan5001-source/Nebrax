@@ -144,7 +144,7 @@ class FuelSettlementFullCycleTest extends TestCase
         $this->assertSame(20_000, (int) DB::table('stock_movements')->where('type', 'out')->whereIn('source_id', $sales->pluck('id'))->sum('quantity'));
         $cogs = (int) $sales->sum('cogs_minor');
         $cogsEntries = $sales->pluck('cogs_journal_entry_id')->filter()->all();
-        $this->assertGreaterThan(0, $cogs);
+        $this->assertSame(2_000_000, $cogs, 'متوسط تكلفة المجمّع 100 هللة/مل (100,000,000 ÷ 1,000,000) × 20,000 مل');
         $this->assertSame($cogs, $this->accountSum('5110', 'debit', $cogsEntries));
         $this->assertSame($cogs, $this->accountSum('1140', 'credit', $cogsEntries));
 
