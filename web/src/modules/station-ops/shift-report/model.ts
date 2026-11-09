@@ -204,7 +204,8 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
     }
 
     const reconciliation = collection.reconciliation;
-    if (reconciliation.visible) {
+    // فشل مغلق: المطابقة والمراجعة تتبعان علم `sales.visible` نفسه (الخادم يضبطها بصلاحية `fuel.sale.view` معاً)؛ حمولة متناقضة لا تكشف شيئاً.
+    if (reconciliation.visible && salesVisible) {
       const review = collection.review.visible ? collection.review.state : null;
       const direction = reconciliation.direction;
       const rows: KvRow[] = [
