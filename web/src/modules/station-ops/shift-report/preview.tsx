@@ -7,8 +7,12 @@ import type { Cell, ReportSection, ShiftReportModel } from './model';
  * AWJ-DOC-V2-PR7 — معاينة التقرير (DOM) من **النموذج نفسه** الذي يرسمه الـPDF: لا حقل ولا قيمة هنا غير ما في `ShiftReportModel`.
  * جوال أولاً (لا تجاوز أفقي للصفحة؛ الجدول العريض يتمرّر داخل غلافه وحده)، RTL/LTR بالخصائص المنطقية، والأرقام كما وصلت (0–9).
  */
+/** نص لاتيني/أرقام فقط (تاريخ، لترات، رقم وردية) يُعزل LTR كي لا يقلب سياق RTL ترتيب «التاريخ الوقت»؛ ما فيه عربية يُترك لسياقه. */
+const LATIN_ONLY = /^[\x20-\x7E]+$/;
+
 function CellText({ cell }: { cell: Cell }) {
-  return <span className={cn(cell.na ? 'text-muted' : 'text-text', cell.strong && !cell.na && 'font-semibold')}>{cell.text}</span>;
+  const ltr = LATIN_ONLY.test(cell.text);
+  return <span dir={ltr ? 'ltr' : undefined} className={cn(cell.na ? 'text-muted' : 'text-text', cell.strong && !cell.na && 'font-semibold', ltr && 'inline-block')}>{cell.text}</span>;
 }
 
 function Section({ section }: { section: ReportSection }) {
@@ -45,14 +49,14 @@ function Section({ section }: { section: ReportSection }) {
               {section.rows.length === 0 ? <tr><td colSpan={section.columns.length} className="px-1.5 py-2 text-muted">—</td></tr> : null}
               {section.rows.map((cells, index) => (
                 <tr key={index} className="border-t border-border">
-                  {cells.map((cell, i) => <td key={i} className={cn('num px-1.5 py-1.5 align-top', section.columns[i].align === 'end' ? 'text-end tabular-nums' : 'text-start')}><CellText cell={cell} /></td>)}
+                  {cells.map((cell, i) => <td key={i} className={cn('num px-1.5 py-1.5 align-top', section.columns[i].align === 'end' ? 'whitespace-nowrap text-end tabular-nums' : 'text-start')}><CellText cell={cell} /></td>)}
                 </tr>
               ))}
             </tbody>
             {section.totals ? (
               <tfoot>
                 <tr className="border-t-2 border-primary">
-                  {section.totals.map((cell, i) => <td key={i} className={cn('num px-1.5 py-1.5 font-bold', section.columns[i].align === 'end' ? 'text-end tabular-nums' : 'text-start')}><CellText cell={{ ...cell, strong: true }} /></td>)}
+                  {section.totals.map((cell, i) => <td key={i} className={cn('num px-1.5 py-1.5 font-bold', section.columns[i].align === 'end' ? 'whitespace-nowrap text-end tabular-nums' : 'text-start')}><CellText cell={{ ...cell, strong: true }} /></td>)}
                 </tr>
               </tfoot>
             ) : null}
