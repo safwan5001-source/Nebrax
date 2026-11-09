@@ -510,4 +510,36 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
         $this->assertSame(0, DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $result->settlementId)->count());
         $this->assertLessThan(30.0, $elapsed, 'مدة معاملة 8 فوهات ضمن حدّ معقول (الإيجار 300ث)');
     }
+
+    #[Test]
+    public function the_final_fiscal_close_racing_the_engine_never_closes_a_year_over_an_unposted_settlement(): void
+    {
+        $y = now()->year;
+        $described = app(\App\Services\Accounting\FiscalYearService::class)->create(['name' => "{$y}-race", 'start_date' => "{$y}-01-01", 'end_date' => "{$y}-12-31"], null);
+        $yearId = $described['id'];
+        $shift = $this->closedShift('fcr1', 1_000_000);
+
+        $results = $this->concurrently([
+            fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($shift->id), $this->f['actor'])->outcome,
+            function () use ($yearId) {
+                try {
+                    app(\App\Services\Accounting\FiscalCloseService::class)->close($yearId, null);
+
+                    return 'closed';
+                } catch (\RuntimeException $e) {
+                    return 'refused';
+                }
+            },
+        ]);
+
+        $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $posted = DB::table('fuel_shift_settlements')->where('fuel_shift_id', $shift->id)->exists();
+        if ($results[1]['value'] === 'closed') {
+            $this->assertTrue($posted, 'لا سنة مقفلة فوق تسوية غير مرحَّلة');
+        }
+        $this->assertContains($results[0]['value'], ['posted', 'blocked']);
+        if ($results[0]['value'] === 'blocked') {
+            $this->assertFalse($posted);
+        }
+    }
 }
