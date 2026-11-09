@@ -290,6 +290,27 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
             $g['amount'] += (int) ($r->amount_minor ?? $r->payment?->amount ?? 0);
             unset($g);
         }
+        // تحصيلات تسوية الورديات (P1-3b-2c): سندات بلا إيصال محطة (`fuel_sale_payment_receipt_id` فارغ) فلا تتداخل مع الإيصالات أعلاه ولا تُعدّ مرتين؛ بلحظة التحصيل الفعلية لا لحظة الترحيل.
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+        if ($tenantId !== null && $context->stationIds() !== []) {
+            $settlementRows = \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_collections as c')
+                ->join('fuel_shift_settlements as s', 's.id', '=', 'c.fuel_shift_settlement_id')
+                ->join('payments as p', 'p.id', '=', 'c.payment_id')
+                ->where('c.tenant_id', $tenantId)->whereNull('c.fuel_sale_payment_receipt_id')->whereIn('s.fuel_station_id', $context->scoped(\App\Models\FuelStation::query(), 'id')->select('fuel_stations.id'))->where('p.status', 'posted')
+                ->where('c.collected_at', '>=', $start)->where('c.collected_at', '<', $end)
+                ->get(['c.amount_minor', 'c.collected_at', 's.fuel_station_id', 'p.payment_method_name', 'p.method']);
+            foreach ($settlementRows as $row) {
+                if (! $context->inPeriod(\Carbon\CarbonImmutable::parse($row->collected_at, 'UTC'), (string) $row->fuel_station_id)) {
+                    continue;
+                }
+                $name = (string) ($row->payment_method_name ?: $row->method ?: '—');
+                $g = &$groups[$name];
+                $g ??= ['method' => $name, 'receipts' => 0, 'amount' => 0];
+                $g['receipts']++;
+                $g['amount'] += (int) $row->amount_minor;
+                unset($g);
+            }
+        }
         ksort($groups);
         $rows = array_values($groups);
         $total = array_sum(array_column($rows, 'amount'));
@@ -302,7 +323,7 @@ final class FuelFinancialReportBuilder implements FuelReportBuilder
                 T::col('amount', 'money', 'المبلغ', 'Amount', ['total' => 'sum', 'sensitivity' => T::SALES]), T::col('share_bp', 'bp', 'الحصة', 'Share', ['sensitivity' => T::SALES]),
             ], $rows, T::SALES)],
             'truncated' => $truncated,
-            'notes' => [['ar' => 'قبوضات بيع الوقود المسجَّلة بسندات؛ المبيعات الآجلة غير المسدَّدة لا تظهر هنا.', 'en' => 'Receipts recorded against fuel sales; unpaid deferred sales do not appear here.']],
+            'notes' => [['ar' => 'قبوضات بيع الوقود المسجَّلة بسندات، وتحصيلات تسوية الورديات (بلا ازدواج: سندات التسوية بلا إيصال محطة)؛ المبيعات الآجلة غير المسدَّدة لا تظهر هنا.', 'en' => 'Receipts recorded against fuel sales plus shift-settlement collections (no double count: settlement vouchers carry no station receipt); unpaid deferred sales do not appear here.']],
         ];
     }
 
