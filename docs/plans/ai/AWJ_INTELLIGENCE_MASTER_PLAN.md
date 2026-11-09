@@ -1,3 +1,5 @@
+> **الحالة (2026-11-09):** أرشيفي — نُفّذت الخطة فعلياً كـAI-01..07 (انظر `docs/reports/AWJ_AI_01_IMPLEMENTATION_REPORT.md`).
+
 # AWJ Intelligence — Master Plan (Proposal)
 
 **Date:** 2026-10-16  

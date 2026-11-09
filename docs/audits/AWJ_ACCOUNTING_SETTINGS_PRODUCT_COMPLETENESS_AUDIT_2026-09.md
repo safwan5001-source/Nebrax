@@ -1,3 +1,5 @@
+> **لقطة 2026-09 (من PR #704):** التدقيق يعكس الحالة وقت كتابته؛ الفجوة المسجَّلة (عدم ظهور سجل Account Routing في الواجهة/الـAPI) كانت ما زالت قائمة عند الأرشفة 2026-11-09.
+
 # أَوْج / AWJ ERP — Accounting Settings Product Completeness Audit
 
 **Date:** 2026-09
