@@ -102,6 +102,7 @@ describe('legacy paper ids are preserved byte for byte', () => {
       'tax-invoice-classic': 'a4', 'tax-invoice-classic-v2': 'a4', 'tax-invoice-modern': 'a4', 'tax-invoice-modern-v2': 'a4',
       'tax-invoice-erp': 'a4', 'tax-invoice-erp-v2': 'a4', 'tax-invoice-minimal': 'a4', 'tax-invoice-minimal-v2': 'a4',
       'tax-invoice-retail': 'a4', 'tax-invoice-retail-v2': 'a4', 'quotation-proposal': 'a4', 'purchase-order-formal': 'a4',
+      'voucher-compact': 'a4',
       'tax-invoice-thermal58': 'thermal_58', 'tax-invoice-thermal80': 'thermal_80',
     };
     for (const template of listTemplates()) {

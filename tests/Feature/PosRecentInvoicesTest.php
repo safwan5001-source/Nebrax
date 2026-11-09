@@ -13,6 +13,7 @@ use Tests\TestCase;
 class PosRecentInvoicesTest extends TestCase
 {
     use RefreshDatabase;
+    use SimulatesLegacyInvoiceRows;
     use InteractsWithApi;
 
     /** @test */
@@ -86,8 +87,10 @@ class PosRecentInvoicesTest extends TestCase
         };
         $older = $checkout('بيع أقدم');
         $newer = $checkout('بيع أحدث');
-        Invoice::whereKey($older['id'])->update(['invoice_date' => now()->subDay()->toDateString(), 'created_at' => now()->subDay()]);
-        Invoice::whereKey($newer['id'])->update(['invoice_date' => now()->toDateString(), 'created_at' => now()]);
+        $this->withoutInvoiceFrozenDateFences(function () use ($older, $newer) {
+            Invoice::whereKey($older['id'])->update(['invoice_date' => now()->subDay()->toDateString(), 'created_at' => now()->subDay()]);
+            Invoice::whereKey($newer['id'])->update(['invoice_date' => now()->toDateString(), 'created_at' => now()]);
+        });
 
         $this->withToken($auth['token'])->getJson('/api/pos/recent-invoices?limit=1')
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $newer['id']);

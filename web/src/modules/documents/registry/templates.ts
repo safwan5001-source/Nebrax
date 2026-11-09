@@ -11,6 +11,7 @@ import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { QuotationProposal } from '../templates/quotation-proposal';
 import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
+import { VoucherCompact } from '../templates/voucher-compact';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -129,6 +130,19 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     supportedPaper: ['a4', 'a4_landscape', 'letter', 'legal', 'a5_landscape'],
     minContentWidthMm: 182,
     documentTypes: ['purchase_order'],
+  },
+  // سند القبض/الصرف المدمج (AWJ-DOC-V2-PR5). غياب Output Profile = A4 كسائر القوالب. المقاسات المعلنة قيست في
+  // Chromium (معاينة + طباعة + PDF): A5 أفقي/عمودي وA6 أفقي لأسطر قليلة؛ ما زاد ينساب لصفحات تالية بلا قصّ.
+  // A6 عمودي وLetter/Legal غير معلنة (لم يُثبَت تخطيطها).
+  'voucher-compact': {
+    id: 'voucher-compact',
+    nameKey: 'voucher_compact',
+    component: VoucherCompact,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'a4_landscape', 'a5', 'a5_landscape', 'a6_landscape'],
+    minContentWidthMm: 128,
+    documentTypes: ['receipt_voucher', 'payment_voucher'],
+    preferredOutput: { paper: 'a5', orientation: 'landscape' },
   },
 };
 

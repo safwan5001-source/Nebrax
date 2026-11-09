@@ -28,6 +28,8 @@ const DECLARED: Record<string, { extra: string[]; minContentWidthMm: number }> =
   'tax-invoice-retail-v2': { extra: ['a4_landscape', 'a5_landscape'], minContentWidthMm: 182 },
   'quotation-proposal': { extra: ['a5_landscape'], minContentWidthMm: 182 },
   'purchase-order-formal': { extra: ['a5_landscape'], minContentWidthMm: 182 },
+  // AWJ-DOC-V2-PR5: السند المدمج — قيس في e2e/voucher-compact-pr5-harness.spec.ts (A6 عمودي وLetter/Legal غير معلنة).
+  'voucher-compact': { extra: ['a4_landscape', 'a5_landscape', 'a5', 'a6_landscape'], minContentWidthMm: 128 },
 };
 
 describe('الدعم المعلَن للقوالب = الدليل المقاس فقط', () => {
@@ -49,9 +51,9 @@ describe('الدعم المعلَن للقوالب = الدليل المقاس �
     for (const template of listTemplates()) expect(template.supportedPaper, template.id).not.toContain('a6');
   });
 
-  it('A5 العمودي معلَن لـclassic-v2 وحده', () => {
+  it('A5 العمودي معلَن لـclassic-v2 والسند المدمج وحدهما', () => {
     const owners = listTemplates().filter((template) => template.supportedPaper.includes('a5')).map((template) => template.id);
-    expect(owners).toEqual(['tax-invoice-classic-v2']);
+    expect(owners).toEqual(['tax-invoice-classic-v2', 'voucher-compact']);
   });
 });
 
