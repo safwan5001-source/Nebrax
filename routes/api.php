@@ -103,6 +103,7 @@ use App\Http\Controllers\Api\FuelStationReadinessController;
 use App\Http\Controllers\Api\FuelStaffController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
+use App\Http\Controllers\Api\FuelTankerController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
 use App\Http\Controllers\Api\FuelShiftSettlementPreviewController;
@@ -222,6 +223,7 @@ use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAuditController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
+use App\Http\Middleware\EnsureFuelTankerManagementEnabled;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsureCustomerPrincipal;
@@ -1737,6 +1739,21 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/corporate-contracts/{id}/suspend', [CorporateFuelContractController::class, 'suspend'])->middleware([$perm('fuel.contract.suspend'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/corporate-contracts/{id}/prices', [CorporateFuelContractController::class, 'storePrice'])->middleware([$perm('fuel.contract.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/corporate-contracts/{id}/credit-exposure', [CorporateFuelContractController::class, 'exposure'])->middleware([$perm('fuel.credit.view'), $commercialApp('fuel_stations.core')]);
+        // TANKER-PR1 — إدارة أصحاب الصهاريج (بيانات رئيسية فقط، بلا أثر مالي/مخزني). البوابة `fuel_stations.tanker_management_enabled` مغلقة افتراضياً ⇒ 404 موحَّد
+        // قبل أي صلاحية. لا مسار منها يصل جلسة PIN (خارج `StationSessionBoundary` = فشل مغلق).
+        $tankerGate = EnsureFuelTankerManagementEnabled::class;
+        Route::get('fuel-stations/tanker-owners', [FuelTankerController::class, 'owners'])->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-owners', [FuelTankerController::class, 'storeOwner'])->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tanker-owners/{id}', [FuelTankerController::class, 'showOwner'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/tanker-owners/{id}', [FuelTankerController::class, 'updateOwner'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tanker-owners/{ownerId}/company-links', [FuelTankerController::class, 'links'])->whereUuid('ownerId')->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-owners/{ownerId}/company-links', [FuelTankerController::class, 'storeLink'])->whereUuid('ownerId')->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/tanker-owners/{ownerId}/company-links/{linkId}/end', [FuelTankerController::class, 'endLink'])->whereUuid(['ownerId', 'linkId'])->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tankers', [FuelTankerController::class, 'tankers'])->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tankers', [FuelTankerController::class, 'storeTanker'])->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tankers/{id}', [FuelTankerController::class, 'showTanker'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/tankers/{id}', [FuelTankerController::class, 'updateTanker'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
         Route::get('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'vehicles'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'storeVehicle'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/fleet/drivers', [FuelFleetController::class, 'drivers'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
