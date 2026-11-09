@@ -16559,6 +16559,7 @@
           "none": "Matched"
         },
         "provisional": "Provisional difference — for supervisor review",
+        "partial": "Partial",
         "reviewState": {
           "none": "No review",
           "not_required": "Not required",
@@ -16592,6 +16593,7 @@
           "collectionNone": "No collection declaration was recorded for this shift.",
           "salesHidden": "You are not allowed to view amounts; litres only.",
           "namesUnavailable": "Employee names are not available in the current shift data; signature spots are left for handwriting.",
+          "litersPartial": "Some litres are partial: the shift closed with missing meter readings, so the quantities marked partial are not confirmed totals.",
           "meterNote": "Litres come from the meter-reading difference; they are not sales, collection or stock movement.",
           "mismatch": "The meter total frozen at closing differs from the sum of the readings shown.",
           "readingsPartial": "Some nozzles have no complete reading; the litres total is the server's.",

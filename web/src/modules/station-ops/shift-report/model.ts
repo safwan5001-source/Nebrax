@@ -111,10 +111,10 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   // ───── المبيعات ─────
   const salesVisible = frozen && collection.sales.visible;
   const frozenProducts = frozen ? collection.sales.products : [];
-  type Row = { id: string; name: string; ml: number; price: number | null | undefined; amount: number | null | undefined };
+  type Row = { id: string; name: string; ml: number; partial?: boolean; price: number | null | undefined; amount: number | null | undefined };
   let productRows: Row[] = [];
   if (frozen) {
-    productRows = frozenProducts.map((product) => ({ id: product.fuel_product_id, name: product.name ?? '', ml: product.milliliters, price: salesVisible ? product.price_per_liter_minor : null, amount: salesVisible ? product.amount_minor : null }));
+    productRows = frozenProducts.map((product) => ({ id: product.fuel_product_id, name: product.name ?? '', ml: product.milliliters, partial: product.gaps.length > 0, price: salesVisible ? product.price_per_liter_minor : null, amount: salesVisible ? product.amount_minor : null }));
   } else if (readings) {
     const byProduct = new Map<string, Row>();
     for (const group of readings.groups) {
@@ -134,14 +134,17 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
     { key: 'liters', label: `${t('doc.field.liters')} (${t('doc.unit')})`, align: 'end' },
     ...(showAmounts ? [{ key: 'price', label: t('doc.field.price'), align: 'end' as const }, { key: 'amount', label: t('doc.field.amount'), align: 'end' as const }] : []),
   ];
+  // لقطة مجمَّدة فيها فجوات (قراءة ناقصة): الكمية جزئية لا مؤكدة، والصفر مع فجوة «غير متاح» لا صفر مؤكد.
+  const litersCell = (row: Row): Cell => (row.partial ? (row.ml === 0 ? { text: t('doc.reading.incomplete'), na: true } : { text: `${litersOf(row.ml)} (${t('doc.partial')})` }) : { text: litersOf(row.ml) });
+  const litersPartial = frozen && (collection.sales.milliliters_complete === false || collection.sales.products.some((product) => product.gaps.length > 0));
   const salesTableRows: Cell[][] = productRows.map((row) => [
     text(row.name),
-    { text: litersOf(row.ml) },
+    litersCell(row),
     ...(showAmounts ? [money(row.price), money(row.amount)] : []),
   ]);
   const salesTotals: Cell[] = [
     { text: t('doc.total.liters'), strong: true },
-    { text: litersOf(serverMl), strong: true },
+    { text: litersPartial ? `${litersOf(serverMl)} (${t('doc.partial')})` : litersOf(serverMl), strong: true },
     ...(showAmounts ? [dash(), collection.sales.complete ? money(collection.sales.amount_minor, true) : na()] : []),
   ];
   sections.push({ kind: 'table', key: 'sales', title: t('doc.section.sales'), columns: salesColumns, rows: salesTableRows, totals: salesTotals });
@@ -247,6 +250,7 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   const notes: ReportSection[] = [];
   if (collection === null) notes.push({ kind: 'note', key: 'amounts-unavailable', tone: 'warning', text: t('doc.note.amountsUnavailable') });
   else if (!frozen) notes.push({ kind: 'note', key: 'amounts-not-frozen', tone: 'warning', text: t('doc.note.amountsNotFrozen') });
+  if (litersPartial) notes.push({ kind: 'note', key: 'liters-partial', tone: 'warning', text: t('doc.note.litersPartial') });
   if (readings?.summary.mismatch) notes.push({ kind: 'note', key: 'mismatch', tone: 'warning', text: t('doc.note.mismatch') });
   else if (readings && readings.summary.invalid > 0) notes.push({ kind: 'note', key: 'readings-partial', tone: 'warning', text: t('doc.note.readingsPartial') });
   const namesUnavailable = closerName === null;

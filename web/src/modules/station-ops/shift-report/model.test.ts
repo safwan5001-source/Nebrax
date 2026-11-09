@@ -181,6 +181,35 @@ describe('shift report model — collection vs sales, honesty, permissions', () 
   });
 });
 
+describe('shift report model — incomplete readings in a frozen snapshot', () => {
+  const partialSnapshot = () => frozenCollection({
+    sales: {
+      ...frozenCollection().sales, complete: false, milliliters_complete: false, amount_minor: null, gaps: ['missing_reading'],
+      products: [
+        { fuel_product_id: 'p1', name: 'Alpha', nozzle_count: 2, milliliters: 790_500, price_per_liter_minor: 200, price_source: 'x', amount_minor: null, gaps: ['missing_reading'] },
+        { fuel_product_id: 'p2', name: 'Beta', nozzle_count: 1, milliliters: 0, price_per_liter_minor: 250, price_source: 'x', amount_minor: null, gaps: ['missing_reading'] },
+      ],
+    },
+    reconciliation: { visible: true, final: false, reason: 'sales_incomplete', collected_total_minor: 283_100, sales_minor: null, difference_minor: null, direction: null },
+  });
+
+  it.each([['a4'], ['a5']] as const)('(%s) partial product litres are labelled, a zero with a gap is "unavailable", the total is partial and a warning is shown', (paper) => {
+    const model = buildShiftReport(base({ paper, collection: partialSnapshot() }));
+    const sales = table(model, 'sales');
+    expect(sales.rows[0][1].text).toBe('790.500 (Partial)');
+    expect(sales.rows[1][1].na).toBe(true); // لا «0.000» مؤكد
+    expect(sales.rows[1][1].text).not.toMatch(/^0/);
+    expect(sales.totals?.[1].text).toContain('(Partial');
+    expect(section(model, 'liters-partial')).toBeDefined();
+  });
+
+  it('a complete snapshot has no partial labels or warning', () => {
+    const model = buildShiftReport(base());
+    expect(JSON.stringify(model.sections)).not.toContain('Partial');
+    expect(section(model, 'liters-partial')).toBeUndefined();
+  });
+});
+
 describe('shift report model — server cash summary rows', () => {
   const summary = (over: Partial<CashSummary> = {}): CashSummary => ({
     state: 'frozen', basis: 'declared_collection',
