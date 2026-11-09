@@ -55,9 +55,9 @@ class FuelSettlementFullCycleTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function report(string $key): array
+    private function report(string $key, ?\Closure $branchScope = null): array
     {
-        return app(FuelReportEngine::class)->run($this->f['actor'], $key, ['station_id' => $this->f['station']->id], null, fn ($q) => $q);
+        return app(FuelReportEngine::class)->run($this->f['actor'], $key, ['station_id' => $this->f['station']->id], null, $branchScope ?? fn ($q) => $q);
     }
 
     private function accountSum(string $code, string $side, array $entryIds): int
@@ -164,6 +164,12 @@ class FuelSettlementFullCycleTest extends TestCase
         $this->assertSame(4600, (int) $this->summary($methods)['amount'], 'إجمالي المقبوض = إجمالي المبيعات (إيصالات ERP + تحصيل التسوية، كل سند مرة)');
         $this->assertSame(4, array_sum(array_column($byMethod, 0)), 'أربع قبوضات: إيصالان + تخصيصان');
         $this->assertSame([1730, 2870], collect($byMethod)->map(fn ($v) => $v[1])->sort()->values()->all());
+
+        // نطاق الفرع النشط يشمل تحصيلات التسوية كإيصالات ERP: فرع آخر ⇒ لا مقبوض من هذه المحطة، وفرعها ⇒ المجموع نفسه.
+        $otherBranch = fn ($q) => $q->where($q->getModel()->getTable().'.branch_id', (string) \Illuminate\Support\Str::uuid());
+        $this->assertSame(0, (int) ($this->summary($this->report('financial.payment_methods', $otherBranch))['amount'] ?? 0));
+        $ownBranch = fn ($q) => $q->where($q->getModel()->getTable().'.branch_id', $f['branch']->id);
+        $this->assertSame(4600, (int) $this->summary($this->report('financial.payment_methods', $ownBranch))['amount']);
 
         $revenue = $this->report('financial.revenue');
         $this->assertSame(4600, (int) collect($revenue['tables'][0]['rows'])->sum(fn ($r) => (int) ($r['gross'] ?? $r['total'] ?? $r['amount'] ?? 0)), 'إيراد المحطة = مجموع الفواتير مرة واحدة');
