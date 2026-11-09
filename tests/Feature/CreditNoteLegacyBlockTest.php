@@ -36,6 +36,7 @@ use Tests\TestCase;
 class CreditNoteLegacyBlockTest extends TestCase
 {
     use RefreshDatabase;
+    use SimulatesLegacyInvoiceRows;
 
     private const REASON = 'مراجعة المالية: التسوية تخص هذا البند فقط';
 
@@ -261,7 +262,7 @@ class CreditNoteLegacyBlockTest extends TestCase
     {
         \App\Support\Settings::put('sales', ['return_window_days' => 1]);
         $invoice = $this->sale([$this->item(2, 10000)]);
-        Invoice::query()->whereKey($invoice->id)->update(['invoice_date' => now()->subDays(30)->toDateString()]);
+        $this->withoutInvoiceFrozenDateFences(fn () => Invoice::query()->whereKey($invoice->id)->update(['invoice_date' => now()->subDays(30)->toDateString()]));
 
         // قائمة المصادر تعلّم الفاتورة خارج مهلة الردّ (للمرتجعات)…
         $source = collect($this->getJson("/api/returns/sources/sales?partner_id={$invoice->partner_id}")->assertOk()->json('data'))->firstWhere('id', $invoice->id);

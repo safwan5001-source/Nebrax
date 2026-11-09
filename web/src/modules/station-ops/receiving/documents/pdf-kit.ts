@@ -47,18 +47,34 @@ export const hasArabic = (text: string): boolean => ARABIC.test(text);
 
 export interface TextStyle { size?: number; bold?: boolean; align?: 'left' | 'right' | 'center'; color?: [number, number, number]; maxWidth?: number }
 
+/** فراغ وعلامات ترقيم لاتينية: عند حدّ المقطع العربي تُرسم قطعاً مستقلة (وإلا ظهرت النقطة الختامية في أول السطر بدل آخره). */
+const BOUNDARY_NEUTRALS = ' :.,;!?';
+
 /** حروف لاتينية وأرقام: تُرسم دائماً بـ Helvetica كمقطع مستقل (تفادي إعادة ترتيب الأرقام داخل النص العربي). */
 const LATIN_LETTER = /[A-Za-z0-9]/;
 
 /** مقاطع النص بحسب الخط اللازم: خط Noto العربي لا يحوي الحروف اللاتينية (تختفي)، فتُرسم المقاطع اللاتينية والأرقام بـ Helvetica والعربية بـ Noto. المحايد (مسافة/ترقيم) يلتصق بالمقطع السابق. */
-export function scriptRuns(value: string): Array<{ text: string; arabic: boolean }> {
-  const out: Array<{ text: string; arabic: boolean }> = [];
-  for (const char of value) {
-    const arabic = ARABIC.test(char) ? true : LATIN_LETTER.test(char) ? false : (out.length > 0 ? out[out.length - 1].arabic : hasArabic(value));
+export function scriptRuns(value: string): Array<{ text: string; arabic: boolean; neutral?: boolean }> {
+  // نص بلا عربي: مقطع لاتيني واحد كما كان (لا حاجة لأي تقطيع).
+  if (!hasArabic(value)) return value === '' ? [] : [{ text: value, arabic: false }];
+  const chars = [...value];
+  const kind = chars.map((c) => (ARABIC.test(c) ? 'A' : LATIN_LETTER.test(c) ? 'L' : 'N'));
+  const out: Array<{ text: string; arabic: boolean; neutral?: boolean }> = [];
+  chars.forEach((char, i) => {
+    // (1) الأقواس: تشكيل jsPDF للعربية يُسقط كل ما قبل القوس إن كان داخل المقطع العربي، فتصير قطعة مستقلة (يعكس شكلها `text()` في اتجاه RTL).
+    // (2) الفراغ وعلامات الترقيم اللاتينية (: . , ; ! ?) غير المحصورة بين حرفين عربيين مباشرة: قطعة مستقلة بترتيبها المنطقي، فلا يضيع الفراغ عند الحدّ ولا يقفز «:» إلى الطرف الآخر.
+    //     أما الفراغ بين كلمتين عربيتين فيبقى في مقطعه (التشكيل يعتمد عليه).
+    const standalone = char === '(' || char === ')'
+      || (BOUNDARY_NEUTRALS.includes(char) && !(kind[i - 1] === 'A' && kind[i + 1] === 'A') && !(kind[i - 1] === 'L' && kind[i + 1] === 'L'));
+    if (standalone) {
+      out.push({ text: char, arabic: false, neutral: true });
+      return;
+    }
+    const arabic = kind[i] === 'A' ? true : kind[i] === 'L' ? false : (out.length > 0 ? out[out.length - 1].arabic : true);
     const last = out[out.length - 1];
-    if (last && last.arabic === arabic) last.text += char;
+    if (last && !last.neutral && last.arabic === arabic) last.text += char;
     else out.push({ text: char, arabic });
-  }
+  });
   return out;
 }
 
@@ -79,13 +95,16 @@ function measure(pdf: PdfDoc, parts: Array<{ shown: string; arabic: boolean }>, 
  */
 export function text(pdf: PdfDoc, value: string, x: number, y: number, style: TextStyle = {}): void {
   const { size = 9, bold = false, align = 'left', color = [17, 24, 39], maxWidth } = style;
-  const parts = scriptRuns(value).map((run) => ({ ...run, shown: run.arabic && pdf.processArabic ? pdf.processArabic(run.text) : run.text }));
+  const runs = scriptRuns(value);
+  const rtl = align === 'right' || (align === 'center' && runs.find((run) => !run.neutral)?.arabic === true);
+  const mirror = (ch: string) => (ch === '(' ? ')' : ch === ')' ? '(' : ch);
+  // الأقواس في اتجاه RTL تُعكس (القوس المنطقي الأول يظهر مفتوحاً نحو النص) كما في الاتجاه الثنائي القياسي.
+  const parts = runs.map((run) => ({ ...run, shown: run.neutral ? (rtl ? mirror(run.text) : run.text) : (run.arabic && pdf.processArabic ? pdf.processArabic(run.text) : run.text) }));
   let fontSize = size;
   if (maxWidth !== undefined) {
     while (fontSize > 5.5 && measure(pdf, parts, bold, fontSize) > maxWidth) fontSize -= 0.5;
   }
   const total = measure(pdf, parts, bold, fontSize);
-  const rtl = align === 'right' || (align === 'center' && parts[0]?.arabic === true);
   let cursor = align === 'center' ? x + (rtl ? total / 2 : -total / 2) : x;
   if (align === 'left') cursor = x;
   const ordered = rtl ? parts : parts;
