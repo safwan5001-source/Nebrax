@@ -183,4 +183,57 @@ class FuelSettlementFiscalCloseTest extends TestCase
         DB::table('fuel_cost_pool_open_histories')->update(['resolution_id' => $resolution, 'resolved_at' => now()]);
         $this->assertSame('finalized', $this->sale('dr-sale2', $live)->status);
     }
+
+    /** @test */
+    public function a_job_that_ended_disabled_after_the_policy_was_switched_off_no_longer_blocks(): void
+    {
+        $this->closedShift('dis1');
+        $this->assertCount(1, $this->pendingItems());
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['shift_settlement_mode' => 'none'], $this->f['actor'], 'إيقاف');
+
+        app(\App\Services\FuelShiftSettlementJobRunner::class)->run();   // المهمة تنتهي disabled
+
+        $this->assertSame('disabled', DB::table('fuel_shift_settlement_jobs')->value('last_outcome'));
+        $this->assertSame([], $this->pendingItems());
+    }
+
+    /** @test */
+    public function shifts_closed_before_the_policy_was_enabled_mid_year_do_not_block(): void
+    {
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['shift_settlement_mode' => 'none'], $this->f['actor'], 'قبل التفعيل');
+        $this->closedShift('pre1');                       // أُغلقت قبل التفعيل: بلا مهمة
+        $this->travel(5)->seconds();
+        app(FuelStationSettingsService::class)->putStationValues($this->f['station'], ['shift_settlement_mode' => 'post_on_close'], $this->f['actor'], 'تفعيل وسط السنة');
+        $this->assertSame([], $this->pendingItems(), 'التفعيل نفسه لا يُنشئ مانعاً بأثر رجعي');
+
+        $this->closedShift('post1', 2_000_000);           // بعد التفعيل: مهمة ⇒ معلّقة حتى تُرحَّل
+        $items = $this->pendingItems();
+        $this->assertCount(1, $items);
+        $this->assertSame(1, $items[0]['details']['count']);
+    }
+
+    /** @test */
+    public function the_supply_day_follows_the_station_timezone_across_the_year_boundary(): void
+    {
+        $y = now()->year;
+        $this->travelTo(\Carbon\CarbonImmutable::parse("{$y}-12-31 21:00:00", 'UTC'));
+        $shift = $this->open('tz1');
+        foreach (['opening' => 1_000_000, 'closing' => 1_020_000] as $stage => $ml) {
+            app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "tz-{$stage}",
+            ], $this->f['actor']);
+        }
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'tz-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+        ], $this->f['actor']);
+        $this->travelTo(\Carbon\CarbonImmutable::parse("{$y}-12-31 22:30:00", 'UTC'));   // 01:30 يناير بتوقيت الرياض
+        app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+
+        $this->assertSame([], $this->pendingItems(), 'يوم التوريد 1 يناير فلا يخص سنة هذه الوردية المنتهية في 31 ديسمبر UTC');
+        $next = $y + 1;
+        $described = app(FiscalYearService::class)->create(['name' => (string) $next, 'start_date' => "{$next}-01-01", 'end_date' => "{$next}-12-31"], null);
+        $readiness = app(FiscalCloseService::class)->readiness(FiscalYear::findOrFail($described['id']));
+        $this->assertCount(1, array_filter($readiness['blockers'], fn ($i) => ($i['code'] ?? null) === 'fuel_settlement_pending'), 'وتخص السنة التالية');
+    }
 }
