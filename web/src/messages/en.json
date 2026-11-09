@@ -16475,6 +16475,141 @@
         "safetyNote": "This policy is operational only: it creates no stock movement, changes no cost, approves no adjustment, and changes no earlier reading."
       }
     },
+    "shiftReport": {
+      "actions": {
+        "title": "Shift closing & handover report",
+        "lead": "Preview, print or download the report from here — read-only, it never changes the shift.",
+        "justClosedTitle": "Shift closed — its report is ready",
+        "justClosedBody": "You can now preview, print or download the report as PDF.",
+        "preview": "Preview report",
+        "print": "Print report",
+        "download": "Download PDF",
+        "share": "Share PDF",
+        "working": "Preparing…",
+        "paper": "Paper size",
+        "paperA4": "A4 portrait — detailed",
+        "paperA5": "A5 landscape — brief",
+        "downloaded": "The file is ready and downloading.",
+        "opened": "The file opened in a new tab; print it from there through the print dialog.",
+        "popupBlocked": "The browser blocked opening the file. Use “Download PDF”.",
+        "shared": "Shared.",
+        "failed": "The report could not be prepared. Try again.",
+        "loadFailed": "The report data could not be loaded. Check the connection and try again.",
+        "notOpen": "The report is available only after the shift is closed.",
+        "closePreview": "Close preview",
+        "previewTitle": "Shift report preview",
+        "loading": "Loading report data…",
+        "printNote": "Printing goes through the browser or system print dialog — there is no silent printing."
+      },
+      "doc": {
+        "title": "Shift Closing & Handover Report",
+        "detailed": "Detailed version",
+        "brief": "Brief version",
+        "company": "Company",
+        "vat": "VAT number",
+        "cr": "CR number",
+        "currency": "SAR",
+        "unit": "L",
+        "status": {
+          "closed": "Closed",
+          "approved": "Approved"
+        },
+        "na": "Not available",
+        "section": {
+          "shift": "Shift details",
+          "sales": "Sales",
+          "readings": "Pump and nozzle readings",
+          "collection": "Collection",
+          "reconciliation": "Reconciliation",
+          "cash": "Drawer cash",
+          "handover": "Handover"
+        },
+        "field": {
+          "number": "Shift number",
+          "status": "Status",
+          "station": "Station",
+          "stationCode": "Station code",
+          "opened": "Started",
+          "closed": "Ended",
+          "approved": "Approved",
+          "duration": "Duration",
+          "responsible": "Responsible employee",
+          "product": "Product",
+          "liters": "Litres",
+          "price": "Price per litre",
+          "amount": "Amount",
+          "total": "Total",
+          "pump": "Pump",
+          "nozzle": "Nozzle",
+          "opening": "Opening",
+          "closing": "Closing",
+          "delta": "Difference",
+          "method": "Payment method",
+          "collected": "Total collected",
+          "cashDeclared": "Cash declared",
+          "networkDeclared": "Network declared",
+          "salesDue": "Sales due",
+          "difference": "Difference",
+          "result": "Result",
+          "review": "Supervisor review"
+        },
+        "direction": {
+          "overage": "Overage",
+          "shortage": "Shortage",
+          "none": "Matched"
+        },
+        "provisional": "Provisional difference — for supervisor review",
+        "reviewState": {
+          "none": "No review",
+          "not_required": "Not required",
+          "pending": "Pending review",
+          "reviewed": "Reviewed"
+        },
+        "cash": {
+          "openingFloat": "Opening float",
+          "sales": "Sales cash",
+          "declaredSales": "Declared cash",
+          "cashIn": "Cash in",
+          "handover": "Handed to treasury",
+          "otherOut": "Other cash out",
+          "expenses": "Expenses",
+          "counted": "Counted cash",
+          "expected": "Expected cash",
+          "expectedPartial": "Expected (partial)",
+          "variance": "Cash variance",
+          "network": "Network (info only)"
+        },
+        "reading": {
+          "missing": "Not recorded",
+          "incomplete": "Incomplete"
+        },
+        "total": {
+          "liters": "Total litres (meters)"
+        },
+        "note": {
+          "amountsUnavailable": "Sales, collection and reconciliation amounts are not available for this shift (collection declaration unavailable, or you lack permission to view them).",
+          "amountsNotFrozen": "This shift's amounts were not frozen at closing, so they are not printed.",
+          "collectionNone": "No collection declaration was recorded for this shift.",
+          "salesHidden": "You are not allowed to view amounts; litres only.",
+          "namesUnavailable": "Employee names are not available in the current shift data; signature spots are left for handwriting.",
+          "meterNote": "Litres come from the meter-reading difference; they are not sales, collection or stock movement.",
+          "mismatch": "The meter total frozen at closing differs from the sum of the readings shown.",
+          "readingsPartial": "Some nozzles have no complete reading; the litres total is the server's.",
+          "tableCut": "The readings table is shortened in the brief version; see the detailed version.",
+          "operational": "Read-only operational report."
+        },
+        "sign": {
+          "handedOver": "Handing-over employee",
+          "received": "Receiver",
+          "supervisor": "Supervisor",
+          "signature": "Signature"
+        },
+        "footer": {
+          "generatedAt": "Generated",
+          "page": "Page"
+        }
+      }
+    },
     "receiving": {
       "title": "Fuel receiving",
       "subtitle": "Receiving drafts and approvals",

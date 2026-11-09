@@ -396,7 +396,9 @@ describe('read-only and app-only', () => {
     await screen.findByText('SH-100');
     // الزر الوحيد الآخر هو «مساعدة هذه الشاشة» (مقروء فقط: يفتح ورقة شرح ولا يكتب شيئاً).
     const controls = screen.getAllByRole('button').filter((button) => button.getAttribute('aria-label') !== 'Help for this screen');
-    expect(controls.map((button) => button.textContent?.trim())).toEqual(['Refresh']);
+    // PR7: وردية مغلقة ⇒ إجراءات تقرير الإغلاق (معاينة/طباعة/PDF/مشاركة) + اختيار الورق — كلها قراءة فقط ولا تكتب شيئاً.
+    const reportControls = ['Preview report', 'Print report', 'Download PDF', 'Share PDF'];
+    expect(controls.map((button) => button.textContent?.trim()).filter((text) => !reportControls.includes(text ?? '') && !/^A[45] /.test(text ?? ''))).toEqual(['Refresh']);
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
