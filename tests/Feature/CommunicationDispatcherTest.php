@@ -475,6 +475,46 @@ class CommunicationDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function a_recovered_retry_stays_pinned_to_the_original_provider_even_if_registry_order_changes(): void
+    {
+        $tenant = $this->commTenant();
+        $id = $this->enqueueMessage($tenant->id);
+        $holder = null;
+        $calls = 0;
+        $a = $this->probe(function () use (&$holder, &$calls, $tenant) {
+            if (++$calls === 1) {
+                $this->travel(121)->seconds();
+                $holder->recoverExpiredLeases($tenant->id);
+            }
+
+            return DispatchResult::accepted('prov-a');
+        }, idempotent: true, key: 'provider-a');
+        $b = $this->probe(fn () => DispatchResult::accepted('prov-b'), idempotent: true, key: 'provider-b');
+        $holder = $this->dispatcherFor($a, $b);
+
+        $holder->dispatchDue($tenant->id);
+        $this->assertSame('retry_scheduled', $this->messageRow($id)->status);
+        $this->travel(61)->seconds();
+
+        // سجل جديد بترتيب معكوس (B أولاً): الاختيار الافتراضي كان سيرسل عبر B.
+        $reordered = $this->dispatcherFor($b, $a);
+        $reordered->dispatchDue($tenant->id);
+
+        $this->assertCount(0, $b->received, 'the retry must never go through another provider');
+        $this->assertCount(2, $a->received);
+        $this->assertSame('accepted', $this->messageRow($id)->status);
+
+        // وإن غاب المزوّد الأصلي: لا إعادة توجيه، تبقى الرسالة بلا إرسال.
+        $id2 = $this->enqueueMessage($tenant->id);
+        DB::table('communication_messages')->where('id', $id2)->update(['status' => 'retry_scheduled', 'attempt_count' => 1, 'next_attempt_at' => now()->subSecond()->toDateTimeString()]);
+        $this->insertCommAttempt($tenant->id, $id2, ['attempt_no' => 1, 'provider_key' => 'provider-a', 'outcome' => 'abandoned']);
+        $onlyB = $this->dispatcherFor($b);
+        $onlyB->dispatchDue($tenant->id);
+        $this->assertCount(0, $b->received);
+        $this->assertSame('retry_scheduled', $this->messageRow($id2)->status);
+    }
+
+    #[Test]
     public function recovery_turns_an_expired_lease_into_unknown_for_a_non_idempotent_provider(): void
     {
         $tenant = $this->commTenant();

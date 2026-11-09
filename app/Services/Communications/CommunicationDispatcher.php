@@ -88,7 +88,7 @@ final class CommunicationDispatcher
             })
             ->orderBy('next_attempt_at')->orderBy('id')
             ->limit(max(1, min($limit, self::MAX_BATCH)))
-            ->get(['id', 'channel', 'classification']);
+            ->get(['id', 'channel', 'classification', 'attempt_count']);
 
         foreach ($candidates as $candidate) {
             try {
@@ -134,10 +134,26 @@ final class CommunicationDispatcher
 
     private function dispatchOne(string $tenantId, CommunicationMessage $candidate, RunSummary $summary): void
     {
-        $provider = $this->registry->resolve(
-            CommunicationChannel::from($candidate->channel),
-            MessageClassification::from($candidate->classification),
-        );
+        $channel = CommunicationChannel::from($candidate->channel);
+        $classification = MessageClassification::from($candidate->classification);
+
+        // إعادة محاولة بعد استرجاع إيجار: تُثبَّت على مزوّد المحاولة السابقة (مفتاح `cm:<id>` لا يزيل التكرار عبر مزوّدَين مختلفين).
+        // لا نعيد التوجيه إلى مزوّد آخر إن غاب الأصلي أو لم يعد يدعم الزوج: تُترك الرسالة لمحاولة لاحقة بدل خطر إرسال مزدوج.
+        if ((int) $candidate->attempt_count > 0) {
+            $pinnedKey = CommunicationMessageAttempt::query()
+                ->where('tenant_id', $tenantId)
+                ->where('message_id', $candidate->id)
+                ->orderByDesc('attempt_no')
+                ->value('provider_key');
+            $provider = is_string($pinnedKey) ? $this->registry->byKey($pinnedKey) : null;
+            if ($provider === null || ! $provider->capabilities()->supports($channel, $classification)) {
+                $summary->increment('skipped_pinned_provider_unavailable');
+
+                return;
+            }
+        } else {
+            $provider = $this->registry->resolve($channel, $classification);
+        }
         if ($provider === null) {
             $summary->increment('skipped_no_provider');
 
