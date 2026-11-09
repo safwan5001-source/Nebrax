@@ -28,13 +28,24 @@ class FuelShiftSettlementJobRunner
         private TenantContext $tenant,
         ?SettlementJobHandler $handler = null,
     ) {
-        $this->handler = $handler ?? app(FuelShiftSettlementPrecheckHandler::class);
+        $this->handler = $handler ?? $this->defaultHandler();
+    }
+
+    /**
+     * المحرك لا يُستعمل إلا حين يُعلَن تفصيل الفواتير `per_nozzle` (شرط النشر الثالث، T-1)؛ وإلا يبقى المعالج الخامل (فحوص مسبقة فقط) كما كان حرفياً.
+     * (البوابة والسياسة تُفحصان داخل المعالجَين؛ هذا الاختيار لا يفتح شيئاً بنفسه.)
+     */
+    private function defaultHandler(): SettlementJobHandler
+    {
+        return FuelShiftSettlementReadiness::granularityDeclared()
+            ? app(FuelShiftSettlementEngineHandler::class)
+            : app(FuelShiftSettlementPrecheckHandler::class);
     }
 
     /** @return array<string,mixed> */
     public function run(?int $limit = null, ?string $workerToken = null): array
     {
-        $summary = ['claimed' => 0, 'blocked' => 0, 'awaiting_engine' => 0, 'disabled' => 0, 'errors' => 0, 'failed' => 0, 'lost_lease' => 0];
+        $summary = ['claimed' => 0, 'posted' => 0, 'blocked' => 0, 'awaiting_engine' => 0, 'disabled' => 0, 'errors' => 0, 'failed' => 0, 'lost_lease' => 0];
         if (! FuelShiftSettlementReadiness::enabled()) {
             return $summary + ['skipped' => 'gate_closed'];
         }
@@ -65,6 +76,12 @@ class FuelShiftSettlementJobRunner
     {
         try {
             $outcome = $this->handler->handle($job);
+            if ($outcome->outcome === FuelShiftSettlementJob::OUTCOME_POSTED) {
+                // أُنهيت المهمة داخل معاملة الترحيل نفسها (FuelShiftSettlementEngineHandler) فلا تسجيل ثانٍ.
+                $summary['posted']++;
+
+                return;
+            }
             if (! $this->jobs->record($job, $token, $outcome)) {
                 $summary['lost_lease']++;
 

@@ -619,7 +619,14 @@ class FuelShiftSettlementPostingTest extends TestCase
                 $callers[] = basename($file->getPathname());
             }
         }
-        $this->assertSame(['FuelShiftSettlementPostingService.php'], $callers, 'لا مسار إنتاجي يستدعي المحرك قبل 2d');
+        sort($callers);
+        // P1-3b-2d: مستهلك واحد فقط هو معالج المهمة؛ لا الإغلاق ولا نقطة نهاية ولا المشغّل مباشرة.
+        $this->assertSame(['FuelShiftSettlementEngineHandler.php', 'FuelShiftSettlementPostingService.php'], $callers, 'معالج المهمة هو المستهلك الوحيد للمحرك');
+        $runner = (string) file_get_contents(app_path('Services/FuelShiftSettlementJobRunner.php'));
+        $this->assertStringNotContainsString('FuelShiftSettlementPostingService', $runner);
+        $close = (string) file_get_contents(app_path('Services/FuelShiftService.php'));
+        $this->assertStringNotContainsString('FuelShiftSettlementPostingService', $close);
+        $this->assertStringNotContainsString('FuelShiftSettlementEngineHandler', $close);
 
         $sales = (string) file_get_contents(app_path('Services/FuelSaleService.php'));
         $this->assertStringContainsString('public function finalize(FuelSale $sale, User $actor): FuelSale', $sales);

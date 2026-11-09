@@ -22,7 +22,7 @@ class FuelShiftSettlementJob extends BaseModel
     public const OUTCOME_BLOCKED = 'blocked';
     public const OUTCOME_AWAITING_ENGINE = 'awaiting_engine';
     public const OUTCOME_DISABLED = 'disabled';
-    /** محجوز لمحرك P1-3b-2؛ لا يصل إليه أي مسار في P1-3b-1. */
+    /** يصل إليه معالج المحرك وحده (P1-3b-2d) بعد ترحيل ناجح داخل معاملة الإنهاء. */
     public const OUTCOME_POSTED = 'posted';
 
     protected $guarded = ['*'];

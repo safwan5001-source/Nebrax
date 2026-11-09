@@ -7,7 +7,7 @@ use App\Models\FuelShiftSettlementJob;
 /**
  * نتيجة تقييم مهمة تسوية وردية (P1-3b-1) — قيمة نقية. الأسباب رموز ثابتة غير مالية فقط (لا قيم ولا بيانات شخصية).
  *
- * لا يوجد فرع «تم الترحيل» قابل للبناء من هنا: محرك الترحيل P1-3b-2 يضيفه بموافقة جديدة (والثابت `OUTCOME_POSTED` محجوز في النموذج).
+ * `posted` (P1-3b-2d) لا يُبنى إلا من معالج المحرك بعد ترحيل (أو إعادة) ناجح؛ ويُسجَّل إنهاؤه **داخل معاملة الترحيل نفسها** فلا يمرّ بـ`record()` ثانيةً.
  */
 final class SettlementJobOutcome
 {
@@ -35,8 +35,14 @@ final class SettlementJobOutcome
         return new self(FuelShiftSettlementJob::OUTCOME_DISABLED);
     }
 
+    /** تسوية الوردية رُحِّلت (أو وُجد ترحيلها السابق). المهمة تنتهي بالنتيجة نفسها. */
+    public static function posted(): self
+    {
+        return new self(FuelShiftSettlementJob::OUTCOME_POSTED);
+    }
+
     public function isFinal(): bool
     {
-        return $this->outcome === FuelShiftSettlementJob::OUTCOME_DISABLED;
+        return $this->outcome === FuelShiftSettlementJob::OUTCOME_DISABLED || $this->outcome === FuelShiftSettlementJob::OUTCOME_POSTED;
     }
 }
