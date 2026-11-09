@@ -12,6 +12,7 @@ vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname, useRouter: 
 vi.mock('@/lib/company', () => ({ useCompany: () => ({ name: 'Acme Fuel Co', logo: null }) }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn(), downloadFile: vi.fn(async () => 'downloaded'), fetchPrivateFileUrl: vi.fn(async () => 'blob:local-preview') }));
 vi.mock('./documents/receipt-pdf', () => ({ createReceiptPdf: vi.fn(async () => new Blob(['%PDF-receipt'], { type: 'application/pdf' })), footers: vi.fn() }));
+vi.mock('./documents/receipt-pdf-a5', () => ({ createReceiptPdfA5: vi.fn(async () => new Blob(['%PDF-receipt-a5'], { type: 'application/pdf' })) }));
 vi.mock('./documents/report-pdf', () => ({ createReportPdf: vi.fn(async () => new Blob(['%PDF-report'], { type: 'application/pdf' })) }));
 vi.mock('./documents/share', () => ({
   downloadBlob: vi.fn(), openForPrint: vi.fn(() => true), shareBlob: vi.fn(async () => 'shared'), blobFromObjectUrl: vi.fn(async () => new Blob(['xlsx'])),
@@ -24,6 +25,7 @@ import type { Station } from '../schemas';
 import { StationOpsShell } from '../shell';
 import { connectReceiving, type ReceivingWorld } from './__receiving-backend';
 import { createReceiptPdf } from './documents/receipt-pdf';
+import { createReceiptPdfA5 } from './documents/receipt-pdf-a5';
 import { createReportPdf } from './documents/report-pdf';
 import { downloadBlob, openForPrint, shareBlob } from './documents/share';
 import { ReceivingCostsScreen } from './receiving-costs-screen';
@@ -72,7 +74,7 @@ const pdf = (name = 'note.pdf', size = 64) => new File([new Uint8Array(size)], n
 beforeEach(() => {
   Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   localStorage.clear(); sessionStorage.clear(); apiMock.mockReset(); vi.mocked(downloadFile).mockClear();
-  vi.mocked(createReceiptPdf).mockClear(); vi.mocked(createReportPdf).mockClear(); vi.mocked(downloadBlob).mockClear(); vi.mocked(openForPrint).mockClear(); vi.mocked(shareBlob).mockClear();
+  vi.mocked(createReceiptPdf).mockClear(); vi.mocked(createReceiptPdfA5).mockClear(); vi.mocked(createReportPdf).mockClear(); vi.mocked(downloadBlob).mockClear(); vi.mocked(openForPrint).mockClear(); vi.mocked(shareBlob).mockClear();
   nav.pathname = '/fuel-stations/ops/receiving';
 });
 afterEach(() => cleanup());
@@ -404,6 +406,90 @@ describe('print, download and share (B5.1)', () => {
     await user.click(details.querySelector('[data-doc-action="xlsx-download"]') as HTMLElement);
     await waitFor(() => expect(downloadFile).toHaveBeenCalledTimes(1));
     expect(String(vi.mocked(downloadFile).mock.calls[0][0])).toMatch(/\/deliveries\/export\?.*variant=operational/);
+  });
+});
+
+describe('A5 landscape voucher (AWJ-DOC-V2-PR6)', () => {
+  it('defaults to the historical A4 voucher; the paper choice exists on the voucher only, never on the statement', async () => {
+    const user = userEvent.setup();
+    seedUser(STAFF);
+    connect(build({ canSeeCost: false, deliveries: [draft() as never] }));
+    await open();
+    expect(document.querySelector('[data-paper="a4"]')?.getAttribute('aria-checked')).toBe('true');
+    expect(document.querySelector('[data-paper="a5"]')?.getAttribute('aria-checked')).toBe('false');
+    await user.click(document.querySelector('[data-doc-action="pdf-download"]') as HTMLElement);
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
+    expect(createReceiptPdf).toHaveBeenCalledTimes(1);
+    expect(createReceiptPdfA5).not.toHaveBeenCalled();
+    expect(vi.mocked(downloadBlob).mock.calls[0][1]).not.toMatch(/-a5-/);
+    cleanup();
+
+    renderOps(<ReceivingListScreen />);
+    await screen.findByText('Station A', undefined, { timeout: 4000 }).catch(() => undefined);
+    expect(document.querySelector('[data-paper-group]')).toBeNull();
+  });
+
+  it('choosing A5 draws the A5 voucher from the same server payload (same endpoint, no cost for a cost-blind user) and says so in the file name', async () => {
+    const user = userEvent.setup();
+    seedUser(STAFF);
+    connect(build({ canSeeCost: false, deliveries: [draft({ received_total_cost_minor: 500_000 }) as never] }));
+    await open();
+    await user.click(document.querySelector('[data-paper="a5"]') as HTMLElement);
+    expect(document.querySelector('[data-paper="a5"]')?.getAttribute('aria-checked')).toBe('true');
+    await user.click(document.querySelector('[data-doc-action="pdf-download"]') as HTMLElement);
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
+    expect(createReceiptPdfA5).toHaveBeenCalledTimes(1);
+    expect(createReceiptPdf).not.toHaveBeenCalled();
+    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toMatch(/-operational-a5-.*\.pdf$/);
+    // الصلاحية والعزل بيد الخادم: نقطة النهاية نفسها والنسخة التشغيلية فقط، ولا مبلغ في الحمولة.
+    expect(world.gets.filter((url) => /\/document\?/.test(url))).toHaveLength(1);
+    expect(world.gets.some((url) => /variant=financial/.test(url))).toBe(false);
+    const payload = vi.mocked(createReceiptPdfA5).mock.calls[0][0] as unknown as Record<string, unknown>;
+    expect(payload.variant).toBe('operational');
+    expect(payload).not.toHaveProperty('cost');
+    expect(JSON.stringify(payload)).not.toMatch(/500000|5,000/);
+  });
+
+  it('remembers the choice on this device only (local preference), and falls back to A4 when storage is blocked', async () => {
+    const user = userEvent.setup();
+    seedUser(FINANCE);
+    connect(build({ deliveries: [draft({ received_total_cost_minor: 500_000 }) as never] }));
+    await open();
+    await user.click(document.querySelector('[data-paper="a5"]') as HTMLElement);
+    expect(localStorage.getItem('awj.fuel-receipt.paper')).toBe('a5');
+    cleanup();
+    await open();
+    await waitFor(() => expect(document.querySelector('[data-paper="a5"]')?.getAttribute('aria-checked')).toBe('true'));
+    await user.click(document.querySelector('[data-variant="financial"]') as HTMLElement);
+    await user.click(document.querySelector('[data-doc-action="pdf-print"]') as HTMLElement);
+    await waitFor(() => expect(openForPrint).toHaveBeenCalledTimes(1));
+    expect((vi.mocked(createReceiptPdfA5).mock.calls[0][0] as unknown as { cost: { total_minor: number } }).cost.total_minor).toBe(500_000);
+    cleanup();
+
+    // تخزين محجوب لمفتاح التفضيل وحده: يبقى A4 والشاشة تعمل (بقية التخزين، كالجلسة، سليمة).
+    const original = Storage.prototype.getItem;
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+      if (key === 'awj.fuel-receipt.paper') throw new Error('blocked');
+      return original.call(this, key);
+    });
+    try {
+      await open();
+      expect(document.querySelector('[data-paper="a4"]')?.getAttribute('aria-checked')).toBe('true');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('the paper choice is accessible in Arabic (radiogroup, labelled, no axe violations)', async () => {
+    seedUser(FINANCE);
+    connect(build({ deliveries: [draft() as never] }));
+    renderOps(<ReceivingDetailScreen id={UID(1)} />, 'ar');
+    await waitFor(() => expect(document.querySelector('[data-paper-group]')).not.toBeNull());
+    const group = document.querySelector('[data-paper-group]') as HTMLElement;
+    expect(group.getAttribute('role')).toBe('radiogroup');
+    expect(group.getAttribute('aria-label')).toBe('حجم الورق');
+    expect(group.textContent).toContain('A5 أفقي');
+    expect((await axe(group, { rules: { 'color-contrast': { enabled: false }, region: { enabled: false } } })).violations).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Download, FileSpreadsheet, FileText, Printer, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { StationOpsError } from '../read-client';
 import { useReceivingAccess } from './data';
 import { reportLabels, receiptLabels } from './documents/labels';
 import { createReceiptPdf } from './documents/receipt-pdf';
+import { createReceiptPdfA5 } from './documents/receipt-pdf-a5';
 import { createReportPdf } from './documents/report-pdf';
 import { blobFromObjectUrl, downloadBlob, openForPrint, shareBlob } from './documents/share';
 import {
@@ -26,21 +27,39 @@ export type DocTarget = { kind: 'receipt'; deliveryId: string; reference: string
 
 type Action = 'pdf-print' | 'pdf-download' | 'pdf-share' | 'xlsx-download' | 'xlsx-share';
 
+/** حجم ورق سند الاستلام (PDF): A4 عمودي هو الافتراضي التاريخي؛ A5 أفقي نسخة اختيارية (AWJ-DOC-V2-PR6). الكشف (report) A4 دائماً. */
+export type ReceiptPaper = 'a4' | 'a5';
+export const RECEIPT_PAPER_KEY = 'awj.fuel-receipt.paper';
+
+/** تفضيل الجهاز المحلي فقط (لا خادم): غيابه أو تعذّر التخزين = A4. */
+function readPaper(): ReceiptPaper {
+  try { return window.localStorage.getItem(RECEIPT_PAPER_KEY) === 'a5' ? 'a5' : 'a4'; } catch { return 'a4'; }
+}
+function rememberPaper(paper: ReceiptPaper): void {
+  try { window.localStorage.setItem(RECEIPT_PAPER_KEY, paper); } catch { /* تخزين محجوب: يبقى الاختيار لهذه الجلسة */ }
+}
+
 export function DocumentActions({ target, branchId }: { target: DocTarget; branchId?: string | null }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
   const access = useReceivingAccess();
   const [variant, setVariant] = useState<ReceivingExportVariant>('operational');
+  const [paper, setPaper] = useState<ReceiptPaper>('a4');
   const [busy, setBusy] = useState<Action | null>(null);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; key: string } | null>(null);
   const lock = useRef(false);
+  const isReceipt = target.kind === 'receipt';
+  useEffect(() => { setPaper(readPaper()); }, []); // بعد التركيب فقط: لا اختلاف ترطيب بين الخادم والمتصفح
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const base = target.kind === 'receipt' ? `fuel-receipt-${target.reference}-${variant}-${stamp}` : `fuel-receipts-${variant}-${stamp}`;
+  const base = target.kind === 'receipt' ? `fuel-receipt-${target.reference}-${variant}${paper === 'a5' ? '-a5' : ''}-${stamp}` : `fuel-receipts-${variant}-${stamp}`;
 
   const makePdf = async (): Promise<Blob> => {
     const tt = t as unknown as (key: string) => string;
-    if (target.kind === 'receipt') return createReceiptPdf(await getReceiptDocument(target.deliveryId, variant, { branchId }), receiptLabels(tt), locale);
+    if (target.kind === 'receipt') {
+      const receipt = await getReceiptDocument(target.deliveryId, variant, { branchId });
+      return paper === 'a5' ? createReceiptPdfA5(receipt, receiptLabels(tt), locale) : createReceiptPdf(receipt, receiptLabels(tt), locale);
+    }
     return createReportPdf(await getReceiptReport(target.query, variant, { branchId }), reportLabels(tt), locale);
   };
 
@@ -91,6 +110,16 @@ export function DocumentActions({ target, branchId }: { target: DocTarget; branc
             <button key={value} type="button" role="radio" aria-checked={variant === value} data-variant={value} onClick={() => { setVariant(value); setMessage(null); }}
               className={cn('min-h-12 rounded-lg border px-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', variant === value ? 'border-primary bg-primary-soft text-primary' : 'border-[color:var(--fo-control)] text-text')}>
               {t(`receiving.docs.variant_${value}`)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {isReceipt ? (
+        <div role="radiogroup" aria-label={t('receiving.docs.paper')} data-paper-group="" className="grid grid-cols-2 gap-2">
+          {(['a4', 'a5'] as const).map((value) => (
+            <button key={value} type="button" role="radio" aria-checked={paper === value} data-paper={value} onClick={() => { setPaper(value); rememberPaper(value); setMessage(null); }}
+              className={cn('min-h-12 rounded-lg border px-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', paper === value ? 'border-primary bg-primary-soft text-primary' : 'border-[color:var(--fo-control)] text-text')}>
+              {t(`receiving.docs.paper_${value}`)}
             </button>
           ))}
         </div>
