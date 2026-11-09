@@ -339,6 +339,8 @@ class FuelShiftSettlementPreviewService
                 ->where('created_at', '>=', $shift->opened_at)
                 ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at)))
             ->whereNotIn('id', FuelSalePaymentReceipt::query()->select('payment_id'))
+            // سندات أنشأتها تسوية وردية أخرى (P1-3b-2c) موسومة بجدول التخصيصات؛ ترحيلها أثناء وردية لاحقة ليس قبضاً غير موسوم.
+            ->whereNotIn('id', fn ($q) => $q->from('fuel_shift_settlement_collections')->select('payment_id'))
             ->exists();
     }
 
@@ -363,7 +365,7 @@ class FuelShiftSettlementPreviewService
      * @param  list<string>  $blockers
      * @return array{reference:array<string,mixed>,declaration:array<string,mixed>,allocation:array<string,mixed>,variances:array<string,mixed>,blockers:list<string>}
      */
-    private function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
+    public function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
     {
         // المبيعات النهائية بفواتيرها (كل الشرائح: عميل المحطة، مسمّون، عقود) — من المجموعة نفسها التي حُسب منها Q_erp.
         $sales = $finalizedSales->filter(fn (FuelSale $sale) => $sale->invoice_id !== null)->values();
@@ -462,7 +464,7 @@ class FuelShiftSettlementPreviewService
             }
         }
         foreach ($postedLines as $line) {
-            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
+            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'nozzle_id' => $line['nozzle_id'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
         }
         $heldCap = $pending;
 
@@ -479,7 +481,7 @@ class FuelShiftSettlementPreviewService
                 $pay = min($left, $target['remaining']);
                 if ($pay > 0) {
                     $rows[] = ['payment_method_id' => $methodId, 'method' => $allowed->get($methodId)?->name, 'settlement_type' => $allowed->get($methodId)?->settlement_type,
-                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
+                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'nozzle_id' => $target['nozzle_id'] ?? null, 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
                     $target['remaining'] -= $pay;
                     $left -= $pay;
                 }

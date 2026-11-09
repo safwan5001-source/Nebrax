@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\FuelShift;
+use App\Models\FuelShiftCollectionDeclaration;
 use App\Models\FuelStation;
 use App\Models\ProductWarehouseStock;
 use Carbon\CarbonImmutable;
@@ -33,7 +34,8 @@ class FuelShiftSettlementEvaluator
      * @return array{
      *   blockers:list<string>, tax_mode:?string, hash:string,
      *   supply:array{started_at:string,ended_at:string,business_date:string},
-     *   lines:list<array<string,mixed>>
+     *   lines:list<array<string,mixed>>,
+     *   finance:array<string,mixed>, collection:array{collected_at:?string,collection_date:?string,declaration_revision:?int}
      * }
      */
     public function evaluate(FuelShift $shift, CarbonInterface $now): array
@@ -152,6 +154,28 @@ class FuelShiftSettlementEvaluator
             }
         }
 
+        // التخصيص والفروق (الشبكة أولاً ثم النقد) بالخوارزمية الوحيدة نفسها التي تعرضها المعاينة؛ ERP هنا بمصدر `station` وحده.
+        $walkIn = $this->readiness->walkInPartner($station);
+        $stationSales = FuelSale::query()->where('fuel_shift_id', $shift->id)->where('status', FuelSale::STATUS_FINALIZED)
+            ->where('source', 'station')->orderBy('finalized_at')->orderBy('id')->get();
+        $finance = $this->preview->finance($shift, $station, $walkIn?->id, $lines, [], $stationSales);
+        foreach ($finance['blockers'] as $blocker) {
+            $blockers[] = $blocker;
+        }
+
+        // تاريخ التحصيل الفعلي: لحظة إقرار التحصيل (دليل العدّ والتسليم) بيومها التجاري في المحطة — **مستقل** عن تاريخ التوريد.
+        $declaration = FuelShiftCollectionDeclaration::query()->where('fuel_shift_id', $shift->id)->first();
+        $collection = ['collected_at' => null, 'collection_date' => null, 'declaration_revision' => $declaration?->revision];
+        if ($declaration?->declared_at !== null) {
+            $declaredAt = CarbonImmutable::instance($declaration->declared_at);
+            $collection['collected_at'] = $declaredAt->utc()->format('Y-m-d H:i:s');
+            $collection['collection_date'] = $this->settings->businessDate($station, $declaredAt);
+            // فترة/سنة التحصيل مقفلة ⇒ لا ترحيل (لا تاريخ بديل)، وتُفحص على تاريخ التحصيل لا التوريد.
+            if (($finance['allocation']['rows'] ?? []) !== [] && $this->preview->periodLocked($collection['collection_date'])) {
+                $blockers[] = 'FUEL_SETTLEMENT_COLLECTION_PERIOD_LOCKED';
+            }
+        }
+
         $blockers = array_values(array_unique(array_filter($blockers)));
         sort($blockers);
 
@@ -160,15 +184,19 @@ class FuelShiftSettlementEvaluator
             'tax_mode' => $taxMode,
             'supply' => $supply,
             'lines' => $lines,
-            'hash' => $this->hash($shift, $taxMode, $lines, $blockers, $supply),
+            'finance' => $finance,
+            'collection' => $collection,
+            'hash' => $this->hash($shift, $taxMode, $lines, $blockers, $supply, $finance, $collection),
         ];
     }
 
     /** بصمة حتمية لحالة التقييم: تستعمل لمقارنة التقييم قبل المِرساة وبعدها، ولتُخزَّن في الرأس. */
-    private function hash(FuelShift $shift, ?string $taxMode, array $lines, array $blockers, array $supply): string
+    private function hash(FuelShift $shift, ?string $taxMode, array $lines, array $blockers, array $supply, array $finance, array $collection): string
     {
         $canonical = [
-            'shift' => $shift->id, 'tax_mode' => $taxMode, 'supply' => $supply, 'blockers' => $blockers,
+            'shift' => $shift->id, 'tax_mode' => $taxMode, 'supply' => $supply, 'blockers' => $blockers, 'collection' => $collection,
+            'allocation' => array_map(fn (array $r) => [$r['payment_method_id'], $r['target_kind'], $r['target_ref'], $r['nozzle_id'] ?? null, $r['invoice_id'], $r['amount_minor']], $finance['allocation']['rows'] ?? []),
+            'variances' => $finance['variances'] ?? [], 'reference_total' => $finance['reference']['total_minor'] ?? null,
             'lines' => array_map(fn (array $l) => [
                 $l['nozzle_id'], $l['state'], $l['metered_milliliters'], $l['erp_milliliters'], $l['residual_milliliters'], $l['price_per_liter_minor'],
             ], $lines),

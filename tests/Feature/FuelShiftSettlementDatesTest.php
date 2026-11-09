@@ -170,6 +170,25 @@ class FuelShiftSettlementDatesTest extends TestCase
         $this->rejectsDb(fn () => DB::table('fuel_shift_settlements')->where('id', $id)->update(['status' => 'withheld']));
     }
 
+    /** @test */
+    public function collection_dates_migration_rolls_back_cleanly_without_rows_and_up_restores_the_guards(): void
+    {
+        $migration = require base_path('database/migrations/2027_01_22_010000_add_collection_dates_to_fuel_shift_settlement_collections.php');
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('fuel_shift_settlement_collections', 'collected_at'));
+        $this->assertFalse(Schema::hasColumn('fuel_shift_settlement_collections', 'collection_date'));
+
+        $migration->up();
+        $this->assertTrue(Schema::hasColumn('fuel_shift_settlement_collections', 'collected_at'));
+        $this->assertTrue(Schema::hasColumn('fuel_shift_settlement_collections', 'collection_date'));
+        // إدراج بلا تاريخ تحصيل مرفوض في القاعدة (الفحص يسبق أي مفتاح أجنبي لأن المُشغّل/القيد على الصف نفسه).
+        $this->rejectsDb(fn () => DB::table('fuel_shift_settlement_collections')->insert([
+            'id' => (string) Str::uuid(), 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id,
+            'fuel_shift_settlement_id' => (string) Str::uuid(), 'payment_method_id' => $this->f['cash']->id, 'invoice_id' => (string) Str::uuid(),
+            'payment_id' => (string) Str::uuid(), 'target_kind' => 'settlement', 'amount_minor' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]));
+    }
+
     // ───────── القارئ ─────────
 
     /** @test */

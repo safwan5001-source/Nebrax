@@ -67,6 +67,8 @@ return [
         'batch_limit' => max(1, (int) env('FUEL_SETTLEMENT_JOB_BATCH_LIMIT', 20)),
         // نافذة رجوع (أيام) لإظهار ورديات مغلقة بلا مهمة (فشل تسجيل) في نموذج التسويات المعلقة.
         'unregistered_lookback_days' => max(1, (int) env('FUEL_SETTLEMENT_UNREGISTERED_LOOKBACK_DAYS', 14)),
+        // مهلة انتظار المِرساة (مللي ثانية، PostgreSQL) قبل أن يتنحّى المحرك بحجب `FUEL_SETTLEMENT_LOCK_BUSY`؛ أقل من `deadlock_timeout` (1ث) كي لا يُختار مستند مستخدم ضحية جمود.
+        'anchor_wait_ms' => max(50, min(900, (int) env('FUEL_SETTLEMENT_ANCHOR_WAIT_MS', 700))),
     ],
 
     /*

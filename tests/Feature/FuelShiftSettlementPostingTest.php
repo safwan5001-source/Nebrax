@@ -56,7 +56,7 @@ class FuelShiftSettlementPostingTest extends TestCase
     }
 
     /** وردية مغلقة بالمسار الحقيقي: عدّاد 20 لتراً (إغلاق − افتتاح) + إقرار نقد 46.00. */
-    private function closedShift(string $key, int $openingMeter = 1_000_000, ?callable $beforeClose = null, int $deltaMl = 20_000, int $cashMinor = 4600): FuelShift
+    private function closedShift(string $key, int $openingMeter = 1_000_000, ?callable $beforeClose = null, int $deltaMl = 20_000, int $cashMinor = 4600, int $bankMinor = 0, ?string $note = null): FuelShift
     {
         $shift = $this->open($key);
         foreach (['opening' => $openingMeter, 'closing' => $openingMeter + $deltaMl] as $stage => $ml) {
@@ -71,11 +71,11 @@ class FuelShiftSettlementPostingTest extends TestCase
             'idempotency_key' => $shift->id.'decl', 'base_revision' => 0,
             'lines' => [
                 ['payment_method_id' => $this->f['cash']->id, 'amount_minor' => $cashMinor],
-                ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0],
+                ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => $bankMinor],
             ],
         ], $this->f['actor']);
 
-        return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + $cashMinor, null, $this->f['actor']);
+        return app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + $cashMinor, $note, $this->f['actor']);
     }
 
     private function engine(): FuelShiftSettlementPostingService
@@ -164,7 +164,7 @@ class FuelShiftSettlementPostingTest extends TestCase
         $this->assertSame('credit', $invoice->payment_type);
         $this->assertSame(4600, (int) $invoice->total);
         $this->assertSame(600, (int) $invoice->tax_amount);
-        $this->assertSame(0, (int) $invoice->paid_amount);
+        $this->assertSame(4600, (int) $invoice->paid_amount, 'سند قبض نقدي J3 بكامل قيمة الفاتورة');
         $lines = JournalLine::where('journal_entry_id', $invoice->journal_entry_id)->with('account')->get();
         $this->assertSame(4600, (int) $lines->sum('debit'));
         $this->assertSame(4600, (int) $lines->sum('credit'));
@@ -187,8 +187,19 @@ class FuelShiftSettlementPostingTest extends TestCase
         $this->assertSame($before['fuel_shift_settlements'] + 1, $after['fuel_shift_settlements']);
         $this->assertSame($before['fuel_sales'] + 1, $after['fuel_sales']);
         $this->assertSame($before['invoices'] + 1, $after['invoices']);
-        $this->assertSame($before['journal_entries'] + 2, $after['journal_entries'], 'قيد الفاتورة + قيد التكلفة');
-        $this->assertSame($before['payments'], $after['payments'], 'لا سندات قبض قبل 2c');
+                $this->assertSame($before['payments'] + 1, $after['payments'], 'سند قبض واحد (J3)');
+        $this->assertSame($before['journal_entries'] + 2, $after['journal_entries'] - 1, 'قيد السند فوق قيدَي الفاتورة والتكلفة');
+        $collection = DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->sole();
+        $this->assertSame(4600, (int) $collection->amount_minor);
+        $this->assertSame('settlement', $collection->target_kind);
+        $this->assertSame($invoice->id, $collection->invoice_id);
+        // J3: مدين الخزينة النقدية (1110) / دائن العملاء (1130) بتاريخ التحصيل.
+        $receipt = DB::table('payments')->where('id', $collection->payment_id)->first();
+        $this->assertSame('posted', $receipt->status);
+        $receiptLines = JournalLine::where('journal_entry_id', $receipt->journal_entry_id)->with('account')->get();
+        $this->assertSame(4600, (int) $receiptLines->filter(fn ($l) => $l->account->code === '1110')->sum('debit'));
+        $this->assertSame(4600, (int) $receiptLines->filter(fn ($l) => $l->account->code === '1130')->sum('credit'));
+        $this->assertSame(0, DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $result->settlementId)->count(), 'لا فرق عند التطابق');
 
         // التواريخ الأربعة: التوريد = تاريخ الفاتورة = تاريخ القيد (يوم الإغلاق بتقويم المحطة)، ولحظة الإصدار من الفاتورة.
         $dates = app(FuelShiftSettlementDates::class)->forSettlement($result->settlementId);
@@ -273,6 +284,265 @@ class FuelShiftSettlementPostingTest extends TestCase
         $this->assertSame(SettlementPostingResult::BLOCKED, $result->outcome);
         $this->assertSame(['FUEL_SETTLEMENT_ZERO_VALUE_RESIDUAL'], $result->reasons);
         $this->assertSame($before, $this->counts());
+    }
+
+    // ───────── 2c: التحصيل (نقد / شبكة / مختلط) والفروق وتاريخ التحصيل ─────────
+
+    /** @return array<string,mixed> */
+    private function collectionsOf(string $settlementId): array
+    {
+        return DB::table('fuel_shift_settlement_collections as c')->join('payment_methods as m', 'm.id', '=', 'c.payment_method_id')
+            ->where('c.fuel_shift_settlement_id', $settlementId)->orderBy('m.settlement_type')->get(['c.*', 'm.settlement_type'])->all();
+    }
+
+    /** @test */
+    public function a_network_payment_posts_a_bank_receipt_not_cash(): void
+    {
+        $shift = $this->closedShift('n1', 1_000_000, null, 20_000, 0, 4600);
+        $result = $this->engine()->post($shift, $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome);
+        $rows = $this->collectionsOf($result->settlementId);
+        $this->assertCount(1, $rows);
+        $this->assertSame('bank', $rows[0]->settlement_type);
+        $lines = JournalLine::where('journal_entry_id', DB::table('payments')->where('id', $rows[0]->payment_id)->value('journal_entry_id'))->with('account')->get();
+        $this->assertSame(0, (int) $lines->filter(fn ($l) => $l->account->code === '1110')->sum('debit'), 'الشبكة لا تمسّ الخزينة النقدية');
+        $this->assertSame(4600, (int) $lines->filter(fn ($l) => $l->account->code === '1130')->sum('credit'));
+        $this->assertSame(4600, (int) $lines->sum('debit'));
+        $this->assertSame(4600, (int) $lines->sum('credit'));
+    }
+
+    /** @test */
+    public function a_mixed_collection_fills_with_the_network_first_then_cash_and_conserves_money(): void
+    {
+        $shift = $this->closedShift('m1', 1_000_000, null, 20_000, 2000, 2600);   // شبكة 2600 + نقد 2000 = 4600
+        $result = $this->engine()->post($shift, $this->f['actor']);
+
+        $rows = $this->collectionsOf($result->settlementId);
+        $byType = collect($rows)->groupBy('settlement_type')->map(fn ($g) => (int) $g->sum('amount_minor'));
+        $this->assertSame(['bank' => 2600, 'cash' => 2000], $byType->all());
+        $invoice = Invoice::findOrFail(DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->value('invoice_id'));
+        $this->assertSame(4600, (int) $invoice->paid_amount);
+        $this->assertSame('paid', $invoice->payment_status);
+        $this->assertSame(0, DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $result->settlementId)->count());
+        // 1130 للعميل النقدي: +4600 فاتورة − 2600 − 2000 = 0 (حفظ المال).
+        $net = JournalLine::query()->whereHas('account', fn ($q) => $q->where('code', '1130'))
+            ->whereIn('journal_entry_id', array_merge(
+                [$invoice->journal_entry_id],
+                DB::table('payments')->whereIn('id', collect($rows)->pluck('payment_id'))->pluck('journal_entry_id')->all(),
+            ))->get();
+        $this->assertSame(0, (int) $net->sum('debit') - (int) $net->sum('credit'));
+    }
+
+    /** @test */
+    public function a_shortage_stays_as_an_open_receivable_and_a_surplus_is_a_record_only(): void
+    {
+        $short = $this->engine()->post($this->closedShift('s1', 1_000_000, null, 20_000, 4000, 0, 'عجز اختبار'), $this->f['actor']);
+        $v = DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $short->settlementId)->get();
+        $this->assertCount(1, $v);
+        $this->assertSame('shortage', $v[0]->kind);
+        $this->assertSame(600, (int) $v[0]->amount_minor);
+        $this->assertNull($v[0]->payment_method_id);
+        $invoice = Invoice::findOrFail(DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $short->settlementId)->value('invoice_id'));
+        $this->assertSame(4000, (int) $invoice->paid_amount);
+        $this->assertSame('partial', $invoice->payment_status);
+
+        $surplus = $this->engine()->post($this->closedShift('s2', 2_000_000, null, 20_000, 5000, 0, 'زيادة اختبار'), $this->f['actor']);
+        $this->assertSame(SettlementPostingResult::POSTED, $surplus->outcome, json_encode($surplus->reasons));
+        $v2 = DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $surplus->settlementId)->get();
+        $this->assertCount(1, $v2);
+        $this->assertSame('surplus', $v2[0]->kind);
+        $this->assertSame(400, (int) $v2[0]->amount_minor);
+        $this->assertSame(4600, (int) DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $surplus->settlementId)->sum('amount_minor'), 'الزيادة لا تُقبض');
+    }
+
+    /** @test */
+    public function the_receipt_date_is_the_actual_collection_date_distinct_from_the_supply_and_posting_dates(): void
+    {
+        // وردية تُقرّ تحصيلها قبل منتصف الليل (اليوم 1) وتُغلق بعده (اليوم 2) ثم تُرحَّل في اليوم 3.
+        $tz = app(FuelStationSettingsService::class)->operatingTimezone($this->f['station']);
+        $day1 = \Carbon\CarbonImmutable::now($tz)->addDays(10)->setTime(23, 40);
+        $this->travelTo($day1->subHours(1));
+        $shift = $this->open('d1');
+        foreach (['opening' => 1_000_000, 'closing' => 1_020_000] as $stage => $ml) {
+            app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "d1-{$stage}",
+            ], $this->f['actor']);
+        }
+        $this->travelTo($day1);
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'd1-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+        ], $this->f['actor']);
+        $this->travelTo($day1->addMinutes(30));                       // بعد منتصف الليل ⇒ يوم الإغلاق = اليوم 2
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+        $this->travelTo($day1->addDays(1)->setTime(10, 0));           // الترحيل في اليوم 3 (بعد يوم الإغلاق)... اليوم 2 + 10 ساعات
+
+        $result = $this->engine()->post($closed, $this->f['actor']);
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome, json_encode($result->reasons));
+
+        $supplyDate = $day1->addMinutes(30)->toDateString();
+        $collectionDate = $day1->toDateString();
+        $this->assertNotSame($supplyDate, $collectionDate);
+        $dates = app(FuelShiftSettlementDates::class)->forSettlement($result->settlementId);
+        $this->assertSame($supplyDate, $dates['supply']['business_date']);
+        $this->assertSame($supplyDate, $dates['lines'][0]['invoice_date']);
+        $this->assertSame($supplyDate, $dates['lines'][0]['entry_date'], 'قيد الفاتورة بتاريخ التوريد');
+
+        $collection = DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->sole();
+        $this->assertSame($collectionDate, substr((string) $collection->collection_date, 0, 10), 'تاريخ التحصيل = يوم الإقرار');
+        $payment = DB::table('payments')->where('id', $collection->payment_id)->first();
+        $this->assertSame($collectionDate, substr((string) $payment->payment_date, 0, 10));
+        $receiptEntry = DB::table('journal_entries')->where('id', $payment->journal_entry_id)->first();
+        $this->assertSame($collectionDate, substr((string) $receiptEntry->entry_date, 0, 10), 'قيد السند بتاريخ التحصيل لا التوريد');
+        $this->assertNotSame($supplyDate, substr((string) $receiptEntry->entry_date, 0, 10));
+        // لحظة الكتابة الفعلية (الترحيل) ثالثة مستقلة.
+        $this->assertSame($day1->addDays(1)->toDateString(), \Carbon\CarbonImmutable::parse($receiptEntry->created_at)->setTimezone($tz)->toDateString());
+    }
+
+    /** @test */
+    public function a_locked_collection_period_blocks_everything_even_when_the_supply_period_is_open(): void
+    {
+        $tz = app(FuelStationSettingsService::class)->operatingTimezone($this->f['station']);
+        $day1 = \Carbon\CarbonImmutable::now($tz)->addDays(10)->setTime(23, 40);
+        $this->travelTo($day1->subHours(1));
+        $shift = $this->open('lc1');
+        foreach (['opening' => 1_000_000, 'closing' => 1_020_000] as $stage => $ml) {
+            app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "lc1-{$stage}",
+            ], $this->f['actor']);
+        }
+        $this->travelTo($day1);
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'lc1-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+        ], $this->f['actor']);
+        $this->travelTo($day1->addMinutes(30));
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+        $this->travelTo($day1->addDays(1)->setTime(10, 0));
+
+        // فترة تاريخ التحصيل (اليوم 1) مقفلة، وفترة التوريد (اليوم 2) مفتوحة.
+        AccountingPeriodLock::create([
+            'tenant_id' => $this->f['tenant_id'], 'start_date' => $day1->toDateString(), 'end_date' => $day1->toDateString(),
+            'status' => 'active', 'reason' => 'اختبار قفل التحصيل',
+        ]);
+        $before = $this->counts();
+
+        $result = $this->engine()->post($closed, $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::BLOCKED, $result->outcome);
+        $this->assertContains('FUEL_SETTLEMENT_COLLECTION_PERIOD_LOCKED', $result->reasons);
+        $this->assertSame($before, $this->counts(), 'لا فاتورة ولا قيد ولا سند');
+    }
+
+    /** @test */
+    public function the_settlement_never_duplicates_receipts_invoices_or_entries_on_replay(): void
+    {
+        $result = $this->engine()->post($this->closedShift('dup1', 1_000_000, null, 20_000, 2000, 2600), $this->f['actor']);
+        $after = $this->counts();
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome);
+
+        $again = $this->engine()->post(FuelShift::findOrFail(DB::table('fuel_shift_settlements')->where('id', $result->settlementId)->value('fuel_shift_id')), $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::REPLAYED, $again->outcome);
+        $this->assertSame($after, $this->counts());
+        $this->assertSame(2, DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->count());
+        $this->assertSame(2, DB::table('payments')->whereIn('id', DB::table('fuel_shift_settlement_collections')->pluck('payment_id'))->count());
+    }
+
+    /** @test */
+    public function an_unpaid_erp_walk_in_invoice_is_collected_first_and_never_paid_twice(): void
+    {
+        $walkIn = app(\App\Services\FuelShiftSettlementReadiness::class)->walkInPartner($this->f['station']);
+        $shift = $this->open('erpw');
+        foreach (['opening' => 3_000_000, 'closing' => 3_020_000] as $stage => $ml) {
+            app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "erpw-{$stage}",
+            ], $this->f['actor']);
+        }
+        $service = app(\App\Services\FuelSaleService::class);
+        $erpSale = $service->finalize($service->createDraft([
+            'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $shift->id,
+            'partner_id' => $walkIn->id, 'quantity_milliliters' => 1000, 'idempotency_key' => 'erpw-sale',
+        ], $this->f['actor']), $this->f['actor']);                    // 1 لتر = 230 للعميل النقدي، غير مسدَّدة
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'erpw-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+        ], $this->f['actor']);
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+
+        $result = $this->engine()->post($closed, $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome, json_encode($result->reasons));
+        $rows = DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->orderBy('target_kind')->get();
+        $this->assertSame(['erp_walk_in', 'settlement'], $rows->pluck('target_kind')->all());
+        $this->assertSame([230, 4370], $rows->pluck('amount_minor')->map(fn ($v) => (int) $v)->all(), '230 للفاتورة القائمة ثم الباقي 19 لتراً');
+        $this->assertSame(230, (int) Invoice::findOrFail($erpSale->invoice_id)->paid_amount);
+        $this->assertSame('paid', Invoice::findOrFail($erpSale->invoice_id)->payment_status);
+        $this->assertSame(0, DB::table('fuel_shift_settlement_variances')->where('fuel_shift_settlement_id', $result->settlementId)->count());
+    }
+
+    /** @test */
+    public function two_nozzles_with_the_same_number_on_different_pumps_are_collected_into_their_own_invoices(): void
+    {
+        $f = $this->f;
+        $pump2 = \App\Models\FuelPump::create(['tenant_id' => $f['tenant_id'], 'branch_id' => $f['branch']->id, 'fuel_station_id' => $f['station']->id, 'pump_number' => 'FCP-2-dup']);
+        $nozzle2 = \App\Models\FuelNozzle::create([
+            'tenant_id' => $f['tenant_id'], 'branch_id' => $f['branch']->id, 'fuel_station_id' => $f['station']->id, 'fuel_pump_id' => $pump2->id,
+            'fuel_tank_id' => $f['nozzle']->fuel_tank_id, 'fuel_product_id' => $f['fuelProduct']->id, 'nozzle_number' => $f['nozzle']->nozzle_number,   // الرقم نفسه على مضخة أخرى
+        ]);
+        $shift = $this->open('dupn');
+        foreach ([[$f['nozzle'], 1_000_000], [$nozzle2, 2_000_000]] as [$nozzle, $base]) {
+            foreach (['opening' => $base, 'closing' => $base + 20_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                    'fuel_nozzle_id' => $nozzle->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "dupn-{$nozzle->id}-{$stage}",
+                ], $f['actor']);
+            }
+        }
+        app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+            'idempotency_key' => 'dupn-decl', 'base_revision' => 0,
+            'lines' => [['payment_method_id' => $f['cash']->id, 'amount_minor' => 9200], ['payment_method_id' => $f['bank']->id, 'amount_minor' => 0]],
+        ], $f['actor']);
+        $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 9200, null, $f['actor']);
+
+        $result = $this->engine()->post($closed, $f['actor']);
+
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome, json_encode($result->reasons));
+        $this->assertSame(2, $result->postedLines);
+        $rows = DB::table('fuel_shift_settlement_collections')->where('fuel_shift_settlement_id', $result->settlementId)->get();
+        $this->assertCount(2, $rows);
+        $this->assertCount(2, $rows->pluck('invoice_id')->unique(), 'كل فوهة بفاتورتها');
+        foreach ($rows as $row) {
+            $this->assertSame(4600, (int) $row->amount_minor);
+            $this->assertSame(4600, (int) Invoice::findOrFail($row->invoice_id)->paid_amount);
+        }
+    }
+
+    /** @test */
+    public function an_unusable_treasury_is_blocked_at_evaluation_and_a_payment_service_rejection_maps_to_a_stable_code_with_no_write(): void
+    {
+        $shift = $this->closedShift('rej1');
+        $before = $this->counts();
+
+        // (1) خزينة غير نشطة تُكشف عند التقييم قبل أي كتابة.
+        DB::table('cash_bank_accounts')->where('tenant_id', $this->f['tenant_id'])->update(['is_active' => false]);
+        $this->assertSame(['FUEL_SETTLEMENT_NOT_READY_PAYMENT_METHOD_TREASURY'], $this->engine()->post($shift, $this->f['actor'])->reasons);
+        $this->assertSame($before, $this->counts());
+        DB::table('cash_bank_accounts')->where('tenant_id', $this->f['tenant_id'])->update(['is_active' => true]);
+
+        // (2) رفض من خدمة السندات وقت الترحيل (تخويل إيداع مثلاً) ⇒ حجب برمز ثابت وتراجع كامل بعد بناء الفواتير.
+        $real = app(\App\Services\Accounting\PaymentService::class);
+        $mock = \Mockery::mock(\App\Services\Accounting\PaymentService::class);
+        $mock->shouldReceive('create')->andReturnUsing(fn (...$args) => $real->create(...$args));
+        $mock->shouldReceive('post')->andThrow(new \RuntimeException('ليس لديك صلاحية الإيداع'));
+        $this->app->instance(\App\Services\Accounting\PaymentService::class, $mock);
+        $this->app->forgetInstance(FuelShiftSettlementPostingService::class);
+
+        $result = $this->engine()->post($shift->fresh(), $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::BLOCKED, $result->outcome);
+        $this->assertSame(['FUEL_SETTLEMENT_RECEIPT_REJECTED'], $result->reasons);
+        $this->assertSame($before, $this->counts(), 'تراجع كامل: لا فاتورة ولا قيد ولا سند');
     }
 
     /** @test */

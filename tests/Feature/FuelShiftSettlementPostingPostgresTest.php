@@ -106,11 +106,15 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
      * محطة ثانية بالمؤسسة والفرع نفسيهما (مخزن ومجمّع وسعر وعميل نقدي خاصة بها) ثم وردية مغلقة عليها.
      * يستبدل `$this->f` مؤقتاً كي تعيد `closedShift()` استعمال المنطق نفسه.
      */
-    private function closedShiftOnSecondStation(string $key, int $openingMeter): FuelShift
+    private function closedShiftOnSecondStation(string $key, int $openingMeter, bool $otherBranch = false): FuelShift
     {
         $f = $this->f;
         $tenantId = $f['tenant_id'];
-        $branch = $f['branch'];
+        $branch = $otherBranch ? \App\Models\Branch::create(['code' => 'BR-'.substr(uniqid(), -6), 'name' => 'فرع المحطة الثانية', 'is_main' => false]) : $f['branch'];
+        $original = app(\App\Tenancy\BranchContext::class)->id();
+        if ($otherBranch) {
+            app(\App\Tenancy\BranchContext::class)->set($branch->id);
+        }
         $actor = $f['actor'];
         $warehouse = Warehouse::create(['tenant_id' => $tenantId, 'branch_id' => $branch->id, 'name' => 'مخزن محطة ثانية', 'code' => 'WH2-'.uniqid()]);
         $station = FuelStation::create(['tenant_id' => $tenantId, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id, 'code' => 'FCS-2-'.uniqid(), 'name' => 'محطة ثانية']);
@@ -154,6 +158,7 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
         } finally {
             $this->f['station'] = $f['station'];
             $this->f['nozzle'] = $f['nozzle'];
+            app(\App\Tenancy\BranchContext::class)->set($original);
         }
     }
 
@@ -273,5 +278,177 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
             $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
             $this->assertSame(['posted', 'posted'], [$results[0]['value'], $results[1]['value']]);
         }
+    }
+
+    #[Test]
+    public function two_stations_in_different_branches_posting_at_once_never_deadlock(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $a = $this->closedShift("xb-a{$i}", 1_000_000 + $i * 100_000);
+            $b = $this->closedShiftOnSecondStation("xb-b{$i}", 2_000_000 + $i * 100_000, true);
+
+            $results = $this->concurrently([
+                function () use ($a) {
+                    app(\App\Tenancy\BranchContext::class)->forget();
+
+                    return app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($a->id), $this->f['actor'])->outcome;
+                },
+                function () use ($b) {
+                    app(\App\Tenancy\BranchContext::class)->forget();
+
+                    return app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($b->id), $this->f['actor'])->outcome;
+                },
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $this->assertSame(['posted', 'posted'], [$results[0]['value'], $results[1]['value']]);
+        }
+    }
+
+    #[Test]
+    public function the_engine_and_a_manual_erp_collection_on_the_same_walk_in_invoice_never_double_pay_or_deadlock(): void
+    {
+        $walkIn = app(\App\Services\FuelShiftSettlementReadiness::class)->walkInPartner($this->f['station']);
+        foreach (range(1, 3) as $i) {
+            $shift = $this->open("mc{$i}");
+            $base = 3_000_000 + $i * 100_000;
+            foreach (['opening' => $base, 'closing' => $base + 20_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($shift->fresh(), [
+                    'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "mc-{$shift->id}-{$stage}",
+                ], $this->f['actor']);
+            }
+            $service = app(FuelSaleService::class);
+            $erpSale = $service->finalize($service->createDraft([
+                'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $shift->id,
+                'partner_id' => $walkIn->id, 'quantity_milliliters' => 1000, 'idempotency_key' => "mc-erp-{$i}",
+            ], $this->f['actor']), $this->f['actor']);
+            app(FuelShiftCollectionService::class)->declare($shift->fresh(), [
+                'idempotency_key' => $shift->id.'decl', 'base_revision' => 0,
+                'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 4600], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+            ], $this->f['actor']);
+            $closed = app(FuelShiftService::class)->close($shift->fresh(), self::FLOAT + 4600, null, $this->f['actor']);
+            $live = $this->open("mc-live{$i}");
+
+            $results = $this->concurrently([
+                fn () => app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome,
+                function () use ($erpSale, $live, $i) {
+                    // تحصيل يدوي لكامل فاتورة ERP للعميل النقدي في الوقت نفسه (يسبق التسوية أو يلحقها).
+                    try {
+                        app(FuelSaleService::class)->collectPayment($erpSale->fresh(), [
+                            'payment_method_id' => $this->f['cash']->id, 'amount_minor' => 230, 'idempotency_key' => "mc-manual-{$i}",
+                        ], $this->f['actor']);
+
+                        return 'collected';
+                    } catch (\RuntimeException $e) {
+                        return 'rejected';
+                    }
+                },
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $invoice = \App\Models\Invoice::findOrFail($erpSale->invoice_id);
+            $this->assertLessThanOrEqual((int) $invoice->total, (int) $invoice->paid_amount, 'لا دفع زائد على الفاتورة');
+            if ($results[0]['value'] === 'posted') {
+                $this->assertSame(230, (int) $invoice->paid_amount, 'مدفوعة مرة واحدة فقط');
+            } else {
+                $this->assertContains($results[0]['value'], ['blocked'], 'التسوية إما ترحَّل أو تُحجب بسبب تغيّر الحالة، لا استثناء');
+            }
+
+            foreach (['opening' => 6_000_000 + $i * 100_000, 'closing' => 6_000_000 + $i * 100_000 + 1_000] as $stage => $ml) {
+                app(FuelShiftService::class)->recordMeter($live->fresh(), [
+                    'fuel_nozzle_id' => $this->f['nozzle']->id, 'reading_stage' => $stage, 'meter_milliliters' => $ml, 'evidence_key' => "mc-live-{$live->id}-{$stage}",
+                ], $this->f['actor']);
+            }
+            app(FuelShiftCollectionService::class)->declare($live->fresh(), [
+                'idempotency_key' => $live->id.'decl', 'base_revision' => 0,
+                'lines' => [['payment_method_id' => $this->f['cash']->id, 'amount_minor' => 230], ['payment_method_id' => $this->f['bank']->id, 'amount_minor' => 0]],
+            ], $this->f['actor']);
+            app(FuelShiftService::class)->close($live->fresh(), self::FLOAT + 230, null, $this->f['actor']);
+        }
+    }
+
+    #[Test]
+    public function the_engine_and_a_generic_cash_invoice_on_the_same_branch_never_deadlock_over_many_staggered_runs(): void
+    {
+        foreach (range(1, 20) as $i) {
+            $closed = $this->closedShift("gc{$i}", 1_000_000 + $i * 100_000);
+            $delay = ($i * 7919) % 60_000;   // 0..60ms: يوسّع نوافذ التداخل بين المسارين
+
+            $results = $this->concurrently([
+                function () use ($closed, $delay) {
+                    usleep($delay);
+
+                    return app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome;
+                },
+                function () use ($delay) {
+                    usleep(60_000 - $delay);
+                    $service = app(\App\Services\Accounting\InvoiceService::class);
+                    $invoice = $service->post($service->create([
+                        'partner_id' => $this->f['customer']->id, 'branch_id' => $this->f['branch']->id, 'payment_type' => 'cash', 'is_paid' => true, 'invoice_date' => now()->toDateString(),
+                        'created_by' => $this->f['actor']->id,
+                    ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]), null, $this->f['actor']);
+
+                    return $invoice->status;
+                },
+            ]);
+
+            $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), "التكرار {$i}: ".json_encode($results, JSON_UNESCAPED_UNICODE));
+            $this->assertContains($results[0]['value'], ['posted', 'blocked'], "التكرار {$i}");
+            $this->assertSame('posted', $results[1]['value'], "الفاتورة النقدية العامة لا تفشل أبداً بسبب التسوية (التكرار {$i})");
+        }
+    }
+
+    /**
+     * مسار القفل الفعلي بترتيب مفروض: فاتورة نقدية عامة (المِرساة ثم ترقيم سندها) تُوقَف عمداً بعد المِرساة، والمحرك يبدأ بعدها (ترقيم الفرع ثم المِرساة).
+     * الدورة حقيقية بين خدمتين حقيقيتين؛ المطلوب: لا جمود ولا خطأ، المحرك يتنحّى بحجب `FUEL_SETTLEMENT_LOCK_BUSY` بلا أي كتابة، والفاتورة تُرحَّل، وإعادة المحاولة تنجح.
+     */
+    #[Test]
+    public function a_forced_anchor_then_branch_cycle_with_a_generic_cash_invoice_makes_the_engine_yield_without_deadlock(): void
+    {
+        $closed = $this->closedShift('cyc1', 1_000_000);
+        $results = $this->concurrently([
+            function () {
+                // الفاتورة العامة بمسارها الحقيقي مع توقف 400ms بين قيدها (المِرساة) وسندها (ترقيم الفرع).
+                $slow = new class(...$this->slowInvoiceServiceArgs()) extends \App\Services\Accounting\InvoiceService {
+                    protected function settle(\App\Models\Invoice $invoice, int $total, ?\App\Models\User $actor = null): void
+                    {
+                        usleep(400_000);
+                        parent::settle($invoice, $total, $actor);
+                    }
+                };
+                $invoice = $slow->post($slow->create([
+                    'partner_id' => $this->f['customer']->id, 'branch_id' => $this->f['branch']->id, 'payment_type' => 'cash', 'is_paid' => true, 'invoice_date' => now()->toDateString(),
+                    'created_by' => $this->f['actor']->id,
+                ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]), null, $this->f['actor']);
+
+                return $invoice->status;
+            },
+            function () use ($closed) {
+                usleep(150_000);   // بعد أن تمسك الفاتورة المِرساة
+
+                $r = app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor']);
+
+                return $r->outcome.':'.implode(',', $r->reasons);
+            },
+        ]);
+
+        $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame('posted', $results[0]['value'], 'الفاتورة النقدية العامة تُرحَّل');
+        // المحرك يتنحّى عن الدورة (بلا جمود) ثم تنجح محاولته الداخلية التالية بعد أن تُنهي الفاتورة، أو يعود حجباً مقروءاً؛ وفي الحالتين لا خطأ ولا أثر ناقص.
+        $this->assertContains($results[1]['value'], ['posted:', 'blocked:FUEL_SETTLEMENT_LOCK_BUSY'], 'المحرك يتنحّى');
+        $settlements = DB::table('fuel_shift_settlements')->where('fuel_shift_id', $closed->id)->count();
+        $this->assertSame($results[1]['value'] === 'posted:' ? 1 : 0, $settlements, 'لا أثر ناقص');
+        if ($settlements === 0) {
+            // إعادة المحاولة بعد زوال التنافس تنجح.
+            $this->assertSame('posted', app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome);
+        }
+    }
+
+    /** @return list<mixed> معاملات منشئ InvoiceService كما يحلّها الحاوي (لصنف فرعي يؤخّر settle في الاختبار) */
+    private function slowInvoiceServiceArgs(): array
+    {
+        $ctor = (new \ReflectionClass(\App\Services\Accounting\InvoiceService::class))->getConstructor();
+
+        return array_map(fn (\ReflectionParameter $p) => app($p->getType()->getName()), $ctor?->getParameters() ?? []);
     }
 }
