@@ -33,6 +33,7 @@ use Tests\TestCase;
 class InvoicePartySnapshotTest extends TestCase
 {
     use RefreshDatabase;
+    use SimulatesLegacyInvoiceRows;
     use InteractsWithApi;
 
     private array $auth;
@@ -196,7 +197,7 @@ class InvoicePartySnapshotTest extends TestCase
     public function legacy_posted_invoices_with_a_null_snapshot_use_the_documented_live_fallback(): void
     {
         $posted = $this->posted();
-        DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => null]); // صف مرحَّل قبل REM-14
+        $this->withoutInvoiceFrozenDateFences(fn () => DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => null])); // صف مرحَّل قبل REM-14
         $this->customer->update(['name' => 'الاسم الحي الآن']);
 
         $this->show($posted->id)->assertOk()
@@ -213,7 +214,7 @@ class InvoicePartySnapshotTest extends TestCase
     public function an_unknown_snapshot_version_or_shape_is_treated_as_no_snapshot(): void
     {
         $posted = $this->posted();
-        DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => json_encode(['v' => 2, 'seller' => [], 'buyer' => []])]);
+        $this->withoutInvoiceFrozenDateFences(fn () => DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => json_encode(['v' => 2, 'seller' => [], 'buyer' => []])]));
         $this->assertNull(InvoicePartySnapshot::parse(Invoice::findOrFail($posted->id)->party_snapshot));
         $this->assertNull(InvoicePartySnapshot::parse(['v' => 1, 'seller' => ['name' => 'x']]));
         $this->assertNull(InvoicePartySnapshot::parse('not json'));
@@ -550,14 +551,17 @@ class InvoicePartySnapshotTest extends TestCase
     public function the_migration_is_additive_nullable_and_never_backfills_existing_rows(): void
     {
         $posted = $this->posted();
-        DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => null]);
-
         $migration = require base_path('database/migrations/2026_11_12_010000_add_party_snapshot_to_invoices.php');
-        $migration->down();
-        $this->assertFalse(Schema::hasColumn('invoices', 'party_snapshot'));
+        // المُشغّلات تعتمد على العمود: تُسقط قبل إسقاطه وتُعاد بعد إعادة إنشائه.
+        $this->withoutInvoiceFrozenDateFences(function () use ($posted, $migration) {
+            DB::table('invoices')->where('id', $posted->id)->update(['party_snapshot' => null]);
 
-        $migration->up();
-        $this->assertTrue(Schema::hasColumn('invoices', 'party_snapshot'));
+            $migration->down();
+            $this->assertFalse(Schema::hasColumn('invoices', 'party_snapshot'));
+
+            $migration->up();
+            $this->assertTrue(Schema::hasColumn('invoices', 'party_snapshot'));
+        });
         $this->assertNull(DB::table('invoices')->where('id', $posted->id)->value('party_snapshot'), 'لا ملء رجعي');
         $this->assertSame($posted->zatca_hash, DB::table('invoices')->where('id', $posted->id)->value('zatca_hash'));
     }

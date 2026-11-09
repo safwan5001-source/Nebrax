@@ -42,6 +42,7 @@ use Tests\TestCase;
 class InvoiceIssuedAtTest extends TestCase
 {
     use RefreshDatabase;
+    use SimulatesLegacyInvoiceRows;
     use InteractsWithApi;
 
     private array $auth;
@@ -397,7 +398,7 @@ class InvoiceIssuedAtTest extends TestCase
     {
         $legacy = $this->postAt('2026-10-15 10:00:00');
         // محاكاة صف مرحَّل قبل REM-13a: بلا لحظة إصدار (تحديث خام يتجاوز النموذج عمداً).
-        DB::table('invoices')->where('id', $legacy->id)->update(['issued_at' => null]);
+        $this->withoutInvoiceFrozenDateFences(fn () => DB::table('invoices')->where('id', $legacy->id)->update(['issued_at' => null]));
         $before = $this->artifacts($legacy);
         $this->assertNull($before['issued_at']);
 
@@ -426,11 +427,14 @@ class InvoiceIssuedAtTest extends TestCase
         $this->assertNotNull(DB::table('invoices')->where('id', $posted->id)->value('issued_at'));
 
         $migration = require base_path('database/migrations/2026_11_11_010000_add_issued_at_to_invoices.php');
-        $migration->down();
-        $this->assertFalse(Schema::hasColumn('invoices', 'issued_at'));
+        // المُشغّلات تعتمد على العمود: تُسقط قبل إسقاطه وتُعاد بعد إعادة إنشائه.
+        $this->withoutInvoiceFrozenDateFences(function () use ($migration) {
+            $migration->down();
+            $this->assertFalse(Schema::hasColumn('invoices', 'issued_at'));
 
-        $migration->up();
-        $this->assertTrue(Schema::hasColumn('invoices', 'issued_at'));
+            $migration->up();
+            $this->assertTrue(Schema::hasColumn('invoices', 'issued_at'));
+        });
         // الصف الموجود يعود بلا لحظة — لا ملء رجعي من created_at ولا من أي مصدر آخر.
         $this->assertNull(DB::table('invoices')->where('id', $posted->id)->value('issued_at'));
         // وبقية الصف سليمة.

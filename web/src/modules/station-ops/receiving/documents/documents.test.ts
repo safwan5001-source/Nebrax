@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReceiptDocument, ReceiptReport } from '../schemas';
-import { dateText, hasArabic, litersText, minorText } from './pdf-kit';
+import { dateText, hasArabic, litersText, minorText, scriptRuns } from './pdf-kit';
 
 const FONT = readFileSync(join(process.cwd(), 'public/fonts/NotoSansArabic-Regular.ttf'));
 
@@ -52,6 +52,37 @@ describe('pdf-kit formatting (0–9 digits, integer maths, no float)', () => {
     expect(dateText('not-a-date')).toBe('not-a-date');
     expect(hasArabic('ديزل')).toBe(true);
     expect(hasArabic('DN-9')).toBe(false);
+  });
+});
+
+describe('pdf-kit script runs (mixed Arabic / Latin)', () => {
+  const space = { text: ' ', arabic: false, neutral: true };
+  const colon = { text: ':', arabic: false, neutral: true };
+
+  it('keeps the space at an Arabic↔Latin boundary as its own piece (it used to vanish: «شركةfuel-cash»)', () => {
+    expect(scriptRuns('شركة fuel-cash-d1a')).toEqual([{ text: 'شركة', arabic: true }, space, { text: 'fuel-cash-d1a', arabic: false }]);
+  });
+
+  it('puts the colon right after an Arabic label, then the space, then the Latin value', () => {
+    expect(scriptRuns('الرقم الضريبي: 300')).toEqual([{ text: 'الرقم الضريبي', arabic: true }, colon, space, { text: '300', arabic: false }]);
+  });
+
+  it('splits parentheses out of Arabic text (jsPDF drops everything before a bracket inside an Arabic run: «عدادات (تقدير)» showed only «تقدير»)', () => {
+    const open = { text: '(', arabic: false, neutral: true };
+    const close = { text: ')', arabic: false, neutral: true };
+    expect(scriptRuns('عدادات (تقدير)')).toEqual([{ text: 'عدادات', arabic: true }, space, open, { text: 'تقدير', arabic: true }, close]);
+    expect(scriptRuns('مراجعة مطلوبة (1/0)')).toEqual([{ text: 'مراجعة مطلوبة', arabic: true }, space, open, { text: '1/0', arabic: false }, close]);
+  });
+
+  it('puts a sentence-final period after the Arabic text (it used to render at the start of the line), keeping decimals inside Latin numbers', () => {
+    expect(scriptRuns('غير مسجّلة.')).toEqual([{ text: 'غير مسجّلة', arabic: true }, { text: '.', arabic: false, neutral: true }]);
+    expect(scriptRuns('المبلغ 575.00')).toEqual([{ text: 'المبلغ', arabic: true }, space, { text: '575.00', arabic: false }]);
+  });
+
+  it('keeps a space inside connected Arabic text in its run (shaping depends on it), and Latin-only text untouched', () => {
+    expect(scriptRuns('محطة نقد اختبار')).toEqual([{ text: 'محطة نقد اختبار', arabic: true }]);
+    expect(scriptRuns('Shift: FSH-1')).toEqual([{ text: 'Shift: FSH-1', arabic: false }]);
+    expect(scriptRuns('2026-11-02 – 2026-11-08')).toEqual([{ text: '2026-11-02 – 2026-11-08', arabic: false }]);
   });
 });
 

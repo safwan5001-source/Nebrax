@@ -170,6 +170,13 @@ describe('outputProfileAfterTemplateChange — التبديل إلى قالب ح
     expect(outputProfileAfterTemplateChange(raw, CLASSIC_V2)).toBe(raw);
   });
 
+  it('السند المدمج يقترح A5 أفقي عند اختياره بلا ملف قائم، ولا يمسّ ملفاً قائماً (AWJ-DOC-V2-PR5)', () => {
+    expect(outputProfileAfterTemplateChange(undefined, 'voucher-compact')).toEqual({ paper: 'a5', orientation: 'landscape' });
+    expect(outputProfileAfterTemplateChange(null, 'voucher-compact')).toEqual({ paper: 'a5', orientation: 'landscape' });
+    const raw = { paper: 'a4' };
+    expect(outputProfileAfterTemplateChange(raw, 'voucher-compact')).toBe(raw);
+  });
+
   it('الغياب يبقى غياباً', () => {
     expect(outputProfileAfterTemplateChange(undefined, 'tax-invoice-thermal80')).toBeUndefined();
     expect(outputProfileAfterTemplateChange(null, CLASSIC)).toBeUndefined();

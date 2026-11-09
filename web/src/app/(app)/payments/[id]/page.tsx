@@ -82,6 +82,8 @@ export default function PaymentDetailPage() {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [partner, setPartner] = useState<PaymentPartner | null>(null);
   const [company, setCompany] = useState<PaymentCompany | null>(null);
+  // اسم فرع السند للسند المدمج (AWJ-DOC-V2-PR5) — يُجلب بأفضل جهد ولا يُخترع: غيابه = لا سطر فرع.
+  const [branchName, setBranchName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
@@ -109,12 +111,14 @@ export default function PaymentDetailPage() {
         setPayment(r.data);
         const documentType = r.data.direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, m, live] = await Promise.allSettled([
+        const [p, m, live, branch] = await Promise.allSettled([
           api<{ data: PaymentPartner }>(`/partners/${r.data.partner_id}`),
           api<{ company: PaymentCompany }>(`/me`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`),
+          r.data.branch_id ? api<{ data: { name?: string | null } }>(`/branches/${r.data.branch_id}`) : Promise.resolve(null),
         ]);
         if (p.status === 'fulfilled') setPartner(p.value.data);
+        setBranchName(branch.status === 'fulfilled' && typeof branch.value?.data?.name === 'string' ? branch.value.data.name : null);
         if (m.status === 'fulfilled') setCompany(m.value.company);
         // السند المرحّل يقرأ مراجعته المثبتة حصراً؛ لا يعيد تعديل القالب أو
         // إعدادات التصميم الحية تفسير مستند تاريخي. المسودات والبيانات القديمة
@@ -191,7 +195,7 @@ export default function PaymentDetailPage() {
 
   // طريقة الدفع مترجَمة، وتُمرَّر للمستند كنصّ جاهز.
   const methodLabel = payment.method === 'bank' ? tp('bank') : tp('cash');
-  const paymentDoc: PaymentDoc = { ...payment, method: methodLabel };
+  const paymentDoc: PaymentDoc = { ...payment, method: methodLabel, branch_name: branchName };
 
   const info: [string, React.ReactNode][] = [
     [tp('partner'), partnerName],
