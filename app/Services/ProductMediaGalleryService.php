@@ -71,6 +71,35 @@ class ProductMediaGalleryService
         return $items->unique('id')->values();
     }
 
+    /**
+     * معرض المنتج المشترك (بلا متغيّر) لعدة منتجات **باستعلام واحد** (S10b — منع N+1 في قوائم Runtime الجوال). يطابق
+     * `resolveGallery($product)` حرفياً (وسائط المنتج فقط، الترتيب نفسه، تفريغ التكرار بالمعرّف) لكل منتج، والمنتج بلا وسائط يأخذ مجموعة فارغة.
+     *
+     * @param  iterable<Product>  $products
+     * @return array<string, Collection<int, ProductMedia>> مفتاحها product_id
+     */
+    public function resolveSharedGalleries(iterable $products): array
+    {
+        $ids = collect($products)->map(fn (Product $p) => $p->id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $byProduct = ProductMedia::whereIn('product_id', $ids)
+            ->whereNull('product_option_value_id')
+            ->whereNull('product_variant_id')
+            ->orderBy('sort_order')->orderBy('created_at')->orderBy('id')
+            ->get()
+            ->groupBy('product_id');
+
+        $out = [];
+        foreach ($ids as $id) {
+            $out[$id] = ($byProduct[$id] ?? collect())->unique('id')->values();
+        }
+
+        return $out;
+    }
+
     public function resolveCover(Product $product, ?ProductVariant $variant = null): ?ProductMedia
     {
         return $this->resolveGallery($product, $variant)->first();

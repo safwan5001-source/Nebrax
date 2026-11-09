@@ -18,6 +18,7 @@ import { litersToMilliliters } from '@/lib/fuel-quantity';
 import { useIntentKeys } from '@/lib/intent-key';
 import { isValidRiyal, minorToRiyal, riyalToMinor } from '@/lib/money';
 import { DialogError } from '@/components/fuel-stations/dialog-error';
+import { TruncationNotice, mergeById, type PageMeta } from '@/components/fuel-stations/truncation-notice';
 
 interface Station { id: string; name: string; code: string; status: string }
 interface Nozzle { id: string; nozzle_number: string; fuel_station_id: string; status: string }
@@ -49,6 +50,8 @@ export default function FuelSalesPage() {
   const [aviAuthorizations, setAviAuthorizations] = useState<AviAuthorization[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [salesMeta, setSalesMeta] = useState<PageMeta>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -71,18 +74,25 @@ export default function FuelSalesPage() {
     setLoading(true); setError(null);
     try {
       const [salesResult, stationResult, nozzleResult, shiftResult, partnerResult, authorizationResult] = await Promise.all([
-        api<{ data: Sale[] }>('/fuel-stations/sales'), api<{ data: Station[] }>('/fuel-stations/stations'),
+        api<{ data: Sale[]; meta?: PageMeta }>('/fuel-stations/sales'), api<{ data: Station[] }>('/fuel-stations/stations'),
         api<{ data: Nozzle[] }>('/fuel-stations/nozzles'), api<{ data: Shift[] }>('/fuel-stations/shifts?status=open'),
         api<{ data: Partner[] }>('/partners?type=customer'),
         api<{ data: AviAuthorization[] }>('/fuel-stations/avi-rfid/authorizations').catch(() => ({ data: [] })),
       ]);
-      setSales(salesResult.data); setStations(stationResult.data.filter((station) => station.status === 'active'));
+      setSales(salesResult.data); setSalesMeta(salesResult.meta); setStations(stationResult.data.filter((station) => station.status === 'active'));
       setNozzles(nozzleResult.data.filter((nozzle) => nozzle.status === 'active')); setShifts(shiftResult.data);
       setPartners(partnerResult.data.filter((partner) => partner.type === 'customer')); setAviAuthorizations(authorizationResult.data); setMethods([]);
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); } finally { setLoading(false); }
   }, [tc]);
 
   useEffect(() => { void load(); }, [load]);
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true); setError(null);
+    try {
+      const next = await api<{ data: Sale[]; meta?: PageMeta }>(`/fuel-stations/sales?page=${(salesMeta?.current_page ?? 1) + 1}`);
+      setSales((current) => mergeById(current, next.data)); setSalesMeta(next.meta);
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); } finally { setLoadingMore(false); }
+  }, [salesMeta, tc]);
   useEffect(() => { const user = currentUser(); if (user?.permissions) setPermissions(user.permissions); else api<{ user: { permissions?: string[] } }>('/me').then((result) => setPermissions(result.user.permissions ?? [])).catch(() => {}); }, []);
 
   const stationNozzles = useMemo(() => nozzles.filter((nozzle) => nozzle.fuel_station_id === stationId), [nozzles, stationId]);
@@ -154,6 +164,7 @@ export default function FuelSalesPage() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div><Button disabled={!can('fuel.sale.create') || stations.length === 0} title={!can('fuel.sale.create') ? t('createPermissionHint') : undefined} onClick={() => { draftKeys.reset(); setDraftOpen(true); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); setError(null); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('newSale')}</Button></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Summary icon={<FileText />} label={t('summaryAll')} value={String(sales.length)} /><Summary icon={<CheckCircle2 />} label={t('summaryFinalized')} value={String(sales.filter((sale) => sale.status === 'finalized').length)} /><Summary icon={<Banknote />} label={t('summaryPaid')} value={String(sales.filter((sale) => sale.payment_status === 'paid').length)} /><Summary icon={<Droplets />} label={t('summaryLiters')} value={`${sales.filter((sale) => sale.status === 'finalized').reduce((total, sale) => total + Number(sale.quantity_liters), 0).toFixed(3)} ${t('literUnit')}`} /></div>
     <p className="rounded-md border border-border bg-primary-soft px-3 py-2 text-xs text-text">{t('separationNotice')}</p>
+    <TruncationNotice loaded={sales.length} meta={salesMeta} loading={loadingMore} onLoadMore={() => void loadMore()} onRefresh={() => void load()} />
     {error && !dialogOpen && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <DataTable columns={columns} data={sales} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="fuel-sales" />
 
