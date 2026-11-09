@@ -99,8 +99,14 @@ class FuelCostBasisService
     }
 
     /** @return array{posted_cost_minor:int,remainder_numerator:string,remainder_denominator:string} */
-    public function quoteIssue(FuelProduct $fuelProduct, Warehouse $warehouse, int $quantityMilliliters): array
+    public function quoteIssue(FuelProduct $fuelProduct, Warehouse $warehouse, int $quantityMilliliters, bool $allowOpenHistory = false): array
     {
+        // D-R (P1-3b-2e-1): مجمّع له تاريخ تكلفة مفتوح (سطر تسوية محجوب لم يُحسم) لا يُسعَّر منه بيع ERP ولا جرد بمتوسط قد يكون ملوَّثاً — لأن قيد COGS ثابت لا يُصحَّح.
+        // مجمّع آخر لا يتأثر. التسوية نفسها تُحجب بفحصها الخاص (`withheld_pool_history_open`) فتمرّ بـ$allowOpenHistory.
+        if (! $allowOpenHistory && \Illuminate\Support\Facades\DB::table('fuel_cost_pool_open_histories')
+            ->where('tenant_id', $warehouse->tenant_id)->where('warehouse_id', $warehouse->id)->where('fuel_product_id', $fuelProduct->id)->whereNull('resolved_at')->exists()) {
+            throw new RuntimeException('FUEL_POOL_COST_HISTORY_OPEN: لهذا المنتج في المخزن تسوية وردية محجوبة لم تُحسم؛ لا يُسعَّر منه بيع أو جرد حتى تُحسم (تفادياً لقيد تكلفة بمتوسط غير مؤكد).');
+        }
         $state = $this->readyForQuantity($fuelProduct, $warehouse, $quantityMilliliters, 'صرف');
         [$valueNumerator, $valueDenominator] = $this->portion($state, $quantityMilliliters);
         return $this->quoteDecrease($state, $valueNumerator, $valueDenominator);

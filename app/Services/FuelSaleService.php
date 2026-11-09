@@ -476,7 +476,7 @@ class FuelSaleService
         $cogsMinor = 0;
         $invoice = $this->invoices->post($invoice, function ($postedInvoice) use ($sale, $station, $warehouse, $fuelProduct, $product, &$stockMovement, &$cogsEntry, &$cogsMinor, $actor) {
             $this->lockWarehouseStock($warehouse->id, $product->id);
-            $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, (int) $sale->quantity_milliliters);
+            $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, (int) $sale->quantity_milliliters, allowOpenHistory: true);   // التسوية تحجب بفحصها الخاص
             $cogsMinor = $quote['posted_cost_minor'];
             $unitCost = intdiv($cogsMinor, (int) $sale->quantity_milliliters);
             $stockMovement = $this->inventory->applyIssue($product, (int) $sale->quantity_milliliters, $unitCost, [
