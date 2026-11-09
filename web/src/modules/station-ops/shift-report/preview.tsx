@@ -85,7 +85,7 @@ function Section({ section }: { section: ReportSection }) {
 export function ShiftReportPreview({ model }: { model: ShiftReportModel }) {
   return (
     <article data-shift-report-preview="" data-paper={model.paper} aria-label={model.title} className="space-y-4 text-text">
-      <header className="rounded-lg bg-[color:var(--fo-navy,#0f2748)] p-3 text-white">
+      <header className="rounded-lg bg-[var(--fo-navy)] p-3 text-[color:var(--fo-on-navy)]">
         <p className="break-words text-base font-bold">{model.company.name}</p>
         <p className="text-[11px] opacity-80">
           {[model.company.vat ? `${model.labels.vat}: ${model.company.vat}` : null, model.company.cr ? `${model.labels.cr}: ${model.company.cr}` : null].filter(Boolean).join('   ')}

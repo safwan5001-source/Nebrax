@@ -1,3 +1,4 @@
+import { utcIsoToZonedWallTime } from '@/lib/timezone';
 import { buildCashSummaryView } from '../cash-summary';
 import type { StationCatalog } from '../catalog';
 import type { CollectionView } from '../collection';
@@ -61,19 +62,11 @@ export function isReportableShift(status: string): status is 'closed' | 'approve
   return status === 'closed' || status === 'approved';
 }
 
-/** `YYYY-MM-DD HH:mm` بمنطقة المحطة (0–9 دائماً)؛ غير صالح ⇒ `null`. منطقة غير صالحة ⇒ منطقة الجهاز. */
+/** `YYYY-MM-DD HH:mm` بمنطقة المحطة (0–9 دائماً) عبر مُحوِّل المنطقة الزمنية المركزي؛ غير صالح ⇒ `null`. منطقة غير صالحة/غائبة ⇒ منطقة المؤسسة الافتراضية (لا منطقة الجهاز). */
 export function stamp(value: string | null | undefined, timeZone: string | null | undefined): string | null {
   if (parseInstant(value) === null) return null;
-  const render = (zone?: string) => {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value as string));
-    const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
-  };
-  try {
-    return render(timeZone || undefined);
-  } catch {
-    return render();
-  }
+  const wall = utcIsoToZonedWallTime(value as string, timeZone ?? '');
+  return wall ? `${wall.date} ${wall.time}` : null;
 }
 
 const litersOf = (ml: number) => formatLitersFixedFromMl(ml, 'en');
