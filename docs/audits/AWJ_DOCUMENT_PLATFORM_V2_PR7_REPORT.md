@@ -116,9 +116,11 @@
 3. فجوات التسعير (`price_unavailable`، `tax_mode_unset`، `price_changed_during_shift`، `product_unavailable`) تمسّ المبلغ لا الكمية ⇒ **فقط** `missing_reading` و`closing_below_opening` تجعل الكمية جزئية (الكود المرجعي `FuelShiftSalesCalculator`)، واختبار لحالة التسعير وحدها.
 - وإصلاحا CI من كودي: لون سداسي/فئة لوحة في المعاينة (حارس `drift-ratchet`) ⇒ رموز `--fo-navy/--fo-on-navy`؛ و`Intl.DateTimeFormat` مباشر (حارس التواريخ) ⇒ `utcIsoToZonedWallTime` المركزي (الأرقام 0–9؛ منطقة غير صالحة ⇒ منطقة المؤسسة الافتراضية لا الجهاز).
 
-**وحدة/تكامل (`vitest`)** على الرأس بعد الدمج: @@RESULTS@@
+**وحدة/تكامل (`vitest`)** على الرأس بعد الدمج: - `station-ops` كاملاً: **65 ملفاً / 1880 اختباراً ناجحاً** (1 متخطّى قائم سابقاً)، منها 68 اختباراً لمجلد التقرير: `model` 22 · `permissions` 8 · `pdf` 11 · `actions.integration` 18 · `report-boundary` 9.
+- **مجموعة الويب الكاملة** (`vitest run`، بعد دمج main): **970 ملفاً / 12714 اختباراً ناجحاً، 0 فاشل** (1 متخطّى).
+- الرقم القديم «1872/1872» كان قبل إضافة اختبارات الصلاحيات (8) وبقية اختبارات الإصلاحات؛ الأرقام أعلاه هي الحالية.
 
-**متصفح حقيقي (Chromium، `fuel-ops-pr7-shift-report.spec.ts`)**: @@E2E@@
+**متصفح حقيقي (Chromium، `fuel-ops-pr7-shift-report.spec.ts`)**: 6/6 ناجحة على الرأس بعد الدمج (iPhone محاكاة، ar+en، A4/A5، معاينة/طباعة/تنزيل، صلاحيات، وردية مفتوحة، فشل اللقطة).
 
 **CI على الـPR:** @@CI@@
 
