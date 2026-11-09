@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Classification;
 use App\Models\Partner;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PaymentService;
@@ -42,6 +43,50 @@ class PaymentVoucherApiTest extends TestCase
             ->assertJsonCount(1, 'data.allocations')
             ->assertJsonPath('data.allocations.0.label', $invoice->number)
             ->assertJsonPath('data.allocations.0.amount', '1150.00');
+    }
+
+    /** @test */
+    public function show_loads_the_classification_for_the_voucher_and_isolates_tenants(): void
+    {
+        ['token' => $token, 'tenant_id' => $tid] = $this->registerTenant('classified', 'owner@classified.test');
+        ['tenant_id' => $otherTid] = $this->registerTenant('foreign', 'owner@foreign.test');
+
+        app(TenantContext::class)->set($otherTid);
+        $foreign = Classification::create(['scope' => 'receipt', 'name' => 'تصنيف مؤسسة أخرى']);
+
+        app(TenantContext::class)->set($tid);
+        $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+        $classification = Classification::create(['scope' => 'receipt', 'name' => 'تسوية عملاء']);
+        $draft = fn () => app(PaymentService::class)->create(
+            ['partner_id' => $customer->id, 'amount' => 50000],
+            []
+        );
+
+        // تصنيف المؤسسة نفسها يصل في استجابة التفاصيل.
+        $withClassification = $draft();
+        $this->withToken($token)->putJson("/api/payments/{$withClassification->id}/classification", ['classification_id' => $classification->id])->assertOk();
+        $this->withToken($token)->getJson("/api/payments/{$withClassification->id}")
+            ->assertOk()
+            ->assertJsonPath('data.classification_id', $classification->id)
+            ->assertJsonPath('data.classification.id', $classification->id)
+            ->assertJsonPath('data.classification.name', 'تسوية عملاء')
+            ->assertJsonPath('data.classification.scope', 'receipt');
+
+        // بلا تصنيف: المفتاح موجود وقيمته null (لا اختلاق).
+        // إزالة التصنيف عبر المسار نفسه ⇒ المفتاح موجود وقيمته null.
+        $without = $withClassification;
+        $this->withToken($token)->putJson("/api/payments/{$without->id}/classification", ['classification_id' => null])->assertOk();
+        $this->withToken($token)->getJson("/api/payments/{$without->id}")
+            ->assertOk()
+            ->assertJsonPath('data.classification_id', null)
+            ->assertJsonPath('data.classification', null);
+
+        // معرّف تصنيف مؤسسة أخرى (مدخل مباشر بتجاوز الخدمة) لا يُحلّ ولا يُسرَّب اسمه.
+        \DB::table('payments')->where('id', $without->id)->update(['classification_id' => $foreign->id]);
+        $this->withToken($token)->getJson("/api/payments/{$without->id}")
+            ->assertOk()
+            ->assertJsonPath('data.classification', null)
+            ->assertDontSee('تصنيف مؤسسة أخرى');
     }
 
     /** @test */

@@ -22,7 +22,18 @@ export const isThermal = (paper: Paper): boolean => paper.startsWith('thermal');
 /** الورق الافتراضي من توجيه تعريف التقرير. */
 export const defaultPaper = (orientation: 'portrait' | 'landscape'): Paper => (orientation === 'landscape' ? 'a4_landscape' : 'a4');
 export interface PdfCompany { name?: string | null; vat?: string | null; cr?: string | null; logo?: string | null }
-export interface PdfOptions { lang: Lang; paper: Paper; company?: PdfCompany; generatedBy?: string | null }
+/** نصوص مترجمة يمرّرها المستدعي (الشاشة تعرضها مترجمة، فلا تظهر رموز خام في الملف): مصدر البيانات وفجوات الجودة. */
+export interface PdfLabels { source?: string; gaps?: Record<string, string> }
+export interface PdfOptions { lang: Lang; paper: Paper; company?: PdfCompany; generatedBy?: string | null; labels?: PdfLabels }
+
+/** سطر المصدر: نص الشاشة المترجم كاملاً (يتضمن بادئة «المصدر:» أصلاً)، وإلا بادئة + الرمز الخام احتياطاً. */
+export const sourceText = (payload: ReportPayload, options: PdfOptions, prefix: string): string => options.labels?.source ?? `${prefix}: ${payload.source.kind}`;
+
+/** سطر الفترة: فاصل «–» (السهم → غير موجود في الخط الاحتياطي فكان يُرسم رموزاً مشوّهة). */
+export const periodText = (payload: ReportPayload, current: string): string => (payload.period ? `${payload.period.from} – ${payload.period.to}` : current);
+
+/** فجوات الجودة بنصها المترجم (الرمز الخام احتياطاً). */
+export const gapTexts = (payload: ReportPayload, options: PdfOptions): string[] => payload.data_quality.gaps.map((code) => options.labels?.gaps?.[code] ?? code);
 
 export const PDF_ROW_CAP = 4000;
 export const THERMAL_ROW_CAP = 80;
@@ -100,7 +111,7 @@ async function createA4(payload: ReportPayload, options: PdfOptions, orientation
     const ids = [options.company?.vat ? `${l.vat}: ${options.company.vat}` : null, options.company?.cr ? `${l.cr}: ${options.company.cr}` : null].filter(Boolean).join('   ');
     if (ids) fitText(pdf, ids, nameX, y + 15, TW * 0.55, { size: 7.5, align: sa, color: [203, 213, 225] });
     fitText(pdf, payload.report.title[lang], rtl ? L + 4 : R - 4, y + 9, TW * 0.4, { size: 13, bold: true, align: ea, color: [255, 255, 255] });
-    const period = payload.period ? `${payload.period.from} → ${payload.period.to}` : l.current;
+    const period = periodText(payload, l.current);
     fitText(pdf, period, rtl ? L + 4 : R - 4, y + 15, TW * 0.4, { size: 8, align: ea, color: [203, 213, 225] });
     y += 26;
     const stations = payload.stations.map((s) => s.name).join('، ');
@@ -134,7 +145,7 @@ async function createA4(payload: ReportPayload, options: PdfOptions, orientation
 
   for (const table of payload.tables) y = drawTable(pdf, table, y, { L, R, TW, H, bottom, rtl, sa, ea, start, orientation, lang, tz });
 
-  const notes = [...payload.data_quality.notes.map((n) => n[lang]), ...(payload.data_quality.gaps.length > 0 ? [`${l.gaps}: ${payload.data_quality.gaps.join(', ')}`] : [])];
+  const notes = [...payload.data_quality.notes.map((n) => n[lang]), ...(payload.data_quality.gaps.length > 0 ? [`${l.gaps}: ${gapTexts(payload, options).join(lang === 'ar' ? '، ' : ', ')}`] : [])];
   if (notes.length > 0) {
     if (y + 8 > bottom) { pdf.addPage('a4', orientation); y = 12; }
     text(pdf, l.notes, start, y + 3, { size: 8.5, bold: true, color: NAVY, align: sa });
@@ -214,7 +225,7 @@ function footer(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, l: (ty
   for (let page = 1; page <= pages; page += 1) {
     pdf.setPage(page);
     line(pdf, 10, H - 12, W - 10, H - 12);
-    const meta = [options.generatedBy ? `${l.by}: ${options.generatedBy}` : null, `${l.generated}: ${dateTimeText(payload.generated_at, tz)} (${tz})`, `${l.source}: ${payload.source.kind}`].filter(Boolean).join('   ');
+    const meta = [options.generatedBy ? `${l.by}: ${options.generatedBy}` : null, `${l.generated}: ${dateTimeText(payload.generated_at, tz)} (${tz})`, sourceText(payload, options, l.source)].filter(Boolean).join('   ');
     fitText(pdf, meta, rtl ? W - 10 : 10, H - 7.5, W - 50, { size: 7, color: MUTED, align: rtl ? 'right' : 'left' });
     text(pdf, `${l.page} ${page} / ${pages}`, rtl ? 10 : W - 10, H - 7.5, { size: 7, color: MUTED, align: rtl ? 'left' : 'right' });
   }
@@ -247,7 +258,7 @@ function drawThermal(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, w
   let y = 5;
 
   const center = (value: string, size: number, bold = false) => { if (draw) fitText(pdf, value, widthMm / 2, y, TW, { size, bold, align: 'center' }); y += size * 0.5 + 1.4; };
-  const rule = () => { if (draw) line(pdf, L, y, R, y, [120, 120, 120], 0.2); y += 2; };
+  const rule = () => { if (draw) line(pdf, L, y, R, y, [120, 120, 120], 0.2); y += 3.6; };
   const pair = (label: string, value: string, bold = false) => {
     if (draw) {
       fitText(pdf, label, start, y, TW * 0.55, { size: small, align: sa, color: MUTED });
@@ -259,7 +270,7 @@ function drawThermal(pdf: PdfDoc, payload: ReportPayload, options: PdfOptions, w
   center(options.company?.name ?? payload.tenant.name ?? '—', small + 2, true);
   center(payload.report.title[lang], small + 1, true);
   if (payload.stations.length > 0) center(payload.stations.map((s) => s.name).join('، '), small);
-  center(payload.period ? `${payload.period.from} → ${payload.period.to}` : l.current, small);
+  center(periodText(payload, l.current), small);
   center(`${dateTimeText(payload.generated_at, tz)}`, small - 0.5);
   rule();
 

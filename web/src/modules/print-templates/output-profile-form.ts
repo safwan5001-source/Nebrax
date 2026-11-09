@@ -96,7 +96,12 @@ export function paperChoicesForTemplate(templateId: string | null | undefined): 
  * وغير الحراري يُبقى كما هو (لدى المحرر عندها تحذير وعناصر تحكم للمسح).
  */
 export function outputProfileAfterTemplateChange(raw: unknown, templateId: string | null | undefined): unknown {
-  if (raw === undefined || raw === null) return undefined;
+  if (raw === undefined || raw === null) {
+    // AWJ-DOC-V2-PR5: قالب يعلن مقاساً مفضَّلاً (السند المدمج ← A5 أفقي) يُقترح عند اختياره بلا ملف قائم؛
+    // ظاهر في «إعداد الصفحة» ويمسحه المستخدم. القوالب الأخرى = غياب كما كان.
+    const preferred = getTemplate(templateId).preferredOutput;
+    return preferred ? { paper: preferred.paper, orientation: preferred.orientation } : undefined;
+  }
   const { thermal } = paperChoicesForTemplate(templateId);
   if (!thermal) return raw;
 
