@@ -69,6 +69,9 @@ export function stamp(value: string | null | undefined, timeZone: string | null 
   return wall ? `${wall.date} ${wall.time}` : null;
 }
 
+/** رموز فجوات تمسّ **الكمية** (قراءات عدّاد) — فجوات السعر/الضريبة/المنتج تمسّ المبلغ وحده (`FuelShiftSalesCalculator`). */
+const QUANTITY_GAPS: readonly string[] = ['missing_reading', 'closing_below_opening'];
+
 const litersOf = (ml: number) => formatLitersFixedFromMl(ml, 'en');
 
 export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
@@ -114,7 +117,7 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   type Row = { id: string; name: string; ml: number; partial?: boolean; price: number | null | undefined; amount: number | null | undefined };
   let productRows: Row[] = [];
   if (frozen) {
-    productRows = frozenProducts.map((product) => ({ id: product.fuel_product_id, name: product.name ?? '', ml: product.milliliters, partial: product.gaps.length > 0, price: salesVisible ? product.price_per_liter_minor : null, amount: salesVisible ? product.amount_minor : null }));
+    productRows = frozenProducts.map((product) => ({ id: product.fuel_product_id, name: product.name ?? '', ml: product.milliliters, partial: product.gaps.some((code) => QUANTITY_GAPS.includes(code)), price: salesVisible ? product.price_per_liter_minor : null, amount: salesVisible ? product.amount_minor : null }));
   } else if (readings) {
     const byProduct = new Map<string, Row>();
     for (const group of readings.groups) {
@@ -136,7 +139,8 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   ];
   // لقطة مجمَّدة فيها فجوات (قراءة ناقصة): الكمية جزئية لا مؤكدة، والصفر مع فجوة «غير متاح» لا صفر مؤكد.
   const litersCell = (row: Row): Cell => (row.partial ? (row.ml === 0 ? { text: t('doc.reading.incomplete'), na: true } : { text: `${litersOf(row.ml)} (${t('doc.partial')})` }) : { text: litersOf(row.ml) });
-  const litersPartial = frozen && (collection.sales.milliliters_complete === false || collection.sales.products.some((product) => product.gaps.length > 0));
+  // الإجمالي من علم الخادم `milliliters_complete` وحده (فجوات التسعير لا تمسّ الكمية).
+  const litersPartial = frozen && (collection.sales.milliliters_complete === false || productRows.some((row) => row.partial === true));
   const salesTableRows: Cell[][] = productRows.map((row) => [
     text(row.name),
     litersCell(row),

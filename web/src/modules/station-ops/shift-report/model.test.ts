@@ -203,6 +203,25 @@ describe('shift report model — incomplete readings in a frozen snapshot', () =
     expect(section(model, 'liters-partial')).toBeDefined();
   });
 
+  it('pricing/tax gaps alone do NOT make litres partial (only meter-reading gaps do) — confirmed volume and confirmed zero stay as they are', () => {
+    const pricingOnly = frozenCollection({
+      sales: {
+        ...frozenCollection().sales, complete: false, amount_minor: null, milliliters_complete: true, gaps: ['price_unavailable', 'tax_mode_unset'],
+        products: [
+          { fuel_product_id: 'p1', name: 'Alpha', nozzle_count: 2, milliliters: 790_500, price_per_liter_minor: null, price_source: null, amount_minor: null, gaps: ['price_unavailable'] },
+          { fuel_product_id: 'p2', name: 'Beta', nozzle_count: 1, milliliters: 0, price_per_liter_minor: null, price_source: null, amount_minor: null, gaps: ['tax_mode_unset', 'price_changed_during_shift'] },
+        ],
+      },
+    });
+    const model = buildShiftReport(base({ collection: pricingOnly }));
+    const sales = table(model, 'sales');
+    expect(sales.rows[0][1].text).toBe('790.500');
+    expect(sales.rows[1][1].text).toBe('0.000'); // صفر مؤكد (القراءات سليمة)
+    expect(sales.rows[1][1].na).toBeUndefined();
+    expect(sales.totals?.[1].text).toBe('1,290.500');
+    expect(section(model, 'liters-partial')).toBeUndefined();
+  });
+
   it('a complete snapshot has no partial labels or warning', () => {
     const model = buildShiftReport(base());
     expect(JSON.stringify(model.sections)).not.toContain('Partial');
