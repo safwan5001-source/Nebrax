@@ -349,6 +349,42 @@ class FuelTankerFoundationTest extends TestCase
         $this->assertSame('2026-02-01', FuelTankerOwnerCompanyLink::findOrFail($id)->valid_to->toDateString());
     }
 
+    /** @test */
+    public function the_shared_audit_reader_never_exposes_tanker_snapshots_without_the_tanker_manage_key_and_an_open_gate(): void
+    {
+        $this->fixture();
+        $ownerId = $this->withToken($this->owner)->postJson(self::BASE . '/tanker-owners', ['name' => 'عسكر', 'phone' => '0555555555', 'notes' => 'ملاحظة سرية'])->assertCreated()->json('data.id');
+        $this->withToken($this->owner)->postJson(self::BASE . '/tankers', ['fuel_tanker_owner_id' => $ownerId, 'plate_number' => 'AUD-1'])->assertCreated();
+        $company = $this->makePartner('كيفير', 'customer');
+        $this->withToken($this->owner)->postJson(self::BASE . "/tanker-owners/{$ownerId}/company-links", ['partner_id' => $company->id])->assertCreated();
+
+        $subjects = fn (string $token, string $query = '') => collect($this->withToken($token)->getJson(self::BASE . '/audit-events' . $query)->assertOk()->json('data'))->pluck('subject_type')->unique()->values()->all();
+        $tanker = ['FuelTankerOwner', 'FuelTanker', 'FuelTankerOwnerCompanyLink'];
+
+        // المفتاح القديم وحده (نطاق غير مقيَّد): لا أي حدث صهاريج، لا بقائمة عامة ولا بالتصفية بالنوع ولا بالمعرّف.
+        $legacy = $this->tokenWithPermissions(['fuel_stations.view', 'fuel_stations.manage']);
+        $this->assertSame([], array_intersect($tanker, $subjects($legacy)));
+        $this->assertSame([], $subjects($legacy, '?subject_type=FuelTankerOwner'));
+        $this->assertSame([], $subjects($legacy, "?subject_id={$ownerId}"));
+        $raw = $this->withToken($legacy)->getJson(self::BASE . '/audit-events?per_page=100')->assertOk()->getContent();
+        $this->assertStringNotContainsString('0555555555', $raw);
+        $this->assertStringNotContainsString('ملاحظة سرية', $raw);
+
+        // عرض الصهاريج وحده (دون إدارة) لا يكفي أيضاً.
+        $viewer = $this->tokenWithPermissions(['fuel_stations.view', 'fuel_stations.manage', 'fuel.tanker.view']);
+        $this->assertSame([], array_intersect($tanker, $subjects($viewer)));
+
+        // المدير مع بوابة مفتوحة يراها كلها.
+        $manager = $this->tokenWithPermissions(['fuel_stations.view', 'fuel_stations.manage', 'fuel.tanker.manage']);
+        $this->assertEqualsCanonicalizing($tanker, array_intersect($tanker, $subjects($manager)));
+        $this->assertSame(['FuelTankerOwner'], $subjects($manager, '?subject_type=FuelTankerOwner'));
+
+        // البوابة مغلقة: حتى المالك والمدير لا يرون ما كُتب سابقاً.
+        config(['fuel_stations.tanker_management_enabled' => false]);
+        $this->assertSame([], array_intersect($tanker, $subjects($manager)));
+        $this->assertSame([], array_intersect($tanker, $subjects($this->owner)));
+    }
+
     // ───────────────────────── العزل ─────────────────────────
 
     /** @test */

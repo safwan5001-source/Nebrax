@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\FuelStationAuditEventResource;
 use App\Models\FuelStationAuditEvent;
+use App\Models\FuelTanker;
+use App\Models\FuelTankerOwner;
+use App\Models\FuelTankerOwnerCompanyLink;
+use App\Support\Rbac;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -15,12 +19,19 @@ use Illuminate\Http\Request;
  */
 class FuelStationAuditController extends ApiController
 {
+    /**
+     * TANKER-PR1: موضوعات أصحاب الصهاريج. لقطاتها تحوي بيانات حسّاسة (اسم، هاتف، ملاحظات) محكومة بصلاحية `fuel.tanker.manage` وبوابة النشر، ولا يكفي
+     * لقراءتها المفتاح القديم `fuel_stations.manage` المطلوب لهذا المسار — وإلا صار سجل التدقيق المشترك باباً خلفياً يتجاوز مفاتيح الميزة وبوابتها.
+     *
+     * @var list<class-string>
+     */
+    private const TANKER_SUBJECTS = [FuelTankerOwner::class, FuelTanker::class, FuelTankerOwnerCompanyLink::class];
 
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
             'fuel_station_id' => ['nullable', 'uuid'],
-            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest'],
+            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink'],
             'subject_id' => ['nullable', 'uuid'],
             'actor_id' => ['nullable', 'uuid'],
             'action' => ['nullable', 'string', 'max:80'],
@@ -31,6 +42,7 @@ class FuelStationAuditController extends ApiController
 
         $query = FuelStationAuditEvent::query()->with('actor:id,name')->orderByDesc('occurred_at')->orderByDesc('id');
         $this->restrictEventsToUserScope($query, $request);
+        $this->restrictTankerSubjects($query, $request);
         if (! empty($filters['fuel_station_id'])) {
             $query->where('fuel_station_id', $filters['fuel_station_id']);
         }
@@ -52,6 +64,17 @@ class FuelStationAuditController extends ApiController
         }
 
         return FuelStationAuditEventResource::collection($query->paginate((int) ($filters['per_page'] ?? 50)))->response();
+    }
+
+    /** أحداث أصحاب الصهاريج تظهر فقط لمن يملك `fuel.tanker.manage` **والبوابة مفتوحة**؛ غيره لا يراها (بما فيها ما كُتب قبل إغلاق البوابة). */
+    private function restrictTankerSubjects(Builder $query, Request $request): void
+    {
+        $user = $request->user();
+        $allowed = (bool) config('fuel_stations.tanker_management_enabled', false)
+            && $user !== null && Rbac::allows((string) $user->role, 'fuel.tanker.manage');
+        if (! $allowed) {
+            $query->whereNotIn('subject_type', self::TANKER_SUBJECTS);
+        }
     }
 
     /**
