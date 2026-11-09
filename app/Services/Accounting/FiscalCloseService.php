@@ -922,7 +922,10 @@ class FiscalCloseService
         }
 
         $stations = \App\Models\FuelStation::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('id', $candidates->pluck('fuel_station_id')->unique())->get()->keyBy('id');
-        $jobShiftIds = \App\Models\FuelShiftSettlementJob::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $candidates->pluck('id'))->pluck('fuel_shift_id')->flip();
+        $jobs = \App\Models\FuelShiftSettlementJob::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $candidates->pluck('id'))->get(['fuel_shift_id', 'last_outcome'])->keyBy('fuel_shift_id');
+        // نقطة بدء التسوية لكل محطة = أول مهمة سُجِّلت لها: وردية أُغلقت قبلها (قبل تفعيل السياسة وسط السنة) لا تُعدّ معلّقة لأن أحداً لم يسجّلها للتسوية، فلا يتحوّل التفعيل نفسه إلى مانع إقفال دائم.
+        $firstJobAt = \App\Models\FuelShiftSettlementJob::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('fuel_station_id', $candidates->pluck('fuel_station_id')->unique())
+            ->selectRaw('fuel_station_id, MIN(created_at) as first_at')->groupBy('fuel_station_id')->pluck('first_at', 'fuel_station_id');
         $headers = \Illuminate\Support\Facades\DB::table('fuel_shift_settlements')->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $candidates->pluck('id'))->pluck('id', 'fuel_shift_id');
         $withheldHeaders = $headers->isEmpty() ? collect() : \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_lines')
             ->whereIn('fuel_shift_settlement_id', $headers->values())->where('state', 'like', 'withheld%')->whereNull('resolution_id')
@@ -938,9 +941,20 @@ class FiscalCloseService
             if ($day < $year->start_date->toDateString() || $day > $year->end_date->toDateString()) {
                 continue;
             }
-            $registered = $jobShiftIds->has($shift->id) || $readiness->mode($station) === \App\Services\FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE;
-            if (! $registered) {
-                continue;
+            $job = $jobs->get($shift->id);
+            if ($job !== null) {
+                // مهمة انتهت `disabled` (السياسة أُعيدت إلى «بلا» لاحقاً): لم تعد الوردية مقصودة بالتسوية.
+                if ($job->last_outcome === \App\Models\FuelShiftSettlementJob::OUTCOME_DISABLED) {
+                    continue;
+                }
+            } else {
+                // بلا مهمة: فشل تسجيل لاحق لبدء التسوية في محطة سياستها الآن `post_on_close` فقط.
+                $start = $firstJobAt->get($shift->fuel_station_id);
+                $registered = $readiness->mode($station) === \App\Services\FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE
+                    && $start !== null && $shift->closed_at->gte(\Carbon\CarbonImmutable::parse($start, 'UTC'));
+                if (! $registered) {
+                    continue;
+                }
             }
             $headerId = $headers->get($shift->id);
             if ($headerId === null || $withheldHeaders->has($headerId)) {
