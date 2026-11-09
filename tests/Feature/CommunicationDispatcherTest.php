@@ -519,6 +519,19 @@ class CommunicationDispatcherTest extends TestCase
         $onlyB->dispatchDue($tenant->id, 1);
         $this->assertSame('accepted', $this->messageRow($fresh)->status);
         $this->assertSame('retry_scheduled', $this->messageRow($id2)->status);
+
+        // سياج المطالبة: مرشّح قديم (attempt_count=0 وقت القراءة) لا يطالب برسالة صارت على المحاولة 1 ولو بدت مستحقة.
+        $stale = new \App\Models\CommunicationMessage();
+        $stale->id = $id2;
+        $stale->channel = 'sms';
+        $stale->classification = 'transactional';
+        $stale->attempt_count = 0;
+        $method = new \ReflectionMethod($onlyB, 'dispatchOne');
+        $summary = new \App\Services\Communications\RunSummary();
+        $sentBefore = count($b->received);
+        $method->invoke($onlyB, $tenant->id, $stale, $summary);
+        $this->assertCount($sentBefore, $b->received, 'a stale candidate must lose the claim, never send');
+        $this->assertSame('retry_scheduled', $this->messageRow($id2)->status);
     }
 
     #[Test]

@@ -172,7 +172,7 @@ final class CommunicationDispatcher
         }
 
         $token = (string) Str::uuid();
-        $message = $this->claim($tenantId, $candidate->id, $token, $provider->key());
+        $message = $this->claim($tenantId, $candidate->id, $token, $provider->key(), (int) $candidate->attempt_count);
         if ($message === null) {
             $summary->increment('claim_lost'); // سباق: عامل آخر طالب بها أو لم تعد مستحقة.
 
@@ -186,9 +186,9 @@ final class CommunicationDispatcher
     }
 
     /** مطالبة ذرّية: UPDATE محروس + صف المحاولة `started` في معاملة واحدة تلتزم قبل أي استدعاء للمزوّد. */
-    private function claim(string $tenantId, string $messageId, string $token, string $providerKey): ?CommunicationMessage
+    private function claim(string $tenantId, string $messageId, string $token, string $providerKey, int $observedAttemptCount): ?CommunicationMessage
     {
-        return DB::transaction(function () use ($tenantId, $messageId, $token, $providerKey): ?CommunicationMessage {
+        return DB::transaction(function () use ($tenantId, $messageId, $token, $providerKey, $observedAttemptCount): ?CommunicationMessage {
             $now = CarbonImmutable::now();
 
             $claimed = CommunicationMessage::query()
@@ -200,6 +200,8 @@ final class CommunicationDispatcher
                 ->where('next_attempt_at', '<=', $now)
                 ->where('expires_at', '>', $now)
                 ->whereColumn('attempt_count', '<', 'max_attempts')
+                // سياج الحالة المرصودة: مرشّح قديم (حُمّل قبل أن يرسله عامل آخر ويُسترجع إيجاره) يخسر المطالبة، فلا يتجاوز تثبيت المزوّد.
+                ->where('attempt_count', $observedAttemptCount)
                 ->update([
                     'status' => DeliveryStatus::Sending->value,
                     'attempt_count' => DB::raw('attempt_count + 1'),
