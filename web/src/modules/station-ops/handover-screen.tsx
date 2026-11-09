@@ -9,7 +9,7 @@ import { CollectionDetailSection, CollectionEntrySection, type CollectionStatus 
 import { SettlementPreviewSection } from './settlement-preview-section';
 import { cashTotals, closePreview, isValidReason, movementBlocker, parseMoney, MOVEMENT_TYPES, type MovementType } from './cash';
 import { useStationOps } from './context';
-import { useShiftDetail, useStationAssets, useStationPolicy } from './data';
+import { useShiftDetail, useStationAssets, useStationPolicy, type StationAssetsResult } from './data';
 import { closeBlockers, readingsCoverage, type Coverage } from './entry';
 import { formatLitersFixedFromMl } from './format';
 import { createIntentStore } from './intents';
@@ -18,6 +18,7 @@ import { OPS_BASE } from './nav';
 import { Quantity } from './quantity';
 import { buildShiftReadings } from './readings';
 import type { ShiftDetail, Station } from './schemas';
+import { ShiftReportActions } from './shift-report/actions';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 import { opsWrite, type WriteResult } from './write-client';
@@ -67,7 +68,7 @@ function DirectionBadge({ variance }: { variance: number }) {
   );
 }
 
-function DonePanel({ detail, justClosed, station }: { detail: ShiftDetail; justClosed: boolean; station: Station }) {
+function DonePanel({ detail, justClosed, station, assets }: { detail: ShiftDetail; justClosed: boolean; station: Station; assets: StationAssetsResult }) {
   const t = useTranslations('stationOps');
   const locale = useLocale();
   const variance = detail.cash_variance_minor;
@@ -90,6 +91,7 @@ function DonePanel({ detail, justClosed, station }: { detail: ShiftDetail; justC
         <p className="mt-3 text-xs leading-5 text-muted">{t('handover.summary.note')}</p>
       </SectionCard>
       <CollectionDetailSection station={station} shiftId={detail.id} />
+      <ShiftReportActions station={station} detail={detail} assets={assets} justClosed={justClosed} />
       <Link href={OPS_BASE} data-primary-action="" className="flex min-h-14 w-full items-center justify-center rounded-[13px] bg-[color:var(--fo-cta-bg)] px-4 text-[15px] font-bold text-[color:var(--fo-cta-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">{t('handover.done.home')}</Link>
     </div>
   );
@@ -255,13 +257,13 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
     }
   }, [countedMinor, note, query, shiftId, station.branch_id]);
 
-  if (closedShift) return <DonePanel detail={closedShift} justClosed station={station} />;
+  if (closedShift) return <DonePanel detail={closedShift} justClosed station={station} assets={assets} />;
   if (!query.allowed) return <div className="pt-5"><EmptyState title={t('shift.noPermission.title')} body={t('shift.noPermission.body')} /></div>;
   if (!detail) {
     if (query.state.status === 'error') return <div className="pt-5"><ErrorState error={query.state.error} onRetry={query.reload} /></div>;
     return <div className="pt-5"><LoadingBlock rows={3} /></div>;
   }
-  if (detail.status !== 'open') return <DonePanel detail={detail} justClosed={false} station={station} />;
+  if (detail.status !== 'open') return <DonePanel detail={detail} justClosed={false} station={station} assets={assets} />;
   if (!can('fuel.shift.close') || !can('fuel.shift.cash_count')) {
     return <div className="pt-5"><EmptyState title={t('shift.noPermission.title')} body={t('shift.noPermission.body')} /></div>;
   }
