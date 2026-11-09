@@ -386,6 +386,32 @@ class FuelSaleService
         return ['sale' => $sale, 'invoice' => $invoice];
     }
 
+    /**
+     * أقفال صفوف التسوية الخارجية بترتيب معرّفات ثابت، **بلا أي إدراج** (يستدعيه محرك التسوية قبل المِرساة).
+     * كل فوهة في الأسطر (لا المرحَّلة وحدها: يُدرَج لكل سطر صف بعد المِرساة فيأخذ KEY SHARE على فوهته) بـFOR UPDATE ثم مضختها وخزانها، ثم منتجات الوقود والمخزن
+     * وطرق الدفع بـKEY SHARE (الأصول التي تُشير إليها صفوف التسوية).
+     *
+     * @param  list<array<string,mixed>>  $lines
+     * @param  list<string>  $paymentMethodIds
+     */
+    public function lockSettlementRows(FuelShift $shift, array $lines, array $paymentMethodIds = []): void
+    {
+        $nozzleIds = collect($lines)->pluck('nozzle_id')->unique()->sort()->values()->all();
+        foreach ($nozzleIds as $nozzleId) {
+            $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
+            $this->lockReferencedRows($nozzle);
+        }
+        $productIds = collect($lines)->pluck('fuel_product_id')->filter()->unique()->sort()->values()->all();
+        if ($productIds !== []) {
+            FuelProduct::query()->whereIn('id', $productIds)->orderBy('id')->lock('for key share')->get();
+        }
+        $station = FuelStation::findOrFail($shift->fuel_station_id);
+        Warehouse::query()->whereKey($station->warehouse_id)->lock('for key share')->first();
+        if ($paymentMethodIds !== []) {
+            PaymentMethod::query()->whereIn('id', collect($paymentMethodIds)->filter()->sort()->values()->all())->orderBy('id')->lock('for key share')->get();
+        }
+    }
+
     public function postSettlementSale(FuelSale $sale, Invoice $invoice, FuelShift $shift, int $pricePerLiterMinor, ?string $taxMode, User $actor): FuelSale
     {
         $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
@@ -413,7 +439,7 @@ class FuelSaleService
         $cogsMinor = 0;
         $invoice = $this->invoices->post($invoice, function ($postedInvoice) use ($sale, $station, $warehouse, $fuelProduct, $product, &$stockMovement, &$cogsEntry, &$cogsMinor, $actor) {
             $this->lockWarehouseStock($warehouse->id, $product->id);
-            $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, (int) $sale->quantity_milliliters);
+            $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, (int) $sale->quantity_milliliters, allowOpenHistory: true);   // التسوية تحجب بفحصها الخاص
             $cogsMinor = $quote['posted_cost_minor'];
             $unitCost = intdiv($cogsMinor, (int) $sale->quantity_milliliters);
             $stockMovement = $this->inventory->applyIssue($product, (int) $sale->quantity_milliliters, $unitCost, [

@@ -205,9 +205,13 @@ class FuelShiftSettlementSchemaTest extends TestCase
         $insert = fn (array $o = []) => DB::table('fuel_shift_settlement_collections')->insert($o + [
             'id' => $this->uuid(), 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'fuel_shift_settlement_id' => $settlement,
             'payment_method_id' => $this->f['cash']->id, 'invoice_id' => $sale->invoice_id, 'payment_id' => $payment->id,
-            'target_kind' => 'erp_walk_in', 'amount_minor' => 230, 'created_at' => now(), 'updated_at' => now(),
+            'target_kind' => 'erp_walk_in', 'amount_minor' => 230, 'collected_at' => now(), 'collection_date' => now()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
         ]);
         $insert();
+        // P1-3b-2c: تاريخ التحصيل إلزامي للصف الجديد ومرتبطان معاً.
+        $this->rejectsDb(fn () => $insert(['payment_id' => $this->uuid(), 'collected_at' => null, 'collection_date' => null]));
+        $this->rejectsDb(fn () => $insert(['payment_id' => $this->uuid(), 'collection_date' => null]));
 
         $this->rejectsDb(fn () => $insert());                                   // تكرار (طريقة، فاتورة) وسند
         $this->rejectsDb(fn () => $insert(['amount_minor' => 0, 'payment_id' => $this->uuid()]));
@@ -230,7 +234,8 @@ class FuelShiftSettlementSchemaTest extends TestCase
         DB::table('fuel_shift_settlement_collections')->insert([
             'id' => $collection, 'tenant_id' => $this->f['tenant_id'], 'branch_id' => $this->f['branch']->id, 'fuel_shift_settlement_id' => $settlement,
             'payment_method_id' => $this->f['cash']->id, 'invoice_id' => $sale->invoice_id, 'payment_id' => $payment->id,
-            'target_kind' => 'resolved_withheld', 'amount_minor' => 230, 'created_at' => now(), 'updated_at' => now(),
+            'target_kind' => 'resolved_withheld', 'amount_minor' => 230, 'collected_at' => now(), 'collection_date' => now()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
         ]);
 
         // العجز إجماليّ بلا طريقة؛ الزيادة والمحجوز لكل طريقة.
