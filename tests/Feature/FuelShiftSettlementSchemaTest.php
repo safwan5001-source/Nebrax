@@ -60,6 +60,8 @@ class FuelShiftSettlementSchemaTest extends TestCase
             'fuel_shift_id' => $shift->id, 'status' => 'posted', 'sales_basis' => 'per_invoice', 'preview_hash' => str_repeat('a', 64),
             'policy_snapshot' => json_encode(['mode' => 'post_on_close']), 'metered_milliliters' => 20000, 'erp_milliliters' => 5000,
             'residual_milliliters' => 15000, 'settled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            // P1-3b-2a: تواريخ التوريد إلزامية عند الإدراج (مُشغّل).
+            'supply_started_at' => '2026-10-15 08:00:00', 'supply_ended_at' => '2026-10-15 16:00:00', 'supply_business_date' => '2026-10-15', 'accounting_date' => '2026-10-15',
         ]);
 
         return $id;
