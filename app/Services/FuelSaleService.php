@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\Invoice;
 use App\Models\FuelNozzle;
 use App\Models\FuelOperationalLedger;
 use App\Models\FuelProduct;
@@ -299,6 +300,180 @@ class FuelSaleService
 
             return $sale->fresh(['invoice.lines', 'stockMovement', 'cogsJournalEntry']);
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  بيع التسوية (P1-3b-2b) — متغيّر **منفصل** عن finalize ولا يعدّله (مسار البيع المباشر القائم لم يتغيّر حرفياً)
+    // ═══════════════════════════════════════════════════════════════════════
+    //  الفروقات المقصودة عن finalize (التصميم §2.3): وردية مغلقة، تاريخ الفاتورة = تاريخ التوريد (لا اليوم)، السعر ووضع الضريبة من تقييم التسوية المثبَّت (لا now())،
+    //  العميل = عميل المحطة النقدي، لا تفويض عقود شركات، لا شرط تشغيل الفوهة/المضخة/الخزان الآن (الوقود وُزِّع في الماضي)، `source = settlement`.
+    //  مقسوم مرحلتين كي يبقى ترتيب الأقفال: كل **الترقيم** (فرع المستندات) قبل أي مِرساة محاسبة، ثم الترحيل بعدها:
+    //    prepareSettlementSale()  ⇒ مسودة بيع + مسودة فاتورة (ترقيم فقط، بلا قيد ولا مخزون)
+    //    postSettlementSale()     ⇒ ترحيل الفاتورة + COGS + حركة مخزون + سجل تشغيلي، ثم إنهاء البيع.
+
+    /**
+     * @param  array{nozzle_id:string,residual_milliliters:int,price_per_liter_minor:int}  $line
+     * @return array{sale:FuelSale,invoice:Invoice}
+     */
+    public function prepareSettlementSale(array $line, FuelShift $shift, string $partnerId, string $supplyDate, ?string $taxMode, User $actor): array
+    {
+        $station = FuelStation::findOrFail($shift->fuel_station_id);          // المحطة والوردية مقفلتان من المستدعي
+        $this->assertStationBranch($station);
+        $this->assertActorStationScope($actor, $station);
+        $nozzle = FuelNozzle::lockForUpdate()->findOrFail($line['nozzle_id']);
+        if ($nozzle->fuel_station_id !== $station->id || $nozzle->branch_id !== $station->branch_id) {
+            throw new RuntimeException('الفوهة لا تخص محطة/فرع التسوية.');
+        }
+        $this->lockReferencedRows($nozzle);
+        $warehouse = $this->warehouse($station);
+        $fuelProduct = FuelProduct::findOrFail($nozzle->fuel_product_id);
+        $product = Product::findOrFail($fuelProduct->product_id);
+        $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
+        $quantity = $this->positiveInteger($line['residual_milliliters'] ?? null, 'residual_milliliters');
+        $price = $this->positiveInteger($line['price_per_liter_minor'] ?? null, 'price_per_liter_minor');
+        $idempotencyKey = 'fuel-settle:'.$shift->id.':'.$nozzle->id;
+        if (FuelSale::where('idempotency_key', $idempotencyKey)->exists()) {
+            throw new RuntimeException('FUEL_SETTLEMENT_SALE_EXISTS: بيع التسوية لهذه الفوهة مسجَّل سابقاً.');
+        }
+
+        $sale = new FuelSale();
+        $sale->forceFill([
+            'branch_id' => $station->branch_id,
+            'number' => FuelSale::nextDocumentNumber('FSL', $supplyDate, $station->branch_id),
+            'status' => FuelSale::STATUS_DRAFT,
+            'source' => 'settlement',
+            'fuel_station_id' => $station->id,
+            'warehouse_id' => $warehouse->id,
+            'fuel_shift_id' => $shift->id,
+            'fuel_pump_id' => $nozzle->fuel_pump_id,
+            'fuel_nozzle_id' => $nozzle->id,
+            'fuel_tank_id' => $nozzle->fuel_tank_id,
+            'fuel_product_id' => $fuelProduct->id,
+            'product_id' => $product->id,
+            'partner_id' => $partnerId,
+            'quantity_milliliters' => $quantity,
+            'payment_status' => FuelSale::PAYMENT_UNPAID,
+            'paid_minor' => 0,
+            'idempotency_key' => $idempotencyKey,
+            'created_by' => $actor->id,
+        ])->save();
+
+        $precision = $this->linePrecision->fromItem([
+            'quantity_numerator' => $quantity,
+            'quantity_denominator' => FuelQuantity::MILLILITERS_PER_LITER,
+        ], $price) ?? throw new RuntimeException('تعذر بناء تسعير الوقود النسبي.');
+        $invoice = $this->invoices->create([
+            'partner_id' => $partnerId,
+            'branch_id' => $station->branch_id,
+            'warehouse_id' => $warehouse->id,
+            'payment_type' => 'credit',
+            'is_paid' => false,
+            'invoice_date' => $supplyDate,
+            'due_date' => $supplyDate,
+            'tax_inclusive' => $taxMode === 'tax_inclusive',
+            'notes' => "تسوية وردية {$shift->number} — فوهة {$nozzle->nozzle_number} ({$sale->number})",
+            'created_by' => $actor->id,
+        ], [[
+            'product_id' => $product->id,
+            'description' => $fuelProduct->name,
+            'unit' => $fuelProduct->display_unit,
+            'quantity_numerator' => $precision['quantity_numerator'],
+            'quantity_denominator' => $precision['quantity_denominator'],
+            'unit_price' => $price,
+            'tax_rate' => (int) \App\Support\Settings::get('sales', 'default_tax_rate'),
+        ]]);
+
+        return ['sale' => $sale, 'invoice' => $invoice];
+    }
+
+    public function postSettlementSale(FuelSale $sale, Invoice $invoice, FuelShift $shift, int $pricePerLiterMinor, ?string $taxMode, User $actor): FuelSale
+    {
+        $sale = FuelSale::lockForUpdate()->findOrFail($sale->id);
+        if (! $sale->isDraft() || $sale->source !== 'settlement' || $sale->fuel_shift_id !== $shift->id) {
+            throw new RuntimeException('FUEL_SETTLEMENT_SALE_INVALID: ليست مسودة بيع تسوية لهذه الوردية.');
+        }
+        $station = FuelStation::findOrFail($sale->fuel_station_id);
+        $warehouse = $this->warehouse($station);
+        if ($warehouse->id !== $sale->warehouse_id) {
+            throw new RuntimeException('تغير مخزن المحطة بعد تجهيز بيع التسوية.');
+        }
+        $fuelProduct = FuelProduct::findOrFail($sale->fuel_product_id);
+        $product = Product::findOrFail($sale->product_id);
+        if ($fuelProduct->product_id !== $product->id || ! $fuelProduct->is_active) {
+            throw new RuntimeException('منتج الوقود في بيع التسوية لم يعد صالحاً.');
+        }
+        $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
+        $precision = $this->linePrecision->fromItem([
+            'quantity_numerator' => $sale->quantity_milliliters,
+            'quantity_denominator' => FuelQuantity::MILLILITERS_PER_LITER,
+        ], $pricePerLiterMinor) ?? throw new RuntimeException('تعذر بناء تسعير الوقود النسبي.');
+
+        $stockMovement = null;
+        $cogsEntry = null;
+        $cogsMinor = 0;
+        $invoice = $this->invoices->post($invoice, function ($postedInvoice) use ($sale, $station, $warehouse, $fuelProduct, $product, &$stockMovement, &$cogsEntry, &$cogsMinor, $actor) {
+            $this->lockWarehouseStock($warehouse->id, $product->id);
+            $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, (int) $sale->quantity_milliliters);
+            $cogsMinor = $quote['posted_cost_minor'];
+            $unitCost = intdiv($cogsMinor, (int) $sale->quantity_milliliters);
+            $stockMovement = $this->inventory->applyIssue($product, (int) $sale->quantity_milliliters, $unitCost, [
+                'warehouse_id' => $warehouse->id,
+                'branch_id' => $station->branch_id,
+                'source_type' => FuelSale::class,
+                'source_id' => $sale->id,
+                'date' => $postedInvoice->invoice_date->toDateString(),
+                'notes' => "صرف وقود عبر تسوية الوردية {$sale->number}",
+                'enforce_stock' => true,
+                InventoryService::FUEL_POOL_META => true,
+            ], $cogsMinor);
+            $cogsEntry = $this->postFuelCogs($station, $cogsMinor, $postedInvoice, $actor);
+            $this->costBasis->recordIssue($fuelProduct, $warehouse, $stockMovement, (int) $sale->quantity_milliliters, $cogsMinor, $cogsEntry);
+
+            return $cogsEntry;
+        });
+        if ($stockMovement === null) {
+            throw new RuntimeException('تعذر تثبيت حركة مخزون بيع التسوية.');
+        }
+
+        $bookBalance = (int) (ProductWarehouseStock::where('warehouse_id', $warehouse->id)->where('product_id', $product->id)->value('quantity') ?? 0);
+        FuelOperationalLedger::create([
+            'branch_id' => $station->branch_id,
+            'fuel_station_id' => $station->id,
+            'fuel_tank_id' => $sale->fuel_tank_id,
+            'fuel_product_id' => $fuelProduct->id,
+            'warehouse_id' => $warehouse->id,
+            'stock_movement_id' => $stockMovement->id,
+            'movement_type' => FuelOperationalLedger::TYPE_SALE,
+            'quantity_milliliters' => -(int) $sale->quantity_milliliters,
+            'book_balance_milliliters' => $bookBalance,
+            'unit_cost_minor' => intdiv($cogsMinor, (int) $sale->quantity_milliliters),
+            'value_minor' => -$cogsMinor,
+            'idempotency_key' => 'fuel-sale:'.$sale->id,
+            'source_type' => FuelSale::class,
+            'source_id' => $sale->id,
+            'occurred_at' => now(),                       // لحظة الترحيل (D-E5)؛ «متى وُزّع الوقود» في رأس التسوية (supply_*)
+            'notes' => "بيع تسوية وردية {$sale->number}",
+        ]);
+
+        $sale->update([
+            'status' => FuelSale::STATUS_FINALIZED,
+            'price_per_liter_minor' => $pricePerLiterMinor,
+            'fuel_price_tax_mode' => $taxMode,
+            'pricing_numerator' => $precision['pricing_numerator'],
+            'pricing_denominator' => $precision['pricing_denominator'],
+            'gross_minor' => $precision['rounded_gross_minor'],
+            'rounding_remainder_numerator' => $precision['rounding_remainder_numerator'],
+            'rounding_remainder_denominator' => $precision['rounding_remainder_denominator'],
+            'rounding_policy' => $precision['rounding_policy'],
+            'invoice_id' => $invoice->id,
+            'stock_movement_id' => $stockMovement->id,
+            'cogs_journal_entry_id' => $cogsEntry?->id,
+            'cogs_minor' => $cogsMinor,
+            'finalized_at' => now(),
+            'finalized_by' => $actor->id,
+        ]);
+
+        return $sale->fresh(['invoice.lines', 'stockMovement', 'cogsJournalEntry']);
     }
 
     /** @param array<string,mixed> $attributes */

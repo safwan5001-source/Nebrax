@@ -37,6 +37,12 @@ class FuelShiftSettlementReadiness
             && trim((string) config('fuel_stations.shift_settlement_tax_opinion_ref', '')) !== '';
     }
 
+    /** شرط نشر مستقل (T-1): تفصيل الفواتير المعلن = `per_nozzle` وحده؛ الفارغ أو أي قيمة أخرى ⇒ لا إصدار فاتورة. */
+    public static function granularityDeclared(): bool
+    {
+        return (string) config('fuel_stations.shift_settlement_invoice_granularity', '') === 'per_nozzle';
+    }
+
     /** السياسة الفعّالة للمحطة: القيمة المخزَّنة إن كانت صالحة وإلا `none` (فشل مغلق). */
     public function mode(FuelStation $station): string
     {

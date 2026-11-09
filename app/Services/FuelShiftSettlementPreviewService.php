@@ -268,7 +268,7 @@ class FuelShiftSettlementPreviewService
      * سبب حجب الترحيل لمنتج، أو null إن أمكن ترحيله بالتكلفة الراهنة. بالترتيب: عبور حدّ شهر (T-3) ← تاريخ مفتوح للمجمّع ← حدث تكلفة داخل نافذة التعرّض.
      * نافذة التعرّض تبدأ من أقدم وردية غير مسوّاة على أي محطة تشترك في المجمّع وتتقاطع مع هذه (وردية مفتوحة اليوم؛ لا تسويات محجوبة قبل P1-3b).
      */
-    private function withholdReason(FuelShift $shift, FuelStation $station, FuelProduct $product, $now): ?string
+    public function withholdReason(FuelShift $shift, FuelStation $station, FuelProduct $product, $now): ?string
     {
         $tz = $this->settings->operatingTimezone($station);
         $opened = \Carbon\CarbonImmutable::instance($shift->opened_at ?? $now)->setTimezone($tz);
@@ -307,7 +307,7 @@ class FuelShiftSettlementPreviewService
      * قبوض مرحَّلة على مبيعات المحطة داخل نافذة الوردية بلا وسم وردية، **بأي طريقة دفع** (Codex P2): عدّاد نقد الدرج يعدّ النقد وحده لأن اهتمامه الدرج، أما التسوية فتحسب كل طرق الدفع،
      * وقبضٌ بنكي غير موسوم خفّض رصيد فاتورة ولم يدخل `$rByMethod` فيُظهر فائضاً وهمياً ويبقى `ready` صحيحاً. يُحجب حتى يُحسم وسمه.
      */
-    private function hasUnattributedReceipts(FuelShift $shift): bool
+    public function hasUnattributedReceipts(FuelShift $shift): bool
     {
         if ($shift->opened_at === null) {
             return false;
@@ -342,7 +342,7 @@ class FuelShiftSettlementPreviewService
             ->exists();
     }
 
-    private function periodLocked(string $date): bool
+    public function periodLocked(string $date): bool
     {
         $tenantId = app(\App\Tenancy\TenantContext::class)->id();
         if ($tenantId === null) {
