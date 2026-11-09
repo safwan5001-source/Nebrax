@@ -105,7 +105,7 @@ class FuelTankerService
             $key = self::plateKey($plate);
             $status = $attributes['status'] ?? FuelTanker::STATUS_ACTIVE;
             $this->assertStatus($status, FuelTanker::STATUSES);
-            $this->assertCapacity($attributes['capacity_milliliters'] ?? null);
+            $capacity = $this->normalizedCapacity($attributes['capacity_milliliters'] ?? null);
             $this->assertPlateAvailable($key, null);
 
             try {
@@ -114,7 +114,7 @@ class FuelTankerService
                     'plate_number' => $plate,
                     'plate_key' => $key,
                     'plate_country' => $this->nullableText($attributes['plate_country'] ?? null),
-                    'capacity_milliliters' => $attributes['capacity_milliliters'] ?? null,
+                    'capacity_milliliters' => $capacity,
                     'notes' => $this->nullableText($attributes['notes'] ?? null),
                     'status' => $status,
                     'created_by' => $actor->id,
@@ -150,8 +150,7 @@ class FuelTankerService
                 $changes['plate_country'] = $this->nullableText($attributes['plate_country']);
             }
             if (array_key_exists('capacity_milliliters', $attributes)) {
-                $this->assertCapacity($attributes['capacity_milliliters']);
-                $changes['capacity_milliliters'] = $attributes['capacity_milliliters'];
+                $changes['capacity_milliliters'] = $this->normalizedCapacity($attributes['capacity_milliliters']);
             }
             if (array_key_exists('notes', $attributes)) {
                 $changes['notes'] = $this->nullableText($attributes['notes']);
@@ -322,11 +321,21 @@ class FuelTankerService
         }
     }
 
-    private function assertCapacity(mixed $capacity): void
+    /**
+     * سعة الصهريج بالمللتر كعدد صحيح موجب أو null. تُطبَّع القيمة المصدَّقة طلباً (نص رقمي من JSON أو form-encoded، أو رقم صحيح بصيغة عشرية كـ3.0E7) بالمعيار نفسه
+     * لقاعدة `integer` في Laravel (`FILTER_VALIDATE_INT`)، فلا يُرفض تمثيلٌ صالح؛ وتبقى الكسور والصفر والسالب والمنطقي والنصوص غير العددية مرفوضة (فشل مغلق).
+     */
+    private function normalizedCapacity(mixed $capacity): ?int
     {
-        if ($capacity !== null && (! is_int($capacity) || $capacity <= 0)) {
+        if ($capacity === null) {
+            return null;
+        }
+        $value = is_bool($capacity) ? false : filter_var($capacity, FILTER_VALIDATE_INT);
+        if ($value === false || $value <= 0) {
             throw ValidationException::withMessages(['capacity_milliliters' => 'سعة الصهريج عدد صحيح موجب بالمللتر.']);
         }
+
+        return $value;
     }
 
     /** @param array<string,mixed> $attributes */

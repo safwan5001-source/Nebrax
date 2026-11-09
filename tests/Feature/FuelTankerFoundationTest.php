@@ -231,6 +231,48 @@ class FuelTankerFoundationTest extends TestCase
     }
 
     /** @test */
+    public function a_numeric_string_capacity_is_normalised_to_an_integer_but_fractions_and_non_positive_values_stay_rejected(): void
+    {
+        $this->fixture();
+        $ownerId = $this->makeOwner('عسكر');
+
+        // JSON بنص رقمي وطلب form-encoded يتجاوزان قاعدة integer، ويجب ألا يُرفضا لتمثيلهما فقط.
+        $json = $this->withToken($this->owner)->postJson(self::BASE . '/tankers', ['fuel_tanker_owner_id' => $ownerId, 'plate_number' => 'CAP-1', 'capacity_milliliters' => '30000000'])
+            ->assertCreated()->json('data');
+        $this->assertSame(30000000, $json['capacity_milliliters']);
+        $this->assertSame(30000000, FuelTanker::findOrFail($json['id'])->capacity_milliliters);
+
+        $form = $this->withToken($this->owner)->post(self::BASE . '/tankers', ['fuel_tanker_owner_id' => $ownerId, 'plate_number' => 'CAP-2', 'capacity_milliliters' => '12000000'], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data');
+        $this->assertSame(12000000, $form['capacity_milliliters']);
+
+        // التعديل بنص رقمي، ثم مسح السعة بـnull.
+        $this->withToken($this->owner)->putJson(self::BASE . "/tankers/{$json['id']}", ['capacity_milliliters' => '25000000'])->assertOk()->assertJsonPath('data.capacity_milliliters', 25000000);
+        $this->withToken($this->owner)->putJson(self::BASE . "/tankers/{$json['id']}", ['capacity_milliliters' => null])->assertOk()->assertJsonPath('data.capacity_milliliters', null);
+
+        // الكسور والصفر والسالب والنصوص غير العددية تبقى مرفوضة بكل تمثيل (طلباً أو خدمةً).
+        foreach (['1.5', 1.5, '0', 0, '-5', -5, 'abc', '1e3', ''] as $i => $bad) {
+            if ($bad === '') {
+                continue; // نص فارغ يحوّله المحوّل الافتراضي إلى null (= بلا سعة) — سلوك Laravel لا هذه الشريحة.
+            }
+            $this->withToken($this->owner)->postJson(self::BASE . '/tankers', ['fuel_tanker_owner_id' => $ownerId, 'plate_number' => "BAD-{$i}", 'capacity_milliliters' => $bad])
+                ->assertStatus(422);
+        }
+        $service = app(FuelTankerService::class);
+        $actor = User::where('tenant_id', $this->tenantId)->where('role', 'owner')->firstOrFail();
+        foreach (['1.5', 1.5, '0', 0, '-5', -5, 'abc', ' ', true] as $i => $bad) {
+            $thrown = null;
+            try {
+                $service->createTanker(['fuel_tanker_owner_id' => $ownerId, 'plate_number' => "SVC-{$i}", 'capacity_milliliters' => $bad], $actor);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $thrown = $e;
+            }
+            $this->assertNotNull($thrown, 'service must reject capacity ' . var_export($bad, true));
+        }
+        $this->assertSame(2, FuelTanker::count());
+    }
+
+    /** @test */
     public function a_tanker_cannot_move_to_another_owner_and_updates_are_audited(): void
     {
         $this->fixture();
