@@ -1244,6 +1244,12 @@ html[data-awj-ui="3"] [data-awj-card-title] {
     transform: none !important;
     width: auto !important;
   }
+  /* Output Profile (PR3B): `will-change: transform` في المعاينة يجعل المصغِّر مرجع تموضع لوجهة الطباعة المطلقة
+     (`[data-print-target]`)، فتنزاح عن أعلى الصفحة بمقدار ما فوقها من عناصر مخفية بصرياً فقط (فراغ علوي وصفحة ثانية).
+     يُلغى للمستند ذي الورقة (`data-doc-sheet`) وحده؛ المستند بلا ملف إخراج يبقى كما كان حرفياً. */
+  .doc-scaler-inner:has([data-doc-sheet]) {
+    will-change: auto !important;
+  }
 
   @page {
     size: A4;

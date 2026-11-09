@@ -12,7 +12,7 @@ vi.stubGlobal('fetch', vi.fn(async (url: string) => {
 }));
 
 import { payload, definition } from './__fixtures__';
-import { createReportPdf, PDF_ROW_CAP, THERMAL_MAX_MM } from './report-pdf';
+import { createReportPdf, gapTexts, periodText, sourceText, PDF_ROW_CAP, THERMAL_MAX_MM } from './report-pdf';
 import type { ReportPayload } from './schemas';
 
 const bytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
@@ -87,5 +87,24 @@ describe('PDF التقارير — ملف حقيقي بـ jsPDF', () => {
     const empty = payload({ tables: [{ ...payload().tables[0], rows: [], totals: null }], summary: [], data_quality: { complete: false, gaps: ['missing_reading'], notes: [] } });
     const pdf = await inspectPdf(await bytes(await createReportPdf(empty, { lang: 'ar', paper: 'a4' })));
     expect(pdf.pageCount).toBe(1);
+  });
+});
+
+describe('نصوص الترويسة في PDF', () => {
+  it('فاصل الفترة «–» لا السهم (الخط الاحتياطي لا يحوي → فكان يظهر !\')', () => {
+    expect(periodText(payload(), 'الحالة')).toBe('2027-03-10 – 2027-03-11');
+    expect(periodText(payload(), 'الحالة')).not.toContain('→');
+    expect(periodText({ ...payload(), period: null }, 'الحالة الراهنة')).toBe('الحالة الراهنة');
+  });
+
+  it('المصدر: النص المترجم كاملاً دون تكرار البادئة، والرمز الخام مع بادئة احتياطاً', () => {
+    expect(sourceText(payload(), { lang: 'en', paper: 'a4', labels: { source: 'Source: operational records' } }, 'Source')).toBe('Source: operational records');
+    expect(sourceText(payload(), { lang: 'en', paper: 'a4' }, 'Source')).toBe(`Source: ${payload().source.kind}`);
+  });
+
+  it('فجوات الجودة بنصها المترجم، والرمز الخام احتياطاً لما لا ترجمة له', () => {
+    const p = payload({ data_quality: { complete: false, gaps: ['price_unavailable', 'unknown_code'], notes: [] } });
+    expect(gapTexts(p, { lang: 'ar', paper: 'a4', labels: { gaps: { price_unavailable: 'السعر غير متاح' } } })).toEqual(['السعر غير متاح', 'unknown_code']);
+    expect(gapTexts(p, { lang: 'ar', paper: 'a4' })).toEqual(['price_unavailable', 'unknown_code']);
   });
 });

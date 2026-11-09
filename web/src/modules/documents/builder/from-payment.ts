@@ -18,6 +18,15 @@ export interface SourcePayment {
   reference?: string | null;
   notes?: string | null;
   allocations?: SourcePaymentAllocation[];
+  /** حقول يعرضها الـAPI أصلاً (PaymentResource) وتقرؤها القوالب التي تعرضها فقط؛ كلها اختيارية. */
+  payment_method_name?: string | null;
+  payment_details?: string | null;
+  collector_employee_name?: string | null;
+  cash_account_name?: string | null;
+  cash_account_code?: string | null;
+  classification?: { name?: string | null } | null;
+  /** اسم الفرع: لا يعرضه الـAPI مع الدفعة (branch_id فقط)، فتحلّه الصفحة من قراءة الفروع إن أمكن. */
+  branch_name?: string | null;
 }
 
 /**
@@ -72,6 +81,22 @@ export function buildPaymentDocumentModel(input: {
       amount,
       reference: payment.reference ?? null,
       allocations: (payment.allocations ?? []).map((a) => ({ label: a.label, amount: riyalToMinor(a.amount) })),
+      methodName: text(payment.payment_method_name),
+      paymentDetails: text(payment.payment_details),
+      accountName: accountLabel(payment.cash_account_code, payment.cash_account_name),
+      collectorName: text(payment.collector_employee_name),
+      classificationName: text(payment.classification?.name),
+      branchName: text(payment.branch_name),
     },
   };
+}
+
+/** نصّ مُقصّ أو `null` — لا قيمة افتراضية ولا تخمين. */
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+function accountLabel(code: string | null | undefined, name: string | null | undefined): string | null {
+  const parts = [text(code), text(name)].filter((part): part is string => part !== null);
+  return parts.length ? parts.join(' — ') : null;
 }
