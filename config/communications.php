@@ -44,4 +44,16 @@ return [
         'transactional' => ['ttl_seconds' => 86400, 'max_attempts' => 3],
         'service'       => ['ttl_seconds' => 86400, 'max_attempts' => 3],
     ],
+
+    /*
+     * الموزّع (03-A). لا يعمل شيء منه تلقائياً: لا جدولة ولا عامل ولا مزوّد مسجَّل في الإنتاج (السجل فارغ افتراضياً).
+     *  - lease_seconds: عمر إيجار المطالبة؛ يجب أن يتجاوز مهلة المزوّد بهامش وإلا تُسترجع رسالة قيد الإرسال.
+     *  - receipt_window_seconds: نافذة انتظار الإيصال بعد القبول/الغموض (تُخزَّن receipt_deadline_at).
+     *  - backoff_seconds: تأخير إعادة المحاولة حسب رقم المحاولة (يُعاد آخر عنصر بعد نفادها).
+     */
+    'dispatch' => [
+        'lease_seconds'          => 120,
+        'receipt_window_seconds' => 259200,
+        'backoff_seconds'        => [60, 300, 900],
+    ],
 ];
