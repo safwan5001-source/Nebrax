@@ -55,7 +55,7 @@ class FuelShiftSalesCalculator
         $readings = FuelShiftMeterReading::where('fuel_shift_id', $shift->id)->get()->groupBy('fuel_nozzle_id');
         $nozzles = FuelNozzle::where('fuel_station_id', $station->id)
             ->where(fn ($query) => $query->where('status', FuelNozzle::STATUS_ACTIVE)->orWhereIn('id', $readings->keys()->all()))
-            ->orderBy('nozzle_number')
+            ->orderBy('nozzle_number')->orderBy('id')   // nozzle_number فريد لكل مضخة لا لكل محطة: id يحسم الترتيب فتثبت البصمة
             ->get();
 
         $gaps = [];

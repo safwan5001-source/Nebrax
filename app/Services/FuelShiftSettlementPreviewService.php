@@ -268,7 +268,7 @@ class FuelShiftSettlementPreviewService
      * سبب حجب الترحيل لمنتج، أو null إن أمكن ترحيله بالتكلفة الراهنة. بالترتيب: عبور حدّ شهر (T-3) ← تاريخ مفتوح للمجمّع ← حدث تكلفة داخل نافذة التعرّض.
      * نافذة التعرّض تبدأ من أقدم وردية غير مسوّاة على أي محطة تشترك في المجمّع وتتقاطع مع هذه (وردية مفتوحة اليوم؛ لا تسويات محجوبة قبل P1-3b).
      */
-    private function withholdReason(FuelShift $shift, FuelStation $station, FuelProduct $product, $now): ?string
+    public function withholdReason(FuelShift $shift, FuelStation $station, FuelProduct $product, $now): ?string
     {
         $tz = $this->settings->operatingTimezone($station);
         $opened = \Carbon\CarbonImmutable::instance($shift->opened_at ?? $now)->setTimezone($tz);
@@ -307,7 +307,7 @@ class FuelShiftSettlementPreviewService
      * قبوض مرحَّلة على مبيعات المحطة داخل نافذة الوردية بلا وسم وردية، **بأي طريقة دفع** (Codex P2): عدّاد نقد الدرج يعدّ النقد وحده لأن اهتمامه الدرج، أما التسوية فتحسب كل طرق الدفع،
      * وقبضٌ بنكي غير موسوم خفّض رصيد فاتورة ولم يدخل `$rByMethod` فيُظهر فائضاً وهمياً ويبقى `ready` صحيحاً. يُحجب حتى يُحسم وسمه.
      */
-    private function hasUnattributedReceipts(FuelShift $shift): bool
+    public function hasUnattributedReceipts(FuelShift $shift): bool
     {
         if ($shift->opened_at === null) {
             return false;
@@ -339,10 +339,12 @@ class FuelShiftSettlementPreviewService
                 ->where('created_at', '>=', $shift->opened_at)
                 ->when($shift->closed_at !== null, fn ($q) => $q->where('created_at', '<=', $shift->closed_at)))
             ->whereNotIn('id', FuelSalePaymentReceipt::query()->select('payment_id'))
+            // سندات أنشأتها تسوية وردية أخرى (P1-3b-2c) موسومة بجدول التخصيصات؛ ترحيلها أثناء وردية لاحقة ليس قبضاً غير موسوم.
+            ->whereNotIn('id', fn ($q) => $q->from('fuel_shift_settlement_collections')->select('payment_id'))
             ->exists();
     }
 
-    private function periodLocked(string $date): bool
+    public function periodLocked(string $date): bool
     {
         $tenantId = app(\App\Tenancy\TenantContext::class)->id();
         if ($tenantId === null) {
@@ -363,7 +365,7 @@ class FuelShiftSettlementPreviewService
      * @param  list<string>  $blockers
      * @return array{reference:array<string,mixed>,declaration:array<string,mixed>,allocation:array<string,mixed>,variances:array<string,mixed>,blockers:list<string>}
      */
-    private function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
+    public function finance(FuelShift $shift, FuelStation $station, ?string $walkInId, array $lines, array $blockers, Collection $finalizedSales): array
     {
         // المبيعات النهائية بفواتيرها (كل الشرائح: عميل المحطة، مسمّون، عقود) — من المجموعة نفسها التي حُسب منها Q_erp.
         $sales = $finalizedSales->filter(fn (FuelSale $sale) => $sale->invoice_id !== null)->values();
@@ -462,7 +464,7 @@ class FuelShiftSettlementPreviewService
             }
         }
         foreach ($postedLines as $line) {
-            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
+            $targets[] = ['kind' => 'settlement', 'ref' => 'nozzle:'.$line['nozzle_number'], 'nozzle_id' => $line['nozzle_id'], 'invoice_id' => null, 'remaining' => (int) $line['expected_gross_minor']];
         }
         $heldCap = $pending;
 
@@ -479,7 +481,7 @@ class FuelShiftSettlementPreviewService
                 $pay = min($left, $target['remaining']);
                 if ($pay > 0) {
                     $rows[] = ['payment_method_id' => $methodId, 'method' => $allowed->get($methodId)?->name, 'settlement_type' => $allowed->get($methodId)?->settlement_type,
-                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
+                        'target_kind' => $target['kind'], 'target_ref' => $target['ref'], 'nozzle_id' => $target['nozzle_id'] ?? null, 'invoice_id' => $target['invoice_id'], 'amount_minor' => $pay];
                     $target['remaining'] -= $pay;
                     $left -= $pay;
                 }
