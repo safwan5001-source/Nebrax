@@ -3105,6 +3105,7 @@
       "reading": "Tank readings",
       "reconciliation": "Inventory reconciliation",
       "supplier_invoice": "Fuel supplier invoices",
+      "tanker": "Tanker owners",
       "governance": "Fuel governance",
       "settlement": "Settlement",
       "staff": "Station staff"
