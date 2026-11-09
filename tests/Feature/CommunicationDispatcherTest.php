@@ -507,7 +507,7 @@ class CommunicationDispatcherTest extends TestCase
         // وإن غاب المزوّد الأصلي: لا إعادة توجيه، تبقى الرسالة بلا إرسال.
         $id2 = $this->enqueueMessage($tenant->id);
         DB::table('communication_messages')->where('id', $id2)->update(['status' => 'retry_scheduled', 'attempt_count' => 1, 'next_attempt_at' => now()->subSecond()->toDateTimeString()]);
-        $this->insertCommAttempt($tenant->id, $id2, ['attempt_no' => 1, 'provider_key' => 'provider-a', 'outcome' => 'abandoned']);
+        $this->insertCommAttempt($tenant->id, $id2, ['attempt_no' => 1, 'provider_key' => 'provider-a', 'outcome' => 'abandoned', 'finished_at' => now()->toDateTimeString()]);
         $onlyB = $this->dispatcherFor($b);
         $onlyB->dispatchDue($tenant->id);
         $this->assertCount(0, $b->received);
