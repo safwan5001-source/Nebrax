@@ -406,8 +406,6 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
     public function a_forced_anchor_then_branch_cycle_with_a_generic_cash_invoice_makes_the_engine_yield_without_deadlock(): void
     {
         $closed = $this->closedShift('cyc1', 1_000_000);
-        $before = DB::table('fuel_shift_settlements')->count();
-
         $results = $this->concurrently([
             function () {
                 // الفاتورة العامة بمسارها الحقيقي مع توقف 400ms بين قيدها (المِرساة) وسندها (ترقيم الفرع).
@@ -436,11 +434,14 @@ class FuelShiftSettlementPostingPostgresTest extends TestCase
 
         $this->assertSame([], array_values(array_filter($results, fn ($r) => ! $r['ok'])), json_encode($results, JSON_UNESCAPED_UNICODE));
         $this->assertSame('posted', $results[0]['value'], 'الفاتورة النقدية العامة تُرحَّل');
-        $this->assertSame('blocked:FUEL_SETTLEMENT_LOCK_BUSY', $results[1]['value'], 'المحرك يتنحّى');
-        $this->assertSame($before, DB::table('fuel_shift_settlements')->count(), 'لا أثر للمحرك المتنحّي');
-
-        // إعادة المحاولة بعد زوال التنافس تنجح.
-        $this->assertSame('posted', app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome);
+        // المحرك يتنحّى عن الدورة (بلا جمود) ثم تنجح محاولته الداخلية التالية بعد أن تُنهي الفاتورة، أو يعود حجباً مقروءاً؛ وفي الحالتين لا خطأ ولا أثر ناقص.
+        $this->assertContains($results[1]['value'], ['posted:', 'blocked:FUEL_SETTLEMENT_LOCK_BUSY'], 'المحرك يتنحّى');
+        $settlements = DB::table('fuel_shift_settlements')->where('fuel_shift_id', $closed->id)->count();
+        $this->assertSame($results[1]['value'] === 'posted:' ? 1 : 0, $settlements, 'لا أثر ناقص');
+        if ($settlements === 0) {
+            // إعادة المحاولة بعد زوال التنافس تنجح.
+            $this->assertSame('posted', app(FuelShiftSettlementPostingService::class)->post(FuelShift::findOrFail($closed->id), $this->f['actor'])->outcome);
+        }
     }
 
     /** @return list<mixed> معاملات منشئ InvoiceService كما يحلّها الحاوي (لصنف فرعي يؤخّر settle في الاختبار) */
