@@ -20,6 +20,7 @@ import type { ShiftDetail, Station } from './schemas';
 import { ProgressSection, ProgressSummary } from './shift-progress';
 import { ReadingsSection, TanksSection } from './shift-readings-section';
 import { FinancialSummary, ShiftStatusBadge } from './shift-card';
+import { ShiftReportActions } from './shift-report/actions';
 import { StationGate } from './station-gate';
 import { EmptyState, ErrorState, InlineNote, LoadingBlock } from './state-views';
 
@@ -283,6 +284,7 @@ function Loaded({ detail, query, assets, station }: { detail: ShiftDetail; query
       {view ? <LitersCard detail={detail} view={view} /> : null}
       {detail.cash_summary ? <CashSummarySection summary={detail.cash_summary} /> : null}
       <CollectionDetailSection station={station} shiftId={detail.id} />
+      <ShiftReportActions station={station} detail={detail} assets={assets} />
       {view ? (
         <ReadingsSection view={view} shiftOpen={detail.status === 'open'} timeZone={station.timezone} />
       ) : assets.state.status === 'error' ? (
