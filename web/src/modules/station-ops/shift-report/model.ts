@@ -185,12 +185,20 @@ export function buildShiftReport(input: ShiftReportInput): ShiftReportModel {
   if (frozen) {
     const declaration = collection.declaration;
     if (declaration) {
+      if (brief) {
+        // المختصر: سطور التحصيل كقيم مرصوصة (طريقة: مبلغ) + الإجمالي من الخادم — بلا جدول ولا حساب.
+        sections.push({
+          kind: 'kv', key: 'collection', title: t('doc.section.collection'), columns: 4,
+          rows: [...declaration.lines.map((line): KvRow => ({ label: line.name, value: money(line.amount_minor) })), { label: t('doc.field.collected'), value: money(declaration.collected_total_minor, true) }],
+        });
+      } else {
       const rows: Cell[][] = declaration.lines.map((line) => [text(line.name), money(line.amount_minor)]);
       sections.push({
         kind: 'table', key: 'collection', title: t('doc.section.collection'), rows,
         columns: [{ key: 'method', label: t('doc.field.method'), align: 'start' }, { key: 'amount', label: t('doc.field.amount'), align: 'end' }],
         totals: [{ text: t('doc.field.collected'), strong: true }, money(declaration.collected_total_minor, true)],
       });
+      }
     } else {
       sections.push({ kind: 'note', key: 'collection-none', tone: 'info', text: t('doc.note.collectionNone') });
     }

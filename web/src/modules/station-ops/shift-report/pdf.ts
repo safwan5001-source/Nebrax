@@ -33,15 +33,15 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
 
   // ───── ترويسة ─────
   const header = () => {
-    const bandH = g.compact ? 17 : 22;
+    const bandH = g.compact ? 15.5 : 22;
     filled(pdf, L, y, R - L, bandH, NAVY, 2);
     const s = rtl ? R - 4 : L + 4;
     const e = rtl ? L + 4 : R - 4;
     fitText(pdf, model.company.name, s, y + (g.compact ? 6.8 : 8.5), 105, { size: g.compact ? 13 : 15, bold: true, align: sa, color: [255, 255, 255] });
     const ids = [model.company.vat ? `${model.labels.vat}: ${model.company.vat}` : null, model.company.cr ? `${model.labels.cr}: ${model.company.cr}` : null].filter(Boolean).join('   ');
-    if (ids) fitText(pdf, ids, s, y + (g.compact ? 12 : 15), 105, { size: 7, align: sa, color: [203, 213, 225] });
+    if (ids) fitText(pdf, ids, s, y + (g.compact ? 11.2 : 15), 105, { size: 7, align: sa, color: [203, 213, 225] });
     fitText(pdf, model.title, e, y + (g.compact ? 5.8 : 8), 80, { size: g.compact ? 12 : 13, bold: true, align: ea, color: [255, 255, 255] });
-    fitText(pdf, `${model.variantLabel} — ${model.status.label}`, e, y + (g.compact ? 11 : 14.5), 80, { size: 8, align: ea, color: [203, 213, 225] });
+    fitText(pdf, `${model.variantLabel} — ${model.status.label}`, e, y + (g.compact ? 10.4 : 14.5), 80, { size: 8, align: ea, color: [203, 213, 225] });
     y += bandH + 4;
   };
   const continuation = () => {
@@ -68,8 +68,9 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
   };
   const cellColor = (cell: Cell): [number, number, number] => (cell.na ? MUTED : INK);
 
-  const sectionTitle = (title: string) => {
-    ensure(10);
+  /** `keep`: ارتفاع أول محتوى يلزم أن يبقى مع العنوان في الصفحة نفسها (لا عنوان قسم يتيم أسفل صفحة). */
+  const sectionTitle = (title: string, keep = 9) => {
+    ensure(5.8 + keep);
     filled(pdf, L, y - 3.4, R - L, 5.4, SOFT, 1);
     text(pdf, title, start, y + 0.3, { size: sizes.head, bold: true, color: NAVY, align: sa });
     y += 5.8;
@@ -90,7 +91,7 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
     for (let r = 0; r < rows.length; r += n) {
       const chunk: KvRow[] = rows.slice(r, r + n);
       const counts = chunk.map((row, i) => lineCount(row.value.text, colEdges(i, n).colW, sizes.value, true));
-      const rowH = (g.compact ? 8.6 : 9.4) + (Math.max(...counts) - 1) * 3.6;
+      const rowH = (g.compact ? 8 : 9.4) + (Math.max(...counts) - 1) * 3.6;
       ensure(rowH + 1);
       chunk.forEach((row, i) => {
         const { x0, x1, colW } = colEdges(i, n);
@@ -105,7 +106,7 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
 
   // ───── جدول: ترويسة مكرَّرة وصفوف منسابة ─────
   const table = (section: Extract<ReportSection, { kind: 'table' }>) => {
-    sectionTitle(section.title);
+    sectionTitle(section.title, 5.2 + 5.6);
     const cols: TableColumn[] = section.columns;
     const weights = cols.map((c) => (c.align === 'end' ? 2 : 3.2));
     const sum = weights.reduce((a, b) => a + b, 0);
@@ -177,10 +178,11 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
 
   // ───── التوقيعات: كتلة لا تنقسم ─────
   const signatures = (section: Extract<ReportSection, { kind: 'signatures' }>) => {
-    const blockH = g.compact ? 24 : 32;
+    // المختصر (A5): الاسم والوقت في سطر واحد فتتّسع الكتلة أسفل الصفحة الأولى حين يسمح ما فوقها؛ وإلا تنتقل كاملة (لا تنقسم ولا تُقصّ).
+    const blockH = g.compact ? 16 : 24;
     ensure(blockH + 8);
-    sectionTitle(section.title);
-    y = Math.max(y + 1, g.bottom - (g.compact ? 19 : 26));
+    sectionTitle(section.title, 1);
+    y = Math.max(y + 1, g.bottom - (g.compact ? 15.8 : 26));
     const n = section.cells.length;
     const sigW = (R - L - (n - 1) * 6) / n;
     section.cells.forEach((cell, i) => {
@@ -188,12 +190,17 @@ export async function createShiftReportPdf(model: ShiftReportModel, locale: stri
       const xl = rtl ? x0 - sigW : x0;
       const cx = x0 + (rtl ? -sigW / 2 : sigW / 2);
       text(pdf, cell.role, cx, y, { size: 8, bold: true, align: 'center', color: NAVY, maxWidth: sigW });
-      if (cell.name) fitText(pdf, cell.name.text, cx, y + 4.4, sigW - 2, { size: 8.5, align: 'center', color: cellColor(cell.name) });
-      if (cell.when) text(pdf, cell.when, cx, y + 8.2, { size: 7, align: 'center', color: MUTED });
-      line(pdf, xl, y + (g.compact ? 15 : 17), xl + sigW, y + (g.compact ? 15 : 17), MUTED, 0.3);
-      text(pdf, model.labels.signature, cx, y + (g.compact ? 18.4 : 20.4), { size: 7, align: 'center', color: MUTED });
+      if (g.compact) {
+        const who = [cell.name?.text, cell.when].filter(Boolean).join('  ·  ');
+        if (who) fitText(pdf, who, cx, y + 4.2, sigW - 2, { size: 8, align: 'center', color: cell.name ? cellColor(cell.name) : MUTED });
+      } else {
+        if (cell.name) fitText(pdf, cell.name.text, cx, y + 4.4, sigW - 2, { size: 8.5, align: 'center', color: cellColor(cell.name) });
+        if (cell.when) text(pdf, cell.when, cx, y + 8.2, { size: 7, align: 'center', color: MUTED });
+      }
+      line(pdf, xl, y + (g.compact ? 10 : 17), xl + sigW, y + (g.compact ? 10 : 17), MUTED, 0.3);
+      text(pdf, model.labels.signature, cx, y + (g.compact ? 13.4 : 20.4), { size: 7, align: 'center', color: MUTED });
     });
-    y += g.compact ? 20 : 24;
+    y += g.compact ? 15 : 24;
   };
 
   for (const section of model.sections) {
