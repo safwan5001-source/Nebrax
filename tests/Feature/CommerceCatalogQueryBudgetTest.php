@@ -85,13 +85,20 @@ class CommerceCatalogQueryBudgetTest extends TestCase
         $headers = ['Authorization' => 'Bearer '.$store['token']];
         $this->getJson($uri, $headers)->assertOk(); // تسخين: التوكن/الإعدادات/الجداول المخبَّأة
 
+        // أدنى عدد من ثلاث قياسات: N+1 حقيقي يتكرر في كل قياس ويتبع عدد الصفوف، أما استعلام عابر دوري (مثل تحديث `last_used_at`
+        // أو مخبّأ منتهي الصلاحية بين القياسين) فيظهر في بعضها فقط — بلا هذا كان الاختبار يتذبذب في CI على PostgreSQL (19 مقابل 20).
         $count = 0;
         DB::listen(function () use (&$count) {
             $count++;
         });
-        $this->getJson($uri, $headers)->assertOk();
+        $min = PHP_INT_MAX;
+        for ($i = 0; $i < 3; $i++) {
+            $count = 0;
+            $this->getJson($uri, $headers)->assertOk();
+            $min = min($min, $count);
+        }
 
-        return $count;
+        return $min;
     }
 
     /** @return array<string, array{0: string}> */
