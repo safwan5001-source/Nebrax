@@ -1,0 +1,200 @@
+/* =============================================================================
+   AWJ Unified UX Foundation — token layers (lab mirror of Design System v3)
+
+   L0  Primitives        raw values (brand ramp, neutrals, fonts, radius, motion)
+   L1  Semantic (v3)     --awj-* role tokens. NAMES ARE FROZEN (same names as
+                         web/src/app/globals.css under html[data-awj-ui="3"]).
+   L2  Theme (v3)        13 shell tokens: Default · Ink · Core (unchanged)
+   L3  Posture (v3)      Ledger · Floor · Studio density/touch keys (unchanged)
+   L4  Identity pack     PROPOSED (decision M10): may override an allow-listed
+                         set of L0/L1 values (brand, neutrals tint, fonts, radius,
+                         shadows, outcome surface). It may NOT touch status
+                         colours, focus contract, spacing, density or names.
+                         Every pack is validated live by a contract checker.
+
+   Values below are copied from web/src/app/globals.css (v3 generated block,
+   2026-11-10) so this lab renders the real v3 Default theme. The lab never
+   sets data-awj-ui on any production route (owner decision M8).
+   ========================================================================== */
+
+/* ---------- L0 primitives that v3 leaves implicit ---------- */
+.fx {
+  --awj-font-ui: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+  --awj-font-num: 'IBM Plex Mono', ui-monospace, monospace;
+  --awj-radius-control: 6px;
+  --awj-radius-surface: 8px;
+  --awj-radius-sheet: 12px;
+  --awj-shadow-float: 0 12px 32px rgba(15,27,51,.18), 0 2px 6px rgba(15,27,51,.08);
+  --awj-motion-fast: 110ms;
+  --awj-motion-base: 160ms;
+  --awj-motion-slow: 240ms;
+  --awj-ease-productive: cubic-bezier(0.2, 0, 0.38, 0.9);
+  --awj-space-1: 4px; --awj-space-2: 8px; --awj-space-3: 12px; --awj-space-4: 16px; --awj-space-5: 20px; --awj-space-6: 24px;
+}
+
+/* ---------- L1 semantic — light (v3 Default, verbatim) ---------- */
+.fx[data-mode="light"] {
+  --awj-surface-desk: #E9E8E4;
+  --awj-surface-paper: #FFFFFF;
+  --awj-surface-band: #F8F9FC;
+  --awj-surface-sunken: #F1F3F7;
+  --awj-surface-raised: #FFFFFF;
+  --awj-surface-float: #FFFFFF;
+  --awj-surface-outcome: #0E1A31;
+  --awj-outcome-fg: #F2F6FD;
+  --awj-outcome-label: #C5D1E8;
+  --awj-outcome-decimal: #A9B8D3;
+  --awj-outcome-rule: #7FA8FF;
+  --awj-border-hairline: #DCE0E8;
+  --awj-border-strong: #C6CCD7;
+  --awj-border-control: #7F8898;
+  --awj-text-primary: #15181D;
+  --awj-text-secondary: #586172;
+  --awj-text-tertiary: #656D7B;
+  --awj-text-inverse: #FFFFFF;
+  --awj-action-primary: #1E40AF;
+  --awj-action-primary-hover: #1E3A8A;
+  --awj-action-primary-pressed: #172F73;
+  --awj-action-primary-fg: #FFFFFF;
+  --awj-status-positive-fg: #166534; --awj-status-positive-bg: #E8F5EC; --awj-status-positive-border: #BFE2CB;
+  --awj-status-negative-fg: #B91C1C; --awj-status-negative-bg: #FDECEC; --awj-status-negative-border: #F5C2C2;
+  --awj-status-warning-fg: #92400E; --awj-status-warning-bg: #FDF3E3; --awj-status-warning-border: #F1D9A8;
+  --awj-status-info-fg: #1E40AF; --awj-status-info-bg: #EAF0FE;
+  --awj-status-neutral-fg: #586172; --awj-status-neutral-bg: #F1F3F7;
+  --awj-brand-soft: #EAF0FE;
+  --awj-state-hover: #F2F5FC;
+  --awj-state-selected: #DDE7FB;
+  --awj-state-selected-edge: #C2D2F2;
+  --awj-state-editing-edge: #8FA9EA;
+  --awj-state-focus-ring: #1E40AF;
+  --awj-state-focus-halo: rgba(30,64,175,.18);
+  --awj-state-disabled-fg: #9AA3B2;
+  /* lab additions (not v3 names): */
+  --awj-scrim: rgba(14,26,49,.45);
+  color-scheme: light;
+}
+/* ---------- L1 semantic — dark (v3, verbatim) ---------- */
+.fx[data-mode="dark"] {
+  --awj-surface-desk: #07090C;
+  --awj-surface-paper: #1C1F28;
+  --awj-surface-band: #22262F;
+  --awj-surface-sunken: #15171D;
+  --awj-surface-raised: #1F232C;
+  --awj-surface-float: #282E39;
+  --awj-surface-outcome: #0E1A31;
+  --awj-outcome-fg: #F2F6FD;
+  --awj-outcome-label: #C5D1E8;
+  --awj-outcome-decimal: #A9B8D3;
+  --awj-outcome-rule: #7FA8FF;
+  --awj-border-hairline: #2E3340;
+  --awj-border-strong: #3A4150;
+  --awj-border-control: #8691A3;
+  --awj-text-primary: #F3F4F6;
+  --awj-text-secondary: #AAB2C0;
+  --awj-text-tertiary: #8D96A6;
+  --awj-text-inverse: #0E1A31;
+  --awj-action-primary: #4F8CFF;
+  --awj-action-primary-hover: #6BA0FF;
+  --awj-action-primary-pressed: #3E73D6;
+  --awj-action-primary-fg: #0E1A31;
+  --awj-status-positive-fg: #16A34A; --awj-status-positive-bg: #122A1D; --awj-status-positive-border: #1F4A30;
+  --awj-status-negative-fg: #F87171; --awj-status-negative-bg: #2C1616; --awj-status-negative-border: #4A2020;
+  --awj-status-warning-fg: #D97706; --awj-status-warning-bg: #2B210E; --awj-status-warning-border: #4A3515;
+  --awj-status-info-fg: #4F8CFF; --awj-status-info-bg: #16233E;
+  --awj-status-neutral-fg: #AAB2C0; --awj-status-neutral-bg: #15171D;
+  --awj-brand-soft: #16233E;
+  --awj-state-hover: #20242D;
+  --awj-state-selected: #1B2A4A;
+  --awj-state-selected-edge: #2B4C86;
+  --awj-state-editing-edge: #3E73D6;
+  --awj-state-focus-ring: #7FA8FF;
+  --awj-state-focus-halo: rgba(127,168,255,.22);
+  --awj-state-disabled-fg: #3A4150;
+  --awj-scrim: rgba(0,0,0,.6);
+  --awj-shadow-float: 0 12px 32px rgba(0,0,0,.5), 0 0 0 1px #2E3340;
+  color-scheme: dark;
+}
+
+/* ---------- L2 themes: 13 shell tokens (v3 verbatim) ---------- */
+.fx[data-mode="light"][data-theme="default"] {
+  --awj-shell-bg: #D5DFF0; --awj-shell-fg: #12203B; --awj-shell-fg-muted: #3F4F6C; --awj-shell-line: #BFCCE3; --awj-shell-hover: #C6D3EA;
+  --awj-shell-active-bg: #FFFFFF; --awj-shell-active-fg: #12203B; --awj-shell-active-shadow: 0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04);
+  --awj-shell-apex: #1E40AF; --awj-shell-field-bg: #E9EFF9; --awj-shell-field-line: #6F82A6; --awj-shell-focus-ring: #1E40AF; --awj-shell-brandmark-bg: #1E40AF;
+}
+.fx[data-mode="light"][data-theme="ink"], .fx[data-mode="dark"][data-theme="default"], .fx[data-mode="dark"][data-theme="ink"] {
+  --awj-shell-bg: #0E1A31; --awj-shell-fg: #E8EEF9; --awj-shell-fg-muted: #9FB0CC; --awj-shell-line: #22345A; --awj-shell-hover: #15244A;
+  --awj-shell-active-bg: #1A2A4A; --awj-shell-active-fg: #FFFFFF; --awj-shell-active-shadow: inset 0 0 0 1px #2C4170;
+  --awj-shell-apex: #7FA8FF; --awj-shell-field-bg: #15244A; --awj-shell-field-line: #5A74A8; --awj-shell-focus-ring: #7FA8FF; --awj-shell-brandmark-bg: #2D5BDB;
+}
+.fx[data-mode="light"][data-theme="core"] {
+  --awj-shell-bg: #1E40AF; --awj-shell-fg: #FFFFFF; --awj-shell-fg-muted: #CBD9FB; --awj-shell-line: #5573D2; --awj-shell-hover: #2A4DBF;
+  --awj-shell-active-bg: #3558C8; --awj-shell-active-fg: #FFFFFF; --awj-shell-active-shadow: inset 0 0 0 1px #6F8BE0;
+  --awj-shell-apex: #FFFFFF; --awj-shell-field-bg: #18368F; --awj-shell-field-line: #9DB4EE; --awj-shell-focus-ring: #FFFFFF; --awj-shell-brandmark-bg: #FFFFFF;
+}
+.fx[data-mode="dark"][data-theme="core"] {
+  --awj-shell-bg: #1E3A8A; --awj-shell-fg: #FFFFFF; --awj-shell-fg-muted: #DCE5FB; --awj-shell-line: #3D5AA6; --awj-shell-hover: #2E4A98;
+  --awj-shell-active-bg: #425FAB; --awj-shell-active-fg: #FFFFFF; --awj-shell-active-shadow: inset 0 0 0 1px #8FA9E8;
+  --awj-shell-apex: #A9C4FF; --awj-shell-field-bg: #142B6B; --awj-shell-field-line: #8FA9E0; --awj-shell-focus-ring: #FFFFFF; --awj-shell-brandmark-bg: #A9C4FF;
+}
+
+/* ---------- L3 postures (v3 verbatim keys) ---------- */
+.fx { --awj-touch-min: 36px; --awj-control-h: 36px; --awj-action-h: 36px; --awj-row-1l: 40px; --awj-row-2l: 48px; --awj-display-money-fs: 28px; --awj-motion-scale: 1; }
+.fx[data-density="compact"] { --awj-control-h: 32px; --awj-row-1l: 32px; --awj-row-2l: 40px; }
+.fx [data-posture="floor"], .fx[data-posture="floor"] { --awj-touch-min: 44px; --awj-control-h: 48px; --awj-action-h: 56px; --awj-row-1l: 48px; --awj-row-2l: 56px; --awj-display-money-fs: 36px; --awj-motion-scale: 0.8; }
+@media (pointer: coarse) { .fx { --awj-touch-min: 44px; --awj-control-h: 44px; --awj-row-1l: 44px; } }
+
+/* ---------- L4 identity packs (PROPOSED — decision M10) ----------
+   Allow-list (enforced by the checker in foundation.js):
+   --awj-action-primary*, --awj-brand-soft, --awj-state-selected*, --awj-state-hover,
+   --awj-state-focus-ring, --awj-state-focus-halo, --awj-shell-* (13), --awj-surface-desk,
+   --awj-surface-outcome, --awj-outcome-rule, --awj-font-ui, --awj-font-num,
+   --awj-radius-control, --awj-radius-surface, --awj-radius-sheet.
+   Locked: --awj-status-*, --awj-text-*, paper/band/sunken surfaces, borders, spacing,
+   posture keys, motion, names. */
+.fx[data-identity="brass"][data-mode="light"] {
+  --awj-action-primary: #7A5A1A; --awj-action-primary-hover: #634813; --awj-action-primary-pressed: #4E380E; --awj-action-primary-fg: #FFFFFF;
+  --awj-brand-soft: #F3EBDB; --awj-state-hover: #F6F2EA; --awj-state-selected: #EFE4CC; --awj-state-selected-edge: #D9C49A;
+  --awj-state-focus-ring: #7A5A1A; --awj-state-focus-halo: rgba(122,90,26,.18);
+  --awj-surface-desk: #E9E8E4; --awj-surface-outcome: #0B1020; --awj-outcome-rule: #D7B36E;
+  --awj-shell-bg: #0E1420; --awj-shell-fg: #ECE6D6; --awj-shell-fg-muted: #B9B19C; --awj-shell-line: #283245; --awj-shell-hover: #172033;
+  --awj-shell-active-bg: #1C2638; --awj-shell-active-fg: #F3EEE0; --awj-shell-active-shadow: inset 0 0 0 1px #3B3424; --awj-shell-apex: #D7B36E;
+  --awj-shell-field-bg: #172033; --awj-shell-field-line: #5E6A80; --awj-shell-focus-ring: #E6C789; --awj-shell-brandmark-bg: #D7B36E;
+  --awj-font-ui: 'Tajawal', 'IBM Plex Sans Arabic', system-ui, sans-serif; --awj-font-num: 'IBM Plex Mono', ui-monospace, monospace;
+  --awj-radius-control: 4px; --awj-radius-surface: 6px; --awj-radius-sheet: 8px;
+}
+.fx[data-identity="brass"][data-mode="dark"] {
+  --awj-action-primary: #D7B36E; --awj-action-primary-hover: #E6C789; --awj-action-primary-pressed: #C29A52; --awj-action-primary-fg: #1A1407;
+  --awj-brand-soft: #2A2416; --awj-state-hover: #20242D; --awj-state-selected: #2C2718; --awj-state-selected-edge: #5A4A26;
+  --awj-state-focus-ring: #E6C789; --awj-state-focus-halo: rgba(230,199,137,.22); --awj-outcome-rule: #D7B36E;
+  --awj-shell-bg: #070B12; --awj-shell-fg: #ECE6D6; --awj-shell-fg-muted: #B9B19C; --awj-shell-line: #1F2A3D; --awj-shell-hover: #111827;
+  --awj-shell-active-bg: #172033; --awj-shell-active-fg: #F3EEE0; --awj-shell-active-shadow: inset 0 0 0 1px #3B3424; --awj-shell-apex: #D7B36E;
+  --awj-shell-field-bg: #111827; --awj-shell-field-line: #5E6A80; --awj-shell-focus-ring: #E6C789; --awj-shell-brandmark-bg: #D7B36E;
+  --awj-font-ui: 'Tajawal', 'IBM Plex Sans Arabic', system-ui, sans-serif; --awj-radius-control: 4px; --awj-radius-surface: 6px; --awj-radius-sheet: 8px;
+}
+.fx[data-identity="fayrouz"][data-mode="light"] {
+  --awj-action-primary: #0A7570; --awj-action-primary-hover: #075B57; --awj-action-primary-pressed: #064B48; --awj-action-primary-fg: #FFFFFF;
+  --awj-brand-soft: #DDF1EF; --awj-state-hover: #EEF6F5; --awj-state-selected: #D3ECE9; --awj-state-selected-edge: #A7D6D1;
+  --awj-state-focus-ring: #0A7570; --awj-state-focus-halo: rgba(10,117,112,.18);
+  --awj-surface-desk: #E6EEED; --awj-surface-outcome: #062B2A; --awj-outcome-rule: #6EE7DB;
+  --awj-shell-bg: #F7FBFA; --awj-shell-fg: #0E2322; --awj-shell-fg-muted: #3B5452; --awj-shell-line: #D3E2E0; --awj-shell-hover: #E8F2F1;
+  --awj-shell-active-bg: #DDF1EF; --awj-shell-active-fg: #064B48; --awj-shell-active-shadow: none; --awj-shell-apex: #0A7570;
+  --awj-shell-field-bg: #EEF5F4; --awj-shell-field-line: #6C8A87; --awj-shell-focus-ring: #0A7570; --awj-shell-brandmark-bg: #0A7570;
+  --awj-font-ui: 'Alexandria', 'IBM Plex Sans Arabic', system-ui, sans-serif; --awj-font-num: 'IBM Plex Mono', ui-monospace, monospace;
+  --awj-radius-control: 10px; --awj-radius-surface: 14px; --awj-radius-sheet: 20px;
+}
+.fx[data-identity="fayrouz"][data-mode="dark"] {
+  --awj-action-primary: #5BD6CA; --awj-action-primary-hover: #83E4DA; --awj-action-primary-pressed: #3FBEB2; --awj-action-primary-fg: #042120;
+  --awj-brand-soft: #0F2A29; --awj-state-hover: #18272A; --awj-state-selected: #123433; --awj-state-selected-edge: #1F5A56;
+  --awj-state-focus-ring: #83E4DA; --awj-state-focus-halo: rgba(131,228,218,.22); --awj-surface-outcome: #031615; --awj-outcome-rule: #6EE7DB;
+  --awj-shell-bg: #0B1C1B; --awj-shell-fg: #E4F2F0; --awj-shell-fg-muted: #9DB9B5; --awj-shell-line: #1D3533; --awj-shell-hover: #132A28;
+  --awj-shell-active-bg: #123433; --awj-shell-active-fg: #E4F2F0; --awj-shell-active-shadow: inset 0 0 0 1px #1F5A56; --awj-shell-apex: #5BD6CA;
+  --awj-shell-field-bg: #132A28; --awj-shell-field-line: #4E7471; --awj-shell-focus-ring: #83E4DA; --awj-shell-brandmark-bg: #5BD6CA;
+  --awj-font-ui: 'Alexandria', 'IBM Plex Sans Arabic', system-ui, sans-serif; --awj-radius-control: 10px; --awj-radius-surface: 14px; --awj-radius-sheet: 20px;
+}
+/* Deliberately invalid pack: proves the contract checker rejects it.
+   (Low-contrast action + an attempt to recolour a locked status token.) */
+.fx[data-identity="invalid"] {
+  --awj-action-primary: #9DB7F5; --awj-action-primary-fg: #FFFFFF;
+  --awj-status-negative-fg: #2E7D32;
+  --awj-state-focus-ring: #E3E8F4;
+}

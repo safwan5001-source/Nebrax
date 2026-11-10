@@ -1,0 +1,2682 @@
+{
+ "generated": "2026-11-10T03:48:34.151Z",
+ "matrix": [
+  {
+   "route": "home",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "phone",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "phone",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "phone",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "phone",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "tablet",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "tablet",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "tablet",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "en",
+   "vp": 1500,
+   "tag": "laptop",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "brass",
+   "vp": 1500,
+   "tag": "id-brass",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "light",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "laptop",
+   "mode": "dark",
+   "lang": "ar",
+   "identity": "fayrouz",
+   "vp": 1500,
+   "tag": "id-fayrouz",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 2560,
+   "tag": "w2560",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 640,
+   "tag": "zoom200",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "home",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "kit",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "numbers",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "rules",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "sales",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "purchase",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "inventory",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "shift",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  },
+  {
+   "route": "identity",
+   "device": "wide",
+   "mode": "light",
+   "lang": "ar",
+   "vp": 320,
+   "tag": "reflow400",
+   "overflow": {
+    "main": 0,
+    "app": 0,
+    "body": 0
+   },
+   "axe": [],
+   "errors": [],
+   "ok": true
+  }
+ ],
+ "interactions": [
+  {
+   "name": "Shell: navigation pattern follows the window class (bottom bar < 600 · rail 600–1199 · sidebar ≥ 1200)",
+   "ok": true
+  },
+  {
+   "name": "Shell: rail opens a group flyout; phone menu opens the full navigation sheet",
+   "ok": true
+  },
+  {
+   "name": "Command palette: Ctrl K opens, scope prefixes (c/ع customers · p/م products · > actions), Enter runs, Esc closes",
+   "ok": true
+  },
+  {
+   "name": "Keyboard: G then S/P/I/F navigates; ? opens the shortcut sheet",
+   "ok": true
+  },
+  {
+   "name": "Sales invoice: totals are integer halalas derived from lines; editing a line recomputes them",
+   "ok": true
+  },
+  {
+   "name": "Arabic-Indic digits are normalised in amount inputs (٢٫٥ → 2.5)",
+   "ok": true
+  },
+  {
+   "name": "sales invoice: Ctrl Enter shows a balanced illustrative entry (1130 / 4110 / 2120) that equals the document total",
+   "ok": true
+  },
+  {
+   "name": "purchase invoice: Ctrl Enter shows a balanced illustrative entry (1140 / 1150 / 2110) that equals the document total",
+   "ok": true
+  },
+  {
+   "name": "Validation: missing party blocks posting with a focused error summary that links to the field",
+   "ok": true
+  },
+  {
+   "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
+   "ok": true
+  },
+  {
+   "name": "Unsaved changes: leaving a dirty document asks first; Stay keeps it, Leave navigates; Ctrl S clears the flag",
+   "ok": true
+  },
+  {
+   "name": "Inventory: peek is a split pane at ≥ 1200 and a sheet below; J/K move the active row",
+   "ok": true
+  },
+  {
+   "name": "Inventory: removing the cost permission removes cost columns and values from the page (not hidden)",
+   "ok": true
+  },
+  {
+   "name": "Field contract: validate on blur, summary on submit, success clears the form",
+   "ok": true
+  },
+  {
+   "name": "Dialog: focus is trapped inside a destructive confirm; Esc closes",
+   "ok": true
+  },
+  {
+   "name": "States: loading → skeleton, empty → empty state with action, error → retry",
+   "ok": true
+  },
+  {
+   "name": "Density: compact rows are shorter than regular; Floor posture keeps touch targets ≥ 44px",
+   "ok": true
+  },
+  {
+   "name": "Shift: a closing reading below the opening meter is flagged and blocks saving",
+   "ok": true
+  },
+  {
+   "name": "M2 comparison: A (text-end) misaligns decimals in RTL; B aligns with tabular figures; C aligns always — RTL/LTR, negatives, riyal sign",
+   "ok": true
+  },
+  {
+   "name": "Identity contract: v3 base, brass and fayrouz are accepted; the invalid pack is rejected (locked token + contrast)",
+   "ok": true
+  },
+  {
+   "name": "Direction: directional icons mirror in RTL only; amounts stay LTR-isolated in both",
+   "ok": true
+  },
+  {
+   "name": "Reduced motion: transitions and animations are disabled inside the frame",
+   "ok": true
+  }
+ ],
+ "summary": {
+  "interactions": {
+   "tests": 22,
+   "failed": 0
+  },
+  "matrix": {
+   "configs": 151,
+   "failed": 0
+  }
+ },
+ "m2": {
+  "mono/neg/sym": {
+   "rtl-a": 72.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "mono/neg/nosym": {
+   "rtl-a": 72.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "mono/pos/sym": {
+   "rtl-a": 72.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "mono/pos/nosym": {
+   "rtl-a": 72,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "sans/neg/sym": {
+   "rtl-a": 63.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "sans/neg/nosym": {
+   "rtl-a": 63.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "sans/pos/sym": {
+   "rtl-a": 63.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "sans/pos/nosym": {
+   "rtl-a": 63.3,
+   "ltr-a": 0,
+   "rtl-b": 0,
+   "ltr-b": 0,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "prop/neg/sym": {
+   "rtl-a": 64.7,
+   "ltr-a": 3.5,
+   "rtl-b": 3.5,
+   "ltr-b": 3.5,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "prop/neg/nosym": {
+   "rtl-a": 64.7,
+   "ltr-a": 3.5,
+   "rtl-b": 3.5,
+   "ltr-b": 3.5,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "prop/pos/sym": {
+   "rtl-a": 64.9,
+   "ltr-a": 3.4,
+   "rtl-b": 3.4,
+   "ltr-b": 3.4,
+   "rtl-c": 0,
+   "ltr-c": 0
+  },
+  "prop/pos/nosym": {
+   "rtl-a": 64.9,
+   "ltr-a": 3.4,
+   "rtl-b": 3.4,
+   "ltr-b": 3.4,
+   "rtl-c": 0,
+   "ltr-c": 0
+  }
+ },
+ "contract": {
+  "base": {
+   "accepted": true,
+   "allowedChanged": 0,
+   "lockedChanged": [],
+   "failing": {
+    "light": [],
+    "dark": []
+   }
+  },
+  "brass": {
+   "accepted": true,
+   "allowedChanged": 28,
+   "lockedChanged": [],
+   "failing": {
+    "light": [],
+    "dark": []
+   }
+  },
+  "fayrouz": {
+   "accepted": true,
+   "allowedChanged": 29,
+   "lockedChanged": [],
+   "failing": {
+    "light": [],
+    "dark": []
+   }
+  },
+  "invalid": {
+   "accepted": false,
+   "allowedChanged": 3,
+   "lockedChanged": [
+    "--awj-status-negative-fg"
+   ],
+   "failing": {
+    "light": [
+     "action-fg / action 2",
+     "action (link) / paper 2",
+     "focus-ring / paper 1.23"
+    ],
+    "dark": [
+     "action-fg / action 2",
+     "negative / paper 3.21"
+    ]
+   }
+  }
+ }
+}

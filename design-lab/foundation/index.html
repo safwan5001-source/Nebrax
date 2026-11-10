@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AWJ Unified UX Foundation</title>
+<meta name="description" content="AWJ Unified UX Foundation — Phase 1 (Design Lab only). Synthetic data, no API, no production gate change.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&family=Alexandria:wght@400;500;600;700&display=swap">
+<style>
+@font-face{font-family:'AWJ Saudi Riyal';src:url(data:font/woff2;base64,d09GMgABAAAAAAHkAAsAAAAAA8gAAAGWAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAANBEICoEUgR4BNgIkAwgLBgAEIAWCMAcgGwsDIJ4Dbmt8FdPWIgWh7r/dphgZD/3vR7sz//0VS3s2m1gXKwkvRSV1vFGaWKRRYdg2YrLZ/UHH8uzI2k5c878pzhP/HqPXQYWRYAPdeXIGjpuGBZb5T24wdVN/UGMJ/Dcst0iWwAQak6JEI+uyaC3D3M77h/08MY9Q1SUeq8m7+Qb3s098MRMphQQvPcDrPuiqkf+iQP0ZBFSNoFsgUaFTJVgpumHxB92fsPu/bAMQEP9JkKAgMYIjABRANvRdq7zyxXtDGLCige+nUAY1IMV7pgLMsDf5PowL6FrPr7ggFp/5fGjAOD+WiIda2sX68Rr+jotmsP3TxaSoBwlhk49gkXRkVScQ8Wb6Pw3WdrSnn1NAILhzbPMFyvm3iTSBn6clAL+/3YFZDeVl+YMmCYKXgWIFmO0Q2s7qCe0fSCMSJEJgGwA0uwmL0oxuVhK6dJPUYZFUxu2TYtB1UksvSYN+r0m79BZ3TOnW7cBkl5lxO0atTKkc4GG+lDqJ/X8+mdGu0riMMjtuVTe4gHsSwCbc0+0rDQAAAA==) format('woff2');unicode-range:U+20C1;font-display:swap}
+:root{color-scheme:light;
+  --lab-bg:#E9EAEC;--lab-panel:#FFFFFF;--lab-fg:#141518;--lab-muted:#5A5D66;--lab-line:#D7D9DE;--lab-accent:#141518;--lab-accent-fg:#FFFFFF;--lab-chip:#E1E3E7;--lab-stage:#D5D7DC;--lab-warn-bg:#FFF4E0;--lab-warn-fg:#7A4A00;
+  --lab-font:'IBM Plex Sans Arabic','IBM Plex Sans',system-ui,sans-serif;--lab-mono:'IBM Plex Mono',ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--lab-bg:#0C0D0F;--lab-panel:#15161A;--lab-fg:#ECEDEF;--lab-muted:#9EA1A9;--lab-line:#272930;--lab-accent:#ECEDEF;--lab-accent-fg:#0C0D0F;--lab-chip:#1E2026;--lab-stage:#060708;--lab-warn-bg:#2A1F0B;--lab-warn-fg:#F2C97A}}
+:root[data-theme="dark"]{color-scheme:dark;--lab-bg:#0C0D0F;--lab-panel:#15161A;--lab-fg:#ECEDEF;--lab-muted:#9EA1A9;--lab-line:#272930;--lab-accent:#ECEDEF;--lab-accent-fg:#0C0D0F;--lab-chip:#1E2026;--lab-stage:#060708;--lab-warn-bg:#2A1F0B;--lab-warn-fg:#F2C97A}
+*,*::before,*::after{box-sizing:border-box}
+html,body{background:var(--lab-bg);color:var(--lab-fg)}
+body{margin:0;font-family:var(--lab-font);font-size:14px;line-height:1.55}
+:focus-visible{outline:2px solid var(--lab-accent);outline-offset:2px}
+.lab{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:22px 48px;max-width:1960px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
+.lab-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px 24px}
+.lab-head h1{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.01em;text-wrap:balance}
+.lab-head p{margin:6px 0 0;color:var(--lab-muted);max-width:82ch}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.lab-tag{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--lab-muted);border:1px solid var(--lab-line);border-radius:999px;padding:2px 10px;background:var(--lab-panel)}
+.lab-tag b{color:var(--lab-fg);font-weight:600}
+.gate{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:10px}
+.gate div{background:var(--lab-warn-bg);color:var(--lab-warn-fg);border-radius:10px;padding:10px 14px;font-size:13px}
+.gate b{display:block;font-size:13.5px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:12px;padding:10px 12px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.ctl>span{font-size:12px;color:var(--lab-muted);white-space:nowrap}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;background:var(--lab-chip);border-radius:9px;padding:3px;min-width:0}
+.seg button{border:0;background:transparent;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;color:var(--lab-muted);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--lab-panel);color:var(--lab-fg);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.note{background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:12px;padding:12px 16px;font-size:13.5px}
+.note h2{margin:0 0 4px;font-size:15px}
+.note p{margin:0;color:var(--lab-muted);max-width:110ch}
+.stage-wrap{background:var(--lab-stage);border-radius:16px;padding:18px;overflow-x:auto;display:flex;justify-content:center}
+.device{flex:none;position:relative;width:var(--dev-w);transition:width .25s ease}
+.device[data-device="wide"]{width:100%}
+.device[data-device="phone"]{padding:12px;border-radius:46px;background:#040506;box-shadow:0 0 0 1px #2A2D33,0 24px 60px rgba(0,0,0,.35)}
+.device[data-device="phone"] .fx{border-radius:34px}
+.device[data-device="tablet"],.device[data-device="tabletL"]{padding:14px;border-radius:30px;background:#040506;box-shadow:0 0 0 1px #2A2D33,0 24px 60px rgba(0,0,0,.3)}
+.device[data-device="tablet"] .fx,.device[data-device="tabletL"] .fx{border-radius:18px}
+.device[data-device="laptop"] .fx,.device[data-device="wide"] .fx{border-radius:12px;box-shadow:0 0 0 1px var(--lab-line)}
+.device .frame-h{height:var(--dev-h)}
+@media (max-width:560px){
+  .stage-wrap{padding:0;background:transparent;border-radius:14px}
+  .device[data-device]{width:100%;padding:0;background:none;box-shadow:none;border-radius:0}
+  .device[data-device] .fx{border-radius:14px}
+  .device .frame-h{height:min(820px,calc(100svh - 40px))}
+}
+.lab-foot{color:var(--lab-muted);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 18px}
+@media (prefers-reduced-motion:reduce){.device{transition:none}}
+</style>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="foundation.css">
+</head>
+<body>
+<div class="lab">
+  <header class="lab-head">
+    <div>
+      <h1>AWJ Unified UX Foundation · المرحلة 1</h1>
+      <p>غلاف موحّد ومتجاوب، ونماذج مرجعية للجداول والنماذج والحوارات والحالات، وقواعد الأرقام والإجراءات، وطبقة هوية قابلة للتوسعة فوق Design System v3، مُثبتة على أربع شاشات: فاتورة مبيعات، فاتورة مشتريات، مخزون، وردية محطة.</p>
+    </div>
+    <div class="tags">
+      <span class="lab-tag"><b>Design Lab فقط</b> لا يُبنى مع web/</span>
+      <span class="lab-tag">بيانات تجريبية · لا API · لا إنتاج</span>
+      <span class="lab-tag">رموز v3 حرفياً من globals.css</span>
+    </div>
+  </header>
+
+  <div class="gate" role="note">
+    <div><b>M2 · محاذاة المبالغ: غير معتمدة</b>المفتاح «محاذاة المبالغ» للمقارنة فقط. A = السلوك الحالي في v3 (text-end)، B = المحاذاة الفيزيائية لليمين. صفحة «الأرقام M2» تقيس موضع الفاصلة حياً وتعرض النتيجة.</div>
+    <div><b>M8 · لا تفعيل لـ v3 على أي مسار</b>هذا المختبر لا يلمس بوابة <code>data-awj-ui</code> ولا <code>NEXT_PUBLIC_AWJ_UI_DEFAULT</code>. أي تفعيل يحتاج اختبارات وموافقة منفصلة.</div>
+  </div>
+
+  <div class="controls" role="group" aria-label="أدوات المختبر">
+    <div class="ctl"><span id="l-route">الشاشة</span><div class="seg" id="c-route" role="group" aria-labelledby="l-route"></div></div>
+    <div class="ctl"><span id="l-device">الجهاز</span><div class="seg" id="c-device" role="group" aria-labelledby="l-device"></div></div>
+    <div class="ctl"><span id="l-mode">الوضع</span><div class="seg" id="c-mode" role="group" aria-labelledby="l-mode"></div></div>
+    <div class="ctl"><span id="l-theme">ثيم v3</span><div class="seg" id="c-theme" role="group" aria-labelledby="l-theme"></div></div>
+    <div class="ctl"><span id="l-identity">حزمة الهوية</span><div class="seg" id="c-identity" role="group" aria-labelledby="l-identity"></div></div>
+    <div class="ctl"><span id="l-amt">محاذاة المبالغ</span><div class="seg" id="c-amt" role="group" aria-labelledby="l-amt"></div></div>
+    <div class="ctl"><span id="l-lang">اللغة</span><div class="seg" id="c-lang" role="group" aria-labelledby="l-lang"></div></div>
+    <div class="ctl"><span id="l-density">الكثافة</span><div class="seg" id="c-density" role="group" aria-labelledby="l-density"></div></div>
+    <div class="ctl"><span id="l-demo">حالة البيانات</span><div class="seg" id="c-demo" role="group" aria-labelledby="l-demo"></div></div>
+  </div>
+
+  <section class="note" id="route-note" aria-live="polite"><h2></h2><p></p></section>
+
+  <div class="stage-wrap"><div class="device" id="device"><div class="frame-h"><div class="fx" id="fx-app"></div></div></div></div>
+
+  <footer class="lab-foot"><span>AWJ Unified UX Foundation · Phase 1 · 2026-11-10</span><span>الأرقام بالهللات (أعداد صحيحة) والإجماليات مشتقة من السطور.</span><span>القيد المعروض «معاينة توضيحية» لا يُرحَّل.</span><span>اختصارات: Ctrl K · ? · G ثم S/P/I/F</span></footer>
+</div>
+<script>
+const NOTES = {
+  home:['الغلاف الموحّد','شريط سياق علوي (مسار، بحث/أوامر، الفرع، الفترة، الإشعارات) + تنقل يتبدّل بفئة نافذة الإطار لا بعرض الشاشة: أقل من 600 شريط سفلي، 600–1199 شريط جانبي ضيق مع قائمة مجموعة، 1200+ شريط جانبي كامل وتقسيم قائمة/معاينة.'],
+  kit:['النماذج المرجعية','جدول مالي (فرز، تصفية، تحديد جماعي، حالة URL، ترقيم صفحات، بطاقات على الجوال)، ونموذج بعقد Field (تحقق عند مغادرة الحقل وملخص أخطاء عند الإرسال)، وحوارات وأوراق ومستويات الرسائل. غيّر «حالة البيانات» لرؤية التحميل والفراغ والخطأ.'],
+  numbers:['مقارنة M2 التفاعلية','تقيس الصفحة موضع الفاصلة العشرية لكل صف في RTL وLTR، موجب وسالب، مع رمز الريال وبدونه. المعيار: تشتّت ≤ 0.75px. A هو سلوك v3 الحالي، B محاذاة فيزيائية لليمين، C عمودان للصحيح والكسر.'],
+  rules:['قواعد الأرقام والمبالغ والإجراءات','المبلغ مكوّن واحد معزول LTR، الهللات أعداد صحيحة، السالب بالإشارة واللون معاً، والإجراءات بترتيب ثابت: أساسي واحد، ثانوي، ثم «المزيد».'],
+  sales:['فاتورة مبيعات','شريط أوامر لاصق، دورة حياة، سطور بإجماليات صحيحة بالهللات، فترة مقفلة، حارس التغييرات غير المحفوظة، ومعاينة قيد متوازن قبل الترحيل (Ctrl Enter).'],
+  purchase:['فاتورة مشتريات','نفس هيكل فاتورة المبيعات حرفياً مع اختلاف الطرف والحسابات: الانسجام يأتي من المكوّن لا من النسخ.'],
+  inventory:['شاشة المخزون','قائمة كثيفة مع معاينة جانبية في 1200+ وورقة سفلية دونها، J/K للتنقل، وطرق عرض محفوظة. إيقاف صلاحية «رؤية التكلفة» يحذف أعمدتها من البيانات لا من العرض فقط.'],
+  shift:['وردية محطة الوقود','وضع Floor: أهداف لمس 44px+، أزرار 56px، رقم عرض كبير، وخطوة تالية واحدة واضحة. نفس الرموز والمكوّنات بكثافة مختلفة.'],
+  identity:['توسيع طبقة الهوية','حزمة هوية تغيّر فقط الرموز المسموحة (لون الإجراء، الخطوط، الزوايا، سطح المكتب...). أسماء الرموز الدلالية وألوان الحالات مقفلة، وفاحص العقد يرفض «غير صالحة».']
+};
+document.addEventListener('fx:render', () => {
+  const r = window.__fx ? window.__fx.S.route : 'home'; const n = NOTES[r] || NOTES.home;
+  const el = document.getElementById('route-note'); el.querySelector('h2').textContent = n[0]; el.querySelector('p').textContent = n[1];
+  document.documentElement.dataset.theme = window.__fx ? window.__fx.S.mode : 'light';
+});
+</script>
+<script src="foundation.js"></script>
+<script>document.dispatchEvent(new CustomEvent("fx:render"));</script>
+</body>
+</html>

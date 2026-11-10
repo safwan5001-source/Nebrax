@@ -23,6 +23,11 @@ design-lab/
   docs/AWJ-UX-RESEARCH-AND-DESIGN-STRATEGY.md   البحث العالمي + المعمارية الموحّدة + القرارات M1–M12
   docs/AWJ-UX-RESEARCH-IMPLEMENTATION-REPORT.md تقرير تنفيذ مرحلة البحث
   docs/research/                ملفات البحث: 12 مصدراً رسمياً، و208 قواعد بروابطها
+  docs/AWJ-UX-FOUNDATION-PHASE-1-REPORT.md       تقرير المرحلة 1: الغلاف، المكوّنات المرجعية، M2، طبقة الهوية
+  foundation/index.html         مستكشف الأساس الموحّد (المرحلة 1) فوق رموز v3 حرفياً
+  foundation/screens/           28 لقطة 2× (الشاشات الأربع، جوال/لوحي/محمول/2560، داكن، LTR، الهوية)
+  foundation/checks.json        نتائج 151 تهيئة + 22 اختبار تفاعل + قياسات M2 وعقد الهوية
+  scripts/foundation.mjs        فحوص المرحلة 1 (مصفوفة + تفاعل + لقطات)
   directions-v2/index.html      مستكشف V2 التفاعلي (هويات جديدة كلياً)
   directions-v2/screens/        لقطات 2× (جوال، محمول، عريض 2560) + لوحي/LTR/حالات
   directions/index.html         مستكشف الاتجاهات التفاعلي (ملف واحد، بلا تبعيات بناء)
@@ -47,6 +52,8 @@ node design-lab/scripts/capture.mjs --shots    # + لقطات PNG (المحفو�
 node design-lab/scripts/interactions.mjs       # 43 اختبار تفاعل
 LAB=v2 node design-lab/scripts/capture.mjs --shots --scale=2   # مصفوفة V2 (87 تهيئة) + لقطات 2×
 LAB=v2 node design-lab/scripts/interactions.mjs                # 43 اختبار تفاعل على V2
+node design-lab/scripts/foundation.mjs                         # المرحلة 1: 151 تهيئة + 22 اختبار تفاعل
+node design-lab/scripts/foundation.mjs --shots --scale=2       # + 28 لقطة WebP
 ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة تصوير شاشة واحدة (لا يمثّل المصفوفة الكاملة)
 ```
 
@@ -57,5 +64,5 @@ ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة �
 | 0 — الاكتشاف والاتجاهات | مكتملة · **لم يُعتمد أي اتجاه** | تدقيق + 3 اتجاهات (قلم، ميزان، فجر) |
 | 0.2 — الاستكشاف البصري V2 | مكتمل · تجريبي غير معتمد | 3 هويات جديدة (أسطرلاب، مشربية، كوفي) + مستكشف + تقرير |
 | 0.3 — البحث واستراتيجية النظام الموحّد | **مكتمل · بانتظار الاعتماد** | بحث 12 مصدراً + تقييم بالأدلة + معمارية موحّدة + مصفوفة الوحدات + خطة V3 + قرارات M1–M12 |
-| 1 — نظام التصميم + النموذج الكامل | لم تبدأ (بوابة اعتماد) | تطبيق مستقل يغطي الوحدات العشر + توثيق النظام |
+| 1 — Unified UX Foundation | **مكتملة في المختبر · بانتظار المراجعة** | غلاف موحّد + مكوّنات مرجعية + مقارنة M2 مقاسة + طبقة هوية L4 بمدقّق عقد + 4 شاشات إثبات. M2 غير معتمد، ولا تفعيل لـ v3 (M8) |
 | 2 — خارطة الترحيل | لم تبدأ | مهام مستقلة قابلة للدمج في `web/` عبر v3 |
