@@ -16,7 +16,7 @@ describe('TANKER-PR2 network boundary', () => {
   it('only client.ts touches the network, and only through api()', () => {
     for (const file of sources) {
       const body = code(file);
-      if (file === 'client.ts') continue;
+      if (file === 'client.ts' || file === 'settings-client.ts') continue; // الثاني له قائمة بيضاء خاصة (اختبار PR-3 أدناه).
       if (file === 'use-permissions.ts') {
         // الاستثناء الوحيد المعلن: هوية المستخدم (`/me`) لا بيانات الميزة.
         expect([...body.matchAll(/api\s*<[^>]*>\(\s*'([^']+)'/g)].map((m) => m[1])).toEqual(['/me']);
@@ -41,6 +41,19 @@ describe('TANKER-PR2 network boundary', () => {
     expect(src).toContain("const TANKERS = '/fuel-stations/tankers'");
     // كل مسار مركّب يمرّ بـassertId (UUID فقط).
     for (const m of src.matchAll(/\$\{(?:OWNERS|TANKERS)\}\/\$\{([^}]+)\}/g)) expect(m[1]).toMatch(/^assertId\(/);
+  });
+
+  it('settings-client.ts (PR-3) reaches exactly the existing fuel settings, stations and nozzles routes, with no tenant_id and nothing but allowed_operations on a nozzle', () => {
+    const src = code('settings-client.ts');
+    expect(src).toContain("const SETTINGS = '/fuel-stations/settings'");
+    expect(src).toContain("const STATIONS = '/fuel-stations/stations'");
+    expect(src).toContain("const NOZZLES = '/fuel-stations/nozzles'");
+    const paths = [...src.matchAll(/(['`])(\/[A-Za-z0-9_\-/${}.]+)\1/g)].map((m) => m[2]);
+    for (const path of paths) expect(['/fuel-stations/settings', '/fuel-stations/stations', '/fuel-stations/nozzles', '${STATIONS}/${assertId(stationId)}/settings', '${NOZZLES}/${assertId(id)}']).toContain(path);
+    expect(src).not.toMatch(/tenant_id|tenantId|\bDELETE\b|\bPOST\b/);
+    // الفوهة: جسم الطلب الوحيد `allowed_operations`.
+    expect(src).toMatch(/body:\s*{\s*allowed_operations:\s*allowed\s*}/);
+    expect([...src.matchAll(/method:\s*'PUT'/g)]).toHaveLength(2);
   });
 
   it('the module never reaches out of scope domains (fills, vouchers, stock, invoices, payments, commission, settlement)', () => {

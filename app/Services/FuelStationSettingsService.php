@@ -32,7 +32,32 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy'];
+
+    /** @var list<string> نطاقات منع تكرار رقم السند الورقي (TANKER-PR3؛ الافتراضي المعتمد `station`). */
+    public const TANKER_VOUCHER_SCOPES = ['station', 'tenant', 'owner', 'none'];
+
+    /** @var list<string> سياسات تجاوز سعة الصهريج (TANKER-PR3؛ `supervisor_approval` مؤجَّل ويُرفض). */
+    public const TANKER_CAPACITY_OVERRUN_POLICIES = ['allow_with_confirmation', 'block', 'allow'];
+
+    /**
+     * TANKER-PR3: سياسات تعبئة صهاريج المتعاملين الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة تُعامَل افتراضيها الآمن (فشل مغلق نحو المعتمد).
+     * القواعد الثابتة (ليست إعدادات): الحجب الصارم للسند المكرر بلا تجاوز، الأصفار البادئة تُحفظ، والسند الملغى يبقى محجوزاً.
+     *
+     * @return array{selection_required: bool, voucher_unique_scope: string, capacity_overrun_policy: string}
+     */
+    public function tankerFillPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $scope = $all['tanker_voucher_unique_scope'] ?? 'station';
+        $overrun = $all['tanker_capacity_overrun_policy'] ?? 'allow_with_confirmation';
+
+        return [
+            'selection_required' => ($all['tanker_selection_required'] ?? false) === true,
+            'voucher_unique_scope' => is_string($scope) && in_array($scope, self::TANKER_VOUCHER_SCOPES, true) ? $scope : 'station',
+            'capacity_overrun_policy' => is_string($overrun) && in_array($overrun, self::TANKER_CAPACITY_OVERRUN_POLICIES, true) ? $overrun : 'allow_with_confirmation',
+        ];
+    }
 
     /** @var list<string> قيم سياسة التأريخ الرجعي لقراءات الخزانات (FUEL-B6). */
     public const BACKDATING_POLICIES = ['deny', 'supervisor_approval', 'authorized_user'];
@@ -72,6 +97,26 @@ class FuelStationSettingsService
     }
 
     /** @return array<string, mixed> */
+    /**
+     * TANKER-PR3 (Codex P2): مفاتيح الإعدادات التي **للمحطة تجاوز صريح لها** (على مستوى المحطة لا الجهاز). `forStation()` يعيد القيمة الفعّالة فقط فلا يميّز
+     * «موروث» من «مثبَّت بقيمة مساوية لقيمة المؤسسة»؛ الواجهة تحتاج الفرق كي لا يتغيّر تجاوز مثبَّت بتغيير لاحق في المؤسسة بلا قصد.
+     *
+     * @return list<string>
+     */
+    public function stationOverrideKeys(FuelStation $station): array
+    {
+        $this->assertStationTenant($station);
+
+        return FuelStationSettingOverride::query()
+            ->where('fuel_station_id', $station->id)
+            ->where('device_key', '')
+            ->orderBy('setting_key')
+            ->pluck('setting_key')
+            ->map(fn ($key) => (string) $key)
+            ->values()
+            ->all();
+    }
+
     public function forStation(FuelStation $station, ?string $deviceKey = null): array
     {
         $this->assertStationTenant($station);
@@ -385,7 +430,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -479,11 +524,27 @@ class FuelStationSettingsService
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
             'device_simulated_ingress_enabled',
             'maintenance_overdue_alerts_enabled', 'safety_inspection_overdue_alerts_enabled',
-            'fuel_station_alerts_enabled',
+            'fuel_station_alerts_enabled', 'tanker_selection_required',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
                 throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_voucher_unique_scope') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_VOUCHER_SCOPES, true)) {
+                throw new RuntimeException('نطاق منع تكرار رقم السند الورقي يجب أن يكون station أو tenant أو owner أو none.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_capacity_overrun_policy') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_CAPACITY_OVERRUN_POLICIES, true)) {
+                throw new RuntimeException('سياسة تجاوز سعة الصهريج يجب أن تكون allow_with_confirmation أو block أو allow (supervisor_approval غير مدعومة بعد).');
             }
 
             return;

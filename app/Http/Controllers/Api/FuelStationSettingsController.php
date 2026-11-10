@@ -38,7 +38,7 @@ class FuelStationSettingsController extends ApiController
         // FUEL-B3: نطاق الفرع/المخزن/المحطة المسنَدة على قراءة إعدادات المحطة (404 موحّد) — كانت بلا فحص نطاق مستخدم.
         $this->accessibleStation($station->id);
 
-        return response()->json(['data' => $this->settings->forStation($station)]);
+        return response()->json(['data' => $this->settings->forStation($station), 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station)]]);
     }
 
     public function updateStation(UpdateFuelStationSettingsRequest $request, string $id): JsonResponse
@@ -53,6 +53,6 @@ class FuelStationSettingsController extends ApiController
             $data['reason'] ?? null,
         ));
 
-        return response()->json(['data' => $settings]);
+        return response()->json(['data' => $settings, 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station)]]);
     }
 }
