@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T03:54:51.876Z",
+ "generated": "2026-11-10T04:00:22.210Z",
  "matrix": [
   {
    "route": "home",
@@ -2480,6 +2480,14 @@
    "ok": true
   },
   {
+   "name": "After a failed posting attempt, typing 1.5 keeps the decimal point (qty 1500, not 15000)",
+   "ok": true
+  },
+  {
+   "name": "Leave without saving discards only the edits after the last saved draft",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2534,7 +2542,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 24,
+   "tests": 26,
    "failed": 0
   },
   "matrix": {

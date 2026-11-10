@@ -253,6 +253,7 @@ const NOZ = [
 ];
 
 /* ------------------------------------------------------------------ state */
+const snapDoc = (D) => { const c = JSON.parse(JSON.stringify({ ...D, saved: undefined })); c.dirty = false; c.showErrs = false; return c; };
 const newDoc = (kind) => ({
   kind, party: kind === 'sales' ? CUST[0] : SUPP[0], date: TODAY, due: addDays(TODAY, 30), ref: kind === 'sales' ? 'PO-77812' : '', wh: 'dmm', dirty: false, errs: {}, showErrs: false, comboOpen: false, comboQ: '', comboIdx: 0,
   lines: kind === 'sales'
@@ -473,7 +474,7 @@ function docErrors(D) {
   D.lines.forEach(l => { Object.entries(l.bad || {}).forEach(([f, b]) => { if (b) e[`l${l.id}-${f}`] = f === 'qty' ? 'errQty' : 'errAmt'; }); });
   return e;
 }
-const lineVal = (l, f) => l.bad?.[f] ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
+const lineVal = (l, f) => l.raw?.[f] !== undefined ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
 function lineRow(D, l, i) {
   const p = PROD[l.p], c = lineCalc(l), priceKey = D.kind === 'sales' ? 'price' : 'cost';
   const inp = (f, w) => `<td data-l="${t(f === 'price' ? priceKey : f === 'disc' ? 'discount' : 'qty')}" style="width:${w}px"><input class="inp n" id="${D.kind}-l${l.id}-${f}" data-lf="${f}" data-doc="${D.kind}" inputmode="decimal" value="${esc(lineVal(l, f))}" aria-label="${t(f === 'price' ? priceKey : f === 'disc' ? 'discount' : 'qty')} ${i + 1}" ${l.bad?.[f] ? 'aria-invalid="true"' : ''}></td>`;
@@ -765,15 +766,15 @@ app.addEventListener('click', (e) => {
     case 'save-draft': saveDraft(d.doc); break;
     case 'post': requestPost(d.doc); break;
     case 'do-post': S.docs[d.doc] = newDoc(d.doc); S.overlay = null; render(); toast(t('toastPosted')); break;
-    case 'leave-go': { const to = S.overlay.to; S.docs[S.route] = newDoc(S.route); go(to, true); break; }
-    case 'leave-save': { const to = S.overlay.to; S.docs[S.route].dirty = false; toast(t('toastSaved')); go(to, true); break; }
+    case 'leave-go': { const to = S.overlay.to, D = S.docs[S.route]; S.docs[S.route] = D.saved ? { ...snapDoc(D.saved), saved: D.saved } : newDoc(S.route); go(to, true); break; }
+    case 'leave-save': { const to = S.overlay.to, D = S.docs[S.route]; D.dirty = false; D.saved = snapDoc(D); toast(t('toastSaved')); go(to, true); break; }
     case 'save-readings': if (shiftReady().ok) toast(t('readingsSaved')); break;
     case 'focus-reading': { const n = NOZ.find(x => readOf(x) === null || readOf(x) < x.open); if (n) app.querySelector(`[data-reading="${n.id}"]`)?.focus(); break; }
   }
 });
 function openPeek(sku) { S.inv.active = sku; if (windowClass() === 'large') { S.inv.peek = sku; render(); } else { S.overlay = { t:'peek', sku }; render(); } }
 function addLine(kind) { const D = S.docs[kind], id = Math.max(0, ...D.lines.map(l => l.id)) + 1; D.lines.push({ id, p:4, qtyM:1000, price: kind === 'sales' ? PROD[4].price : PROD[4].cost, disc:0 }); D.dirty = true; render(`#${kind}-l${id}-qty`); }
-function saveDraft(kind) { S.docs[kind].dirty = false; render(); toast(t('toastSaved')); }
+function saveDraft(kind) { const D = S.docs[kind]; D.dirty = false; D.saved = snapDoc(D); render(); toast(t('toastSaved')); }
 function requestPost(kind) {
   const D = S.docs[kind];
   if (D.date < LOCKED_BEFORE) { app.querySelector(`#${kind}-lock`)?.focus?.(); toast(t('postDisabledLocked')); return; }
@@ -795,7 +796,9 @@ function kitValidate(F, all) {
   return e;
 }
 app.addEventListener('focusout', (e) => {
-  const el = e.target; if (!el.dataset?.kf) return;
+  const el = e.target;
+  if (el.dataset?.lf && el.dataset.lf !== 'p') { const D = S.docs[el.dataset.doc], line = D?.lines.find(l => l.id === Number(el.closest('tr')?.dataset.line)); if (line?.raw && !line.bad?.[el.dataset.lf]) delete line.raw[el.dataset.lf]; return; }
+  if (!el.dataset?.kf) return;
   const F = S.kit.form; F.touched[el.dataset.kf] = true; const before = JSON.stringify(F.errs); F.errs = kitValidate(F, false);
   // Moving to the submit button: keep the new state but do not re-render — re-rendering on mousedown would replace the button and swallow the click; submit validates everything anyway.
   if (e.relatedTarget?.closest?.('#kform [type="submit"]')) return;
@@ -815,7 +818,7 @@ app.addEventListener('input', (e) => {
     if (d.lf === 'p') { line.p = Number(el.value); line.price = d.doc === 'sales' ? PROD[line.p].price : PROD[line.p].cost; render('#' + el.id); return; }
     const m = toMinor(el.value, d.lf === 'qty' ? 3 : 2); line.bad = line.bad || {}; line.raw = line.raw || {};
     if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[d.lf] = true; line.raw[d.lf] = el.value; return; }
-    el.removeAttribute('aria-invalid'); line.bad[d.lf] = false; delete line.raw[d.lf];
+    el.removeAttribute('aria-invalid'); line.bad[d.lf] = false; line.raw[d.lf] = el.value; // keep the text being typed ("1.") until the field is left
     if (d.lf === 'qty') line.qtyM = m; else if (d.lf === 'price') line.price = m; else line.disc = m;
     if (D.showErrs) { render('#' + el.id); return; }
     updateDocTotals(d.doc);

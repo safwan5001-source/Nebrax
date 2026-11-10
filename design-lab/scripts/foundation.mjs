@@ -223,6 +223,32 @@ test('An invoice with no billable lines cannot be posted; the summary links to A
   await ctx.close();
 });
 
+test('After a failed posting attempt, typing 1.5 keeps the decimal point (qty 1500, not 15000)', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  await page.evaluate(() => { const F = window.__fx; F.S.docs.sales.party = null; F.render(); });
+  await page.click('.cmdbar [data-act="post"]');
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.showErrs), 'showErrs not set');
+  const id = await page.evaluate(() => window.__fx.S.docs.sales.lines[0].id);
+  await page.fill(`#sales-l${id}-qty`, ''); await page.type(`#sales-l${id}-qty`, '1.5', { delay: 30 });
+  assert(await page.inputValue(`#sales-l${id}-qty`) === '1.5', 'input shows ' + await page.inputValue(`#sales-l${id}-qty`));
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.lines[0].qtyM) === 1500, 'qty stored as ' + await page.evaluate(() => window.__fx.S.docs.sales.lines[0].qtyM));
+  await page.keyboard.press('Tab');
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.lines[0].raw?.qty) === undefined, 'raw text kept after leaving the field');
+  await ctx.close();
+});
+
+test('Leave without saving discards only the edits after the last saved draft', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'purchase' });
+  await page.fill('#purchase-ref', 'SAVED-REF');
+  await page.locator('#main').focus(); await page.keyboard.press('Control+s'); await page.waitForTimeout(80);
+  await page.fill('#purchase-ref', 'UNSAVED-REF');
+  await page.click('.side [data-route="inventory"]'); await page.click('.dlg [data-act="leave-go"]');
+  await page.click('.side [data-route="purchase"]'); await page.waitForTimeout(80);
+  assert(await page.inputValue('#purchase-ref') === 'SAVED-REF', 'ref after discard = ' + await page.inputValue('#purchase-ref'));
+  assert(await page.evaluate(() => window.__fx.S.docs.purchase.dirty) === false, 'restored draft is dirty');
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);
