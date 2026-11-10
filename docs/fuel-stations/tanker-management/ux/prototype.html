@@ -269,6 +269,8 @@ const tnkById=id=>TNK.find(t=>t.id===id);
 const ownName=id=>id==='org'?X('المؤسسة (صرف داخلي)','Organization (internal)'):nm(ownById(id));
 const monthFills=oid=>FILLS.filter(f=>f.oid===oid&&f.at.startsWith('2026-11'));
 function calc(oid){
+  const st0=S.erp.settle[oid],snap=S.erp.snap&&S.erp.snap[oid];
+  if(st0&&st0!=='draft'&&snap){const paid=st0==='paid'?snap.net:0;return {...snap,paid,due:snap.net-paid}}
   const liters=monthFills(oid).reduce((a,f)=>a+f.l,0);
   const withdrawals=liters*PRICE;
   const coll=COL.filter(c=>c.oid===oid).reduce((a,c)=>a+c.amt,0);
@@ -585,13 +587,14 @@ function collectionsTab(o){
 }
 /* ── settlement ── */
 function commissionCard(o){
-  const cm=COMM[o.id];
+  const cm=COMM[o.id]||(COMM[o.id]={mode:'auto',pct:5,manual:0,reason:''});
+  const fz=(S.erp.settle[o.id]||'draft')!=='draft',wAttr=()=>fz||!canW()?` disabled aria-disabled="true"`:'';
   return `<div class="card sec"><div class="row between"><h2>${X('العمولة','Commission')}</h2>${tg('dec')}</div>
    <div class="rad" role="group" aria-label="${X('نمط العمولة','Commission mode')}">${[['auto',X('تلقائي','Automatic')],['manual',X('يدوي','Manual')],['none',X('بدون','None')]].map(([k,l])=>`<button data-act="cm-mode" data-id="${k}" aria-pressed="${cm.mode===k}"${wAttr()}>${l}</button>`).join('')}</div>
    ${cm.mode==='auto'?`<div class="field"><label for="cmPct">${X('النسبة الافتراضية %','Default rate %')}</label><input id="cmPct" class="inp" inputmode="decimal" data-bind="comm.${o.id}.pct" data-after="comm" value="${cm.pct}" style="max-width:160px"${wAttr()}></div>`:''}
    ${cm.mode==='manual'?`<div class="field"><label for="cmMan">${X('المبلغ','Amount')}</label><input id="cmMan" class="inp" inputmode="decimal" data-bind="comm.${o.id}.manual" data-after="comm" value="${cm.manual}" style="max-width:200px"${wAttr()}></div>`:''}
    <div class="field"><label for="cmWhy">${X('سبب التعديل (يُسجَّل في التدقيق)','Reason for change (audited)')}</label><input id="cmWhy" class="inp" data-bind="comm.${o.id}.reason" value="${esc(cm.reason)}"${wAttr()}></div>
-   <div class="muted" style="font-size:12px">${X('أساس العمولة (على المقبوض أم المفوتر؟) وقبل/بعد الضريبة ومعالجتها الضريبية: قرارات مفتوحة. النموذج يحسب على المقبوض المؤهَّل لتوضيح التدفق فقط.','Commission basis (collected vs invoiced), before/after VAT and its tax treatment are open decisions. The prototype uses qualifying collections only to illustrate the flow.')}</div></div>`;
+   ${fz?`<div class="note">${X('الكشف معتمد ومجمَّد — تعديل العمولة يتطلب مسار تصحيح.','The statement is approved and frozen — changing commission requires a correction path.')}</div>`:''}<div class="muted" style="font-size:12px">${X('أساس العمولة (على المقبوض أم المفوتر؟) وقبل/بعد الضريبة ومعالجتها الضريبية: قرارات مفتوحة. النموذج يحسب على المقبوض المؤهَّل لتوضيح التدفق فقط.','Commission basis (collected vs invoiced), before/after VAT and its tax treatment are open decisions. The prototype uses qualifying collections only to illustrate the flow.')}</div></div>`;
 }
 function calcCard(o){
   const c=calc(o.id),st=S.erp.settle[o.id]||'draft';
@@ -762,7 +765,7 @@ const ACTS={
     if(d.k==='link'){if(!v.cid)e.cid=X('اختر الشركة.','Select a company.');if(!/^\d{4}-\d{2}-\d{2}$/.test(v.from||''))e.from=X('تاريخ غير صالح (YYYY-MM-DD).','Invalid date (YYYY-MM-DD).')}
     if(d.k==='endlink'){const l=LNK.find(x=>x.id===d.ref.split(':')[1]);if(!/^\d{4}-\d{2}-\d{2}$/.test(v.to||''))e.to=X('تاريخ غير صالح (YYYY-MM-DD).','Invalid date (YYYY-MM-DD).');else if(l&&v.to<l.from)e.to=X('لا يسبق تاريخ البداية.','Cannot be before the start date.')}
     d.errs=e;if(Object.keys(e).length){render();return}
-    if(d.k==='owner'){OWN.push({id:'o'+(OWN.length+1),name:[v.name.trim(),v.name.trim()],phone:normD(v.phone||''),status:'active',note:''})}
+    if(d.k==='owner'){const nid='o'+(OWN.length+1);COMM[nid]={mode:'auto',pct:5,manual:0,reason:''};OWN.push({id:nid,name:[v.name.trim(),v.name.trim()],phone:normD(v.phone||''),status:'active',note:''})}
     if(d.k==='owner-edit'){const o=ownById(S.erp.oid);o.name=[v.name.trim(),v.name.trim()];o.phone=normD(v.phone||'');o.status=v.status}
     if(d.k==='tanker'){TNK.push({id:'t'+(TNK.length+10),oid:S.erp.oid,plate:v.plate.trim(),cap:pf(v.cap),active:true})}
     if(d.k==='link'){LNK.push({id:'l'+(LNK.length+1),oid:S.erp.oid,cid:v.cid,from:v.from,to:null})}
@@ -774,7 +777,7 @@ const ACTS={
     S.erp.dlg={k:'info',title,html,cta};render()},
   'mk-draft'(b){SUP.find(x=>x.id===b.dataset.id).sales='draft';S.erp.dlg=null;flash(X('نموذج: ظهرت كمسودة في المبيعات','Prototype: shown as a draft in Sales'),'erp')},
   attr(b){const c=COL.find(x=>x.id===b.dataset.id);S.erp.dlg={k:'confirm',title:X('إسناد التحصيل','Attribute the collection'),html:`<p>${X('سيُحتسب هذا التحصيل ضمن التحصيلات المؤهَّلة لصاحب الصهريج. لا يُنشأ قبض جديد — الإسناد مرجعي فقط.','This collection will count as qualifying for the owner. No new receipt is created — attribution is a reference only.')}</p><p><b class="ltr num">${c.id}</b> · ${coName(c.cid)} · ${SAR(c.amt)}</p>`,ok:X('إسناد','Attribute'),run:()=>{c.oid=S.erp.oid;flash(X('أُسند التحصيل','Collection attributed'),'erp')}};render()},
-  'stl-approve'(){const id=S.erp.oid;S.erp.dlg={k:'confirm',title:X('اعتماد التسوية','Approve settlement'),html:`<p>${X('بعد الاعتماد يُجمَّد الكشف ولا يُعدَّل إلا بمسار تصحيح. الاعتماد لا يدفع شيئًا.','After approval the statement is frozen and changes only through a correction path. Approval pays nothing.')}</p>`,ok:X('اعتماد','Approve'),run:()=>{S.erp.settle[id]='approved';flash(X('اعتُمدت التسوية','Settlement approved'),'erp')}};render()},
+  'stl-approve'(){const id=S.erp.oid;S.erp.dlg={k:'confirm',title:X('اعتماد التسوية','Approve settlement'),html:`<p>${X('بعد الاعتماد يُجمَّد الكشف ولا يُعدَّل إلا بمسار تصحيح. الاعتماد لا يدفع شيئًا.','After approval the statement is frozen and changes only through a correction path. Approval pays nothing.')}</p>`,ok:X('اعتماد','Approve'),run:()=>{S.erp.snap=S.erp.snap||{};S.erp.snap[id]=calc(id);S.erp.settle[id]='approved';flash(X('اعتُمدت التسوية','Settlement approved'),'erp')}};render()},
   'stl-pay'(){const id=S.erp.oid,c=calc(id);S.erp.dlg={k:'confirm',title:X('تسجيل دفع لصاحب الصهريج','Record payout to owner'),html:`<p>${X('عملية منفصلة تُسجَّل في المالية الرسمية (صرف). المبلغ:','A separate operation recorded in official Finance (payment out). Amount:')} ${SAR(c.net)}</p>`,ok:X('تسجيل الدفع','Record payout'),run:()=>{S.erp.settle[id]='paid';flash(X('سُجّل الدفع (نموذج)','Payout recorded (prototype)'),'erp')}};render()},
   'dlg-confirm'(){const d=S.erp.dlg;S.erp.dlg=null;if(d.run)d.run();else render()},
   'cm-mode'(b){COMM[S.erp.oid].mode=b.dataset.id;render()}
