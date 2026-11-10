@@ -7,7 +7,8 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const url = pathToFileURL(path.join(root, 'directions/index.html')).href;
+const V2 = process.env.LAB === 'v2';
+const url = pathToFileURL(path.join(root, V2 ? 'directions-v2' : 'directions', 'index.html')).href;
 
 const browser = await chromium.launch();
 const results = [];
@@ -24,7 +25,7 @@ const set = (page, s) => page.evaluate((s) => { Object.assign(window.__awjLab.S,
 const app = '#app';
 const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got ${a}`); };
 
-for (const dir of ['qalam', 'mizan', 'fajr']) {
+for (const dir of (V2 ? ['astur', 'mash', 'kufi'] : ['qalam', 'mizan', 'fajr'])) {
   await test(`${dir}: table search narrows rows and empty state appears`, { width: 1440, height: 1000 }, async (p) => {
     await set(p, { dir, surface: 'table', device: 'laptop' });
     const before = await p.locator(`${app} tbody tr`).count();
@@ -175,12 +176,12 @@ for (const dir of ['qalam', 'mizan', 'fajr']) {
     await set(p, { dir, surface: 'dash', device: 'wide' });
     await p.click(`${app} .tabbar [data-go="table"]`);
     eq(await p.evaluate(() => window.__awjLab.S.surface), 'table', 'surface');
-    const small = await p.evaluate(() => [...document.querySelectorAll('#app .tabbar button, #app .topbar button, #app .f-row button, #app .mcard, #app .fchip, #app .btn')].filter(b => b.offsetParent && b.getBoundingClientRect().height < 44 && !b.classList.contains('fchip')).map(b => b.className));
+    const small = await p.evaluate(() => [...document.querySelectorAll('#app .tabbar button, #app .topbar button, #app .f-row button, #app .a-top button, #app .m-top button, #app .k-top button, #app .mcard, #app .fchip, #app .btn')].filter(b => b.offsetParent && b.getBoundingClientRect().height < 44 && !b.classList.contains('fchip')).map(b => b.className));
     if (small.length) throw new Error('small targets: ' + small.slice(0, 5).join(','));
   });
 }
 await test('LTR/English renders with dir=ltr and English labels', { width: 1440, height: 1000 }, async (p) => {
-  await set(p, { dir: 'mizan', surface: 'table', device: 'laptop', lang: 'en' });
+  await set(p, { dir: V2 ? 'mash' : 'mizan', surface: 'table', device: 'laptop', lang: 'en' });
   eq(await p.getAttribute(app, 'dir'), 'ltr', 'dir');
   await p.getByText('Sales invoices').first().waitFor();
 });

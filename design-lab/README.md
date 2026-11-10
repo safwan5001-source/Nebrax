@@ -19,6 +19,9 @@ design-lab/
   docs/01-UX-AUDIT.md           تدقيق مختصر للحالة الحالية
   docs/02-DESIGN-DIRECTIONS.md  الاتجاهات الثلاثة + المقارنة + التوصية
   docs/PHASE-0-REPORT.md        تقرير المرحلة 0 وبوابة الاعتماد
+  docs/03-VISUAL-EXPLORATION-V2.md  الاستكشاف البصري V2: أسطرلاب · مشربية · كوفي
+  directions-v2/index.html      مستكشف V2 التفاعلي (هويات جديدة كلياً)
+  directions-v2/screens/        لقطات 2× (جوال، محمول، عريض 2560) + لوحي/LTR/حالات
   directions/index.html         مستكشف الاتجاهات التفاعلي (ملف واحد، بلا تبعيات بناء)
   directions/screens/           لقطات Phone/Tablet/Laptop/Dark/LTR/States
   directions/checks.json        نتائج فحص الأخطاء والتجاوز وaxe-core
@@ -37,12 +40,16 @@ open design-lab/directions/index.html      # أو xdg-open على Linux
 node design-lab/scripts/capture.mjs            # 84 تهيئة: أخطاء + تجاوز أفقي + WCAG
 node design-lab/scripts/capture.mjs --shots    # + لقطات PNG (المحفوظة في المستودع مُحوَّلة إلى WebP للحجم)
 node design-lab/scripts/interactions.mjs       # 43 اختبار تفاعل
+LAB=v2 node design-lab/scripts/capture.mjs --shots --scale=2   # مصفوفة V2 (87 تهيئة) + لقطات 2×
+LAB=v2 node design-lab/scripts/interactions.mjs                # 43 اختبار تفاعل على V2
+ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة تصوير شاشة واحدة (لا يمثّل المصفوفة الكاملة)
 ```
 
 ## المراحل
 
 | المرحلة | الحالة | الناتج |
 |---|---|---|
-| 0 — الاكتشاف والاتجاهات | **مكتملة — بانتظار الاعتماد** | تدقيق + 3 اتجاهات + مستكشف تفاعلي + توصية |
+| 0 — الاكتشاف والاتجاهات | مكتملة · **لم يُعتمد أي اتجاه** | تدقيق + 3 اتجاهات (قلم، ميزان، فجر) |
+| 0.2 — الاستكشاف البصري V2 | **مكتمل · بانتظار الاعتماد** | 3 هويات جديدة (أسطرلاب، مشربية، كوفي) + مستكشف + تقرير |
 | 1 — نظام التصميم + النموذج الكامل | لم تبدأ (بوابة اعتماد) | تطبيق مستقل يغطي الوحدات العشر + توثيق النظام |
 | 2 — خارطة الترحيل | لم تبدأ | مهام مستقلة قابلة للدمج في `web/` عبر v3 |
