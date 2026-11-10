@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T03:48:34.151Z",
+ "generated": "2026-11-10T03:54:51.876Z",
  "matrix": [
   {
    "route": "home",
@@ -2472,6 +2472,14 @@
    "ok": true
   },
   {
+   "name": "Line product change keeps keyboard focus on that line's product selector (no selector error)",
+   "ok": true
+  },
+  {
+   "name": "An invoice with no billable lines cannot be posted; the summary links to Add line",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2526,7 +2534,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 22,
+   "tests": 24,
    "failed": 0
   },
   "matrix": {
@@ -2552,7 +2560,7 @@
    "ltr-c": 0
   },
   "mono/pos/sym": {
-   "rtl-a": 72.3,
+   "rtl-a": 72,
    "ltr-a": 0,
    "rtl-b": 0,
    "ltr-b": 0,

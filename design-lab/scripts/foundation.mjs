@@ -199,6 +199,30 @@ test('Validation: missing party blocks posting with a focused error summary that
   await ctx.close();
 });
 
+test('Line product change keeps keyboard focus on that line\'s product selector (no selector error)', async () => {
+  const { ctx, page, errors } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  const id = await page.evaluate(() => window.__fx.S.docs.sales.lines[0].id);
+  await page.focus(`#sales-l${id}-p`);
+  await page.selectOption(`#sales-l${id}-p`, { index: 2 }); await page.waitForTimeout(120);
+  assert(!errors.length, 'page error: ' + errors.join(' | '));
+  assert(await page.evaluate(() => document.activeElement?.id) === `sales-l${id}-p`, 'focus lost after product change');
+  await ctx.close();
+});
+
+test('An invoice with no billable lines cannot be posted; the summary links to Add line', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  while (await page.locator('[data-del]').count()) await page.click('[data-del] >> nth=0');
+  await page.click('.cmdbar [data-act="post"]');
+  assert(await page.locator('.dlg').count() === 0, 'journal preview opened with no lines');
+  assert(await page.locator('.err-summary').count() === 1, 'no error summary');
+  await page.click('.err-summary [data-focus="#sales-addline"]');
+  assert(await page.evaluate(() => document.activeElement?.id) === 'sales-addline', 'summary link did not focus Add line');
+  await page.click('#sales-addline'); await page.waitForTimeout(100);
+  await page.locator('#main').focus(); await page.keyboard.press('Control+Enter');
+  assert(await page.locator('.dlg [data-dr]').count() === 1, 'one billable line should allow the preview');
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);
