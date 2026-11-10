@@ -47,7 +47,7 @@ export function AwjLogo({
       aria-label={alt || undefined}
       aria-hidden={alt ? undefined : true}
       focusable="false"
-      className={cn('inline-block h-10 w-auto shrink-0 text-primary dark:text-white', className)}
+      className={cn('inline-block h-10 w-auto shrink-0 text-primary dark:text-text', className)}
     >
       {alt ? <title>{BRAND.displayName}</title> : null}
       <g fill="currentColor" fillRule="evenodd">

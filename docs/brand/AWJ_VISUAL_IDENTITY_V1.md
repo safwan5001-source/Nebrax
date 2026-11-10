@@ -19,7 +19,7 @@ The shared `AwjLogo` now renders the approved geometric Arabic identity as inlin
 | Fuel Stations installed app | New static 192/512 PNG, maskable 512 PNG, and 180 Apple touch icon |
 | Reusable vector masters | Six blue/white SVG assets in `web/public/brand/awj/` |
 
-The SVG uses `currentColor` and the existing `text-primary` token, with white in dark mode. Existing landing/auth navy-surface CSS can still override the ink. No theme tokens or stylesheets changed. Brand paths are font-independent and are never mirrored for RTL.
+The SVG uses `currentColor` and the existing `text-primary` token, with the semantic `text-text` ink in dark mode. Existing landing/auth navy-surface CSS can still override the ink. No theme tokens or stylesheets changed. Brand paths are font-independent and are never mirrored for RTL.
 
 ## Company identity and compatibility
 
@@ -57,3 +57,7 @@ Local Vitest command was attempted but could not start: `vitest: not found`. Thi
 ## Next step
 
 Review Web CI and the visual result on mobile/desktop, then obtain owner approval before merge and deployment. Verify the actual authenticated tenant logo and icon still override the AWJ fallback after deployment.
+
+## CI follow-up: semantic palette regression
+
+Web CI run 42876776560 reported one token-ratchet regression in `awj-logo.tsx`: palette classes 0 → 1. The introduced `dark:text-white` bypassed semantic tokens. Replaced it with `dark:text-text`; the actual repository scanner reproduced palette=1 before the fix and reports palette=0, hex=0 afterward for this component. No baseline, guard, theme token, SVG outline or company identity logic was changed. Full Web CI must confirm the updated head.
