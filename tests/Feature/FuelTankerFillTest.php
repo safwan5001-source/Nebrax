@@ -853,6 +853,30 @@ class FuelTankerFillTest extends TestCase
     }
 
     /** @test */
+    public function the_longest_supported_custom_numbering_format_still_records(): void
+    {
+        $staff = $this->staff();
+        \App\Support\DocumentNumberingCatalog::putSeriesFormat('fuel_tanker_fill', 'default', str_repeat('P', 20), str_repeat('S', 20));
+
+        $number = $this->record($staff['token'])->assertCreated()->json('data.number');
+        $this->assertSame(52, strlen($number), $number);
+        $this->assertSame($number, FuelTankerFill::query()->value('number'));
+    }
+
+    /** @test */
+    public function a_zero_voucher_filter_returns_only_that_voucher(): void
+    {
+        $staff = $this->staff();
+        $this->record($staff['token'], ['voucher_number' => '0'])->assertCreated();
+        $this->record($staff['token'], ['voucher_number' => '1'])->assertCreated();
+
+        $rows = $this->withToken($staff['token'])->getJson(self::BASE . '?voucher_number=0')->assertOk()->json('data');
+        $this->assertCount(1, $rows);
+        $this->assertSame('0', $rows[0]['voucher_number']);
+        $this->assertCount(2, $this->withToken($staff['token'])->getJson(self::BASE . '?voucher_number=')->assertOk()->json('data'));
+    }
+
+    /** @test */
     public function the_ftf_series_is_registered_in_the_numbering_catalog(): void
     {
         $this->assertContains('fuel_tanker_fill', \App\Support\DocumentNumberingCatalog::editableKeys());

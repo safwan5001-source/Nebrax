@@ -51,7 +51,7 @@ return new class extends Migration
             $table->foreignUuid('fuel_tanker_owner_id')->constrained('fuel_tanker_owners');
             $table->foreignUuid('fuel_tanker_id')->nullable()->constrained('fuel_tankers');
 
-            $table->string('number', 32);
+            $table->string('number'); // 255 كباقي المستندات: بادئة 20 + سنة + تسلسل + لاحقة 20 تبلغ 52 حرفاً (إعدادات الترقيم المسموحة).
             $table->string('voucher_number', 64);
             $table->string('voucher_key', 64);
             $table->string('voucher_scope', 16);

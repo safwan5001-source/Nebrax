@@ -47,7 +47,8 @@ class FuelTankerFillController extends ApiController
                 $query->where($column, $filters[$param]);
             }
         }
-        if (! empty($filters['voucher_number'])) {
+        // `empty('0')` صحيحة في PHP والسند «0» صالح: يُفحص الغياب/الفراغ صراحةً.
+        if (isset($filters['voucher_number']) && $filters['voucher_number'] !== '') {
             $voucher = FuelTankerFill::normalizeVoucher($filters['voucher_number']);
             $query->where('voucher_key', $voucher['key'] ?? '__invalid__');
         }
