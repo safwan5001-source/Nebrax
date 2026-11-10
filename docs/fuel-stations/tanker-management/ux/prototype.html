@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tanker Owners Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout concept: a thin prototype bar (neutral) above one stage. The stage shows either the Station app (navy + orange, bottom nav, phone-first)
+   or AWJ ERP (blue, grouped sidebar, dense tables). Each identity owns its tokens under .app-station / .app-erp; the two never share a palette. */
+@font-face{font-family:'AWJ Saudi Riyal';src:url(data:font/woff2;base64,d09GMgABAAAAAAHkAAsAAAAAA8gAAAGWAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAANBEICoEUgR4BNgIkAwgLBgAEIAWCMAcgGwsDIJ4Dbmt8FdPWIgWh7r/dphgZD/3vR7sz//0VS3s2m1gXKwkvRSV1vFGaWKRRYdg2YrLZ/UHH8uzI2k5c878pzhP/HqPXQYWRYAPdeXIGjpuGBZb5T24wdVN/UGMJ/Dcst0iWwAQak6JEI+uyaC3D3M77h/08MY9Q1SUeq8m7+Qb3s098MRMphQQvPcDrPuiqkf+iQP0ZBFSNoFsgUaFTJVgpumHxB92fsPu/bAMQEP9JkKAgMYIjABRANvRdq7zyxXtDGLCige+nUAY1IMV7pgLMsDf5PowL6FrPr7ggFp/5fGjAOD+WiIda2sX68Rr+jotmsP3TxaSoBwlhk49gkXRkVScQ8Wb6Pw3WdrSnn1NAILhzbPMFyvm3iTSBn6clAL+/3YFZDeVl+YMmCYKXgWIFmO0Q2s7qCe0fSCMSJEJgGwA0uwmL0oxuVhK6dJPUYZFUxu2TYtB1UksvSYN+r0m79BZ3TOnW7cBkl5lxO0atTKkc4GG+lDqJ/X8+mdGu0riMMjtuVTe4gHsSwCbc0+0rDQAAAA==) format('woff2');unicode-range:U+20C1;font-display:swap}
+:root{
+  --sh-bg:#e9edf2;--sh-fg:#142238;--sh-muted:#586576;--sh-line:#d3dae3;--sh-chip:#ffffff;--sh-chip-on:#142238;--sh-chip-on-fg:#ffffff;--sh-warn:#8f4d08;--sh-warn-bg:#fdf1e3;
+  --sans:'IBM Plex Sans Arabic','AWJ Saudi Riyal',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:'IBM Plex Mono','AWJ Saudi Riyal',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sh-bg:#0a1018;--sh-fg:#eef2f7;--sh-muted:#a6b3c5;--sh-line:#223046;--sh-chip:#142238;--sh-chip-on:#eef2f7;--sh-chip-on-fg:#0a1018;--sh-warn:#f2b068;--sh-warn-bg:#3a2a1c;color-scheme:dark}}
+:root[data-theme="dark"]{--sh-bg:#0a1018;--sh-fg:#eef2f7;--sh-muted:#a6b3c5;--sh-line:#223046;--sh-chip:#142238;--sh-chip-on:#eef2f7;--sh-chip-on-fg:#0a1018;--sh-warn:#f2b068;--sh-warn-bg:#3a2a1c;color-scheme:dark}
+
+/* ───────── Station app identity (mirrors web/src/modules/station-ops/fuel-ops.css) ───────── */
+.app-station{--navy:#142238;--accent:#e87722;--on-navy:#fff;--on-navy-muted:#b9c7d6;--navy-line:#2a3b56;--cta-bg:#e87722;--cta-fg:#142238;
+  --bg:#f7f8fa;--surface:#fff;--text:#142238;--muted:#586576;--border:#e3e7ec;--primary:#b3500a;--primary-hover:#973f07;--primary-soft:#fff3e8;
+  --positive:#0b6e5a;--negative:#b42332;--warning:#8f4d08;--control:#7a8aa0;--pos-tint:#e8f5f0;--warn-tint:#fdf1e3;--neg-tint:#fbe9eb;--shadow:0 5px 18px rgb(20 34 56/.09);--r:12px;--r-sm:10px;--tap:52px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .app-station{--navy:#0a121e;--accent:#f08a3c;--navy-line:#22324a;--cta-bg:#f08a3c;--bg:#0d1624;--surface:#142238;--text:#eef2f7;--muted:#a6b3c5;--border:#2a3b56;--primary:#f4a15a;--primary-hover:#f7b57b;--primary-soft:#3a2a1c;--positive:#4cc9a8;--negative:#ff8a94;--warning:#f2b068;--control:#7388a6;--pos-tint:#12372f;--warn-tint:#3a2a1c;--neg-tint:#3d1f26;--shadow:0 5px 18px rgb(0 0 0/.35)}}
+:root[data-theme="dark"] .app-station{--navy:#0a121e;--accent:#f08a3c;--navy-line:#22324a;--cta-bg:#f08a3c;--bg:#0d1624;--surface:#142238;--text:#eef2f7;--muted:#a6b3c5;--border:#2a3b56;--primary:#f4a15a;--primary-hover:#f7b57b;--primary-soft:#3a2a1c;--positive:#4cc9a8;--negative:#ff8a94;--warning:#f2b068;--control:#7388a6;--pos-tint:#12372f;--warn-tint:#3a2a1c;--neg-tint:#3d1f26;--shadow:0 5px 18px rgb(0 0 0/.35)}
+
+/* ───────── AWJ ERP identity (mirrors web/src/app/globals.css + DESIGN_SYSTEM.md) ───────── */
+.app-erp{--bg:#f6f7f9;--surface:#fff;--text:#15181d;--muted:#6b7280;--border:#eceef1;--primary:#1e40af;--primary-hover:#1e3a8a;--primary-soft:#eef2ff;--primary-fg:#fff;
+  --positive:#166534;--negative:#b91c1c;--warning:#92400e;--control:#aab2bf;--pos-tint:#e9f6ee;--warn-tint:#fdf1e3;--neg-tint:#fbeaea;--r:8px;--r-sm:6px;--tap:36px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .app-erp{--bg:#0e1014;--surface:#181b20;--text:#f3f4f6;--muted:#9099a5;--border:#262a31;--primary:#4f8cff;--primary-hover:#6ba0ff;--primary-soft:#1b2740;--primary-fg:#0e1014;--positive:#16a34a;--negative:#f87171;--warning:#d97706;--control:#454b55;--pos-tint:#10261a;--warn-tint:#33230f;--neg-tint:#35181a}}
+:root[data-theme="dark"] .app-erp{--bg:#0e1014;--surface:#181b20;--text:#f3f4f6;--muted:#9099a5;--border:#262a31;--primary:#4f8cff;--primary-hover:#6ba0ff;--primary-soft:#1b2740;--primary-fg:#0e1014;--positive:#16a34a;--negative:#f87171;--warning:#d97706;--control:#454b55;--pos-tint:#10261a;--warn-tint:#33230f;--neg-tint:#35181a}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--sh-bg);color:var(--sh-fg);font-family:var(--sans);font-size:14px;line-height:1.5;display:flex;flex-direction:column;overflow-x:hidden;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary,var(--sh-fg));outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.gut{padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+
+/* ───────── Prototype bar (neutral, not part of either product) ───────── */
+.bar{flex:none;border-bottom:1px solid var(--sh-line);background:var(--sh-bg)}
+.bar-in{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding-block:8px;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+.seg{display:inline-flex;border:1px solid var(--sh-line);border-radius:999px;background:var(--sh-chip);padding:2px;gap:2px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600;min-height:34px;color:var(--sh-muted)}
+.seg button[aria-pressed="true"]{background:var(--sh-chip-on);color:var(--sh-chip-on-fg)}
+.bar-tools{display:flex;gap:6px;align-items:center}
+.ibtn{border:1px solid var(--sh-line);background:var(--sh-chip);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;min-height:34px}
+.fixture{font-size:12px;color:var(--sh-warn);background:var(--sh-warn-bg);padding:4px 10px;border-radius:999px;font-weight:600}
+.stage{flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center}
+
+/* ───────── Phone frame (desktop only; on a phone the app is the screen) ───────── */
+.phone{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+@media (min-width:760px){.stage.is-station{align-items:center;padding-block:14px}.phone{width:390px;height:min(844px,100%);border-radius:38px;border:8px solid #0b121c;box-shadow:0 24px 60px rgb(0 0 0/.25)}}
+
+.app{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text);position:relative;width:100%}
+.app-erp{font-size:14px}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+h1,h2,h3,p{margin:0}
+.muted{color:var(--muted)}
+.row{display:flex;align-items:center;gap:8px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.stack{display:flex;flex-direction:column;gap:12px}
+.hide{display:none!important}
+
+/* shared controls (each identity re-skins through tokens) */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--control);background:var(--surface);color:var(--text);border-radius:var(--r-sm);min-height:var(--tap);padding:0 16px;font-weight:600;font-size:15px;text-decoration:none}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-fg,#fff)}
+.app-station .btn.primary{background:var(--cta-bg);border-color:var(--cta-bg);color:var(--cta-fg);min-height:56px;font-size:17px;font-weight:700;border-radius:var(--r)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--primary)}
+.btn.danger{border-color:var(--negative);color:var(--negative)}
+.btn.sm{min-height:32px;padding:0 10px;font-size:13px}
+.app-station .btn.sm{min-height:44px;font-size:14px}
+.btn.block{width:100%}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.badge.pos{background:var(--pos-tint);color:var(--positive)}.badge.warn{background:var(--warn-tint);color:var(--warning)}.badge.neg{background:var(--neg-tint);color:var(--negative)}.badge.neu{background:var(--primary-soft);color:var(--primary)}.badge.mut{border:1px solid var(--border);color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.lbl{font-size:13px;font-weight:600;color:var(--text)}
+.field .hint{font-size:12px;color:var(--muted)}
+.field .err{font-size:12px;color:var(--negative);font-weight:600}
+.inp{width:100%;min-height:var(--tap);border:1px solid var(--control);border-radius:var(--r-sm);background:var(--surface);color:var(--text);padding:0 12px;font-size:16px}
+textarea.inp{min-height:84px;padding:10px 12px}
+.inp.bad{border-color:var(--negative)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.app-station .card{box-shadow:var(--shadow);border-color:var(--border)}
+.pad{padding:16px}
+.note{border-radius:var(--r-sm);padding:10px 12px;font-size:13px;background:var(--primary-soft);color:var(--text)}
+.note.warn{background:var(--warn-tint)}.note.neg{background:var(--neg-tint)}.note.pos{background:var(--pos-tint)}
+
+/* prototype annotations: what is real vs designed */
+.tag{display:inline-flex;gap:4px;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px dashed var(--control);color:var(--muted);white-space:nowrap}
+.tag.real{border-style:solid;border-color:var(--positive);color:var(--positive)}
+.tag.dec{border-color:var(--warning);color:var(--warning)}
+.annot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-block:4px}
+.sheet{position:absolute;inset:0;background:rgb(10 18 30/.55);display:flex;align-items:flex-end;justify-content:center;z-index:40}
+.sheet-in{background:var(--surface);color:var(--text);width:100%;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-bottom,0px))}
+.app-erp .sheet{align-items:center}.app-erp .sheet-in{max-width:560px;border-radius:var(--r);max-height:88%}
+.toast{position:absolute;inset-inline:16px;bottom:84px;background:var(--text);color:var(--bg);border-radius:var(--r-sm);padding:12px 14px;font-weight:600;z-index:50;box-shadow:var(--shadow)}
+.app-erp .toast{bottom:20px;inset-inline:auto 20px;max-width:360px}
+.spin{width:18px;height:18px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+<style>
+html,body{height:100dvh}
+#root{flex:1;min-height:0;display:flex;flex-direction:column}
+.tag.local{border-style:solid;border-color:var(--primary);color:var(--primary)}
+body:not(.show-tags) .tag-inline{display:none!important}
+.flip{display:inline-grid}[dir="rtl"] .flip svg{transform:scaleX(-1)}
+.ico{flex:none}
+/* station */
+.st-top{flex:none;background:var(--navy);color:var(--on-navy);padding:max(12px,env(safe-area-inset-top,0px)) 16px 14px}
+.st-top h1{font-size:20px;font-weight:700;line-height:1.3}
+.st-top .sub{color:var(--on-navy-muted);font-size:13px}
+.st-ib{border:0;background:rgb(255 255 255/.12);color:inherit;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none}
+.st-chip{display:inline-flex;align-items:center;gap:6px;background:rgb(255 255 255/.12);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--on-navy)}
+.st-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+.st-nav{flex:none;display:flex;background:var(--surface);border-top:1px solid var(--border);padding-bottom:max(6px,env(safe-area-inset-bottom,0px))}
+.st-nav button{flex:1;border:0;background:transparent;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted)}
+.st-nav button[aria-current="page"]{color:var(--primary)}
+.opt{display:flex;align-items:center;gap:12px;width:100%;text-align:start;min-height:64px;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text)}
+.opt[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft)}
+.opt:disabled{opacity:.55;cursor:not-allowed}
+.opt .t{font-weight:700;font-size:16px}.opt .s{font-size:13px;color:var(--muted)}
+.dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--control);display:grid;place-items:center}
+.opt[aria-pressed="true"] .dot{border-color:var(--primary);background:var(--primary);color:#fff}
+.steps{display:flex;gap:6px}.steps i{flex:1;height:5px;border-radius:3px;background:var(--border)}.steps i.on{background:var(--accent)}
+.big-in{font-size:34px;font-weight:700;text-align:center;min-height:76px;direction:ltr;font-family:var(--mono)}
+.foot{flex:none;padding:12px 16px max(12px,env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--border);display:flex;gap:10px}
+.foot .btn{flex:1}.foot .btn.back{flex:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:baseline}
+.kv dt{color:var(--muted);font-size:13px}.kv dd{margin:0;font-weight:600;text-align:end;overflow-wrap:anywhere}
+.skel{height:64px;border-radius:var(--r-sm);background:linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%);background-size:200% 100%;animation:sk 1.2s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+.empty{text-align:center;padding:32px 16px;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+.pump{padding:12px;display:flex;flex-direction:column;gap:10px}
+.nz{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nz .opt{min-height:72px;flex-direction:column;align-items:flex-start;gap:2px}
+.vbox{border:1.5px dashed var(--control);border-radius:var(--r);min-height:150px;display:grid;place-items:center;background:var(--bg);overflow:hidden}
+.vbox img{max-width:100%;max-height:320px;display:block}
+.fcard{display:block;width:100%;text-align:start;padding:14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow);color:var(--text)}
+.ov{position:absolute;inset:0;background:rgb(10 18 30/.6);display:grid;place-items:center;z-index:45;color:#fff;font-weight:700;text-align:center;gap:10px}
+.rc{padding:12px;display:flex;flex-direction:column;gap:6px}
+.rc.over{border-color:var(--negative)}.rc.rem{border-color:var(--warning)}.rc.ok{border-color:var(--positive)}
+.sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.sum3 b{display:block;font-size:18px}.sum3 span{font-size:11px;color:var(--muted)}
+/* erp */
+.erp-wrap{flex:1;min-height:0;display:flex}
+.erp-side{flex:none;width:240px;overflow:auto;background:var(--surface);border-inline-end:1px solid var(--border);padding:8px}
+.erp-side .grp{font-size:11px;font-weight:700;color:var(--muted);padding:14px 10px 4px}
+.erp-side button,.erp-chips button{display:flex;width:100%;align-items:center;gap:8px;border:0;background:transparent;padding:8px 10px;border-radius:var(--r-sm);font-size:14px;text-align:start;color:var(--text);min-height:36px}
+.erp-side button[aria-current="page"],.erp-chips button[aria-current="page"]{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.erp-side button[aria-disabled="true"],.erp-chips button[aria-disabled="true"]{color:var(--muted);cursor:default}
+.erp-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.erp-top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.erp-top .crumb{font-size:13px;color:var(--muted)}
+.erp-chips{display:none}
+.erp-pg{padding:16px;display:flex;flex-direction:column;gap:16px;max-width:1180px;width:100%;margin-inline:auto}
+.pg-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.pg-h h1{font-size:20px;font-weight:700}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--muted);text-align:start;font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tr.clk{cursor:pointer}tr.clk:hover{background:var(--primary-soft)}
+td.n,th.n{text-align:end}
+tfoot td{font-weight:700;background:var(--bg)}
+.tbl-d{overflow-x:auto}
+.cards-m{display:none;flex-direction:column;gap:8px}
+.mcard{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:6px;text-align:start;width:100%;color:var(--text)}
+.mcard .mc-title{font-weight:700}.mcard .mc-row{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.mcard.clk{cursor:pointer}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--border)}
+.tabs button{border:0;background:none;padding:10px 12px;min-height:44px;white-space:nowrap;font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{padding:14px}.stat .v{font-size:22px;font-weight:700;margin-top:2px}.stat .l{font-size:12px;color:var(--muted)}
+.calc{display:flex;flex-direction:column}
+.calc .ln{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.calc .ln.tot{font-weight:700;font-size:16px;border-bottom:0;padding-top:12px}
+.calc .ln .src{font-size:12px;color:var(--muted)}
+.sec{padding:16px;display:flex;flex-direction:column;gap:12px}
+.sec h2{font-size:15px;font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rad{display:flex;gap:8px;flex-wrap:wrap}
+.rad button{border:1px solid var(--control);background:var(--surface);border-radius:var(--r-sm);padding:0 14px;min-height:var(--tap);font-weight:600}
+.rad button[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.sheet-h h2{font-size:17px}
+.stmt{background:#fff;color:#111;border:1px solid var(--border);border-radius:var(--r);padding:24px;display:flex;flex-direction:column;gap:14px;font-size:13px}
+.stmt table th{background:#f3f4f6;color:#444}.stmt td{border-color:#e5e7eb}
+.stmt h3{font-size:16px}
+@media (max-width:899px){.erp-side{display:none}.erp-chips{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex:none}.erp-chips button{width:auto;white-space:nowrap;border:1px solid var(--border);border-radius:999px}}
+@media (max-width:719px){.tbl-d{display:none}.cards-m{display:flex}.grid2{grid-template-columns:1fr}.erp-pg{padding:12px}}
+@media print{
+  html,body,#root,.stage,.phone,.app,.erp-wrap,.erp-main,.scroll{height:auto!important;overflow:visible!important;display:block!important}
+  .bar,.erp-side,.erp-chips,.erp-top,.noprint,.tabs,.toast,.sheet,.pg-h{display:none!important}
+  body{background:#fff}.stmt{border:0;padding:0}
+}
+</style>
+</head><body><div id="root"></div>
+<script>
+/* ═══════ Tanker Owners — interactive UX prototype ═══════
+   PROTOTYPE ONLY: all data below is fictional and lives in memory. Nothing here calls an API,
+   moves stock, posts an entry or touches a tenant. Money values are illustrative. */
+const TODAY='2026-11-09';
+const S={app:'station',lang:'ar',theme:'auto',sim:'ok',tags:true,about:false,
+  st:{tab:'home',view:null,wiz:null,sel:null,fFilter:'shift',saving:false,checking:false,shift:{state:'open',close:{},confirm:false},flash:null,okNote:null},
+  erp:{page:'owners',oid:null,tab:'overview',q:'',status:'all',dlg:null,settle:{},toast:null,lq:''}};
+
+/* i18n: every string is written as an (ar,en) pair at the call site; a missing English string renders as ⟦…⟧ so tests can detect it */
+const X=(a,e)=>{const v=S.lang==='ar'?a:e;return v==null?'⟦'+a+'⟧':v};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const AR_D='٠١٢٣٤٥٦٧٨٩',FA_D='۰۱۲۳۴۵۶۷۸۹';
+const normD=s=>String(s).replace(/[٠-٩]/g,d=>AR_D.indexOf(d)).replace(/[۰-۹]/g,d=>FA_D.indexOf(d)).replace(/٫/g,'.').replace(/،/g,',');
+const fmt=(n,d=0)=>new Intl.NumberFormat('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+const LIT=n=>`<span class="num ltr">${fmt(n,Number.isInteger(n)?0:1)}</span> ${X('لتر','L')}`;
+const SAR=(n,d=2)=>`<span class="num ltr">${fmt(n,d)} ⃁</span>`;
+const LTR=s=>`<span class="ltr num">${esc(s)}</span>`;
+const MON={ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],en:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']};
+const dstr=(s,time)=>{const [d,t]=String(s).split(' ');const [y,m,dd]=d.split('-').map(Number);const base=`${dd} ${MON[S.lang][m-1]} ${y}`;return time&&t?`${base} · ${t}`:base};
+const nm=o=>S.lang==='ar'?o.name[0]:o.name[1];
+const tg=k=>({real:`<span class="tag tag-inline real">✓ ${X('موجود في النظام','Exists in system')}</span>`,local:`<span class="tag tag-inline local">${X('مبني محليًا — غير مدموج','Built locally — not merged')}</span>`,proto:`<span class="tag tag-inline">${X('تصميم فقط','Design only')}</span>`,dec:`<span class="tag tag-inline dec">${X('قرار مفتوح','Open decision')}</span>`})[k];
+
+/* ───── icons ───── */
+const IC={back:'<path d="M15 5l-7 7 7 7"/>',chev:'<path d="M9 5l7 7-7 7"/>',home:'<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',truck:'<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8M6 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>',clip:'<path d="M9 4h6l1 2h3v15H5V6h3zM9 12h6M9 16h4"/>',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/>',file:'<path d="M7 3h7l4 4v14H7zM14 3v4h4"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',alert:'<path d="M12 4l10 17H2zM12 10v5M12 18v.5"/>',print:'<path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/>',search:'<path d="M11 18a7 7 0 100-14 7 7 0 000 14zM20 20l-4-4"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',info:'<path d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5v.5"/>',ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>'};
+const ico=(k,s=20)=>`<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
+
+/* ───── fictional master data (names are samples, phones are 05000000xx) ───── */
+const PRICE=1.5; // illustrative SAR/L — the real pricing source is an OPEN DECISION (D-A3)
+const OWN=[
+  {id:'o1',name:['عسكر (مثال)','Askar (sample)'],phone:'0500000001',status:'active',note:''},
+  {id:'o2',name:['سلطان (مثال)','Sultan (sample)'],phone:'0500000002',status:'active',note:''},
+  {id:'o3',name:['ماجد (مثال)','Majed (sample)'],phone:'0500000003',status:'inactive',note:''}];
+const TNK=[
+  {id:'t1',oid:'o1',plate:'TNK-1001',cap:20000,active:true},
+  {id:'t2',oid:'o1',plate:'TNK-1002',cap:12000,active:true},
+  {id:'t3',oid:'o2',plate:'TNK-2001',cap:30000,active:true},
+  {id:'t9',oid:'org',plate:'ORG-0001',cap:10000,active:true}];
+const CO=[{id:'c1',name:['كيفير (مثال)','Kefir (sample)']},{id:'c2',name:['شركة الندى (مثال)','Nada Co. (sample)']},{id:'c3',name:['مؤسسة الواحة (مثال)','Oasis Est. (sample)']},{id:'c4',name:['شركة الريان (مثال)','Rayyan Co. (sample)']}];
+const LNK=[
+  {id:'l1',oid:'o1',cid:'c1',from:'2026-01-01',to:null},
+  {id:'l2',oid:'o1',cid:'c2',from:'2026-06-01',to:null},
+  {id:'l3',oid:'o1',cid:'c3',from:'2026-01-01',to:'2026-05-31'},
+  {id:'l4',oid:'o2',cid:'c3',from:'2026-06-01',to:null}];
+const PROD={d:['ديزل','Diesel'],g:['بنزين 91','Gasoline 91']};
+const NOZ=[{id:'p1-1',pump:1,n:1,prod:'d',open:125430.0},{id:'p1-2',pump:1,n:2,prod:'g',open:88120.5},{id:'p2-1',pump:2,n:1,prod:'d',open:240115.0},{id:'p2-2',pump:2,n:2,prod:'d',open:97660.0}];
+const nozLabel=z=>X(`مضخة ${z.pump} · فوهة ${z.n}`,`Pump ${z.pump} · Nozzle ${z.n}`);
+const nozById=id=>NOZ.find(z=>z.id===id);
+const FILLS=[
+  {id:'f3',no:'TF-000123',oid:'o2',tid:'t3',nz:'p2-1',l:12000,paper:'7710',at:'2026-11-09 09:05',att:{name:'voucher-7710.jpg',sample:true,by:['موظف تجريبي','Demo employee'],at:'2026-11-09 09:06'}},
+  {id:'f2',no:'TF-000122',oid:'o1',tid:'t1',nz:'p1-1',l:3000,paper:'4053',at:'2026-11-09 11:15',att:null},
+  {id:'f1',no:'TF-000121',oid:'o1',tid:'t1',nz:'p1-1',l:2000,paper:'4052',at:'2026-11-09 07:40',att:{name:'voucher-4052.jpg',sample:true,by:['موظف تجريبي','Demo employee'],at:'2026-11-09 07:42'}},
+  {id:'f0',no:'TF-000118',oid:'o1',tid:'t2',nz:'p1-1',l:5000,paper:'4049',at:'2026-11-03 14:20',att:{name:'voucher-4049.jpg',sample:true,by:['موظف تجريبي','Demo employee'],at:'2026-11-03 14:22'}}
+].sort((a,b)=>b.at.localeCompare(a.at));
+const SUP=[
+  {id:'s1',oid:'o1',cid:'c1',l:7000,date:'2026-11-04',inv:'INV-2031',total:20000,paid:20000},
+  {id:'s2',oid:'o1',cid:'c2',l:2000,date:'2026-11-06',inv:'INV-2044',total:3000,paid:2500},
+  {id:'s3',oid:'o2',cid:'c3',l:12000,date:'2026-11-09',inv:null,total:0,paid:0,sales:null}];
+const COL=[
+  {id:'PAY-3011',inv:'INV-2031',cid:'c1',amt:8000,date:'2026-11-05',oid:'o1'},
+  {id:'PAY-3017',inv:'INV-2031',cid:'c1',amt:12000,date:'2026-11-08',oid:'o1'},
+  {id:'PAY-3020',inv:'INV-2044',cid:'c2',amt:2500,date:'2026-11-08',oid:null}];
+const COMM={o1:{mode:'auto',pct:5,manual:0,reason:''},o2:{mode:'auto',pct:5,manual:0,reason:''},o3:{mode:'none',pct:0,manual:0,reason:''}};
+const coName=id=>nm(CO.find(c=>c.id===id));
+const ownById=id=>OWN.find(o=>o.id===id);
+const tnkById=id=>TNK.find(t=>t.id===id);
+const ownName=id=>id==='org'?X('المؤسسة (صرف داخلي)','Organization (internal)'):nm(ownById(id));
+const monthFills=oid=>FILLS.filter(f=>f.oid===oid&&f.at.startsWith('2026-11'));
+function calc(oid){
+  const liters=monthFills(oid).reduce((a,f)=>a+f.l,0);
+  const withdrawals=liters*PRICE;
+  const coll=COL.filter(c=>c.oid===oid).reduce((a,c)=>a+c.amt,0);
+  const pend=COL.filter(c=>c.oid===null&&LNK.some(l=>l.oid===oid&&l.cid===c.cid&&!l.to)).reduce((a,c)=>a+c.amt,0);
+  const cm=COMM[oid]||{mode:'none',pct:0,manual:0};
+  const commission=cm.mode==='auto'?coll*cm.pct/100:cm.mode==='manual'?Number(cm.manual)||0:0;
+  const paid=(S.erp.settle[oid]==='paid')?(coll-withdrawals-commission):0;
+  const net=coll-withdrawals-commission;
+  return {liters,withdrawals,coll,pend,commission,net,paid,due:net-paid,opening:0,adj:0};
+}
+const supBal=oid=>{const out=FILLS.filter(f=>f.oid===oid&&f.at.startsWith('2026-11')).reduce((a,f)=>a+f.l,0);const dist=SUP.filter(s=>s.oid===oid).reduce((a,s)=>a+s.l,0);return {out,dist,rest:out-dist}};
+
+/* ═══════ Station app (identity: navy + orange, bottom nav, 52px+ touch targets) ═══════ */
+const newWiz=(keep)=>Object.assign({step:1,mode:'owner',oq:'',owner:null,tanker:null,noz:null,liters:'',paper:'',file:null,errs:{},out:null,committed:null,replayed:false},keep||{});
+const fillCount=()=>FILLS.filter(f=>f.at.startsWith(TODAY));
+const stTop=(title,back,sub)=>`<header class="st-top"><div class="row">${back?`<button class="st-ib flip" data-act="st-back" aria-label="${X('رجوع','Back')}">${ico('back')}</button>`:''}<div class="grow"><h1>${title}</h1>${sub?`<div class="sub">${sub}</div>`:''}</div></div></header>`;
+const skel=n=>Array.from({length:n},()=>'<div class="skel"></div>').join('');
+function stState(okFn){
+  if(S.sim==='loading')return `<div class="st-body" aria-busy="true">${skel(4)}</div>`;
+  if(S.sim==='error')return `<div class="st-body"><div class="note neg"><b>${X('تعذّر تحميل البيانات','Could not load data')}</b><p>${X('تحقق من الاتصال ثم أعد المحاولة.','Check your connection and retry.')}</p></div><button class="btn block" data-act="sim-ok">${X('إعادة المحاولة','Retry')}</button></div>`;
+  if(S.sim==='empty')return `<div class="st-body"><div class="empty">${ico('clip',36)}<b>${X('لا توجد تعبئات بعد','No fills yet')}</b><span>${X('ابدأ بتسجيل أول تعبئة لصهريج.','Start by recording the first tanker fill.')}</span></div></div>`;
+  return okFn();
+}
+function stNav(){
+  const it=[['home','home',X('الرئيسية','Home')],['fills','truck',X('تعبئات الصهاريج','Tanker fills')],['shift','clip',X('الوردية','Shift')]];
+  return `<nav class="st-nav" aria-label="${X('التنقل','Navigation')}">${it.map(([k,i,l])=>`<button data-act="st-tab" data-id="${k}" ${S.st.tab===k&&!S.st.view?'aria-current="page"':''}>${ico(i,24)}<span>${l}</span></button>`).join('')}</nav>`;
+}
+function stScreen(){
+  const s=S.st;let top='',body='',foot='',nav=true;
+  if(s.view==='wizard'){const w=s.wiz;nav=false;({top,body,foot}=wizScreen(w))}
+  else if(s.view==='success'){nav=false;top=stTop(X('تم حفظ التعبئة','Fill saved'),false);body=successBody();foot=''}
+  else if(s.view==='detail'){top=stTop(X('تفاصيل التعبئة','Fill details'),true);body=detailBody()}
+  else if(s.tab==='home'){top=homeTop();body=homeBody()}
+  else if(s.tab==='fills'){top=stTop(X('تعبئات الصهاريج','Tanker fills'),false,X('محطة الدمام — تجريبية','Dammam Station — demo'));body=fillsBody()}
+  else {top=stTop(X('الوردية','Shift'),false,X('مطابقة التعبئات مع العدادات','Reconcile fills with meters'));body=shiftBody()}
+  return `<div class="app app-station">${top}<div class="scroll" id="stScroll">${body}</div>${foot||''}${nav?stNav():''}${s.saving||s.checking?`<div class="ov" role="status"><span class="spin" style="width:34px;height:34px;border-width:3px"></span><div>${s.checking?X('جارٍ التحقق من الحالة…','Checking status…'):X('جارٍ الحفظ…','Saving…')}</div></div>`:''}${s.flash?`<div class="toast" role="status">${esc(s.flash)}</div>`:''}</div>`;
+}
+/* ── home ── */
+function homeTop(){return `<header class="st-top"><div class="row between"><div><div class="sub">${X('مرحبًا','Welcome')}</div><h1>${X('موظف تجريبي','Demo employee')}</h1></div><span class="st-chip">${X('محطة الدمام — تجريبية','Dammam Station — demo')}</span></div></header>`}
+function homeBody(){
+  const fc=fillCount(),liters=fc.reduce((a,f)=>a+f.l,0),closed=S.st.shift.state==='closed';
+  return `<div class="st-body">
+   <div class="card pad stack"><div class="row between"><b>${X('الوردية الحالية','Current shift')}</b><span class="badge ${closed?'mut':'pos'}">${closed?X('أُغلقت','Closed'):X('مفتوحة منذ 06:00','Open since 06:00')}</span></div>
+     <div class="sum3"><div><b class="num">${fc.length}</b><span>${X('تعبئات الصهاريج','Tanker fills')}</span></div><div><b class="num ltr">${fmt(liters)}</b><span>${X('لتر','Litres')}</span></div><div><b class="num">${fc.filter(f=>!f.att).length}</b><span>${X('بلا مرفق','No attachment')}</span></div></div>
+     <div class="annot">${tg('real')}</div></div>
+   <button class="btn primary block" data-act="wiz-start" ${closed?'disabled':''}>${ico('truck',24)} ${X('تعبئة صهريج جديدة','New tanker fill')}</button>
+   ${closed?`<div class="note">${X('الوردية مغلقة — لا يمكن تسجيل تعبئات جديدة.','The shift is closed — new fills cannot be recorded.')}</div>`:''}
+   <div class="annot">${tg('proto')}</div>
+   <button class="opt" data-act="st-tab" data-id="fills">${ico('clip',24)}<div class="grow"><div class="t">${X('سجل تعبئات الصهاريج','Tanker fills log')}</div><div class="s">${X('كل التعبئات مع رقم السند والمرفق','All fills with voucher number and attachment')}</div></div><span class="flip">${ico('chev')}</span></button>
+   <button class="opt" data-act="st-tab" data-id="shift">${ico('check',24)}<div class="grow"><div class="t">${X('مطابقة الوردية','Shift reconciliation')}</div><div class="s">${X('قارن مجموع التعبئات بفرق عداد كل فوهة','Compare fill totals with each nozzle meter delta')}</div></div><span class="flip">${ico('chev')}</span></button>
+  </div>`;
+}
+/* ── wizard ── */
+const wizTitles=()=>[X('صاحب الصهريج','Tanker owner'),X('المضخة والفوهة','Pump & nozzle'),X('الكمية والسند','Quantity & voucher'),X('مراجعة وحفظ','Review & save')];
+function wizScreen(w){
+  const t=wizTitles();
+  const top=`<header class="st-top"><div class="row"><button class="st-ib flip" data-act="wiz-back" aria-label="${X('رجوع','Back')}">${ico('back')}</button><div class="grow"><div class="sub">${X(`الخطوة ${w.step} من 4`,`Step ${w.step} of 4`)}</div><h1>${t[w.step-1]}</h1></div></div><div class="steps" style="margin-top:12px" aria-hidden="true">${[1,2,3,4].map(i=>`<i class="${i<=w.step?'on':''}"></i>`).join('')}</div></header>`;
+  const body=[wizStep1,wizStep2,wizStep3,wizStep4][w.step-1](w);
+  const last=w.step===4;
+  const dis=(w.step===1&&!w.tanker)||(w.step===2&&!w.noz);
+  const foot=`<div class="foot">${last?`<button class="btn primary" data-act="wiz-save" ${w.out&&w.out.kind==='unknown'?'disabled':''}>${ico('check',22)} ${X('حفظ التعبئة','Save fill')}</button>`:`<button class="btn primary" data-act="wiz-next" ${dis?'disabled':''}>${X('التالي','Next')}</button>`}</div>`;
+  return {top,body,foot};
+}
+function ownerListHtml(w){
+  const q=normD(w.oq).trim().toLowerCase();
+  const list=OWN.filter(o=>!q||nm(o).toLowerCase().includes(q)||o.phone.includes(q));
+  if(!list.length)return `<div class="empty"><b>${X('لا نتائج','No results')}</b><span>${X('صاحب الصهريج يُضاف من AWJ ERP وليس من التطبيق.','Tanker owners are added in AWJ ERP, not in this app.')}</span></div>`;
+  return list.map(o=>{const n=TNK.filter(t=>t.oid===o.id&&t.active).length,off=o.status!=='active'||!n;
+    return `<button class="opt" data-act="wiz-owner" data-id="${o.id}" aria-pressed="${w.owner===o.id}" ${off?'disabled':''}><span class="dot">${w.owner===o.id?ico('check',14):''}</span><div class="grow"><div class="t">${esc(nm(o))}</div><div class="s">${o.status!=='active'?X('غير نشط','Inactive'):X(`${n} صهريج`,`${n} tanker(s)`)}</div></div></button>`}).join('');
+}
+function wizStep1(w){
+  const owners=w.mode==='owner';
+  const tk=owners?TNK.filter(t=>t.oid===w.owner&&t.active):TNK.filter(t=>t.oid==='org'&&t.active);
+  return `<div class="st-body">
+   <div class="rad" role="group" aria-label="${X('نوع العملية','Operation type')}"><button data-act="wiz-mode" data-id="owner" aria-pressed="${owners}">${X('صاحب صهريج','Tanker owner')}</button><button data-act="wiz-mode" data-id="org" aria-pressed="${!owners}">${X('صرف داخلي للمؤسسة','Internal (organization)')}</button></div>
+   ${owners?`<div class="field"><label for="oq">${X('ابحث بالاسم أو الجوال','Search by name or phone')}</label><input id="oq" class="inp" data-bind="st.wiz.oq" data-after="owners" autocomplete="off" inputmode="search" placeholder="${X('اكتب للبحث','Type to search')}" value="${esc(w.oq)}"></div><div class="stack" id="ownerList">${ownerListHtml(w)}</div>`
+   :`<div class="note">${X('صرف داخلي: لا تُنشأ مبيعات عميل ولا فاتورة آلية — يُسجَّل كنوع عملية مختلف.','Internal issue: no customer sale or automatic invoice — recorded as a different operation type.')}</div>`}
+   ${(owners&&w.owner)||!owners?`<div class="lbl" style="margin-top:4px">${X('الصهريج','Tanker')}</div><div class="stack">${tk.map(t=>`<button class="opt" data-act="wiz-tanker" data-id="${t.id}" aria-pressed="${w.tanker===t.id}"><span class="dot">${w.tanker===t.id?ico('check',14):''}</span><div class="grow"><div class="t">${LTR(t.plate)}</div><div class="s">${X('السعة','Capacity')}: ${LIT(t.cap)}</div></div></button>`).join('')}</div>`:''}
+   ${w.errs.tanker?`<div class="note neg" role="alert">${w.errs.tanker}</div>`:''}
+   <div class="annot">${tg('proto')}${tg('local')}</div>
+  </div>`;
+}
+function wizStep2(w){
+  const pumps=[1,2];
+  return `<div class="st-body"><div class="note">${X('الفوهة تُحدَّد بالمضخة + رقم الفوهة معًا؛ الرقم المحلي قد يتكرر بين المضخات.','A nozzle is identified by pump + nozzle number; the local number can repeat across pumps.')}</div>
+  ${pumps.map(p=>`<div class="card pump"><b>${X(`المضخة ${p}`,`Pump ${p}`)}</b><div class="nz">${NOZ.filter(z=>z.pump===p).map(z=>`<button class="opt" data-act="wiz-noz" data-id="${z.id}" aria-pressed="${w.noz===z.id}"><span class="t">${X(`فوهة ${z.n}`,`Nozzle ${z.n}`)}</span><span class="s">${PROD[z.prod][S.lang==='ar'?0:1]}</span></button>`).join('')}</div></div>`).join('')}
+  ${w.errs.noz?`<div class="note neg" role="alert">${w.errs.noz}</div>`:''}
+  <div class="annot">${tg('proto')}</div></div>`;
+}
+function fileBox(w){
+  if(!w.file)return `<div class="vbox"><span class="muted">${X('لم يُرفق ملف','No file attached')}</span></div>`;
+  const f=w.file;return `<div class="vbox">${f.img?`<img src="${f.url}" alt="${X('معاينة السند','Voucher preview')}">`:`<div class="stack" style="align-items:center">${ico('file',36)}<b class="ltr">${esc(f.name)}</b></div>`}</div>`;
+}
+function wizStep3(w){
+  const t=tnkById(w.tanker),l=parseFloat(normD(w.liters).replace(',','.')),over=t&&l>t.cap;
+  return `<div class="st-body">
+   <div class="field"><label for="lit">${X('الكمية من شاشة المضخة (لتر)','Quantity from the pump display (litres)')}</label><input id="lit" class="inp big-in ${w.errs.liters?'bad':''}" data-bind="st.wiz.liters" data-after="liters" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(w.liters)}"><span class="hint">${X('أدخل الرقم كما يظهر على المضخة. لا ربط إلكتروني بالمضخات.','Enter the number as shown on the pump. No electronic pump link.')}</span>${w.errs.liters?`<span class="err" role="alert">${w.errs.liters}</span>`:''}<div id="capWarn">${over?`<div class="note warn">${X(`الكمية أكبر من سعة الصهريج (${fmt(t.cap)} لتر) — تحقق قبل المتابعة.`,`Quantity exceeds the tanker capacity (${fmt(t.cap)} L) — double-check before continuing.`)}</div>`:''}</div></div>
+   <div class="field"><label for="pap">${X('رقم السند الورقي','Paper voucher number')}</label><input id="pap" class="inp ${w.errs.paper?'bad':''}" data-bind="st.wiz.paper" inputmode="text" autocomplete="off" placeholder="4052" value="${esc(w.paper)}"><span class="hint">${X('يُحفظ منفصلًا عن رقم العملية الإلكتروني الذي يولّده النظام.','Stored separately from the electronic operation number generated by the system.')}</span>${w.errs.paper?`<span class="err" role="alert">${w.errs.paper}</span>`:''}</div>
+   <div class="field"><span class="lbl">${X('صورة السند أو ملف','Voucher photo or file')}</span>${fileBox(w)}
+     <div class="row wrap"><label class="btn grow" for="fCam">${ico('cam',22)} ${X('تصوير بالكاميرا','Take photo')}</label><label class="btn grow" for="fPick">${ico('file',22)} ${X('اختيار من الملفات','Choose file')}</label>${w.file?`<button class="btn danger" data-act="wiz-rmfile">${X('إزالة','Remove')}</button>`:''}</div>
+     <input id="fCam" class="sr" type="file" accept="image/*" capture="environment" data-file="1"><input id="fPick" class="sr" type="file" accept="image/*,application/pdf" data-file="1">
+     <span class="hint">${X('اختياري الآن — يمكن إضافة المرفق لاحقًا دون تغيير وقت التعبئة.','Optional now — can be added later without changing the fill time.')}</span></div>
+   <div class="annot">${tg('proto')}${tg('dec')}</div></div>`;
+}
+function wizStep4(w){
+  const t=tnkById(w.tanker),z=nozById(w.noz),l=parseFloat(normD(w.liters).replace(',','.')),own=w.mode==='owner'?ownName(w.owner):ownName('org');
+  const out=w.out;
+  return `<div class="st-body">
+   ${out&&out.kind==='rejected'?`<div class="note neg" role="alert"><b>${X('رفض الخادم الحفظ — لم يُسجَّل شيء','The server rejected the save — nothing was recorded')}</b><p>${X('رقم السند الورقي مكرر ضمن نطاق الترقيم. عدّل الرقم من الخطوة السابقة.','The paper voucher number repeats within its numbering scope. Edit it in the previous step.')}</p><button class="btn sm" style="margin-top:8px" data-act="wiz-fix">${X('تعديل رقم السند','Edit voucher number')}</button></div>`:''}
+   ${out&&out.kind==='unknown'?`<div class="note warn" role="alert"><b>${X('انقطع الاتصال بعد الإرسال','Connection dropped after sending')}</b><p>${X('قد تكون التعبئة سُجّلت. لا تُعد الإرسال — تحقق من الحالة أولًا حتى لا يتكرر السند أو صرف المخزون.','The fill may have been recorded. Do not resend — check the status first so the voucher and stock issue are not duplicated.')}</p><button class="btn primary" style="margin-top:8px" data-act="wiz-check">${X('تحقق من الحالة','Check status')}</button></div>`:''}
+   <div class="card pad"><dl class="kv"><dt>${X('الجهة','Party')}</dt><dd>${esc(own)}</dd><dt>${X('الصهريج','Tanker')}</dt><dd>${LTR(t.plate)}</dd><dt>${X('المضخة / الفوهة','Pump / nozzle')}</dt><dd>${nozLabel(z)} · ${PROD[z.prod][S.lang==='ar'?0:1]}</dd><dt>${X('الكمية','Quantity')}</dt><dd>${LIT(l)}</dd><dt>${X('رقم السند الورقي','Paper voucher no.')}</dt><dd>${LTR(w.paper)}</dd><dt>${X('المرفق','Attachment')}</dt><dd>${w.file?`<span class="ltr">${esc(w.file.name)}</span>`:X('لا يوجد (يمكن إضافته لاحقًا)','None (can be added later)')}</dd><dt>${X('وقت التعبئة','Fill time')}</dt><dd>${X('يسجّله الخادم عند الحفظ','Recorded by the server on save')}</dd></dl></div>
+   ${w.mode==='org'?`<div class="note">${X('صرف داخلي — لا مبيعات عميل.','Internal issue — no customer sale.')}</div>`:''}
+   <div class="note">${X('لا يمكن تعديل التعبئة بعد الحفظ؛ التصحيح بمسار مضبوط. يُخصم مخزون الخزان مرة واحدة فقط.','A saved fill cannot be edited; corrections use a controlled path. Tank stock is issued exactly once.')}</div>
+   <div class="annot">${tg('proto')}</div></div>`;
+}
+function successBody(){
+  const f=FILLS.find(x=>x.id===S.st.wiz.committed)||FILLS[0];
+  return `<div class="st-body"><div class="empty" style="color:var(--text)"><span class="badge pos" style="padding:14px;border-radius:50%">${ico('check',34)}</span><h2>${X('تم حفظ التعبئة','Fill saved')}</h2><span class="ltr num" style="font-size:20px;font-weight:700">${f.no}</span></div>
+   ${S.st.wiz.replayed?`<div class="note pos">${X('وُجدت التعبئة مسجّلة بالفعل — لم يتكرر السند ولا صرف المخزون.','The fill was already recorded — the voucher and stock issue were not duplicated.')}</div>`:''}
+   <div class="card pad"><dl class="kv"><dt>${X('الجهة','Party')}</dt><dd>${esc(ownName(f.oid))}</dd><dt>${X('الكمية','Quantity')}</dt><dd>${LIT(f.l)}</dd><dt>${X('السند الورقي','Paper voucher')}</dt><dd>${LTR(f.paper)}</dd><dt>${X('المرفق','Attachment')}</dt><dd>${f.att?X('مرفق','Attached'):X('بلا مرفق','None')}</dd></dl></div>
+   <div class="note">${X('نموذج: في النظام الفعلي يصدر الرقم الإلكتروني من الخادم.','Prototype: in the real system the electronic number comes from the server.')}</div>
+   <button class="btn primary block" data-act="wiz-again">${ico('plus',22)} ${X('تعبئة أخرى لنفس الصاحب','Another fill for the same owner')}</button>
+   ${f.att?'':`<button class="btn block" data-act="st-open" data-id="${f.id}">${ico('cam',22)} ${X('إضافة صورة السند','Add voucher photo')}</button>`}
+   <button class="btn block" data-act="st-tab" data-id="fills">${X('عرض سجل التعبئات','View fills log')}</button>
+   <button class="btn ghost block" data-act="st-tab" data-id="home">${X('الرئيسية','Home')}</button></div>`;
+}
+/* ── fills log + detail ── */
+function fillCard(f){return `<button class="fcard" data-act="st-open" data-id="${f.id}"><div class="row between"><b class="ltr num">${f.no}</b><span class="badge ${f.att?'pos':'warn'}">${f.att?X('مرفق','Attached'):X('بلا مرفق','No file')}</span></div><div style="margin-top:6px"><b>${esc(ownName(f.oid))}</b> · ${LTR(tnkById(f.tid).plate)}</div><div class="row between muted" style="margin-top:4px"><span>${nozLabel(nozById(f.nz))}</span><span>${LIT(f.l)}</span></div><div class="row between muted" style="margin-top:2px"><span>${X('سند','Voucher')} ${LTR(f.paper)}</span><span>${dstr(f.at,true)}</span></div></button>`}
+function fillsBody(){
+  return stState(()=>{
+    const F=S.st.fFilter,list=FILLS.filter(f=>F==='shift'?f.at.startsWith(TODAY):F==='noatt'?!f.att:true);
+    const chips=[['shift',X('الوردية الحالية','Current shift')],['month',X('الشهر','This month')],['noatt',X('بلا مرفق','No attachment')]];
+    return `<div class="st-body"><div class="rad">${chips.map(([k,l])=>`<button data-act="st-filter" data-id="${k}" aria-pressed="${F===k}">${l}</button>`).join('')}</div>
+     <div class="card pad sum3"><div><b class="num">${list.length}</b><span>${X('تعبئة','Fills')}</span></div><div><b class="num ltr">${fmt(list.reduce((a,f)=>a+f.l,0))}</b><span>${X('لتر','Litres')}</span></div><div><b class="num">${new Set(list.map(f=>f.oid)).size}</b><span>${X('أصحاب','Owners')}</span></div></div>
+     ${list.length?list.map(fillCard).join(''):`<div class="empty"><b>${X('لا توجد تعبئات في هذا العرض','No fills in this view')}</b></div>`}
+     <div class="annot">${tg('proto')}</div></div>`});
+}
+function attBox(f){
+  if(!f.att)return `<div class="vbox"><span class="muted">${X('لا يوجد مرفق','No attachment')}</span></div>`;
+  const a=f.att;
+  if(a.url&&a.img)return `<div class="vbox"><img src="${a.url}" alt="${X('مرفق السند','Voucher attachment')}"></div>`;
+  if(a.sample)return `<div class="vbox"><svg viewBox="0 0 200 130" width="200" role="img" aria-label="${X('صورة تجريبية لسند ورقي','Sample voucher image')}"><rect x="8" y="6" width="184" height="118" rx="6" fill="#fff" stroke="#b9c2cf"/><rect x="20" y="18" width="70" height="8" rx="2" fill="#cbd3de"/><rect x="20" y="38" width="160" height="5" rx="2" fill="#dfe4ec"/><rect x="20" y="52" width="160" height="5" rx="2" fill="#dfe4ec"/><rect x="20" y="66" width="120" height="5" rx="2" fill="#dfe4ec"/><text x="24" y="104" font-size="14" font-family="monospace" fill="#142238">${esc(f.paper)}</text></svg></div>`;
+  return `<div class="vbox"><div class="stack" style="align-items:center">${ico('file',36)}<b class="ltr">${esc(a.name)}</b></div></div>`;
+}
+function detailBody(){
+  const f=FILLS.find(x=>x.id===S.st.sel);if(!f)return '';
+  return `<div class="st-body"><div class="card pad"><dl class="kv"><dt>${X('الرقم الإلكتروني','Electronic no.')}</dt><dd class="ltr num">${f.no}</dd><dt>${X('رقم السند الورقي','Paper voucher no.')}</dt><dd>${LTR(f.paper)}</dd><dt>${X('الجهة','Party')}</dt><dd>${esc(ownName(f.oid))}</dd><dt>${X('الصهريج','Tanker')}</dt><dd>${LTR(tnkById(f.tid).plate)}</dd><dt>${X('المضخة / الفوهة','Pump / nozzle')}</dt><dd>${nozLabel(nozById(f.nz))}</dd><dt>${X('الكمية','Quantity')}</dt><dd>${LIT(f.l)}</dd><dt>${X('وقت التعبئة','Fill time')}</dt><dd>${dstr(f.at,true)}</dd><dt>${X('سجّلها','Recorded by')}</dt><dd>${X('موظف تجريبي','Demo employee')}</dd></dl></div>
+   <div class="card pad stack"><b>${X('مرفق السند','Voucher attachment')}</b>${attBox(f)}
+    ${f.att?`<div class="note">${X('أضافه','Added by')}: ${esc(S.lang==='ar'?f.att.by[0]:f.att.by[1])} · ${dstr(f.att.at,true)}${f.att.late?`<br>${X('أُضيف بعد إنشاء التعبئة — وقت التعبئة لم يتغيّر.','Added after the fill was created — the fill time is unchanged.')}`:''}</div>`
+     :`<label class="btn block" for="addAtt">${ico('cam',22)} ${X('إضافة صورة أو ملف','Add photo or file')}</label><input id="addAtt" class="sr" type="file" accept="image/*,application/pdf" data-file="late"><span class="hint">${X('بصلاحية الإرفاق اللاحق — يُسجَّل من أضافه ومتى.','With the late-attachment permission — who added it and when is logged.')}</span>`}</div>
+   <button class="btn block" disabled aria-disabled="true">${X('طلب تصحيح (مسار مضبوط — لاحقًا)','Request correction (controlled path — later)')}</button>
+   <div class="annot">${tg('proto')}${tg('dec')}</div></div>`;
+}
+/* ── shift reconciliation ── */
+const pf=v=>{const n=parseFloat(normD(v==null?'':v).replace(',','.'));return isNaN(n)?null:n};
+function reconRows(){
+  return NOZ.map(z=>{const raw=S.st.shift.close[z.id],cl=pf(raw);const fills=FILLS.filter(f=>f.nz===z.id&&f.at.startsWith(TODAY)).reduce((a,f)=>a+f.l,0);
+    let meter=null,state='wait',diff=null;
+    if(cl!=null){if(cl<z.open){state='bad'}else{meter=Math.round((cl-z.open)*10)/10;diff=Math.round((meter-fills)*10)/10;state=fills===0?'none':diff===0?'ok':diff<0?'over':'rem'}}
+    return {z,raw,cl,fills,meter,diff,state}});
+}
+function reconOutHtml(){
+  const rows=reconRows();
+  const lbl={ok:[X('مطابق','Matches'),'pos'],rem:[X('متبقٍ على العداد','Meter exceeds fills'),'warn'],over:[X('التعبئات أكثر من العداد','Fills exceed meter'),'neg'],none:[X('لا تعبئات صهاريج','No tanker fills'),'mut'],wait:[X('بانتظار القراءة','Awaiting reading'),'mut'],bad:[X('قراءة أقل من الافتتاح','Below opening reading'),'neg']};
+  const done=rows.filter(r=>r.meter!=null);
+  return `<div class="stack">${rows.map(r=>{const [t,c]=lbl[r.state];const cls=r.state==='over'||r.state==='bad'?'over':r.state==='rem'?'rem':r.state==='ok'?'ok':'';
+    return `<div class="card rc ${cls}"><div class="row between"><b>${nozLabel(r.z)} · ${PROD[r.z.prod][S.lang==='ar'?0:1]}</b><span class="badge ${c}">${t}</span></div>
+    <div class="sum3"><div><b class="num ltr">${r.meter==null?'—':fmt(r.meter,1)}</b><span>${X('فرق العداد','Meter delta')}</span></div><div><b class="num ltr">${fmt(r.fills)}</b><span>${X('مجموع التعبئات','Fills total')}</span></div><div><b class="num ltr">${r.diff==null?'—':(r.diff>0?'+':'')+fmt(r.diff,1)}</b><span>${X('الفرق','Difference')}</span></div></div></div>`}).join('')}</div>
+   ${done.length?`<div class="card pad sum3"><div><b class="num ltr">${fmt(done.reduce((a,r)=>a+r.meter,0),1)}</b><span>${X('إجمالي العدادات','Meters total')}</span></div><div><b class="num ltr">${fmt(rows.reduce((a,r)=>a+r.fills,0))}</b><span>${X('إجمالي التعبئات','Fills total')}</span></div><div><b class="num ltr">${fmt(done.reduce((a,r)=>a+r.diff,0),1)}</b><span>${X('إجمالي الفرق','Total difference')}</span></div></div>`:''}`;
+}
+function shiftBody(){
+  return stState(()=>{
+    const sh=S.st.shift;
+    if(sh.state==='closed')return `<div class="st-body"><div class="note pos"><b>${X('أُغلقت الوردية','Shift closed')}</b><p>${X('الفروق (إن وُجدت) أُحيلت للمراجعة ولم تُسوَّ آليًا.','Differences (if any) were sent for review and not settled automatically.')}</p></div>${reconOutHtml()}<div class="annot">${tg('proto')}</div></div>`;
+    const rows=reconRows(),ready=rows.every(r=>r.cl!=null&&r.state!=='bad');
+    return `<div class="st-body">
+     <div class="note">${X('أدخل قراءة النهاية التراكمية لكل فوهة يدويًا. تُقارَن بمجموع التعبئات المرتبطة بالفوهة — ولا تُسوّى الفروق آليًا.','Enter each nozzle’s cumulative closing reading manually. It is compared with the fills linked to that nozzle — differences are never settled automatically.')}</div>
+     <div class="stack">${NOZ.map(z=>`<div class="card pad"><div class="row between"><b>${nozLabel(z)}</b><span class="muted">${X('الافتتاح','Opening')}: <span class="ltr num">${fmt(z.open,1)}</span></span></div><div class="field" style="margin-top:8px"><label for="cl-${z.id}">${X('قراءة النهاية','Closing reading')}</label><input id="cl-${z.id}" class="inp" inputmode="decimal" autocomplete="off" data-bind="st.shift.close.${z.id}" data-after="recon" value="${esc(S.st.shift.close[z.id]||'')}" style="direction:ltr;text-align:start"></div></div>`).join('')}</div>
+     <div class="row wrap"><button class="btn sm" data-act="demo-match">${X('قيم تجريبية: متطابقة','Demo values: matching')}</button><button class="btn sm" data-act="demo-diff">${X('قيم تجريبية: بها فرق','Demo values: with difference')}</button><span class="tag">${X('للنموذج فقط','prototype only')}</span></div>
+     <b>${X('المطابقة','Reconciliation')}</b><div id="reconOut">${reconOutHtml()}</div>
+     <button class="btn primary block" data-act="shift-review" ${ready?'':'disabled'}>${X('مراجعة وإغلاق الوردية','Review & close shift')}</button>
+     <div class="annot">${tg('proto')}${tg('dec')}</div></div>`});
+}
+function shiftSheet(){
+  if(!S.st.shift.confirm)return '';
+  const rows=reconRows(),bad=rows.filter(r=>r.state==='over'||r.state==='rem');
+  return `<div class="sheet" data-act="sheet-bg"><div class="sheet-in" role="dialog" aria-modal="true"><div class="sheet-h"><h2>${X('تأكيد إغلاق الوردية','Confirm shift close')}</h2></div>
+   ${bad.length?`<div class="note warn">${X(`${bad.length} فوهة بها فرق بين العداد والتعبئات. ستُعرض للمراجعة ولا تُسوّى آليًا.`,`${bad.length} nozzle(s) differ between meter and fills. They go to review and are not settled automatically.`)}</div>`:`<div class="note pos">${X('كل الفوهات مطابقة.','All nozzles match.')}</div>`}
+   <div class="stack" style="margin-top:12px"><button class="btn primary block" data-act="shift-close">${X('إغلاق الوردية','Close shift')}</button><button class="btn block" data-act="shift-cancel">${X('رجوع','Back')}</button></div></div></div>`;
+}
+
+/* ═══════ AWJ ERP (identity: blue accounting tool, grouped sidebar, dense tables) ═══════ */
+const canW=()=>S.sim!=='readonly';
+const wAttr=()=>canW()?'':` disabled aria-disabled="true" title="${X('تحتاج صلاحية fuel.tanker.manage','Requires fuel.tanker.manage')}"`;
+function tbl(cols,rows,o={}){
+  const head=cols.map(c=>`<th class="${c.n?'n':''}">${c.h}</th>`).join('');
+  const val=(c,r)=>c.r?c.r(r):esc(r[c.k]);
+  const body=rows.map(r=>`<tr ${o.act?`class="clk" data-act="${o.act}" data-id="${r.id}" tabindex="0"`:''}>${cols.map(c=>`<td class="${c.n?'n':''}">${val(c,r)}</td>`).join('')}</tr>`).join('');
+  const cards=rows.map(r=>`<div class="mcard ${o.act?'clk':''}" ${o.act?`data-act="${o.act}" data-id="${r.id}"`:''}>${cols.map((c,i)=>i===0?`<div class="mc-title">${val(c,r)}</div>`:`<div class="mc-row"><span class="muted">${c.h}</span><span>${val(c,r)}</span></div>`).join('')}</div>`).join('');
+  return `<div class="tbl-d card"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${o.foot?`<tfoot>${o.foot}</tfoot>`:''}</table></div><div class="cards-m">${cards}${o.mfoot||''}</div>`;
+}
+function erpState(okFn,page){
+  if(S.sim==='gate'&&page!=='reports')return `<div class="card sec" style="align-items:flex-start"><b>${X('الميزة غير مفعّلة لهذا الحساب','This feature is not enabled for this account')}</b><span class="muted">${X('تفعيل «إدارة أصحاب الصهاريج» قرار تفعيل منسّق بموافقة صريحة، ولا يتم من هذه الشاشة.','Enabling tanker management is a coordinated rollout decision with explicit approval and is not done from this screen.')}</span></div>`;
+  if(S.sim==='loading')return `<div class="stack" aria-busy="true">${skel(4)}</div>`;
+  if(S.sim==='error')return `<div class="note neg"><b>${X('تعذّر تحميل البيانات','Could not load data')}</b><p>${X('حدث خطأ أثناء الاتصال بالخادم.','An error occurred while contacting the server.')}</p><button class="btn sm" style="margin-top:8px" data-act="sim-ok">${X('إعادة المحاولة','Retry')}</button></div>`;
+  if(S.sim==='empty')return `<div class="card empty"><b>${X('لا توجد بيانات بعد','No data yet')}</b><span>${X('ستظهر هنا السجلات فور إنشائها.','Records appear here once created.')}</span></div>`;
+  return okFn();
+}
+const stBadge=s=>s==='active'?`<span class="badge pos">${X('نشط','Active')}</span>`:`<span class="badge mut">${X('غير نشط','Inactive')}</span>`;
+const hint=(a,e)=>`<div class="note" style="display:flex;gap:8px;align-items:flex-start">${ico('info',16)}<span>${X(a,e)}</span></div>`;
+
+/* ── shell ── */
+const NAV=()=>[
+  {g:X('محطات الوقود','Fuel stations'),it:[['x1',X('لوحة المحطات','Stations overview'),'real'],['x2',X('الورديات','Shifts'),'real'],['x3',X('استلام الوقود','Fuel receiving'),'real']]},
+  {g:X('الصهاريج','Tankers'),it:[['owners',X('أصحاب الصهاريج','Tanker owners'),'local'],['ledger',X('سجل المسحوبات','Withdrawals ledger'),'proto'],['supplies',X('التوريدات والفواتير','Supplies & invoices'),'proto'],['settle',X('التسويات والمستحقات','Settlements & dues'),'proto'],['reports',X('التقارير','Reports'),'proto']]},
+  {g:X('وحدات أَوْج الرسمية','Official AWJ modules'),it:[['x4',X('المبيعات — الفواتير','Sales — invoices'),'real'],['x5',X('المالية — المقبوضات','Finance — receipts'),'real'],['x6',X('المخزون — الأرصدة','Inventory — balances'),'real']]}];
+function erpShell(inner){
+  const nav=NAV(),cur=S.erp.page==='owner'?'owners':S.erp.page;
+  const btn=([k,l])=>k.startsWith('x')?`<button aria-disabled="true" tabindex="-1" title="${X('موجود في أَوْج — خارج هذا النموذج','Exists in AWJ — outside this prototype')}">${l}</button>`:`<button data-act="erp-page" data-id="${k}" ${cur===k?'aria-current="page"':''}>${l}</button>`;
+  return `<div class="app app-erp"><div class="erp-wrap"><aside class="erp-side" aria-label="${X('القائمة','Menu')}"><div class="row" style="padding:8px 10px 4px"><b style="font-size:16px">AWJ</b><span class="muted" style="font-size:12px">${X('نموذج','prototype')}</span></div>${nav.map(g=>`<div class="grp">${g.g}</div>${g.it.map(i=>btn(i)).join('')}`).join('')}</aside>
+   <main class="erp-main"><div class="erp-top"><span class="crumb">${X('محطات الوقود','Fuel stations')} › ${crumb()}</span><span class="badge neu">${X('المستأجر التجريبي','Demo tenant')}</span></div>
+   <nav class="erp-chips" aria-label="${X('الصفحات','Pages')}">${nav[1].it.map(i=>btn(i)).join('')}</nav>
+   <div class="scroll"><div class="erp-pg">${inner}</div></div></main></div>${erpDialog()}${S.erp.toast?`<div class="toast" role="status">${esc(S.erp.toast)}</div>`:''}</div>`;
+}
+function crumb(){const p=S.erp.page,m={owners:X('أصحاب الصهاريج','Tanker owners'),ledger:X('سجل المسحوبات','Withdrawals ledger'),supplies:X('التوريدات والفواتير','Supplies & invoices'),settle:X('التسويات والمستحقات','Settlements & dues'),reports:X('التقارير','Reports'),owner:X('أصحاب الصهاريج','Tanker owners')};return m[p]+(p==='owner'?' › '+esc(nm(ownById(S.erp.oid))):'')}
+function erpScreen(){
+  const p=S.erp.page;let inner;
+  if(p==='owners')inner=ownersPage();else if(p==='owner')inner=ownerPage();
+  else if(p==='ledger')inner=pageWrap(X('سجل المسحوبات','Withdrawals ledger'),erpState(()=>ledgerTab(null),p),'ledger');
+  else if(p==='supplies')inner=pageWrap(X('التوريدات والفواتير الرسمية','Supplies & official invoices'),erpState(()=>suppliesTab(null),p),'supplies');
+  else if(p==='settle')inner=pageWrap(X('التسويات والمستحقات','Settlements & dues'),erpState(settleList,p),'settle');
+  else inner=reportsPage();
+  return erpShell(inner);
+}
+const pageWrap=(title,body,k)=>`<div class="pg-h"><h1>${title}</h1><div class="annot">${tg('proto')}</div></div>${body}`;
+
+/* ── owners list ── */
+function ownersRows(){
+  const q=normD(S.erp.q).trim().toLowerCase();
+  return OWN.filter(o=>(S.erp.status==='all'||o.status===S.erp.status)&&(!q||nm(o).toLowerCase().includes(q)||o.phone.includes(q)));
+}
+function ownersTable(){
+  const rows=ownersRows();if(!rows.length)return `<div class="card empty"><b>${X('لا نتائج مطابقة','No matching results')}</b><span>${X('عدّل البحث أو الحالة.','Adjust the search or status.')}</span></div>`;
+  return tbl([{h:X('الاسم','Name'),r:o=>`<b>${esc(nm(o))}</b>`},{h:X('الجوال','Phone'),r:o=>LTR(o.phone)},{h:X('الحالة','Status'),r:o=>stBadge(o.status)},{h:X('الصهاريج','Tankers'),n:1,r:o=>`<span class="num">${TNK.filter(t=>t.oid===o.id).length}</span>`},{h:X('الشركات المرتبطة','Linked companies'),n:1,r:o=>`<span class="num">${LNK.filter(l=>l.oid===o.id&&!l.to).length}</span>`},{h:X('لترات الشهر','Month litres'),n:1,r:o=>LIT(calc(o.id).liters)},{h:X('صافي المستحق (توضيحي)','Net due (illustrative)'),n:1,r:o=>SAR(calc(o.id).due)}],rows,{act:'erp-open'});
+}
+function ownersPage(){
+  return `<div class="pg-h"><h1>${X('أصحاب الصهاريج','Tanker owners')}</h1><div class="row"><span class="annot">${tg('local')}</span><button class="btn primary" data-act="dlg" data-id="owner"${wAttr()}>${ico('plus',16)} ${X('إضافة صاحب صهريج','Add tanker owner')}</button></div></div>
+  ${!canW()?`<div class="note">${X('عرض فقط — لا تملك صلاحية الإدارة (fuel.tanker.manage).','View only — you do not have the manage permission (fuel.tanker.manage).')}</div>`:''}
+  ${erpState(()=>`<div class="row wrap"><div class="field grow" style="min-width:200px"><label class="sr" for="oSearch">${X('بحث','Search')}</label><input id="oSearch" class="inp" type="search" placeholder="${X('ابحث بالاسم أو الجوال','Search by name or phone')}" data-bind="erp.q" data-after="ownersT" value="${esc(S.erp.q)}"></div>
+   <select class="inp" style="width:auto" data-bind="erp.status" data-after="ownersT" aria-label="${X('الحالة','Status')}"><option value="all" ${S.erp.status==='all'?'selected':''}>${X('كل الحالات','All statuses')}</option><option value="active" ${S.erp.status==='active'?'selected':''}>${X('نشط','Active')}</option><option value="inactive" ${S.erp.status==='inactive'?'selected':''}>${X('غير نشط','Inactive')}</option></select></div><div id="ownersT">${ownersTable()}</div>
+   ${hint('صاحب الصهريج ملف مستقل وليس عميلًا أو موردًا. الشركات المرتبطة به تبقى عملاء رسميين في أَوْج.','A tanker owner is a standalone profile, not a customer or supplier. Linked companies remain official AWJ customers.')}`,'owners')}`;
+}
+/* ── owner detail ── */
+const TABS=()=>[['overview',X('نظرة عامة','Overview')],['tankers',X('الصهاريج','Tankers')],['links',X('الشركات المرتبطة','Linked companies')],['ledger',X('المسحوبات','Withdrawals')],['supplies',X('التوريدات والفواتير','Supplies & invoices')],['collections',X('التحصيلات','Collections')],['settle',X('التسوية','Settlement')],['statement',X('الكشف','Statement')]];
+function ownerPage(){
+  const o=ownById(S.erp.oid),tab=S.erp.tab;
+  const bodies={overview:overviewTab,tankers:tankersTab,links:linksTab,ledger:()=>ledgerTab(o.id),supplies:()=>suppliesTab(o.id),collections:collectionsTab,settle:settleTab,statement:statementTab};
+  return `<div class="pg-h"><div><button class="btn ghost sm" data-act="erp-back">${X('‹ كل أصحاب الصهاريج','‹ All tanker owners')}</button><h1>${esc(nm(o))} ${stBadge(o.status)}</h1></div><div class="row"><button class="btn" data-act="dlg" data-id="owner-edit"${wAttr()}>${X('تعديل','Edit')}</button></div></div>
+  <div class="tabs" role="tablist">${TABS().map(([k,l])=>`<button role="tab" data-act="erp-tab" data-id="${k}" aria-selected="${tab===k}">${l}</button>`).join('')}</div>
+  ${erpState(()=>bodies[tab](o),'owner')}`;
+}
+function overviewTab(o){
+  const c=calc(o.id),b=supBal(o.id),pending=COL.filter(x=>x.oid===null&&LNK.some(l=>l.oid===o.id&&l.cid===x.cid&&!l.to)),unInv=SUP.filter(s=>s.oid===o.id&&!s.inv);
+  return `<div class="stats"><div class="card stat"><div class="l">${X('لترات الشهر','Litres this month')}</div><div class="v">${LIT(c.liters)}</div></div><div class="card stat"><div class="l">${X('قيمة المسحوبات (توضيحي)','Withdrawals value (illustrative)')}</div><div class="v">${SAR(c.withdrawals)}</div></div><div class="card stat"><div class="l">${X('تحصيلات مؤهلة','Qualifying collections')}</div><div class="v">${SAR(c.coll)}</div></div><div class="card stat"><div class="l">${X('صافي المستحق قبل الدفع','Net due before payout')}</div><div class="v" style="color:${c.net>=0?'var(--positive)':'var(--negative)'}">${SAR(c.net)}</div></div></div>
+  <div class="grid2"><div class="card sec"><h2>${X('يحتاج إجراء','Needs attention')}</h2>
+   ${pending.map(p=>`<div class="row between"><span>${X('تحصيل غير منسوب','Unattributed collection')} <span class="ltr num">${p.id}</span> · ${coName(p.cid)} · ${SAR(p.amt)}</span><button class="btn sm" data-act="erp-tab" data-id="collections">${X('مراجعة','Review')}</button></div>`).join('')}
+   ${unInv.map(s=>`<div class="row between"><span>${X('توريد بلا فاتورة','Supply without invoice')} · ${coName(s.cid)} · ${LIT(s.l)}</span><button class="btn sm" data-act="erp-tab" data-id="supplies">${X('فتح','Open')}</button></div>`).join('')}
+   ${!pending.length&&!unInv.length?`<span class="muted">${X('لا شيء معلّق.','Nothing pending.')}</span>`:''}</div>
+  <div class="card sec"><h2>${X('توزيع الكميات (حسابي)','Quantity distribution (arithmetic)')}</h2><dl class="kv"><dt>${X('مسحوب من المحطة هذا الشهر','Withdrawn from station this month')}</dt><dd>${LIT(b.out)}</dd><dt>${X('موزَّع على شركات','Distributed to companies')}</dt><dd>${LIT(b.dist)}</dd><dt>${X('غير موزَّع','Undistributed')}</dt><dd>${LIT(b.rest)}</dd></dl>${hint('الرقم المتبقي حساب توضيحي — ليس مخزون صهريج مُدارًا داخل أَوْج.','The remainder is an arithmetic figure — not stock managed inside a tanker in AWJ.')}</div></div>
+  <div class="annot">${tg('proto')}${tg('dec')}</div>`;
+}
+function tankersTab(o){
+  const rows=TNK.filter(t=>t.oid===o.id);
+  return `<div class="row between"><h2>${X('صهاريج صاحب الصهريج','Owner’s tankers')}</h2><div class="row"><span class="annot">${tg('local')}</span><button class="btn primary sm" data-act="dlg" data-id="tanker"${o.status!=='active'||!canW()?' disabled':''}>${ico('plus',14)} ${X('إضافة صهريج','Add tanker')}</button></div></div>
+  ${o.status!=='active'?`<div class="note warn">${X('صاحب الصهريج غير نشط — لا يمكن إضافة صهاريج.','The owner is inactive — tankers cannot be added.')}</div>`:''}
+  ${rows.length?tbl([{h:X('اللوحة','Plate'),r:t=>LTR(t.plate)},{h:X('السعة','Capacity'),n:1,r:t=>LIT(t.cap)},{h:X('الحالة','Status'),r:t=>stBadge(t.active?'active':'inactive')}],rows):`<div class="card empty"><b>${X('لا صهاريج بعد','No tankers yet')}</b></div>`}
+  ${hint('المالك ثابت للصهريج؛ لا ينتقل لمالك آخر بتعديل مباشر. السعة معلومة فقط — لا تتبّع مخزون داخل الصهريج.','The owner of a tanker is fixed; it cannot move by direct edit. Capacity is informational only — no stock tracking inside the tanker.')}`;
+}
+function linksTab(o){
+  const rows=LNK.filter(l=>l.oid===o.id);
+  return `<div class="row between"><h2>${X('الشركات الرسمية المرتبطة','Linked official companies')}</h2><div class="row"><span class="annot">${tg('local')}</span><button class="btn primary sm" data-act="dlg" data-id="link"${o.status!=='active'||!canW()?' disabled':''}>${ico('link',14)} ${X('ربط شركة','Link company')}</button></div></div>
+  ${tbl([{h:X('الشركة (عميل أَوْج)','Company (AWJ customer)'),r:l=>`<b>${coName(l.cid)}</b>`},{h:X('من','From'),r:l=>dstr(l.from)},{h:X('إلى','To'),r:l=>l.to?dstr(l.to):'—'},{h:X('الحالة','Status'),r:l=>l.to?`<span class="badge mut">${X('منتهٍ','Ended')}</span>`:`<span class="badge pos">${X('ساري','Active')}</span>`},{h:'',r:l=>l.to?'':`<button class="btn sm danger" data-act="dlg" data-id="endlink:${l.id}"${wAttr()}>${X('إنهاء الربط','End link')}</button>`}],rows)}
+  ${hint('الربط مؤرَّخ؛ إنهاؤه لا يعيد نسب عمليات سابقة، ولا يُحذف ولا يُعاد فتحه. الشركة تبقى عميلًا رسميًا مستقلًا.','Links are dated; ending one never re-attributes past operations, and it is neither deleted nor reopened. The company stays an independent official customer.')}`;
+}
+/* ── ledger / supplies / collections ── */
+function ledgerRows(oid){const q=normD(S.erp.lq).trim();return FILLS.filter(f=>(!oid||f.oid===oid)&&f.oid!=='org'&&(!q||f.paper.includes(q)||f.no.toLowerCase().includes(q.toLowerCase())))}
+function ledgerTable(oid){
+  const rows=ledgerRows(oid);if(!rows.length)return `<div class="card empty"><b>${X('لا نتائج','No results')}</b></div>`;
+  const tl=rows.reduce((a,f)=>a+f.l,0);
+  return tbl([{h:X('التاريخ','Date'),r:f=>dstr(f.at,true)},{h:X('رقم العملية','Operation no.'),r:f=>LTR(f.no)},{h:X('سند ورقي','Paper voucher'),r:f=>LTR(f.paper)},...(oid?[]:[{h:X('صاحب الصهريج','Owner'),r:f=>esc(ownName(f.oid))}]),{h:X('الصهريج','Tanker'),r:f=>LTR(tnkById(f.tid).plate)},{h:X('المضخة / الفوهة','Pump / nozzle'),r:f=>nozLabel(nozById(f.nz))},{h:X('اللترات','Litres'),n:1,r:f=>LIT(f.l)},{h:X('القيمة (توضيحي)','Value (illustrative)'),n:1,r:f=>SAR(f.l*PRICE)},{h:X('المرفق','Attachment'),r:f=>f.att?`<span class="badge pos">${X('مرفق','Attached')}</span>`:`<span class="badge warn">${X('بلا','None')}</span>`}],rows,{foot:`<tr><td colspan="${oid?5:6}">${X('الإجمالي','Total')}</td><td class="n">${LIT(tl)}</td><td class="n">${SAR(tl*PRICE)}</td><td></td></tr>`,mfoot:`<div class="mcard"><div class="mc-row"><b>${X('الإجمالي','Total')}</b><b>${LIT(tl)}</b></div><div class="mc-row"><span class="muted">${X('القيمة (توضيحي)','Value (illustrative)')}</span><span>${SAR(tl*PRICE)}</span></div></div>`});
+}
+function ledgerTab(oid){
+  return `<div class="row between wrap"><h2>${X('كل مسحوبات الصهاريج من المحطة','All tanker withdrawals from the station')}</h2><span class="annot">${tg('proto')}${tg('dec')}</span></div>
+  <div class="row wrap"><div class="field grow" style="min-width:200px"><label class="sr" for="lSearch">${X('بحث','Search')}</label><input id="lSearch" class="inp" type="search" placeholder="${X('ابحث برقم السند الورقي أو رقم العملية','Search by paper voucher or operation no.')}" data-bind="erp.lq" data-after="ledgerT" data-oid="${oid||''}" value="${esc(S.erp.lq)}"></div><button class="btn" data-act="toast" data-id="${X('نموذج: التصدير غير متاح','Prototype: export not available')}">${X('تصدير','Export')}</button></div>
+  <div id="ledgerT">${ledgerTable(oid)}</div>
+  ${hint('القيمة = لترات × سعر توضيحي. مصدر السعر وتوقيت تثبيته قرار محاسبي مفتوح. المسحوب يسجَّل كعملية تشغيلية؛ خصم المخزون يحدث مرة واحدة عند التعبئة.','Value = litres × an illustrative price. The pricing source and fixing time are an open accounting decision. A withdrawal is an operational record; stock is issued exactly once at fill time.')}`;
+}
+function supStatus(s){if(!s.inv)return s.sales?`<span class="badge neu">${X('مسودة في المبيعات','Draft in Sales')}</span>`:`<span class="badge warn">${X('بلا فاتورة','Not invoiced')}</span>`;return s.paid>=s.total?`<span class="badge pos">${X('مسدَّدة','Paid')}</span>`:`<span class="badge warn">${X('سداد جزئي','Partly paid')}</span>`}
+function suppliesTab(oid){
+  const rows=SUP.filter(s=>!oid||s.oid===oid);
+  const t=tbl([{h:X('التاريخ','Date'),r:s=>dstr(s.date)},...(oid?[]:[{h:X('صاحب الصهريج','Owner'),r:s=>esc(ownName(s.oid))}]),{h:X('الشركة (العميل الرسمي)','Company (official customer)'),r:s=>`<b>${coName(s.cid)}</b>`},{h:X('الكمية','Quantity'),n:1,r:s=>LIT(s.l)},{h:X('الفاتورة الرسمية','Official invoice'),r:s=>s.inv?`<span class="ltr num">${s.inv}</span> <button class="btn ghost sm" data-act="int" data-id="invoice">${ico('ext',14)}</button>`:'—'},{h:X('الإجمالي','Total'),n:1,r:s=>s.inv?SAR(s.total):'—'},{h:X('المسدَّد','Paid'),n:1,r:s=>s.inv?SAR(s.paid):'—'},{h:X('الحالة','Status'),r:s=>supStatus(s)},{h:'',r:s=>s.inv||s.sales?'':`<button class="btn sm primary" data-act="int" data-id="newinv:${s.id}"${wAttr()}>${X('إنشاء فاتورة في المبيعات','Create invoice in Sales')}</button>`}],rows);
+  const bal=oid?(()=>{const b=supBal(oid);return `<div class="card sec"><dl class="kv"><dt>${X('مسحوب من المحطة','Withdrawn from station')}</dt><dd>${LIT(b.out)}</dd><dt>${X('موزَّع على شركات','Distributed')}</dt><dd>${LIT(b.dist)}</dd><dt>${X('غير موزَّع (حسابي)','Undistributed (arithmetic)')}</dt><dd>${LIT(b.rest)}</dd></dl></div>`})():'';
+  return `<div class="row between wrap"><h2>${X('توريدات الشركات وفواتيرها الرسمية','Company supplies & official invoices')}</h2><span class="annot">${tg('proto')}${tg('dec')}</span></div>
+  ${bal}${t}
+  ${hint('الفاتورة الضريبية تصدر من مبيعات أَوْج فقط والشركة هي العميل الرسمي. الكمية سبق صرفها من المحطة، فلا يُخصم المخزون مرة ثانية عند الفوترة — يلزم التحقق من دعم ذلك في وحدة المبيعات.','The tax invoice is issued from AWJ Sales only and the company is the official customer. The quantity already left the station, so stock must not be issued again on invoicing — support for this in Sales still has to be verified.')}`;
+}
+function collectionsTab(o){
+  const mine=COL.filter(c=>c.oid===o.id),pend=COL.filter(c=>c.oid===null&&LNK.some(l=>l.oid===o.id&&l.cid===c.cid&&!l.to));
+  const row=(c,att)=>({...c,att});
+  const rows=[...mine.map(c=>row(c,true)),...pend.map(c=>row(c,false))];
+  return `<div class="row between wrap"><h2>${X('التحصيلات المنسوبة لصاحب الصهريج','Collections attributed to the owner')}</h2><span class="annot">${tg('proto')}${tg('dec')}</span></div>
+  ${rows.length?tbl([{h:X('مرجع القبض في أَوْج','AWJ receipt ref.'),r:c=>`<span class="ltr num">${c.id}</span> <button class="btn ghost sm" data-act="int" data-id="receipt">${ico('ext',14)}</button>`},{h:X('الفاتورة','Invoice'),r:c=>LTR(c.inv)},{h:X('الشركة','Company'),r:c=>coName(c.cid)},{h:X('التاريخ','Date'),r:c=>dstr(c.date)},{h:X('المبلغ','Amount'),n:1,r:c=>SAR(c.amt)},{h:X('الإسناد','Attribution'),r:c=>c.att?`<span class="badge pos">${X('منسوب — مؤهَّل','Attributed — qualifying')}</span>`:`<span class="badge warn">${X('بانتظار الإسناد','Awaiting attribution')}</span>`},{h:'',r:c=>c.att?'':`<button class="btn sm primary" data-act="attr" data-id="${c.id}"${wAttr()}>${X('إسناد لهذا الصاحب','Attribute to this owner')}</button>`}],rows):`<div class="card empty"><b>${X('لا تحصيلات','No collections')}</b></div>`}
+  ${hint('هذه مراجع إلى مقبوضات أَوْج الرسمية؛ عرضها هنا ليس قيد قبض ثانيًا. لا يُحتسب أي تحصيل للشركة لصاحب الصهريج دون إسناد صريح. أساس الإسناد قرار مفتوح.','These are references to official AWJ receipts; showing them here is not a second receipt entry. No company collection counts for the owner without explicit attribution. The attribution basis is an open decision.')}`;
+}
+/* ── settlement ── */
+function commissionCard(o){
+  const cm=COMM[o.id];
+  return `<div class="card sec"><div class="row between"><h2>${X('العمولة','Commission')}</h2>${tg('dec')}</div>
+   <div class="rad" role="group" aria-label="${X('نمط العمولة','Commission mode')}">${[['auto',X('تلقائي','Automatic')],['manual',X('يدوي','Manual')],['none',X('بدون','None')]].map(([k,l])=>`<button data-act="cm-mode" data-id="${k}" aria-pressed="${cm.mode===k}"${wAttr()}>${l}</button>`).join('')}</div>
+   ${cm.mode==='auto'?`<div class="field"><label for="cmPct">${X('النسبة الافتراضية %','Default rate %')}</label><input id="cmPct" class="inp" inputmode="decimal" data-bind="comm.${o.id}.pct" data-after="comm" value="${cm.pct}" style="max-width:160px"${wAttr()}></div>`:''}
+   ${cm.mode==='manual'?`<div class="field"><label for="cmMan">${X('المبلغ','Amount')}</label><input id="cmMan" class="inp" inputmode="decimal" data-bind="comm.${o.id}.manual" data-after="comm" value="${cm.manual}" style="max-width:200px"${wAttr()}></div>`:''}
+   <div class="field"><label for="cmWhy">${X('سبب التعديل (يُسجَّل في التدقيق)','Reason for change (audited)')}</label><input id="cmWhy" class="inp" data-bind="comm.${o.id}.reason" value="${esc(cm.reason)}"${wAttr()}></div>
+   <div class="muted" style="font-size:12px">${X('أساس العمولة (على المقبوض أم المفوتر؟) وقبل/بعد الضريبة ومعالجتها الضريبية: قرارات مفتوحة. النموذج يحسب على المقبوض المؤهَّل لتوضيح التدفق فقط.','Commission basis (collected vs invoiced), before/after VAT and its tax treatment are open decisions. The prototype uses qualifying collections only to illustrate the flow.')}</div></div>`;
+}
+function calcCard(o){
+  const c=calc(o.id),st=S.erp.settle[o.id]||'draft';
+  const ln=(l,v,s)=>`<div class="ln"><div>${l}${s?`<div class="src">${s}</div>`:''}</div><div>${v}</div></div>`;
+  return `<div class="card sec" id="calcCard"><div class="row between"><h2>${X('احتساب التسوية','Settlement calculation')}</h2><span class="badge ${st==='draft'?'warn':'pos'}">${st==='draft'?X('كشف مسودة','Draft statement'):st==='approved'?X('معتمد','Approved'):X('مدفوع','Paid')}</span></div>
+   <div class="calc">${ln(X('الرصيد الافتتاحي المعتمد','Approved opening balance'),SAR(c.opening),X('لا رصيد افتتاحي في النموذج','No opening balance in the prototype'))}${ln(X('+ تحصيلات مؤهَّلة','+ Qualifying collections'),SAR(c.coll),X('من مقبوضات أَوْج المنسوبة','From attributed AWJ receipts'))}${ln(X('− مسحوبات مؤهَّلة','− Qualifying withdrawals'),SAR(c.withdrawals),X(`${fmt(c.liters)} لتر × سعر توضيحي`,`${fmt(c.liters)} L × illustrative price`))}${ln(X('− العمولة','− Commission'),SAR(c.commission))}${ln(X('± تسويات وتصحيحات','± Adjustments & corrections'),SAR(c.adj))}${ln(X('= الصافي','= Net'),SAR(c.net))}${ln(X('− المدفوع فعليًا لصاحب الصهريج','− Paid to the owner'),SAR(c.paid))}<div class="ln tot"><div>${X('المستحق','Amount due')}</div><div style="color:${c.due>=0?'var(--positive)':'var(--negative)'}">${SAR(c.due)}</div></div></div>
+   ${c.pend?`<div class="note warn">${X(`يوجد تحصيل غير منسوب بقيمة`,`There is an unattributed collection of`)} ${SAR(c.pend)} — ${X('غير محتسب حتى الإسناد.','not counted until attributed.')}</div>`:''}
+   ${c.due<0?`<div class="note neg">${X('رصيد سالب (مديونية على صاحب الصهريج) — معالجة الرصيد السالب قرار مفتوح.','Negative balance (owed by the owner) — handling of negative balances is an open decision.')}</div>`:''}
+   <div class="row wrap noprint">${st==='draft'?`<button class="btn primary" data-act="stl-approve"${wAttr()}>${X('اعتماد التسوية','Approve settlement')}</button>`:''}${st==='approved'?`<button class="btn primary" data-act="stl-pay"${wAttr()}>${X('تسجيل دفع لصاحب الصهريج','Record payout to owner')}</button>`:''}${st!=='draft'?`<span class="muted">${st==='approved'?X('الاعتماد لا يعني الدفع — الدفع عملية منفصلة تُسجَّل في المالية الرسمية.','Approval is not payment — payout is a separate operation recorded in official Finance.'):X('سُجّل الدفع في المالية الرسمية (نموذج).','Payout recorded in official Finance (prototype).')}</span>`:''}</div></div>`;
+}
+function settleTab(o){return `<div class="row between wrap"><h2>${X('العمولة والتسوية والمستحقات','Commission, settlement & dues')}</h2><span class="annot">${tg('proto')}${tg('dec')}</span></div><div class="grid2"><div id="calcWrap">${calcCard(o)}</div>${commissionCard(o)}</div>${hint('كشف التسوية داخلي وليس فاتورة ضريبية ولا قيدًا محاسبيًا. العرض المزدوج للتحصيل (حساب الشركة + كشف الصهريج) ليس قبضًا مزدوجًا.','The settlement statement is internal — not a tax invoice or a ledger entry. Showing a collection in both the company account and the owner statement is not a double receipt.')}`}
+function settleList(){
+  const rows=OWN.filter(o=>o.status==='active').map(o=>({id:o.id,o,c:calc(o.id),st:S.erp.settle[o.id]||'draft'}));
+  return `<div class="annot">${tg('proto')}${tg('dec')}</div>`+tbl([{h:X('صاحب الصهريج','Owner'),r:r=>`<b>${esc(nm(r.o))}</b>`},{h:X('المسحوبات','Withdrawals'),n:1,r:r=>SAR(r.c.withdrawals)},{h:X('التحصيلات المؤهلة','Qualifying collections'),n:1,r:r=>SAR(r.c.coll)},{h:X('العمولة','Commission'),n:1,r:r=>SAR(r.c.commission)},{h:X('المستحق','Due'),n:1,r:r=>SAR(r.c.due)},{h:X('الحالة','Status'),r:r=>`<span class="badge ${r.st==='draft'?'warn':'pos'}">${r.st==='draft'?X('مسودة','Draft'):r.st==='approved'?X('معتمد','Approved'):X('مدفوع','Paid')}</span>`}],rows,{act:'erp-settle-open'});
+}
+/* ── statement (printable) ── */
+function statementTab(o){
+  const c=calc(o.id),f=FILLS.filter(x=>x.oid===o.id),cl=COL.filter(x=>x.oid===o.id);
+  return `<div class="row between wrap noprint"><h2>${X('كشف حساب صاحب الصهريج','Tanker owner statement')}</h2><div class="row">${tg('proto')}<button class="btn primary" data-act="print">${ico('print',16)} ${X('طباعة','Print')}</button></div></div>
+  <div class="stmt print-area"><div class="row between"><div><h3>${X('كشف تسوية صاحب صهريج','Tanker owner settlement statement')}</h3><div>${X('الفترة','Period')}: ${dstr('2026-11-01')} – ${dstr(TODAY)}</div></div><div style="text-align:end"><b>${esc(nm(o))}</b><div>${X('نموذج — بيانات وهمية','Prototype — fictional data')}</div></div></div>
+   <div><b>${X('المسحوبات','Withdrawals')}</b><table><thead><tr><th>${X('التاريخ','Date')}</th><th>${X('رقم العملية','Operation no.')}</th><th>${X('سند ورقي','Paper voucher')}</th><th class="n">${X('اللترات','Litres')}</th><th class="n">${X('القيمة','Value')}</th></tr></thead><tbody>${f.map(x=>`<tr><td>${dstr(x.at)}</td><td>${LTR(x.no)}</td><td>${LTR(x.paper)}</td><td class="n">${LIT(x.l)}</td><td class="n">${SAR(x.l*PRICE)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="3">${X('الإجمالي','Total')}</td><td class="n">${LIT(c.liters)}</td><td class="n">${SAR(c.withdrawals)}</td></tr></tfoot></table></div>
+   <div><b>${X('التحصيلات المنسوبة','Attributed collections')}</b><table><thead><tr><th>${X('المرجع','Ref.')}</th><th>${X('الفاتورة','Invoice')}</th><th>${X('الشركة','Company')}</th><th class="n">${X('المبلغ','Amount')}</th></tr></thead><tbody>${cl.map(x=>`<tr><td>${LTR(x.id)}</td><td>${LTR(x.inv)}</td><td>${coName(x.cid)}</td><td class="n">${SAR(x.amt)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="3">${X('الإجمالي','Total')}</td><td class="n">${SAR(c.coll)}</td></tr></tfoot></table></div>
+   <div class="calc"><div class="ln"><span>${X('− العمولة','− Commission')}</span>${SAR(c.commission)}</div><div class="ln tot"><span>${X('المستحق','Amount due')}</span>${SAR(c.due)}</div></div>
+   <div style="color:#666;font-size:12px">${X('كشف داخلي للتسوية — ليس فاتورة ضريبية ولا قيدًا محاسبيًا. القيم توضيحية.','Internal settlement statement — not a tax invoice or a ledger entry. Values are illustrative.')}</div></div>`;
+}
+/* ── reports ── */
+function reportsPage(){
+  const reps=[['r1',X('اللترات لكل صاحب صهريج','Litres per tanker owner')],['r2',X('المسحوبات لكل صهريج','Withdrawals per tanker')],['r3',X('التوريدات والفواتير والتحصيل','Supplies, invoices & collection')],['r4',X('التسويات والمستحقات','Settlements & dues')]];
+  const k=S.erp.rep||'r1';let body='';
+  if(k==='r1')body=tbl([{h:X('صاحب الصهريج','Owner'),r:o=>esc(nm(o))},{h:X('عدد التعبئات','Fills'),n:1,r:o=>`<span class="num">${monthFills(o.id).length}</span>`},{h:X('اللترات','Litres'),n:1,r:o=>LIT(calc(o.id).liters)}],OWN);
+  if(k==='r2')body=tbl([{h:X('الصهريج','Tanker'),r:t=>LTR(t.plate)},{h:X('الصاحب','Owner'),r:t=>esc(ownName(t.oid))},{h:X('اللترات','Litres'),n:1,r:t=>LIT(FILLS.filter(f=>f.tid===t.id).reduce((a,f)=>a+f.l,0))}],TNK);
+  if(k==='r3')body=tbl([{h:X('الشركة','Company'),r:s=>coName(s.cid)},{h:X('الكمية','Quantity'),n:1,r:s=>LIT(s.l)},{h:X('الفاتورة','Invoice'),r:s=>s.inv?LTR(s.inv):'—'},{h:X('المسدَّد','Paid'),n:1,r:s=>SAR(s.paid)},{h:X('الحالة','Status'),r:s=>supStatus(s)}],SUP);
+  if(k==='r4')body=settleList();
+  return `<div class="pg-h"><h1>${X('التقارير','Reports')}</h1><div class="row"><span class="annot">${tg('proto')}</span><button class="btn" data-act="print">${ico('print',16)} ${X('طباعة','Print')}</button><button class="btn" data-act="toast" data-id="${X('نموذج: التصدير غير متاح','Prototype: export not available')}">${X('تصدير','Export')}</button></div></div>
+  <div class="rad">${reps.map(([i,l])=>`<button data-act="rep" data-id="${i}" aria-pressed="${k===i}">${l}</button>`).join('')}</div>${erpState(()=>body,'reports')}${hint('التقارير تقرأ مصادر الأحداث والخدمات نفسها، ولا تُنشئ قاعدة بيانات مالية ثانية.','Reports read the same source events and services; they do not create a second financial database.')}`;
+}
+/* ── dialogs ── */
+function erpDialog(){
+  const d=S.erp.dlg;if(!d)return '';
+  const close=`<button class="btn ghost sm" data-act="dlg-close" aria-label="${X('إغلاق','Close')}">${ico('x',18)}</button>`;
+  const wrap=(t,b)=>`<div class="sheet" data-act="sheet-bg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="${t}"><div class="sheet-h"><h2>${t}</h2>${close}</div>${b}</div></div>`;
+  const e=d.errs||{};
+  const fld=(id,l,v,ph,extra='')=>`<div class="field"><label for="${id}">${l}</label><input id="${id}" class="inp ${e[id]?'bad':''}" data-bind="erp.dlg.v.${id}" value="${esc(v||'')}" ${ph?`placeholder="${ph}"`:''} ${extra}>${e[id]?`<span class="err" role="alert">${e[id]}</span>`:''}</div>`;
+  const v=d.v||{};
+  if(d.k==='owner'||d.k==='owner-edit'){const ed=d.k==='owner-edit';return wrap(ed?X('تعديل صاحب الصهريج','Edit tanker owner'):X('إضافة صاحب صهريج','Add tanker owner'),`<div class="stack">${fld('name',X('الاسم','Name'),v.name)}${fld('phone',X('الجوال (اختياري)','Phone (optional)'),v.phone,'05XXXXXXXX','inputmode="tel" dir="ltr"')}${ed?`<div class="rad"><button data-act="dlg-status" data-id="active" aria-pressed="${v.status==='active'}">${X('نشط','Active')}</button><button data-act="dlg-status" data-id="inactive" aria-pressed="${v.status==='inactive'}">${X('غير نشط','Inactive')}</button></div>`:''}<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إلغاء','Cancel')}</button><button class="btn primary" data-act="dlg-save">${X('حفظ','Save')}</button></div></div>`)}
+  if(d.k==='tanker')return wrap(X('إضافة صهريج','Add tanker'),`<div class="stack">${fld('plate',X('رقم اللوحة','Plate number'),v.plate,'TNK-0000','dir="ltr"')}${fld('cap',X('السعة (لتر)','Capacity (litres)'),v.cap,'20000','inputmode="decimal" dir="ltr"')}<div class="muted" style="font-size:12px">${X('تُرسل السعة بالمللتر كعدد صحيح — لا كسور.','Capacity is sent as an integer in millilitres — no fractions.')}</div><div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إلغاء','Cancel')}</button><button class="btn primary" data-act="dlg-save">${X('حفظ','Save')}</button></div></div>`);
+  if(d.k==='link'){const used=LNK.filter(l=>l.oid===S.erp.oid&&!l.to).map(l=>l.cid);const opts=CO.filter(c=>!used.includes(c.id));return wrap(X('ربط شركة رسمية','Link an official company'),`<div class="stack"><div class="field"><label for="cid">${X('العميل (من عملاء أَوْج)','Customer (from AWJ customers)')}</label><select id="cid" class="inp ${e.cid?'bad':''}" data-bind="erp.dlg.v.cid"><option value="">${X('اختر…','Select…')}</option>${opts.map(c=>`<option value="${c.id}" ${v.cid===c.id?'selected':''}>${esc(nm(c))}</option>`).join('')}</select>${e.cid?`<span class="err" role="alert">${e.cid}</span>`:''}</div>${fld('from',X('تاريخ البداية','Start date'),v.from,'YYYY-MM-DD','dir="ltr"')}<div class="note">${X('لا يُعاد نسب عمليات سابقة. الشركات المرتبطة حاليًا غير ظاهرة في القائمة.','Past operations are not re-attributed. Currently linked companies are hidden from the list.')}</div><div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إلغاء','Cancel')}</button><button class="btn primary" data-act="dlg-save">${X('ربط','Link')}</button></div></div>`)}
+  if(d.k.startsWith('endlink')){return wrap(X('إنهاء الربط','End link'),`<div class="stack"><div class="note warn">${X('الإنهاء نهائي: لا إعادة فتح ولا حذف، ولا يغيّر عمليات سابقة.','Ending is final: no reopening or deletion, and past operations are unchanged.')}</div>${fld('to',X('تاريخ الانتهاء','End date'),v.to,'YYYY-MM-DD','dir="ltr"')}<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إلغاء','Cancel')}</button><button class="btn danger" data-act="dlg-save">${X('إنهاء الربط','End link')}</button></div></div>`)}
+  if(d.k==='info'){return wrap(d.title,`<div class="stack">${d.html}<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إغلاق','Close')}</button>${d.cta||''}</div></div>`)}
+  if(d.k==='confirm'){return wrap(d.title,`<div class="stack">${d.html}<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dlg-close">${X('إلغاء','Cancel')}</button><button class="btn primary" data-act="dlg-confirm">${d.ok}</button></div></div>`)}
+  return '';
+}
+
+/* ═══════ prototype shell, routing, events ═══════ */
+function barHtml(){
+  const sims=[['ok',X('الوضع الطبيعي','Normal')],['loading',X('تحميل القوائم','Loading lists')],['empty',X('قوائم فارغة','Empty lists')],['error',X('خطأ خادم','Server error')],['gate',X('الميزة مغلقة (ERP)','Feature gate closed (ERP)')],['readonly',X('عرض فقط (ERP)','View only (ERP)')],['unknown',X('انقطاع بعد الإرسال (حفظ التعبئة)','Network cut after send (save fill)')],['rejected',X('رفض الخادم (حفظ التعبئة)','Server rejects (save fill)')]];
+  return `<div class="bar"><div class="bar-in"><div class="seg" role="group" aria-label="${X('التطبيق','App')}"><button data-act="app" data-id="station" aria-pressed="${S.app==='station'}">${X('تطبيق المحطات','Station app')}</button><button data-act="app" data-id="erp" aria-pressed="${S.app==='erp'}">AWJ ERP</button></div>
+   <div class="bar-tools"><span class="fixture">${X('نموذج — بيانات وهمية','Prototype — fake data')}</span><button class="ibtn" data-act="lang" aria-label="${X('اللغة','Language')}">${S.lang==='ar'?'EN':'ع'}</button><button class="ibtn" data-act="theme" aria-label="${X('المظهر','Theme')}">${S.theme==='auto'?X('تلقائي','Auto'):S.theme==='light'?X('فاتح','Light'):X('داكن','Dark')}</button></div></div>
+   <div class="bar-in" style="padding-top:0"><label class="sr" for="simSel">${X('محاكاة الحالة','State simulation')}</label><select id="simSel" class="ibtn" data-bind="sim" data-after="rerender" style="flex:1;min-width:0">${sims.map(([k,l])=>`<option value="${k}" ${S.sim===k?'selected':''}>${X('محاكاة','Simulate')}: ${l}</option>`).join('')}</select><button class="ibtn" data-act="tags" aria-pressed="${S.tags}">${X('الشارات','Tags')} ${S.tags?'✓':''}</button><button class="ibtn" data-act="about">${X('ما الموجود فعليًا؟','What is real?')}</button></div></div>`;
+}
+function aboutSheet(){
+  if(!S.about)return '';
+  const row=(k,a,b)=>`<tr><td style="white-space:nowrap">${tg(k)}</td><td>${a}</td></tr>`;
+  return `<div class="sheet" style="position:fixed;color:var(--sh-fg)" data-act="sheet-bg"><div class="sheet-in" role="dialog" aria-modal="true" style="background:var(--sh-chip);color:var(--sh-fg);max-width:680px"><div class="sheet-h"><h2>${X('ما هو موجود وما هو نموذج؟','What exists and what is a prototype?')}</h2><button class="ibtn" data-act="about">${X('إغلاق','Close')}</button></div>
+   <p style="margin-bottom:10px">${X('هذه الصفحة نموذج تفاعلي لتجربة المستخدم فقط: لا تتصل بخادم ولا تنفّذ عمليات مالية أو مخزنية ولا تغيّر أي بيانات. كل الأسماء والأرقام وهمية.','This page is an interactive UX prototype only: it calls no server, performs no financial or inventory operations and changes no data. All names and numbers are fictional.')}</p>
+   <table style="font-size:13px"><tbody>
+   ${row('real',X('الواجهة الخلفية لأصحاب الصهاريج والصهاريج وربط الشركات (PR-1) مدموجة، والبوابة مغلقة افتراضيًا. وكذلك: مظهر تطبيق المحطات، التنقل، الورديات، قراءات العدادات، فواتير ومقبوضات أَوْج، وأرصدة المخزون.','Backend for tanker owners, tankers and company links (PR-1) is merged, gate closed by default. Also: station app shell, navigation, shifts, meter readings, AWJ invoices & receipts, stock balances.'))}
+   ${row('local',X('شاشات AWJ ERP لقائمة أصحاب الصهاريج وتفاصيلهم وصهاريجهم وربط الشركات (PR-2) مبنية محليًا ولم تُرفع ولم تُدمج، بانتظار اعتماد التصميم.','AWJ ERP screens for owners list, detail, tankers and company links (PR-2) are built locally, not pushed or merged, awaiting design approval.'))}
+   ${row('proto',X('كل ما عدا ذلك تصميم فقط: تعبئة الصهريج من التطبيق، سندات التعبئة، المرفقات، مطابقة الوردية، سجل المسحوبات، التوريدات والفواتير، التحصيلات، العمولة والتسوية والكشوف والتقارير.','Everything else is design only: fills from the app, fill vouchers, attachments, shift reconciliation, withdrawals ledger, supplies & invoices, collections, commission, settlement, statements and reports.'))}
+   ${row('dec',X('قرارات مفتوحة تؤثر على الشاشات: مصدر السعر وتوقيته، أساس العمولة، أساس إسناد التحصيل، معالجة الرصيد السالب، سياسة تكرار رقم السند الورقي، تخصيص الفوهة للصهاريج أم مشتركة، وتوقيت القيد المحاسبي.','Open decisions affecting screens: pricing source and timing, commission basis, collection attribution basis, negative balance handling, paper voucher duplicate policy, dedicated vs shared nozzles, and accounting-entry timing.'))}
+   </tbody></table>
+   <p style="margin-top:10px;font-size:13px">${X('للتجربة على الآيفون: جرّب تبديل التطبيق واللغة والمظهر، ومن قائمة «محاكاة» اختبر حالات التحميل والفراغ والخطأ والبوابة المغلقة وانقطاع الشبكة أثناء الحفظ.','On iPhone: switch app, language and theme, and use the “Simulate” menu to test loading, empty, error, closed-gate and network-cut-while-saving states.')}</p></div></div>`;
+}
+/* ── render ── */
+function render(){
+  const root=document.getElementById('root');
+  document.documentElement.lang=S.lang;document.documentElement.dir=S.lang==='ar'?'rtl':'ltr';
+  if(S.theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',S.theme);
+  document.body.classList.toggle('show-tags',S.tags);
+  const keep=document.activeElement&&document.activeElement.id,sc=root.querySelector('.scroll'),st=sc?sc.scrollTop:0,same=root.dataset.k===S.app+':'+(S.st.view||S.st.tab)+':'+S.erp.page+':'+S.erp.tab;
+  const stage=S.app==='station'?`<div class="stage is-station"><div class="phone">${stScreen()}${shiftSheet()}</div></div>`:`<div class="stage">${erpScreen()}</div>`;
+  root.innerHTML=barHtml()+stage+aboutSheet();
+  root.dataset.k=S.app+':'+(S.st.view||S.st.tab)+':'+S.erp.page+':'+S.erp.tab;
+  const nsc=root.querySelector('.scroll');if(nsc&&same)nsc.scrollTop=st;
+  if(keep){const el=document.getElementById(keep);if(el&&el.tagName!=='SELECT'){el.focus();try{const n=el.value.length;el.setSelectionRange(n,n)}catch(_){}}}
+}
+function flash(msg,where){const k=where==='erp'?S.erp:S.st;k[where==='erp'?'toast':'flash']=msg;render();setTimeout(()=>{k[where==='erp'?'toast':'flash']=null;render()},2200)}
+/* ── generic path binding ── */
+function setPath(path,val){const seg=path.split('.');let o=seg[0]==='comm'?COMM:S;if(seg[0]==='comm')seg.shift();for(let i=0;i<seg.length-1;i++)o=o[seg[i]]=o[seg[i]]||{};o[seg[seg.length-1]]=val}
+const AFTER={
+  owners(){const e=document.getElementById('ownerList');if(e)e.innerHTML=ownerListHtml(S.st.wiz)},
+  liters(){const w=S.st.wiz,t=tnkById(w.tanker),l=pf(w.liters),e=document.getElementById('capWarn');if(w.errs)delete w.errs.liters;if(e)e.innerHTML=t&&l>t.cap?`<div class="note warn">${X(`الكمية أكبر من سعة الصهريج (${fmt(t.cap)} لتر) — تحقق قبل المتابعة.`,`Quantity exceeds the tanker capacity (${fmt(t.cap)} L) — double-check before continuing.`)}</div>`:''},
+  recon(){const e=document.getElementById('reconOut');if(e)e.innerHTML=reconOutHtml();const b=document.querySelector('[data-act="shift-review"]');if(b){const rows=reconRows();b.disabled=!rows.every(r=>r.cl!=null&&r.state!=='bad')}},
+  ownersT(){const e=document.getElementById('ownersT');if(e)e.innerHTML=ownersTable()},
+  ledgerT(){const e=document.getElementById('ledgerT');if(e)e.innerHTML=ledgerTable(S.erp.page==='owner'?S.erp.oid:null)},
+  comm(){const id=S.erp.oid;if(COMM[id])COMM[id].pct=Number(COMM[id].pct)||0;const e=document.getElementById('calcWrap'),o=ownById(id);if(e)e.innerHTML=calcCard(o)},
+  rerender(){render()}
+};
+document.addEventListener('input',e=>{const el=e.target;if(!el.dataset||!el.dataset.bind||el.tagName==='SELECT')return;if(/^(st\.wiz\.(liters|paper)|st\.shift\.close\.)/.test(el.dataset.bind)&&/[٠-٩۰-۹]/.test(el.value))el.value=normD(el.value);setPath(el.dataset.bind,el.value);if(el.dataset.after&&AFTER[el.dataset.after])AFTER[el.dataset.after]()});
+document.addEventListener('change',e=>{const el=e.target;if(el.dataset&&el.dataset.bind&&el.tagName==='SELECT'){setPath(el.dataset.bind,el.value);if(el.dataset.after&&AFTER[el.dataset.after])AFTER[el.dataset.after]();return}
+  if(el.dataset&&el.dataset.file){const f=el.files&&el.files[0];if(!f)return;const img=/^image\//.test(f.type),url=img?URL.createObjectURL(f):null;
+    if(el.dataset.file==='1'){S.st.wiz.file={name:f.name,img,url};render()}
+    else{const fl=FILLS.find(x=>x.id===S.st.sel);if(fl){fl.att={name:f.name,img,url,by:['موظف تجريبي','Demo employee'],at:TODAY+' '+new Date().toTimeString().slice(0,5),late:true};flash(X('أُضيف المرفق — وقت التعبئة لم يتغيّر','Attachment added — fill time unchanged'))}}}});
+/* ── wizard logic ── */
+function wizValidate(n){
+  const w=S.st.wiz,e={};
+  if(n===1&&!w.tanker)e.tanker=X('اختر الصهريج للمتابعة.','Select a tanker to continue.');
+  if(n===2&&!w.noz)e.noz=X('اختر الفوهة للمتابعة.','Select a nozzle to continue.');
+  if(n===3){const l=pf(w.liters);if(!(l>0))e.liters=X('أدخل كمية أكبر من صفر.','Enter a quantity greater than zero.');
+    const p=normD(w.paper).trim();if(!p)e.paper=X('أدخل رقم السند الورقي.','Enter the paper voucher number.');else if(FILLS.some(f=>f.paper===p))e.paper=X(`رقم السند ${p} مسجّل مسبقًا في تعبئة أخرى.`,`Voucher number ${p} is already recorded on another fill.`)}
+  w.errs=e;return !Object.keys(e).length;
+}
+function commitFill(replayed){
+  const w=S.st.wiz;if(w.committed){return}
+  const n=Math.max(...FILLS.map(f=>Number(f.no.slice(3))))+1,hh=new Date().toTimeString().slice(0,5);
+  const f={id:'f'+n,no:'TF-'+String(n).padStart(6,'0'),oid:w.mode==='org'?'org':w.owner,tid:w.tanker,nz:w.noz,l:pf(w.liters),paper:normD(w.paper).trim(),at:TODAY+' '+hh,att:w.file?{name:w.file.name,img:w.file.img,url:w.file.url,by:['موظف تجريبي','Demo employee'],at:TODAY+' '+hh}:null};
+  FILLS.unshift(f);w.committed=f.id;w.replayed=!!replayed;
+}
+const ACTS={
+  app(b){S.app=b.dataset.id;render()},
+  lang(){S.lang=S.lang==='ar'?'en':'ar';render()},
+  theme(){S.theme=({auto:'light',light:'dark',dark:'auto'})[S.theme];render()},
+  tags(){S.tags=!S.tags;render()},
+  about(){S.about=!S.about;render()},
+  'sheet-bg'(b,e){if(e.target===b){if(b.closest('.app-erp'))S.erp.dlg=null;else if(S.about)S.about=false;else S.st.shift.confirm=false;render()}},
+  'sim-ok'(){S.sim='ok';render()},
+  /* station */
+  'st-tab'(b){S.st.tab=b.dataset.id;S.st.view=null;render()},
+  'st-back'(){S.st.view=null;render()},
+  'st-open'(b){S.st.sel=b.dataset.id;S.st.view='detail';render()},
+  'st-filter'(b){S.st.fFilter=b.dataset.id;render()},
+  'wiz-start'(){S.st.wiz=newWiz();S.st.view='wizard';render()},
+  'wiz-back'(){const w=S.st.wiz;if(w.step>1){w.step--;w.out=null}else S.st.view=null;render()},
+  'wiz-mode'(b){const w=S.st.wiz;w.mode=b.dataset.id;w.owner=null;w.tanker=null;if(w.mode==='org'){w.tanker='t9'}render()},
+  'wiz-owner'(b){const w=S.st.wiz;w.owner=b.dataset.id;const ts=TNK.filter(t=>t.oid===w.owner&&t.active);w.tanker=ts.length===1?ts[0].id:null;render()},
+  'wiz-tanker'(b){S.st.wiz.tanker=b.dataset.id;S.st.wiz.errs={};render()},
+  'wiz-noz'(b){S.st.wiz.noz=b.dataset.id;S.st.wiz.errs={};render()},
+  'wiz-rmfile'(){S.st.wiz.file=null;render()},
+  'wiz-next'(){const w=S.st.wiz;if(wizValidate(w.step)){w.step++;w.out=null}render()},
+  'wiz-fix'(){const w=S.st.wiz;w.step=3;w.out=null;render()},
+  'wiz-save'(){const s=S.st;s.saving=true;render();setTimeout(()=>{s.saving=false;const w=s.wiz;
+    if(S.sim==='rejected'){w.out={kind:'rejected'}}else if(S.sim==='unknown'){w.out={kind:'unknown'}}else{commitFill(false);s.view='success'}render()},1100)},
+  'wiz-check'(){const s=S.st;s.checking=true;render();setTimeout(()=>{s.checking=false;commitFill(true);s.wiz.out=null;s.view='success';render()},900)},
+  'wiz-again'(){const w=S.st.wiz;S.st.wiz=newWiz({mode:w.mode,owner:w.owner,tanker:w.tanker,step:2});S.st.view='wizard';render()},
+  'demo-match'(){const c=S.st.shift.close;c['p1-1']='130430.0';c['p1-2']='88120.5';c['p2-1']='252115.0';c['p2-2']='97660.0';render()},
+  'demo-diff'(){const c=S.st.shift.close;c['p1-1']='130130.0';c['p1-2']='89320.5';c['p2-1']='252915.0';c['p2-2']='98510.0';render()},
+  'shift-review'(){S.st.shift.confirm=true;render()},
+  'shift-cancel'(){S.st.shift.confirm=false;render()},
+  'shift-close'(){S.st.shift.confirm=false;S.st.shift.state='closed';render()},
+  /* erp */
+  'erp-page'(b){S.erp.page=b.dataset.id;S.erp.oid=null;S.erp.lq='';render()},
+  'erp-open'(b){S.erp.oid=b.dataset.id;S.erp.page='owner';S.erp.tab='overview';render()},
+  'erp-settle-open'(b){S.erp.oid=b.dataset.id;S.erp.page='owner';S.erp.tab='settle';render()},
+  'erp-back'(){S.erp.page='owners';S.erp.oid=null;render()},
+  'erp-tab'(b){S.erp.tab=b.dataset.id;S.erp.lq='';render()},
+  rep(b){S.erp.rep=b.dataset.id;render()},
+  toast(b){flash(b.dataset.id,'erp')},
+  print(){window.print()},
+  dlg(b){const id=b.dataset.id;let v={};
+    if(id==='owner-edit'){const o=ownById(S.erp.oid);v={name:nm(o),phone:o.phone,status:o.status}}
+    if(id==='link')v={from:TODAY};if(id.startsWith('endlink'))v={to:TODAY};
+    S.erp.dlg={k:id.startsWith('endlink')?'endlink':id,ref:id,v,errs:{}};render()},
+  'dlg-close'(){S.erp.dlg=null;render()},
+  'dlg-status'(b){S.erp.dlg.v.status=b.dataset.id;render()},
+  'dlg-save'(){const d=S.erp.dlg,v=d.v,e={};
+    if(d.k==='owner'||d.k==='owner-edit'){if(!v.name||v.name.trim().length<2)e.name=X('الاسم مطلوب (حرفان على الأقل).','Name is required (at least 2 characters).');if(v.phone&&!/^\+?[0-9]{7,15}$/.test(normD(v.phone)))e.phone=X('رقم جوال غير صالح.','Invalid phone number.')}
+    if(d.k==='tanker'){if(!v.plate||!v.plate.trim())e.plate=X('رقم اللوحة مطلوب.','Plate number is required.');const c=pf(v.cap);if(!(c>0)||!Number.isInteger(c*1000))e.cap=X('أدخل سعة صحيحة بالمللتر الصحيح (حتى 3 منازل).','Enter a valid capacity (up to 3 decimals).')}
+    if(d.k==='link'){if(!v.cid)e.cid=X('اختر الشركة.','Select a company.');if(!/^\d{4}-\d{2}-\d{2}$/.test(v.from||''))e.from=X('تاريخ غير صالح (YYYY-MM-DD).','Invalid date (YYYY-MM-DD).')}
+    if(d.k==='endlink'){const l=LNK.find(x=>x.id===d.ref.split(':')[1]);if(!/^\d{4}-\d{2}-\d{2}$/.test(v.to||''))e.to=X('تاريخ غير صالح (YYYY-MM-DD).','Invalid date (YYYY-MM-DD).');else if(l&&v.to<l.from)e.to=X('لا يسبق تاريخ البداية.','Cannot be before the start date.')}
+    d.errs=e;if(Object.keys(e).length){render();return}
+    if(d.k==='owner'){OWN.push({id:'o'+(OWN.length+1),name:[v.name.trim(),v.name.trim()],phone:normD(v.phone||''),status:'active',note:''})}
+    if(d.k==='owner-edit'){const o=ownById(S.erp.oid);o.name=[v.name.trim(),v.name.trim()];o.phone=normD(v.phone||'');o.status=v.status}
+    if(d.k==='tanker'){TNK.push({id:'t'+(TNK.length+10),oid:S.erp.oid,plate:v.plate.trim(),cap:pf(v.cap),active:true})}
+    if(d.k==='link'){LNK.push({id:'l'+(LNK.length+1),oid:S.erp.oid,cid:v.cid,from:v.from,to:null})}
+    if(d.k==='endlink'){LNK.find(x=>x.id===d.ref.split(':')[1]).to=v.to}
+    S.erp.dlg=null;flash(X('تم الحفظ (نموذج — لم يُكتب شيء)','Saved (prototype — nothing was written)'),'erp')},
+  int(b){const id=b.dataset.id;let title,html,cta='';
+    if(id==='invoice'||id==='receipt'){title=id==='invoice'?X('فتح الفاتورة في المبيعات','Open the invoice in Sales'):X('فتح السند في المالية','Open the receipt in Finance');html=`<p>${X('في النظام الفعلي ينقلك هذا الزر إلى المستند الرسمي في وحدة أَوْج المعنية. لا تُعرض ولا تُعدَّل بيانات مالية من هنا.','In the real system this takes you to the official document in the relevant AWJ module. No financial data is shown or edited from here.')}</p>`}
+    else{const s=SUP.find(x=>x.id===id.split(':')[1]);title=X('إنشاء فاتورة في مبيعات أَوْج','Create an invoice in AWJ Sales');html=`<p>${X(`ستُفتح مسودة فاتورة في وحدة المبيعات الرسمية: العميل ${coName(s.cid)} والكمية ${fmt(s.l)} لتر.`,`A draft invoice opens in official Sales: customer ${coName(s.cid)}, quantity ${fmt(s.l)} L.`)}</p><div class="note warn">${X('الكمية سبق صرفها من المحطة عند التعبئة، فلا يجوز خصم مخزون ثانٍ. دعم هذا المسار في المبيعات يُتحقق منه قبل البناء.','The quantity already left the station at fill time, so stock must not be issued again. Support for this path in Sales is verified before building.')}</div>`;cta=`<button class="btn primary" data-act="mk-draft" data-id="${s.id}">${X('فتح مسودة (نموذج)','Open draft (prototype)')}</button>`}
+    S.erp.dlg={k:'info',title,html,cta};render()},
+  'mk-draft'(b){SUP.find(x=>x.id===b.dataset.id).sales='draft';S.erp.dlg=null;flash(X('نموذج: ظهرت كمسودة في المبيعات','Prototype: shown as a draft in Sales'),'erp')},
+  attr(b){const c=COL.find(x=>x.id===b.dataset.id);S.erp.dlg={k:'confirm',title:X('إسناد التحصيل','Attribute the collection'),html:`<p>${X('سيُحتسب هذا التحصيل ضمن التحصيلات المؤهَّلة لصاحب الصهريج. لا يُنشأ قبض جديد — الإسناد مرجعي فقط.','This collection will count as qualifying for the owner. No new receipt is created — attribution is a reference only.')}</p><p><b class="ltr num">${c.id}</b> · ${coName(c.cid)} · ${SAR(c.amt)}</p>`,ok:X('إسناد','Attribute'),run:()=>{c.oid=S.erp.oid;flash(X('أُسند التحصيل','Collection attributed'),'erp')}};render()},
+  'stl-approve'(){const id=S.erp.oid;S.erp.dlg={k:'confirm',title:X('اعتماد التسوية','Approve settlement'),html:`<p>${X('بعد الاعتماد يُجمَّد الكشف ولا يُعدَّل إلا بمسار تصحيح. الاعتماد لا يدفع شيئًا.','After approval the statement is frozen and changes only through a correction path. Approval pays nothing.')}</p>`,ok:X('اعتماد','Approve'),run:()=>{S.erp.settle[id]='approved';flash(X('اعتُمدت التسوية','Settlement approved'),'erp')}};render()},
+  'stl-pay'(){const id=S.erp.oid,c=calc(id);S.erp.dlg={k:'confirm',title:X('تسجيل دفع لصاحب الصهريج','Record payout to owner'),html:`<p>${X('عملية منفصلة تُسجَّل في المالية الرسمية (صرف). المبلغ:','A separate operation recorded in official Finance (payment out). Amount:')} ${SAR(c.net)}</p>`,ok:X('تسجيل الدفع','Record payout'),run:()=>{S.erp.settle[id]='paid';flash(X('سُجّل الدفع (نموذج)','Payout recorded (prototype)'),'erp')}};render()},
+  'dlg-confirm'(){const d=S.erp.dlg;S.erp.dlg=null;if(d.run)d.run();else render()},
+  'cm-mode'(b){COMM[S.erp.oid].mode=b.dataset.id;render()}
+};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled||b.getAttribute('aria-disabled')==='true')return;const f=ACTS[b.dataset.act];if(f){if(b.tagName==='A')e.preventDefault();f(b,e)}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('tr.clk')){e.target.click()}if(e.key==='Escape'){if(S.erp.dlg){S.erp.dlg=null;render()}else if(S.about){S.about=false;render()}}});
+render();
+
+</script>
+</body></html>
