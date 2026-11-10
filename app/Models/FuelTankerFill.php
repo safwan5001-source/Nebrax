@@ -99,7 +99,12 @@ class FuelTankerFill extends BaseModel
             return null;
         }
 
-        return ['display' => $display, 'key' => mb_strtolower(str_replace(' ', '', $display))];
+        $key = mb_strtolower(str_replace(' ', '', $display));
+        if (mb_strlen($key) > 128) { // تصغير Unicode قد يضاعف الطول (`İ` ⇒ حرفان): حدّ المفتاح المخزَّن.
+            return null;
+        }
+
+        return ['display' => $display, 'key' => $key];
     }
 
     public function station(): BelongsTo { return $this->belongsTo(FuelStation::class, 'fuel_station_id'); }

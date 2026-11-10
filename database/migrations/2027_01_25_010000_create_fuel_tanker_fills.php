@@ -53,7 +53,7 @@ return new class extends Migration
 
             $table->string('number'); // 255 كباقي المستندات: بادئة 20 + سنة + تسلسل + لاحقة 20 تبلغ 52 حرفاً (إعدادات الترقيم المسموحة).
             $table->string('voucher_number', 64);
-            $table->string('voucher_key', 64);
+            $table->string('voucher_key', 128); // مفتاح التطبيع (أحرف صغيرة بلا مسافات): قد يتضاعف طول `İ` عند التصغير (64 → 128).
             $table->string('voucher_scope', 16);
             $table->string('voucher_scope_key', 64);
 

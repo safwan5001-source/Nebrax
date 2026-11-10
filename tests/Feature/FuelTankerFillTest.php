@@ -864,6 +864,17 @@ class FuelTankerFillTest extends TestCase
     }
 
     /** @test */
+    public function a_voucher_whose_lowercase_key_expands_still_records(): void
+    {
+        $staff = $this->staff();
+        $voucher = str_repeat('İ', 64); // 64 حرفاً ظاهراً ⇒ مفتاح من 128 حرفاً بعد التصغير
+        $this->record($staff['token'], ['voucher_number' => $voucher])->assertCreated()->assertJsonPath('data.voucher_number', $voucher);
+        $this->assertSame(128, mb_strlen((string) FuelTankerFill::query()->value('voucher_key')));
+        $this->record($staff['token'], ['voucher_number' => $voucher])->assertStatus(409)->assertJsonPath('reason', 'voucher_duplicate');
+        $this->assertSame(128, mb_strlen((string) FuelTankerFill::normalizeVoucher($voucher)['key']));
+    }
+
+    /** @test */
     public function a_zero_voucher_filter_returns_only_that_voucher(): void
     {
         $staff = $this->staff();
