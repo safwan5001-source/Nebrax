@@ -89,8 +89,14 @@ export function TankerSettingsScreen() {
     if (!dirty || saving) return;
     setSaving(true);
     setFormError(null);
+    const scopeAtSave = sequence.current;
     try {
       const saved = await saveTankerPolicy(stationScope ? stationId : undefined, changes, reason);
+      // تغيّر النطاق أثناء الحفظ: نتيجة نطاق سابق لا تُعرض تحت نطاق آخر (التحميل الجديد هو المرجع).
+      if (scopeAtSave !== sequence.current) {
+        success(t('settings.saved'));
+        return;
+      }
       // بعد الحفظ تُعاد القراءة من الخادم (القيمة الفعّالة بعد الوراثة هي المرجع)، لا نفترض أن ما أُرسل هو ما حُفظ.
       const start = toDraft(saved.policy, saved.overrides);
       setInitial(start);
@@ -142,7 +148,7 @@ export function TankerSettingsScreen() {
       <Card>
         <CardContent className="space-y-3 pt-4">
           <Field id="tanker-settings-scope" label={t('settings.scopeLabel')} hint={t('settings.scopeHint')}>
-            <Select value={stationId} onChange={(event) => setStationId(event.target.value)}>
+            <Select value={stationId} disabled={saving} onChange={(event) => setStationId(event.target.value)}>
               <option value="">{t('settings.orgScope')}</option>
               {stations.map((station) => <option key={station.id} value={station.id}>{station.name}{station.code ? ` (${station.code})` : ''}</option>)}
             </Select>

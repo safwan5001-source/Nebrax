@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   station: {} as Record<string, unknown>,
   overrides: [] as string[],
   holds: [] as Array<Promise<void>>,
+  saveHold: null as Promise<void> | null,
   nozzles: [] as Array<Record<string, unknown>>,
 }));
 const toast = vi.hoisted(() => vi.fn());
@@ -35,6 +36,7 @@ vi.mock('@/lib/api', async (original) => ({
     if (path === '/fuel-stations/settings' && method === 'PUT') { Object.assign(state.tenant, opts.body); return { data: state.tenant }; }
     if (/^\/fuel-stations\/stations\/[0-9a-f-]{36}\/settings$/.test(path)) {
       if (method === 'PUT') {
+        if (state.saveHold) await state.saveHold;
         for (const [k, v] of Object.entries(opts.body as Record<string, unknown>)) {
           if (k === 'reason') continue;
           state.station[k] = v ?? state.tenant[k];
@@ -70,6 +72,7 @@ beforeEach(() => {
   state.station = { ...state.tenant };
   state.overrides = [];
   state.holds = [];
+  state.saveHold = null;
   state.nozzles = [
     { id: N1, fuel_station_id: ST1, nozzle_number: '1', pump: { pump_number: '1' }, fuel_product: { name: 'ديزل' }, status: 'active', allowed_operations: null },
     { id: N2, fuel_station_id: ST1, nozzle_number: '2', pump: { pump_number: '1' }, fuel_product: { name: 'بنزين' }, status: 'active', allowed_operations: ['tanker_fill'] },
@@ -260,5 +263,20 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
     fireEvent.click(within(document.querySelector(`[data-nozzle="${ST2_NOZZLE}"]`) as HTMLElement).getByRole('button', { name: T(locale).settings.nozzles.save }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0].path).toBe(`/fuel-stations/nozzles/${ST2_NOZZLE}`);
+  });
+  it('the scope selector is locked while a save is pending, so its result never shows under another scope (Codex P2)', async () => {
+    let release!: () => void;
+    state.saveHold = new Promise<void>((resolve) => { release = resolve; });
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
+    await waitFor(() => expect(select('tanker-settings-overrun').value).toBe('allow_with_confirmation'));
+    fireEvent.change(select('tanker-settings-overrun'), { target: { value: 'block' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(select('tanker-settings-scope').disabled).toBe(true));
+    release();
+    await waitFor(() => expect(select('tanker-settings-scope').disabled).toBe(false));
+    expect(select('tanker-settings-scope').value).toBe(ST1);
+    expect(select('tanker-settings-overrun').value).toBe('block');
   });
 });
