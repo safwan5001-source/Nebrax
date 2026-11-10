@@ -157,6 +157,22 @@ class FuelNozzleAllowedOperationsTest extends TestCase
     }
 
     /** @test */
+    public function an_open_shift_of_the_stations_branch_counts_even_when_the_active_branch_is_another_branch(): void
+    {
+        $this->openShift(); // فرع أ
+        $manager = $this->manager(false);
+        app(\App\Tenancy\BranchContext::class)->set($this->fx['branchB']->id);
+        $this->assertFalse(FuelShift::query()->where('status', FuelShift::STATUS_OPEN)->exists(), 'precondition: the branch scope hides the shift');
+
+        try {
+            $this->expectException(AuthorizationException::class);
+            app(FuelStationMasterDataService::class)->updateNozzle($this->nozzle, ['allowed_operations' => ['tanker_fill']], $manager['user']);
+        } finally {
+            app(\App\Tenancy\BranchContext::class)->forget();
+        }
+    }
+
+    /** @test */
     public function a_missing_actor_cannot_narrow_under_an_open_shift_fail_closed(): void
     {
         $this->openShift();

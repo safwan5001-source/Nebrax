@@ -325,7 +325,8 @@ class FuelStationMasterDataService
         if (array_diff($before, $after) === []) {
             return null; // لا إزالة لأي نوع: توسيع أو بلا تغيير.
         }
-        if (! FuelShift::query()->where('fuel_station_id', $nozzle->fuel_station_id)->where('status', FuelShift::STATUS_OPEN)->exists()) {
+        // بلا عزل الفرع النشط: التضييق يعتمد على محطة الفوهة نفسها لا على ترويسة الفرع (مدير متعدد الفروع قد يعمل من فرع آخر).
+        if (! FuelShift::query()->withoutGlobalScope(BranchScope::class)->where('fuel_station_id', $nozzle->fuel_station_id)->where('status', FuelShift::STATUS_OPEN)->exists()) {
             return ['before' => $before, 'after' => $after];
         }
         if ($actor === null || ! Rbac::allows((string) $actor->role, FuelStationSettingsService::GOVERNANCE_PERMISSION)) {
