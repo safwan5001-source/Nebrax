@@ -1328,10 +1328,12 @@ function render(focusSel) {
   app.dataset.dir = S.dir; app.dataset.mode = S.mode; app.dataset.density = S.density; app.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr'); app.setAttribute('lang', S.lang);
   const content = S.surface === 'dash' ? ({ astur:dashAstur, mash:dashMash, kufi:dashKufi })[S.dir]() : S.surface === 'table' ? tableSurface() : S.surface === 'inv' ? invoiceSurface() : shiftSurface();
   const scroll = $('#main')?.scrollTop || 0;
+  // Keep the caret/selection of the field being edited (re-rendering replaces it; jumping to the end corrupts mid-field edits)
+  let caret = null; try { const a = document.activeElement; if (a && app.contains(a) && typeof a.selectionStart === 'number') caret = { sel: a.id ? '#' + CSS.escape(a.id) : null, s: a.selectionStart, e: a.selectionEnd, v: a.value }; } catch (e) {}
   app.innerHTML = shell(content);
   if ($('#main') && !S._reset) $('#main').scrollTop = scroll; S._reset = false;
   S.toasts.forEach(drawToast); animateOdos(); animateDial();
-  if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {} } }
+  if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { if (caret && el.value === caret.v && (caret.sel ? el.matches(caret.sel) : true) && el.type !== 'number') el.setSelectionRange(caret.s, caret.e); else if (el.type !== 'number') { const n = el.value.length; el.setSelectionRange(n, n); } } catch (e) {} } }
   else if (S.overlay?.t === 'palette') $('#pal-q')?.focus();
   else if (S.overlay) app.querySelector('.overlay button')?.focus();
   S.inv.lines.forEach(l => delete l.fresh);

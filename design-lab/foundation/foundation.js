@@ -708,11 +708,13 @@ function render(focusSel) {
   Object.assign(app.dataset, { mode:S.mode, theme:S.theme, identity:S.identity, amt:S.amt, density:S.density });
   app.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr'); app.setAttribute('lang', S.lang);
   const scroll = document.getElementById('main')?.scrollTop || 0;
+  // Keep the caret/selection of the field being edited: re-rendering replaces it, and jumping to the end would corrupt mid-field edits
+  let caret = null; try { const a = document.activeElement; if (a && app.contains(a) && a.id && typeof a.selectionStart === 'number') caret = { id: a.id, s: a.selectionStart, e: a.selectionEnd, v: a.value }; } catch (e) {}
   app.innerHTML = shell(PAGES[S.route]());
   if (!S._reset) document.getElementById('main').scrollTop = scroll; S._reset = false;
   S.toasts.forEach(drawToast);
   if (S.route === 'numbers') requestAnimationFrame(() => measureNumbers());
-  if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {} } }
+  if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { if (caret && el.id === caret.id && el.value === caret.v) el.setSelectionRange(caret.s, caret.e); else { const n = el.value.length; el.setSelectionRange(n, n); } } catch (e) {} } }
   else if (S.overlay?.t === 'palette') document.getElementById('pal-q')?.focus();
   else if (S.overlay && !S.overlay.menu) app.querySelector('.ovl button:not([disabled]), .ovl [role="tab"]')?.focus();
   else if (S.overlay?.menu) app.querySelector('.menu [role="menuitem"]')?.focus();

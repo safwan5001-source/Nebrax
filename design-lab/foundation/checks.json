@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T04:25:02.527Z",
+ "generated": "2026-11-10T04:36:27.446Z",
  "matrix": [
   {
    "route": "home",
@@ -2504,6 +2504,10 @@
    "ok": true
   },
   {
+   "name": "After a failed posting attempt, editing digits mid-field keeps the caret (120 → select 1, type 34 → 3420)",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2558,7 +2562,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 30,
+   "tests": 31,
    "failed": 0
   },
   "matrix": {

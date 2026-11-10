@@ -307,6 +307,19 @@ test('Compact screens: Save draft is reachable from the More menu (no keyboard n
   await ctx.close();
 });
 
+test('After a failed posting attempt, editing digits mid-field keeps the caret (120 → select 1, type 34 → 3420)', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  await page.evaluate(() => { const F = window.__fx; F.S.docs.sales.party = null; F.render(); });
+  await page.click('.cmdbar [data-act="post"]');
+  const id = await page.evaluate(() => window.__fx.S.docs.sales.lines[0].id), q = `#sales-l${id}-qty`;
+  assert(await page.inputValue(q) === '120', 'fixture qty is ' + await page.inputValue(q));
+  await page.focus(q); await page.evaluate((q) => document.querySelector(q).setSelectionRange(0, 1), q);
+  await page.keyboard.type('34', { delay: 30 });
+  assert(await page.inputValue(q) === '3420', 'input shows ' + await page.inputValue(q));
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.lines[0].qtyM) === 3420000, 'stored qty ' + await page.evaluate(() => window.__fx.S.docs.sales.lines[0].qtyM));
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);
