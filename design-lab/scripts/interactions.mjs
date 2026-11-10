@@ -148,6 +148,29 @@ for (const dir of ['qalam', 'mizan', 'fajr']) {
     await p.click(`${app} .next [data-act="save-readings"]`);
     await p.locator(`${app} .toast`).waitFor();
   });
+  await test(`${dir}: Tab right after typing a reading keeps focus on the next field`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'shift', device: 'laptop' });
+    await p.click(`${app} [data-reading="N1"]`);
+    await p.keyboard.type('285012.37');
+    await p.keyboard.press('Tab');
+    await p.keyboard.press('Tab');
+    const before = await p.evaluate(() => document.activeElement?.dataset?.reading || document.activeElement?.id);
+    await p.waitForTimeout(500);
+    const after = await p.evaluate(() => document.activeElement?.dataset?.reading || document.activeElement?.id);
+    eq(after, before, 'focus not pulled back after the deferred render');
+    if (after === 'N1') throw new Error('focus returned to N1');
+  });
+  await test(`${dir}: Shift+Tab and Tab stay inside the open command palette`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'dash', device: 'laptop' });
+    await p.click(`${app} .page-head`);
+    await p.keyboard.press('Control+k');
+    await p.locator('#pal-q').waitFor();
+    for (const k of ['Shift+Tab', 'Shift+Tab', 'Tab', 'Tab', 'Tab']) {
+      await p.keyboard.press(k);
+      const inside = await p.evaluate(() => !!document.activeElement?.closest('#app .overlay'));
+      if (!inside) throw new Error(`focus left the palette after ${k}`);
+    }
+  });
   await test(`${dir}: phone tab bar navigates; touch targets ≥ 44px`, { width: 390, height: 844 }, async (p) => {
     await set(p, { dir, surface: 'dash', device: 'wide' });
     await p.click(`${app} .tabbar [data-go="table"]`);

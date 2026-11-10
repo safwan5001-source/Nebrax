@@ -1351,7 +1351,9 @@ function render(focusSel) {
   else if (S.overlay) app.querySelector('.overlay button')?.focus();
   S.inv.lines.forEach(l => delete l.fresh);
 }
-function go(surface) { S.surface = surface; S.overlay = null; S._resetScroll = true; persist(); syncControls(); render(); }
+/** Selector for whatever control has focus now, so a deferred re-render never pulls focus back to an older field. */
+function focusedSelector() { const f = document.activeElement; if (!f || !app.contains(f)) return undefined; if (f.dataset.reading) return `[data-reading="${f.dataset.reading}"]`; return f.id ? '#' + CSS.escape(f.id) : undefined; }
+function go(surface) { clearTimeout(S._rt); clearTimeout(S._qt); S.surface = surface; S.overlay = null; S._resetScroll = true; persist(); syncControls(); render(); }
 function toast(msg) { const id = Date.now() + Math.random(); const o = {id, msg}; S.toasts.push(o); drawToast(o); setTimeout(() => { S.toasts = S.toasts.filter(x => x.id !== id); document.getElementById('t' + String(id).replace('.', ''))?.remove(); }, 3200); }
 function drawToast(o) { const host = $('#toasts'); if (!host) return; const el = document.createElement('div'); el.className = 'toast'; el.id = 't' + String(o.id).replace('.', ''); el.innerHTML = ic('check') + '<span></span>'; el.querySelector('span').textContent = o.msg; host.appendChild(el); }
 
@@ -1411,14 +1413,14 @@ function validatePost() {
 }
 app.addEventListener('input', (e) => {
   const el = e.target;
-  if (el.id === 'tq') { S.q = el.value; S.page = 0; clearTimeout(S._qt); S._qt = setTimeout(() => render('#tq'), 120); return; }
+  if (el.id === 'tq') { S.q = el.value; S.page = 0; clearTimeout(S._qt); S._qt = setTimeout(() => { if (S.surface === 'table') render(focusedSelector()); }, 120); return; }
   if (el.id === 'pal-q') { S.palQ = el.value; S.palIdx = 0; render('#pal-q'); return; }
   if (el.id === 'cust-q') { S.inv.comboQ = el.value; S.inv.combo = true; S.inv.comboIdx = 0; render('#cust-q'); return; }
   if (el.dataset.reading) {
     const id = el.dataset.reading; S.readings[id + ':raw'] = el.value;
     const m = toMinor(el.value, 3);
     S.readings[id] = el.value.trim() === '' || m === null ? null : m;
-    clearTimeout(S._rt); S._rt = setTimeout(() => render(`[data-reading="${id}"]`), 350); return;
+    clearTimeout(S._rt); S._rt = setTimeout(() => { if (S.surface === 'shift') render(focusedSelector()); }, 350); return;
   }
   if (el.dataset.hf) { S.inv[el.dataset.hf] = el.value; return; }
   const lf = el.dataset.lf; if (!lf) return;
@@ -1434,7 +1436,7 @@ app.addEventListener('input', (e) => {
 });
 app.addEventListener('keydown', (e) => {
   const el = e.target;
-  if (S.overlay?.t === 'palette' && el.id === 'pal-q') {
+  if (S.overlay?.t === 'palette' && el.id === 'pal-q' && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
     const r = palResults();
     if (e.key === 'ArrowDown') { e.preventDefault(); S.palIdx = (S.palIdx + 1) % Math.max(1, r.length); render('#pal-q'); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); S.palIdx = (S.palIdx - 1 + r.length) % Math.max(1, r.length); render('#pal-q'); }
