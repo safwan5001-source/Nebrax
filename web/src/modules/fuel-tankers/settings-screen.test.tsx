@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   fail: {} as Record<string, number>,
   tenant: {} as Record<string, unknown>,
   station: {} as Record<string, unknown>,
+  overrides: [] as string[],
+  holds: [] as Array<Promise<void>>,
   nozzles: [] as Array<Record<string, unknown>>,
 }));
 const toast = vi.hoisted(() => vi.fn());
@@ -32,10 +34,16 @@ vi.mock('@/lib/api', async (original) => ({
     if (path === '/fuel-stations/settings' && method === 'GET') return { data: state.tenant };
     if (path === '/fuel-stations/settings' && method === 'PUT') { Object.assign(state.tenant, opts.body); return { data: state.tenant }; }
     if (/^\/fuel-stations\/stations\/[0-9a-f-]{36}\/settings$/.test(path)) {
-      if (method === 'PUT') { for (const [k, v] of Object.entries(opts.body as Record<string, unknown>)) { if (k !== 'reason') state.station[k] = v ?? state.tenant[k]; } return { data: state.station }; }
-      return { data: state.station };
+      if (method === 'PUT') {
+        for (const [k, v] of Object.entries(opts.body as Record<string, unknown>)) {
+          if (k === 'reason') continue;
+          state.station[k] = v ?? state.tenant[k];
+          state.overrides = v === null ? state.overrides.filter((x) => x !== k) : [...new Set([...state.overrides, k])];
+        }
+      }
+      return { data: state.station, meta: { overrides: state.overrides } };
     }
-    if (path === '/fuel-stations/nozzles') return { data: state.nozzles };
+    if (path === '/fuel-stations/nozzles') { const hold = state.holds.shift(); if (hold) await hold; return { data: state.nozzles }; }
     const put = /^\/fuel-stations\/nozzles\/([0-9a-f-]{36})$/.exec(path);
     if (put && method === 'PUT') {
       const row = state.nozzles.find((n) => n.id === put[1])!;
@@ -52,7 +60,7 @@ const N1 = '00000000-0000-4000-8000-0000000000b1';
 const N2 = '00000000-0000-4000-8000-0000000000b2';
 const T = (locale: TestLocale) => TEST_MESSAGES[locale].fuelTankers;
 const writes = () => calls.filter((c) => c.method !== 'GET');
-const GOV = ['fuel.tanker.view', 'fuel_stations.manage', 'fuel.governance.manage'];
+const GOV = ['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage', 'fuel.governance.manage'];
 
 beforeEach(() => {
   calls.length = 0;
@@ -60,6 +68,8 @@ beforeEach(() => {
   state.fail = {};
   state.tenant = { tanker_selection_required: false, tanker_voucher_unique_scope: 'station', tanker_capacity_overrun_policy: 'allow_with_confirmation' };
   state.station = { ...state.tenant };
+  state.overrides = [];
+  state.holds = [];
   state.nozzles = [
     { id: N1, fuel_station_id: ST1, nozzle_number: '1', pump: { pump_number: '1' }, fuel_product: { name: 'ديزل' }, status: 'active', allowed_operations: null },
     { id: N2, fuel_station_id: ST1, nozzle_number: '2', pump: { pump_number: '1' }, fuel_product: { name: 'بنزين' }, status: 'active', allowed_operations: ['tanker_fill'] },
@@ -101,6 +111,7 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
 
   it('at station scope inherit sends null (clears the override) and a station value sends the value', async () => {
     state.station = { tanker_selection_required: false, tanker_voucher_unique_scope: 'owner', tanker_capacity_overrun_policy: 'allow_with_confirmation' };
+    state.overrides = ['tanker_voucher_unique_scope'];
     renderIntl(<TankerSettingsScreen />, locale);
     await screen.findByRole('heading', { name: T(locale).settings.title });
     fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
@@ -114,7 +125,7 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
   });
 
   it('without the governance permission the policies are read-only and nothing can be sent; the nozzle editor stays available to station managers', async () => {
-    state.permissions = ['fuel.tanker.view', 'fuel_stations.manage'];
+    state.permissions = ['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'];
     renderIntl(<TankerSettingsScreen />, locale);
     await screen.findByRole('heading', { name: T(locale).settings.title });
     expect(select('tanker-settings-selection').disabled).toBe(true);
@@ -126,7 +137,7 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
   });
 
   it('view-only users cannot edit anything', async () => {
-    state.permissions = ['fuel.tanker.view'];
+    state.permissions = ['fuel.tanker.view', 'fuel_stations.view'];
     renderIntl(<TankerSettingsScreen />, locale);
     await screen.findByRole('heading', { name: T(locale).settings.title });
     expect(select('tanker-settings-selection').disabled).toBe(true);
@@ -205,5 +216,49 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
     expect(within(document.querySelector(`[data-nozzle="${N2}"]`) as HTMLElement).queryByRole('alert')).toBeNull();
     // لا نجاح مزيَّف: القيد الظاهر يبقى كما كان قبل الحفظ.
     expect(toast).not.toHaveBeenCalled();
+  });
+  it('tanker.view without fuel_stations.view is denied up-front with the missing key and no request (the API reads need fuel_stations.view)', async () => {
+    state.permissions = ['fuel.tanker.view'];
+    renderIntl(<TankerSettingsScreen />, locale);
+    expect(await screen.findByText(T(locale).states.forbiddenTitle)).toBeTruthy();
+    expect(screen.getByText('fuel_stations.view')).toBeTruthy();
+    expect(calls).toEqual([]);
+  });
+
+  it('pinning a station override equal to the effective organization value is sent (it is an override, not a no-op)', async () => {
+    state.tenant = { tanker_selection_required: false, tanker_voucher_unique_scope: 'station', tanker_capacity_overrun_policy: 'block' };
+    state.station = { ...state.tenant };
+    state.overrides = [];
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
+    await waitFor(() => expect(select('tanker-settings-overrun').value).toBe('inherit'));
+    fireEvent.change(select('tanker-settings-overrun'), { target: { value: 'block' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({ tanker_capacity_overrun_policy: 'block' });
+    await waitFor(() => expect(select('tanker-settings-overrun').value).toBe('block'));
+    // بعد الحفظ يظهر كتجاوز صريح (من meta.overrides) لا كموروث.
+    expect(state.overrides).toEqual(['tanker_capacity_overrun_policy']);
+  });
+
+  it('a late nozzle response for a previously selected station never overwrites the selected station (Codex P2)', async () => {
+    const ST2_NOZZLE = '00000000-0000-4000-8000-0000000000c1';
+    state.nozzles.push({ id: ST2_NOZZLE, fuel_station_id: ST2, nozzle_number: '7', pump: { pump_number: '3' }, fuel_product_id: 'x', fuel_product: { name: 'ديزل' }, status: 'active', allowed_operations: null });
+    let release!: () => void;
+    state.holds = [new Promise<void>((resolve) => { release = resolve; })]; // أول طلب فوهات (محطة أ) يتأخر
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } }); // طلب متأخر
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST2 } }); // يكتمل أولاً
+    await waitFor(() => expect(document.querySelector(`[data-nozzle="${ST2_NOZZLE}"]`)).toBeTruthy());
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect([...document.querySelectorAll('[data-nozzle]')].map((el) => el.getAttribute('data-nozzle'))).toEqual([ST2_NOZZLE]);
+    // الحفظ يستهدف فوهة المحطة المعروضة فقط.
+    fireEvent.click(within(document.querySelector(`[data-nozzle="${ST2_NOZZLE}"]`) as HTMLElement).getAllByRole('checkbox')[0]);
+    fireEvent.click(within(document.querySelector(`[data-nozzle="${ST2_NOZZLE}"]`) as HTMLElement).getByRole('button', { name: T(locale).settings.nozzles.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].path).toBe(`/fuel-stations/nozzles/${ST2_NOZZLE}`);
   });
 });

@@ -97,6 +97,26 @@ class FuelStationSettingsService
     }
 
     /** @return array<string, mixed> */
+    /**
+     * TANKER-PR3 (Codex P2): مفاتيح الإعدادات التي **للمحطة تجاوز صريح لها** (على مستوى المحطة لا الجهاز). `forStation()` يعيد القيمة الفعّالة فقط فلا يميّز
+     * «موروث» من «مثبَّت بقيمة مساوية لقيمة المؤسسة»؛ الواجهة تحتاج الفرق كي لا يتغيّر تجاوز مثبَّت بتغيير لاحق في المؤسسة بلا قصد.
+     *
+     * @return list<string>
+     */
+    public function stationOverrideKeys(FuelStation $station): array
+    {
+        $this->assertStationTenant($station);
+
+        return FuelStationSettingOverride::query()
+            ->where('fuel_station_id', $station->id)
+            ->where('device_key', '')
+            ->orderBy('setting_key')
+            ->pluck('setting_key')
+            ->map(fn ($key) => (string) $key)
+            ->values()
+            ->all();
+    }
+
     public function forStation(FuelStation $station, ?string $deviceKey = null): array
     {
         $this->assertStationTenant($station);

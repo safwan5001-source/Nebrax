@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  effectiveOperations, INHERIT, isNarrowing, POLICY_DEFAULTS, policyChanges, readPolicy, sameOperations, SERVER_KEYS, toDraft, toStoredOperations,
+  effectiveOperations, INHERIT, isNarrowing, overrideFields, POLICY_DEFAULTS, policyChanges, readPolicy, sameOperations, SERVER_KEYS, toDraft, toStoredOperations,
 } from './settings-logic';
 
 describe('readPolicy', () => {
@@ -17,15 +17,29 @@ describe('readPolicy', () => {
 
 describe('policyChanges', () => {
   const current = readPolicy({});
+  const org = toDraft(current);
   it('sends only changed keys, typed (boolean stays boolean)', () => {
-    expect(policyChanges(current, toDraft(current), false)).toEqual({});
-    expect(policyChanges(current, { ...toDraft(current), selectionRequired: 'true' }, false)).toEqual({ [SERVER_KEYS.selectionRequired]: true });
-    expect(policyChanges(current, { ...toDraft(current), voucherScope: 'owner', overrunPolicy: 'block' }, false)).toEqual({ [SERVER_KEYS.voucherScope]: 'owner', [SERVER_KEYS.overrunPolicy]: 'block' });
+    expect(policyChanges(org, org)).toEqual({});
+    expect(policyChanges(org, { ...org, selectionRequired: 'true' })).toEqual({ [SERVER_KEYS.selectionRequired]: true });
+    expect(policyChanges(org, { ...org, voucherScope: 'owner', overrunPolicy: 'block' })).toEqual({ [SERVER_KEYS.voucherScope]: 'owner', [SERVER_KEYS.overrunPolicy]: 'block' });
   });
-  it('inherit clears a station override (null) and is never sent at organization scope', () => {
-    const draft = { ...toDraft(current), voucherScope: INHERIT };
-    expect(policyChanges(current, draft, true)).toEqual({ [SERVER_KEYS.voucherScope]: null });
-    expect(policyChanges(current, draft, false)).toEqual({});
+  it('station scope keeps inherited vs overridden state: inherit is the initial value of a non-overridden key', () => {
+    const station = toDraft(current, new Set(['voucherScope']));
+    expect(station).toEqual({ selectionRequired: INHERIT, voucherScope: 'station', overrunPolicy: INHERIT });
+    expect(policyChanges(station, station)).toEqual({});
+  });
+  it('pinning an explicit value EQUAL to the current effective one creates an override (Codex P2)', () => {
+    const station = toDraft(current, new Set());
+    expect(policyChanges(station, { ...station, overrunPolicy: 'allow_with_confirmation' })).toEqual({ [SERVER_KEYS.overrunPolicy]: 'allow_with_confirmation' });
+  });
+  it('choosing inherit on an overridden key clears it (null); an untouched inherited key sends nothing', () => {
+    const station = toDraft(current, new Set(['voucherScope']));
+    expect(policyChanges(station, { ...station, voucherScope: INHERIT })).toEqual({ [SERVER_KEYS.voucherScope]: null });
+  });
+  it('maps server override keys to UI fields and ignores unknown or malformed input', () => {
+    expect([...overrideFields(['tanker_voucher_unique_scope', 'unrelated', 'tanker_selection_required'])].sort()).toEqual(['selectionRequired', 'voucherScope']);
+    expect(overrideFields(undefined).size).toBe(0);
+    expect(overrideFields('x').size).toBe(0);
   });
 });
 

@@ -40,31 +40,45 @@ export function readPolicy(raw: unknown): TankerPolicy {
   };
 }
 
-/** اختيار الواجهة لكل سياسة: القيمة نفسها كنص، أو `inherit` (نطاق المحطة فقط: مسح التجاوز والعودة لافتراضي المؤسسة). */
+/** اختيار الواجهة لكل سياسة: القيمة نفسها كنص، أو `inherit` (نطاق المحطة فقط: لا تجاوز، أو مسح التجاوز والعودة لافتراضي المؤسسة). */
 export const INHERIT = 'inherit';
 export type PolicyDraft = Record<PolicyField, string>;
 
-export function toDraft(policy: TankerPolicy): PolicyDraft {
-  return { selectionRequired: String(policy.selectionRequired), voucherScope: policy.voucherScope, overrunPolicy: policy.overrunPolicy };
+const draftValue = (policy: TankerPolicy, field: PolicyField): string => (field === 'selectionRequired' ? String(policy.selectionRequired) : policy[field]);
+
+/**
+ * المسودة الابتدائية. نطاق المؤسسة (`overrides = null`): القيم الفعلية. نطاق المحطة: `inherit` لما **لا تجاوز له**، والقيمة لما له تجاوز صريح —
+ * فتبقى حالة الوراثة مرئية حتى لو تساوت القيمة الفعّالة مع قيمة المؤسسة (تثبيت قيمة مساوية = تجاوز، لا لا-تغيير).
+ */
+export function toDraft(policy: TankerPolicy, overrides: ReadonlySet<PolicyField> | null = null): PolicyDraft {
+  const draft = {} as PolicyDraft;
+  for (const field of POLICY_FIELDS) draft[field] = overrides !== null && !overrides.has(field) ? INHERIT : draftValue(policy, field);
+  return draft;
 }
 
 function typed(field: PolicyField, value: string): boolean | string {
   return field === 'selectionRequired' ? value === 'true' : value;
 }
 
-/** المتغيّر فقط (لا طلب عند عدم التغيير). `inherit` ⇒ `null` (مسح تجاوز المحطة) ولا يُرسَل أبداً على مستوى المؤسسة. */
-export function policyChanges(current: TankerPolicy, draft: PolicyDraft, stationScope: boolean): Record<string, boolean | string | null> {
+/**
+ * المتغيّر عن المسودة الابتدائية فقط (لا طلب عند عدم التغيير). `inherit` ⇒ `null` (مسح تجاوز المحطة)؛ وقيمة صريحة بعد `inherit` تُرسَل حتى لو ساوت
+ * القيمة الفعّالة (تثبيت تجاوز). لا يصل `inherit` إلى نطاق المؤسسة أصلاً (لا خيار له هناك).
+ */
+export function policyChanges(initial: PolicyDraft, draft: PolicyDraft): Record<string, boolean | string | null> {
   const payload: Record<string, boolean | string | null> = {};
-  const now = toDraft(current);
   for (const field of POLICY_FIELDS) {
-    const next = draft[field];
-    if (next === INHERIT) {
-      if (stationScope) payload[SERVER_KEYS[field]] = null;
-      continue;
-    }
-    if (next !== now[field]) payload[SERVER_KEYS[field]] = typed(field, next);
+    if (draft[field] === initial[field]) continue;
+    payload[SERVER_KEYS[field]] = draft[field] === INHERIT ? null : typed(field, draft[field]);
   }
   return payload;
+}
+
+/** مفاتيح الخادم ⇒ حقول الواجهة (للتجاوزات المعادة في `meta.overrides`). */
+export function overrideFields(serverKeys: unknown): Set<PolicyField> {
+  const fields = new Set<PolicyField>();
+  if (!Array.isArray(serverKeys)) return fields;
+  for (const field of POLICY_FIELDS) if (serverKeys.includes(SERVER_KEYS[field])) fields.add(field);
+  return fields;
 }
 
 /** قيد الفوهة المخزَّن (`null` = كل العمليات) ⇒ العمليات المسموحة فعلاً بالترتيب الكنسي. */

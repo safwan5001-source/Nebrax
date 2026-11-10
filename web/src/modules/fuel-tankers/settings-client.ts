@@ -1,6 +1,6 @@
 import { api } from '@/lib/api';
 import { assertId } from './client';
-import { readPolicy, type TankerOperation, type TankerPolicy } from './settings-logic';
+import { overrideFields, readPolicy, type PolicyField, type TankerOperation, type TankerPolicy } from './settings-logic';
 
 /**
  * TANKER-PR3 — نقطة الشبكة الوحيدة لشاشة إعدادات التعبئة: إعدادات الوقود القائمة (مؤسسة/محطة) وفوهات المحطة. لا حمولة تحمل `tenant_id`،
@@ -28,17 +28,25 @@ const asList = (payload: unknown): unknown[] => {
   return Array.isArray(data) ? data : [];
 };
 
-export async function getTankerPolicy(stationId?: string): Promise<TankerPolicy> {
+/** السياسات الفعّالة + (لنطاق المحطة) أيّها **لها تجاوز صريح** من `meta.overrides`؛ `overrides = null` لنطاق المؤسسة. */
+export interface PolicyState { policy: TankerPolicy; overrides: Set<PolicyField> | null }
+
+function toPolicyState(payload: unknown, stationScope: boolean): PolicyState {
+  const body = asObject(payload);
+  return { policy: readPolicy(body.data), overrides: stationScope ? overrideFields(asObject(body.meta).overrides) : null };
+}
+
+export async function getTankerPolicy(stationId?: string): Promise<PolicyState> {
   const path = stationId ? `${STATIONS}/${assertId(stationId)}/settings` : SETTINGS;
-  return readPolicy(asObject(await api<unknown>(path)).data);
+  return toPolicyState(await api<unknown>(path), Boolean(stationId));
 }
 
 export type PolicyPayload = Record<string, boolean | string | null>;
 
-export async function saveTankerPolicy(stationId: string | undefined, changes: PolicyPayload, reason?: string): Promise<TankerPolicy> {
+export async function saveTankerPolicy(stationId: string | undefined, changes: PolicyPayload, reason?: string): Promise<PolicyState> {
   const path = stationId ? `${STATIONS}/${assertId(stationId)}/settings` : SETTINGS;
   const body = reason && reason.trim() !== '' ? { ...changes, reason: reason.trim() } : changes;
-  return readPolicy(asObject(await api<unknown>(path, { method: 'PUT', body })).data);
+  return toPolicyState(await api<unknown>(path, { method: 'PUT', body }), Boolean(stationId));
 }
 
 export async function listStations(): Promise<StationOption[]> {

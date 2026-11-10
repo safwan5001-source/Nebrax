@@ -21,6 +21,7 @@ import {
 import { ForbiddenState, GateClosedState } from './states';
 import { usePermissions } from './use-permissions';
 
+const STATIONS_VIEW = 'fuel_stations.view';
 const MANAGE = 'fuel_stations.manage';
 const GOVERNANCE = 'fuel.governance.manage';
 
@@ -35,7 +36,9 @@ export function TankerSettingsScreen() {
   const t = useTranslations('fuelTankers');
   const { success } = useToast();
   const permissions = usePermissions();
-  const canView = hasPermission(permissions, TANKER_VIEW);
+  // القراءة تمرّ بمسارات إعدادات الوقود والمحطات (`fuel_stations.view`) إضافة إلى مسبار البوابة (`fuel.tanker.view`): كلاهما لازم، فلا نعرض شاشة تفشل بعد قبولها.
+  const hasTankerView = hasPermission(permissions, TANKER_VIEW);
+  const canView = hasTankerView && hasPermission(permissions, STATIONS_VIEW);
   const canManage = hasPermission(permissions, MANAGE);
   const canGovern = canManage && hasPermission(permissions, GOVERNANCE);
 
@@ -43,7 +46,8 @@ export function TankerSettingsScreen() {
   const [stations, setStations] = useState<StationOption[]>([]);
   const [stationId, setStationId] = useState('');
   const [orgPolicy, setOrgPolicy] = useState<TankerPolicy>(POLICY_DEFAULTS);
-  const [policy, setPolicy] = useState<TankerPolicy>(POLICY_DEFAULTS);
+  // المسودة الابتدائية تحمل حالة الوراثة/التجاوز للمحطة (`inherit` لما لا تجاوز له) فلا يضيع الفرق بين «موروث» و«مثبَّت بقيمة مساوية».
+  const [initial, setInitial] = useState<PolicyDraft>(toDraft(POLICY_DEFAULTS));
   const [draft, setDraft] = useState<PolicyDraft>(toDraft(POLICY_DEFAULTS));
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -60,10 +64,10 @@ export function TankerSettingsScreen() {
       const [org, list, scoped] = await Promise.all([getTankerPolicy(), listStations(), scopeStation ? getTankerPolicy(scopeStation) : Promise.resolve(null)]);
       if (mine !== sequence.current) return;
       setStations(list);
-      setOrgPolicy(org);
-      const effective = scoped ?? org;
-      setPolicy(effective);
-      setDraft(toDraft(effective));
+      setOrgPolicy(org.policy);
+      const start = toDraft((scoped ?? org).policy, (scoped ?? org).overrides);
+      setInitial(start);
+      setDraft(start);
       setFormError(null);
       setState('ready');
     } catch (error) {
@@ -78,7 +82,7 @@ export function TankerSettingsScreen() {
     void load(stationId);
   }, [permissions, canView, stationId, load]);
 
-  const changes = useMemo(() => policyChanges(policy, draft, stationScope), [policy, draft, stationScope]);
+  const changes = useMemo(() => policyChanges(initial, draft), [initial, draft]);
   const dirty = Object.keys(changes).length > 0;
 
   async function save() {
@@ -88,9 +92,10 @@ export function TankerSettingsScreen() {
     try {
       const saved = await saveTankerPolicy(stationScope ? stationId : undefined, changes, reason);
       // بعد الحفظ تُعاد القراءة من الخادم (القيمة الفعّالة بعد الوراثة هي المرجع)، لا نفترض أن ما أُرسل هو ما حُفظ.
-      setPolicy(saved);
-      setDraft(toDraft(saved));
-      if (!stationScope) setOrgPolicy(saved);
+      const start = toDraft(saved.policy, saved.overrides);
+      setInitial(start);
+      setDraft(start);
+      if (!stationScope) setOrgPolicy(saved.policy);
       setReason('');
       success(t('settings.saved'));
     } catch (error) {
@@ -106,7 +111,7 @@ export function TankerSettingsScreen() {
   }
 
   if (permissions === null) return <LoadingState variant="cards" rows={3} />;
-  if (!canView || state === 'forbidden') return <ForbiddenState required={TANKER_VIEW} />;
+  if (!canView || state === 'forbidden') return <ForbiddenState required={hasTankerView ? STATIONS_VIEW : TANKER_VIEW} />;
   if (state === 'gate_closed') return <GateClosedState />;
   if (state === 'error') return <ErrorState message={t('settings.loadFailed')} onRetry={() => void load(stationId)} />;
   if (state === 'loading' && stations.length === 0 && !stationScope) return <LoadingState variant="cards" rows={3} />;
@@ -205,7 +210,7 @@ export function TankerSettingsScreen() {
         </CardContent>
       </Card>
 
-      <NozzleOperations stationId={stationId} canManage={canManage} />
+      <NozzleOperations key={stationId} stationId={stationId} canManage={canManage} />
     </div>
   );
 }
@@ -219,22 +224,26 @@ function NozzleOperations({ stationId, canManage }: { stationId: string; canMana
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadFailed, setLoadFailed] = useState(false);
+  const sequence = useRef(0);
 
   const load = useCallback(async () => {
+    const mine = ++sequence.current;
     if (!stationId) { setRows(null); return; }
     setRows(null);
     setLoadFailed(false);
     try {
       const list = await listStationNozzles(stationId);
+      // رد متأخر لمحطة سابقة (أو لطلب قديم) لا يكتب فوق المحطة المختارة الآن: وإلا حُفظ تعديل على فوهة محطة غير المعروضة.
+      if (mine !== sequence.current) return;
       setRows(list);
       setSelection(Object.fromEntries(list.map((row) => [row.id, effectiveOperations(row.allowed_operations)])));
       setErrors({});
     } catch {
-      setLoadFailed(true);
+      if (mine === sequence.current) setLoadFailed(true);
     }
   }, [stationId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { sequence.current += 1; }; }, [load]);
 
   if (!stationId) {
     return <Card><CardHeader><CardTitle>{t('settings.nozzles.title')}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted">{t('settings.nozzles.pickStation')}</p></CardContent></Card>;

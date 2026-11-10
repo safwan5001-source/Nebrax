@@ -83,6 +83,29 @@ class FuelTankerPolicySettingsTest extends TestCase
     }
 
     /** @test */
+    public function the_station_settings_response_tells_overridden_keys_from_inherited_ones_even_when_the_values_are_equal(): void
+    {
+        $url = self::BASE . '/stations/' . $this->fx['s1']->id . '/settings';
+        $this->assertSame([], $this->withToken($this->fx['owner'])->getJson($url)->assertOk()->json('meta.overrides'));
+
+        // تثبيت قيمة مساوية لقيمة المؤسسة (station = الافتراضي) هو تجاوز صريح لا وراثة.
+        $put = $this->withToken($this->fx['owner'])->putJson($url, ['tanker_voucher_unique_scope' => 'station', 'reason' => 'تثبيت'])->assertOk();
+        $this->assertSame(['tanker_voucher_unique_scope'], $put->json('meta.overrides'));
+        $this->assertSame(['tanker_voucher_unique_scope'], $this->withToken($this->fx['owner'])->getJson($url)->json('meta.overrides'));
+
+        // تغيّر المؤسسة لاحقاً لا يغيّر المحطة المثبَّتة، ويغيّر المحطة الأخرى الموروثة.
+        $this->withToken($this->fx['owner'])->putJson(self::BASE . '/settings', ['tanker_voucher_unique_scope' => 'owner', 'reason' => 'x'])->assertOk();
+        $svc = app(FuelStationSettingsService::class);
+        $this->assertSame('station', $svc->tankerFillPolicy($this->fx['s1'])['voucher_unique_scope']);
+        $this->assertSame('owner', $svc->tankerFillPolicy($this->fx['s2'])['voucher_unique_scope']);
+
+        // المسح يعيد الوراثة؛ وتجاوز محطة لا يظهر في محطة أخرى.
+        $this->assertSame([], $this->withToken($this->fx['owner'])->getJson(self::BASE . '/stations/' . $this->fx['s2']->id . '/settings')->json('meta.overrides'));
+        $cleared = $this->withToken($this->fx['owner'])->putJson($url, ['tanker_voucher_unique_scope' => null, 'reason' => 'مسح'])->assertOk();
+        $this->assertSame([], $cleared->json('meta.overrides'));
+    }
+
+    /** @test */
     public function invalid_values_are_rejected_and_supervisor_approval_is_not_supported_yet(): void
     {
         foreach ([
