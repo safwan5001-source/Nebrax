@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Branch;
 use App\Models\FuelNozzle;
+use App\Models\FuelShift;
 use App\Models\FuelOperationalLedger;
 use App\Models\FuelProduct;
 use App\Models\FuelPump;
@@ -13,7 +14,9 @@ use App\Models\FuelTank;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Support\Rbac;
 use App\Tenancy\BranchScope;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -290,16 +293,46 @@ class FuelStationMasterDataService
             $before = $this->audit->snapshot($nozzle);
             $next = $this->merged($nozzle, $data, [
                 'fuel_pump_id', 'fuel_tank_id', 'fuel_product_id', 'nozzle_number', 'controller_key',
-                'meter_opening_milliliters', 'status',
+                'meter_opening_milliliters', 'status', 'allowed_operations',
             ]);
             $attributes = $this->nozzleAttributes($next);
+            $narrowed = $this->assertNozzleOperationsChangeAllowed($nozzle, $attributes['allowed_operations'], $actor);
             $this->assertNozzleNumberAvailable($attributes['fuel_pump_id'], $attributes['nozzle_number'], $nozzle->id);
             $this->assertControllerKeyAvailable(FuelNozzle::class, $attributes['controller_key'], $nozzle->id);
             $nozzle->update($attributes);
             $this->audit->record('nozzle.updated', $nozzle, $before, $this->audit->snapshot($nozzle->fresh()), $actor);
+            if ($narrowed !== null) {
+                // قرار المالك 7: كل تضييق حدث تدقيق صريح مستقل (فاعل + قبل/بعد المجموعة الفعّالة) فوق حدث التعديل العام.
+                $this->audit->record('nozzle.operations_narrowed', $nozzle, ['effective_operations' => $narrowed['before']], ['effective_operations' => $narrowed['after']], $actor);
+            }
 
             return $nozzle->fresh(['pump', 'tank', 'fuelProduct']);
         });
+    }
+
+    /**
+     * TANKER-PR3 (قرار المالك 7): **تضييق** عمليات فوهة (إزالة نوع كان مسموحاً) أثناء وجود **وردية مفتوحة** لمحطتها يتطلب `fuel.governance.manage`
+     * بالإضافة إلى `fuel_stations.manage` (صلاحية المسار). الوردية موحّدة لكل العمليات، فوردية مفتوحة = عمليات قد تجري على الفوهة الآن (تفسير محافظ).
+     * التوسيع أو التعديل بلا وردية مفتوحة يكفيه `fuel_stations.manage`. فاعل غائب في حالة التضييق المحكوم مرفوض (فشل مغلق).
+     *
+     * @param  list<string>|null  $nextStored
+     * @return array{before: list<string>, after: list<string>}|null  المجموعتان الفعّالتان إن حصل **تضييق** (بأي حال؛ يُدقَّق صراحةً)، وإلا null
+     */
+    private function assertNozzleOperationsChangeAllowed(FuelNozzle $nozzle, ?array $nextStored, ?User $actor): ?array
+    {
+        $before = $nozzle->effectiveOperations();
+        $after = $nextStored === null ? FuelNozzle::OPERATIONS : $nextStored;
+        if (array_diff($before, $after) === []) {
+            return null; // لا إزالة لأي نوع: توسيع أو بلا تغيير.
+        }
+        if (! FuelShift::query()->where('fuel_station_id', $nozzle->fuel_station_id)->where('status', FuelShift::STATUS_OPEN)->exists()) {
+            return ['before' => $before, 'after' => $after];
+        }
+        if ($actor === null || ! Rbac::allows((string) $actor->role, FuelStationSettingsService::GOVERNANCE_PERMISSION)) {
+            throw new AuthorizationException('تضييق عمليات فوهة عليها وردية مفتوحة يتطلب صلاحية حوكمة الوقود إضافة إلى إدارة المحطة.');
+        }
+
+        return ['before' => $before, 'after' => $after];
     }
 
     public function deleteNozzle(FuelNozzle $nozzle, ?User $actor = null): void
@@ -509,6 +542,7 @@ class FuelStationMasterDataService
             'controller_key' => $this->nullableTrim($data['controller_key'] ?? null),
             'meter_opening_milliliters' => $this->nonNegativeInt($data['meter_opening_milliliters'] ?? 0, 'قراءة العداد الافتتاحية'),
             'status' => $data['status'] ?? FuelNozzle::STATUS_ACTIVE,
+            'allowed_operations' => FuelNozzle::normalizeOperations($data['allowed_operations'] ?? null),
         ];
     }
 

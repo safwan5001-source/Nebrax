@@ -154,6 +154,9 @@ class Rbac
             'fuel_stations.view', 'fuel_stations.manage',
             'fuel.shift.view', 'fuel.shift.open', 'fuel.shift.close', 'fuel.shift.approve',
             'fuel.shift.correct', 'fuel.shift.cash_count', 'fuel.shift.cash_variance_review',
+            // TANKER-PR3 (قرار المالك 8): مراجعة المشرف لفروق **العدادات** (عدّاد الفوهة ↔ المسجَّل) سلطة مستقلة عن مراجعة فروق النقد `cash_variance_review`.
+            // owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني). تُسجَّل الآن ولا يستعملها مسار بعد (التطبيق في PR-8).
+            'fuel.shift.meter_variance_review',
             'fuel.sale.view', 'fuel.sale.create', 'fuel.sale.finalize', 'fuel.sale.collect', 'fuel.sale.price.manage',
             // Cycle 6: سلطات العقد والائتمان والبطاقة مستقلة، ولا ترثها
             // أدوار المحطة من fuel_stations.manage.

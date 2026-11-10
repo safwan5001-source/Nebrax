@@ -43,6 +43,8 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
       { href: '/fuel-stations/avi-rfid', labelKey: 'aviRfid', permissions: ['fuel.avi.view'], appKey: 'fuel_stations.avi' },
       // TANKER-PR2: إدارة أصحاب الصهاريج — بوابة نشر مغلقة افتراضياً (`FUEL_TANKER_MANAGEMENT_ENABLED`).
       { href: '/fuel-stations/tanker-owners', labelKey: 'tankerOwners', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
+      // TANKER-PR3: إعدادات تعبئة الصهاريج (سياسات + عمليات الفوهات) — البوابة نفسها.
+      { href: '/fuel-stations/tanker-settings', labelKey: 'tankerSettings', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
     ],
   },
   {

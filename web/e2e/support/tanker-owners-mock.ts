@@ -9,6 +9,10 @@ export const MANAGER = ['fuel_stations.view', 'fuel.tanker.view', 'fuel.tanker.m
 export const VIEWER = ['fuel_stations.view', 'fuel.tanker.view'];
 type Dict = Record<string, unknown>;
 export type Mode = 'ok' | 'gate_closed' | 'error';
+export const GOVERNOR = ['fuel_stations.view', 'fuel.tanker.view', 'fuel_stations.manage', 'fuel.governance.manage'];
+export const STATION_A = '00000000-0000-4000-8000-0000000000a1';
+export const NOZZLE_A = '00000000-0000-4000-8000-0000000000b1';
+export const NOZZLE_B = '00000000-0000-4000-8000-0000000000b2';
 
 export const OWNER_A = '11111111-1111-4111-8111-111111111111';
 export const OWNER_B = '11111111-1111-4111-8111-111111111112';
@@ -31,6 +35,13 @@ export async function mockTankerApi(page: Page, opts: { baseUrl: string; locale:
     { id: '33333333-3333-4333-8333-333333333331', fuel_tanker_owner_id: OWNER_A, partner_id: PARTNER_A, partner: { id: PARTNER_A, name: opts.locale === 'ar' ? 'شركة تجريبية أ' : 'Sample Company A' }, valid_from: '2026-01-01', valid_to: null, is_active: true, note: null, end_reason: null, created_at: '2026-01-01T00:00:00Z' },
     { id: '33333333-3333-4333-8333-333333333332', fuel_tanker_owner_id: OWNER_A, partner_id: PARTNER_B, partner: { id: PARTNER_B, name: opts.locale === 'ar' ? 'شركة تجريبية ب' : 'Sample Company B' }, valid_from: '2026-01-01', valid_to: '2026-05-31', is_active: false, note: null, end_reason: null, created_at: '2026-01-01T00:00:00Z' },
   ];
+  const tenantSettings: Dict = { tanker_selection_required: false, tanker_voucher_unique_scope: 'station', tanker_capacity_overrun_policy: 'allow_with_confirmation' };
+  const stationSettings: Dict = { ...tenantSettings };
+  const stations = [{ id: STATION_A, name: opts.locale === 'ar' ? 'محطة تجريبية' : 'Sample Station', code: 'S1', status: 'active' }];
+  const nozzles: Dict[] = [
+    { id: NOZZLE_A, fuel_station_id: STATION_A, nozzle_number: '1', pump: { pump_number: '1' }, fuel_product: { name: opts.locale === 'ar' ? 'ديزل' : 'Diesel' }, status: 'active', allowed_operations: null },
+    { id: NOZZLE_B, fuel_station_id: STATION_A, nozzle_number: '2', pump: { pump_number: '1' }, fuel_product: { name: opts.locale === 'ar' ? 'بنزين 91' : 'Gasoline 91' }, status: 'active', allowed_operations: ['tanker_fill'] },
+  ];
   const customers = [PARTNER_A, PARTNER_B, PARTNER_C].map((id, i) => ({ id, name: (opts.locale === 'ar' ? 'شركة تجريبية ' : 'Sample Company ') + 'ABC'[i], code: `C${i + 1}`, is_active: true }));
   const requests: Array<{ method: string; path: string; query: string; body?: Dict }> = [];
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -49,6 +60,13 @@ export async function mockTankerApi(page: Page, opts: { baseUrl: string; locale:
     if (p === '/company') return json(route, { data: { name: 'شركة الاختبار', logo: null } });
     if (p === '/branches') return json(route, { data: [], main_branch_id: null });
     if (p === '/partners') return json(route, paged(customers));
+    // TANKER-PR3: إعدادات الوقود القائمة + الفوهات.
+    if (p === '/fuel-stations/settings') { if (method === 'PUT') Object.assign(tenantSettings, body, { reason: undefined }); return json(route, { data: tenantSettings }); }
+    if (p === '/fuel-stations/stations') return json(route, { data: stations });
+    if (/^\/fuel-stations\/stations\/[\w-]+\/settings$/.test(p)) { if (method === 'PUT') { for (const [k, v] of Object.entries(body ?? {})) if (k !== 'reason') stationSettings[k] = v ?? tenantSettings[k]; } return json(route, { data: stationSettings }); }
+    if (p === '/fuel-stations/nozzles') return json(route, { data: nozzles });
+    const nz = /^\/fuel-stations\/nozzles\/([\w-]+)$/.exec(p);
+    if (nz && method === 'PUT') { if (mode === 'error') return json(route, { message: 'Forbidden' }, 403); const row = nozzles.find((x) => x.id === nz[1]); if (!row) return json(route, { message: 'Not Found' }, 404); row.allowed_operations = (body as Dict).allowed_operations; return json(route, { data: row }); }
     if (p.startsWith('/fuel-stations/tanker') || p.startsWith('/fuel-stations/tankers')) {
       if (mode === 'gate_closed') return json(route, { message: 'Not Found' }, 404);
       if (mode === 'error') return json(route, { message: 'Server Error' }, 500);

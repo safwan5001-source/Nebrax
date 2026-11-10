@@ -2982,6 +2982,7 @@
       "build_draft": "Build draft",
       "cash_count": "Cash count",
       "cash_variance_review": "Cash variance review",
+      "meter_variance_review": "Meter variance review",
       "invoice": "Invoice",
       "access": "Access",
       "view_cost": "View cost",
@@ -9781,6 +9782,7 @@
     "customersFleet": "Customers and fleet",
     "corporateContracts": "Corporate contracts",
     "tankerOwners": "Tanker owners",
+    "tankerSettings": "Tanker fill settings",
     "aviRfid": "AVI/RFID",
     "devices": "Devices",
     "deviceRegistry": "Device registry",
@@ -10063,6 +10065,80 @@
     "paymentCollected": "Receipt posted and invoice payment status updated."
   },
   "fuelTankers": {
+    "settings": {
+      "title": "Tanker fill settings",
+      "subtitle": "Customer-tanker fill policies and the operations each nozzle allows. Storage and validation only — no fills, stock or ledger entries at this stage.",
+      "scopeLabel": "Scope",
+      "scopeHint": "The organization default applies to every station; a station can override it.",
+      "orgScope": "Organization default (all stations)",
+      "inherit": "Organization default ({value})",
+      "governanceNeeded": "Changing these policies requires the {governance} permission in addition to {manage}. Fields are read-only.",
+      "governanceRefused": "The server refused the change: it requires {governance} in addition to {manage}.",
+      "reasonLabel": "Reason for the change (optional)",
+      "reasonHint": "Recorded in the audit log with the actor and the before/after values.",
+      "save": "Save policies",
+      "saving": "Saving…",
+      "saved": "Settings saved",
+      "saveFailed": "Could not save. Try again.",
+      "loadFailed": "Could not load the fill settings.",
+      "selection": {
+        "title": "Tanker selection when filling",
+        "owner": "Tanker owner (customer fills):",
+        "ownerAlways": "Always required",
+        "tanker": "Tanker",
+        "optional": "Optional (default)",
+        "required": "Required",
+        "ruleOne": "Owner with one tanker: auto-selected and can be changed or cleared when optional.",
+        "ruleMany": "Owner with several tankers: shown for choice; continuing without one is allowed when optional.",
+        "ruleNone": "Owner with no registered tanker: never blocked, even with “Required”.",
+        "ruleSaved": "The operation is always saved on the owner’s account with voucher, quantity, pump, nozzle and shift."
+      },
+      "voucher": {
+        "title": "Paper voucher number",
+        "scopeLabel": "Duplicate-prevention scope",
+        "scopeHint": "A duplicate voucher within this scope cannot be saved.",
+        "scope": {
+          "station": "Within a single station (default)",
+          "tenant": "Across the organization",
+          "owner": "Within a tanker owner",
+          "none": "No prevention"
+        },
+        "fixedTitle": "Fixed rules (not settings)",
+        "fixedBlock": "Prevention is strict, with no override.",
+        "fixedZeros": "Leading zeros are kept: 04052 differs from 4052.",
+        "fixedVoided": "A voided voucher keeps its number reserved and is never reused."
+      },
+      "overrun": {
+        "title": "Tanker capacity overrun",
+        "policyLabel": "Policy",
+        "hint": "Capacity is informational, not a physical limit. No check when no tanker is selected.",
+        "policy": {
+          "allow_with_confirmation": "Warn with explicit confirmation (default)",
+          "block": "Block",
+          "allow": "Allow without a warning"
+        }
+      },
+      "nozzles": {
+        "title": "Allowed nozzle operations",
+        "description": "The operation types each nozzle allows. Default: all operations.",
+        "pickStation": "Pick a station to see its nozzles and set their allowed operations.",
+        "notEnforced": "The restriction is stored now and is applied to tanker fills and internal issues once they are enabled; existing direct sales are not affected by it for now.",
+        "none": "This station has no nozzles.",
+        "loadFailed": "Could not load the nozzles.",
+        "label": "Pump {pump} · Nozzle {nozzle}",
+        "opsLegend": "Allowed operations",
+        "ops": {
+          "direct_sale": "Direct sales",
+          "tanker_fill": "Customer tanker fills",
+          "internal_issue": "Internal issue"
+        },
+        "needOne": "Select at least one operation. To stop a nozzle, change its status in station data.",
+        "narrowHint": "Narrowing operations while a shift is open requires the {governance} permission in addition to station management, and is audited.",
+        "governanceRefused": "The server refused the narrowing: it requires {governance} in addition to {manage} because the station has an open shift.",
+        "save": "Save operations",
+        "saved": "Nozzle operations saved"
+      }
+    },
     "eyebrow": "Fuel stations",
     "list": {
       "title": "Tanker owners",

@@ -413,6 +413,14 @@ class Settings
             'tank_reading_backdating_policy' => 'deny',
             'tank_reading_backdating_max_hours' => 24,
             'tank_reading_backdating_reason_required' => true,
+            // TANKER-PR3: سياسات تعبئة صهاريج المتعاملين — قرارات المالك المعتمدة (PR3_DECISIONS.md). قابلة للضبط (قاعدة 6) وحوكمية (تتطلب `fuel.governance.manage`)
+            // وتخزَّن فقط: لا أثر مالي أو مخزني ولا تُفعَّل قبل بوابة `fuel_stations.tanker_management_enabled` (مغلقة).
+            // `tanker_selection_required`: اختيار الصهريج اختياري افتراضياً؛ صاحب الصهريج إلزامي دائماً لتعبئات المتعاملين ولا يُمنع صاحب بلا صهريج مسجَّل أبداً.
+            'tanker_selection_required' => false,
+            // نطاق منع تكرار رقم السند الورقي: `station` (المعتمد) | `tenant` | `owner` | `none`. الحجب صارم بلا تجاوز؛ الأصفار تُحفظ والملغى محجوز (ثوابت تُفرض في PR-4).
+            'tanker_voucher_unique_scope' => 'station',
+            // تجاوز سعة الصهريج: `allow_with_confirmation` (المعتمد: تحذير + تأكيد صريح يُسجَّل) | `block` | `allow`. `supervisor_approval` غير مبني فيُرفض.
+            'tanker_capacity_overrun_policy' => 'allow_with_confirmation',
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,

@@ -19,6 +19,10 @@ function usedKeys(): Set<string> {
   for (const status of ['active', 'suspended', 'inactive']) keys.add(`status.${status}`);
   for (const phase of ['active', 'upcoming', 'ended']) keys.add(`phase.${phase}`);
   for (const code of ['required', 'too_long', 'invalid_capacity', 'invalid_date', 'end_before_start']) keys.add(`errors.${code}`);
+  // TANKER-PR3: خيارات السياسات وعمليات الفوهات تُبنى ديناميكياً من قوائم مغلقة.
+  for (const scope of ['station', 'tenant', 'owner', 'none']) keys.add(`settings.voucher.scope.${scope}`);
+  for (const policy of ['allow_with_confirmation', 'block', 'allow']) keys.add(`settings.overrun.policy.${policy}`);
+  for (const operation of ['direct_sale', 'tanker_fill', 'internal_issue']) keys.add(`settings.nozzles.ops.${operation}`);
   for (const key of [...keys]) if (key.includes('${')) keys.delete(key);
   return keys;
 }
@@ -52,5 +56,7 @@ describe('fuelTankers messages', () => {
   it('adds the navigation label in both languages', () => {
     expect((ar as unknown as { fuelWorkspaceNav: Record<string, string> }).fuelWorkspaceNav.tankerOwners).toBeTruthy();
     expect((en as unknown as { fuelWorkspaceNav: Record<string, string> }).fuelWorkspaceNav.tankerOwners).toBeTruthy();
+    expect((ar as unknown as { fuelWorkspaceNav: Record<string, string> }).fuelWorkspaceNav.tankerSettings).toBeTruthy();
+    expect((en as unknown as { fuelWorkspaceNav: Record<string, string> }).fuelWorkspaceNav.tankerSettings).toBeTruthy();
   });
 });
