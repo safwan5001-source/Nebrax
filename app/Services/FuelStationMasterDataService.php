@@ -338,6 +338,10 @@ class FuelStationMasterDataService
 
     public function deleteNozzle(FuelNozzle $nozzle, ?User $actor = null): void
     {
+        // TANKER-PR4: فوهة عليها سندات تعبئة صهاريج لا تُحذف (يُحفظ أثر السندات)؛ تُعطَّل بدل ذلك.
+        if (\App\Models\FuelTankerFill::query()->withoutGlobalScope(\App\Tenancy\BranchScope::class)->where('fuel_nozzle_id', $nozzle->id)->exists()) {
+            throw new RuntimeException('لا يمكن حذف فوهة لها سندات تعبئة صهاريج. عطّلها للاحتفاظ بالأثر التشغيلي.');
+        }
         DB::transaction(function () use ($nozzle, $actor) {
             $this->audit->record('nozzle.deleted', $nozzle, $this->audit->snapshot($nozzle), null, $actor);
             $nozzle->delete();

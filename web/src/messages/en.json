@@ -3107,6 +3107,7 @@
       "reconciliation": "Inventory reconciliation",
       "supplier_invoice": "Fuel supplier invoices",
       "tanker": "Tanker owners",
+      "fill": "Fills",
       "governance": "Fuel governance",
       "settlement": "Settlement",
       "staff": "Station staff"
@@ -9386,6 +9387,7 @@
     "entity_fuel_shift": "Fuel shift",
     "entity_fuel_sale": "Fuel sale",
     "entity_fuel_opening_balance": "Fuel opening balance",
+    "entity_fuel_tanker_fill": "Tanker fill",
     "entity_fuel_maintenance_work_order": "Station maintenance work order",
     "entity_fuel_safety_inspection": "Station safety inspection",
     "entity_corporate_fuel_contract": "Corporate fuel contract",
