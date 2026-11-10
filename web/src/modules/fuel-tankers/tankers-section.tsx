@@ -27,6 +27,8 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
   const sequence = useRef(0);
   const ownerActive = owner.status === 'active';
   const liters = t('units.liter');
+  /* السعة اختيارية: null = غير محدّدة وتُعرض «—» (الدالة المشتركة تحوّل null إلى 0 فتُظهر سعة صفرية كاذبة) */
+  const capacityText = (milliliters: number | null) => (milliliters === null || milliliters === undefined ? '—' : formatMillilitersAsLiters(milliliters, locale, liters));
 
   const load = useCallback(async () => {
     const mine = ++sequence.current;
@@ -81,7 +83,7 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
                       <TR key={tanker.id}>
                         <TD className="font-medium"><bdi>{tanker.plate_number}</bdi></TD>
                         <TD><span dir="ltr">{tanker.plate_country ?? '—'}</span></TD>
-                        <TD><span className="num">{formatMillilitersAsLiters(tanker.capacity_milliliters, locale, liters)}</span></TD>
+                        <TD><span className="num">{capacityText(tanker.capacity_milliliters)}</span></TD>
                         <TD><StatusBadge status={tanker.status} /></TD>
                         <TD className="text-end">
                           <Button size="sm" className="max-md:h-11" variant="outline" disabled={!canManage} title={!canManage ? t('states.manageRequired', { permission: TANKER_MANAGE }) : undefined}
@@ -101,7 +103,7 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
                       title: tanker.plate_number,
                       subtitle: tanker.plate_country ?? undefined,
                       amountLabel: t('tanker.capacity'),
-                      amount: formatMillilitersAsLiters(tanker.capacity_milliliters, locale, liters),
+                      amount: capacityText(tanker.capacity_milliliters),
                       status: <StatusBadge status={tanker.status} />,
                       actions: (
                         <Button size="sm" className="max-md:h-11" variant="ghost" disabled={!canManage} aria-label={t('tanker.editAria', { plate: tanker.plate_number })} onClick={() => setDialog({ open: true, tanker })}>

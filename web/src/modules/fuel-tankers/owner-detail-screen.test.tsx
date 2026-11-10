@@ -148,6 +148,14 @@ describe.each(['ar', 'en'] as const)('OwnerDetailScreen (%s)', (locale) => {
     expect((await screen.findAllByText('ABC 1234')).length).toBeGreaterThan(0);
   });
 
+  it('shows an unspecified tanker capacity as a placeholder, never as 0', async () => {
+    state.tankers = page([tanker({ capacity_milliliters: null })]);
+    renderIntl(<OwnerDetailScreen ownerId={OWNER_ID} />, locale);
+    await ready();
+    expect(screen.queryAllByText(/^0\s*(L|لتر)$/)).toHaveLength(0);
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('adds a tanker: liters become an integer milliliter capacity, the owner id is sent once, nothing else leaks', async () => {
     renderIntl(<OwnerDetailScreen ownerId={OWNER_ID} />, locale);
     await ready();
