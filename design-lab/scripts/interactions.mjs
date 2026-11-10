@@ -95,6 +95,36 @@ for (const dir of ['qalam', 'mizan', 'fajr']) {
     await p.click(`${app} [data-act="confirm-post"]`);
     await p.locator(`${app} .toast`).waitFor();
   });
+  await test(`${dir}: invalid price/discount keeps the typed text and blocks posting until fixed`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'inv', device: 'laptop' });
+    const line = `${app} tr[data-line="2"]`;
+    await p.fill(`${line} [data-lf="price"]`, '1.234');
+    await p.fill(`${line} [data-lf="disc"]`, 'abc');
+    await p.click(`${app} [data-act="post"] >> nth=0`);
+    eq(await p.locator(`${app} .je`).count(), 0, 'no journal preview while invalid');
+    eq(await p.inputValue(`${line} [data-lf="price"]`), '1.234', 'typed price kept after re-render');
+    eq(await p.inputValue(`${line} [data-lf="disc"]`), 'abc', 'typed discount kept after re-render');
+    eq(await p.getAttribute(`${line} [data-lf="disc"]`, 'aria-invalid'), 'true', 'still flagged');
+    await p.fill(`${line} [data-lf="price"]`, '1.23');
+    await p.fill(`${line} [data-lf="disc"]`, '0');
+    await p.click(`${app} [data-act="post"] >> nth=0`);
+    await p.locator(`${app} .je`).waitFor();
+  });
+  await test(`${dir}: invoice header edits survive adding a line and changing the customer`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'inv', device: 'laptop' });
+    await p.fill('#f-date', '2026-11-05');
+    await p.fill('#f-due', '2026-12-31');
+    await p.fill('#f-ref', 'PO-90001');
+    await p.selectOption('#f-br', 'khb');
+    await p.click(`${app} [data-act="add-line"]`);
+    await p.click(`${app} [data-act="cust-change"]`);
+    await p.fill('#cust-q', 'مستشفى');
+    await p.keyboard.press('Enter');
+    eq(await p.inputValue('#f-date'), '2026-11-05', 'date');
+    eq(await p.inputValue('#f-due'), '2026-12-31', 'due');
+    eq(await p.inputValue('#f-ref'), 'PO-90001', 'ref');
+    eq(await p.inputValue('#f-br'), 'khb', 'branch');
+  });
   await test(`${dir}: fuel shift blocks closing below opening and computes liters`, { width: 390, height: 844 }, async (p) => {
     await set(p, { dir, surface: 'shift', device: 'wide' });
     await p.fill(`${app} [data-reading="N1"]`, '284000');

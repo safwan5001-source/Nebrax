@@ -812,7 +812,7 @@ const T = {
     invHead:'فاتورة مبيعات جديدة', invSub:'مسودة · لن يُنشأ قيد قبل الترحيل', pickCust:'ابحث عن عميل بالاسم أو الرقم الضريبي', invDate:'تاريخ الفاتورة', dueDate:'تاريخ الاستحقاق', priceList:'قائمة الأسعار', plStd:'قائمة أسعار الجملة', ref:'مرجع العميل',
     item:'الصنف', qty:'الكمية', unit:'الوحدة', price:'السعر', discount:'الخصم', vatAmt:'الضريبة', lineTotal:'الإجمالي', addLine:'إضافة بند', addHint:'أو اضغط Enter في آخر بند',
     saveDraft:'حفظ كمسودة', post:'اعتماد وترحيل', grand:'الإجمالي المستحق', creditUsed:'من حد الائتمان', change:'تغيير',
-    errCust:'اختر العميل قبل الترحيل', errLines:'أضف بنداً واحداً على الأقل بكمية وسعر', errQty:'كمية غير صالحة',
+    errCust:'اختر العميل قبل الترحيل', errLines:'أضف بنداً واحداً على الأقل بكمية وسعر', errQty:'كمية غير صالحة', errNum:'صحّح الحقول المعلَّمة: أرقام فقط، بمنزلتين عشريتين للمبالغ وثلاث للكمية',
     confirmT:'ترحيل الفاتورة', confirmP:'سيُنشأ القيد التالي وتُصدر بيانات ZATCA. لا يمكن تعديل فاتورة مرحّلة؛ التصحيح بإشعار دائن.', account:'الحساب', debit:'مدين', credit:'دائن', cancel:'رجوع', confirmPost:'ترحيل الآن',
     accAR:'العملاء', accRev:'إيرادات المبيعات', accVat:'ضريبة المخرجات', previewTag:'معاينة توضيحية',
     toastDraft:'حُفظت المسودة', toastPosted:'رُحّلت الفاتورة INV-2026-0437 · القيد متوازن', toastRemind:'أُرسل التذكير إلى 3 عملاء', toastExport:'جُهّز ملف التصدير', toastDemo:'هذا الإجراء تجريبي في المختبر',
@@ -850,7 +850,7 @@ const T = {
     invHead:'New sales invoice', invSub:'Draft · no journal entry until posted', pickCust:'Search customers by name or VAT number', invDate:'Invoice date', dueDate:'Due date', priceList:'Price list', plStd:'Wholesale price list', ref:'Customer reference',
     item:'Item', qty:'Qty', unit:'Unit', price:'Price', discount:'Discount', vatAmt:'VAT', lineTotal:'Total', addLine:'Add line', addHint:'or press Enter on the last line',
     saveDraft:'Save draft', post:'Approve & post', grand:'Total due', creditUsed:'of credit limit', change:'Change',
-    errCust:'Choose a customer before posting', errLines:'Add at least one line with a quantity and price', errQty:'Invalid quantity',
+    errCust:'Choose a customer before posting', errLines:'Add at least one line with a quantity and price', errQty:'Invalid quantity', errNum:'Fix the highlighted fields: numbers only, up to 2 decimals for amounts and 3 for quantity',
     confirmT:'Post invoice', confirmP:'This creates the journal entry below and issues ZATCA data. A posted invoice cannot be edited; corrections use a credit note.', account:'Account', debit:'Debit', credit:'Credit', cancel:'Back', confirmPost:'Post now',
     accAR:'Accounts receivable', accRev:'Sales revenue', accVat:'Output VAT', previewTag:'Illustrative preview',
     toastDraft:'Draft saved', toastPosted:'INV-2026-0437 posted · entry balanced', toastRemind:'Reminder sent to 3 customers', toastExport:'Export file ready', toastDemo:'This action is a lab demo',
@@ -964,7 +964,7 @@ const NOZ = [
 const S = {
   dir:'mizan', surface:'dash', device:'laptop', mode:'light', lang:'ar', density:'regular', demo:'ready',
   q:'', st:'all', sort:{k:'no', d:'desc'}, page:0, sel:new Set(), active:null, insp:null,
-  inv:{ cust:CUST[0], date:TODAY, due:addDays(TODAY,30), ref:'PO-77812', lines:[
+  inv:{ cust:CUST[0], date:TODAY, due:addDays(TODAY,30), ref:'PO-77812', br:'jbl', lines:[
     {id:1, p:0, qtyM:120000, price:8500, disc:0},
     {id:2, p:1, qtyM:14000, price:41200, disc:0},
     {id:3, p:7, qtyM:1000, price:51750, disc:5000},
@@ -1230,9 +1230,10 @@ function invoiceSurface() {
   const custField = I.cust
     ? `<div class="cust-chip"><div style="min-width:0"><b>${esc(nm(I.cust))}</b><br><span class="num">${I.cust.vat}</span><div class="credit" title="${Math.round(I.cust.used*100/I.cust.limit)}% ${t('creditUsed')}"><i style="width:${Math.min(100, Math.round(I.cust.used*100/I.cust.limit))}%;${I.cust.used/I.cust.limit>.85?'background:var(--warn)':''}"></i></div></div><button class="btn ghost" type="button" data-act="cust-change">${t('change')}</button></div>`
     : `<div class="combo"><input id="cust-q" type="text" role="combobox" aria-expanded="${I.combo}" aria-controls="cust-list" aria-autocomplete="list" placeholder="${t('pickCust')}" value="${esc(I.comboQ)}" ${I.errs.cust?'aria-invalid="true" aria-describedby="e-cust"':''} autocomplete="off">${I.combo ? comboList() : ''}</div>${I.errs.cust ? `<span class="err" id="e-cust">${ic('alert')}${t('errCust')}</span>` : ''}`;
-  const header = `<div class="fields"><div class="field span2"><label for="cust-q">${t('customer')} <span class="req">*</span></label>${custField}</div><div class="field"><label for="f-date">${t('invDate')}</label><input id="f-date" type="date" value="${I.date}"></div><div class="field"><label for="f-due">${t('dueDate')}</label><input id="f-due" type="date" value="${I.due}"></div><div class="field"><label for="f-br">${t('branch')}</label><select id="f-br">${Object.entries(BR).map(([k, b]) => `<option value="${k}" ${k==='jbl'?'selected':''}>${nm(b)}</option>`).join('')}</select></div><div class="field"><label for="f-pl">${t('priceList')}</label><select id="f-pl"><option>${t('plStd')}</option></select></div><div class="field span2"><label for="f-ref">${t('ref')}</label><input id="f-ref" type="text" value="${esc(I.ref)}"></div></div>`;
+  const header = `<div class="fields"><div class="field span2"><label for="cust-q">${t('customer')} <span class="req">*</span></label>${custField}</div><div class="field"><label for="f-date">${t('invDate')}</label><input id="f-date" data-hf="date" type="date" value="${I.date}"></div><div class="field"><label for="f-due">${t('dueDate')}</label><input id="f-due" data-hf="due" type="date" value="${I.due}"></div><div class="field"><label for="f-br">${t('branch')}</label><select id="f-br" data-hf="br">${Object.entries(BR).map(([k, b]) => `<option value="${k}" ${k===I.br?'selected':''}>${nm(b)}</option>`).join('')}</select></div><div class="field"><label for="f-pl">${t('priceList')}</label><select id="f-pl"><option>${t('plStd')}</option></select></div><div class="field span2"><label for="f-ref">${t('ref')}</label><input id="f-ref" data-hf="ref" type="text" value="${esc(I.ref)}"></div></div>`;
   const linesTbl = `<table class="lines"><thead><tr><th>#</th><th>${t('item')}</th><th class="c-num">${t('qty')}</th><th>${t('unit')}</th><th class="c-num">${t('price')}</th><th class="c-num">${t('discount')}</th><th class="c-num">${t('vatAmt')}</th><th class="c-num">${t('lineTotal')}</th><th></th></tr></thead><tbody>${I.lines.map((l, idx) => lineRow(l, idx)).join('')}</tbody></table>
     ${I.errs.lines ? `<div class="field" style="padding:6px"><span class="err">${ic('alert')}${t('errLines')}</span></div>` : ''}
+    ${I.errs.invalid ? `<div class="field" style="padding:6px"><span class="err" role="alert">${ic('alert')}${t('errNum')}</span></div>` : ''}
     <div class="addline"><button class="btn" type="button" data-act="add-line">${ic('plus')}${t('addLine')}</button><span class="muted hide-phone" style="font-size:12px">${t('addHint')}</span></div>`;
   const totalsParts = `<div class="part"><span>${t('sub')}</span><b data-tot="sub">${plain(tot.sub)}</b></div><div class="part"><span>${t('disc')}</span><b data-tot="disc">${plain(-tot.disc)}</b></div><div class="part"><span>${t('vat')}</span><b data-tot="vat">${plain(tot.vat)}</b></div>`;
   const outcome = `<div class="outcome" aria-live="polite"><span class="lbl"><span>${t('grand')}</span><span>${I.lines.length} ${t('lines')}</span></span><span class="amt" data-tot="total">${moneyOutcome(tot.total)}</span></div>`;
@@ -1247,9 +1248,11 @@ function invoiceSurface() {
   }
   return `<div class="page" style="max-width:1040px;margin-inline:auto;width:100%;padding-bottom:20px">${head}<div class="steps"><span><b>1</b>${t('stepCust')}</span><i></i><span><b>2</b>${t('stepItems')}</span><i></i><span><b style="background:var(--pri-soft);color:var(--pri-text)">3</b>${t('stepReview')}</span></div><section class="card"><div class="card-h"><h2><span class="sec-n">1</span>${t('stepCust')}</h2></div><div class="card-b">${header}</div></section><section class="card"><div class="card-h"><h2><span class="sec-n">2</span>${t('stepItems')}</h2></div><div style="overflow-x:auto;padding:0 8px">${linesTbl}</div></section><div class="pill-total" aria-live="polite"><span><span style="font-size:12px;opacity:.75;display:block">${t('grand')}</span><span class="amt" data-tot="total">${moneyOutcome(tot.total)}</span></span><button class="btn" type="button" data-act="post">${t('post')}</button></div></div>`;
 }
+/** Shows the user's own text while a field is invalid, so a re-render never swaps it for the last valid amount. */
+const lineVal = (l, f) => l.bad?.[f] ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
 function lineRow(l, idx) {
   const p = PROD[l.p], c = lineCalc(l);
-  return `<tr data-line="${l.id}" class="${l.fresh ? 'new' : ''}"><td class="hide-phone num muted">${idx + 1}</td><td class="pr" data-l="${t('item')}"><select data-lf="p" aria-label="${t('item')} ${idx+1}">${PROD.map((x, i) => `<option value="${i}" ${i===l.p?'selected':''}>${esc(nm(x))}</option>`).join('')}</select><small>${p.sku}</small></td><td data-l="${t('qty')}" style="width:92px"><input class="n" data-lf="qty" inputmode="decimal" value="${fromMinor(l.qtyM, 3)}" aria-label="${t('qty')} ${idx+1}" ${l.badQty?'aria-invalid="true"':''}></td><td class="hide-phone muted" style="width:60px">${nm(p.u)}</td><td data-l="${t('price')}" style="width:110px"><input class="n" data-lf="price" inputmode="decimal" value="${fromMinor(l.price, 2)}" aria-label="${t('price')} ${idx+1}"></td><td data-l="${t('discount')}" style="width:96px"><input class="n" data-lf="disc" inputmode="decimal" value="${fromMinor(l.disc, 2)}" aria-label="${t('discount')} ${idx+1}"></td><td class="ro" data-l="${t('vatAmt')}" data-lt="vat">${plain(c.vat)}</td><td class="ro" data-l="${t('lineTotal')}" data-lt="total" style="font-weight:600">${plain(c.total)}</td><td class="del" style="width:40px"><button class="icon-btn" type="button" data-del="${l.id}" aria-label="delete line ${idx+1}">${ic('trash')}</button></td></tr>`;
+  return `<tr data-line="${l.id}" class="${l.fresh ? 'new' : ''}"><td class="hide-phone num muted">${idx + 1}</td><td class="pr" data-l="${t('item')}"><select data-lf="p" aria-label="${t('item')} ${idx+1}">${PROD.map((x, i) => `<option value="${i}" ${i===l.p?'selected':''}>${esc(nm(x))}</option>`).join('')}</select><small>${p.sku}</small></td><td data-l="${t('qty')}" style="width:92px"><input class="n" data-lf="qty" inputmode="decimal" value="${esc(lineVal(l, 'qty'))}" aria-label="${t('qty')} ${idx+1}" ${l.bad?.qty?'aria-invalid="true"':''}></td><td class="hide-phone muted" style="width:60px">${nm(p.u)}</td><td data-l="${t('price')}" style="width:110px"><input class="n" data-lf="price" inputmode="decimal" value="${esc(lineVal(l, 'price'))}" aria-label="${t('price')} ${idx+1}" ${l.bad?.price?'aria-invalid="true"':''}></td><td data-l="${t('discount')}" style="width:96px"><input class="n" data-lf="disc" inputmode="decimal" value="${esc(lineVal(l, 'disc'))}" aria-label="${t('discount')} ${idx+1}" ${l.bad?.disc?'aria-invalid="true"':''}></td><td class="ro" data-l="${t('vatAmt')}" data-lt="vat">${plain(c.vat)}</td><td class="ro" data-l="${t('lineTotal')}" data-lt="total" style="font-weight:600">${plain(c.total)}</td><td class="del" style="width:40px"><button class="icon-btn" type="button" data-del="${l.id}" aria-label="delete line ${idx+1}">${ic('trash')}</button></td></tr>`;
 }
 function comboList() {
   const q = normDigits(S.inv.comboQ).trim().toLowerCase();
@@ -1391,9 +1394,10 @@ function addLine() { const id = S.lineSeq++; S.inv.lines.push({ id, p:4, qtyM:10
 function validatePost() {
   const errs = {};
   if (!S.inv.cust) errs.cust = 1;
-  if (!S.inv.lines.some(l => l.qtyM > 0 && l.price > 0) || S.inv.lines.some(l => l.badQty)) errs.lines = 1;
+  if (!S.inv.lines.some(l => l.qtyM > 0 && l.price > 0)) errs.lines = 1;
+  if (S.inv.lines.some(l => l.bad && Object.values(l.bad).some(Boolean))) errs.invalid = 1;
   S.inv.errs = errs;
-  if (Object.keys(errs).length) { render(errs.cust ? '#cust-q' : undefined); return; }
+  if (Object.keys(errs).length) { render(errs.cust ? '#cust-q' : errs.invalid ? '#app .lines [aria-invalid="true"]' : undefined); return; }
   S.overlay = { t:'post' }; render();
 }
 app.addEventListener('input', (e) => {
@@ -1407,13 +1411,16 @@ app.addEventListener('input', (e) => {
     S.readings[id] = el.value.trim() === '' || m === null ? null : m;
     clearTimeout(S._rt); S._rt = setTimeout(() => render(`[data-reading="${id}"]`), 350); return;
   }
+  if (el.dataset.hf) { S.inv[el.dataset.hf] = el.value; return; }
   const lf = el.dataset.lf; if (!lf) return;
   const row = el.closest('tr'); const line = S.inv.lines.find(l => l.id === Number(row.dataset.line)); if (!line) return;
   if (lf === 'p') { line.p = Number(el.value); line.price = PROD[line.p].price; render(`tr[data-line="${line.id}"] [data-lf="qty"]`); return; }
   const m = toMinor(el.value, lf === 'qty' ? 3 : 2);
-  if (m === null) { el.setAttribute('aria-invalid', 'true'); if (lf === 'qty') line.badQty = true; return; }
-  el.removeAttribute('aria-invalid'); if (lf === 'qty') line.badQty = false;
+  line.bad = line.bad || {}; line.raw = line.raw || {};
+  if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[lf] = true; line.raw[lf] = el.value; return; }
+  el.removeAttribute('aria-invalid'); line.bad[lf] = false; delete line.raw[lf];
   if (lf === 'qty') line.qtyM = m; else if (lf === 'price') line.price = m; else line.disc = m;
+  if (S.inv.errs.invalid && !S.inv.lines.some(l => l.bad && Object.values(l.bad).some(Boolean))) { delete S.inv.errs.invalid; render(`tr[data-line="${line.id}"] [data-lf="${lf}"]`); return; }
   updateTotals();
 });
 app.addEventListener('keydown', (e) => {

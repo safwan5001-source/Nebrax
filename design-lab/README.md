@@ -36,7 +36,7 @@ open design-lab/directions/index.html      # أو xdg-open على Linux
 # الفحوص (Chromium من Playwright، وaxe-core من web/node_modules)
 node design-lab/scripts/capture.mjs            # 84 تهيئة: أخطاء + تجاوز أفقي + WCAG
 node design-lab/scripts/capture.mjs --shots    # + لقطات PNG (المحفوظة في المستودع مُحوَّلة إلى WebP للحجم)
-node design-lab/scripts/interactions.mjs       # 28 اختبار تفاعل
+node design-lab/scripts/interactions.mjs       # 34 اختبار تفاعل
 ```
 
 ## المراحل
