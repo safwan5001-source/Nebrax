@@ -3,6 +3,11 @@ export type FuelWorkspaceNavItem = {
   labelKey: string;
   permissions: string[];
   appKey?: string;
+  /**
+   * بوابة نشر على مستوى الخادم (علم بيئة) لا تعلنها قدرة التطبيقات: لا يُظهر العنصر إلا بعد أن يؤكد الخادم فتحها (`openGates`).
+   * مغلقة أو لم تُفحص بعد ⇒ مخفي (فشل مغلق، لا رابط يقود لصفحة «غير متاحة» لكل مالك). عرض فقط؛ الخادم يفرضها على كل طلب.
+   */
+  gate?: string;
 };
 
 export type FuelWorkspaceNavGroup = {
@@ -36,6 +41,8 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
     items: [
       { href: '/fuel-stations/corporate-contracts', labelKey: 'corporateContracts', permissions: ['fuel.contract.view'] },
       { href: '/fuel-stations/avi-rfid', labelKey: 'aviRfid', permissions: ['fuel.avi.view'], appKey: 'fuel_stations.avi' },
+      // TANKER-PR2: إدارة أصحاب الصهاريج — بوابة نشر مغلقة افتراضياً (`FUEL_TANKER_MANAGEMENT_ENABLED`).
+      { href: '/fuel-stations/tanker-owners', labelKey: 'tankerOwners', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
     ],
   },
   {
@@ -62,13 +69,13 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
   },
 ];
 
-export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>): FuelWorkspaceNavGroup[] {
+export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>, openGates: ReadonlySet<string> = new Set()): FuelWorkspaceNavGroup[] {
   const canAccess = (required: string[]) => permissions.includes('*') || required.every((permission) => permissions.includes(permission));
 
   return FUEL_WORKSPACE_NAV_GROUPS
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canAccess(item.permissions) && (!item.appKey || !hiddenAppKeys.has(item.appKey))),
+      items: group.items.filter((item) => canAccess(item.permissions) && (!item.appKey || !hiddenAppKeys.has(item.appKey)) && (!item.gate || openGates.has(item.gate))),
     }))
     .filter((group) => group.items.length > 0);
 }
