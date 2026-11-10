@@ -10078,6 +10078,7 @@
       "reasonHint": "Recorded in the audit log with the actor and the before/after values.",
       "save": "Save policies",
       "saving": "Saving…",
+      "stationUnavailable": "Could not open this station's settings. Showing organization settings instead.",
       "saved": "Settings saved",
       "saveFailed": "Could not save. Try again.",
       "loadFailed": "Could not load the fill settings.",

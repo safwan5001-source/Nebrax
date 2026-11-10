@@ -43,6 +43,21 @@ class FuelTankerPolicySettingsTest extends TestCase
     }
 
     /** @test */
+    public function station_settings_of_another_permitted_branch_are_reachable_with_branch_all_and_still_isolated_by_tenant(): void
+    {
+        $other = $this->fx['s3']; // فرع ب
+        $headers = ['X-Branch-Id' => $this->fx['branchA']->id];
+        $path = self::BASE . '/stations/' . $other->id . '/settings';
+
+        // الفرع النشط أ: المحطة خارجه، فتُخفى (السلوك القائم بلا تغيير).
+        $this->withToken($this->fx['owner'])->withHeaders($headers)->getJson($path)->assertNotFound();
+        // الواجهة تطلب `branch=all` لتتوافق مع قائمة المحطات المقيَّدة بصلاحيات المستخدم لا بالفرع النشط.
+        $this->withToken($this->fx['owner'])->withHeaders($headers)->getJson($path . '?branch=all')->assertOk()->assertJsonPath('meta.overrides', []);
+        $this->withToken($this->fx['owner'])->withHeaders($headers)->putJson($path . '?branch=all', ['tanker_capacity_overrun_policy' => 'block'])
+            ->assertOk()->assertJsonPath('meta.overrides', ['tanker_capacity_overrun_policy']);
+    }
+
+    /** @test */
     public function defaults_are_the_owner_approved_values_at_tenant_and_station_level(): void
     {
         $tenant = $this->withToken($this->fx['owner'])->getJson(self::BASE . '/settings')->assertOk()->json('data');

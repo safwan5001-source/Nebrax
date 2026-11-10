@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { classifyError, hasPermission, serverMessage, TANKER_VIEW } from './access';
 import { listOwners } from './client';
 import { Field } from './fields';
-import { getTankerPolicy, listStationNozzles, listStations, saveTankerPolicy, updateNozzleOperations, type NozzleRow, type StationOption } from './settings-client';
+import { getTankerPolicy, listStationNozzles, listStations, saveTankerPolicy, updateNozzleOperations, type NozzleRow, type PolicyState, type StationOption } from './settings-client';
 import {
   effectiveOperations, INHERIT, isNarrowing, OVERRUN_POLICIES, POLICY_DEFAULTS, policyChanges, sameOperations, TANKER_OPERATIONS, toDraft, toStoredOperations, VOUCHER_SCOPES,
   type PolicyDraft, type PolicyField, type TankerOperation, type TankerPolicy,
@@ -52,6 +52,7 @@ export function TankerSettingsScreen() {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
   const sequence = useRef(0);
 
   const stationScope = stationId !== '';
@@ -60,9 +61,28 @@ export function TankerSettingsScreen() {
     const mine = ++sequence.current;
     setState('loading');
     try {
-      await listOwners(); // مسبار البوابة نفسه لشاشة الأصحاب: 404 ⇒ الميزة مغلقة.
-      const [org, list, scoped] = await Promise.all([getTankerPolicy(), listStations(), scopeStation ? getTankerPolicy(scopeStation) : Promise.resolve(null)]);
+      await listOwners(); // مسبار البوابة نفسه لشاشة الأصحاب: 404 هنا وحده يعني أن الميزة مغلقة.
+      const [org, list] = await Promise.all([getTankerPolicy(), listStations()]);
       if (mine !== sequence.current) return;
+      let scoped: PolicyState | null = null;
+      if (scopeStation) {
+        try {
+          scoped = await getTankerPolicy(scopeStation);
+        } catch {
+          if (mine !== sequence.current) return;
+          // فشل إعدادات محطة (محطة غير متاحة للفرع/المستخدم…) ليس إغلاقاً للبوابة: نعود لنطاق المؤسسة مع رسالة، ويبقى المحدّد.
+          setStations(list);
+          setOrgPolicy(org.policy);
+          const start = toDraft(org.policy, org.overrides);
+          setInitial(start);
+          setDraft(start);
+          setScopeError(t('settings.stationUnavailable'));
+          setState('ready');
+          setStationId('');
+          return;
+        }
+        if (mine !== sequence.current) return;
+      }
       setStations(list);
       setOrgPolicy(org.policy);
       const start = toDraft((scoped ?? org).policy, (scoped ?? org).overrides);
@@ -75,7 +95,7 @@ export function TankerSettingsScreen() {
       const problem = classifyError(error, 'list');
       setState(problem === 'gate_closed' ? 'gate_closed' : problem === 'forbidden' ? 'forbidden' : 'error');
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (permissions === null || !canView) return;
@@ -148,11 +168,12 @@ export function TankerSettingsScreen() {
       <Card>
         <CardContent className="space-y-3 pt-4">
           <Field id="tanker-settings-scope" label={t('settings.scopeLabel')} hint={t('settings.scopeHint')}>
-            <Select value={stationId} disabled={saving} onChange={(event) => setStationId(event.target.value)}>
+            <Select value={stationId} disabled={saving} onChange={(event) => { setScopeError(null); setStationId(event.target.value); }}>
               <option value="">{t('settings.orgScope')}</option>
               {stations.map((station) => <option key={station.id} value={station.id}>{station.name}{station.code ? ` (${station.code})` : ''}</option>)}
             </Select>
           </Field>
+          {scopeError ? <p role="alert" className="text-sm text-negative">{scopeError}</p> : null}
         </CardContent>
       </Card>
 

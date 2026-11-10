@@ -34,7 +34,7 @@ vi.mock('@/lib/api', async (original) => ({
     if (path === '/fuel-stations/stations') return { data: [{ id: ST1, name: 'محطة أ', code: 'A', status: 'active' }, { id: ST2, name: 'محطة ب', code: 'B', status: 'active' }] };
     if (path === '/fuel-stations/settings' && method === 'GET') return { data: state.tenant };
     if (path === '/fuel-stations/settings' && method === 'PUT') { Object.assign(state.tenant, opts.body); return { data: state.tenant }; }
-    if (/^\/fuel-stations\/stations\/[0-9a-f-]{36}\/settings$/.test(path)) {
+    if (/^\/fuel-stations\/stations\/[0-9a-f-]{36}\/settings$/.test(path.split('?')[0])) {
       if (method === 'PUT') {
         if (state.saveHold) await state.saveHold;
         for (const [k, v] of Object.entries(opts.body as Record<string, unknown>)) {
@@ -123,7 +123,7 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
     fireEvent.change(select('tanker-settings-overrun'), { target: { value: 'allow' } });
     fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
     await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0].path).toBe(`/fuel-stations/stations/${ST1}/settings`);
+    expect(writes()[0].path).toBe(`/fuel-stations/stations/${ST1}/settings?branch=all`);
     expect(writes()[0].body).toEqual({ tanker_voucher_unique_scope: null, tanker_capacity_overrun_policy: 'allow' });
   });
 
@@ -278,5 +278,26 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
     await waitFor(() => expect(select('tanker-settings-scope').disabled).toBe(false));
     expect(select('tanker-settings-scope').value).toBe(ST1);
     expect(select('tanker-settings-overrun').value).toBe('block');
+  });
+  it('station settings are requested for all of the user\'s branches, matching the access-scoped station list (Codex P2)', async () => {
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
+    await waitFor(() => expect(calls.some((c) => c.path === `/fuel-stations/stations/${ST1}/settings?branch=all`)).toBe(true));
+    expect(calls.filter((c) => /\/stations\/[0-9a-f-]{36}\/settings/.test(c.path)).every((c) => c.path.endsWith('?branch=all'))).toBe(true);
+  });
+
+  it('a failing station settings load is not a closed gate: the selector stays, organization scope is shown with a message (Codex P2)', async () => {
+    state.fail[`GET /fuel-stations/stations/${ST2}/settings`] = 404;
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST2 } });
+    expect(await screen.findByText(T(locale).settings.stationUnavailable)).toBeTruthy();
+    await waitFor(() => expect(select('tanker-settings-scope').value).toBe(''));
+    expect(screen.queryByText(T(locale).states.gateClosedTitle)).toBeNull();
+    // التعافي داخل الشاشة: اختيار محطة سليمة يعمل ويمسح الرسالة.
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
+    await waitFor(() => expect(select('tanker-settings-scope').value).toBe(ST1));
+    expect(screen.queryByText(T(locale).settings.stationUnavailable)).toBeNull();
   });
 });

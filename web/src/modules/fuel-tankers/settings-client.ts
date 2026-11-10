@@ -36,15 +36,22 @@ function toPolicyState(payload: unknown, stationScope: boolean): PolicyState {
   return { policy: readPolicy(body.data), overrides: stationScope ? overrideFields(asObject(body.meta).overrides) : null };
 }
 
+/**
+ * قائمة المحطات تُقيَّد بصلاحيات المستخدم (لا بالفرع النشط)، فإعدادات المحطة تُطلب بـ`branch=all` ليغطي كل فروعه المسموحة
+ * (الخادم يفرض نطاق المستخدم/المحطة في الحالتين) — وإلا أعاد اختيار محطة خارج الفرع النشط 404 مضللاً.
+ */
+function settingsPath(stationId?: string): string {
+  return stationId ? `${STATIONS}/${assertId(stationId)}/settings?branch=all` : SETTINGS;
+}
+
 export async function getTankerPolicy(stationId?: string): Promise<PolicyState> {
-  const path = stationId ? `${STATIONS}/${assertId(stationId)}/settings` : SETTINGS;
-  return toPolicyState(await api<unknown>(path), Boolean(stationId));
+  return toPolicyState(await api<unknown>(settingsPath(stationId)), Boolean(stationId));
 }
 
 export type PolicyPayload = Record<string, boolean | string | null>;
 
 export async function saveTankerPolicy(stationId: string | undefined, changes: PolicyPayload, reason?: string): Promise<PolicyState> {
-  const path = stationId ? `${STATIONS}/${assertId(stationId)}/settings` : SETTINGS;
+  const path = settingsPath(stationId);
   const body = reason && reason.trim() !== '' ? { ...changes, reason: reason.trim() } : changes;
   return toPolicyState(await api<unknown>(path, { method: 'PUT', body }), Boolean(stationId));
 }
