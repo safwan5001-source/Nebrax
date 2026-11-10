@@ -1,4 +1,5 @@
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
+import { stationOpsPwaMetadata, stationOpsViewport } from '@/modules/station-ops/pwa-metadata';
 import '@/modules/station-ops/fuel-ops.css';
 
 /**
@@ -8,13 +9,10 @@ import '@/modules/station-ops/fuel-ops.css';
 export const metadata: Metadata = {
   title: 'دخول | محطات أَوْج',
   robots: { index: false, follow: false },
+  ...stationOpsPwaMetadata,
 };
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
-};
+export const viewport = stationOpsViewport;
 
 export default function FuelOpsAuthLayout({ children }: { children: React.ReactNode }) {
   return children;
