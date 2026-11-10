@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-const FALLBACK_ICON = '/icon.ico';
+const FALLBACK_ICON = '/brand/awj/app-icon-v2.png';
 const SAFE_COMPANY_LOGO = /^(https:\/\/[^\s]+|data:image\/(png|jpeg|jpg|webp);base64,[a-z0-9+/]+=*)$/i;
 const DATA_IMAGE = /^data:image\/(png|jpeg|jpg|webp);base64,([a-z0-9+/]+=*)$/i;
 

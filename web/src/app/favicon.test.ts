@@ -9,6 +9,9 @@ describe('AWJ ERP browser icon', () => {
 
     expect(icon.length).toBeGreaterThan(0);
     expect(icon.subarray(0, 4)).toEqual(Buffer.from([0, 0, 1, 0]));
+    const apple = fs.readFileSync(path.join(process.cwd(), 'public/brand/awj/app-icon-v2.png'));
+    expect(apple.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect([apple.readUInt32BE(16), apple.readUInt32BE(20)]).toEqual([180, 180]);
   });
 
   it('does not reference legacy Nebrax/Nibras favicon branding', () => {
@@ -51,6 +54,6 @@ describe('AWJ ERP browser icon', () => {
     expect(layout).toContain("apple: '/api/company-browser-icon'");
     expect(route).toContain('company-browser-identity');
     expect(route).toContain("Origin: `${protocol}://${host}`");
-    expect(route).toContain("const FALLBACK_ICON = '/icon.ico'");
+    expect(route).toContain("const FALLBACK_ICON = '/brand/awj/app-icon-v2.png'");
   });
 });
