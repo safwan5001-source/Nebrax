@@ -58,7 +58,7 @@ for(const [name,w,h,kb] of sizes){
   ok(q.tt>=q.st-1&&q.tb<=q.sb+1,`${scheme}: note field visible inside the sheet`,JSON.stringify(q));
   if(scheme==='dark'&&name.startsWith('14'))await p.screenshot({path:__dirname+'/L-sheet-kb.png'});
   await p.setViewportSize({width:w,height:h});await p.waitForTimeout(100);
-  if(scheme==='dark')await p.screenshot({path:S+`L-${name.split(' ')[0]}-sheet.png`});
+  if(scheme==='dark')await p.screenshot({path:__dirname+`/L-${name.split(' ')[0]}-sheet.png`});
   // E. back navigation restores list scroll
   await p.reload();await p.addScriptTag({content:PAGE});await p.waitForTimeout(200);
   await click('.st-nav [data-id="fills"]');await click('[data-act="st-filter"][data-id="month"]');
