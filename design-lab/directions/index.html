@@ -1425,7 +1425,7 @@ app.addEventListener('input', (e) => {
   if (el.dataset.hf) { S.inv[el.dataset.hf] = el.value; return; }
   const lf = el.dataset.lf; if (!lf) return;
   const row = el.closest('tr'); const line = S.inv.lines.find(l => l.id === Number(row.dataset.line)); if (!line) return;
-  if (lf === 'p') { line.p = Number(el.value); line.price = PROD[line.p].price; render(`tr[data-line="${line.id}"] [data-lf="qty"]`); return; }
+  if (lf === 'p') { line.p = Number(el.value); line.price = PROD[line.p].price; if (line.bad) line.bad.price = false; if (line.raw) delete line.raw.price; render(`tr[data-line="${line.id}"] [data-lf="qty"]`); return; }
   const m = toMinor(el.value, lf === 'qty' ? 3 : 2);
   line.bad = line.bad || {}; line.raw = line.raw || {};
   if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[lf] = true; line.raw[lf] = el.value; return; }

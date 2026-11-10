@@ -279,6 +279,19 @@ test('Changing a line\'s product clears a stale invalid price so display, totals
   await ctx.close();
 });
 
+test('Inventory: Enter on a focused button keeps its own action; Enter elsewhere opens the active row', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'inventory' });
+  await page.locator('#main').focus(); await page.keyboard.press('j');
+  const chip = page.locator('#fx-app [data-ist]').nth(1);
+  const st = await chip.getAttribute('data-ist');
+  await chip.focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
+  assert(await page.evaluate(() => window.__fx.S.inv.st) === st, 'Enter on the filter chip did not apply it');
+  assert(await page.evaluate(() => window.__fx.S.inv.peek) === null, 'Enter on a chip opened the peek instead');
+  await page.locator('#main').focus(); await page.keyboard.press('j'); await page.keyboard.press('Enter');
+  assert(await page.locator('.split.peeking .peek').count() === 1, 'Enter on the list did not open the active row');
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);

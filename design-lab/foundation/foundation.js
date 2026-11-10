@@ -872,7 +872,9 @@ document.addEventListener('keydown', (e) => {
   if (S.route === 'inventory' && ['ArrowDown', 'ArrowUp'].includes(e.key) || S.route === 'inventory' && ['KeyJ', 'KeyK'].includes(e.code)) {
     const rows = invRows(); if (!rows.length) return; e.preventDefault(); let i = rows.findIndex(p => p.sku === S.inv.active);
     i = (e.key === 'ArrowDown' || e.code === 'KeyJ') ? Math.min(rows.length - 1, i + 1) : Math.max(0, i - 1); S.inv.active = rows[i].sku; if (S.inv.peek) S.inv.peek = rows[i].sku; render();
-  } else if (S.route === 'inventory' && e.key === 'Enter' && S.inv.active) { e.preventDefault(); openPeek(S.inv.active); }
+  } else if (S.route === 'inventory' && e.key === 'Enter' && S.inv.active
+    // Enter on a focused control (filter chip, sort header, nav link, menu…) keeps its own activation
+    && !document.activeElement?.closest?.('button, a[href], input, select, textarea, summary, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="checkbox"]')) { e.preventDefault(); openPeek(S.inv.active); }
 });
 new ResizeObserver(() => { if (S.route === 'numbers') { clearTimeout(S._rn); S._rn = setTimeout(() => measureNumbers(), 60); } if (S.route === 'home' || (S.route === 'inventory' && S.inv.peek)) { clearTimeout(S._ro); S._ro = setTimeout(() => render(), 60); } }).observe(app);
 

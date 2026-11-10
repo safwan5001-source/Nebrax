@@ -118,6 +118,20 @@ for (const dir of (V2 ? ['astur', 'mash', 'kufi'] : ['qalam', 'mizan', 'fajr']))
     await p.click(`${app} [data-act="post"] >> nth=0`);
     await p.locator(`${app} .je`).waitFor();
   });
+  await test(`${dir}: changing a line's product clears a stale invalid price`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'inv', device: 'laptop' });
+    const line = `${app} tr[data-line="2"]`;
+    await p.fill(`${line} [data-lf="price"]`, 'abc');
+    eq(await p.getAttribute(`${line} [data-lf="price"]`, 'aria-invalid'), 'true', 'abc flagged');
+    const cur = await p.inputValue(`${line} [data-lf="p"]`);
+    const other = await p.evaluate((sel) => [...document.querySelectorAll(sel + ' option')].map(o => o.value), `${line} [data-lf="p"]`);
+    await p.selectOption(`${line} [data-lf="p"]`, other.find(v => v !== cur));
+    const shown = await p.inputValue(`${line} [data-lf="price"]`);
+    if (shown === 'abc') throw new Error('stale price text still shown');
+    eq(await p.getAttribute(`${line} [data-lf="price"]`, 'aria-invalid'), null, 'price no longer flagged');
+    await p.click(`${app} [data-act="post"] >> nth=0`);
+    await p.locator(`${app} .je`).waitFor({ timeout: 3000 });
+  });
   await test(`${dir}: invoice header edits survive adding a line and changing the customer`, { width: 1440, height: 1000 }, async (p) => {
     await set(p, { dir, surface: 'inv', device: 'laptop' });
     await p.fill('#f-date', '2026-11-05');

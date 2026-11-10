@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T04:06:02.207Z",
+ "generated": "2026-11-10T04:14:44.094Z",
  "matrix": [
   {
    "route": "home",
@@ -2496,6 +2496,10 @@
    "ok": true
   },
   {
+   "name": "Inventory: Enter on a focused button keeps its own action; Enter elsewhere opens the active row",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2550,7 +2554,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 28,
+   "tests": 29,
    "failed": 0
   },
   "matrix": {
