@@ -51,7 +51,7 @@ input,select,textarea{font:inherit;color:inherit}
 
 /* ───────── Phone frame (desktop only; on a phone the app is the screen) ───────── */
 .phone{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
-@media (min-width:760px){.stage.is-station{align-items:center;padding-block:14px}.phone{width:390px;height:min(844px,100%);border-radius:38px;border:8px solid #0b121c;box-shadow:0 24px 60px rgb(0 0 0/.25)}}
+@media (min-width:760px) and (min-height:640px){.stage.is-station{align-items:center;padding-block:14px}.phone{width:390px;height:min(844px,100%);border-radius:38px;border:8px solid #0b121c;box-shadow:0 24px 60px rgb(0 0 0/.25)}}
 
 .app{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text);position:relative;width:100%}
 .app-erp{font-size:14px}
@@ -104,7 +104,8 @@ textarea.inp{min-height:84px;padding:10px 12px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 <style>
-html,body{height:100dvh}
+html{height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;top:0;left:0;width:100%;height:var(--vvh,100dvh);overscroll-behavior:none}
 #root{flex:1;min-height:0;display:flex;flex-direction:column}
 .tag.local{border-style:solid;border-color:var(--primary);color:var(--primary)}
 body:not(.show-tags) .tag-inline{display:none!important}
@@ -193,7 +194,29 @@ tfoot td{font-weight:700;background:var(--bg)}
 .stmt h3{font-size:16px}
 @media (max-width:899px){.erp-side{display:none}.erp-chips{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex:none}.erp-chips button{width:auto;white-space:nowrap;border:1px solid var(--border);border-radius:999px}}
 @media (max-width:719px){.tbl-d{display:none}.cards-m{display:flex}.grid2{grid-template-columns:1fr}.erp-pg{padding:12px}}
+/* wide-but-short screens (phone landscape): no phone frame, compact chrome, centered content */
+.st-body{max-width:640px;margin-inline:auto;width:100%}
+.scroll,.sheet-in{overscroll-behavior:contain}
+.bar-in.r1{padding-block:6px}
+.bar-in.r2{padding-block:0 6px;gap:12px;justify-content:flex-start;font-size:12px}
+.lnk{border:0;background:none;padding:2px 0;font-size:12px;font-weight:600;text-decoration:underline;color:var(--sh-fg);min-height:28px}
+.fixture{font-size:11px;padding:2px 8px}
+@media (max-height:500px){
+  .bar-in.r2{display:none}
+  .st-top{padding-block:max(6px,env(safe-area-inset-top,0px)) 8px}
+  .st-top h1{font-size:17px}.st-top .sub{display:none}.st-top .steps{margin-top:8px!important}
+  .st-ib{width:38px;height:38px}
+  .st-body{padding:12px;gap:10px}
+  .foot{padding:8px 16px max(8px,env(safe-area-inset-bottom,0px))}
+  .app-station .btn.primary{min-height:46px;font-size:16px}
+  .st-nav{padding-bottom:max(2px,env(safe-area-inset-bottom,0px))}
+  .st-nav button{min-height:44px;flex-direction:row;gap:8px;font-size:13px}
+  .big-in{min-height:56px;font-size:28px}
+  .sheet-in{max-height:96%;padding-block:12px}
+  .erp-top{padding-block:6px}
+}
 @media print{
+  body{position:static!important;height:auto!important}
   html,body,#root,.stage,.phone,.app,.erp-wrap,.erp-main,.scroll{height:auto!important;overflow:visible!important;display:block!important}
   .bar,.erp-side,.erp-chips,.erp-top,.noprint,.tabs,.toast,.sheet,.pg-h{display:none!important}
   body{background:#fff}.stmt{border:0;padding:0}
@@ -749,12 +772,14 @@ function policyPage(){
 function barHtml(){
   const sims=[['ok',X('الوضع الطبيعي','Normal')],['loading',X('تحميل القوائم','Loading lists')],['empty',X('قوائم فارغة','Empty lists')],['error',X('خطأ خادم','Server error')],['gate',X('الميزة مغلقة (ERP)','Feature gate closed (ERP)')],['readonly',X('عرض فقط (ERP)','View only (ERP)')],['unknown',X('انقطاع بعد الإرسال (حفظ التعبئة)','Network cut after send (save fill)')],['rejected',X('رفض الخادم (حفظ التعبئة)','Server rejects (save fill)')]];
   const roles=[['seller',X('بائع','Seller')],['supervisor',X('مشرف','Supervisor')],['noclose',X('بائع بلا صلاحية الإغلاق','Seller without close permission')]];
-  return `<div class="bar"><div class="bar-in"><div class="seg" role="group" aria-label="${X('التطبيق','App')}"><button data-act="app" data-id="station" aria-pressed="${S.app==='station'}">${X('تطبيق المحطات','Station app')}</button><button data-act="app" data-id="erp" aria-pressed="${S.app==='erp'}">AWJ ERP</button></div>
-   <div class="bar-tools"><button class="ibtn" data-act="lang" aria-label="${X('اللغة','Language')}">${S.lang==='ar'?'EN':'ع'}</button><button class="ibtn" data-act="theme" aria-label="${X('المظهر','Theme')}">${S.theme==='auto'?X('تلقائي','Auto'):S.theme==='light'?X('فاتح','Light'):X('داكن','Dark')}</button><button class="ibtn" data-act="tools" aria-expanded="${S.tools}" aria-controls="protoTools">${X('أدوات النموذج','Prototype tools')} ${S.tools?'▴':'▾'}</button></div></div>
-   ${S.tools?`<div id="protoTools" class="bar-in" style="border-top:1px dashed var(--sh-line)"><span class="fixture">${X('نموذج — بيانات وهمية. هذه الأدوات ليست جزءًا من أي تطبيق.','Prototype — fake data. These tools are not part of either app.')}</span>
+  const th=S.theme==='auto'?X('تلقائي','Auto'):S.theme==='light'?X('فاتح','Light'):X('داكن','Dark');
+  const panel=S.tools?`<div id="protoTools" class="bar-in" style="border-top:1px dashed var(--sh-line)"><span class="fixture">${X('نموذج — بيانات وهمية. هذه الأدوات ليست جزءًا من أي تطبيق.','Prototype — fake data. These tools are not part of either app.')}</span>
     <div class="row wrap" style="width:100%;gap:8px"><label class="sr" for="simSel">${X('محاكاة الحالة','State simulation')}</label><select id="simSel" class="ibtn" data-bind="sim" data-after="rerender" style="flex:1;min-width:140px">${sims.map(([k,l])=>`<option value="${k}" ${S.sim===k?'selected':''}>${X('محاكاة','Simulate')}: ${l}</option>`).join('')}</select>
     <label class="sr" for="roleSel">${X('الدور','Role')}</label><select id="roleSel" class="ibtn" data-bind="role" data-after="rerender" style="flex:1;min-width:140px">${roles.map(([k,l])=>`<option value="${k}" ${S.role===k?'selected':''}>${X('الدور','Role')}: ${l}</option>`).join('')}</select>
-    <button class="ibtn" data-act="tags" aria-pressed="${S.tags}">${X('الشارات','Tags')} ${S.tags?'✓':''}</button><button class="ibtn" data-act="about">${X('ما الموجود فعليًا؟','What is real?')}</button><button class="ibtn" data-act="reset">${X('إعادة ضبط البيانات','Reset data')}</button></div></div>`:`<div class="bar-in" style="padding-top:0"><span class="fixture">${X('نموذج — بيانات وهمية','Prototype — fake data')}</span><button class="ibtn" data-act="about">${X('ما الموجود فعليًا؟','What is real?')}</button></div>`}</div>`;
+    <button class="ibtn" data-act="tags" aria-pressed="${S.tags}">${X('الشارات','Tags')} ${S.tags?'✓':''}</button><button class="ibtn" data-act="about">${X('ما الموجود فعليًا؟','What is real?')}</button><button class="ibtn" data-act="reset">${X('إعادة ضبط البيانات','Reset data')}</button></div></div>`:'';
+  return `<div class="bar"><div class="bar-in r1"><div class="seg" role="group" aria-label="${X('التطبيق','App')}"><button data-act="app" data-id="station" aria-pressed="${S.app==='station'}">${X('المحطات','Station')}</button><button data-act="app" data-id="erp" aria-pressed="${S.app==='erp'}">AWJ ERP</button></div>
+   <div class="bar-tools"><button class="ibtn" data-act="lang" aria-label="${X('اللغة','Language')}">${S.lang==='ar'?'EN':'ع'}</button><button class="ibtn" data-act="theme" aria-label="${X('المظهر','Theme')}: ${th}" title="${th}">◐ ${th}</button><button class="ibtn" data-act="tools" aria-expanded="${S.tools}" aria-controls="protoTools" aria-label="${X('أدوات النموذج','Prototype tools')}">⚙ ${S.tools?'▴':'▾'}</button></div></div>
+   ${S.tools?'':`<div class="bar-in r2"><span class="fixture">${X('نموذج — بيانات وهمية','Prototype — fake data')}</span><button class="lnk" data-act="about">${X('ما الموجود فعليًا؟','What is real?')}</button></div>`}${panel}</div>`;
 }
 function aboutSheet(){
   if(!S.about)return '';
@@ -770,18 +795,30 @@ function aboutSheet(){
    <p style="margin-top:10px;font-size:13px">${X('للتجربة على الآيفون: جرّب تبديل التطبيق واللغة والمظهر، ومن «أدوات النموذج» اختبر الدور (بائع/مشرف/بلا صلاحية إغلاق) وحالات التحميل والفراغ والخطأ والبوابة المغلقة وانقطاع الشبكة أثناء الحفظ.','On iPhone: switch app, language and theme, and use “Prototype tools” to test the role (seller/supervisor/no close permission) and loading, empty, error, closed-gate and network-cut-while-saving states.')}</p></div></div>`;
 }
 /* ── render ── */
+const SCR={};
+function scrKey(){return S.app==='station'?`st:${S.st.view||S.st.tab}:${S.st.view==='wizard'?S.st.wiz.step:''}:${S.st.view==='detail'?S.st.sel:''}`:`erp:${S.erp.page}:${S.erp.oid||''}:${S.erp.tab}`}
+/* tab roots remember their scroll position (back/return); every other screen or wizard step starts at the top */
+const isRoot=k=>/^st:(home|fills|shift)::$/.test(k)||/^erp:(owners|ledger|supplies|settle|reports|policy)::/.test(k);
 function render(){
   const root=document.getElementById('root');
   document.documentElement.lang=S.lang;document.documentElement.dir=S.lang==='ar'?'rtl':'ltr';
   if(S.theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',S.theme);
   document.body.classList.toggle('show-tags',S.tags);
-  const keep=document.activeElement&&document.activeElement.id,sc=root.querySelector('.scroll'),st=sc?sc.scrollTop:0,same=root.dataset.k===S.app+':'+(S.st.view||S.st.tab)+':'+S.erp.page+':'+S.erp.tab;
+  const keep=document.activeElement&&document.activeElement.id,sc=root.querySelector('.scroll'),prev=root.dataset.k,cur=scrKey();
+  if(sc&&prev)SCR[prev]=sc.scrollTop;
   const stage=S.app==='station'?`<div class="stage is-station"><div class="phone">${stScreen()}</div></div>`:`<div class="stage">${erpScreen()}</div>`;
   root.innerHTML=barHtml()+stage+aboutSheet();
-  root.dataset.k=S.app+':'+(S.st.view||S.st.tab)+':'+S.erp.page+':'+S.erp.tab;
-  const nsc=root.querySelector('.scroll');if(nsc&&same)nsc.scrollTop=st;
-  if(keep){const el=document.getElementById(keep);if(el&&el.tagName!=='SELECT'){el.focus();try{const n=el.value.length;el.setSelectionRange(n,n)}catch(_){}}}
+  root.dataset.k=cur;
+  const nsc=root.querySelector('.scroll');
+  if(nsc){nsc.scrollTop=prev===cur?(SCR[cur]||0):(isRoot(cur)?(SCR[cur]||0):0)}
+  if(prev!==cur&&(window.scrollY||0))window.scrollTo(0,0);
+  if(keep){const el=document.getElementById(keep);if(el&&el.tagName!=='SELECT'){el.focus({preventScroll:true});try{const n=el.value.length;el.setSelectionRange(n,n)}catch(_){}}}
 }
+/* iOS keyboard / toolbar: size the app to the VISUAL viewport and never let the document pan (no blank band above or below) */
+const VV=window.visualViewport;
+function fit(){const h=Math.round(VV?VV.height:innerHeight);document.documentElement.style.setProperty('--vvh',h+'px');if(window.scrollY||(VV&&VV.offsetTop))window.scrollTo(0,0)}
+if(VV){VV.addEventListener('resize',fit);VV.addEventListener('scroll',fit)}addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,200));fit();
+document.addEventListener('focusin',e=>{const t=e.target;if(/^(INPUT|TEXTAREA)$/.test(t.tagName)&&t.type!=='checkbox'){setTimeout(()=>{fit();try{t.scrollIntoView({block:'center',behavior:'smooth'})}catch(_){}},320)}});
 function flash(msg,where){const k=where==='erp'?S.erp:S.st;k[where==='erp'?'toast':'flash']=msg;render();setTimeout(()=>{k[where==='erp'?'toast':'flash']=null;render()},2200)}
 /* ── generic path binding ── */
 function setPath(path,val){const seg=path.split('.');let o=seg[0]==='comm'?COMM:S;if(seg[0]==='comm')seg.shift();for(let i=0;i<seg.length-1;i++)o=o[seg[i]]=o[seg[i]]||{};o[seg[seg.length-1]]=val}
