@@ -52,7 +52,7 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>{t('tanker.sectionTitle')}{result ? <span className="num ms-2 text-sm font-normal text-muted">({result.meta.total})</span> : null}</CardTitle>
-        <Button size="sm" disabled={addDisabledReason !== undefined} title={addDisabledReason} onClick={() => setDialog({ open: true })}>
+        <Button size="sm" className="max-md:h-11" disabled={addDisabledReason !== undefined} title={addDisabledReason} onClick={() => setDialog({ open: true })}>
           <Plus className="h-4 w-4" aria-hidden="true" />{t('tanker.create')}
         </Button>
       </CardHeader>
@@ -84,7 +84,7 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
                         <TD><span className="num">{formatMillilitersAsLiters(tanker.capacity_milliliters, locale, liters)}</span></TD>
                         <TD><StatusBadge status={tanker.status} /></TD>
                         <TD className="text-end">
-                          <Button size="sm" variant="outline" disabled={!canManage} title={!canManage ? t('states.manageRequired', { permission: TANKER_MANAGE }) : undefined}
+                          <Button size="sm" className="max-md:h-11" variant="outline" disabled={!canManage} title={!canManage ? t('states.manageRequired', { permission: TANKER_MANAGE }) : undefined}
                             aria-label={t('tanker.editAria', { plate: tanker.plate_number })} onClick={() => setDialog({ open: true, tanker })}>
                             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />{t('common.edit')}
                           </Button>
@@ -104,7 +104,7 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
                       amount: formatMillilitersAsLiters(tanker.capacity_milliliters, locale, liters),
                       status: <StatusBadge status={tanker.status} />,
                       actions: (
-                        <Button size="sm" variant="ghost" disabled={!canManage} aria-label={t('tanker.editAria', { plate: tanker.plate_number })} onClick={() => setDialog({ open: true, tanker })}>
+                        <Button size="sm" className="max-md:h-11" variant="ghost" disabled={!canManage} aria-label={t('tanker.editAria', { plate: tanker.plate_number })} onClick={() => setDialog({ open: true, tanker })}>
                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />{t('common.edit')}
                         </Button>
                       ),

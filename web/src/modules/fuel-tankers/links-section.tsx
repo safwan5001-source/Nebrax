@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Building2, CalendarX2, Link2 } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState, MobileRecordItem, Pagination } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import type { OwnerCompanyLink, Paged, TankerOwner } from './types';
  */
 export function LinksSection({ owner, canManage }: { owner: TankerOwner; canManage: boolean }) {
   const t = useTranslations('fuelTankers');
+  const locale = useLocale();
   const { success } = useToast();
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<Paged<OwnerCompanyLink> | null>(null);
@@ -49,9 +50,9 @@ export function LinksSection({ owner, canManage }: { owner: TankerOwner; canMana
 
   const addDisabledReason = !canManage ? t('states.manageRequired', { permission: TANKER_MANAGE }) : !ownerActive ? t('link.ownerInactive') : undefined;
   const rows = result?.rows ?? [];
-  const period = (link: OwnerCompanyLink) => `${formatDate(link.valid_from)} → ${link.valid_to ? formatDate(link.valid_to) : t('link.openEnded')}`;
+  const period = (link: OwnerCompanyLink) => `${formatDate(link.valid_from, locale)} → ${link.valid_to ? formatDate(link.valid_to, locale) : t('link.openEnded')}`;
   const endAction = (link: OwnerCompanyLink, variant: 'outline' | 'ghost') => link.valid_to === null && canManage ? (
-    <Button size="sm" variant={variant} aria-label={t('link.endAria', { name: link.partner?.name ?? '' })} onClick={() => setEnding(link)}>
+    <Button size="sm" className="max-md:h-11" variant={variant} aria-label={t('link.endAria', { name: link.partner?.name ?? '' })} onClick={() => setEnding(link)}>
       <CalendarX2 className="h-3.5 w-3.5" aria-hidden="true" />{t('link.end')}
     </Button>
   ) : null;
@@ -60,7 +61,7 @@ export function LinksSection({ owner, canManage }: { owner: TankerOwner; canMana
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>{t('link.sectionTitle')}{result ? <span className="num ms-2 text-sm font-normal text-muted">({result.meta.total})</span> : null}</CardTitle>
-        <Button size="sm" disabled={addDisabledReason !== undefined} title={addDisabledReason} onClick={() => setCreating(true)}>
+        <Button size="sm" className="max-md:h-11" disabled={addDisabledReason !== undefined} title={addDisabledReason} onClick={() => setCreating(true)}>
           <Link2 className="h-4 w-4" aria-hidden="true" />{t('link.create')}
         </Button>
       </CardHeader>

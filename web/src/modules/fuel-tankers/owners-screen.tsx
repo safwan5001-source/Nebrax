@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, Plus, Search, Truck } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState, MobileRecordItem, PageHeader, Pagination } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const detailHref = (id: string) => `/fuel-stations/tanker-owners/${id}`;
  */
 export function OwnersScreen() {
   const t = useTranslations('fuelTankers');
+  const locale = useLocale();
   const router = useRouter();
   const { success } = useToast();
   const permissions = usePermissions();
@@ -147,7 +148,7 @@ export function OwnersScreen() {
                       <TD className="font-medium"><Link href={detailHref(owner.id)} className="text-primary hover:underline"><bdi>{owner.name}</bdi></Link></TD>
                       <TD><span className="num" dir="ltr">{owner.code ?? '—'}</span></TD>
                       <TD><StatusBadge status={owner.status} /></TD>
-                      <TD><span className="num">{formatDate(owner.created_at)}</span></TD>
+                      <TD><span className="num">{formatDate(owner.created_at, locale)}</span></TD>
                       <TD className="text-end"><Button asChild size="sm" variant="outline"><Link href={detailHref(owner.id)}>{t('list.open')}</Link></Button></TD>
                     </TR>
                   ))}
@@ -162,7 +163,7 @@ export function OwnersScreen() {
                       title: owner.name,
                       subtitle: owner.code ?? undefined,
                       status: <StatusBadge status={owner.status} />,
-                      meta: formatDate(owner.created_at),
+                      meta: formatDate(owner.created_at, locale),
                       actions: <span className="flex items-center gap-1 text-xs text-primary">{t('list.open')}<ChevronLeft className="h-4 w-4 rotate-180 rtl:rotate-0" aria-hidden="true" /></span>,
                     }} />
                   </Link>

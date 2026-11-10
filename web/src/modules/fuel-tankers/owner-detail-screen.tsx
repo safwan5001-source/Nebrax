@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Pencil } from 'lucide-react';
 import { ErrorState, LoadingState } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ type ScreenState = 'loading' | 'ready' | 'not_found' | 'forbidden' | 'error';
  */
 export function OwnerDetailScreen({ ownerId }: { ownerId: string }) {
   const t = useTranslations('fuelTankers');
+  const locale = useLocale();
   const { success } = useToast();
   const permissions = usePermissions();
   const canView = hasPermission(permissions, TANKER_VIEW);
@@ -65,7 +66,7 @@ export function OwnerDetailScreen({ ownerId }: { ownerId: string }) {
 
   return (
     <div className="space-y-4">
-      <Link href="/fuel-stations/tanker-owners" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+      <Link href="/fuel-stations/tanker-owners" className="inline-flex items-center gap-1 text-sm text-primary hover:underline max-md:min-h-11">
         <ArrowRight className="h-4 w-4 rtl:rotate-0 rotate-180" aria-hidden="true" />{t('detail.back')}
       </Link>
 
@@ -89,7 +90,7 @@ export function OwnerDetailScreen({ ownerId }: { ownerId: string }) {
             <Item label={t('owner.name')} value={<bdi>{owner.name}</bdi>} />
             <Item label={t('owner.code')} value={owner.code ? <span className="num" dir="ltr">{owner.code}</span> : '—'} />
             <Item label={t('owner.status')} value={<StatusBadge status={owner.status} />} />
-            <Item label={t('list.createdAt')} value={<span className="num">{formatDate(owner.created_at)}</span>} />
+            <Item label={t('list.createdAt')} value={<span className="num">{formatDate(owner.created_at, locale)}</span>} />
             <Item label={t('owner.phone')} value={sensitiveVisible ? (owner.phone ? <span className="num" dir="ltr">{owner.phone}</span> : '—') : <span className="text-muted">{t('detail.managerOnly')}</span>} />
             <Item label={t('owner.notes')} value={sensitiveVisible ? (owner.notes ? <span className="whitespace-pre-wrap">{owner.notes}</span> : '—') : <span className="text-muted">{t('detail.managerOnly')}</span>} />
           </dl>

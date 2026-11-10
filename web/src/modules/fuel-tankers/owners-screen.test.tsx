@@ -49,6 +49,18 @@ describe.each(['ar', 'en'] as const)('OwnersScreen (%s)', (locale) => {
     expect(screen.getAllByRole('link').some((a) => a.getAttribute('href') === `/fuel-stations/tanker-owners/${OWNER_ID}`)).toBe(true);
   });
 
+  it('formats dates in the UI language (English never gets Arabic-style RLM-marked dates)', async () => {
+    renderIntl(<OwnersScreen />, locale);
+    await screen.findAllByText('مالك تجريبي');
+    const text = document.body.textContent ?? '';
+    if (locale === 'en') {
+      expect(text).toMatch(/Jan\s+5,\s+2026|5\s+Jan\s+2026|05\/01\/2026/);
+      expect(text).not.toContain('\u200f');
+    } else {
+      expect(text).toContain('\u200f');
+    }
+  });
+
   it('shows the explicit forbidden state without calling the API when the view permission is missing', async () => {
     state.permissions = ['fuel_stations.view', 'fuel_stations.manage']; // المفتاح القديم لا يكفي
     renderIntl(<OwnersScreen />, locale);
