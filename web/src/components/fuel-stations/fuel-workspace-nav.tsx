@@ -19,11 +19,13 @@ import {
   Settings2,
   Truck,
   Wrench,
+  Container,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { type FuelWorkspaceNavItem, visibleFuelWorkspaceGroups } from '@/lib/fuel-workspace-nav';
+import { listOwners } from '@/modules/fuel-tankers/client';
 
 const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations': Gauge,
@@ -34,6 +36,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/master-data': Database,
   '/fuel-stations/corporate-contracts': Handshake,
   '/fuel-stations/avi-rfid': Fingerprint,
+  '/fuel-stations/tanker-owners': Container,
   '/fuel-stations/devices': Network,
   '/fuel-stations/maintenance': Wrench,
   '/fuel-stations/safety': ShieldCheck,
@@ -71,7 +74,18 @@ export function FuelWorkspaceNav({ onNavigate, className }: { onNavigate?: () =>
     return () => { cancelled = true; };
   }, []);
 
-  const visibleGroups = useMemo(() => visibleFuelWorkspaceGroups(permissions, hiddenAppKeys), [hiddenAppKeys, permissions]);
+  // بوابات النشر التي يفحصها الخادم ولا تعلنها قدرة التطبيقات: لا يُفحص إلا ما يملك المستخدم صلاحيته (فلا طلب لمن لا يراه أصلاً).
+  const [openGates, setOpenGates] = useState<ReadonlySet<string>>(new Set());
+  const canProbeTankers = permissions.includes('*') || permissions.includes('fuel.tanker.view');
+  useEffect(() => {
+    if (!canProbeTankers) return;
+    let cancelled = false;
+    // مفتوحة ⇒ 200؛ مغلقة ⇒ 404 موحَّد؛ أي فشل آخر ⇒ يبقى مخفياً (فشل مغلق).
+    listOwners().then(() => { if (!cancelled) setOpenGates((current) => new Set(current).add('tanker_management')); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [canProbeTankers]);
+
+  const visibleGroups = useMemo(() => visibleFuelWorkspaceGroups(permissions, hiddenAppKeys, openGates), [hiddenAppKeys, permissions, openGates]);
   if (visibleGroups.length === 0) return null;
 
   return (
