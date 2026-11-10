@@ -1272,7 +1272,16 @@ function updateTotals() {
 }
 
 /* ------------------------------------------------------------------ surfaces: fuel shift */
+/** Single source for whether the shift's closing readings can be saved: every nozzle has a
+ *  closing reading and none is below its opening meter. Used by the screen and the save handler. */
+function shiftReadiness() {
+  const close = (n) => S.readings[n.id] !== undefined ? S.readings[n.id] : n.close;
+  const left = NOZ.filter(n => close(n) === null).length;
+  const below = NOZ.filter(n => close(n) !== null && close(n) < n.open).length;
+  return { left, below, canSave: left === 0 && below === 0 };
+}
 function shiftSurface() {
+  const ready = shiftReadiness();
   const nz = NOZ.map(n => ({...n, close: S.readings[n.id] !== undefined ? S.readings[n.id] : n.close}));
   const left = nz.filter(n => n.close === null).length;
   let totalSales = 0, complete = true;
@@ -1284,8 +1293,8 @@ function shiftSurface() {
     if (sales === null) complete = false; else totalSales += sales;
     return `<article class="card nz"><div class="nz-h"><b>${n.id} · ${S.lang==='ar'?n.pump:n.pumpEn}</b><span class="prod"><i style="background:${n.color}"></i>${t(n.prod)}</span></div><div class="rd"><div class="field"><label for="op-${n.id}">${t('opening')}</label><input id="op-${n.id}" value="${fromMinor(n.open,3)}" readonly aria-readonly="true" tabindex="-1" style="background:var(--band)"></div><div class="field"><label for="rd-${n.id}">${t('closing')}</label><input id="rd-${n.id}" data-reading="${n.id}" inputmode="decimal" placeholder="${S.lang==='ar'?'أدخل القراءة':'Enter reading'}" value="${raw !== undefined ? esc(raw) : n.close !== null ? fromMinor(n.close,3) : ''}" ${bad?'aria-invalid="true" aria-describedby="e-'+n.id+'"':''}></div></div>${bad?`<span class="err" id="e-${n.id}" style="font-size:12px;color:var(--neg);display:flex;gap:4px">${ic('alert').replace('<svg','<svg width="13" height="13"')}${t('errBelow')}</span>`:''}<div class="out"><span>${t('liters')}</span><b>${ml===null?'—':fromMinor(ml,3).replace(/\B(?=(\d{3})+(?!\d))/,',')}</b></div><div class="out" style="border:0;padding:0"><span>${t('estSales')}</span><b>${sales===null?'—':money(sales)}</b></div></article>`;
   }).join('');
-  return `<div class="page" style="${S.dir==='fajr'?'padding-bottom:90px':''}"><div class="page-head"><div><div class="shift-hd"><span class="st"><i></i>${t('shiftOpen')}</span><span class="muted" style="font-size:12.5px">${t('shiftSince')}</span></div><h1 style="margin-top:6px">${t('shiftTitle')}</h1></div><div class="actions hide-phone"><button class="btn primary" type="button" data-act="save-readings" ${left?'':'disabled'}>${ic('check')}${t('saveReadings')}</button></div></div>
-  <section class="card next"><span class="q-ic">${ic('gauge')}</span><span class="t"><b>${t('nextStep')}: ${t('nextT')}</b><span>${t('nextP').replace('{n}', left)}</span></span><button class="btn primary" type="button" data-act="focus-reading" ${left?'':'disabled'}>${S.lang==='ar'?'ابدأ':'Start'}</button></section>
+  return `<div class="page" style="${S.dir==='fajr'?'padding-bottom:90px':''}"><div class="page-head"><div><div class="shift-hd"><span class="st"><i></i>${t('shiftOpen')}</span><span class="muted" style="font-size:12.5px">${t('shiftSince')}</span></div><h1 style="margin-top:6px">${t('shiftTitle')}</h1></div><div class="actions hide-phone"><button class="btn primary" type="button" data-act="save-readings" ${ready.canSave?'':'disabled'}>${ic('check')}${t('saveReadings')}</button></div></div>
+  <section class="card next"><span class="q-ic">${ic('gauge')}</span><span class="t"><b>${t('nextStep')}: ${t('nextT')}</b><span>${t('nextP').replace('{n}', left)}</span></span>${ready.canSave ? `<button class="btn primary" type="button" data-act="save-readings">${t('saveReadings')}</button>` : `<button class="btn primary" type="button" data-act="focus-reading">${ready.left ? (S.lang==='ar'?'ابدأ':'Start') : (S.lang==='ar'?'صحّح القراءة':'Fix reading')}</button>`}</section>
   <div class="nozzles">${cards}</div>
   <section class="outcome" style="border-radius:var(--radius-lg)"><span class="lbl"><span>${t('shiftTotal')}</span><span>${complete ? '' : (S.lang==='ar'?'جزئي — فوهات بلا قراءة':'Partial — nozzles without readings')}</span></span><span class="amt">${complete ? moneyOutcome(totalSales) : `${moneyOutcome(totalSales)}`}</span></section>
   <p class="note">${ic('info')}${t('estNote')}</p></div>`;
@@ -1386,8 +1395,8 @@ app.addEventListener('click', (e) => {
     case 'save-draft': toast(t('toastDraft')); break;
     case 'post': validatePost(); break;
     case 'confirm-post': S.overlay = null; render(); toast(t('toastPosted')); break;
-    case 'save-readings': toast(t('readingsSaved')); break;
-    case 'focus-reading': { const first = NOZ.find(n => (S.readings[n.id] ?? n.close) === null); if (first) app.querySelector(`[data-reading="${first.id}"]`)?.focus(); break; }
+    case 'save-readings': if (shiftReadiness().canSave) toast(t('readingsSaved')); break;
+    case 'focus-reading': { const v = (n) => S.readings[n.id] !== undefined ? S.readings[n.id] : n.close; const first = NOZ.find(n => v(n) === null || v(n) < n.open); if (first) app.querySelector(`[data-reading="${first.id}"]`)?.focus(); break; }
   }
 });
 function addLine() { const id = S.lineSeq++; S.inv.lines.push({ id, p:4, qtyM:1000, price:PROD[4].price, disc:0, fresh:true }); delete S.inv.errs.lines; render(`tr[data-line="${id}"] [data-lf="qty"]`); }

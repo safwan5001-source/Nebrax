@@ -136,6 +136,18 @@ for (const dir of ['qalam', 'mizan', 'fajr']) {
     const txt = await p.textContent(`${app} .nz:nth-child(1) .out b`);
     eq(txt.trim(), '500', 'liters');
   });
+  await test(`${dir}: saving readings is enabled only when every reading is present and valid`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'shift', device: 'laptop' });
+    const save = `${app} .page-head [data-act="save-readings"]`;
+    eq(await p.isDisabled(save), true, 'disabled while readings missing');
+    const fill = async (id, v) => { await p.fill(`${app} [data-reading="${id}"]`, v); await p.waitForTimeout(450); };
+    await fill('N1', '285012.37'); await fill('N3', '413100'); await fill('N4', '377000');
+    eq(await p.isDisabled(save), true, 'disabled while one reading is below opening');
+    await fill('N4', '377500');
+    eq(await p.isDisabled(save), false, 'enabled when all four are valid');
+    await p.click(`${app} .next [data-act="save-readings"]`);
+    await p.locator(`${app} .toast`).waitFor();
+  });
   await test(`${dir}: phone tab bar navigates; touch targets ≥ 44px`, { width: 390, height: 844 }, async (p) => {
     await set(p, { dir, surface: 'dash', device: 'wide' });
     await p.click(`${app} .tabbar [data-go="table"]`);
