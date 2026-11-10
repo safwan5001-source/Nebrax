@@ -132,6 +132,16 @@ for (const dir of (V2 ? ['astur', 'mash', 'kufi'] : ['qalam', 'mizan', 'fajr']))
     await p.click(`${app} [data-act="post"] >> nth=0`);
     await p.locator(`${app} .je`).waitFor({ timeout: 3000 });
   });
+  await test(`${dir}: correcting an invalid quantity by typing .5 keeps the decimal (qty 500, not 5000)`, { width: 1440, height: 1000 }, async (p) => {
+    await set(p, { dir, surface: 'inv', device: 'laptop' });
+    const line = `${app} tr[data-line="2"]`, q = `${line} [data-lf="qty"]`;
+    await p.fill(q, 'abc');
+    await p.click(`${app} [data-act="post"] >> nth=0`);
+    eq(await p.locator(`${app} .je`).count(), 0, 'no preview while invalid');
+    await p.fill(q, ''); await p.type(q, '.5', { delay: 30 });
+    eq(await p.inputValue(q), '.5', 'typed text kept');
+    eq(await p.evaluate(() => window.__awjLab.S.inv.lines.find(l => l.id === 2).qtyM), 500, 'stored quantity');
+  });
   await test(`${dir}: invoice header edits survive adding a line and changing the customer`, { width: 1440, height: 1000 }, async (p) => {
     await set(p, { dir, surface: 'inv', device: 'laptop' });
     await p.fill('#f-date', '2026-11-05');

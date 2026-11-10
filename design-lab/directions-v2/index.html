@@ -1219,7 +1219,7 @@ function inspector(no) {
 }
 
 /* ----------------------------------------------------------------- invoice entry */
-const lineVal = (l, f) => l.bad?.[f] ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
+const lineVal = (l, f) => l.raw?.[f] !== undefined ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
 function lineRow(l, idx) {
   const p = PROD[l.p], c = lineCalc(l);
   return `<tr data-line="${l.id}" class="${l.fresh ? 'new' : ''}"><td class="hide-phone num muted">${idx + 1}</td><td class="pr" data-l="${t('item')}"><select data-lf="p" aria-label="${t('item')} ${idx + 1}">${PROD.map((x, i) => `<option value="${i}" ${i === l.p ? 'selected' : ''}>${esc(nm(x))}</option>`).join('')}</select><small>${p.sku}</small></td><td data-l="${t('qty')}" style="width:92px"><input class="n" data-lf="qty" inputmode="decimal" value="${esc(lineVal(l, 'qty'))}" aria-label="${t('qty')} ${idx + 1}" ${l.bad?.qty ? 'aria-invalid="true"' : ''}></td><td class="hide-phone muted" style="width:56px">${nm(p.u)}</td><td data-l="${t('price')}" style="width:110px"><input class="n" data-lf="price" inputmode="decimal" value="${esc(lineVal(l, 'price'))}" aria-label="${t('price')} ${idx + 1}" ${l.bad?.price ? 'aria-invalid="true"' : ''}></td><td data-l="${t('discount')}" style="width:96px"><input class="n" data-lf="disc" inputmode="decimal" value="${esc(lineVal(l, 'disc'))}" aria-label="${t('discount')} ${idx + 1}" ${l.bad?.disc ? 'aria-invalid="true"' : ''}></td><td class="ro" data-l="${t('vatAmt')}" data-lt="vat">${plain(c.vat)}</td><td class="ro" data-l="${t('lineTotal')}" data-lt="total" style="font-weight:600">${plain(c.total)}</td><td class="del" style="width:44px"><button class="icon-btn" type="button" data-del="${l.id}" aria-label="delete line ${idx + 1}">${ic('trash')}</button></td></tr>`;
@@ -1401,10 +1401,15 @@ app.addEventListener('input', (e) => {
   const m = toMinor(el.value, lf === 'qty' ? 3 : 2);
   line.bad = line.bad || {}; line.raw = line.raw || {};
   if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[lf] = true; line.raw[lf] = el.value; return; }
-  el.removeAttribute('aria-invalid'); line.bad[lf] = false; delete line.raw[lf];
+  el.removeAttribute('aria-invalid'); line.bad[lf] = false; line.raw[lf] = el.value; // keep the text being typed (".", "1.") until the field is left
   if (lf === 'qty') line.qtyM = m; else if (lf === 'price') line.price = m; else line.disc = m;
   if (S.inv.errs.invalid && !S.inv.lines.some(l => l.bad && Object.values(l.bad).some(Boolean))) { delete S.inv.errs.invalid; render(`tr[data-line="${line.id}"] [data-lf="${lf}"]`); return; }
   updateTotals();
+});
+app.addEventListener('focusout', (e) => {
+  const el = e.target, lf = el.dataset?.lf; if (!lf || lf === 'p') return;
+  const line = S.inv.lines.find(l => l.id === Number(el.closest('tr')?.dataset.line));
+  if (line?.raw && !line.bad?.[lf]) delete line.raw[lf];
 });
 app.addEventListener('keydown', (e) => {
   const el = e.target;

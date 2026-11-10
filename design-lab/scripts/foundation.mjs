@@ -292,6 +292,21 @@ test('Inventory: Enter on a focused button keeps its own action; Enter elsewhere
   await ctx.close();
 });
 
+test('Compact screens: Save draft is reachable from the More menu (no keyboard needed)', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales', device: 'phone' });
+  await page.waitForTimeout(300);
+  const id = await page.evaluate(() => window.__fx.S.docs.sales.lines[0].id);
+  await page.fill(`#sales-l${id}-disc`, '5'); await page.waitForTimeout(80);
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.dirty), 'not dirty');
+  assert(!(await vis(page, '.cmdbar [data-act="save-draft"]:not([role="menuitem"])')), 'toolbar save unexpectedly visible on compact');
+  await page.click('.cmdbar [data-act="menu"]');
+  await page.click('.menu [data-act="save-draft"]');
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.dirty) === false, 'menu Save draft did not save');
+  assert(await page.locator('.menu').count() === 0, 'menu still open');
+  assert(await page.evaluate(() => document.activeElement?.matches('.cmdbar [data-act="menu"]')), 'focus not returned to More');
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);

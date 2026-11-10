@@ -26,7 +26,7 @@ design-lab/
   docs/AWJ-UX-FOUNDATION-PHASE-1-REPORT.md       تقرير المرحلة 1: الغلاف، المكوّنات المرجعية، M2، طبقة الهوية
   foundation/index.html         مستكشف الأساس الموحّد (المرحلة 1) فوق رموز v3 حرفياً
   foundation/screens/           28 لقطة 2× (الشاشات الأربع، جوال/لوحي/محمول/2560، داكن، LTR، الهوية)
-  foundation/checks.json        نتائج 151 تهيئة + 29 اختبار تفاعل + قياسات M2 وعقد الهوية
+  foundation/checks.json        نتائج 151 تهيئة + 30 اختبار تفاعل + قياسات M2 وعقد الهوية
   scripts/foundation.mjs        فحوص المرحلة 1 (مصفوفة + تفاعل + لقطات)
   directions-v2/index.html      مستكشف V2 التفاعلي (هويات جديدة كلياً)
   directions-v2/screens/        لقطات 2× (جوال، محمول، عريض 2560) + لوحي/LTR/حالات
@@ -49,10 +49,10 @@ open design-lab/directions/index.html      # أو xdg-open على Linux
 # capture.mjs يخرج برمز 1 عند أي خطأ صفحة أو تمرير أفقي أو مخالفة axe؛ interactions.mjs عند أي اختبار فاشل.
 node design-lab/scripts/capture.mjs            # 84 تهيئة: أخطاء + تجاوز أفقي + WCAG
 node design-lab/scripts/capture.mjs --shots    # + لقطات PNG (المحفوظة في المستودع مُحوَّلة إلى WebP للحجم)
-node design-lab/scripts/interactions.mjs       # 46 اختبار تفاعل
+node design-lab/scripts/interactions.mjs       # 49 اختبار تفاعل
 LAB=v2 node design-lab/scripts/capture.mjs --shots --scale=2   # مصفوفة V2 (87 تهيئة) + لقطات 2×
-LAB=v2 node design-lab/scripts/interactions.mjs                # 46 اختبار تفاعل على V2
-node design-lab/scripts/foundation.mjs                         # المرحلة 1: 151 تهيئة + 29 اختبار تفاعل
+LAB=v2 node design-lab/scripts/interactions.mjs                # 49 اختبار تفاعل على V2
+node design-lab/scripts/foundation.mjs                         # المرحلة 1: 151 تهيئة + 30 اختبار تفاعل
 node design-lab/scripts/foundation.mjs --shots --scale=2       # + 28 لقطة WebP
 ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة تصوير شاشة واحدة (لا يمثّل المصفوفة الكاملة)
 ```

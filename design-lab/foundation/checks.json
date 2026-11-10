@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T04:14:44.094Z",
+ "generated": "2026-11-10T04:25:02.527Z",
  "matrix": [
   {
    "route": "home",
@@ -2500,6 +2500,10 @@
    "ok": true
   },
   {
+   "name": "Compact screens: Save draft is reachable from the More menu (no keyboard needed)",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2554,7 +2558,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 29,
+   "tests": 30,
    "failed": 0
   },
   "matrix": {
