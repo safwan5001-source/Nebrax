@@ -845,6 +845,14 @@ class FuelTankerFillTest extends TestCase
     }
 
     /** @test */
+    public function the_voucher_duplicate_lookup_has_a_dedicated_index(): void
+    {
+        $names = array_column(\Illuminate\Support\Facades\Schema::getIndexes('fuel_tanker_fills'), 'name');
+        $this->assertContains('fuel_tanker_fill_voucher_lookup_idx', $names);
+        $this->assertContains('fuel_tanker_fill_voucher_unique', $names);
+    }
+
+    /** @test */
     public function the_ftf_series_is_registered_in_the_numbering_catalog(): void
     {
         $this->assertContains('fuel_tanker_fill', \App\Support\DocumentNumberingCatalog::editableKeys());

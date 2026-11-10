@@ -80,6 +80,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'branch_id', 'number'], 'fuel_tanker_fill_number_unique');
             $table->unique(['tenant_id', 'idempotency_key'], 'fuel_tanker_fill_idempotency_unique');
             $table->unique(['tenant_id', 'voucher_scope_key', 'voucher_key'], 'fuel_tanker_fill_voucher_unique');
+            // فحص تكرار السند (`tenant_id` + `voucher_key` عبر النطاقات): الفهرس الفريد أعلاه يبدأ بـ`voucher_scope_key` فلا يخدم هذا الاستعلام.
+            $table->index(['tenant_id', 'voucher_key'], 'fuel_tanker_fill_voucher_lookup_idx');
             $table->index(['tenant_id', 'fuel_station_id', 'recorded_at'], 'fuel_tanker_fill_station_idx');
             $table->index(['tenant_id', 'fuel_shift_id'], 'fuel_tanker_fill_shift_idx');
             $table->index(['tenant_id', 'fuel_tanker_owner_id', 'recorded_at'], 'fuel_tanker_fill_owner_idx');
