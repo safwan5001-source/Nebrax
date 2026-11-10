@@ -114,13 +114,14 @@ class FuelTankerFillService
         if ($station === null) {
             throw $this->notFound();
         }
-        $this->assertStationUsable($station, $actor);
+        $this->assertStationAccessible($station, $actor);
 
-        // الإعادة بالمفتاح تُحسم قبل أي تقييم جديد (الوردية قد تكون أُغلقت، والسياسات قد تغيّرت).
+        // الإعادة بالمفتاح تُحسم قبل أي تقييم جديد (الوردية قد تكون أُغلقت، والمحطة عُطّلت، والسياسات قد تغيّرت): فحوص الوصول وحدها تسبقها، وشرط نشاط المحطة لتسجيل جديد فقط.
         $existing = FuelTankerFill::query()->withoutGlobalScope(BranchScope::class)->where('idempotency_key', $intent['key'])->first();
         if ($existing !== null) {
             return ['fill' => $this->assertReplay($existing, $intent, $actor), 'replayed' => true];
         }
+        $this->assertStationActive($station);
 
         $policy = $this->settings->tankerFillPolicy($station);
 
@@ -235,7 +236,8 @@ class FuelTankerFillService
 
     // ───────────────────────── التحققات ─────────────────────────
 
-    private function assertStationUsable(FuelStation $station, User $actor): void
+    /** نطاق المستخدم والفرع النشط (404 موحَّد) — يسبق حسم الإعادة بالمفتاح. */
+    private function assertStationAccessible(FuelStation $station, User $actor): void
     {
         if (! $actor->canAccessFuelStation($station)) {
             throw $this->notFound();
@@ -244,6 +246,11 @@ class FuelTankerFillService
         if ($branchId !== null && $station->branch_id !== $branchId) {
             throw $this->notFound();
         }
+    }
+
+    /** نشاط المحطة شرط لتسجيل تعبئة جديدة فقط، لا لاسترجاع تعبئة سبق تسجيلها. */
+    private function assertStationActive(FuelStation $station): void
+    {
         if ($station->status !== FuelStation::STATUS_ACTIVE) {
             throw new FuelTankerFillException(FuelTankerFillException::EQUIPMENT_NOT_OPERATIONAL, 'محطة الوقود غير نشطة.');
         }
@@ -275,6 +282,9 @@ class FuelTankerFillService
         $fuelProduct = FuelProduct::query()->find($nozzle->fuel_product_id);
         if ($fuelProduct === null) {
             throw new FuelTankerFillException(FuelTankerFillException::PRODUCT_MISMATCH, 'منتج الفوهة غير موجود.');
+        }
+        if (! $fuelProduct->is_active) { // مثل مسار البيع المباشر: منتج وقود أُخرج من التشغيل لا تُسجَّل عليه تعبئة ولو بقي مربوطاً بالفوهة والخزان.
+            throw new FuelTankerFillException(FuelTankerFillException::EQUIPMENT_NOT_OPERATIONAL, 'منتج الوقود غير نشط؛ لا تُسجَّل عليه التعبئة.');
         }
         if ($tank->fuel_product_id !== $fuelProduct->id) {
             throw new FuelTankerFillException(FuelTankerFillException::PRODUCT_MISMATCH, 'منتج خزان الفوهة لا يطابق منتج الفوهة.');

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\FuelNozzle;
 use App\Models\FuelPump;
 use App\Models\FuelShift;
+use App\Models\FuelStation;
 use App\Models\FuelStationAuditEvent;
 use App\Models\FuelTanker;
 use App\Models\FuelTankerFill;
@@ -510,6 +511,36 @@ class FuelTankerFillTest extends TestCase
         $foreign = $this->makeNozzle($this->fx['s2'], $pump2, $this->fx['t2'], '1');
         $this->record($staff['token'], ['fuel_nozzle_id' => $foreign->id, 'voucher_number' => 'Q4'])->assertStatus(422)->assertJsonPath('reason', 'invalid_input');
         $this->assertSame(0, FuelTankerFill::query()->count());
+    }
+
+    /** @test */
+    public function an_inactive_fuel_product_is_rejected_even_when_its_tank_and_nozzle_mappings_remain(): void
+    {
+        $staff = $this->staff();
+        $this->fx['fuel']->update(['is_active' => false]);
+
+        $this->record($staff['token'], ['voucher_number' => 'IP1'])->assertStatus(422)->assertJsonPath('reason', 'equipment_not_operational');
+        $this->assertSame(0, FuelTankerFill::query()->count());
+
+        $this->fx['fuel']->update(['is_active' => true]);
+        $this->record($staff['token'], ['voucher_number' => 'IP1'])->assertCreated();
+    }
+
+    /** @test */
+    public function a_replay_is_answered_even_after_the_station_was_deactivated_but_new_fills_are_not(): void
+    {
+        $staff = $this->staff();
+        $payload = $this->payload();
+        $id = $this->withToken($staff['token'])->postJson(self::BASE, $payload)->assertCreated()->json('data.id');
+        $this->fx['s1']->update(['status' => FuelStation::STATUS_INACTIVE]);
+
+        $this->withToken($staff['token'])->postJson(self::BASE, $payload)->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('meta.replayed', true);
+        $this->record($staff['token'], ['voucher_number' => 'ST2'])->assertStatus(422)->assertJsonPath('reason', 'equipment_not_operational');
+
+        // فحوص الوصول تسبق الإعادة دائماً: مستخدم محطة أخرى لا يسترجع شيئاً.
+        $restricted = $this->staff(self::RECORD, [$this->fx['s2']->id]);
+        $this->withToken($restricted['token'])->postJson(self::BASE, $payload)->assertNotFound();
+        $this->assertSame(1, FuelTankerFill::query()->count());
     }
 
     /** @test */
