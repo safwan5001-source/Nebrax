@@ -329,6 +329,87 @@ class FuelTankerFillTest extends TestCase
     }
 
     /** @test */
+    public function an_owner_with_no_registered_tankers_is_never_blocked_even_when_selection_is_required(): void
+    {
+        $staff = $this->staff();
+        $this->setPolicy(['tanker_selection_required' => true]);
+        $bare = FuelTankerOwner::create(['name' => 'بلا مركبات', 'code' => 'NOV', 'status' => 'active']);
+        $before = $this->sideEffectCounts();
+
+        $data = $this->record($staff['token'], ['fuel_tanker_owner_id' => $bare->id, 'voucher_number' => 'W1'])->assertCreated()->json('data');
+        $this->assertNull($data['fuel_tanker_id']);
+        $this->assertTrue($data['policy_snapshot']['tanker_selection_required'], 'السياسة نفسها لم تتغيّر');
+        $this->assertSame('owner_has_no_registered_tankers', $data['policy_snapshot']['tanker_selection_waived'], 'الاستثناء مسجَّل في لقطة السياسة');
+        $this->assertSame($before, $this->sideEffectCounts(), 'لا أثر مخزني ولا محاسبي');
+
+        // الاستثناء خاص بهذا المالك: مالك له مركبة يبقى خاضعاً للسياسة في المحطة نفسها.
+        $this->record($staff['token'], ['voucher_number' => 'W2'])->assertStatus(422)->assertJsonPath('reason', 'tanker_required');
+    }
+
+    /** @test */
+    public function the_policy_still_applies_to_an_owner_who_has_a_tanker_in_any_state(): void
+    {
+        $staff = $this->staff();
+        $this->setPolicy(['tanker_selection_required' => true]);
+
+        $this->record($staff['token'], ['voucher_number' => 'X1'])->assertStatus(422)->assertJsonPath('reason', 'tanker_required');
+
+        // مركبة موقوفة تبقى «مسجَّلة»: المالك خاضع للسياسة ولا يُعفى (وتحديد الموقوفة مرفوض كما كان).
+        $this->tanker->update(['status' => 'suspended']);
+        $this->record($staff['token'], ['voucher_number' => 'X2'])->assertStatus(422)->assertJsonPath('reason', 'tanker_required');
+        $this->record($staff['token'], ['voucher_number' => 'X2', 'fuel_tanker_id' => $this->tanker->id])->assertStatus(422)->assertJsonPath('reason', 'tanker_inactive');
+        $this->assertSame(0, FuelTankerFill::query()->count());
+    }
+
+    /** @test */
+    public function the_exemption_does_not_loosen_any_other_rule_for_an_owner_without_tankers(): void
+    {
+        $staff = $this->staff();
+        $this->setPolicy(['tanker_selection_required' => true]);
+        $bare = FuelTankerOwner::create(['name' => 'بلا مركبات', 'code' => 'NOV', 'status' => 'active']);
+        $over = ['fuel_tanker_owner_id' => $bare->id];
+
+        // صهريج صريح لا يتبع المالك يبقى مرفوضاً.
+        $this->record($staff['token'], $over + ['voucher_number' => 'Y1', 'fuel_tanker_id' => $this->tanker->id])->assertStatus(422)->assertJsonPath('reason', 'tanker_mismatch');
+        // صاحب الصهريج غير النشط مرفوض، والسند الورقي المكرر مرفوض، والوردية المطلوبة قائمة.
+        $this->record($staff['token'], $over + ['voucher_number' => 'Y2'])->assertCreated();
+        $this->record($staff['token'], $over + ['voucher_number' => 'Y2'])->assertStatus(409)->assertJsonPath('reason', 'voucher_duplicate');
+        $bare->update(['status' => 'inactive']);
+        $this->record($staff['token'], $over + ['voucher_number' => 'Y3'])->assertStatus(422)->assertJsonPath('reason', 'owner_inactive');
+        $bare->update(['status' => 'active']);
+        $this->closeShift($this->shift);
+        $this->record($staff['token'], $over + ['voucher_number' => 'Y4'])->assertStatus(422);
+    }
+
+    /** @test */
+    public function the_exemption_respects_permissions_gates_station_access_and_tenant_isolation(): void
+    {
+        $this->setPolicy(['tanker_selection_required' => true]);
+        $bare = FuelTankerOwner::create(['name' => 'بلا مركبات', 'code' => 'NOV', 'status' => 'active']);
+        $over = ['fuel_tanker_owner_id' => $bare->id, 'voucher_number' => 'Z1'];
+
+        // الصلاحيات: العرض وحده أو بلا صلاحية لا يسجّلان، ومستخدم محطة أخرى 404، ومحطة بوابة مغلقة 404.
+        $this->record($this->staff(['fuel.tanker.fill.view'])['token'], $over)->assertForbidden();
+        $this->record($this->staff([])['token'], $over)->assertForbidden();
+        $this->record($this->staff(self::RECORD, [$this->fx['s2']->id])['token'], $over)->assertNotFound();
+        config(['fuel_stations.tanker_fills_enabled' => false]);
+        $this->record($this->staff()['token'], $over)->assertNotFound();
+        config(['fuel_stations.tanker_fills_enabled' => true]);
+        $this->assertSame(0, FuelTankerFill::query()->count());
+
+        // العزل: مركبات مؤسسة أخرى (ولو بالرقم نفسه) لا تُحتسب لهذا المالك ولا تُرى.
+        $other = $this->registerTenant('fuel-t4-exempt', 'owner@fuel-t4-exempt.test', autoEnableApplications: true);
+        app(TenantContext::class)->set($other['tenant_id']);
+        $foreignOwner = FuelTankerOwner::create(['name' => 'مالك آخر', 'code' => 'NOV', 'status' => 'active']);
+        FuelTanker::create(['fuel_tanker_owner_id' => $foreignOwner->id, 'plate_number' => 'Q 1', 'plate_key' => 'Q1', 'status' => 'active']);
+        app(TenantContext::class)->set($this->tenantId);
+
+        $this->record($this->staff()['token'], $over)->assertCreated()->assertJsonPath('data.fuel_tanker_id', null);
+        // ولا يعمل على مالك مؤسسة أخرى (معرّفه غير موجود في نطاق هذه المؤسسة).
+        $this->record($this->staff()['token'], ['fuel_tanker_owner_id' => $foreignOwner->id, 'voucher_number' => 'Z2'])->assertStatus(422);
+    }
+
+    /** @test */
     public function the_tanker_must_belong_to_the_selected_owner_and_be_active(): void
     {
         $staff = $this->staff();

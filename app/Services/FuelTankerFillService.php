@@ -149,7 +149,8 @@ class FuelTankerFillService
         if ($owner->status !== FuelTankerOwner::STATUS_ACTIVE) {
             throw new FuelTankerFillException(FuelTankerFillException::OWNER_INACTIVE, 'صاحب الصهريج غير نشط.');
         }
-        $tanker = $this->resolveTanker($intent['tanker_id'], $owner, $policy['selection_required']);
+        $selectionWaived = $policy['selection_required'] && $intent['tanker_id'] === null && ! $this->ownerHasRegisteredTankers($owner);
+        $tanker = $this->resolveTanker($intent['tanker_id'], $owner, $policy['selection_required'] && ! $selectionWaived);
 
         $this->serializeVoucher($intent['voucher_key'], $policy['voucher_unique_scope']);
         $this->assertVoucherAvailable($intent, $policy['voucher_unique_scope'], $station, $owner, $actor);
@@ -181,7 +182,7 @@ class FuelTankerFillService
                 'tanker_selection_required' => $policy['selection_required'],
                 'tanker_voucher_unique_scope' => $policy['voucher_unique_scope'],
                 'tanker_capacity_overrun_policy' => $policy['capacity_overrun_policy'],
-            ],
+            ] + ($selectionWaived ? ['tanker_selection_waived' => 'owner_has_no_registered_tankers'] : []),
             'notes' => $intent['notes'],
             'idempotency_key' => $intent['key'],
             'request_fingerprint' => $intent['fingerprint'],
@@ -307,6 +308,16 @@ class FuelTankerFillService
         }
 
         return $locked;
+    }
+
+    /**
+     * استثناء سياسة «اختيار الصهريج إلزامي» (قرار معتمد، PR3_DECISIONS): صاحب صهريج **لا توجد له مركبة مسجَّلة** لا يُمنع من التعبئة باسمه لأنه لا يملك ما يختاره.
+     * «مسجَّلة» = أي سجل صهريج للمالك في المؤسسة بأي حالة؛ فمن لديه مركبة (ولو موقوفة) يبقى خاضعاً للسياسة. العزل بين المؤسسات بنطاق `BaseModel`.
+     * فحص نقطي بلا قفل: مركبة تُسجَّل بالتزامن تعني فقط أن التعبئة سبقتها في الترتيب، ولا يضرّ ذلك ثابتاً.
+     */
+    private function ownerHasRegisteredTankers(FuelTankerOwner $owner): bool
+    {
+        return FuelTanker::query()->where('fuel_tanker_owner_id', $owner->id)->exists();
     }
 
     private function resolveTanker(?string $tankerId, FuelTankerOwner $owner, bool $selectionRequired): ?FuelTanker
