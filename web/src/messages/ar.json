@@ -3107,6 +3107,7 @@
       "reconciliation": "تسوية المخزون",
       "supplier_invoice": "فواتير موردي الوقود",
       "tanker": "أصحاب الصهاريج",
+      "fill": "التعبئات",
       "governance": "حوكمة الوقود",
       "settlement": "التسوية",
       "staff": "موظفو المحطات"
@@ -9386,6 +9387,7 @@
     "entity_fuel_shift": "وردية وقود",
     "entity_fuel_sale": "بيع وقود",
     "entity_fuel_opening_balance": "رصيد افتتاحي للوقود",
+    "entity_fuel_tanker_fill": "تعبئة صهريج",
     "entity_fuel_maintenance_work_order": "أمر صيانة محطة",
     "entity_fuel_safety_inspection": "فحص سلامة محطة",
     "entity_corporate_fuel_contract": "عقد وقود مؤسسي",

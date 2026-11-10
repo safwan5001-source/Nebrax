@@ -215,6 +215,9 @@ class Rbac
             // owner/admin عبر `*`؛ لا تُضافان لـ`MATRIX` ولا لأي قالب موظف ولا تُمنحان لأي دور مخزَّن بهجرة (لا منح ضمني). المسارات خلف بوابة
             // نشر مغلقة (`fuel_stations.tanker_management_enabled`) فلا أثر قبل التفعيل.
             'fuel.tanker.view', 'fuel.tanker.manage',
+            // TANKER-PR4: سندات تعبئة الصهاريج — عرض وتسجيل وإلغاء منفصلة. **تشغيلي فقط (لا مخزون ولا قيد)**. owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف
+            // (منحها لموظف المحطة يأتي مع واجهة التطبيق المكتملة) ولا تُمنح لأي دور مخزَّن بهجرة. المسارات خلف بوابة نشر منفصلة مغلقة (`tanker_fills_enabled`).
+            'fuel.tanker.fill.view', 'fuel.tanker.fill.record', 'fuel.tanker.fill.void',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
             // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات
