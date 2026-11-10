@@ -54,3 +54,25 @@ describe('Fuel Workspace navigation presentation', () => {
     expect(routes(['*'])).toContain('/fuel-stations/prices');
   });
 });
+
+describe('TANKER-PR2 deployment-gated navigation', () => {
+  const tankerRoutes = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+
+  it('hides tanker owners until the server confirms the deployment gate is open (fail closed)', () => {
+    expect(tankerRoutes(['*'])).not.toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['*'], ['some_other_gate'])).not.toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['*'], ['tanker_management'])).toContain('/fuel-stations/tanker-owners');
+  });
+
+  it('needs the exact view permission even when the gate is open; the legacy station keys are not enough', () => {
+    expect(tankerRoutes(['fuel.tanker.view'], ['tanker_management'])).toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['fuel_stations.view', 'fuel_stations.manage'], ['tanker_management'])).not.toContain('/fuel-stations/tanker-owners');
+  });
+
+  it('leaves every existing route untouched (gate-less items ignore the gate set)', () => {
+    const before = visibleFuelWorkspaceGroups(['*'], new Set()).flatMap((g) => g.items.map((i) => i.href)).filter((h) => h !== '/fuel-stations/tanker-owners');
+    expect(before).toContain('/fuel-stations/shifts');
+    expect(before).toContain('/fuel-stations/corporate-contracts');
+  });
+});
