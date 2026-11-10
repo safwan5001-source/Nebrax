@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NebraxLogo } from '@/components/layout/nebrax-logo';
+import { AwjLogo } from '@/components/layout/awj-logo';
 import { cn } from '@/lib/utils';
 
 /**
  * علامة المؤسسة في قشرة لوحة التحكم.
  *
  * يحظى الشعار الذي ترفعه المؤسسة من الإعدادات بالأولوية المطلقة. وعندما لا
- * يوجد شعار مرفوع — كما في الحسابات الجديدة — يظهر شعار نبراكس المتكيف مع
- * اللغة والوضع النشط بدلاً من حرف ثابت، ويعود تلقائياً إلى شعار المؤسسة عند
+ * يوجد شعار مرفوع — كما في الحسابات الجديدة — يظهر شعار أَوْج المتكيف مع
+ * الوضع النشط بدلاً من حرف ثابت، ويعود تلقائياً إلى شعار المؤسسة عند
  * حفظه في الإعدادات.
  */
 export function CompanyLogoMark({
@@ -50,5 +50,6 @@ export function CompanyLogoMark({
     );
   }
 
-  return <NebraxLogo alt="" className={cn('shrink-0', logoClass, className)} />;
+  return <AwjLogo alt="" variant={size === 'sm' ? 'mark' : 'wordmark'} className={cn('shrink-0', logoClass, className)} />;
 }
+
