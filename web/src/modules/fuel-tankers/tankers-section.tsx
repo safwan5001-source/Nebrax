@@ -27,8 +27,8 @@ export function TankersSection({ owner, canManage }: { owner: TankerOwner; canMa
   const sequence = useRef(0);
   const ownerActive = owner.status === 'active';
   const liters = t('units.liter');
-  /* السعة اختيارية: null = غير محدّدة وتُعرض «—» (الدالة المشتركة تحوّل null إلى 0 فتُظهر سعة صفرية كاذبة) */
-  const capacityText = (milliliters: number | null) => (milliliters === null || milliliters === undefined ? '—' : formatMillilitersAsLiters(milliliters, locale, liters));
+  /* السعة اختيارية: null = غير محدّدة وتُعرض نصًّا صريحًا (الدالة المشتركة تحوّل null إلى 0 فتُظهر سعة صفرية كاذبة) */
+  const capacityText = (milliliters: number | null) => (milliliters === null || milliliters === undefined ? t('tanker.capacityUnspecified') : formatMillilitersAsLiters(milliliters, locale, liters));
 
   const load = useCallback(async () => {
     const mine = ++sequence.current;

@@ -148,12 +148,21 @@ describe.each(['ar', 'en'] as const)('OwnerDetailScreen (%s)', (locale) => {
     expect((await screen.findAllByText('ABC 1234')).length).toBeGreaterThan(0);
   });
 
-  it('shows an unspecified tanker capacity as a placeholder, never as 0', async () => {
+  it('shows an unspecified tanker capacity as «Not specified» — in the desktop table AND the mobile cards — never as 0', async () => {
     state.tankers = page([tanker({ capacity_milliliters: null })]);
     renderIntl(<OwnerDetailScreen ownerId={OWNER_ID} />, locale);
     await ready();
+    // الجدول وبطاقات الجوال كلاهما يُعرضان في jsdom (CSS يختار أحدهما) — يجب أن يظهر النص في الموضعين
+    expect(screen.getAllByText(T(locale).tanker.capacityUnspecified).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryAllByText(/^0\s*(L|لتر)$/)).toHaveLength(0);
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps a real capacity formatted in liters next to an unspecified one', async () => {
+    state.tankers = page([tanker({ capacity_milliliters: null }), tanker({ id: '22222222-2222-4222-8222-222222222299', plate_number: 'DEF 5678', capacity_milliliters: 12500 })]);
+    renderIntl(<OwnerDetailScreen ownerId={OWNER_ID} />, locale);
+    await screen.findAllByText('DEF 5678');
+    expect(screen.getAllByText(T(locale).tanker.capacityUnspecified).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/^12\.5\s*(L|لتر)$/).length).toBeGreaterThanOrEqual(2);
   });
 
   it('adds a tanker: liters become an integer milliliter capacity, the owner id is sent once, nothing else leaks', async () => {

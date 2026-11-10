@@ -10103,6 +10103,7 @@
       "plate": "Plate number",
       "plateHint": "Plates are compared after normalizing spaces, dashes, and Arabic digits, so they can't repeat.",
       "capacity": "Capacity (L)",
+      "capacityUnspecified": "Not specified",
       "capacityHint": "Optional. Up to three decimal places.",
       "country": "Country code",
       "countryHint": "Optional, up to 8 characters.",
