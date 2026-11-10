@@ -147,6 +147,32 @@ class FuelTankerFillConcurrencyPostgresTest extends TestCase
     }
 
     /** @test */
+    public function mixed_station_voucher_policies_racing_on_one_voucher_record_it_once(): void
+    {
+        $f = $this->fixture(withSecondStation: true);
+        app(TenantContext::class)->set($f['tenant_id']);
+        $actor = User::findOrFail($f['actor_id']);
+        // المحطة 1 بنطاق «مؤسسة» والمحطة 2 بالافتراضي «محطة»: مفتاحا نطاق مختلفان لا يحسمهما الفهرس الفريد وحده.
+        app(FuelStationSettingsService::class)->putStationValues(FuelStation::findOrFail($f['station_id']), ['tanker_voucher_unique_scope' => 'tenant'], $actor, 'اختبار تزامن');
+
+        $jobs = [];
+        foreach (range(1, 10) as $i) {
+            $second = $i % 2 === 0;
+            $jobs[] = fn () => $this->attempt($f, [
+                'voucher_number' => 'MIXED-1', 'idempotency_key' => "conc-mixed-{$i}",
+                'fuel_station_id' => $second ? $f['station2_id'] : $f['station_id'], 'fuel_nozzle_id' => $second ? $f['nozzle2_id'] : $f['nozzle_id'],
+            ]);
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $values = array_column($results, 'value');
+        $this->assertSame(1, count(array_filter($values, fn ($v) => str_starts_with($v, 'ok:'))), json_encode($values));
+        $this->assertSame(9, count(array_filter($values, fn ($v) => $v === 'rejected:voucher_duplicate')), json_encode($values));
+        $this->assertSame(1, (int) DB::table('fuel_tanker_fills')->where('tenant_id', $f['tenant_id'])->count());
+    }
+
+    /** @test */
     public function fills_racing_a_shift_close_never_land_after_the_close_and_never_deadlock(): void
     {
         $f = $this->fixture();

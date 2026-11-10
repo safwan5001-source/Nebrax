@@ -101,6 +101,21 @@ class FuelTankerFillTest extends TestCase
         $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', $values + ['reason' => 'اختبار PR-4'])->assertOk();
     }
 
+    private function setStationPolicy(string $stationId, array $values): void
+    {
+        $this->withToken($this->fx['owner'])->putJson("/api/fuel-stations/stations/{$stationId}/settings", $values + ['reason' => 'اختبار PR-4'])->assertOk();
+    }
+
+    /** @return array{fuel_station_id: string, fuel_nozzle_id: string} محطة ثانية بفوهة ووردية مفتوحة. */
+    private function secondStation(): array
+    {
+        $pump = FuelPump::create(['branch_id' => $this->fx['branchA']->id, 'fuel_station_id' => $this->fx['s2']->id, 'pump_number' => '01', 'name' => 'م']);
+        $nozzle = $this->makeNozzle($this->fx['s2'], $pump, $this->fx['t2'], '1');
+        $this->openShift($this->fx['s2'], 'FSH-T4-2');
+
+        return ['fuel_station_id' => $this->fx['s2']->id, 'fuel_nozzle_id' => $nozzle->id];
+    }
+
     /** @return array<string,int> */
     private function sideEffectCounts(): array
     {
@@ -277,6 +292,27 @@ class FuelTankerFillTest extends TestCase
         $this->record($staff['token'], ['voucher_number' => 'N-1'])->assertCreated();
         $this->record($staff['token'], ['voucher_number' => 'N-1'])->assertCreated();
         $this->assertSame(2, FuelTankerFill::query()->where('voucher_key', 'n-1')->count());
+    }
+
+    /** @test */
+    public function mixed_per_station_voucher_policies_give_the_same_answer_in_either_order(): void
+    {
+        $staff = $this->staff();
+        $this->setStationPolicy($this->fx['s1']->id, ['tanker_voucher_unique_scope' => 'tenant']); // المحطة 1 بنطاق مؤسسة، والمحطة 2 بالافتراضي (محطة)
+        $station2 = $this->secondStation();
+
+        // سند سُجّل بنطاق «مؤسسة» يبقى محجوزاً مؤسسياً حتى لو سُجّل الثاني من محطة بسياسة «محطة».
+        $this->record($staff['token'], ['voucher_number' => 'MIX-1'])->assertCreated();
+        $this->record($staff['token'], $station2 + ['voucher_number' => 'MIX-1'])->assertStatus(409)->assertJsonPath('reason', 'voucher_duplicate');
+
+        // والعكس: سند بنطاق «محطة» ثم كاتب بنطاق «مؤسسة» ⇒ يغطّيه نطاق الكاتب.
+        $this->record($staff['token'], $station2 + ['voucher_number' => 'MIX-2'])->assertCreated();
+        $this->record($staff['token'], ['voucher_number' => 'MIX-2'])->assertStatus(409)->assertJsonPath('reason', 'voucher_duplicate');
+
+        // سندان مختلفان لا يتأثران، و«بلا منع» لدى الكاتب تعطيل صريح لفحصه.
+        $this->record($staff['token'], $station2 + ['voucher_number' => 'MIX-3'])->assertCreated();
+        $this->setStationPolicy($this->fx['s2']->id, ['tanker_voucher_unique_scope' => 'none']);
+        $this->record($staff['token'], $station2 + ['voucher_number' => 'MIX-3'])->assertCreated();
     }
 
     // ───────────────────────── سياسات الصهريج والسعة ─────────────────────────

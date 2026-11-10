@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScope;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -150,6 +151,7 @@ class FuelTankerFillService
         }
         $tanker = $this->resolveTanker($intent['tanker_id'], $owner, $policy['selection_required']);
 
+        $this->serializeVoucher($intent['voucher_key'], $policy['voucher_unique_scope']);
         $this->assertVoucherAvailable($intent, $policy['voucher_unique_scope'], $station, $owner, $actor);
         $overrun = $this->evaluateCapacity($tanker, $intent['quantity_milliliters'], $policy['capacity_overrun_policy'], $intent['confirm_overrun']);
 
@@ -331,8 +333,23 @@ class FuelTankerFillService
     }
 
     /**
+     * يُسلسل تسجيلات السند الورقي نفسه داخل المؤسسة تحت نطاقات مختلفة (محطة A بسياسة «مؤسسة» ومحطة B بسياسة «محطة»): قفلا المحطتين صفّان مختلفان والفهرس الفريد يقبل مفتاحَي نطاق
+     * مختلفين، فبلا هذا يمرّ فحصان متزامنان معاً. قفل استشاري على (مؤسسة، مفتاح السند) يُؤخذ **بعد** أقفال الصفوف وقبل مِرساة الترقيم ويُحرَّر مع المعاملة؛ لا يتعارض مع سند آخر.
+     * على SQLite (كاتب واحد) لا حاجة له. «بلا منع» لا يفحص ولا يُسلسل.
+     */
+    private function serializeVoucher(string $voucherKey, string $scope): void
+    {
+        if ($scope === FuelTankerFill::SCOPE_NONE || DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['tanker-fill-voucher:' . app(TenantContext::class)->id() . ':' . $voucherKey]);
+    }
+
+    /**
      * منع تكرار السند الورقي حسب سياسة النطاق (محطة افتراضياً). **الأصفار البادئة تُحفظ** (المفتاح حرفي)، و**السند الملغى يبقى محجوزاً** (لا استثناء للملغى).
-     * الفحص هنا يغطّي السجلات القديمة المسجَّلة بنطاق مختلف؛ الفهرس الفريد في القاعدة يحرس السباق في نطاق التسجيل نفسه.
+     * يتعارض السند إذا غطّى نطاق **الكاتب الحالي** السجل القائم **أو** غطّى نطاق **السجل القائم** (المحفوظ عند تسجيله) الكاتب الحالي — فلا يتوقف الحكم على ترتيب التسجيل ولا على اختلاف
+     * سياسات المحطات (سند سُجّل بنطاق «مؤسسة» يبقى محجوزاً مؤسسياً حتى لو سُجّل الثاني من محطة بسياسة «محطة»). «بلا منع» لدى الكاتب تعطيل صريح لفحصه.
+     * الفهرس الفريد في القاعدة يحرس السباق في مفتاح النطاق نفسه؛ والقفل الاستشاري أعلاه يحرس النطاقات المختلفة.
      *
      * @param  array<string,mixed>  $intent
      */
@@ -341,13 +358,23 @@ class FuelTankerFillService
         if ($scope === FuelTankerFill::SCOPE_NONE) {
             return;
         }
-        $query = FuelTankerFill::query()->withoutGlobalScope(BranchScope::class)->where('voucher_key', $intent['voucher_key']);
-        if ($scope === FuelTankerFill::SCOPE_STATION) {
-            $query->where('fuel_station_id', $station->id);
-        } elseif ($scope === FuelTankerFill::SCOPE_OWNER) {
-            $query->where('fuel_tanker_owner_id', $owner->id);
-        }
-        $duplicate = $query->first();
+        $duplicate = FuelTankerFill::query()->withoutGlobalScope(BranchScope::class)
+            ->where('voucher_key', $intent['voucher_key'])
+            ->where(function ($covered) use ($scope, $station, $owner) {
+                // نطاق الكاتب الحالي.
+                $covered->where(function ($writer) use ($scope, $station, $owner) {
+                    match ($scope) {
+                        FuelTankerFill::SCOPE_STATION => $writer->where('fuel_station_id', $station->id),
+                        FuelTankerFill::SCOPE_OWNER => $writer->where('fuel_tanker_owner_id', $owner->id),
+                        default => $writer->whereRaw('1 = 1'),
+                    };
+                })
+                // نطاق السجل القائم كما حُفظ عند تسجيله.
+                ->orWhere('voucher_scope', FuelTankerFill::SCOPE_TENANT)
+                ->orWhere(fn ($q) => $q->where('voucher_scope', FuelTankerFill::SCOPE_OWNER)->where('fuel_tanker_owner_id', $owner->id))
+                ->orWhere(fn ($q) => $q->where('voucher_scope', FuelTankerFill::SCOPE_STATION)->where('fuel_station_id', $station->id));
+            })
+            ->first();
         if ($duplicate !== null) {
             throw $this->voucherDuplicate($duplicate, $actor);
         }
