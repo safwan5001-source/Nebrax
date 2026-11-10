@@ -686,7 +686,21 @@ function palette() {
 /* ------------------------------------------------------------------ render + routing */
 const app = document.getElementById('fx-app');
 const PAGES = { home:pageHome, kit:pageKit, numbers:pageNumbers, rules:pageRules, sales:() => docPage('sales'), purchase:() => docPage('purchase'), inventory:pageInventory, shift:pageShift, identity:pageIdentity };
-let lastFocus = null;
+// Focus return for overlays. render() replaces the whole app, so a stored element would be detached:
+// keep a stable key (id · the menu's trigger · nth [data-act]) and resolve it after rendering.
+function focusKey(el) {
+  if (!el || !app.contains(el)) return null;
+  if (el.id) return { sel: '#' + CSS.escape(el.id) };
+  const trigger = el.closest('.menu-wrap')?.querySelector('[data-act="menu"]');
+  if (el.closest('.menu') && trigger?.dataset.menu) return { sel: `[data-act="menu"][data-menu="${trigger.dataset.menu}"]` };
+  if (el.dataset.act) return { act: el.dataset.act, i: [...app.querySelectorAll(`[data-act="${el.dataset.act}"]`)].indexOf(el) };
+  return null;
+}
+function restoreFocus() {
+  const k = S.returnFocus; S.returnFocus = null; if (!k) return;
+  const el = k.sel ? app.querySelector(k.sel) : app.querySelectorAll(`[data-act="${k.act}"]`)[k.i];
+  (el || document.getElementById('main'))?.focus();
+}
 function render(focusSel) {
   L = T[S.lang];
   const dev = document.getElementById('device'); dev.dataset.device = S.device;
@@ -743,7 +757,7 @@ app.addEventListener('click', (e) => {
   const doc = d.doc ? S.docs[d.doc] : null;
   switch (d.act) {
     case 'palette': S.overlay = { t:'palette' }; S.palQ = ''; S.palIdx = 0; render(); break;
-    case 'close': S.overlay = null; render(); lastFocus?.focus?.(); break;
+    case 'close': S.overlay = null; render(); restoreFocus(); break;
     case 'navsheet': case 'create': case 'inbox': case 'context': case 'sheet-demo': S.overlay = { t:d.act }; render(); break;
     case 'usermenu': S.overlay = { t:'shortcuts' }; render(); break;
     case 'menu': S.overlay = S.overlay?.menu === d.menu ? null : { menu:d.menu }; render(); break;
@@ -757,9 +771,9 @@ app.addEventListener('click', (e) => {
     case 'inv-clearsel': S.inv.sel.clear(); render(); break;
     case 'clear-filters': S.kit.q = ''; S.kit.st = 'all'; S.inv.q = ''; S.inv.st = 'all'; S.demo = 'ready'; sync(); break;
     case 'retry': S.demo = 'loading'; sync(); setTimeout(() => { S.demo = 'ready'; sync(); }, 800); break;
-    case 'confirm-delete': lastFocus = el; S.overlay = { t:'confirm-delete', doc:d.doc }; render(); break;
-    case 'blocking': lastFocus = el; S.overlay = { t:'blocking' }; render(); break;
-    case 'do-delete': if (d.doc) { S.docs[d.doc] = newDoc(d.doc); } S.overlay = null; render(); toast(t('toastDeleted')); break;
+    case 'confirm-delete': S.returnFocus = focusKey(el); S.overlay = { t:'confirm-delete', doc:d.doc }; render(); break;
+    case 'blocking': S.returnFocus = focusKey(el); S.overlay = { t:'blocking' }; render(); break;
+    case 'do-delete': if (d.doc) { S.docs[d.doc] = newDoc(d.doc); } S.overlay = null; render(); restoreFocus(); toast(t('toastDeleted')); break;
     case 'peek-close': S.inv.peek = null; S.overlay = null; render(); break;
     case 'party-change': doc.party = null; doc.comboOpen = true; doc.dirty = true; render(`#${d.doc}-party`); break;
     case 'add-line': addLine(d.doc); break;
@@ -780,7 +794,7 @@ function requestPost(kind) {
   if (D.date < LOCKED_BEFORE) { app.querySelector(`#${kind}-lock`)?.focus?.(); toast(t('postDisabledLocked')); return; }
   D.showErrs = true; const errs = docErrors(D);
   if (Object.keys(errs).length) { render(`#${kind}-sum`); return; }
-  S.overlay = { t:'post', doc:kind }; render();
+  S.returnFocus = focusKey(document.activeElement); S.overlay = { t:'post', doc:kind }; render();
 }
 app.addEventListener('submit', (e) => {
   if (e.target.id !== 'kform') return; e.preventDefault();
@@ -815,7 +829,7 @@ app.addEventListener('input', (e) => {
   if (d.hf) { const D = S.docs[d.doc]; D[d.hf] = el.value; D.dirty = true; if (d.hf === 'date') render('#' + el.id); return; }
   if (d.lf) {
     const D = S.docs[d.doc], line = D.lines.find(l => l.id === Number(el.closest('tr').dataset.line)); if (!line) return; D.dirty = true;
-    if (d.lf === 'p') { line.p = Number(el.value); line.price = d.doc === 'sales' ? PROD[line.p].price : PROD[line.p].cost; render('#' + el.id); return; }
+    if (d.lf === 'p') { line.p = Number(el.value); line.price = d.doc === 'sales' ? PROD[line.p].price : PROD[line.p].cost; if (line.bad) line.bad.price = false; if (line.raw) delete line.raw.price; render('#' + el.id); return; }
     const m = toMinor(el.value, d.lf === 'qty' ? 3 : 2); line.bad = line.bad || {}; line.raw = line.raw || {};
     if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[d.lf] = true; line.raw[d.lf] = el.value; return; }
     el.removeAttribute('aria-invalid'); line.bad[d.lf] = false; line.raw[d.lf] = el.value; // keep the text being typed ("1.") until the field is left
@@ -848,7 +862,7 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.code === 'KeyS' && S.docs[S.route]) { e.preventDefault(); saveDraft(S.route); return; }
   if (mod && e.key === 'Enter' && S.docs[S.route]) { e.preventDefault(); requestPost(S.route); return; }
   if (e.altKey && e.code === 'KeyN' && S.docs[S.route]) { e.preventDefault(); addLine(S.route); return; }
-  if (e.key === 'Escape' && S.overlay) { S.overlay = null; render(); return; }
+  if (e.key === 'Escape' && S.overlay) { S.overlay = null; render(); restoreFocus(); return; }
   if (typing || S.overlay) return;
   if (!(app.contains(document.activeElement) || document.activeElement === document.body)) return;
   if (S.gSeq) { S.gSeq = false; const map = { KeyS:'sales', KeyP:'purchase', KeyI:'inventory', KeyF:'shift', KeyK:'kit', KeyN:'numbers', KeyH:'home' }; if (map[e.code]) { e.preventDefault(); go(map[e.code]); } return; }

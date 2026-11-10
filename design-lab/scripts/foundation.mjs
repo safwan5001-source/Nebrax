@@ -249,6 +249,36 @@ test('Leave without saving discards only the edits after the last saved draft', 
   await ctx.close();
 });
 
+test('Closing a dialog returns focus to a connected control (More → Delete draft → Cancel / Esc; kit confirm)', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  const more = '.cmdbar [data-act="menu"][data-menu="doc"]';
+  for (const how of ['cancel', 'escape']) {
+    await page.click(more); await page.click('.menu [data-act="confirm-delete"]');
+    assert(await page.locator('.dlg').count() === 1, 'confirm not open');
+    if (how === 'cancel') await page.click('.dlg [data-act="close"]'); else await page.keyboard.press('Escape');
+    const f = await page.evaluate((sel) => document.activeElement === document.querySelector(sel), more);
+    assert(f, `${how}: focus is on ${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))}`);
+  }
+  await setState(page, { route: 'kit' });
+  const btn = page.locator('[data-act="confirm-delete"]').nth(0);
+  await btn.click(); await page.click('.dlg [data-act="close"]');
+  assert(await page.evaluate(() => document.activeElement === document.querySelectorAll('[data-act="confirm-delete"]')[0]), 'kit: focus not returned to the trigger');
+  await ctx.close();
+});
+
+test('Changing a line\'s product clears a stale invalid price so display, totals and validation agree', async () => {
+  const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
+  const id = await page.evaluate(() => window.__fx.S.docs.sales.lines[0].id);
+  await page.fill(`#sales-l${id}-price`, 'abc'); await page.waitForTimeout(80);
+  assert(await page.getAttribute(`#sales-l${id}-price`, 'aria-invalid') === 'true', 'abc not flagged');
+  await page.selectOption(`#sales-l${id}-p`, { index: 2 }); await page.waitForTimeout(120);
+  const r = await page.evaluate((id) => { const l = window.__fx.S.docs.sales.lines[0]; return { shown: document.querySelector(`#sales-l${id}-price`).value, invalid: document.querySelector(`#sales-l${id}-price`).getAttribute('aria-invalid'), price: l.price }; }, id);
+  assert(r.invalid === null && r.shown !== 'abc' && Math.round(Number(r.shown) * 100) === r.price, 'stale price state ' + JSON.stringify(r));
+  await page.locator('#main').focus(); await page.keyboard.press('Control+Enter');
+  assert(await page.locator('.dlg [data-dr]').count() === 1, 'posting still blocked by the obsolete price error');
+  await ctx.close();
+});
+
 test('Locked period: a date before 2026-10-01 shows the warning and disables posting', async () => {
   const { ctx, page } = await fresh({ width: 1500, height: 1100 }, { route: 'sales' });
   await page.fill('#sales-date', '2026-09-15'); await page.locator('#sales-date').dispatchEvent('change'); await page.waitForTimeout(150);

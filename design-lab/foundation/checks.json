@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-10T04:00:22.210Z",
+ "generated": "2026-11-10T04:06:02.207Z",
  "matrix": [
   {
    "route": "home",
@@ -2488,6 +2488,14 @@
    "ok": true
   },
   {
+   "name": "Closing a dialog returns focus to a connected control (More → Delete draft → Cancel / Esc; kit confirm)",
+   "ok": true
+  },
+  {
+   "name": "Changing a line's product clears a stale invalid price so display, totals and validation agree",
+   "ok": true
+  },
+  {
    "name": "Locked period: a date before 2026-10-01 shows the warning and disables posting",
    "ok": true
   },
@@ -2542,7 +2550,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 26,
+   "tests": 28,
    "failed": 0
   },
   "matrix": {
