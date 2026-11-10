@@ -36,7 +36,9 @@ design-lab/
 # افتح مباشرة في المتصفح
 open design-lab/directions/index.html      # أو xdg-open على Linux
 
-# الفحوص (Chromium من Playwright، وaxe-core من web/node_modules)
+# الفحوص: Playwright من التثبيت العام أو من web/node_modules (بعد npm ci في web/)، وaxe-core من web/node_modules.
+# إن لم يكن متصفح Playwright المطابق مثبّتاً: CHROMIUM_PATH=/path/to/chrome node …
+# capture.mjs يخرج برمز 1 عند أي خطأ صفحة أو تمرير أفقي أو مخالفة axe؛ interactions.mjs عند أي اختبار فاشل.
 node design-lab/scripts/capture.mjs            # 84 تهيئة: أخطاء + تجاوز أفقي + WCAG
 node design-lab/scripts/capture.mjs --shots    # + لقطات PNG (المحفوظة في المستودع مُحوَّلة إلى WebP للحجم)
 node design-lab/scripts/interactions.mjs       # 43 اختبار تفاعل

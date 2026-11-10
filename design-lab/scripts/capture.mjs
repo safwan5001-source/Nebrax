@@ -11,8 +11,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
+/** Playwright from this script's own resolution (global/NODE_PATH install with its browser),
+ *  falling back to the repo's web/ dependency tree, so the checks run after `npm ci` in web/. */
+function loadPlaywright() {
+  const webPkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/package.json');
+  for (const from of [import.meta.url, webPkg]) { try { return createRequire(from)('playwright'); } catch (e) { /* try next */ } }
+  throw new Error('Playwright not found: run `npm ci` in web/ or install Playwright.');
+}
+const { chromium } = loadPlaywright();
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 // LAB=v2 runs the same matrix against the V2 visual exploration.
@@ -29,7 +35,8 @@ const DIRS = V2 ? ['astur', 'mash', 'kufi'] : ['qalam', 'mizan', 'fajr'];
 const SURFACES = ['dash', 'table', 'inv', 'shift'];
 const DEVICES = ['phone', 'tablet', 'laptop'];
 
-const browser = await chromium.launch();
+// CHROMIUM_PATH points at an existing Chrome/Chromium when the resolved Playwright's own browser build is not installed.
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const results = [];
 // ONLY=dir/surface limits the matrix to matching configs (quick re-shoot after a local fix).
 const ONLY = process.env.ONLY;
@@ -94,3 +101,5 @@ for (const r of results) for (const v of r.axe) { const k = `${v.id} (${v.impact
 const summary = { runs: results.length, layoutOrErrorFailures: bad.map(b => ({ cfg: `${b.dir}/${b.surface}/${b.device}/${b.mode}/${b.lang}${b.demo ? '/' + b.demo : ''}@${b.vw}`, errors: b.errors, mainOverflow: b.mainOverflow, bodyOverflow: b.bodyOverflow, escapees: b.escapees })), axe: axeAgg };
 fs.writeFileSync(path.join(root, labDir, 'checks.json'), JSON.stringify(summary, null, 2));
 console.log(JSON.stringify(summary, null, 2));
+// Non-zero exit when any configuration has page errors, overflow or axe violations.
+process.exitCode = (bad.length || Object.keys(axeAgg).length) ? 1 : 0;

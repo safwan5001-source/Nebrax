@@ -4,13 +4,20 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
+/** Playwright from this script's own resolution (global/NODE_PATH install with its browser),
+ *  falling back to the repo's web/ dependency tree, so the checks run after `npm ci` in web/. */
+function loadPlaywright() {
+  const webPkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/package.json');
+  for (const from of [import.meta.url, webPkg]) { try { return createRequire(from)('playwright'); } catch (e) { /* try next */ } }
+  throw new Error('Playwright not found: run `npm ci` in web/ or install Playwright.');
+}
+const { chromium } = loadPlaywright();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const V2 = process.env.LAB === 'v2';
 const url = pathToFileURL(path.join(root, V2 ? 'directions-v2' : 'directions', 'index.html')).href;
 
-const browser = await chromium.launch();
+// CHROMIUM_PATH points at an existing Chrome/Chromium when the resolved Playwright's own browser build is not installed.
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const results = [];
 async function test(name, viewport, fn) {
   const page = await browser.newPage({ viewport });
