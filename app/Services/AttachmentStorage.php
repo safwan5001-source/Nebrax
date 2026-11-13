@@ -30,11 +30,12 @@ final class AttachmentStorage
     public const DOMAIN_EMPLOYEE_PHOTO = 'employee-photo';
     public const DOMAIN_PAYMENT_METHOD_LOGO = 'payment-method-logo';
     public const DOMAIN_FUEL_DELIVERY = 'fuel-delivery-attachments';
+    public const DOMAIN_FUEL_TANKER_FILL = 'fuel-tanker-fill-attachments';
 
     private const DOMAINS = [
         self::DOMAIN_EXPENSE, self::DOMAIN_PAYMENT, self::DOMAIN_PURCHASE,
         self::DOMAIN_INVOICE_NOTE, self::DOMAIN_EMPLOYEE, self::DOMAIN_EMPLOYEE_PHOTO, self::DOMAIN_PAYMENT_METHOD_LOGO,
-        self::DOMAIN_FUEL_DELIVERY,
+        self::DOMAIN_FUEL_DELIVERY, self::DOMAIN_FUEL_TANKER_FILL,
     ];
 
     private const IMAGE_MIME_BY_EXTENSION = [

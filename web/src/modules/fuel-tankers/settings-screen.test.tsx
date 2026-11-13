@@ -301,3 +301,70 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen (%s)', (locale) => {
     expect(screen.queryByText(T(locale).settings.stationUnavailable)).toBeNull();
   });
 });
+
+
+describe.each(['ar', 'en'] as const)('TankerSettingsScreen attachments policy (%s)', (locale) => {
+  it('shows the safe defaults: voucher photo optional, photos and PDF, 10 MB, 10 per voucher, add after close, remove while the shift is open', async () => {
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    expect(screen.getByRole('heading', { name: T(locale).settings.attachments.title })).toBeTruthy();
+    expect(select('tanker-settings-attachment-required').value).toBe('never');
+    expect(select('tanker-settings-attachment-types').value).toBe('images_and_pdf');
+    expect(select('tanker-settings-attachment-size').value).toBe('10');
+    expect(select('tanker-settings-attachment-count').value).toBe('10');
+    expect(select('tanker-settings-attachment-after-close').value).toBe('allow');
+    expect(select('tanker-settings-attachment-removal').value).toBe('open_shift_only');
+    // الخيارات المتقدمة مطوية افتراضياً (بساطة) وتبقى الإلزامية صريحة بأنها لا تحجب شيئاً.
+    expect((document.querySelector('[data-attachment-advanced]') as HTMLDetailsElement).open).toBe(false);
+    expect(screen.getByText(T(locale).settings.attachments.requiredNote)).toBeTruthy();
+  });
+
+  it('sends only the changed attachment keys, typed (numbers stay numbers, the flag stays boolean) and never a tenant id', async () => {
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-attachment-types'), { target: { value: 'images_only' } });
+    fireEvent.change(select('tanker-settings-attachment-size'), { target: { value: '2' } });
+    fireEvent.change(select('tanker-settings-attachment-count'), { target: { value: '5' } });
+    fireEvent.change(select('tanker-settings-attachment-required'), { target: { value: 'before_shift_approval' } });
+    fireEvent.change(select('tanker-settings-attachment-removal'), { target: { value: 'never' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({
+      tanker_voucher_attachment_required: 'before_shift_approval', tanker_fill_attachment_types: 'images_only', tanker_fill_attachment_max_size_mb: 2,
+      tanker_fill_attachment_max_count: 5, tanker_fill_attachment_removal: 'never',
+    });
+    expect(JSON.stringify(writes()[0].body)).not.toMatch(/tenant/);
+  });
+
+  it('a station manager without governance can change types, size and count but not the three governed options', async () => {
+    state.permissions = ['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'];
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    expect(select('tanker-settings-attachment-required').disabled).toBe(true);
+    expect(select('tanker-settings-attachment-after-close').disabled).toBe(true);
+    expect(select('tanker-settings-attachment-removal').disabled).toBe(true);
+    expect(select('tanker-settings-attachment-types').disabled).toBe(false);
+    expect(select('tanker-settings-attachment-size').disabled).toBe(false);
+    expect(select('tanker-settings-attachment-count').disabled).toBe(false);
+    fireEvent.change(select('tanker-settings-attachment-count'), { target: { value: '3' } });
+    const save = screen.getByRole('button', { name: T(locale).settings.save }) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({ tanker_fill_attachment_max_count: 3 });
+  });
+
+  it('at station scope inheriting a numeric policy clears the override (null) and shows the organization value', async () => {
+    state.tenant = { ...state.tenant, tanker_fill_attachment_max_count: 4 };
+    state.station = { ...state.tenant, tanker_fill_attachment_max_count: 2 };
+    state.overrides = ['tanker_fill_attachment_max_count'];
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-scope'), { target: { value: ST1 } });
+    await waitFor(() => expect(select('tanker-settings-attachment-count').value).toBe('2'));
+    fireEvent.change(select('tanker-settings-attachment-count'), { target: { value: 'inherit' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({ tanker_fill_attachment_max_count: null });
+  });
+});

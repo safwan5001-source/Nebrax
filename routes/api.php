@@ -104,6 +104,7 @@ use App\Http\Controllers\Api\FuelStaffController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelTankerController;
+use App\Http\Controllers\Api\FuelTankerFillAttachmentController;
 use App\Http\Controllers\Api\FuelTankerFillController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
@@ -1762,6 +1763,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/tanker-fills', [FuelTankerFillController::class, 'store'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.record'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/tanker-fills/{id}', [FuelTankerFillController::class, 'show'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/tanker-fills/{id}/void', [FuelTankerFillController::class, 'void'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.void'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR5: مرفقات سندات التعبئة (دليل فقط). العرض والتنزيل `fuel.tanker.fill.view`؛ الرفع `…attachment.add`؛ الإزالة والاستبدال `…attachment.remove`. خلف البوابتين نفسيهما؛ جلسة PIN لا تصل (PR-7).
+        Route::get('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'index'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.add'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/download', [FuelTankerFillAttachmentController::class, 'download'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/replace', [FuelTankerFillAttachmentController::class, 'replace'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.remove'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}', [FuelTankerFillAttachmentController::class, 'destroy'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.remove'), $commercialApp('fuel_stations.core', 'write')]);
 
         Route::get('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'vehicles'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'storeVehicle'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);

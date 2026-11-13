@@ -23,6 +23,24 @@ function usedKeys(): Set<string> {
   for (const scope of ['station', 'tenant', 'owner', 'none']) keys.add(`settings.voucher.scope.${scope}`);
   for (const policy of ['allow_with_confirmation', 'block', 'allow']) keys.add(`settings.overrun.policy.${policy}`);
   for (const operation of ['direct_sale', 'tanker_fill', 'internal_issue']) keys.add(`settings.nozzles.ops.${operation}`);
+  // TANKER-PR5: مفاتيح مكوّن المرفقات (`useTranslations('fuelTankers.attachments')` في المجلد الفرعي) تُحسب بالبادئة `attachments.`.
+  const attachmentsDir = join(dir, 'attachments');
+  for (const file of readdirSync(attachmentsDir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))) {
+    for (const m of readFileSync(join(attachmentsDir, file), 'utf8').matchAll(/\bt\(\s*(['`])([A-Za-z0-9_.${}]+)\1/g)) keys.add(`attachments.${m[2]}`);
+  }
+  const attachmentGroups: Record<string, string[]> = {
+    status: ['present', 'missing', 'none'],
+    'blocked.add': ['fill_voided', 'shift_closed', 'limit_reached', 'removal_disabled'],
+    'blocked.remove': ['fill_voided', 'shift_closed', 'limit_reached', 'removal_disabled'],
+    rejected: ['type', 'size', 'empty', 'limit'],
+    historyStatus: ['active', 'removed', 'replaced'],
+    errors: ['attachment_invalid', 'attachment_type_not_allowed', 'attachment_too_large', 'attachment_limit_reached', 'attachment_add_blocked', 'attachment_removal_blocked', 'attachment_not_active', 'attachment_same_content', 'attachment_duplicate', 'attachment_storage_failed', 'attachment_conflict', 'forbidden', 'not_found'],
+  };
+  for (const [group, values] of Object.entries(attachmentGroups)) for (const value of values) keys.add(`attachments.${group}.${value}`);
+  for (const value of ['never', 'before_shift_approval', 'before_settlement']) keys.add(`settings.attachments.required.${value}`);
+  for (const value of ['images_and_pdf', 'images_only']) keys.add(`settings.attachments.types.${value}`);
+  for (const value of ['allow', 'deny']) keys.add(`settings.attachments.afterClose.${value}`);
+  for (const value of ['open_shift_only', 'always', 'never']) keys.add(`settings.attachments.removal.${value}`);
   for (const key of [...keys]) if (key.includes('${')) keys.delete(key);
   return keys;
 }

@@ -218,6 +218,9 @@ class Rbac
             // TANKER-PR4: سندات تعبئة الصهاريج — عرض وتسجيل وإلغاء منفصلة. **تشغيلي فقط (لا مخزون ولا قيد)**. owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف
             // (منحها لموظف المحطة يأتي مع واجهة التطبيق المكتملة) ولا تُمنح لأي دور مخزَّن بهجرة. المسارات خلف بوابة نشر منفصلة مغلقة (`tanker_fills_enabled`).
             'fuel.tanker.fill.view', 'fuel.tanker.fill.record', 'fuel.tanker.fill.void',
+            // TANKER-PR5: مرفقات سندات التعبئة — إضافة وإزالة/استبدال منفصلتان (العرض والتنزيل بـ`fuel.tanker.fill.view`). دليل فقط، لا أثر مخزني أو محاسبي.
+            // owner/admin عبر `*`؛ لا `MATRIX` ولا قالب موظف ولا دور مخزَّن؛ جلسة PIN لا تصل المسارات (تكامل موظف المحطة = PR-7).
+            'fuel.tanker.fill.attachment.add', 'fuel.tanker.fill.attachment.remove',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
             // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات

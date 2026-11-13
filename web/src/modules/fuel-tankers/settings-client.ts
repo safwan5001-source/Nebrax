@@ -48,7 +48,7 @@ export async function getTankerPolicy(stationId?: string): Promise<PolicyState> 
   return toPolicyState(await api<unknown>(settingsPath(stationId)), Boolean(stationId));
 }
 
-export type PolicyPayload = Record<string, boolean | string | null>;
+export type PolicyPayload = Record<string, boolean | number | string | null>;
 
 export async function saveTankerPolicy(stationId: string | undefined, changes: PolicyPayload, reason?: string): Promise<PolicyState> {
   const path = settingsPath(stationId);
