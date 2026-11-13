@@ -368,3 +368,41 @@ describe.each(['ar', 'en'] as const)('TankerSettingsScreen attachments policy (%
     expect(writes()[0].body).toEqual({ tanker_fill_attachment_max_count: null });
   });
 });
+
+describe.each(['ar', 'en'] as const)('TankerSettingsScreen inventory review policy (%s)', (locale) => {
+  it('shows the not-enabled notice, the safe defaults, the folded advanced hours and the review link only with the review permission', async () => {
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    expect(screen.getByRole('heading', { name: T(locale).settings.inventory.title })).toBeTruthy();
+    expect(document.querySelector('[data-inventory-posting-disabled]')?.textContent).toBe(T(locale).settings.inventory.notEnabled);
+    expect(select('tanker-settings-inventory-policy').value).toBe('block');
+    expect(select('tanker-settings-inventory-hours').value).toBe('24');
+    expect((document.querySelector('[data-inventory-advanced]') as HTMLDetailsElement).open).toBe(false);
+    expect(document.querySelector('[data-inventory-review-link]')?.getAttribute('href')).toBe('/fuel-stations/tanker-inventory-review');
+    // no option for allowing negative balances or silent adjustment
+    expect([...select('tanker-settings-inventory-policy').options].map((o) => o.value)).toEqual(['block', 'hold_for_review']);
+  });
+
+  it('hides the review link without the review permission and a manager without governance edits only the hours', async () => {
+    state.permissions = ['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'];
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    expect(document.querySelector('[data-inventory-review-link]')).toBeNull();
+    expect(select('tanker-settings-inventory-policy').disabled).toBe(true);
+    expect(select('tanker-settings-inventory-hours').disabled).toBe(false);
+    fireEvent.change(select('tanker-settings-inventory-hours'), { target: { value: '48' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({ tanker_inventory_review_after_hours: 48 });
+  });
+
+  it('a governor changes the insufficient-balance policy and sends only that key', async () => {
+    renderIntl(<TankerSettingsScreen />, locale);
+    await screen.findByRole('heading', { name: T(locale).settings.title });
+    fireEvent.change(select('tanker-settings-inventory-policy'), { target: { value: 'hold_for_review' } });
+    fireEvent.click(screen.getByRole('button', { name: T(locale).settings.save }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].body).toEqual({ tanker_inventory_insufficient_policy: 'hold_for_review' });
+  });
+});
+

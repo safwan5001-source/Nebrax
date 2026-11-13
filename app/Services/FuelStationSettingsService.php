@@ -32,7 +32,7 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy'];
 
     /** @var list<string> نطاقات منع تكرار رقم السند الورقي (TANKER-PR3؛ الافتراضي المعتمد `station`). */
     public const TANKER_VOUCHER_SCOPES = ['station', 'tenant', 'owner', 'none'];
@@ -56,6 +56,26 @@ class FuelStationSettingsService
             'selection_required' => ($all['tanker_selection_required'] ?? false) === true,
             'voucher_unique_scope' => is_string($scope) && in_array($scope, self::TANKER_VOUCHER_SCOPES, true) ? $scope : 'station',
             'capacity_overrun_policy' => is_string($overrun) && in_array($overrun, self::TANKER_CAPACITY_OVERRUN_POLICIES, true) ? $overrun : 'allow_with_confirmation',
+        ];
+    }
+
+    /** @var list<string> سياسة الرصيد غير الكافي للسند المعلّق (TANKER-PR6A): لا «سماح بالسالب» ولا «تسوية صامتة» مهما كانت القيمة. */
+    public const TANKER_INVENTORY_INSUFFICIENT_POLICIES = ['block', 'hold_for_review'];
+
+    /**
+     * TANKER-PR6A: سياسة مراجعة السندات المعلّقة الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة ⇒ الافتراضي الآمن. **لا أثر على أي رصيد**: تُستعمل لتصنيف الجاهزية وعرضها فقط.
+     *
+     * @return array{insufficient_policy: string, review_after_hours: int}
+     */
+    public function tankerInventoryPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $policy = $all['tanker_inventory_insufficient_policy'] ?? 'block';
+        $hours = $all['tanker_inventory_review_after_hours'] ?? 24;
+
+        return [
+            'insufficient_policy' => is_string($policy) && in_array($policy, self::TANKER_INVENTORY_INSUFFICIENT_POLICIES, true) ? $policy : 'block',
+            'review_after_hours' => is_int($hours) && $hours >= 1 && $hours <= 720 ? $hours : 24,
         ];
     }
 
@@ -480,7 +500,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_inventory_review_after_hours', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -635,6 +655,22 @@ class FuelStationSettingsService
         if ($key === 'tanker_fill_attachment_after_close') {
             if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_AFTER_CLOSE, true)) {
                 throw new RuntimeException('سياسة إضافة المرفقات بعد إغلاق الوردية يجب أن تكون allow أو deny.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_inventory_insufficient_policy') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_INVENTORY_INSUFFICIENT_POLICIES, true)) {
+                throw new RuntimeException('سياسة الرصيد غير الكافي للسندات المعلّقة يجب أن تكون block أو hold_for_review.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_inventory_review_after_hours') {
+            if (! is_int($value) || $value < 1 || $value > 720) {
+                throw new RuntimeException('مهلة وسم السند المعلّق «متأخراً» يجب أن تكون عدداً صحيحاً بين 1 و720 ساعة.');
             }
 
             return;

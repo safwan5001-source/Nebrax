@@ -44,6 +44,8 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'tanker_fill_attachment_max_count' => ['sometimes', 'integer', 'min:1', 'max:20'],
             'tanker_fill_attachment_after_close' => ['sometimes', 'in:allow,deny'],
             'tanker_fill_attachment_removal' => ['sometimes', 'in:open_shift_only,always,never'],
+            'tanker_inventory_insufficient_policy' => ['sometimes', 'in:block,hold_for_review'],
+            'tanker_inventory_review_after_hours' => ['sometimes', 'integer', 'min:1', 'max:720'],
             'tank_reading_stale_after_minutes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:43200'],
             'shift_tank_tolerance_milliliters' => ['sometimes', 'integer', 'min:0'],
             'fuel_price_tax_mode' => ['sometimes', 'in:tax_inclusive,tax_exclusive'],

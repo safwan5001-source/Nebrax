@@ -45,6 +45,8 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
       { href: '/fuel-stations/tanker-owners', labelKey: 'tankerOwners', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
       // TANKER-PR3: إعدادات تعبئة الصهاريج (سياسات + عمليات الفوهات) — البوابة نفسها.
       { href: '/fuel-stations/tanker-settings', labelKey: 'tankerSettings', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
+      // TANKER-PR6A: مراجعة جاهزية الدمج المخزني للسندات المعلّقة (عرض فقط، لا ترحيل) — البوابة نفسها، وصلاحية مراجعة مستقلة.
+      { href: '/fuel-stations/tanker-inventory-review', labelKey: 'tankerInventoryReview', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_management' },
     ],
   },
   {

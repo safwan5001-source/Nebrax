@@ -3072,6 +3072,7 @@
     "close": "Close",
     "perm_areas": {
       "attachment": "Attachments",
+      "inventory": "Inventory",
       "cost": "Cost",
       "late": "Late readings",
       "actions": "Executable actions",
@@ -9788,6 +9789,7 @@
     "corporateContracts": "Corporate contracts",
     "tankerOwners": "Tanker owners",
     "tankerSettings": "Tanker fill settings",
+    "tankerInventoryReview": "Fill inventory review",
     "aviRfid": "AVI/RFID",
     "devices": "Devices",
     "deviceRegistry": "Device registry",
@@ -10070,7 +10072,101 @@
     "paymentCollected": "Receipt posted and invoice payment status updated."
   },
   "fuelTankers": {
+    "inventory": {
+      "eyebrow": "Tanker fills",
+      "title": "Inventory integration readiness",
+      "subtitle": "Pending fill vouchers and what blocks them from the official stock, or needs review first.",
+      "notEnabled": "Inventory integration is not enabled yet: this screen is review-only. No fuel is deducted and no stock movement or journal entry is created. Vouchers stay “pending” until activation is approved.",
+      "loadFailed": "Could not load the pending-voucher review.",
+      "truncated": "Only the oldest 500 pending vouchers are shown; narrow the filters to see the rest.",
+      "summary": {
+        "total": "Pending vouchers",
+        "ready": "Ready",
+        "needs_review": "Need review",
+        "blocked": "Blocked",
+        "overdue": "Overdue"
+      },
+      "filters": {
+        "station": "Station",
+        "allStations": "All stations",
+        "readiness": "Readiness",
+        "allReadiness": "All states",
+        "overdue": "Age",
+        "anyAge": "Any age",
+        "overdueOnly": "Overdue only"
+      },
+      "readiness": {
+        "ready": "Ready",
+        "needs_review": "Needs review",
+        "blocked": "Blocked"
+      },
+      "empty": "No matching pending vouchers.",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {last}",
+      "voucher": "voucher",
+      "liters": "L",
+      "overdueBadge": "Overdue",
+      "recordedAt": "Recorded {when} · {hours} h ago",
+      "blockers": "Blockers",
+      "reasons": "Review reasons",
+      "balanceLine": "Warehouse balance {available} L · pending cumulative {cumulative} L",
+      "blocker": {
+        "station_not_active": "Station is not active",
+        "station_warehouse_required": "Station has no linked warehouse",
+        "warehouse_unavailable": "Station warehouse is unavailable",
+        "warehouse_branch_mismatch": "Warehouse does not match the station branch",
+        "fuel_product_unavailable": "Fuel product is unavailable",
+        "stock_record_missing": "No stock record for this product in the warehouse",
+        "cost_baseline_required": "A cost baseline is required first",
+        "cost_history_open": "An unresolved held settlement exists for this pool",
+        "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse balance",
+        "insufficient_balance": "Insufficient balance",
+        "unknown": "Unknown blocker"
+      },
+      "reason": {
+        "capacity_overrun": "Tanker capacity overrun (confirmed)",
+        "insufficient_balance": "Insufficient balance (awaiting review)",
+        "overdue": "Pending longer than the review window",
+        "unknown": "Unknown review reason"
+      },
+      "pools": {
+        "title": "Pools involved",
+        "hint": "Official warehouse balance versus the fuel cost pool per warehouse and product. Nothing is adjusted from here.",
+        "stock": "Warehouse balance",
+        "costPool": "Cost pool quantity",
+        "pending": "{count} pending vouchers totalling {liters} L",
+        "shortfall": "Shortfall against balance: {liters} L",
+        "inSync": "In sync",
+        "outOfSync": "Out of sync",
+        "syncUnknown": "Undetermined"
+      },
+      "requirements": {
+        "title": "Reconciliation requirements before activation",
+        "quantity": "Cost pool quantity equals the warehouse balance.",
+        "value": "Pool value equals the fuel share of the inventory account (1140).",
+        "other": "Another reconciliation requirement.",
+        "ledgerNotChecked": "Account 1140 is not computed here (it also holds non-fuel stock); it is reconciled at activation after the accounting approval."
+      },
+      "settingsLink": "Review settings"
+    },
     "settings": {
+      "inventory": {
+        "title": "Inventory integration review",
+        "notEnabled": "Inventory integration is not enabled: these settings are stored and only govern the review display. No deduction, posting or journal entry.",
+        "policyLabel": "When the balance is insufficient",
+        "policyNote": "There is no allow-negative option and no silent adjustment; only an explicit block or human review.",
+        "policy": {
+          "block": "Block the voucher (blocker)",
+          "hold_for_review": "Hold it for human review"
+        },
+        "advanced": "Advanced options",
+        "hoursLabel": "Mark a pending voucher “overdue” after",
+        "hoursNote": "A voucher is flagged overdue in the review after this long.",
+        "hours": "{n} hours",
+        "fixedNote": "Fixed rules no setting can disable: duplicate-posting prevention, historical cost pinning, reversal once, tenant/branch/station isolation.",
+        "reviewLink": "Open the pending-voucher review"
+      },
       "title": "Tanker fill settings",
       "subtitle": "Customer-tanker fill policies and the operations each nozzle allows. Storage and validation only — no fills, stock or ledger entries at this stage.",
       "scopeLabel": "Scope",
