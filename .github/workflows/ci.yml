@@ -754,26 +754,23 @@ jobs:
     #  أي ضجيج بيئة لا انحدار كود. حدّ p95 < 50ms وحمل العمل وعدد الجولات بلا أي تغيير. خطوة «تحقق أن بيانات PostgreSQL على tmpfs» أدناه تُفشل
     #  الوظيفة إن لم يتحقق الشرط (فلا يعود القياس إلى القرص بصمت). وظيفة `test` الكاملة تبقى على القرص عمداً.
     #  قياس fsync/WAL على التخزين الحقيقي يبقى منفصلاً وغير مانع: `perf-feed-lock-baseline.yml` (جدولة/يدوي، pg_test_fsync) — لا يدخل شروط الدمج.
-    #  PERF-LOCKS: `docker run` بدل `services:` لأن حدّ `max_locks_per_transaction` لا يتغيّر إلا بوسيط خادم (`-c`) أو إعادة تشغيل، وإعادة تشغيل حاوية tmpfs تمسح البيانات.
-    #  كل `migrate:fresh` يُسقط ~440 جدولاً بفهارسها في معاملة واحدة، وبالافتراض (64 × 100 = 6400 خانة) كانت الوظيفة على حافة الحدّ فكل جدول جديد في المخطط يدفعها فوقه
-    #  («out of shared memory» في `DROP TABLE … CASCADE`). وظائف الاختبار الكاملة ترفع الحدّ إلى 1024 بالطريقة نفسها؛ لا تغيير في حمل القياس ولا في حدّ p95.
-    steps:
-      - name: تشغيل PostgreSQL على tmpfs بحدّ أقفال أعلى
-        run: |
-          set -euo pipefail
-          docker run -d --name pg-perf-db \
-            -e POSTGRES_USER=nibras -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=nibras \
-            -p 5432:5432 --tmpfs /var/lib/postgresql/data:rw \
-            postgres:16 -c max_locks_per_transaction=1024
-          for i in $(seq 1 60); do
-            docker exec pg-perf-db pg_isready -h 127.0.0.1 -U nibras -d nibras >/dev/null 2>&1 && break
-            sleep 1
-          done
-          docker exec pg-perf-db pg_isready -h 127.0.0.1 -U nibras -d nibras
-          LIMIT="$(docker exec pg-perf-db psql -U nibras -d nibras -Atc "SHOW max_locks_per_transaction")"
-          echo "max_locks_per_transaction=$LIMIT"
-          [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nibras
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: nibras
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nibras"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw
 
+    steps:
       - name: Checkout core (النواة)
         uses: actions/checkout@v4
 
@@ -933,6 +930,29 @@ jobs:
             [ "$t" = "tmpfs" ] || { echo "::error::بيانات PostgreSQL ليست على tmpfs (النوع: $t) — القياس لم يعد يعزل ضجيج القرص"; exit 1; }
           done
           [ "$used_kb" -gt 10000 ] || { echo "::error::حجم PGDATA صغير جداً ($used_kb KB): قاعدة القياس لا تكتب هنا"; exit 1; }
+
+      # PERF-LOCKS: `RefreshDatabase` ينفّذ `migrate:fresh` في أول اختبار، و`db:wipe` يُسقط **كل** الجداول (~440 بفهارسها) بعبارة `DROP TABLE … CASCADE` واحدة في معاملة واحدة.
+      #  بخانات الأقفال الافتراضية (`max_locks_per_transaction=64 × max_connections=100 = 6400`) كانت العبارة على حافة الحدّ، فكل جدول جديد في المخطط يدفعها فوقه
+      #  («SQLSTATE[53200] out of shared memory»). وظائف الاختبار الكاملة ترفع الحدّ وتعيد تشغيل الحاوية، وهذا غير ممكن هنا لأن بيانات هذه الوظيفة على tmpfs (إعادة التشغيل تمسحها)،
+      #  وحارس التكافؤ يُبقي خدمة postgres مطابقة لوظيفة `test` عدا tmpfs. المعالجة بلا مساس بالخدمة ولا بحمل القياس: بعد التحقق من tmpfs تُسقَط الجداول **على دفعات صغيرة**
+      #  (كل دفعة معاملة مستقلة) فيجد `migrate:fresh` الأول مخططاً فارغاً فلا يحتاج إسقاطاً كبيراً، ثم يُنشئ كل شيء من جديد كما كان تماماً. التحقق من tmpfs سبق هذه الخطوة.
+      - name: إسقاط جداول قاعدة القياس على دفعات (تفادي حدّ الأقفال)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cid="$(docker ps -q --filter ancestor=postgres:16 | head -1)"
+          [ -n "$cid" ] || { echo "::error::لم يُعثر على حاوية خدمة postgres"; exit 1; }
+          psql_q() { docker exec -e PGOPTIONS="-c client_min_messages=warning" "$cid" psql -U nibras -d nibras -v ON_ERROR_STOP=1 -Atc "$1"; }
+          before="$(psql_q "SELECT count(*) FROM pg_tables WHERE schemaname='public'")"
+          psql_q "SELECT quote_ident(tablename) FROM pg_tables WHERE schemaname='public' ORDER BY 1" > /tmp/awj-perf-tables.txt
+          xargs -a /tmp/awj-perf-tables.txt -n 40 | while read -r batch; do
+            list=""
+            for t in $batch; do list="${list}public.${t},"; done
+            psql_q "DROP TABLE ${list%,} CASCADE" >/dev/null
+          done
+          after="$(psql_q "SELECT count(*) FROM pg_tables WHERE schemaname='public'")"
+          echo "tables_before=$before tables_after=$after"
+          [ "$after" = "0" ] || { echo "::error::بقيت جداول بعد الإسقاط على دفعات ($after)"; exit 1; }
 
       - name: اختبارات مُلخِّص المقاييس
         run: python3 -m unittest discover -s scripts/ci-perf -v
