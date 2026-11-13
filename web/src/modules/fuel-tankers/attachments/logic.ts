@@ -110,6 +110,14 @@ export function toState(meta: unknown): AttachmentState {
 }
 
 /** قيمة `accept` لمنتقي الملفات من أنواع السياسة. الصور تُحصر في JPEG/PNG كي يحوّل iOS صور HEIC إلى JPEG عند الاختيار. */
+/** يدمج الصفوف الواردة في القائمة الحالية بالمعرّف: الموجود يُحدَّث في مكانه والجديد يُلحق في النهاية (لا استبدال للقائمة). */
+export function mergeRows(current: FillAttachment[], incoming: FillAttachment[]): FillAttachment[] {
+  const byId = new Map(incoming.map((row) => [row.id, row]));
+  const merged = current.map((row) => byId.get(row.id) ?? row);
+  const known = new Set(current.map((row) => row.id));
+  return [...merged, ...incoming.filter((row) => !known.has(row.id))];
+}
+
 export const acceptAttr = (policy: AttachmentPolicy): string => policy.mime_types.join(',');
 export const imageAcceptAttr = (policy: AttachmentPolicy): string => policy.mime_types.filter((mime) => mime.startsWith('image/')).join(',');
 

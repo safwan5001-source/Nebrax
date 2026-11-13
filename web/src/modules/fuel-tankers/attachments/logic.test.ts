@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptAttr, blockKey, checkFiles, declaredMime, formatBytes, imageAcceptAttr, megabytes, reasonKey, SAFE_POLICY, toAttachment, toState } from './logic';
+import { acceptAttr, blockKey, checkFiles, declaredMime, formatBytes, imageAcceptAttr, megabytes, mergeRows, reasonKey, SAFE_POLICY, toAttachment, toState } from './logic';
 
 const file = (name: string, type: string, size = 1000) => new File([new Uint8Array(size)], name, { type });
 const policy = { ...SAFE_POLICY, max_bytes: 2 * 1024 * 1024, max_count: 3 };
@@ -71,5 +71,13 @@ describe('helpers', () => {
     expect(blockKey('shift_closed')).toBe('shift_closed');
     expect(blockKey('weird')).toBeNull();
     expect(blockKey(null)).toBeNull();
+  });
+});
+
+describe('mergeRows', () => {
+  const r = (id: string, name: string) => toAttachment({ id, fuel_tanker_fill_id: 'f', original_name: name, mime_type: 'image/jpeg', kind: 'image', size: 1, status: 'active', uploaded_at: '2027-01-26T09:30:00+03:00' })!;
+  it('keeps current rows, updates matches in place and appends new ones', () => {
+    const merged = mergeRows([r('a', 'a1'), r('b', 'b1')], [r('b', 'b2'), r('c', 'c1')]);
+    expect(merged.map((x) => [x.id, x.original_name])).toEqual([['a', 'a1'], ['b', 'b2'], ['c', 'c1']]);
   });
 });

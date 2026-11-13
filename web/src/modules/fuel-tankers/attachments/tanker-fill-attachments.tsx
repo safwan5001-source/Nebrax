@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { downloadAttachment, listAttachments, previewUrl, removeAttachment, replaceAttachment, uploadAttachment } from './client';
 import {
-  acceptAttr, blockKey, checkFiles, formatBytes, imageAcceptAttr, megabytes, reasonKey, SAFE_POLICY,
+  acceptAttr, blockKey, checkFiles, formatBytes, imageAcceptAttr, megabytes, mergeRows, reasonKey, SAFE_POLICY,
   type AttachmentState, type FileRejection, type FillAttachment,
 } from './logic';
 
@@ -51,8 +51,9 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
   const keys = useRef(0);
   const working = useRef(false);
 
-  const apply = useCallback((next: { rows?: FillAttachment[]; state: AttachmentState }) => {
-    if (next.rows) setRows(next.rows);
+  const apply = useCallback((next: { rows?: FillAttachment[]; state: AttachmentState }, merge = false) => {
+    // رد الرفع يحمل الصفوف المرفوعة في ذلك الطلب وحدها (لا كل مرفقات السند) ⇒ تُدمج بالمعرّف ولا تستبدل القائمة المعروضة.
+    if (next.rows) { const incoming = next.rows; setRows((current) => (merge ? mergeRows(current, incoming) : incoming)); }
     setState(next.state);
     onCountChange?.(next.state.active_count);
   }, [onCountChange]);
@@ -89,7 +90,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
         try {
           const result = await uploadAttachment(fillId, item.file);
           setQueue((current) => current.filter((q) => q.key !== item.key));
-          apply({ rows: history ? undefined : result.rows, state: result.state });
+          apply({ rows: history ? undefined : result.rows, state: result.state }, true);
           if (history) void load(true);
         } catch (error) {
           // فشل شبكة/خادم: يبقى الملف في القائمة بسببه مع «إعادة المحاولة»؛ لا إعادة إرسال تلقائية (الخادم idempotent بالمحتوى إن أُعيد).

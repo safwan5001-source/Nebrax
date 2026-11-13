@@ -115,6 +115,17 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     expect(api.upload).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the attachments already shown when an upload response carries only the newly uploaded rows', async () => {
+    const existing = row({ id: '00000000-0000-4000-8000-0000000000a1', original_name: 'first.jpg' });
+    api.list.mockResolvedValue({ rows: [existing], state: stateOf({ active_count: 1, status: 'present' }) });
+    api.upload.mockResolvedValue({ rows: [row({ id: '00000000-0000-4000-8000-0000000000b2', original_name: 'second.jpg' })], state: stateOf({ active_count: 2, status: 'present' }) });
+    mount();
+    expect(await screen.findByRole('button', { name: text.openNamed.replace('{name}', 'first.jpg') })).toBeTruthy();
+    fireEvent.change(document.querySelector('[data-camera-input]')!, { target: { files: [image('second.jpg')] } });
+    expect(await screen.findByRole('button', { name: text.openNamed.replace('{name}', 'second.jpg') })).toBeTruthy();
+    expect(screen.getByRole('button', { name: text.openNamed.replace('{name}', 'first.jpg') })).toBeTruthy();
+  });
+
   it('keeps a failed upload with a clear reason, retries it explicitly, and never retries on its own', async () => {
     api.upload.mockRejectedValueOnce(new ApiError(422, 'x', { reason: 'attachment_storage_failed' }));
     api.upload.mockResolvedValueOnce({ rows: [row()], state: stateOf({ active_count: 1, status: 'present' }) });
