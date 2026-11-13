@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AWJ Signature V3</title>
 <meta name="description" content="AWJ Signature V3 — two premium visual identities over the Unified UX Foundation (Design Lab only, synthetic data).">
-<script>(function(){var q=new URLSearchParams(location.search);if(q.has('embed'))document.documentElement.classList.add('embed');if(q.has('full'))document.documentElement.classList.add('full');})();</script>
+<script>(function(){var q=new URLSearchParams(location.search),h=document.documentElement;function app(){h.classList.toggle('embed',q.has('embed')||location.hash==='#app');}app();window.addEventListener('hashchange',function(){app();window.dispatchEvent(new Event('resize'));});if(q.has('full'))h.classList.add('full');})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Noto+Sans+Arabic:wght@400..700&family=Rubik:wght@400..700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -86,6 +86,7 @@ body{margin:0;font-family:var(--lab-font);font-size:14px;line-height:1.55}
       <span class="lab-tag">بيانات تجريبية · لا API</span>
       <span class="lab-tag">D1: محاذاة B + أرقام جدولية</span>
       <span class="lab-tag">لا تفعيل لـ v3 (M8)</span>
+      <a class="lab-tag" href="#app"><b>عرض التطبيق وحده</b> بملء الشاشة</a>
     </div>
   </header>
 
