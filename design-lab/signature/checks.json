@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T20:28:28.118Z",
+ "generated": "2026-11-13T22:49:14.151Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3026,6 +3026,18 @@
    "ok": true
   },
   {
+   "name": "Navigation icons: every item has its own approved icon, drawn (no missing symbol), identical in sidebar, mobile sheet and tablet group sheet",
+   "ok": true
+  },
+  {
+   "name": "Navigation icons: an item without an icon, or with an unknown one, keeps its group icon (EXT.nav compatibility)",
+   "ok": true
+  },
+  {
+   "name": "Mobile menu sheet: 44px rows, current item revealed below the sticky header, every item reachable, bottom bar unchanged",
+   "ok": true
+  },
+  {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
    "ok": true
   },
@@ -3052,7 +3064,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 19,
+   "tests": 22,
    "failed": 0
   },
   "matrix": {

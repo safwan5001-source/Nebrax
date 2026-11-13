@@ -290,6 +290,90 @@ test('"Add line" and Alt+N under find / error filter add a visible, focused line
   await ctx.close();
 });
 
+/* ---- navigation iconography (regression) ---- */
+// The approved item → icon table. Changing an icon must change this table on purpose.
+const NAV_ICON_TABLE = {
+  dash: 'layout-dashboard', salesInv: 'file-plus-2', salesList: 'files', quotes: 'file-text', creditNotes: 'file-minus-2',
+  purchInv: 'file-input', purchOrders: 'clipboard-list', suppliers: 'building-2', stock: 'boxes', permits: 'package-check',
+  stocktaking: 'clipboard-check', customers: 'users', statements: 'scroll-text', journal: 'book-open-text', accounts: 'list-tree',
+  treasury: 'landmark', expenses: 'receipt-text', employees: 'id-card', payroll: 'banknote', workorders: 'wrench',
+  shift: 'calendar-clock', stations: 'fuel', tanks: 'cylinder', taxSettings: 'percent', roles: 'shield-check', reports: 'chart-column',
+};
+const navIconsOf = (page, sel) => page.evaluate((sel) => Object.fromEntries([...document.querySelectorAll(sel)].map(b => {
+  const svg = b.querySelector('svg'); return [b.dataset.label, { icon: b.dataset.icon, shapes: svg ? svg.children.length : 0, body: svg ? svg.innerHTML : '' }];
+})), sel);
+
+test('Navigation icons: every item has its own approved icon, drawn (no missing symbol), identical in sidebar, mobile sheet and tablet group sheet', async () => {
+  for (const identity of IDS) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&r=sales`, { width: 1366, height: 900 });
+    const side = await navIconsOf(page, '.side .nav-a');
+    assert(Object.keys(side).length === Object.keys(NAV_ICON_TABLE).length, `${identity}: sidebar items ${Object.keys(side).length}`);
+    for (const [k, want] of Object.entries(NAV_ICON_TABLE)) {
+      assert(side[k], `${identity}: sidebar has no ${k}`);
+      assert(side[k].icon === want, `${identity}: ${k} shows ${side[k].icon}, expected ${want}`);
+      assert(side[k].shapes > 0, `${identity}: ${k} icon is empty`);
+    }
+    // the same group never repeats one icon across all its items any more
+    const groups = await page.evaluate(() => window.__fx.NAV.map(([g, , items]) => [g, items.map(it => window.__fx.navIcon(it))]));
+    for (const [g, icons] of groups) if (icons.length > 1) assert(new Set(icons).size === icons.length, `${identity}: ${g} repeats an icon ${icons}`);
+    await ctx.close();
+    const m = await open(`embed=1&id=${identity}&r=sales`, { width: 390, height: 844 });
+    await m.page.click('.bbar [data-act="navsheet"]');
+    const sheet = await navIconsOf(m.page, '.sheet-nav .sheet-a');
+    for (const [k, v] of Object.entries(side)) assert(sheet[k] && sheet[k].icon === v.icon && sheet[k].body === v.body, `${identity}: mobile sheet ${k} differs from sidebar`);
+    await m.ctx.close();
+    const tb = await open(`embed=1&id=${identity}&r=purchase`, { width: 834, height: 1112 });
+    for (const g of ['g_sales', 'g_purch', 'g_inv', 'g_fin', 'g_fuel', 'g_set']) {
+      await tb.page.click(`.rail [data-group="${g}"]`);
+      const grp = await navIconsOf(tb.page, '.sheet-nav .sheet-a');
+      assert(Object.keys(grp).length > 0, `${identity}: tablet ${g} sheet empty`);
+      for (const [k, v] of Object.entries(grp)) assert(v.icon === side[k].icon && v.body === side[k].body, `${identity}: tablet ${g} ${k} differs`);
+      await tb.page.keyboard.press('Escape');
+    }
+    // the rail keeps one icon per group
+    const rail = await tb.page.evaluate(() => ({ n: window.__fx.NAV.length, shapes: [...document.querySelectorAll('.rail .rail-b')].map(b => b.querySelector('svg').children.length) }));
+    assert(rail.shapes.length === rail.n && rail.shapes.every(n => n > 0), `${identity}: rail ${JSON.stringify(rail)}`);
+    await tb.ctx.close();
+  }
+});
+
+test('Navigation icons: an item without an icon, or with an unknown one, keeps its group icon (EXT.nav compatibility)', async () => {
+  const { ctx, page } = await open('embed=1&r=sales', { width: 1366, height: 900 });
+  const r = await page.evaluate(() => {
+    const F = window.__fx, grp = F.NAV.find(n => n[0] === 'g_sales');
+    grp[2].push(['tmpPlain', null], ['tmpUnknown', null, 'no-such-icon']);
+    F.render();
+    const pick = (k) => { const b = document.querySelector(`.side .nav-a[data-label="${k}"]`); return { icon: b.dataset.icon, shapes: b.querySelector('svg').children.length }; };
+    const out = { plain: pick('tmpPlain'), unknown: pick('tmpUnknown') };
+    grp[2].splice(-2, 2); F.render();
+    return out;
+  });
+  assert(r.plain.icon === 'cart' && r.plain.shapes > 0, 'plain item did not fall back ' + JSON.stringify(r.plain));
+  assert(r.unknown.icon === 'cart' && r.unknown.shapes > 0, 'unknown icon did not fall back ' + JSON.stringify(r.unknown));
+  await ctx.close();
+});
+
+test('Mobile menu sheet: 44px rows, current item revealed below the sticky header, every item reachable, bottom bar unchanged', async () => {
+  for (const identity of IDS) for (const [route, label] of [['sales', 'salesInv'], ['shift', 'shift']]) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&r=${route}`, { width: 390, height: 844 }, { reducedMotion: 'reduce' });
+    const bbar = await page.evaluate(() => [...document.querySelectorAll('.bbar > button')].map(b => b.dataset.act || b.dataset.route));
+    assert(JSON.stringify(bbar) === JSON.stringify(['dashboard', 'palette', 'create', 'inbox', 'navsheet']), `${identity}: bottom bar changed ${bbar}`);
+    await page.click('.bbar [data-act="navsheet"]'); await page.waitForTimeout(60);
+    const r = await page.evaluate((label) => {
+      const sh = document.querySelector('.sheet-nav'), head = sh.querySelector('.sheet-h').getBoundingClientRect(), box = sh.getBoundingClientRect();
+      const cur = sh.querySelector(`.sheet-a[data-label="${label}"]`).getBoundingClientRect();
+      const heights = [...sh.querySelectorAll('.sheet-a')].map(b => b.offsetHeight); // layout height, unaffected by the opening transform
+      sh.scrollTop = sh.scrollHeight; const last = [...sh.querySelectorAll('.sheet-a')].pop().getBoundingClientRect();
+      return { minH: Math.min(...heights), curTop: cur.top, curBottom: cur.bottom, headBottom: head.bottom, boxBottom: box.bottom, lastBottom: last.bottom, current: sh.querySelector('[aria-current="page"]')?.dataset.label };
+    }, label);
+    assert(r.minH >= 44, `${identity}/${route}: row ${r.minH}px < 44`);
+    assert(r.current === label, `${identity}/${route}: current ${r.current}`);
+    assert(r.curTop >= r.headBottom - 0.5 && r.curBottom <= r.boxBottom + 0.5, `${identity}/${route}: current item hidden ${JSON.stringify(r)}`);
+    assert(r.lastBottom <= r.boxBottom + 0.5, `${identity}/${route}: last item unreachable ${JSON.stringify(r)}`);
+    await ctx.close();
+  }
+});
+
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
   const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });

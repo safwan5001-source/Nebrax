@@ -271,6 +271,19 @@ table.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .sheet-a:hover{background:var(--awj-state-hover)}
 .sheet-a svg{width:18px;height:18px;color:var(--awj-text-tertiary);flex:none}
 .sheet-a[aria-current="page"]{background:var(--awj-state-selected);font-weight:600}
+/* Navigation sheets (menu sheet on phones, group sheet on tablets): denser rows that keep 44px targets, a hairline between
+   groups, a visible current item, and focus/scroll that never lands under the sticky sheet header or the home indicator. */
+.sheet-nav{scroll-padding-block:72px 24px}
+.sheet-nav .sheet-b{gap:0;padding-block:4px calc(16px + env(safe-area-inset-bottom, 0px))}
+.navlist{display:flex;flex-direction:column}
+.navlist .nav-sec{display:flex;flex-direction:column;gap:2px;padding-block:6px}
+.navlist .nav-sec + .nav-sec{border-top:1px solid var(--awj-border-hairline)}
+.navlist .sheet-grp{padding:8px 10px 4px;font-size:12px;letter-spacing:.02em}
+.navlist .sheet-a{position:relative;min-height:44px;padding-block:0;padding-inline:12px;gap:12px}
+.navlist .sheet-a .lbl{flex:1;min-width:0}
+.navlist .sheet-a svg{width:20px;height:20px}
+.navlist .sheet-a[aria-current="page"] svg{color:var(--awj-action-primary)}
+.navlist .sheet-a[aria-current="page"]::before{content:"";position:absolute;inset-inline-start:0;inset-block:10px;width:3px;border-radius:2px;background:var(--awj-action-primary)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--awj-border-hairline);padding:0 12px}
 .tabs button{position:relative;border:0;background:transparent;padding:10px 12px;color:var(--awj-text-secondary);font-size:13px}
 .tabs button[aria-selected="true"]{color:var(--awj-text-primary);font-weight:600}
@@ -465,7 +478,7 @@ table.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
   .layer span{grid-column:1 / -1}
 }
 @media (prefers-reduced-motion:reduce){.fx *,.fx *::before,.fx *::after{animation:none!important;transition:none!important}}
-@media (forced-colors:active){.nav-a[aria-current="page"]::before{background:Highlight}.rail-b[aria-current="true"]{outline:2px solid Highlight}}
+@media (forced-colors:active){.nav-a[aria-current="page"]::before,.navlist .sheet-a[aria-current="page"]::before{background:Highlight}.rail-b[aria-current="true"]{outline:2px solid Highlight}}
 
 /* ---------- Direction: directional glyphs mirror in RTL (back, chevrons). Non-directional icons never mirror. ---------- */
 .fx[dir="rtl"] .dir-icon{transform:scaleX(-1)}

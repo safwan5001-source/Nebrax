@@ -191,7 +191,7 @@ window.FX_EXT = {
   homeRoute: 'dashboard', devices: DEVICES, icons: ICONS, i18n: { ar: AR, en: EN },
   state: { route: 'dashboard', identity: 'nasaq', amt: 'b', device: 'laptop', lines: '24', scenario: 'normal', recovered: null },
   routeLabels: { dashboard: 'dash' },
-  nav(NAV, ROUTES) { NAV.splice(NAV.length - 1, 1); NAV.unshift(['g_home', 'home', [['dash', 'dashboard']]]); ROUTES.push('dashboard'); },
+  nav(NAV, ROUTES) { NAV.splice(NAV.length - 1, 1); NAV.unshift(['g_home', 'home', [['dash', 'dashboard', 'layout-dashboard']]]); ROUTES.push('dashboard'); },
   init(S) {
     // URL state (embed / compare / tests): id, r, m, l, dn, ln, sc, st, dev
     const map = { id:'identity', r:'route', m:'mode', l:'lang', dn:'density', ln:'lines', sc:'scenario', st:'demo', dev:'device' };

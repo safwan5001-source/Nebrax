@@ -6,9 +6,11 @@
 |---|---|
 | `index.html` | المستكشف: اتجاه واحد أو مقارنة جنباً إلى جنب (`?embed=1` للعرض المنفرد بعرض النافذة الحقيقي) |
 | `signature.css` / `signature.js` | حزمتا الهوية + لوحة التحكم + تجهيزات الفاتورة + الاستعادة |
+| `nav-icons.js` | قاموس أيقونات عناصر التنقل (26، من Lucide، **مولَّد** — لا يُعدَّل يدوياً) |
+| `tools/` | توليد قاموس الأيقونات ولقطات التنقل قبل/بعد |
 | `foundation/` | نسخة مجمّدة من وقت تشغيل الأساس الذي يعتمد عليه V3 (المصدر الأصلي ومجموعة اختباراته في PR #2099) |
-| `previews/` | 8 معاينات رئيسية 2× |
-| `out/` | مخرجات الاختبار (39 لقطة) — مُستثناة من Git |
+| `previews/` | 8 معاينات رئيسية 2× + `nav/` (قبل/بعد التنقل ومقارناته) |
+| `out/` | مخرجات الاختبار (39 لقطة + 64 لقطة تنقل) — مُستثناة من Git |
 | `checks.json` | نتائج آخر تشغيل كامل |
 
 ## المعاينة
@@ -26,9 +28,12 @@
 Playwright من التثبيت العام أو من `web/node_modules` (بعد `npm ci` في `web/`)، وaxe-core من `web/node_modules`.
 
 ```bash
-node design-lab/scripts/signature.mjs                      # 370 تهيئة + 14 اختبار تفاعل
+node design-lab/scripts/signature.mjs                      # 370 تهيئة + 22 اختبار تفاعل
 node design-lab/scripts/signature.mjs --shots --scale=2    # + 39 لقطة → out/screens (مخرجات اختبار)
 node design-lab/scripts/signature.mjs --previews           # يعيد توليد المعاينات الثماني في previews/
+node design-lab/signature/tools/gen-nav-icons.mjs                       # يعيد توليد nav-icons.js من lucide-react في web/node_modules
+node design-lab/signature/tools/signature-nav-previews.mjs --tag=after  # 32 لقطة تنقل → out/nav/after
+node design-lab/signature/tools/signature-nav-previews.mjs --tag=after --commit && python3 design-lab/signature/tools/nav-previews-webp.py
 ```
 
-التوثيق: `design-lab/docs/AWJ-SIGNATURE-V3-*.md`.
+التوثيق: `design-lab/docs/AWJ-SIGNATURE-V3-*.md` و`docs/AWJ-SIGNATURE-V3-NAV-ICONS-REPORT.md`.

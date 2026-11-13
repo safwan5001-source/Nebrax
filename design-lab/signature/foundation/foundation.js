@@ -54,7 +54,15 @@ const P = {
 /** Directional icons (back, chevrons) mirror in RTL — one component, not scattered rotate-180. */
 const DIRECTIONAL = new Set(['chevS', 'chevE', 'back']);
 Object.assign(P, (window.FX_EXT || {}).icons || {});
-const ic = (n, cls = '') => `<svg class="${cls}${DIRECTIONAL.has(n) ? ' dir-icon' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
+const svg = (body, cls = '', dir = false) => `<svg class="${cls}${dir ? ' dir-icon' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ic = (n, cls = '') => svg(P[n] || '', cls, DIRECTIONAL.has(n));
+/** Navigation item icons: one central Lucide-based dictionary (nav-icons.js, generated). An item names its own icon as the
+ *  third NAV element; an item without one (or with an unknown name) keeps its group's icon, so EXT.nav entries stay valid. */
+const NAVP = window.AWJ_NAV_ICONS || {};
+const navIcon = (item) => (item[2] && NAVP[item[2]] ? item[2] : null);
+/** On opening the menu/group sheet, bring the current page's item into view (below the sticky sheet header). */
+const revealNav = () => app.querySelector('.navlist [aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+const navIc = (item, groupIcon) => { const n = navIcon(item); return n ? svg(NAVP[n], 'nav-ic') : ic(groupIcon, 'nav-ic'); };
 
 /* ------------------------------------------------------------------ i18n */
 const T = {
@@ -293,16 +301,18 @@ const nm = (o) => o ? (S.lang === 'ar' ? o.ar : o.en) : '';
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
 /* ------------------------------------------------------------------ navigation model */
+// [groupKey, groupIcon, items]; item = [labelKey, route, icon] — the icon is the item's own meaning (Lucide name in nav-icons.js);
+// the group icon stays for the tablet rail. Same item icon in the sidebar, the mobile menu sheet and the tablet group sheet.
 const NAV = [
-  ['g_sales','cart',[['salesInv','sales'],['salesList',null],['quotes',null],['creditNotes',null]]],
-  ['g_purch','truck',[['purchInv','purchase'],['purchOrders',null],['suppliers',null]]],
-  ['g_inv','box',[['stock','inventory'],['permits',null],['stocktaking',null]]],
-  ['g_parties','users',[['customers',null],['statements',null]]],
-  ['g_fin','ledger',[['journal',null],['accounts',null],['treasury',null],['expenses',null]]],
-  ['g_hr','idcard',[['employees',null],['payroll',null]]],
-  ['g_ops','building',[['workorders',null]]],
-  ['g_fuel','fuel',[['shift','shift'],['stations',null],['tanks',null]]],
-  ['g_set','cog',[['taxSettings',null],['roles',null],['reports',null]]],
+  ['g_sales','cart',[['salesInv','sales','file-plus-2'],['salesList',null,'files'],['quotes',null,'file-text'],['creditNotes',null,'file-minus-2']]],
+  ['g_purch','truck',[['purchInv','purchase','file-input'],['purchOrders',null,'clipboard-list'],['suppliers',null,'building-2']]],
+  ['g_inv','box',[['stock','inventory','boxes'],['permits',null,'package-check'],['stocktaking',null,'clipboard-check']]],
+  ['g_parties','users',[['customers',null,'users'],['statements',null,'scroll-text']]],
+  ['g_fin','ledger',[['journal',null,'book-open-text'],['accounts',null,'list-tree'],['treasury',null,'landmark'],['expenses',null,'receipt-text']]],
+  ['g_hr','idcard',[['employees',null,'id-card'],['payroll',null,'banknote']]],
+  ['g_ops','building',[['workorders',null,'wrench']]],
+  ['g_fuel','fuel',[['shift','shift','calendar-clock'],['stations',null,'fuel'],['tanks',null,'cylinder']]],
+  ['g_set','cog',[['taxSettings',null,'percent'],['roles',null,'shield-check'],['reports',null,'chart-column']]],
   ['g_lab','flask',[['home','home'],['kit','kit'],['numbers','numbers'],['rules','rules'],['identity','identity']]],
 ];
 const ROUTES = ['home','kit','numbers','rules','sales','purchase','inventory','shift','identity'];
@@ -318,7 +328,7 @@ function shell(content) {
   const [gKey] = groupOf(S.route);
   const home = EXT.homeRoute || 'home';
   const side = `<div class="side">${EXT.brand ? EXT.brand('side', API) : `<div class="brand"><span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span><div style="min-width:0"><b>${t('company')}</b><span>${t('product')}</span></div></div>`}
-    <nav class="nav-scroll" aria-label="${t('menu')}">${NAV.map(([g, icn, items]) => `<div class="nav-grp">${t(g)}${g === 'g_lab' ? '<span class="tag-lab" style="font-size:9.5px">LAB</span>' : ''}</div>${items.map(([k, r]) => `<button type="button" class="nav-a" data-route="${r || ''}" data-label="${k}" ${r === S.route ? 'aria-current="page"' : ''}>${ic(r === S.route || g !== 'g_lab' ? icn : 'flask')}<span class="lbl">${t(k)}</span></button>`).join('')}`).join('')}</nav></div>`;
+    <nav class="nav-scroll" aria-label="${t('menu')}">${NAV.map(([g, icn, items]) => `<div class="nav-grp">${t(g)}${g === 'g_lab' ? '<span class="tag-lab" style="font-size:9.5px">LAB</span>' : ''}</div>${items.map((it) => { const [k, r] = it; return `<button type="button" class="nav-a" data-route="${r || ''}" data-label="${k}" data-icon="${navIcon(it) || icn}" ${r === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span class="lbl">${t(k)}</span></button>`; }).join('')}`).join('')}</nav></div>`;
   const rail = `<nav class="rail" aria-label="${t('menu')}">${EXT.brand ? EXT.brand('rail', API) : `<span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span>`}${NAV.map(([g, icn]) => `<button type="button" class="rail-b" data-group="${g}" aria-current="${g === gKey}" title="${t(g)}">${ic(icn)}<span class="lbl">${t(g)}</span></button>`).join('')}</nav>`;
   const brChip = `<button type="button" class="ctx-chip" data-act="context" aria-haspopup="dialog">${ic('building')}<span class="hide-c">${t('branch')}:</span> <b>${t('br_' + S.branch)}</b></button>`;
   const periodChip = `<span class="ctx-chip hide-m" data-locked="false"><span class="dot"></span>${t('period')}: <b>${t('periodOpen')}</b></span>`;
@@ -678,9 +688,10 @@ function pageIdentity() {
 function overlay() {
   const o = S.overlay; if (!o || o.menu) return '';
   if (o.t === 'palette') return `<div class="ovl top" data-scrim>${palette()}</div>`;
-  const sheet = (title, body, side = 'start') => `<div class="ovl ${windowClass() === 'compact' ? 'bottom' : side}" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-label="${title}"><div class="sheet-h"><h3>${title}</h3><button type="button" class="ibtn" data-act="close" aria-label="${t('close')}">${ic('x')}</button></div><div class="sheet-b">${body}</div></div></div>`;
-  if (o.t === 'navsheet') return sheet(t('menu'), NAV.map(([g, icn, items]) => `<div class="sheet-grp">${t(g)}</div>${items.map(([k, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}" ${r === S.route ? 'aria-current="page"' : ''}>${ic(icn)}${t(k)}</button>`).join('')}`).join(''));
-  if (o.t === 'group') { const [g, icn, items] = NAV.find(n => n[0] === o.g); return sheet(t(g), items.map(([k, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}" ${r === S.route ? 'aria-current="page"' : ''}>${ic(icn)}${t(k)}</button>`).join('')); }
+  const sheet = (title, body, side = 'start', cls = '') => `<div class="ovl ${windowClass() === 'compact' ? 'bottom' : side}" data-scrim><div class="sheet${cls ? ' ' + cls : ''}" role="dialog" aria-modal="true" aria-label="${title}"><div class="sheet-h"><h3>${title}</h3><button type="button" class="ibtn" data-act="close" aria-label="${t('close')}">${ic('x')}</button></div><div class="sheet-b">${body}</div></div></div>`;
+  const navItem = (it, icn) => { const [k, r] = it; return `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}" data-icon="${navIcon(it) || icn}" ${r === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span class="lbl">${t(k)}</span></button>`; };
+  if (o.t === 'navsheet') return sheet(t('menu'), `<div class="navlist">${NAV.map(([g, icn, items]) => `<div class="nav-sec"><div class="sheet-grp">${t(g)}</div>${items.map(it => navItem(it, icn)).join('')}</div>`).join('')}</div>`, 'start', 'sheet-nav');
+  if (o.t === 'group') { const [g, icn, items] = NAV.find(n => n[0] === o.g); return sheet(t(g), `<div class="navlist">${items.map(it => navItem(it, icn)).join('')}</div>`, 'start', 'sheet-nav'); }
   if (o.t === 'create') return sheet(t('create'), [['newSales','cart','sales'],['newPurch','truck','purchase'],['newReceipt','send',null],['newPermit','box',null]].map(([k, i, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}">${ic(i)}${t(k)}</button>`).join(''));
   if (o.t === 'context') return sheet(t('ctxTitle'), `<div class="sheet-grp">${t('branch')}</div>${['dmm','jbl','khb'].map(b => `<button type="button" class="sheet-a" data-branch="${b}" ${S.branch === b ? 'aria-current="page"' : ''}>${ic('building')}${t('br_' + b)}</button>`).join('')}<div class="sheet-grp">${t('period')}</div><div class="sheet-a" style="cursor:default">${ic('calendar')}${t('periodOpen')}</div><div class="sheet-a" style="cursor:default;color:var(--awj-text-tertiary)">${ic('lock')}${S.lang === 'ar' ? 'سبتمبر 2026 · مقفلة' : 'Sep 2026 · locked'}</div>`);
   if (o.t === 'inbox') return sheet(t('inbox'), `<div class="tabs" role="tablist" style="padding:0;margin-bottom:6px"><button type="button" role="tab" aria-selected="true">${t('priority')} · 3</button><button type="button" role="tab" aria-selected="false" data-act="demo">${t('all')}</button></div>${[['inbox1','inbox1d','fuel','shift'],['inbox2','inbox2d','alert','kit'],['inbox3','inbox3d','box','inventory']].map(([h, d, i, r]) => `<div style="display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--awj-border-hairline)">${ic(i).replace('<svg', '<svg width="18" height="18" style="flex:none;color:var(--awj-status-warning-fg);margin-top:2px"')}<div style="flex:1;min-width:0"><b style="font-weight:600;font-size:13.5px">${t(h)}</b><div class="muted" style="font-size:12.5px">${t(d)}</div><div style="display:flex;gap:6px;margin-top:6px"><button class="btn primary" type="button" data-route="${r}" style="height:30px">${t('open')}</button><button class="btn ghost" type="button" data-act="demo" style="height:30px">${t('snooze')}</button></div></div></div>`).join('')}`, 'start');
@@ -781,7 +792,7 @@ app.addEventListener('click', (e) => {
   if (el.matches('input[data-act="cost-perm"]')) { S.inv.costPerm = el.checked; render(); return; }
   if (el.matches('label.chip')) return;
   if (d.route !== undefined) { if (d.route) go(d.route); else { S.overlay = null; render(); toast(`${t(d.label)} · ${t('notOnLab')}`); } return; }
-  if (d.group) { S.overlay = { t:'group', g:d.group }; render(); return; }
+  if (d.group) { S.overlay = { t:'group', g:d.group }; render(); revealNav(); return; }
   if (d.branch) { S.branch = d.branch; S.overlay = null; render(); toast(`${t('brChanged')}: ${t('br_' + d.branch)}`); return; }
   if (d.identity) { S.identity = d.identity; persist(); sync(); return; }
   if (d.num) { const v = d.v === 'true' ? true : d.v === 'false' ? false : d.v; S.num[d.num] = v; render(); return; }
@@ -804,7 +815,7 @@ app.addEventListener('click', (e) => {
   switch (d.act) {
     case 'palette': S.overlay = { t:'palette' }; S.palQ = ''; S.palIdx = 0; render(); break;
     case 'close': S.overlay = null; render(); restoreFocus(); break;
-    case 'navsheet': case 'create': case 'inbox': case 'context': case 'sheet-demo': S.overlay = { t:d.act }; render(); break;
+    case 'navsheet': case 'create': case 'inbox': case 'context': case 'sheet-demo': S.overlay = { t:d.act }; render(); if (d.act === 'navsheet') revealNav(); break;
     case 'usermenu': S.overlay = { t:'shortcuts' }; render(); break;
     case 'menu': S.overlay = S.overlay?.menu === d.menu ? null : { menu:d.menu }; render(); break;
     case 'demo': S.overlay = null; render(); toast(t('demoToast')); break;
@@ -942,5 +953,5 @@ function sync() {
   render();
 }
 sync();
-window.__fx = { S, render, go, totals, lineCalc, toMinor, measureNumbers, contract, windowClass, docErrors, setMode, setLang, newDoc, API };
+window.__fx = { S, render, go, totals, lineCalc, toMinor, measureNumbers, contract, windowClass, docErrors, setMode, setLang, newDoc, API, NAV, navIcon };
 })();
