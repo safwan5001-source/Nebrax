@@ -754,23 +754,26 @@ jobs:
     #  أي ضجيج بيئة لا انحدار كود. حدّ p95 < 50ms وحمل العمل وعدد الجولات بلا أي تغيير. خطوة «تحقق أن بيانات PostgreSQL على tmpfs» أدناه تُفشل
     #  الوظيفة إن لم يتحقق الشرط (فلا يعود القياس إلى القرص بصمت). وظيفة `test` الكاملة تبقى على القرص عمداً.
     #  قياس fsync/WAL على التخزين الحقيقي يبقى منفصلاً وغير مانع: `perf-feed-lock-baseline.yml` (جدولة/يدوي، pg_test_fsync) — لا يدخل شروط الدمج.
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: nibras
-          POSTGRES_PASSWORD: secret
-          POSTGRES_DB: nibras
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U nibras"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          --tmpfs /var/lib/postgresql/data:rw
-
+    #  PERF-LOCKS: `docker run` بدل `services:` لأن حدّ `max_locks_per_transaction` لا يتغيّر إلا بوسيط خادم (`-c`) أو إعادة تشغيل، وإعادة تشغيل حاوية tmpfs تمسح البيانات.
+    #  كل `migrate:fresh` يُسقط ~440 جدولاً بفهارسها في معاملة واحدة، وبالافتراض (64 × 100 = 6400 خانة) كانت الوظيفة على حافة الحدّ فكل جدول جديد في المخطط يدفعها فوقه
+    #  («out of shared memory» في `DROP TABLE … CASCADE`). وظائف الاختبار الكاملة ترفع الحدّ إلى 1024 بالطريقة نفسها؛ لا تغيير في حمل القياس ولا في حدّ p95.
     steps:
+      - name: تشغيل PostgreSQL على tmpfs بحدّ أقفال أعلى
+        run: |
+          set -euo pipefail
+          docker run -d --name pg-perf-db \
+            -e POSTGRES_USER=nibras -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=nibras \
+            -p 5432:5432 --tmpfs /var/lib/postgresql/data:rw \
+            postgres:16 -c max_locks_per_transaction=1024
+          for i in $(seq 1 60); do
+            docker exec pg-perf-db pg_isready -h 127.0.0.1 -U nibras -d nibras >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker exec pg-perf-db pg_isready -h 127.0.0.1 -U nibras -d nibras
+          LIMIT="$(docker exec pg-perf-db psql -U nibras -d nibras -Atc "SHOW max_locks_per_transaction")"
+          echo "max_locks_per_transaction=$LIMIT"
+          [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
+
       - name: Checkout core (النواة)
         uses: actions/checkout@v4
 
