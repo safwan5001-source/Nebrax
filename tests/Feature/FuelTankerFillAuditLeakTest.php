@@ -96,7 +96,7 @@ class FuelTankerFillAuditLeakTest extends TestCase
     }
 
     private const ALL_ACTIONS = ['tanker_fill.attachment_added', 'tanker_fill.attachment_removed', 'tanker_fill.attachment_replaced', 'tanker_fill.recorded'];
-    private const VIEW_ONLY_ACTIONS = ['tanker_fill.attachment_added', 'tanker_fill.recorded'];
+    private const VIEW_ONLY_ACTIONS = ['tanker_fill.recorded'];
 
     /** @test */
     public function the_events_exist_in_the_original_audit_log_and_are_never_altered_by_reading(): void
@@ -126,17 +126,103 @@ class FuelTankerFillAuditLeakTest extends TestCase
     }
 
     /** @test */
-    public function a_viewer_sees_fill_and_added_events_but_not_the_attachment_history_events(): void
+    public function a_viewer_sees_only_the_core_fill_events_and_no_attachment_event_of_any_kind(): void
     {
-        $viewer = $this->staff(['fuel.tanker.fill.view']);
+        $viewer = $this->staff(['fuel.tanker.fill.view', 'fuel.tanker.fill.attachment.add']);
 
         $this->assertSame(self::VIEW_ONLY_ACTIONS, $this->actions($viewer));
-        $this->assertSame([], $this->actions($viewer, '&action=tanker_fill.attachment_removed'));
-        $this->assertSame([], $this->actions($viewer, '&action=tanker_fill.attachment_replaced'));
+        foreach (['tanker_fill.attachment_added', 'tanker_fill.attachment_replaced', 'tanker_fill.attachment_removed'] as $action) {
+            $this->assertSame([], $this->actions($viewer, "&action={$action}"), $action);
+        }
         $raw = $this->raw($viewer);
-        $this->assertStringNotContainsString('سبب-إزالة-سري', $raw);
-        $this->assertStringNotContainsString('tanker_fill.attachment_removed', $raw);
-        $this->assertStringNotContainsString('tanker_fill.attachment_replaced', $raw);
+        foreach (['tanker_fill.attachment', 'سبب-إزالة-سري', 'original_name', 'sha256'] as $needle) {
+            $this->assertStringNotContainsString($needle, $raw, $needle);
+        }
+    }
+
+    /** @test */
+    public function removed_and_replaced_attachments_leave_no_file_name_or_fingerprint_for_a_user_without_the_history_permission(): void
+    {
+        // الإعداد أنشأ ثلاثة مرفقات: الأول استُبدل، والثاني أُزيل، والثالث (بديل الأول) فعّال.
+        $rows = \App\Models\FuelTankerFillAttachment::query()->where('fuel_tanker_fill_id', $this->fill->id)->get();
+        $this->assertGreaterThanOrEqual(3, $rows->count());
+        $this->assertContains('replaced', $rows->pluck('status')->all());
+        $this->assertContains('removed', $rows->pluck('status')->all());
+
+        $historian = $this->staff(['fuel.tanker.fill.view', 'fuel.tanker.fill.attachment.remove']);
+        $historianRaw = $this->raw($historian);
+        // الضابط الإيجابي: صاحب صلاحية التاريخ يرى فعلاً بصمات الملفات (فالاختبار السلبي أدناه ليس فارغاً).
+        foreach ($rows as $row) {
+            $this->assertStringContainsString($row->sha256, $historianRaw);
+        }
+
+        foreach ([[], ['fuel.tanker.fill.view'], ['fuel.tanker.fill.view', 'fuel.tanker.fill.attachment.add']] as $permissions) {
+            $raw = $this->raw($this->staff($permissions));
+            foreach ($rows as $row) {
+                $this->assertStringNotContainsString($row->sha256, $raw, 'sha256 of a ' . $row->status . ' attachment');
+            }
+            foreach (['first-secret-name', 'second-secret-name', 'replaced-secret-name'] as $name) {
+                $this->assertStringNotContainsString($name, $raw, $name);
+            }
+        }
+    }
+
+    /** @test */
+    public function a_future_attachment_event_type_is_hidden_by_default_from_users_without_the_history_permission(): void
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        foreach (['tanker_fill.attachment_quarantined', 'tanker_fill.attachment_something_new', 'tanker_fill.document_changed'] as $action) {
+            FuelStationAuditEvent::create([
+                'tenant_id' => $this->tenantId, 'branch_id' => $this->fx['branchA']->id, 'fuel_station_id' => $this->fx['s1']->id, 'warehouse_id' => $this->fx['wA1']->id,
+                'action' => $action, 'subject_type' => FuelTankerFill::class, 'subject_id' => $this->fill->id,
+                'after' => ['original_name' => 'future-secret-file.pdf', 'sha256' => str_repeat('f', 64)], 'occurred_at' => now(),
+            ]);
+        }
+
+        $viewer = $this->staff(['fuel.tanker.fill.view']);
+        $this->assertSame(self::VIEW_ONLY_ACTIONS, $this->actions($viewer));
+        $this->assertStringNotContainsString('future-secret-file', $this->raw($viewer));
+        $this->assertStringNotContainsString(str_repeat('f', 64), $this->raw($viewer));
+
+        $historian = $this->staff(['fuel.tanker.fill.view', 'fuel.tanker.fill.attachment.remove']);
+        $this->assertContains('tanker_fill.attachment_quarantined', $this->actions($historian));
+    }
+
+    /** @test */
+    public function the_voided_event_is_visible_under_the_same_gates_and_permissions_as_the_core_fill_events(): void
+    {
+        $token = $this->fx['owner'];
+        $nozzleId = $this->fill->fuel_nozzle_id;
+        $second = $this->withToken($token)->postJson(self::FILLS, [
+            'fuel_station_id' => $this->fx['s1']->id, 'fuel_nozzle_id' => $nozzleId, 'fuel_tanker_owner_id' => $this->fill->fuel_tanker_owner_id,
+            'voucher_number' => 'VOID-VOUCHER-77', 'quantity_liters' => '500', 'notes' => 'ملاحظة-سند-ملغى', 'idempotency_key' => 'fill-sec-void',
+        ])->assertCreated()->json('data.id');
+        $this->withToken($token)->postJson(self::FILLS . "/{$second}/void", ['reason' => 'سبب-إلغاء-سري'])->assertOk();
+        $this->assertTrue(FuelStationAuditEvent::query()->where('action', 'tanker_fill.voided')->where('subject_id', $second)->exists());
+
+        $viewer = $this->staff(['fuel.tanker.fill.view']);
+        $this->assertSame(['tanker_fill.recorded', 'tanker_fill.voided'], $this->actions($viewer));
+        $this->assertSame(['tanker_fill.voided'], $this->actions($viewer, '&action=tanker_fill.voided'));
+
+        foreach ([[], ['fuel.tanker.view', 'fuel.tanker.manage']] as $permissions) {
+            $none = $this->staff($permissions);
+            $this->assertSame([], $this->actions($none, '&action=tanker_fill.voided'));
+            $this->assertSame([], $this->actions($none, "&subject_id={$second}"));
+            $raw = $this->raw($none);
+            $this->assertStringNotContainsString('VOID-VOUCHER-77', $raw);
+            $this->assertStringNotContainsString('سبب-إلغاء-سري', $raw);
+        }
+
+        foreach (['fuel_stations.tanker_fills_enabled', 'fuel_stations.tanker_management_enabled'] as $gate) {
+            config([$gate => false]);
+            $this->assertSame([], $this->actions($viewer, '&action=tanker_fill.voided'), $gate);
+            $this->assertSame([], $this->actions($this->fx['owner'], '&action=tanker_fill.voided'), $gate);
+            config([$gate => true]);
+        }
+
+        // صاحب صلاحية الإزالة/السجل التاريخي يرى الإلغاء أيضاً.
+        $historian = $this->staff(['fuel.tanker.fill.view', 'fuel.tanker.fill.attachment.remove']);
+        $this->assertContains('tanker_fill.voided', $this->actions($historian));
     }
 
     /** @test */

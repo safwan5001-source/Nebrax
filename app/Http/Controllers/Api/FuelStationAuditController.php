@@ -29,12 +29,14 @@ class FuelStationAuditController extends ApiController
     private const TANKER_SUBJECTS = [FuelTankerOwner::class, FuelTanker::class, FuelTankerOwnerCompanyLink::class];
 
     /**
-     * أحداث سجل المرفقات التاريخي (المستبدَلة/المزالة): لقطاتها تحمل بيانات مرفقات لا تراها مسارات التعبئة إلا بـ`fuel.tanker.fill.attachment.remove`
-     * (`?history=1`)، فلا تُكشف هنا لمن يملك العرض فقط.
+     * قائمة سماح (لا قائمة منع) لأحداث `FuelTankerFill` التي يراها حامل `fuel.tanker.fill.view` وحده: حدثا السند الأساسيان. **كل ما عداها** — أحداث المرفقات
+     * (`attachment_added|replaced|removed` وما قد يُضاف مستقبلاً) وأي نوع حدث جديد غير مصنَّف — يتطلب صلاحية السجل التاريخي `fuel.tanker.fill.attachment.remove`:
+     * لقطاتها تحمل اسم الملف الأصلي وبصمته وتبقى بعد إزالة المرفق أو استبداله، بينما لا تعرض واجهة المرفقات العادية هذا التاريخ إلا بتلك الصلاحية.
+     * إضافة نوع حدث جديد إلى هذه القائمة قرارٌ صريح بأن لقطته لا تكشف شيئاً يتجاوز عرض السند.
      *
      * @var list<string>
      */
-    private const FILL_ATTACHMENT_HISTORY_ACTIONS = ['tanker_fill.attachment_replaced', 'tanker_fill.attachment_removed'];
+    private const FILL_VIEW_ACTIONS = ['tanker_fill.recorded', 'tanker_fill.voided'];
 
     public function index(Request $request): JsonResponse
     {
@@ -90,8 +92,8 @@ class FuelStationAuditController extends ApiController
     /**
      * TANKER-SEC-1: أحداث سندات التعبئة ومرفقاتها (موضوعها `FuelTankerFill`). لقطاتها تحوي الكمية والسند الورقي والملاحظات وبيانات المرفقات، ومحكومة
      * في مساراتها ببوابتَي PR-1 وPR-4 معاً وبصلاحية `fuel.tanker.fill.view` — فلا يكفي لقراءتها `fuel_stations.manage` المطلوب لهذا المسار.
-     * البوابتان مغلقتان ⇒ لا يراها أحد (بمن فيهم المالك) حتى ما كُتب قبل الإغلاق. أحداث الإزالة/الاستبدال تتطلب أيضاً `fuel.tanker.fill.attachment.remove`
-     * كما تتطلبه قراءة السجل التاريخي للمرفقات. السجل الأصلي لا يُمسّ؛ التصفية على القراءة فقط. نطاق المحطة/الفرع يطبّقه `restrictEventsToUserScope`.
+     * البوابتان مغلقتان ⇒ لا يراها أحد (بمن فيهم المالك) حتى ما كُتب قبل الإغلاق. غير حدثَي السند الأساسيين (`recorded|voided`) — أي كل أحداث
+     * المرفقات الحالية والمستقبلية — يتطلب أيضاً `fuel.tanker.fill.attachment.remove` كما تتطلبه قراءة السجل التاريخي للمرفقات (قائمة سماح: `FILL_VIEW_ACTIONS`). السجل الأصلي لا يُمسّ؛ التصفية على القراءة فقط. نطاق المحطة/الفرع يطبّقه `restrictEventsToUserScope`.
      */
     private function restrictTankerFillSubjects(Builder $query, Request $request): void
     {
@@ -106,7 +108,7 @@ class FuelStationAuditController extends ApiController
             return;
         }
         if (! Rbac::allows($role, 'fuel.tanker.fill.attachment.remove')) {
-            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereNotIn('action', self::FILL_ATTACHMENT_HISTORY_ACTIONS));
+            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereIn('action', self::FILL_VIEW_ACTIONS));
         }
     }
 
