@@ -265,6 +265,17 @@ test('Enter in a filtered invoice skips hidden rows; Enter on the last visible r
   await ctx.close();
 });
 
+test('"With errors" filter keeps the row being corrected visible until the field is left', async () => {
+  const { ctx, page } = await open('embed=1&r=sales&ln=24&sc=errors', { width: 1366, height: 768 });
+  await page.click('[data-act="lines-filter"][data-v="err"]');
+  await page.click('#sales-l5-qty', { clickCount: 3 }); await page.keyboard.type('25', { delay: 30 }); await page.waitForTimeout(80);
+  const r = await page.evaluate(() => ({ v: document.querySelector('#sales-l5-qty')?.value, id: document.activeElement?.id, hidden: document.querySelector('#sales-l5-qty')?.closest('tr').hidden }));
+  assert(r.v === '25' && r.id === 'sales-l5-qty' && !r.hidden, 'edited row hidden or keystrokes lost ' + JSON.stringify(r));
+  await page.focus('#sales-l12-price'); await page.fill('#sales-l12-price', '41.20'); await page.waitForTimeout(80);
+  assert(await page.evaluate(() => window.__fx.S.docs.sales.lines.find(l => l.id === 5).qtyM) === 25000, 'corrected quantity not kept');
+  await ctx.close();
+});
+
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
   const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });

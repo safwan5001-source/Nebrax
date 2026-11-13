@@ -516,7 +516,7 @@ function docPage(kind) {
       : `<div class="field"><label for="purchase-wh">${t('whIn')}</label><select class="sel" id="purchase-wh" data-hf="wh" data-doc="purchase">${WH.map(w => `<option value="${w}" ${w === D.wh ? 'selected' : ''}>${t('wh_' + w)}</option>`).join('')}</select></div><div class="field"><label for="purchase-ref">${t('supRef')} <span class="req" aria-hidden="true">*</span></label><input class="inp num" id="purchase-ref" data-hf="ref" data-doc="purchase" value="${esc(D.ref)}" ${errs.ref ? 'aria-invalid="true" aria-describedby="purchase-ref-e"' : ''}>${errs.ref ? `<span class="err" id="purchase-ref-e">${ic('alert')}${t('errSupRef')}</span>` : ''}</div>`}
     <div class="field span2"><span class="label">${t('branch')}</span><div class="ro-val">${ic('building')}${t('br_' + S.branch)}</div></div></div>`;
   const lerr = new Set(D.lines.filter(l => Object.values(l.bad || {}).some(Boolean)).map(l => l.id)), lq = (D.lq || '').trim().toLowerCase(), onlyErr = D.lf === 'err' && lerr.size > 0;
-  const shown = (l) => (!onlyErr || lerr.has(l.id)) && (!lq || nm(PROD[l.p]).toLowerCase().includes(lq) || PROD[l.p].sku.toLowerCase().includes(lq));
+  const shown = (l) => (!onlyErr || lerr.has(l.id) || l.id === D.editing) && (!lq || nm(PROD[l.p]).toLowerCase().includes(lq) || PROD[l.p].sku.toLowerCase().includes(lq));
   const nShown = D.lines.filter(shown).length, tall = D.lines.length > 10;
   const lbar = `<div class="lines-bar"><span class="cnt num">${t('linesCount', { n: D.lines.length })}</span>${lerr.size ? `<span class="chips" role="group" aria-label="${t('lines')}"><button type="button" class="chip" data-act="lines-filter" data-doc="${kind}" data-v="all" aria-pressed="${!onlyErr}">${t('linesAll')}</button><button type="button" class="chip warn" data-act="lines-filter" data-doc="${kind}" data-v="err" aria-pressed="${onlyErr}">${ic('alert')}${t('linesErr', { n: lerr.size })}</button></span>` : ''}${tall ? `<label class="srch lfind">${ic('search')}<input class="inp" id="${kind}-lq" data-lq="${kind}" type="search" placeholder="${t('linesFind')}" aria-label="${t('linesFind')}" value="${esc(D.lq || '')}"></label>` : ''}</div>`;
   const lines = `${lbar}<div class="tscroll${tall ? ' tall' : ''}"${tall ? ` tabindex="0" role="region" aria-label="${t('lines')}"` : ''}><table class="lines"><thead><tr><th class="hide-c">#</th><th>${t('item')}</th><th class="c-amt">${t('qty')}</th><th class="hide-c">${t('unit')}</th><th class="c-amt">${t(kind === 'sales' ? 'price' : 'cost')}</th><th class="c-amt">${t('discount')}</th><th class="c-amt">${t('vat')}</th><th class="c-amt">${t('lineTotal')}</th><th><span class="sr">actions</span></th></tr></thead><tbody>${D.lines.map((l, i) => lineRow(D, l, i, shown(l))).join('')}</tbody></table>${nShown ? '' : `<p class="state" style="padding:16px">${t('linesNoMatch')}</p>`}</div>
@@ -858,7 +858,7 @@ function kitValidate(F, all) {
 }
 app.addEventListener('focusout', (e) => {
   const el = e.target;
-  if (el.dataset?.lf && el.dataset.lf !== 'p') { const D = S.docs[el.dataset.doc], line = D?.lines.find(l => l.id === Number(el.closest('tr')?.dataset.line)); if (line?.raw && !line.bad?.[el.dataset.lf]) delete line.raw[el.dataset.lf]; return; }
+  if (el.dataset?.lf && el.dataset.lf !== 'p') { const D = S.docs[el.dataset.doc], line = D?.lines.find(l => l.id === Number(el.closest('tr')?.dataset.line)); if (line?.raw && !line.bad?.[el.dataset.lf]) delete line.raw[el.dataset.lf]; if (D && line && D.editing === line.id && !el.closest('tr')?.contains(e.relatedTarget)) D.editing = null; /* left the row: the filter applies at the next render (no render here, so a click is not swallowed) */ return; }
   if (!el.dataset?.kf) return;
   const F = S.kit.form; F.touched[el.dataset.kf] = true; const before = JSON.stringify(F.errs); F.errs = kitValidate(F, false);
   // Moving to the submit button: keep the new state but do not re-render — re-rendering on mousedown would replace the button and swallow the click; submit validates everything anyway.
@@ -878,7 +878,7 @@ app.addEventListener('input', (e) => {
   if (d.lf) {
     const D = S.docs[d.doc], line = D.lines.find(l => l.id === Number(el.closest('tr').dataset.line)); if (!line) return; D.dirty = true;
     if (d.lf === 'p') { line.p = Number(el.value); line.price = d.doc === 'sales' ? PROD[line.p].price : PROD[line.p].cost; if (line.bad) line.bad.price = false; if (line.raw) delete line.raw.price; render('#' + el.id); return; }
-    const m = toMinor(el.value, d.lf === 'qty' ? 3 : 2); line.bad = line.bad || {}; line.raw = line.raw || {};
+    D.editing = line.id; /* the error filter must not hide the row under the caret */ const m = toMinor(el.value, d.lf === 'qty' ? 3 : 2); line.bad = line.bad || {}; line.raw = line.raw || {};
     if (m === null) { el.setAttribute('aria-invalid', 'true'); line.bad[d.lf] = true; line.raw[d.lf] = el.value; return; }
     el.removeAttribute('aria-invalid'); line.bad[d.lf] = false; line.raw[d.lf] = el.value; // keep the text being typed ("1.") until the field is left
     if (d.lf === 'qty') line.qtyM = m; else if (d.lf === 'price') line.price = m; else line.disc = m;
