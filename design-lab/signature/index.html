@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AWJ Signature V3</title>
+<meta name="description" content="AWJ Signature V3 — two premium visual identities over the Unified UX Foundation (Design Lab only, synthetic data).">
+<script>(function(){var q=new URLSearchParams(location.search);if(q.has('embed'))document.documentElement.classList.add('embed');if(q.has('full'))document.documentElement.classList.add('full');})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Noto+Sans+Arabic:wght@400..700&family=Rubik:wght@400..700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+@font-face{font-family:'AWJ Saudi Riyal';src:url(data:font/woff2;base64,d09GMgABAAAAAAHkAAsAAAAAA8gAAAGWAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAANBEICoEUgR4BNgIkAwgLBgAEIAWCMAcgGwsDIJ4Dbmt8FdPWIgWh7r/dphgZD/3vR7sz//0VS3s2m1gXKwkvRSV1vFGaWKRRYdg2YrLZ/UHH8uzI2k5c878pzhP/HqPXQYWRYAPdeXIGjpuGBZb5T24wdVN/UGMJ/Dcst0iWwAQak6JEI+uyaC3D3M77h/08MY9Q1SUeq8m7+Qb3s098MRMphQQvPcDrPuiqkf+iQP0ZBFSNoFsgUaFTJVgpumHxB92fsPu/bAMQEP9JkKAgMYIjABRANvRdq7zyxXtDGLCige+nUAY1IMV7pgLMsDf5PowL6FrPr7ggFp/5fGjAOD+WiIda2sX68Rr+jotmsP3TxaSoBwlhk49gkXRkVScQ8Wb6Pw3WdrSnn1NAILhzbPMFyvm3iTSBn6clAL+/3YFZDeVl+YMmCYKXgWIFmO0Q2s7qCe0fSCMSJEJgGwA0uwmL0oxuVhK6dJPUYZFUxu2TYtB1UksvSYN+r0m79BZ3TOnW7cBkl5lxO0atTKkc4GG+lDqJ/X8+mdGu0riMMjtuVTe4gHsSwCbc0+0rDQAAAA==) format('woff2');unicode-range:U+20C1;font-display:swap}
+:root{color-scheme:light;
+  --lab-bg:#ECECEA;--lab-panel:#FFFFFF;--lab-fg:#141518;--lab-muted:#575B64;--lab-line:#D8D9DC;--lab-accent:#141518;--lab-accent-fg:#FFFFFF;--lab-chip:#E3E4E6;--lab-stage:#D9DADC;--lab-ok-bg:#E8F5EC;--lab-ok-fg:#166534;--lab-bad-bg:#FDECEC;--lab-bad-fg:#B91C1C;
+  --lab-font:'IBM Plex Sans Arabic',system-ui,sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--lab-bg:#0C0D0F;--lab-panel:#15161A;--lab-fg:#ECEDEF;--lab-muted:#A0A3AB;--lab-line:#272930;--lab-accent:#ECEDEF;--lab-accent-fg:#0C0D0F;--lab-chip:#1E2026;--lab-stage:#060708;--lab-ok-bg:#122A1D;--lab-ok-fg:#4ADE80;--lab-bad-bg:#2C1616;--lab-bad-fg:#F87171}}
+:root[data-theme="dark"]{color-scheme:dark;--lab-bg:#0C0D0F;--lab-panel:#15161A;--lab-fg:#ECEDEF;--lab-muted:#A0A3AB;--lab-line:#272930;--lab-accent:#ECEDEF;--lab-accent-fg:#0C0D0F;--lab-chip:#1E2026;--lab-stage:#060708;--lab-ok-bg:#122A1D;--lab-ok-fg:#4ADE80;--lab-bad-bg:#2C1616;--lab-bad-fg:#F87171}
+*,*::before,*::after{box-sizing:border-box}
+html,body{background:var(--lab-bg);color:var(--lab-fg)}
+body{margin:0;font-family:var(--lab-font);font-size:14px;line-height:1.55}
+:focus-visible{outline:2px solid var(--lab-accent);outline-offset:2px}
+.lab{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:22px 48px;max-width:2600px;margin-inline:auto;display:flex;flex-direction:column;gap:14px}
+.lab-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px 24px}
+.lab-head h1{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.01em}
+.lab-head p{margin:6px 0 0;color:var(--lab-muted);max-width:92ch}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.lab-tag{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--lab-muted);border:1px solid var(--lab-line);border-radius:999px;padding:2px 10px;background:var(--lab-panel)}
+.lab-tag b{color:var(--lab-fg);font-weight:600}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:12px;padding:10px 12px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.ctl>span{font-size:12px;color:var(--lab-muted);white-space:nowrap}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;background:var(--lab-chip);border-radius:9px;padding:3px;min-width:0}
+.seg button{border:0;background:transparent;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;color:var(--lab-muted);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--lab-panel);color:var(--lab-fg);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px}
+.card{background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:12px;padding:12px 16px;font-size:13.5px;min-width:0}
+.card h2{margin:0 0 4px;font-size:15px}
+.card p{margin:0;color:var(--lab-muted)}
+.card dl{margin:8px 0 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px}
+.card dt{color:var(--lab-muted)} .card dd{margin:0;overflow-wrap:anywhere}
+.verdict{display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border-radius:999px;padding:2px 10px}
+.verdict.ok{background:var(--lab-ok-bg);color:var(--lab-ok-fg)} .verdict.bad{background:var(--lab-bad-bg);color:var(--lab-bad-fg)}
+.stage-wrap{background:var(--lab-stage);border-radius:16px;padding:18px;overflow:hidden}
+#fit{position:relative;margin-inline:auto}
+.device{position:absolute;top:0;left:50%;width:var(--dev-w);transform-origin:top center}
+.device[data-device^="phone"]{padding:12px;border-radius:44px;background:#040506;box-shadow:0 0 0 1px #2A2D33,0 24px 60px rgba(0,0,0,.35)}
+.device[data-device^="phone"] .fx{border-radius:32px}
+.device[data-device^="tablet"]{padding:14px;border-radius:28px;background:#040506;box-shadow:0 0 0 1px #2A2D33,0 24px 60px rgba(0,0,0,.3)}
+.device[data-device^="tablet"] .fx{border-radius:16px}
+.device[data-device="laptop"] .fx,.device[data-device="desktop"] .fx,.device[data-device="ultra"] .fx,.device[data-device="wide"] .fx{border-radius:10px;box-shadow:0 0 0 1px var(--lab-line),0 18px 50px rgba(0,0,0,.18)}
+.device .frame-h{height:var(--dev-h)}
+#cmp{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.compare #cmp{display:grid} .compare #stage{display:none}
+.cframe{min-width:0}
+.cframe h3{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:baseline}
+.cframe h3 small{color:var(--lab-muted);font-weight:400}
+.cbox{position:relative;overflow:hidden;border-radius:12px;background:var(--lab-stage)}
+.cbox iframe{position:absolute;top:0;inset-inline-start:0;border:0;transform-origin:top left;background:#fff}
+[dir="rtl"] .cbox iframe{inset-inline-start:auto;right:0;transform-origin:top right}
+@media (max-width:900px){#cmp{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.stage-wrap{padding:8px;border-radius:12px}}
+.lab-foot{color:var(--lab-muted);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 18px}
+/* embed: the app alone, at the real viewport (used by compare and by the tests) */
+.embed body{background:#fff}
+.embed .lab>*:not(.stage-wrap){display:none} .embed .lab{padding:0;max-width:none;gap:0}
+.embed .stage-wrap{padding:0;border-radius:0;background:none}
+.embed #fit{width:100vw!important;height:100vh!important} .embed .device{position:static;transform:none!important;width:100vw!important;padding:0!important;border-radius:0!important;box-shadow:none!important;background:none!important}
+.embed .device .fx{border-radius:0!important;box-shadow:none!important} .embed .frame-h{height:100vh!important}
+.full #fit,.full .frame-h{height:auto!important} .full .fx{height:auto;overflow:visible} .full .fx-shell{height:auto} .full .main{overflow:visible}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+<link rel="stylesheet" href="foundation/tokens.css">
+<link rel="stylesheet" href="foundation/foundation.css">
+<link rel="stylesheet" href="signature.css">
+</head>
+<body>
+<div class="lab" id="lab">
+  <header class="lab-head">
+    <div>
+      <h1>AWJ Signature V3 · اتجاهان بصريان</h1>
+      <p>نَسَق وليوان فوق نفس الغلاف والتنقّل والمكوّنات السلوكية والقواعد المحاسبية ودلالات الحالات. الفرق هوية بصرية فقط (طبقة L4)، ويتحقق منها مدقّق العقد حياً.</p>
+    </div>
+    <div class="tags">
+      <span class="lab-tag"><b>Design Lab فقط</b> لا يُبنى مع web/</span>
+      <span class="lab-tag">بيانات تجريبية · لا API</span>
+      <span class="lab-tag">D1: محاذاة B + أرقام جدولية</span>
+      <span class="lab-tag">لا تفعيل لـ v3 (M8)</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="أدوات المختبر">
+    <div class="ctl"><span id="l-view">العرض</span><div class="seg" id="c-view" role="group" aria-labelledby="l-view"><button type="button" data-view="single" aria-pressed="true">اتجاه واحد</button><button type="button" data-view="compare" aria-pressed="false">مقارنة جنباً إلى جنب</button></div></div>
+    <div class="ctl" id="w-id"><span id="l-id">الاتجاه</span><div class="seg" id="c-id" role="group" aria-labelledby="l-id"></div></div>
+    <div class="ctl"><span id="l-route">الشاشة</span><div class="seg" id="c-route" role="group" aria-labelledby="l-route"></div></div>
+    <div class="ctl"><span id="l-device">العرض بالبكسل</span><div class="seg" id="c-device" role="group" aria-labelledby="l-device"></div></div>
+    <div class="ctl"><span id="l-mode">الوضع</span><div class="seg" id="c-mode" role="group" aria-labelledby="l-mode"></div></div>
+    <div class="ctl"><span id="l-lang">اللغة</span><div class="seg" id="c-lang" role="group" aria-labelledby="l-lang"></div></div>
+    <div class="ctl"><span id="l-density">الكثافة</span><div class="seg" id="c-density" role="group" aria-labelledby="l-density"></div></div>
+    <div class="ctl"><span id="l-lines">بنود الفاتورة</span><div class="seg" id="c-lines" role="group" aria-labelledby="l-lines"></div></div>
+    <div class="ctl"><span id="l-scen">الفاتورة</span><div class="seg" id="c-scen" role="group" aria-labelledby="l-scen"></div></div>
+    <div class="ctl"><span id="l-demo">حالة البيانات</span><div class="seg" id="c-demo" role="group" aria-labelledby="l-demo"></div></div>
+  </div>
+
+  <div class="info">
+    <section class="card" id="note-id" aria-live="polite"><h2></h2><p></p></section>
+    <section class="card" id="tokens" aria-live="polite"><h2>توكنز الهوية وعقدها</h2><dl></dl></section>
+  </div>
+
+  <div class="stage-wrap" id="stage"><div id="fit"><div class="device" id="device"><div class="frame-h"><div class="fx" id="fx-app"></div></div></div></div></div>
+  <div id="cmp" aria-label="مقارنة الاتجاهين">
+    <section class="cframe"><h3>نَسَق · Nasaq <small>دقّة تحريرية</small></h3><div class="cbox"><iframe title="نَسَق" id="if-a" loading="lazy"></iframe></div></section>
+    <section class="cframe"><h3>ليوان · Liwan <small>دفء معماري</small></h3><div class="cbox"><iframe title="ليوان" id="if-b" loading="lazy"></iframe></div></section>
+  </div>
+
+  <footer class="lab-foot"><span>AWJ Signature V3 · 2026-11-13</span><span>المبالغ بالهللات، والإجماليات مشتقة من السطور.</span><span>القيد المعروض معاينة توضيحية لا تُرحَّل.</span><span>Ctrl K · G ثم S/P/I/F · ?</span></footer>
+</div>
+<script src="signature.js"></script>
+<script src="foundation/foundation.js"></script>
+<script>
+(function () {
+  var F = window.__fx, S = F.S, lab = document.getElementById('lab');
+  var NOTES = {
+    nasaq: ['نَسَق · دقّة تحريرية', 'هوية تقودها الطباعة والإيقاع: إطار فاتح بخطوط شعرية بلا ظلال، أرقام كبيرة بوزن خفيف وأشكال جدولية، عناوين أقسام صغيرة متباعدة كترويسة تقرير، وأزرق أَوْج نفسه لوناً وحيداً للإجراء. للاستخدام المحاسبي الطويل والمراجعة.'],
+    liwan: ['ليوان · دفء معماري', 'هوية تقودها المساحة: إطار ليلي كرواق الليوان يحتضن ساحة دافئة بلون الحجر الجيري، أسطح بزوايا لينة وظل خفيف، خط Rubik بعائلة واحدة للعربية واللاتينية، وخط رملي يُستعمل فقط لعلامة الموضع والإجمالي، لا للحالات. للإدارة والتشغيل اليومي.']
+  };
+  var TOK = {
+    nasaq: [['الخط','Inter + Noto Sans Arabic (أرقام جدولية)'],['الإجراء','#1E40AF (أزرق أَوْج) · داكن #9DB2FF'],['الإطار','فاتح #FBFBF9 بخط شعري · بلا ظلال'],['الأسطح','حجر بارد #F4F4F1 · ورق أبيض'],['الزوايا','6 / 8 / 12'],['الأرقام','300 · 31px'],['عناوين الأقسام','11.5px متباعدة (لاتيني) · 13px (عربي)'],['الأيقونات','خط 1.5']],
+    liwan: [['الخط','Rubik (عربي + لاتيني، أرقام جدولية)'],['الإجراء','#2747C2 · داكن #86A2FF'],['الإطار','ليلي #131A2C · علامة رملية #D7B679'],['الأسطح','حجر جيري #F2EDE4 · ورق أبيض بظل خفيف'],['الزوايا','10 / 14 / 20 · أزرار حبوبية'],['الأرقام','500 · 28px'],['عناوين الأقسام','15px بلا تباعد'],['الأيقونات','خط 1.75']]
+  };
+  var view = 'single', lastCmp = '';
+  function fit() {
+    var D = { phoneS:[320,640], phone:[390,844], phoneL:[430,932], tablet:[768,1024], tabletW:[834,1194], laptop:[1366,768], desktop:[1920,1080], ultra:[2560,1080], wide:[0,900] }[S.device] || [1366, 768];
+    var dev = document.getElementById('device'), fitEl = document.getElementById('fit'), stage = document.getElementById('stage');
+    var pad = S.device.indexOf('phone') === 0 ? 24 : S.device.indexOf('tablet') === 0 ? 28 : 0;
+    var w = (D[0] || stage.clientWidth - 36) + pad, h = D[1] + pad, avail = stage.clientWidth - 36;
+    var s = Math.min(1, avail / w); fitEl.style.width = (w * s) + 'px'; fitEl.style.height = (h * s) + 'px';
+    dev.style.transform = 'translateX(-50%) scale(' + s + ')'; dev.style.width = (D[0] ? D[0] + pad : w) + 'px';
+  }
+  function cmpSrc(id) { var p = new URLSearchParams({ embed: '1', id: id, r: S.route, m: S.mode, l: S.lang, dn: S.density, ln: S.lines, sc: S.scenario, st: S.demo }); return '?' + p.toString(); /* same document, any host (file://, preview server, private artifact) */ }
+  function compare() {
+    var D = { phoneS:[320,640], phone:[390,844], phoneL:[430,932], tablet:[768,1024], tabletW:[834,1194], laptop:[1366,768], desktop:[1920,1080], ultra:[2560,1080], wide:[1366,900] }[S.device] || [1366, 768];
+    var key = [S.route, S.mode, S.lang, S.density, S.lines, S.scenario, S.demo].join('|');
+    [['if-a','nasaq'],['if-b','liwan']].forEach(function (x) {
+      var f = document.getElementById(x[0]), box = f.parentElement, s = Math.min(1, box.clientWidth / D[0]);
+      f.style.width = D[0] + 'px'; f.style.height = D[1] + 'px'; f.style.transform = 'scale(' + s + ')'; box.style.height = (D[1] * s) + 'px';
+      if (key !== lastCmp || !f.src) f.src = cmpSrc(x[1]);
+    });
+    lastCmp = key;
+  }
+  function info() {
+    var n = NOTES[S.identity] || NOTES.nasaq, el = document.getElementById('note-id');
+    el.querySelector('h2').textContent = n[0]; el.querySelector('p').textContent = n[1];
+    var c = F.contract(S.identity), dl = document.querySelector('#tokens dl');
+    var rows = (TOK[S.identity] || []).map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+    var fails = Object.keys(c.modes).reduce(function (a, m) { return a + c.modes[m].filter(function (x) { return !x.pass; }).length; }, 0);
+    dl.innerHTML = rows + '<dt>العقد</dt><dd><span class="verdict ' + (c.accepted ? 'ok' : 'bad') + '" data-contract="' + (c.accepted ? 'accepted' : 'rejected') + '">' + (c.accepted ? '✓ مقبول' : '✕ مرفوض') + '</span> ' + c.allowedChanged + ' رمزاً من القائمة المسموحة · ' + c.lockedChanged.length + ' رمزاً مقفلاً · ' + fails + ' فحص تباين فاشل (فاتح + داكن)</dd>';
+    document.documentElement.dataset.theme = S.mode;
+  }
+  document.querySelectorAll('#c-view button').forEach(function (b) { b.addEventListener('click', function () { view = b.dataset.view; document.querySelectorAll('#c-view button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); lab.classList.toggle('compare', view === 'compare'); document.getElementById('w-id').hidden = view === 'compare'; if (view === 'compare') compare(); else fit(); }); });
+  document.addEventListener('fx:render', function () { fit(); info(); if (view === 'compare') compare(); });
+  window.addEventListener('resize', function () { fit(); if (view === 'compare') compare(); });
+  fit(); info();
+})();
+</script>
+</body>
+</html>
