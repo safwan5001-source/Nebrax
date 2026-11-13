@@ -96,7 +96,26 @@ HINT: You might need to increase max_locks_per_transaction.
 
 ## 7. نتائج CI
 
-تُسجَّل بعد اكتمال التشغيل على رأس الـPR (القسم 8).
+على رأس الإصلاح `c89f6f04` (PR #2112) نجحت كل الوظائف:
+
+| الوظيفة | النتيجة |
+|---|---|
+| PostgreSQL feed-lock performance (COPS-H1-1) | ✅ |
+| php artisan test (L11, sqlite) | ✅ |
+| php artisan test (L11, pgsql, shard 1) | ✅ |
+| php artisan test (L11, pgsql, shard 2) | ✅ |
+| php artisan test (L11, pgsql) | ✅ |
+| CI Gate | ✅ |
+| مراجعة Codex | ✅ بلا ملاحظات |
+
+من سجل وظيفة `pg-perf`:
+- `max_locks_per_transaction=1024`: طُبِّق الحدّ قبل بناء المخطط.
+- `pgdata_fstype=tmpfs relation_file_fstype=tmpfs pg_wal_fstype=tmpfs`: البيانات وWAL على tmpfs بعد إعادة التهيئة، فشرط PERF-TMPFS محفوظ.
+- `Tests: 2, Assertions: 27`: كلا الاختبارين نُفِّذا، بلا أخطاء تهيئة.
+- **p95 الإضافي** للجولات المحتسبة الثلاث: 15.5 / 12.5 / 20.9 ms (المتوسط 16.3)، والحدّ المعتمد **< 50ms** لم يتغيّر. سلامة التسلسل كاملة في كل جولة.
+- تشخيص الاندفاع المشبَع (معلَن «ليس شرط قبول»): p95 إضافي 72.4ms، وهو قراءة تشخيصية كما كانت قبل الإصلاح.
+
+commit هذا التقرير يطلق تشغيلاً ثانياً على تغيير توثيقي فقط، فيعطي تأكيداً ثانياً مستقلاً لاستقرار الوظيفة.
 
 ## 8. الفرع والـSHA
 
@@ -104,8 +123,8 @@ HINT: You might need to increase max_locks_per_transaction.
 |---|---|
 | Branch | `claude/ci-pg-perf-max-locks` |
 | Base | `main` @ `e217e903348f8e808cbcafd06e778d9793351eb3` |
-| Head | يُسجَّل في الـPR |
-| PR | يُسجَّل بعد الإنشاء |
+| Head (الإصلاح) | `c89f6f04ad62cac1485e99cdd11daf69538acec9`؛ والـcommit التالي يضيف هذا التقرير المحدَّث فقط |
+| PR | #2112 |
 
 ## 9. المخاطر
 
