@@ -163,7 +163,7 @@ export const megabytes = (bytes: number): number => Math.round((bytes / (1024 * 
  */
 const REASONS = new Set([
   'attachment_invalid', 'attachment_type_not_allowed', 'attachment_too_large', 'attachment_limit_reached', 'attachment_add_blocked', 'attachment_removal_blocked',
-  'attachment_not_active', 'attachment_same_content', 'attachment_duplicate', 'attachment_storage_failed', 'forbidden', 'not_found',
+  'attachment_not_active', 'attachment_same_content', 'attachment_duplicate', 'attachment_storage_failed', 'attachment_conflict', 'forbidden', 'not_found',
 ]);
 export const reasonKey = (reason: unknown): string | null => (typeof reason === 'string' && REASONS.has(reason) ? reason : null);
 

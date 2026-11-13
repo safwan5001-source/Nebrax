@@ -44,6 +44,7 @@ class FuelTankerFillException extends Exception
     public const ATTACHMENT_SAME_CONTENT = 'attachment_same_content';
     public const ATTACHMENT_DUPLICATE = 'attachment_duplicate';
     public const ATTACHMENT_STORAGE_FAILED = 'attachment_storage_failed';
+    public const ATTACHMENT_CONFLICT = 'attachment_conflict';
 
     /** @param array<string,mixed> $details */
     public function __construct(

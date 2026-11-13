@@ -10261,6 +10261,7 @@
         "attachment_same_content": "The new file is identical to the current one.",
         "attachment_duplicate": "This file is already attached to the voucher.",
         "attachment_storage_failed": "Could not save the file; nothing was recorded. Try again.",
+        "attachment_conflict": "The voucher attachments changed while uploading. Refresh and try again.",
         "forbidden": "You do not have permission for this action.",
         "not_found": "The voucher or attachment was not found.",
         "offline": "No connection. Nothing was uploaded; try again when you are online.",

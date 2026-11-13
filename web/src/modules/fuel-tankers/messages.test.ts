@@ -34,7 +34,7 @@ function usedKeys(): Set<string> {
     'blocked.remove': ['fill_voided', 'shift_closed', 'limit_reached', 'removal_disabled'],
     rejected: ['type', 'size', 'empty', 'limit'],
     historyStatus: ['active', 'removed', 'replaced'],
-    errors: ['attachment_invalid', 'attachment_type_not_allowed', 'attachment_too_large', 'attachment_limit_reached', 'attachment_add_blocked', 'attachment_removal_blocked', 'attachment_not_active', 'attachment_same_content', 'attachment_duplicate', 'attachment_storage_failed', 'forbidden', 'not_found'],
+    errors: ['attachment_invalid', 'attachment_type_not_allowed', 'attachment_too_large', 'attachment_limit_reached', 'attachment_add_blocked', 'attachment_removal_blocked', 'attachment_not_active', 'attachment_same_content', 'attachment_duplicate', 'attachment_storage_failed', 'attachment_conflict', 'forbidden', 'not_found'],
   };
   for (const [group, values] of Object.entries(attachmentGroups)) for (const value of values) keys.add(`attachments.${group}.${value}`);
   for (const value of ['never', 'before_shift_approval', 'before_settlement']) keys.add(`settings.attachments.required.${value}`);

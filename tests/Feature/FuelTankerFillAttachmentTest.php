@@ -723,6 +723,34 @@ class FuelTankerFillAttachmentTest extends TestCase
     }
 
     /** @test */
+    public function an_existing_attachment_removed_while_a_batch_is_being_stored_gives_a_controlled_conflict_not_a_server_error(): void
+    {
+        $fill = $this->fill();
+        $staff = $this->staff();
+        $a = $this->image('a.jpg', 160, 110);
+        $aId = $this->upload($staff['token'], $fill, [$a])->assertCreated()->json('data.0.id');
+        $filesBefore = Storage::disk('local')->allFiles();
+
+        // الدفعة [A (موجود نشط)، B (جديد)]: A يُستثنى من التخزين، ثم يُزال A من طلب آخر أثناء كتابة B.
+        $real = Storage::disk('local');
+        $remover = \App\Models\User::query()->firstOrFail();
+        $flaky = \Mockery::mock($real)->makePartial();
+        $flaky->shouldReceive('putFileAs')->andReturnUsing(function (...$arguments) use ($real, $aId, $remover) {
+            $row = FuelTankerFillAttachment::query()->findOrFail($aId);
+            $row->forceFill(['status' => 'removed', 'removed_by' => $remover->id, 'removed_at' => now(), 'removal_reason' => 'سباق'])->save();
+
+            return $real->putFileAs(...$arguments);
+        });
+        Storage::set('local', $flaky);
+
+        $this->upload($staff['token'], $fill, [$a, $this->image('b.jpg', 161, 111)])
+            ->assertStatus(409)->assertJsonPath('reason', 'attachment_conflict');
+
+        $this->assertSame(1, FuelTankerFillAttachment::query()->count(), 'لا صفوف جديدة');
+        $this->assertEqualsCanonicalizing($filesBefore, $real->allFiles(), 'ملف B المكتوب حُذف تعويضاً');
+    }
+
+    /** @test */
     public function a_database_failure_after_the_files_were_written_removes_them_and_records_nothing(): void
     {
         $fill = $this->fill();

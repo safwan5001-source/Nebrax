@@ -167,6 +167,14 @@ class FuelTankerFillAttachmentService
                     $this->assertCanAdd($locked, $shift, $policy, $this->activeCount($locked), count($toInsert));
                 }
 
+                // سباق معاكس: مرفق كان نشطاً عند الفحص الأول (فلم يُخزَّن له ملف) أُزيل/استُبدل من طلب آخر قبل القفل ⇒ لا ملف مخزَّن لإدراجه.
+                // رد تعارض مضبوط (409) يعيد المستخدم لقراءة الحالة؛ لا خطأ خادم ولا إدراج جزئي (المعاملة كلها تُرجَع والملفات المخزَّنة تُحذف).
+                foreach (array_keys($unique) as $hash) {
+                    if (! $current->has($hash) && ! isset($storedByHash[$hash])) {
+                        throw new FuelTankerFillException(FuelTankerFillException::ATTACHMENT_CONFLICT, 'تغيّرت مرفقات السند أثناء الرفع؛ حدّث القائمة وأعد المحاولة.', 409);
+                    }
+                }
+
                 $rows = [];
                 foreach ($unique as $hash => [, $info]) {
                     if ($current->has($hash)) {
