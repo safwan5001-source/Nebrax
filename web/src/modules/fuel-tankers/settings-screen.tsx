@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Save } from 'lucide-react';
 import { ErrorState, LoadingState, PageHeader } from '@/components/nebrax';
@@ -16,9 +17,10 @@ import { Field } from './fields';
 import { getTankerPolicy, listStationNozzles, listStations, saveTankerPolicy, updateNozzleOperations, type NozzleRow, type PolicyState, type StationOption } from './settings-client';
 import {
   ATTACHMENT_AFTER_CLOSE, ATTACHMENT_HARD_MAX_COUNT, ATTACHMENT_HARD_MAX_MB, ATTACHMENT_REMOVAL, ATTACHMENT_REQUIRED, ATTACHMENT_TYPES,
-  effectiveOperations, INHERIT, isNarrowing, OVERRUN_POLICIES, POLICY_DEFAULTS, policyChanges, sameOperations, TANKER_OPERATIONS, toDraft, toStoredOperations, touchesGovernance, VOUCHER_SCOPES,
+  effectiveOperations, INHERIT, INVENTORY_POLICIES, INVENTORY_REVIEW_HOURS_MAX, isNarrowing, OVERRUN_POLICIES, POLICY_DEFAULTS, policyChanges, sameOperations, TANKER_OPERATIONS, toDraft, toStoredOperations, touchesGovernance, VOUCHER_SCOPES,
   type PolicyDraft, type PolicyField, type TankerOperation, type TankerPolicy,
 } from './settings-logic';
+import { INVENTORY_REVIEW_HREF, INVENTORY_REVIEW_PERMISSION } from './inventory/routes';
 import { ForbiddenState, GateClosedState } from './states';
 import { usePermissions } from './use-permissions';
 
@@ -160,6 +162,8 @@ export function TankerSettingsScreen() {
     if (field === 'attachmentMaxCount') return t('settings.attachments.count', { n: value });
     if (field === 'attachmentAfterClose') return t(`settings.attachments.afterClose.${value}`);
     if (field === 'attachmentRemoval') return t(`settings.attachments.removal.${value}`);
+    if (field === 'inventoryPolicy') return t(`settings.inventory.policy.${value}`);
+    if (field === 'inventoryReviewHours') return t('settings.inventory.hours', { n: value });
     return t(`settings.overrun.policy.${value}`);
   }
   /** خيارات رقمية قصيرة + القيمة الحالية والموروثة إن لم تكن منها، فلا تضيع قيمة محفوظة خارج القائمة. */
@@ -281,6 +285,32 @@ export function TankerSettingsScreen() {
               <p className="text-xs text-muted">{t('settings.attachments.limitsNote')}</p>
             </div>
           </details>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>{t('settings.inventory.title')}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p role="note" className="rounded-md border border-border bg-primary-soft px-3 py-2 text-sm text-text" data-inventory-posting-disabled="">{t('settings.inventory.notEnabled')}</p>
+          <Field id="tanker-settings-inventory-policy" label={t('settings.inventory.policyLabel')} hint={t('settings.inventory.policyNote')}>
+            <Select value={draft.inventoryPolicy} disabled={!editable} onChange={(event) => setField('inventoryPolicy', event.target.value)}>
+              {options('inventoryPolicy', INVENTORY_POLICIES)}
+            </Select>
+          </Field>
+          <details className="rounded-md border border-border px-3 py-2" data-inventory-advanced="">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-text">{t('settings.inventory.advanced')}</summary>
+            <div className="space-y-3 pb-2 pt-1">
+              <Field id="tanker-settings-inventory-hours" label={t('settings.inventory.hoursLabel')} hint={t('settings.inventory.hoursNote')}>
+                <Select value={draft.inventoryReviewHours} disabled={!basicEditable} onChange={(event) => setField('inventoryReviewHours', event.target.value)}>
+                  {numberOptions('inventoryReviewHours', [6, 12, 24, 48, 72, 168, INVENTORY_REVIEW_HOURS_MAX])}
+                </Select>
+              </Field>
+              <p className="text-xs text-muted">{t('settings.inventory.fixedNote')}</p>
+            </div>
+          </details>
+          {hasPermission(permissions, INVENTORY_REVIEW_PERMISSION) ? (
+            <Link href={INVENTORY_REVIEW_HREF} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-medium text-primary hover:bg-primary-soft" data-inventory-review-link="">{t('settings.inventory.reviewLink')}</Link>
+          ) : null}
         </CardContent>
       </Card>
 

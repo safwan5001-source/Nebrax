@@ -11,6 +11,7 @@ describe('readPolicy', () => {
     expect(POLICY_DEFAULTS).toEqual({
       selectionRequired: false, voucherScope: 'station', overrunPolicy: 'allow_with_confirmation',
       attachmentRequired: 'never', attachmentTypes: 'images_and_pdf', attachmentMaxMb: 10, attachmentMaxCount: 10, attachmentAfterClose: 'allow', attachmentRemoval: 'open_shift_only',
+      inventoryPolicy: 'block', inventoryReviewHours: 24,
     });
   });
   it('the voucher photo is optional by default and every attachment default mirrors the server', () => {
@@ -31,7 +32,7 @@ describe('readPolicy', () => {
     });
   });
   it('flags exactly the governance fields (required, after close, removal) — the server decides, this is display only', () => {
-    expect([...GOVERNANCE_FIELDS].sort()).toEqual(['attachmentAfterClose', 'attachmentRemoval', 'attachmentRequired', 'overrunPolicy', 'selectionRequired', 'voucherScope']);
+    expect([...GOVERNANCE_FIELDS].sort()).toEqual(['attachmentAfterClose', 'attachmentRemoval', 'attachmentRequired', 'inventoryPolicy', 'overrunPolicy', 'selectionRequired', 'voucherScope']);
     expect(touchesGovernance({ [SERVER_KEYS.attachmentMaxCount]: 3, [SERVER_KEYS.attachmentTypes]: 'images_only', [SERVER_KEYS.attachmentMaxMb]: 2 })).toBe(false);
     expect(touchesGovernance({ [SERVER_KEYS.attachmentRequired]: 'before_shift_approval' })).toBe(true);
     expect(touchesGovernance({ [SERVER_KEYS.attachmentMaxCount]: 3, [SERVER_KEYS.attachmentRemoval]: 'never' })).toBe(true);
@@ -94,3 +95,22 @@ describe('nozzle operations', () => {
     expect(sameOperations(['tanker_fill'], all)).toBe(false);
   });
 });
+
+describe('TANKER-PR6A inventory review policy', () => {
+  it('defaults to block and 24 hours, falls back on corrupt values (never an unsafe policy) and bounds the hours', () => {
+    expect(readPolicy({})).toMatchObject({ inventoryPolicy: 'block', inventoryReviewHours: 24 });
+    expect(readPolicy({ tanker_inventory_insufficient_policy: 'allow_negative', tanker_inventory_review_after_hours: 0 })).toMatchObject({ inventoryPolicy: 'block', inventoryReviewHours: 24 });
+    expect(readPolicy({ tanker_inventory_review_after_hours: 721 }).inventoryReviewHours).toBe(24);
+    expect(readPolicy({ tanker_inventory_insufficient_policy: 'hold_for_review', tanker_inventory_review_after_hours: 72 })).toMatchObject({ inventoryPolicy: 'hold_for_review', inventoryReviewHours: 72 });
+  });
+
+  it('only the insufficient-balance policy is governance-gated; the hours are a plain manage setting, and hours are sent as integers', () => {
+    expect(touchesGovernance({ [SERVER_KEYS.inventoryPolicy]: 'hold_for_review' })).toBe(true);
+    expect(touchesGovernance({ [SERVER_KEYS.inventoryReviewHours]: 48 })).toBe(false);
+    const org = toDraft(POLICY_DEFAULTS);
+    expect(policyChanges(org, { ...org, inventoryReviewHours: '48', inventoryPolicy: 'hold_for_review' })).toEqual({
+      [SERVER_KEYS.inventoryReviewHours]: 48, [SERVER_KEYS.inventoryPolicy]: 'hold_for_review',
+    });
+  });
+});
+

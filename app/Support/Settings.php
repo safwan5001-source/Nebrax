@@ -432,6 +432,11 @@ class Settings
             'tanker_fill_attachment_max_count' => 10,
             'tanker_fill_attachment_after_close' => 'allow',
             'tanker_fill_attachment_removal' => 'open_shift_only',
+            // TANKER-PR6A: سياسات مراجعة السندات المعلّقة قبل الدمج المخزني (تخزين وعرض فقط — **لا خصم ولا ترحيل في هذه الشريحة**). لا مفتاح «تفعيل الترحيل» عمداً:
+            // التفعيل المخزني قرار منفصل (PR-6B) ولا يُضبط من إعداد. `tanker_inventory_insufficient_policy`: `block` (الافتراضي: رصيد غير كافٍ = مانع) | `hold_for_review` (مراجعة بشرية)؛
+            // لا خيار «السماح بالسالب» ولا «تسوية صامتة». `tanker_inventory_review_after_hours`: عمر السند المعلّق (بالساعات) الذي يُوسَم بعده «متأخر».
+            'tanker_inventory_insufficient_policy' => 'block',
+            'tanker_inventory_review_after_hours' => 24,
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,
