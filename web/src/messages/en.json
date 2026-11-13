@@ -10121,6 +10121,41 @@
           "allow": "Allow without a warning"
         }
       },
+      "attachments": {
+        "title": "Voucher attachments",
+        "hint": "The photo of the paper voucher attached to each tanker fill.",
+        "requiredLabel": "Voucher photo",
+        "required": {
+          "never": "Optional (default)",
+          "before_shift_approval": "Required before shift approval",
+          "before_settlement": "Required before settlement"
+        },
+        "requiredNote": "A stage other than “Optional” only flags a voucher with no photo as missing; it does not block recording a fill, closing or approving the shift, or settlement yet. Enforcement is a separate decision.",
+        "typesLabel": "Allowed files",
+        "types": {
+          "images_and_pdf": "Photos and PDF (default)",
+          "images_only": "Photos only"
+        },
+        "advanced": "Advanced options",
+        "advancedHint": "Limits and rules for adding, removing and replacing attachments.",
+        "maxSizeLabel": "Maximum file size",
+        "size": "{n} MB",
+        "maxCountLabel": "Maximum attachments per voucher",
+        "count": "{n}",
+        "afterCloseLabel": "Adding after the shift is closed",
+        "afterClose": {
+          "allow": "Allowed (default)",
+          "deny": "Not allowed"
+        },
+        "removalLabel": "Removing and replacing",
+        "removal": {
+          "open_shift_only": "While the shift is open only (default)",
+          "always": "Always",
+          "never": "Never"
+        },
+        "removalNote": "Removing or replacing needs its own permission, asks for a reason and is audited. The record and the file always stay in the voucher history.",
+        "limitsNote": "Hard ceilings: JPG, PNG or PDF only, 10 MB per file, 20 attachments per voucher. Settings can only narrow them."
+      },
       "nozzles": {
         "title": "Allowed nozzle operations",
         "description": "The operation types each nozzle allows. Default: all operations.",
@@ -10141,6 +10176,103 @@
         "save": "Save operations",
         "saved": "Nozzle operations saved"
       }
+    },
+    "attachments": {
+      "title": "Voucher attachments",
+      "loading": "Loading attachments…",
+      "unavailable": "Attachments are not available for this voucher.",
+      "loadFailed": "Could not load the attachments.",
+      "retry": "Try again",
+      "dismiss": "Dismiss",
+      "cancel": "Cancel",
+      "policy": "JPG, PNG or PDF up to {mb} MB each; up to {count} attachments per voucher.",
+      "status": {
+        "present": "{count, plural, one {# attachment} other {# attachments}}",
+        "missing": "Photo missing",
+        "none": "No attachments"
+      },
+      "missingNote": "This station requires the paper voucher photo and none is attached yet. This reminder does not block the fill or the shift.",
+      "takePhoto": "Take photo",
+      "chooseFile": "Choose file",
+      "blocked": {
+        "add": {
+          "fill_voided": "The voucher is voided; attachments cannot be added.",
+          "shift_closed": "Station policy does not allow adding attachments after the shift is closed.",
+          "limit_reached": "This voucher reached the maximum of {count} attachments.",
+          "removal_disabled": "Attachments cannot be added now."
+        },
+        "remove": {
+          "fill_voided": "The voucher is voided; its attachments are frozen.",
+          "shift_closed": "Attachments can be removed or replaced while the shift is open only.",
+          "limit_reached": "Attachments cannot be changed now.",
+          "removal_disabled": "Station policy does not allow removing or replacing attachments."
+        }
+      },
+      "rejected": {
+        "type": "{name}: file type is not allowed.",
+        "size": "{name}: larger than {mb} MB.",
+        "empty": "{name}: the file is empty.",
+        "limit": "{name}: the voucher cannot take more than {count} attachments."
+      },
+      "uploading": "Uploading {name}",
+      "empty": "No attachments yet.",
+      "openNamed": "Open {name}",
+      "loadingPreview": "Loading preview…",
+      "showHistory": "Show history",
+      "hideHistory": "Hide history",
+      "noHistory": "No removed or replaced attachments.",
+      "historyStatus": {
+        "active": "Active",
+        "removed": "Removed",
+        "replaced": "Replaced"
+      },
+      "removedBy": "By {name} · {when}",
+      "reason": "Reason: {reason}",
+      "open": "Open",
+      "replaced": "Attachment replaced",
+      "removed": "Attachment removed",
+      "replace": {
+        "title": "Replace attachment",
+        "body": "Choose the new file to replace {name}.",
+        "keepNote": "The old file stays in the voucher history; it is not deleted.",
+        "busy": "Replacing…",
+        "choose": "Choose new file"
+      },
+      "remove": {
+        "title": "Remove attachment",
+        "body": "Remove {name} from the voucher?",
+        "keepNote": "The record and the file are kept in the history with who removed it, when and why; the voucher itself is not changed.",
+        "reasonLabel": "Reason for removal",
+        "reasonHint": "Required (3–500 characters). Recorded in the audit log.",
+        "busy": "Removing…",
+        "confirm": "Remove"
+      },
+      "errors": {
+        "attachment_invalid": "The file is not valid or is corrupted.",
+        "attachment_type_not_allowed": "This file type is not allowed.",
+        "attachment_too_large": "The file is larger than {mb} MB.",
+        "attachment_limit_reached": "The voucher reached the maximum of {count} attachments.",
+        "attachment_add_blocked": "Station policy does not allow adding attachments now.",
+        "attachment_removal_blocked": "Station policy does not allow removing or replacing attachments now.",
+        "attachment_not_active": "The attachment is no longer active. Refresh and try again.",
+        "attachment_same_content": "The new file is identical to the current one.",
+        "attachment_duplicate": "This file is already attached to the voucher.",
+        "attachment_storage_failed": "Could not save the file; nothing was recorded. Try again.",
+        "forbidden": "You do not have permission for this action.",
+        "not_found": "The voucher or attachment was not found.",
+        "offline": "No connection. Nothing was uploaded; try again when you are online.",
+        "generic": "Could not complete the action. Try again."
+      },
+      "voucher": "voucher",
+      "uploadedBy": "Uploaded by {name} · {when}",
+      "previewFailed": "Could not load the preview. You can still download the file.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "download": "Download",
+      "downloaded": "Download started",
+      "replaceAction": "Replace",
+      "removeAction": "Remove"
     },
     "eyebrow": "Fuel stations",
     "list": {

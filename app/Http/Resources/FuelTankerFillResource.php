@@ -49,6 +49,8 @@ class FuelTankerFillResource extends JsonResource
             'tanker' => $this->whenLoaded('tanker', fn () => $this->tanker === null ? null : [
                 'id' => $this->tanker->id, 'plate_number' => $this->tanker->plate_number, 'capacity_milliliters' => $this->tanker->capacity_milliliters,
             ]),
+            // TANKER-PR5: عدد المرفقات النشطة (يظهر حين يحمّله المتحكّم). الدليل فقط — لا يغيّر حالة السند.
+            'attachments_count' => $this->when(isset($this->active_attachments_count), fn () => (int) $this->active_attachments_count),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

@@ -15,7 +15,8 @@ import { listOwners } from './client';
 import { Field } from './fields';
 import { getTankerPolicy, listStationNozzles, listStations, saveTankerPolicy, updateNozzleOperations, type NozzleRow, type PolicyState, type StationOption } from './settings-client';
 import {
-  effectiveOperations, INHERIT, isNarrowing, OVERRUN_POLICIES, POLICY_DEFAULTS, policyChanges, sameOperations, TANKER_OPERATIONS, toDraft, toStoredOperations, VOUCHER_SCOPES,
+  ATTACHMENT_AFTER_CLOSE, ATTACHMENT_HARD_MAX_COUNT, ATTACHMENT_HARD_MAX_MB, ATTACHMENT_REMOVAL, ATTACHMENT_REQUIRED, ATTACHMENT_TYPES,
+  effectiveOperations, INHERIT, isNarrowing, OVERRUN_POLICIES, POLICY_DEFAULTS, policyChanges, sameOperations, TANKER_OPERATIONS, toDraft, toStoredOperations, touchesGovernance, VOUCHER_SCOPES,
   type PolicyDraft, type PolicyField, type TankerOperation, type TankerPolicy,
 } from './settings-logic';
 import { ForbiddenState, GateClosedState } from './states';
@@ -143,6 +144,9 @@ export function TankerSettingsScreen() {
   if (state === 'loading' && stations.length === 0 && !stationScope) return <LoadingState variant="cards" rows={3} />;
 
   const editable = canGovern && state === 'ready';
+  // الأنواع والحجم والعدد تكفيها `fuel_stations.manage`؛ الإلزام وبعد الإغلاق والإزالة حوكمية. الخادم يفرض الفرق — هذا لتعطيل ما لا يملكه المستخدم فقط.
+  const basicEditable = canManage && state === 'ready';
+  const canSave = state === 'ready' && dirty && (canGovern || (canManage && !touchesGovernance(changes)));
   const inheritLabel = (field: PolicyField) => {
     const orgDraft = toDraft(orgPolicy)[field];
     return t('settings.inherit', { value: valueLabel(field, orgDraft) });
@@ -150,8 +154,19 @@ export function TankerSettingsScreen() {
   function valueLabel(field: PolicyField, value: string): string {
     if (field === 'selectionRequired') return value === 'true' ? t('settings.selection.required') : t('settings.selection.optional');
     if (field === 'voucherScope') return t(`settings.voucher.scope.${value}`);
+    if (field === 'attachmentRequired') return t(`settings.attachments.required.${value}`);
+    if (field === 'attachmentTypes') return t(`settings.attachments.types.${value}`);
+    if (field === 'attachmentMaxMb') return t('settings.attachments.size', { n: value });
+    if (field === 'attachmentMaxCount') return t('settings.attachments.count', { n: value });
+    if (field === 'attachmentAfterClose') return t(`settings.attachments.afterClose.${value}`);
+    if (field === 'attachmentRemoval') return t(`settings.attachments.removal.${value}`);
     return t(`settings.overrun.policy.${value}`);
   }
+  /** خيارات رقمية قصيرة + القيمة الحالية والموروثة إن لم تكن منها، فلا تضيع قيمة محفوظة خارج القائمة. */
+  const numberOptions = (field: PolicyField, steps: readonly number[]) => {
+    const present = new Set([...steps, Number(draft[field]), Number(toDraft(orgPolicy)[field])].filter((n) => Number.isInteger(n) && n > 0));
+    return options(field, [...present].sort((a, b) => a - b).map(String));
+  };
   const options = (field: PolicyField, values: readonly string[]) => (
     <>
       {stationScope ? <option value={INHERIT}>{inheritLabel(field)}</option> : null}
@@ -226,12 +241,56 @@ export function TankerSettingsScreen() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>{t('settings.attachments.title')}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted">{t('settings.attachments.hint')}</p>
+          <Field id="tanker-settings-attachment-required" label={t('settings.attachments.requiredLabel')} hint={t('settings.attachments.requiredNote')}>
+            <Select value={draft.attachmentRequired} disabled={!editable} onChange={(event) => setField('attachmentRequired', event.target.value)}>
+              {options('attachmentRequired', ATTACHMENT_REQUIRED)}
+            </Select>
+          </Field>
+          <Field id="tanker-settings-attachment-types" label={t('settings.attachments.typesLabel')}>
+            <Select value={draft.attachmentTypes} disabled={!basicEditable} onChange={(event) => setField('attachmentTypes', event.target.value)}>
+              {options('attachmentTypes', ATTACHMENT_TYPES)}
+            </Select>
+          </Field>
+          <details className="rounded-md border border-border px-3 py-2" data-attachment-advanced="">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-text">{t('settings.attachments.advanced')}</summary>
+            <div className="space-y-3 pb-2 pt-1">
+              <p className="text-xs text-muted">{t('settings.attachments.advancedHint')}</p>
+              <Field id="tanker-settings-attachment-size" label={t('settings.attachments.maxSizeLabel')}>
+                <Select value={draft.attachmentMaxMb} disabled={!basicEditable} onChange={(event) => setField('attachmentMaxMb', event.target.value)}>
+                  {numberOptions('attachmentMaxMb', [1, 2, 5, ATTACHMENT_HARD_MAX_MB])}
+                </Select>
+              </Field>
+              <Field id="tanker-settings-attachment-count" label={t('settings.attachments.maxCountLabel')}>
+                <Select value={draft.attachmentMaxCount} disabled={!basicEditable} onChange={(event) => setField('attachmentMaxCount', event.target.value)}>
+                  {numberOptions('attachmentMaxCount', [1, 3, 5, 10, ATTACHMENT_HARD_MAX_COUNT])}
+                </Select>
+              </Field>
+              <Field id="tanker-settings-attachment-after-close" label={t('settings.attachments.afterCloseLabel')}>
+                <Select value={draft.attachmentAfterClose} disabled={!editable} onChange={(event) => setField('attachmentAfterClose', event.target.value)}>
+                  {options('attachmentAfterClose', ATTACHMENT_AFTER_CLOSE)}
+                </Select>
+              </Field>
+              <Field id="tanker-settings-attachment-removal" label={t('settings.attachments.removalLabel')} hint={t('settings.attachments.removalNote')}>
+                <Select value={draft.attachmentRemoval} disabled={!editable} onChange={(event) => setField('attachmentRemoval', event.target.value)}>
+                  {options('attachmentRemoval', ATTACHMENT_REMOVAL)}
+                </Select>
+              </Field>
+              <p className="text-xs text-muted">{t('settings.attachments.limitsNote')}</p>
+            </div>
+          </details>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="space-y-3 pt-4">
           <Field id="tanker-settings-reason" label={t('settings.reasonLabel')} hint={t('settings.reasonHint')}>
-            <Input value={reason} maxLength={500} disabled={!editable} onChange={(event) => setReason(event.target.value)} />
+            <Input value={reason} maxLength={500} disabled={!basicEditable} onChange={(event) => setReason(event.target.value)} />
           </Field>
           {formError ? <p role="alert" className="text-sm text-negative">{formError}</p> : null}
-          <Button type="button" className="max-md:h-11" disabled={!editable || !dirty || saving} onClick={() => void save()}>
+          <Button type="button" className="max-md:h-11" disabled={!canSave || saving} onClick={() => void save()}>
             <Save className="h-4 w-4" aria-hidden="true" />{saving ? t('settings.saving') : t('settings.save')}
           </Button>
         </CardContent>

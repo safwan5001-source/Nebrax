@@ -41,7 +41,7 @@ class FuelTankerFillController extends ApiController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PER_PAGE],
         ]);
 
-        $query = FuelTankerFill::query()->with(['owner', 'tanker'])->orderByDesc('recorded_at')->orderByDesc('id');
+        $query = FuelTankerFill::query()->with(['owner', 'tanker'])->withCount('activeAttachments')->orderByDesc('recorded_at')->orderByDesc('id');
         foreach (['station_id' => 'fuel_station_id', 'shift_id' => 'fuel_shift_id', 'owner_id' => 'fuel_tanker_owner_id', 'tanker_id' => 'fuel_tanker_id', 'nozzle_id' => 'fuel_nozzle_id', 'status' => 'status'] as $param => $column) {
             if (! empty($filters[$param])) {
                 $query->where($column, $filters[$param]);
@@ -69,7 +69,7 @@ class FuelTankerFillController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
-        return (new FuelTankerFillResource($this->visibleFill($id, $request)->load(['owner', 'tanker'])))->response();
+        return (new FuelTankerFillResource($this->visibleFill($id, $request)->load(['owner', 'tanker'])->loadCount('activeAttachments')))->response();
     }
 
     public function store(StoreFuelTankerFillRequest $request): JsonResponse

@@ -33,6 +33,18 @@ class FuelTankerFillException extends Exception
     public const NOT_FOUND = 'not_found';
     public const FORBIDDEN = 'forbidden';
 
+    // TANKER-PR5 — مرفقات السند.
+    public const ATTACHMENT_INVALID = 'attachment_invalid';
+    public const ATTACHMENT_TYPE_NOT_ALLOWED = 'attachment_type_not_allowed';
+    public const ATTACHMENT_TOO_LARGE = 'attachment_too_large';
+    public const ATTACHMENT_LIMIT_REACHED = 'attachment_limit_reached';
+    public const ATTACHMENT_ADD_BLOCKED = 'attachment_add_blocked';
+    public const ATTACHMENT_REMOVAL_BLOCKED = 'attachment_removal_blocked';
+    public const ATTACHMENT_NOT_ACTIVE = 'attachment_not_active';
+    public const ATTACHMENT_SAME_CONTENT = 'attachment_same_content';
+    public const ATTACHMENT_DUPLICATE = 'attachment_duplicate';
+    public const ATTACHMENT_STORAGE_FAILED = 'attachment_storage_failed';
+
     /** @param array<string,mixed> $details */
     public function __construct(
         public readonly string $reason,

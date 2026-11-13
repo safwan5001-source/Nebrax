@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BranchScoped;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
@@ -117,4 +118,10 @@ class FuelTankerFill extends BaseModel
     public function tanker(): BelongsTo { return $this->belongsTo(FuelTanker::class, 'fuel_tanker_id'); }
     public function recorder(): BelongsTo { return $this->belongsTo(User::class, 'recorded_by'); }
     public function voider(): BelongsTo { return $this->belongsTo(User::class, 'voided_by'); }
+
+    /** TANKER-PR5: المرفقات النشطة فقط (المُزالة/المُستبدَلة سجل تاريخي يُقرأ عبر خدمة المرفقات). */
+    public function activeAttachments(): HasMany
+    {
+        return $this->hasMany(FuelTankerFillAttachment::class, 'fuel_tanker_fill_id')->where('status', FuelTankerFillAttachment::STATUS_ACTIVE);
+    }
 }

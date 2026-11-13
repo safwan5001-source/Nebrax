@@ -32,7 +32,7 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal'];
 
     /** @var list<string> نطاقات منع تكرار رقم السند الورقي (TANKER-PR3؛ الافتراضي المعتمد `station`). */
     public const TANKER_VOUCHER_SCOPES = ['station', 'tenant', 'owner', 'none'];
@@ -56,6 +56,56 @@ class FuelStationSettingsService
             'selection_required' => ($all['tanker_selection_required'] ?? false) === true,
             'voucher_unique_scope' => is_string($scope) && in_array($scope, self::TANKER_VOUCHER_SCOPES, true) ? $scope : 'station',
             'capacity_overrun_policy' => is_string($overrun) && in_array($overrun, self::TANKER_CAPACITY_OVERRUN_POLICIES, true) ? $overrun : 'allow_with_confirmation',
+        ];
+    }
+
+    /** @var array<string, list<string>> أنواع مرفقات سند التعبئة المسموحة (TANKER-PR5): السقف الصلب لا يتجاوز PDF وJPG وPNG (بلا WebP)، والإعداد يضيّق فقط. */
+    public const TANKER_ATTACHMENT_TYPES = [
+        'images_and_pdf' => ['image/jpeg', 'image/png', 'application/pdf'],
+        'images_only' => ['image/jpeg', 'image/png'],
+    ];
+
+    /** @var list<string> إلزام صورة السند (قرار المالك D-T2): `never` الافتراضي؛ والمرحلتان تُعلنان «ناقص» فقط — لا إنفاذ قبل قرار مستقل. */
+    public const TANKER_ATTACHMENT_REQUIRED = ['never', 'before_shift_approval', 'before_settlement'];
+
+    /** @var list<string> */
+    public const TANKER_ATTACHMENT_AFTER_CLOSE = ['allow', 'deny'];
+
+    /** @var list<string> */
+    public const TANKER_ATTACHMENT_REMOVAL = ['open_shift_only', 'always', 'never'];
+
+    /** السقف الصلب لحجم المرفق (م.ب) وعدد المرفقات للسند: الإعداد يضيّق فقط ولا يرفع. */
+    public const TANKER_ATTACHMENT_HARD_MAX_MB = 10;
+    public const TANKER_ATTACHMENT_HARD_MAX_COUNT = 20;
+
+    /**
+     * TANKER-PR5: سياسة مرفقات سند التعبئة الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة تُعامَل افتراضيها الآمن (فشل مغلق نحو المعتمد)، وتُقصّ الحدود بالسقف الصلب.
+     *
+     * @return array{required: bool, required_stage: string, types: string, mime_types: list<string>, max_bytes: int, max_count: int, after_close: string, removal: string}
+     */
+    public function tankerAttachmentPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $types = $all['tanker_fill_attachment_types'] ?? 'images_and_pdf';
+        $types = is_string($types) && array_key_exists($types, self::TANKER_ATTACHMENT_TYPES) ? $types : 'images_and_pdf';
+        $mb = $all['tanker_fill_attachment_max_size_mb'] ?? self::TANKER_ATTACHMENT_HARD_MAX_MB;
+        $mb = is_int($mb) && $mb >= 1 ? min($mb, self::TANKER_ATTACHMENT_HARD_MAX_MB) : self::TANKER_ATTACHMENT_HARD_MAX_MB;
+        $count = $all['tanker_fill_attachment_max_count'] ?? 10;
+        $count = is_int($count) && $count >= 1 ? min($count, self::TANKER_ATTACHMENT_HARD_MAX_COUNT) : 10;
+        $stage = $all['tanker_voucher_attachment_required'] ?? 'never';
+        $stage = is_string($stage) && in_array($stage, self::TANKER_ATTACHMENT_REQUIRED, true) ? $stage : 'never';
+        $afterClose = $all['tanker_fill_attachment_after_close'] ?? 'allow';
+        $removal = $all['tanker_fill_attachment_removal'] ?? 'open_shift_only';
+
+        return [
+            'required' => $stage !== 'never',
+            'required_stage' => $stage,
+            'types' => $types,
+            'mime_types' => self::TANKER_ATTACHMENT_TYPES[$types],
+            'max_bytes' => $mb * 1024 * 1024,
+            'max_count' => $count,
+            'after_close' => is_string($afterClose) && in_array($afterClose, self::TANKER_ATTACHMENT_AFTER_CLOSE, true) ? $afterClose : 'allow',
+            'removal' => is_string($removal) && in_array($removal, self::TANKER_ATTACHMENT_REMOVAL, true) ? $removal : 'open_shift_only',
         ];
     }
 
@@ -430,7 +480,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -545,6 +595,54 @@ class FuelStationSettingsService
         if ($key === 'tanker_capacity_overrun_policy') {
             if (! is_string($value) || ! in_array($value, self::TANKER_CAPACITY_OVERRUN_POLICIES, true)) {
                 throw new RuntimeException('سياسة تجاوز سعة الصهريج يجب أن تكون allow_with_confirmation أو block أو allow (supervisor_approval غير مدعومة بعد).');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_voucher_attachment_required') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_REQUIRED, true)) {
+                throw new RuntimeException('إلزام صورة السند يجب أن يكون never أو before_shift_approval أو before_settlement.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_types') {
+            if (! is_string($value) || ! array_key_exists($value, self::TANKER_ATTACHMENT_TYPES)) {
+                throw new RuntimeException('أنواع مرفقات السند يجب أن تكون images_and_pdf أو images_only.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_max_size_mb') {
+            if (! is_int($value) || $value < 1 || $value > self::TANKER_ATTACHMENT_HARD_MAX_MB) {
+                throw new RuntimeException('الحد الأقصى لحجم المرفق يجب أن يكون عدداً صحيحاً بين 1 و' . self::TANKER_ATTACHMENT_HARD_MAX_MB . ' ميغابايت.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_max_count') {
+            if (! is_int($value) || $value < 1 || $value > self::TANKER_ATTACHMENT_HARD_MAX_COUNT) {
+                throw new RuntimeException('الحد الأقصى لعدد المرفقات يجب أن يكون عدداً صحيحاً بين 1 و' . self::TANKER_ATTACHMENT_HARD_MAX_COUNT . '.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_after_close') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_AFTER_CLOSE, true)) {
+                throw new RuntimeException('سياسة إضافة المرفقات بعد إغلاق الوردية يجب أن تكون allow أو deny.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_removal') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_REMOVAL, true)) {
+                throw new RuntimeException('سياسة إزالة المرفقات واستبدالها يجب أن تكون open_shift_only أو always أو never.');
             }
 
             return;

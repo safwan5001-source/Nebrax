@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  effectiveOperations, INHERIT, isNarrowing, overrideFields, POLICY_DEFAULTS, policyChanges, readPolicy, sameOperations, SERVER_KEYS, toDraft, toStoredOperations,
+  effectiveOperations, GOVERNANCE_FIELDS, INHERIT, isNarrowing, overrideFields, POLICY_DEFAULTS, policyChanges, readPolicy, sameOperations, SERVER_KEYS, toDraft, toStoredOperations, touchesGovernance,
 } from './settings-logic';
 
 describe('readPolicy', () => {
@@ -8,10 +8,36 @@ describe('readPolicy', () => {
     expect(readPolicy(undefined)).toEqual(POLICY_DEFAULTS);
     expect(readPolicy(null)).toEqual(POLICY_DEFAULTS);
     expect(readPolicy({ tanker_voucher_unique_scope: 'branch', tanker_capacity_overrun_policy: 'supervisor_approval', tanker_selection_required: 'yes' })).toEqual(POLICY_DEFAULTS);
-    expect(POLICY_DEFAULTS).toEqual({ selectionRequired: false, voucherScope: 'station', overrunPolicy: 'allow_with_confirmation' });
+    expect(POLICY_DEFAULTS).toEqual({
+      selectionRequired: false, voucherScope: 'station', overrunPolicy: 'allow_with_confirmation',
+      attachmentRequired: 'never', attachmentTypes: 'images_and_pdf', attachmentMaxMb: 10, attachmentMaxCount: 10, attachmentAfterClose: 'allow', attachmentRemoval: 'open_shift_only',
+    });
+  });
+  it('the voucher photo is optional by default and every attachment default mirrors the server', () => {
+    const attachments = readPolicy({});
+    expect(attachments.attachmentRequired).toBe('never');
+    expect(attachments.attachmentMaxMb).toBe(10);
+    expect(attachments.attachmentMaxCount).toBe(10);
+  });
+  it('rejects corrupt or out-of-ceiling attachment values and falls back to the safe default', () => {
+    const corrupt = readPolicy({
+      tanker_fill_attachment_types: 'everything', tanker_fill_attachment_max_size_mb: 11, tanker_fill_attachment_max_count: 21,
+      tanker_fill_attachment_after_close: 'maybe', tanker_fill_attachment_removal: 'sometimes', tanker_voucher_attachment_required: 'yes',
+    });
+    expect(corrupt).toEqual(POLICY_DEFAULTS);
+    expect(readPolicy({ tanker_fill_attachment_max_size_mb: 0, tanker_fill_attachment_max_count: 1.5 })).toEqual(POLICY_DEFAULTS);
+    expect(readPolicy({ tanker_fill_attachment_max_size_mb: 2, tanker_fill_attachment_max_count: 3, tanker_fill_attachment_types: 'images_only', tanker_fill_attachment_after_close: 'deny', tanker_fill_attachment_removal: 'never', tanker_voucher_attachment_required: 'before_settlement' })).toMatchObject({
+      attachmentMaxMb: 2, attachmentMaxCount: 3, attachmentTypes: 'images_only', attachmentAfterClose: 'deny', attachmentRemoval: 'never', attachmentRequired: 'before_settlement',
+    });
+  });
+  it('flags exactly the governance fields (required, after close, removal) — the server decides, this is display only', () => {
+    expect([...GOVERNANCE_FIELDS].sort()).toEqual(['attachmentAfterClose', 'attachmentRemoval', 'attachmentRequired', 'overrunPolicy', 'selectionRequired', 'voucherScope']);
+    expect(touchesGovernance({ [SERVER_KEYS.attachmentMaxCount]: 3, [SERVER_KEYS.attachmentTypes]: 'images_only', [SERVER_KEYS.attachmentMaxMb]: 2 })).toBe(false);
+    expect(touchesGovernance({ [SERVER_KEYS.attachmentRequired]: 'before_shift_approval' })).toBe(true);
+    expect(touchesGovernance({ [SERVER_KEYS.attachmentMaxCount]: 3, [SERVER_KEYS.attachmentRemoval]: 'never' })).toBe(true);
   });
   it('reads valid server values', () => {
-    expect(readPolicy({ tanker_selection_required: true, tanker_voucher_unique_scope: 'tenant', tanker_capacity_overrun_policy: 'block' })).toEqual({ selectionRequired: true, voucherScope: 'tenant', overrunPolicy: 'block' });
+    expect(readPolicy({ tanker_selection_required: true, tanker_voucher_unique_scope: 'tenant', tanker_capacity_overrun_policy: 'block' })).toEqual({ ...POLICY_DEFAULTS, selectionRequired: true, voucherScope: 'tenant', overrunPolicy: 'block' });
   });
 });
 
@@ -23,9 +49,14 @@ describe('policyChanges', () => {
     expect(policyChanges(org, { ...org, selectionRequired: 'true' })).toEqual({ [SERVER_KEYS.selectionRequired]: true });
     expect(policyChanges(org, { ...org, voucherScope: 'owner', overrunPolicy: 'block' })).toEqual({ [SERVER_KEYS.voucherScope]: 'owner', [SERVER_KEYS.overrunPolicy]: 'block' });
   });
+  it('typed numbers: attachment limits are sent as integers, not strings', () => {
+    expect(policyChanges(org, { ...org, attachmentMaxMb: '2', attachmentMaxCount: '5', attachmentRequired: 'before_shift_approval' })).toEqual({
+      [SERVER_KEYS.attachmentMaxMb]: 2, [SERVER_KEYS.attachmentMaxCount]: 5, [SERVER_KEYS.attachmentRequired]: 'before_shift_approval',
+    });
+  });
   it('station scope keeps inherited vs overridden state: inherit is the initial value of a non-overridden key', () => {
     const station = toDraft(current, new Set(['voucherScope']));
-    expect(station).toEqual({ selectionRequired: INHERIT, voucherScope: 'station', overrunPolicy: INHERIT });
+    expect(station).toMatchObject({ selectionRequired: INHERIT, voucherScope: 'station', overrunPolicy: INHERIT, attachmentMaxCount: INHERIT, attachmentRemoval: INHERIT });
     expect(policyChanges(station, station)).toEqual({});
   });
   it('pinning an explicit value EQUAL to the current effective one creates an override (Codex P2)', () => {

@@ -421,6 +421,17 @@ class Settings
             'tanker_voucher_unique_scope' => 'station',
             // تجاوز سعة الصهريج: `allow_with_confirmation` (المعتمد: تحذير + تأكيد صريح يُسجَّل) | `block` | `allow`. `supervisor_approval` غير مبني فيُرفض.
             'tanker_capacity_overrun_policy' => 'allow_with_confirmation',
+            // TANKER-PR5: مرفقات سندات التعبئة — سياسات عمل قابلة للضبط (قاعدة 6)، **الافتراضات تحفظ السلوك القائم**: الصورة اختيارية، PDF وJPG وPNG حتى 10 م.ب و10 مرفقات للسند،
+            // الإضافة مسموحة بعد إغلاق الوردية (دليل فقط لا يغيّر السجل)، والإزالة/الاستبدال أثناء الوردية المفتوحة فقط (وبصلاحية + تدقيق + سبب، ولا يُحذف الملف ولا الصف).
+            // الإلزام `tanker_voucher_attachment_required` (قرار المالك D-T2، PR3_DECISIONS #5): `never` (الافتراضي) | `before_shift_approval` | `before_settlement`. غير `never` يُعلن حالة «ناقص» فقط؛
+            // **لا إنفاذ في PR-5** (لا حجب لتسجيل التعبئة ولا إغلاق الوردية ولا الاعتماد ولا التسوية): ربطه بنقطتي الإنفاذ قرار منفصل عند تجهيز التطبيق التشغيلي.
+            // الثلاثة الحوكمية (الإلزام، بعد الإغلاق، الإزالة) تتطلب `fuel.governance.manage`؛ الأنواع والحجم والعدد تكفيها `fuel_stations.manage`.
+            'tanker_voucher_attachment_required' => 'never',
+            'tanker_fill_attachment_types' => 'images_and_pdf',
+            'tanker_fill_attachment_max_size_mb' => 10,
+            'tanker_fill_attachment_max_count' => 10,
+            'tanker_fill_attachment_after_close' => 'allow',
+            'tanker_fill_attachment_removal' => 'open_shift_only',
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,
