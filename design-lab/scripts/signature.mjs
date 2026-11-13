@@ -209,6 +209,29 @@ test('Errors keep the typed data: line-numbered summary, "with errors" filter, l
   await ctx.close();
 });
 
+test('A correction link to a line hidden by "find in lines" clears the find and focuses the field', async () => {
+  const { ctx, page } = await open('embed=1&r=sales&ln=24&sc=errors', { width: 1366, height: 768 });
+  await page.fill('#sales-lq', 'GLV'); await page.waitForTimeout(250);
+  assert(await page.evaluate(() => document.querySelector('#sales-l12-price').closest('tr').hidden), 'precondition: line 12 hidden by find');
+  await page.click('.err-summary li:nth-child(2) .lnk');
+  const r = await page.evaluate(() => ({ id: document.activeElement?.id, lq: window.__fx.S.docs.sales.lq, hidden: document.querySelector('#sales-l12-price').closest('tr').hidden }));
+  assert(r.id === 'sales-l12-price' && r.lq === '' && !r.hidden, 'hidden line not revealed/focused ' + JSON.stringify(r));
+  await ctx.close();
+});
+
+test('Recovery keeps the last saved draft: discard after reload returns to the save, not to a blank invoice', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  const page = await ctx.newPage();
+  await page.goto(`${base}?r=sales&ln=3`); await page.evaluate(() => { localStorage.clear(); }); await page.reload();
+  await page.fill('#sales-ref', 'SAVED-REF'); await page.locator('#main').focus(); await page.keyboard.press('Control+s'); await page.waitForTimeout(80);
+  await page.fill('#sales-ref', 'UNSAVED-REF'); await page.waitForTimeout(80);
+  await page.reload(); await page.waitForTimeout(200);
+  assert(await page.inputValue('#sales-ref') === 'UNSAVED-REF' && await page.locator('.msg.recovered').count() === 1, 'unsaved edit not recovered');
+  await page.click('[data-act="v3-discard"]'); await page.waitForTimeout(80);
+  assert(await page.inputValue('#sales-ref') === 'SAVED-REF', 'discard did not return to the saved draft: ' + await page.inputValue('#sales-ref'));
+  await page.evaluate(() => localStorage.clear()); await ctx.close();
+});
+
 test('Draft vs post is explicit: lifecycle captions, draft note, Save draft keeps the document editable', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=3', { width: 1366, height: 768 });
   assert(await page.locator('.lifecycle li small').count() === 3, 'lifecycle captions');

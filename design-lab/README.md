@@ -30,7 +30,7 @@ design-lab/
   scripts/foundation.mjs        فحوص المرحلة 1 (مصفوفة + تفاعل + لقطات)
   signature/index.html          AWJ Signature V3: اتجاهان (نَسَق · ليوان) بعرض فردي أو مقارنة جنباً إلى جنب
   signature/screens/            39 لقطة 2× (320 → 2560، داكن، إنجليزي، فاتورة 80 بنداً، أخطاء)
-  signature/checks.json         370 تهيئة + 12 اختبار تفاعل + العقد
+  signature/checks.json         370 تهيئة + 14 اختبار تفاعل + العقد
   scripts/signature.mjs         فحوص V3 (مصفوفة بصرية/وظيفية + تفاعل + لقطات)
   docs/AWJ-SIGNATURE-V3-DESIGN-RATIONALE.md     مبررات التصميم، المقارنة، توكنز الهوية المقترحة
   docs/AWJ-SIGNATURE-V3-IMPLEMENTATION-REPORT.md تقرير تنفيذ V3
@@ -60,7 +60,7 @@ LAB=v2 node design-lab/scripts/capture.mjs --shots --scale=2   # مصفوفة V2
 LAB=v2 node design-lab/scripts/interactions.mjs                # 52 اختبار تفاعل على V2
 node design-lab/scripts/foundation.mjs                         # المرحلة 1: 151 تهيئة + 31 اختبار تفاعل
 node design-lab/scripts/foundation.mjs --shots --scale=2       # + 28 لقطة WebP
-node design-lab/scripts/signature.mjs                          # V3: 370 تهيئة + 12 اختبار تفاعل
+node design-lab/scripts/signature.mjs                          # V3: 370 تهيئة + 14 اختبار تفاعل
 node design-lab/scripts/signature.mjs --shots --scale=2        # + 39 لقطة WebP
 ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة تصوير شاشة واحدة (لا يمثّل المصفوفة الكاملة)
 ```

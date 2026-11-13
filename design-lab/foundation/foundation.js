@@ -793,7 +793,12 @@ app.addEventListener('click', (e) => {
   if (d.pal !== undefined) { const c = palResults()[Number(d.pal)]; S.overlay = null; S.palQ = ''; c?.run(); render(); return; }
   if (d.pick) { const D = S.docs[d.doc]; D.party = (d.doc === 'sales' ? CUST : SUPP).find(c => c.id === d.pick); D.comboOpen = false; D.comboQ = ''; D.dirty = true; render(); return; }
   if (d.del) { const D = S.docs[d.doc]; D.lines = D.lines.filter(l => l.id !== Number(d.del)); D.dirty = true; render(); return; }
-  if (d.focus) { app.querySelector(d.focus)?.focus(); return; }
+  if (d.focus) {
+    const target = app.querySelector(d.focus);
+    // a line hidden by "find in lines" or the error filter cannot take focus: clear both, re-render, then focus
+    if (target?.closest('[hidden]') && S.docs[target.dataset.doc]) { Object.assign(S.docs[target.dataset.doc], { lq: '', lf: 'all' }); render(d.focus); return; }
+    target?.focus(); return;
+  }
   const doc = d.doc ? S.docs[d.doc] : null;
   switch (d.act) {
     case 'palette': S.overlay = { t:'palette' }; S.palQ = ''; S.palIdx = 0; render(); break;

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T19:37:22.919Z",
+ "generated": "2026-11-13T19:47:53.326Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3002,6 +3002,14 @@
    "ok": true
   },
   {
+   "name": "A correction link to a line hidden by \"find in lines\" clears the find and focuses the field",
+   "ok": true
+  },
+  {
+   "name": "Recovery keeps the last saved draft: discard after reload returns to the save, not to a blank invoice",
+   "ok": true
+  },
+  {
    "name": "Draft vs post is explicit: lifecycle captions, draft note, Save draft keeps the document editable",
    "ok": true
   },
@@ -3024,7 +3032,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 12,
+   "tests": 14,
    "failed": 0
   },
   "matrix": {
