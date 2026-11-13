@@ -47,7 +47,7 @@ class FuelTankerFillInventoryReviewController extends ApiController
         $truncated = $fills->count() > self::SCAN_LIMIT;
         $fills = $fills->take(self::SCAN_LIMIT);
 
-        $result = $this->readiness->evaluate($fills, $request->user()->hasPermission('products.view_cost'));
+        $result = $this->readiness->evaluate($fills, $request->user()->hasPermission('products.view_cost'), null, $this->accessibleStationIds());
         $summary = FuelTankerFillInventoryReadiness::summarize($result['items']);
 
         $rows = $fills->filter(function (FuelTankerFill $fill) use ($result, $filters) {

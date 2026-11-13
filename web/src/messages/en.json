@@ -10140,6 +10140,7 @@
         "inSync": "In sync",
         "outOfSync": "Out of sync",
         "syncUnknown": "Undetermined",
+        "shared": "The balance is shared with other stations; figures shown cover your stations only, while the classification accounts for the whole warehouse.",
         "unnamedWarehouse": "Unnamed warehouse",
         "unnamedProduct": "Unnamed product"
       },

@@ -45,6 +45,8 @@ export interface PoolSummary {
   stockMilliliters: number | null;
   costPoolMilliliters: number | null;
   quantityInSync: boolean | null;
+  /** يوجد في المخزن نفسه سندات معلّقة لمحطات أخرى (يُعلَن وجودها فقط؛ الكميات المعروضة لمحطات المراجع وحدها). */
+  sharedWithOtherStations: boolean;
   pendingCount: number;
   pendingTotalMilliliters: number;
   shortfallMilliliters: number | null;
@@ -116,6 +118,7 @@ function readPool(raw: unknown): PoolSummary | null {
     stockMilliliters: int(pool.stock_milliliters),
     costPoolMilliliters: int(pool.cost_pool_milliliters),
     quantityInSync: typeof pool.quantity_in_sync === 'boolean' ? pool.quantity_in_sync : null,
+    sharedWithOtherStations: pool.shared_with_other_stations === true,
     pendingCount: int(pool.pending_count) ?? 0,
     pendingTotalMilliliters: int(pool.pending_total_milliliters) ?? 0,
     shortfallMilliliters: int(pool.shortfall_milliliters),

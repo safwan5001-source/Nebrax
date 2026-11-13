@@ -99,10 +99,10 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $n = ++$this->seq;
         // أوقات تسجيل متمايزة: ترتيب التراكم في المراجعة بوقت التسجيل (ثانية واحدة بينها).
         Carbon::setTestNow(($this->clock ??= \Carbon\CarbonImmutable::now())->addSeconds($n));
-        $response = $this->withToken($this->fx['owner'])->postJson(self::FILLS, [
+        $response = $this->withToken($this->fx['owner'])->postJson(self::FILLS, array_merge([
             'fuel_station_id' => $this->fx['s1']->id, 'fuel_nozzle_id' => $this->nozzle->id, 'fuel_tanker_owner_id' => $this->owner->id,
             'voucher_number' => $voucher ?? "V{$n}", 'quantity_milliliters' => $milliliters, 'idempotency_key' => "fill-t6-{$n}",
-        ] + $extra)->assertCreated();
+        ], $extra))->assertCreated();
 
         return FuelTankerFill::query()->findOrFail($response->json('data.id'));
     }
@@ -308,6 +308,43 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
                 $this->assertMatchesRegularExpression('/sum\(|count\(\*\)/i', $entry['query'], 'استعلام السندات يجب أن يكون تجميعاً: ' . $entry['query']);
             }
         }
+    }
+
+    /** @test */
+    public function a_reviewer_of_one_station_never_sees_pending_activity_of_another_station_sharing_the_warehouse(): void
+    {
+        // المحطة 2 تشارك مخزن المحطة 1 (رصيد واحد): التصنيف يعدّ الاثنتين، والعرض يقتصر على محطات المراجع.
+        FuelStation::query()->whereKey($this->fx['s2']->id)->update(['warehouse_id' => $this->fx['wA1']->id]);
+        $pump2 = FuelPump::create(['branch_id' => $this->fx['branchA']->id, 'fuel_station_id' => $this->fx['s2']->id, 'pump_number' => '01', 'name' => 'مضخة م2']);
+        $nozzle2 = FuelNozzle::create([
+            'branch_id' => $this->fx['branchA']->id, 'fuel_station_id' => $this->fx['s2']->id, 'fuel_pump_id' => $pump2->id, 'fuel_tank_id' => $this->fx['t2']->id,
+            'fuel_product_id' => $this->fx['fuel']->id, 'nozzle_number' => '1',
+        ]);
+        FuelShift::create([
+            'branch_id' => $this->fx['branchA']->id, 'fuel_station_id' => $this->fx['s2']->id, 'number' => 'FSH-T6-2', 'status' => FuelShift::STATUS_OPEN,
+            'opening_float_minor' => 0, 'idempotency_key' => 'shift-t6-2', 'opened_by' => \App\Models\User::query()->firstOrFail()->id, 'opened_at' => now(),
+        ]);
+        $this->seedStock(1_500_000);
+        $own = $this->fill(1_000_000); // s1 — مرئي للمراجع
+        $other = $this->fill(900_000, extra: ['fuel_station_id' => $this->fx['s2']->id, 'fuel_nozzle_id' => $nozzle2->id]); // s2 — غير مرئي له
+
+        $scoped = $this->staff(self::VIEW, [$this->fx['s1']->id]);
+        $payload = $this->review($scoped['token']);
+        $this->assertSame([$own->id], array_column($payload['data'], 'id'));
+        $pool = $payload['meta']['pools'][0];
+        $this->assertSame(1, $pool['pending_count'], 'عدّ سنداته وحدها');
+        $this->assertSame(1_000_000, $pool['pending_total_milliliters']);
+        $this->assertTrue($pool['shared_with_other_stations'], 'يُعلَن أن الرصيد مشترك دون كميات المحطة الأخرى');
+        $this->assertSame(0, $pool['shortfall_milliliters'], 'عجز محسوب على سنداته وحدها: لا يكشف طلب المحطة الأخرى');
+        $this->assertSame(1_000_000, $this->itemOf($payload, $own)['pool']['cumulative_milliliters']);
+        $this->assertStringNotContainsString('900000', (string) json_encode($payload));
+
+        // لكن التصنيف يعدّ المخزن كله: السند الثاني (حسب وقت التسجيل) يتجاوز الرصيد المشترك، وكل ما يُعرض له سبب عام فقط.
+        $unrestricted = $this->review($this->staff()['token']);
+        $this->assertSame(1_900_000, $unrestricted['meta']['pools'][0]['pending_total_milliliters']);
+        $this->assertFalse($unrestricted['meta']['pools'][0]['shared_with_other_stations']);
+        $this->assertSame([Readiness::B_INSUFFICIENT_BALANCE], $this->itemOf($unrestricted, $other)['blockers']);
+        $this->assertSame(Readiness::READY, $this->itemOf($unrestricted, $own)['readiness']);
     }
 
     /** @test */

@@ -60,9 +60,11 @@ class FuelTankerFillInventoryReadiness
 
     /**
      * @param  Collection<int, FuelTankerFill>  $fills
+     * @param  list<string>|null  $visibleStationIds  محطات المراجع (null = غير مقيَّد). **التصنيف** يعدّ كل سندات المخزن المشترك (الرصيد واحد)، أما **ما يُعرض**
+     *                                                  (التراكمي والمجاميع والعجز) فيقتصر على محطاته فلا يكشف نشاط محطة أخرى تشاركه المخزن؛ ويُعلَن فقط أن الرصيد مشترك.
      * @return array{items: array<string, array<string, mixed>>, pools: list<array<string, mixed>>}
      */
-    public function evaluate(Collection $fills, bool $includeCost = false, ?CarbonInterface $now = null): array
+    public function evaluate(Collection $fills, bool $includeCost = false, ?CarbonInterface $now = null, ?array $visibleStationIds = null): array
     {
         $now ??= now();
         $items = [];
@@ -92,7 +94,10 @@ class FuelTankerFillInventoryReadiness
         // التراكمي والمجاميع تُحسب في قاعدة البيانات (نافذة `SUM … OVER` وتجميع) لا بتحميل كل السندات المعلّقة إلى الذاكرة: الأرشيف المعلّق ينمو بلا سقف في هذه المرحلة
         // (لا ترحيل)، فلا يتناسب استهلاك الذاكرة مع حجمه. يُرجَع فقط تراكمي السندات المُقيَّمة (≤ سقف المتحكّم) ومجموع كل مجمّع.
         $cumulative = $this->cumulativeByFill($tenantId, $active->pluck('id')->all(), $warehouseIds->all());
-        $poolTotals = $this->poolTotals($tenantId, $warehouseIds->all());
+        $poolTotalsAll = $this->poolTotals($tenantId, $warehouseIds->all());
+        // المعروض: محطات المراجع وحدها (يطابق الكل حين لا قيد).
+        $visibleCumulative = $visibleStationIds === null ? $cumulative : $this->cumulativeByFill($tenantId, $active->pluck('id')->all(), $warehouseIds->all(), $visibleStationIds);
+        $poolTotals = $visibleStationIds === null ? $poolTotalsAll : $this->poolTotals($tenantId, $warehouseIds->all(), $visibleStationIds);
 
         $policies = [];
         $pools = [];
@@ -143,8 +148,8 @@ class FuelTankerFillInventoryReadiness
                     $policy['insufficient_policy'] === 'hold_for_review' ? $reasons[] = self::R_INSUFFICIENT_BALANCE : $blockers[] = self::B_INSUFFICIENT_BALANCE;
                 }
 
-                $poolInfo = ['warehouse_id' => $warehouse->id, 'fuel_product_id' => $product->id, 'available_milliliters' => $available, 'cumulative_milliliters' => $cumulativeQuantity];
-                $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolTotals[$key] ?? ['count' => 0, 'total' => 0], $includeCost);
+                $poolInfo = ['warehouse_id' => $warehouse->id, 'fuel_product_id' => $product->id, 'available_milliliters' => $available, 'cumulative_milliliters' => (int) ($visibleCumulative[$fill->id] ?? $fill->quantity_milliliters)];
+                $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolTotals[$key] ?? ['count' => 0, 'total' => 0], ($poolTotalsAll[$key]['count'] ?? 0) > ($poolTotals[$key]['count'] ?? 0), $includeCost);
             }
 
             if ($fill->capacity_overrun_milliliters !== null) {
@@ -202,10 +207,11 @@ class FuelTankerFillInventoryReadiness
     }
 
     /**
-     * @param  array{count: int, total: int}  $pending  عدد ومجموع السندات المعلّقة في المجمّع (مجمَّعة في القاعدة)
+     * @param  array{count: int, total: int}  $pending  عدد ومجموع السندات المعلّقة في المجمّع لمحطات المراجع (مجمَّعة في القاعدة)
+     * @param  bool  $shared  توجد سندات معلّقة لمحطات أخرى في المخزن نفسه (يُعلَن وجودها فقط، لا كمياتها)
      * @return array<string, mixed>
      */
-    private function poolSummary(Warehouse $warehouse, FuelProduct $product, ?ProductWarehouseStock $stock, ?FuelInventoryCostState $state, array $pending, bool $includeCost): array
+    private function poolSummary(Warehouse $warehouse, FuelProduct $product, ?ProductWarehouseStock $stock, ?FuelInventoryCostState $state, array $pending, bool $shared, bool $includeCost): array
     {
         $available = $stock === null ? null : (int) $stock->quantity;
         $pendingTotal = $pending['total'];
@@ -220,6 +226,7 @@ class FuelTankerFillInventoryReadiness
             'pending_count' => $pending['count'],
             'pending_total_milliliters' => $pendingTotal,
             'shortfall_milliliters' => $available === null ? null : max(0, $pendingTotal - $available),
+            'shared_with_other_stations' => $shared,
             'ledger_1140' => 'not_checked',
         ];
         if ($includeCost) {
@@ -234,9 +241,10 @@ class FuelTankerFillInventoryReadiness
      *
      * @param  list<string>  $fillIds
      * @param  list<string>  $warehouseIds
+     * @param  list<string>|null  $onlyStations  يقصر العدّ على هذه المحطات (للعرض المقيَّد)؛ null = كل محطات المخزن (للتصنيف)
      * @return array<string, int>
      */
-    private function cumulativeByFill(string $tenantId, array $fillIds, array $warehouseIds): array
+    private function cumulativeByFill(string $tenantId, array $fillIds, array $warehouseIds, ?array $onlyStations = null): array
     {
         if ($fillIds === [] || $warehouseIds === []) {
             return [];
@@ -247,6 +255,7 @@ class FuelTankerFillInventoryReadiness
             ->where('f.tenant_id', $tenantId)
             ->where('f.status', FuelTankerFill::STATUS_RECORDED)->where('f.inventory_status', FuelTankerFill::INVENTORY_PENDING_INTEGRATION)
             ->whereIn('s.warehouse_id', $warehouseIds)
+            ->when($onlyStations !== null, fn ($q) => $q->whereIn('f.fuel_station_id', $onlyStations))
             ->selectRaw('f.id as id, SUM(f.quantity_milliliters) OVER (PARTITION BY s.warehouse_id, p.product_id ORDER BY f.recorded_at, f.id) as cumulative');
 
         $rows = [];
@@ -263,9 +272,10 @@ class FuelTankerFillInventoryReadiness
      * عدد ومجموع السندات المعلّقة لكل مجمّع (مفتاح `warehouse|product`) — تجميع في القاعدة.
      *
      * @param  list<string>  $warehouseIds
+     * @param  list<string>|null  $onlyStations
      * @return array<string, array{count: int, total: int}>
      */
-    private function poolTotals(string $tenantId, array $warehouseIds): array
+    private function poolTotals(string $tenantId, array $warehouseIds, ?array $onlyStations = null): array
     {
         if ($warehouseIds === []) {
             return [];
@@ -277,6 +287,7 @@ class FuelTankerFillInventoryReadiness
             ->where('f.tenant_id', $tenantId)
             ->where('f.status', FuelTankerFill::STATUS_RECORDED)->where('f.inventory_status', FuelTankerFill::INVENTORY_PENDING_INTEGRATION)
             ->whereIn('s.warehouse_id', $warehouseIds)
+            ->when($onlyStations !== null, fn ($q) => $q->whereIn('f.fuel_station_id', $onlyStations))
             ->groupBy('s.warehouse_id', 'p.product_id')
             ->selectRaw('s.warehouse_id as warehouse_id, p.product_id as product_id, COUNT(*) as pending_count, SUM(f.quantity_milliliters) as pending_total')
             ->get();

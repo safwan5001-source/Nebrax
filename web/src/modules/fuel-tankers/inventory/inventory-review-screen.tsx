@@ -198,6 +198,7 @@ function PoolRow({ pool }: { pool: PoolSummary }) {
       </div>
       <p className="text-muted">{t('pools.costPool')}: <span className="num">{litersOf(pool.costPoolMilliliters)}</span> {t('liters')}</p>
       <p className="text-muted">{t('pools.pending', { count: pool.pendingCount, liters: litersOf(pool.pendingTotalMilliliters) })}</p>
+      {pool.sharedWithOtherStations ? <p className="text-xs text-muted" data-pool-shared="">{t('pools.shared')}</p> : null}
       {pool.shortfallMilliliters !== null && pool.shortfallMilliliters > 0 ? <p className="text-negative">{t('pools.shortfall', { liters: litersOf(pool.shortfallMilliliters) })}</p> : null}
     </li>
   );

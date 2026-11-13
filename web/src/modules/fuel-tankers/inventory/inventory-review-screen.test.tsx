@@ -36,7 +36,7 @@ const payload = (rows: unknown[] = [row()], meta: Record<string, unknown> = {}) 
   meta: {
     page: 1, per_page: 25, total: rows.length, last_page: 1, truncated: false, posting_enabled: false, reconciliation_requirements: ['pool_quantity_equals_warehouse_stock', 'pool_value_equals_fuel_share_of_ledger_1140'],
     summary: { total: rows.length, ready: 0, needs_review: 0, blocked: rows.length, overdue: 1 },
-    pools: [{ warehouse_id: 'w1', warehouse_name: 'المخزن الرئيسي', fuel_product_id: 'p1', fuel_product_name: 'بنزين 91', stock_milliliters: 0, cost_pool_milliliters: 500, quantity_in_sync: false, pending_count: 1, pending_total_milliliters: 2_000_000, shortfall_milliliters: 2_000_000 }],
+    pools: [{ warehouse_id: 'w1', warehouse_name: 'المخزن الرئيسي', fuel_product_id: 'p1', fuel_product_name: 'بنزين 91', stock_milliliters: 0, cost_pool_milliliters: 500, quantity_in_sync: false, shared_with_other_stations: true, pending_count: 1, pending_total_milliliters: 2_000_000, shortfall_milliliters: 2_000_000 }],
     ...meta,
   },
 });
@@ -60,6 +60,7 @@ describe.each(['ar', 'en'] as const)('InventoryReviewScreen (%s)', (locale) => {
     expect(rowEl.textContent).toContain('FTF-2027-00001');
     expect(rowEl.textContent).toContain('04052');
     expect(document.querySelector('[data-inventory-pools]')?.textContent).toContain(text.pools.outOfSync);
+    expect(document.querySelector('[data-pool-shared]')?.textContent).toBe(text.pools.shared);
     expect(document.querySelector('[data-pool-title]')?.textContent).toBe('المخزن الرئيسي · بنزين 91');
     expect(document.querySelector('[data-reconciliation]')?.textContent).toContain(text.requirements.ledgerNotChecked);
   });
