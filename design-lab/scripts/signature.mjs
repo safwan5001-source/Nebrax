@@ -250,6 +250,21 @@ test('Keyboard actions update recovery: Ctrl+S survives a reload with no "unsave
   await page.evaluate(() => localStorage.clear()); await ctx.close();
 });
 
+test('Enter in a filtered invoice skips hidden rows; Enter on the last visible row adds a visible, focused line', async () => {
+  const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
+  await page.fill('#sales-lq', 'CMT'); await page.waitForTimeout(250);
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.lines tbody tr')].filter(tr => !tr.hidden).map(tr => tr.dataset.line));
+  const all = await page.evaluate(() => [...document.querySelectorAll('.lines tbody tr')].map(tr => tr.dataset.line));
+  assert(shown.length >= 2 && all.indexOf(shown[1]) - all.indexOf(shown[0]) > 1, 'precondition: find leaves a gap ' + JSON.stringify(shown));
+  await page.focus(`#sales-l${shown[0]}-qty`); await page.keyboard.press('Enter');
+  const f1 = await page.evaluate(() => document.activeElement?.id);
+  assert(f1 === `sales-l${shown[1]}-qty`, `Enter went to ${f1}, expected next visible line ${shown[1]}`);
+  await page.focus(`#sales-l${shown[shown.length - 1]}-qty`); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
+  const f2 = await page.evaluate(() => { const a = document.activeElement; return { id: a?.id, hidden: a?.closest('tr')?.hidden, lq: window.__fx.S.docs.sales.lq, n: window.__fx.S.docs.sales.lines.length }; });
+  assert(/^sales-l\d+-qty$/.test(f2.id || '') && !f2.hidden && f2.lq === '' && f2.n === all.length + 1, 'last visible row did not add a visible focused line ' + JSON.stringify(f2));
+  await ctx.close();
+});
+
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
   const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });

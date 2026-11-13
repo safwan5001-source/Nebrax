@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T20:16:16.463Z",
+ "generated": "2026-11-13T20:22:24.747Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3014,6 +3014,10 @@
    "ok": true
   },
   {
+   "name": "Enter in a filtered invoice skips hidden rows; Enter on the last visible row adds a visible, focused line",
+   "ok": true
+  },
+  {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
    "ok": true
   },
@@ -3040,7 +3044,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 16,
+   "tests": 17,
    "failed": 0
   },
   "matrix": {
