@@ -35,6 +35,8 @@ const AR = {
   today:'الثلاثاء، 10 نوفمبر 2026', demoData:'بيانات تجريبية', quick:'إجراءات سريعة',
   qaSales:'فاتورة مبيعات', qaPurch:'فاتورة مشتريات', qaReceipt:'سند قبض', qaPermit:'إذن مخزني', qaShift:'وردية المحطة',
   kpis:'المؤشرات المالية', kRev:'الإيرادات · الشهر حتى اليوم', kCash:'النقد والبنوك', kAR:'الذمم المدينة', kAP:'مستحق للموردين خلال 7 أيام', kMargin:'هامش الربح الإجمالي', kVat:'ضريبة القيمة المضافة المستحقة',
+  /* phone labels (R2): shorter, same accounting meaning; the time context stays (الشهر · 7 أيام) and the footer keeps the comparison basis */
+  kRevS:'إيرادات الشهر', kAPS:'مستحق للموردين · 7 أيام', kVatS:'ض.ق.م المستحقة',
   vsOct:'مقارنة بالفترة نفسها من أكتوبر', vsWeek:'منذ بداية الأسبوع', nAccounts:'5 حسابات', overdue:'متأخر', bills:'6 فواتير موردين', pts:'نقطة', vatDue:'الربع الرابع · الإقرار حتى 31 يناير 2027',
   attn:'يحتاج انتباهك', attnSub:'مرتّب حسب الأثر المالي',
   a1:'4 فواتير متأخرة أكثر من 30 يوماً', a1m:'أقدمها 46 يوماً · مؤسسة الخليج الحديثة للتجارة', a1b:'عرض وتذكير',
@@ -59,6 +61,7 @@ const EN = {
   today:'Tuesday, 10 November 2026', demoData:'Sample data', quick:'Quick actions',
   qaSales:'Sales invoice', qaPurch:'Purchase invoice', qaReceipt:'Receipt voucher', qaPermit:'Stock permit', qaShift:'Station shift',
   kpis:'Financial indicators', kRev:'Revenue · month to date', kCash:'Cash & banks', kAR:'Receivables', kAP:'Payables due in 7 days', kMargin:'Gross margin', kVat:'VAT payable',
+  kRevS:'Revenue · MTD', kAPS:'Payables · 7 days', kVatS:'VAT payable',
   vsOct:'vs same period in October', vsWeek:'since start of week', nAccounts:'5 accounts', overdue:'Overdue', bills:'6 supplier bills', pts:'pts', vatDue:'Q4 · return due 31 Jan 2027',
   attn:'Needs your attention', attnSub:'Ordered by financial impact',
   a1:'4 invoices overdue by 30+ days', a1m:'Oldest 46 days · Modern Gulf Trading Est.', a1b:'Review & remind',
@@ -128,12 +131,13 @@ function dashboard(api) {
   const { t, ic, money, statusBadge, S, esc, nm, INV, invStatus, fmtDate, grp } = api;
   const loading = S.demo === 'loading', failed = S.demo === 'error';
   const sk = (w = '60%') => `<span class="sk" style="width:${w};display:block;height:14px"></span>`;
-  const kpi = (x) => `<li class="kpi" data-k="${x.k}"><div class="kpi-h">${ic(x.icon)}<span>${t(x.k)}</span></div>
+  const kpi = (x) => `<li class="kpi" data-k="${x.k}"><div class="kpi-h">${ic(x.icon)}<span>${SHORT_KPI.has(x.k) ? `<span class="kl has-s">${t(x.k)}</span><span class="ks">${t(x.k + 'S')}</span>` : t(x.k)}</span></div>
     ${loading ? `<div class="kpi-v">${sk('70%')}</div>` : `<div class="kpi-v">${x.pct ? `<span class="m pct">${x.pct}</span>` : money(x.v)}</div>`}
     <div class="kpi-f">${x.delta ? `<span class="delta ${x.good ? 'good' : 'bad'}">${ic(x.delta.startsWith('+') ? 'trendUp' : 'trendDown')}<b class="num">${x.delta}</b>${x.unit ? ` ${t(x.unit)}` : ''}</span><span class="muted">${t(x.note || '')}</span>` : ''}${x.overdue ? `<span class="delta bad">${ic('alert')}${t('overdue')} <b>${money(x.overdue, { sym: false })}</b></span>` : ''}${x.sub ? `<span class="muted">${t(x.sub)}</span>` : ''}</div>
     ${loading ? '' : spark(x.spark)}</li>`;
+  const SHORT_KPI = new Set(['kRev', 'kAP', 'kVat']);
   const att = [['neg','alert','a1',38645000,'sales'],['warn','fuel','a2',null,'shift'],['warn','box','a3',null,'inventory'],['info','file','a4',null,'sales'],['neutral','calendar','a5',null,'']];
-  const attItem = ([sev, icn, k, amt, route]) => `<li class="att sev-${sev}"><span class="sev">${ic(icn)}</span><div class="tx"><b>${t(k)}</b><span>${t(k + 'm')}</span></div>${amt ? `<span class="amt">${money(amt)}</span>` : '<span class="amt"></span>'}<button type="button" class="btn sm" ${route ? `data-route="${route}"` : `data-act="v3-na"`}>${t(k + 'b')}</button></li>`;
+  const attItem = ([sev, icn, k, amt, route]) => `<li class="att sev-${sev}${amt ? ' has-amt' : ''}"><span class="sev">${ic(icn)}</span><div class="tx"><b>${t(k)}</b><span>${t(k + 'm')}</span></div>${amt ? `<span class="amt">${money(amt)}</span>` : '<span class="amt"></span>'}<button type="button" class="btn sm" ${route ? `data-route="${route}"` : `data-act="v3-na"`}>${t(k + 'b')}</button></li>`;
   const maxC = Math.max(...CASH.flatMap(([, a, b]) => [a, b]));
   const cashBars = CASH.map(([m, a, b], i) => `<div class="mo${i === CASH.length - 1 ? ' cur' : ''}"><div class="pair" aria-hidden="true"><i class="in" style="--h:${(a / maxC * 100).toFixed(1)}%"></i><i class="out" style="--h:${(b / maxC * 100).toFixed(1)}%"></i></div><span class="lb">${t(m)}${i === CASH.length - 1 ? `<small>${t('partial')}</small>` : ''}</span></div>`).join('');
   const [, ci, co] = CASH[CASH.length - 1];

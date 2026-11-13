@@ -1,11 +1,12 @@
 """Builds the Liwan refinement comparison sheets from the PNGs written by liwan-previews.mjs --commit
 (before-* and after-*), then deletes the PNGs so only a few webp sheets enter Git.
 Each sheet: Liwan before | Liwan after | Nasaq reference (the original, captured before the refinement).
-Usage: python3 design-lab/signature/tools/liwan-previews-webp.py  (needs Pillow)."""
-import glob, os
+Usage: python3 design-lab/signature/tools/liwan-previews-webp.py [set]   (set defaults to liwan; needs Pillow).
+Sheets whose PNGs are missing are skipped; an English capture (…-en.png) gets its own sheet."""
+import glob, os, sys
 from PIL import Image, ImageDraw, ImageFont
 
-d = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'previews', 'liwan')
+d = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'previews', sys.argv[1] if len(sys.argv) > 1 else 'liwan')
 os.chdir(d)
 bold = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 font = ImageFont.truetype(bold, 30) if os.path.exists(bold) else ImageFont.load_default()
@@ -31,7 +32,8 @@ def load(name, h):
     return im.resize((im.width // 2, im.height // 2), Image.LANCZOS)  # sheets at 1x keep Git light
 
 
-for sheet, shot, h, ref in SHEETS:
+for (sheet, shot, h, ref), sfx in [(x, s) for x in SHEETS for s in ('', '-en')]:
+    sheet, shot = sheet + sfx, shot + sfx
     cols = [('LIWAN BEFORE', load(f'before-liwan-{shot}', h)), ('LIWAN AFTER', load(f'after-liwan-{shot}', h))]
     if ref:
         cols.append(('NASAQ (REFERENCE)', load(f'before-nasaq-{shot}', h)))

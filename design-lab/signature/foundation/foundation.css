@@ -73,14 +73,15 @@
 .nav-a:focus-visible{outline-color:var(--awj-shell-focus-ring);outline-offset:-2px}
 .side-foot{padding:10px;border-top:1px solid var(--awj-shell-line)}
 /* Rail (medium) */
-.rail{width:72px;display:none;flex-direction:column;align-items:stretch;gap:2px;padding:10px 6px;height:100%;overflow:auto}
+.rail{width:72px;display:none;flex-direction:column;align-items:stretch;gap:2px;padding:10px 4px;height:100%;overflow:auto}
 .rail .mk{width:36px;height:36px;margin:0 auto 10px;border-radius:9px;display:grid;place-items:center;background:var(--awj-shell-brandmark-bg);color:var(--awj-shell-bg);font-weight:800}
 .rail-b{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;justify-content:center;border:0;background:transparent;color:var(--awj-shell-fg-muted);border-radius:10px;font-size:10.5px;padding:4px 2px}
 .rail-b svg{width:20px;height:20px}
 .rail-b:hover{background:var(--awj-shell-hover);color:var(--awj-shell-fg)}
 .rail-b[aria-current="true"]{background:var(--awj-shell-active-bg);color:var(--awj-shell-active-fg);box-shadow:var(--awj-shell-active-shadow)}
 .rail-b[aria-current="true"] svg{color:var(--awj-shell-apex)}
-.rail-b .lbl{max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* R2: a group name wraps to two centred lines instead of being cut ("العملاء والمو…") */
+.rail-b .lbl{max-width:100%;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;hyphens:auto}
 .rail-b:focus-visible{outline-color:var(--awj-shell-focus-ring);outline-offset:-2px}
 /* Bottom bar (compact) */
 .bbar{display:none;grid-area:bbar;align-items:stretch;justify-content:space-around;background:var(--awj-surface-paper);border-top:1px solid var(--awj-border-hairline);padding:4px 4px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
@@ -289,17 +290,17 @@ table.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .navlist .sheet-a svg{width:20px;height:20px}
 .navlist .sheet-a[aria-current="page"] svg{color:var(--awj-action-primary)}
 .navlist .sheet-a[aria-current="page"]::before{content:"";position:absolute;inset-inline-start:0;inset-block:10px;width:3px;border-radius:2px;background:var(--awj-action-primary)}
-.navlist .sheet-a:focus-visible,.freq-a:focus-visible{outline-offset:-2px}
-/* frequent: the screens used every day, one tap from the menu — a shortcut row above the full, unchanged group order */
-.nav-freq{padding-block:2px 12px;border-bottom:1px solid var(--awj-border-hairline)}
-.nav-freq .sheet-grp{padding:8px 10px 6px;font-size:12px;letter-spacing:.02em}
-.freq-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px}
-.freq-a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:64px;padding:8px 4px;border:1px solid var(--awj-border-hairline);border-radius:var(--awj-radius-control);background:transparent;color:var(--awj-text-primary);font-size:12px;line-height:1.25;text-align:center}
-.freq-a span{overflow-wrap:anywhere}
-.freq-a svg{width:20px;height:20px;flex:none;color:var(--awj-text-tertiary)}
-.freq-a:hover{background:var(--awj-state-hover)}
-.freq-a[aria-current="page"]{background:var(--awj-state-selected);border-color:var(--awj-action-primary);font-weight:600}
-.freq-a[aria-current="page"] svg{color:var(--awj-action-primary)}
+.navlist .sheet-a:focus-visible,.quick-a:focus-visible{outline-offset:-2px}
+/* quick access: shortcut tiles above the full, unchanged group order */
+.nav-quick{padding-block:2px 12px;border-bottom:1px solid var(--awj-border-hairline)}
+.nav-quick .sheet-grp{padding:8px 10px 6px;font-size:12px;letter-spacing:.02em}
+.quick-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px}
+.quick-a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:64px;padding:8px 4px;border:1px solid var(--awj-border-hairline);border-radius:var(--awj-radius-control);background:transparent;color:var(--awj-text-primary);font-size:12px;line-height:1.25;text-align:center}
+.quick-a span{overflow-wrap:anywhere}
+.quick-a svg{width:20px;height:20px;flex:none;color:var(--awj-text-tertiary)}
+.quick-a:hover{background:var(--awj-state-hover)}
+.quick-a[aria-current="page"]{background:var(--awj-state-selected);border-color:var(--awj-action-primary);font-weight:600}
+.quick-a[aria-current="page"] svg{color:var(--awj-action-primary)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--awj-border-hairline);padding:0 12px}
 .tabs button{position:relative;border:0;background:transparent;padding:10px 12px;color:var(--awj-text-secondary);font-size:13px}
 .tabs button[aria-selected="true"]{color:var(--awj-text-primary);font-weight:600}
@@ -496,7 +497,7 @@ table.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 }
 @container fx (max-width:359px){.lines tr{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.fx *,.fx *::before,.fx *::after{animation:none!important;transition:none!important}}
-@media (forced-colors:active){.nav-a[aria-current="page"]::before,.navlist .sheet-a[aria-current="page"]::before{background:Highlight}.rail-b[aria-current="true"],.freq-a[aria-current="page"]{outline:2px solid Highlight}}
+@media (forced-colors:active){.nav-a[aria-current="page"]::before,.navlist .sheet-a[aria-current="page"]::before{background:Highlight}.rail-b[aria-current="true"],.quick-a[aria-current="page"]{outline:2px solid Highlight}}
 
 /* ---------- Direction: directional glyphs mirror in RTL (back, chevrons). Non-directional icons never mirror. ---------- */
 .fx[dir="rtl"] .dir-icon{transform:scaleX(-1)}

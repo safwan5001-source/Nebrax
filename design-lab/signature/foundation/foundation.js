@@ -82,7 +82,7 @@ const T = {
     employees:'الموظفون', payroll:'مسيّر الرواتب', workorders:'أوامر الشغل', shift:'وردية المحطة', stations:'المحطات', tanks:'الخزانات',
     taxSettings:'إعدادات الضرائب', roles:'الأدوار والصلاحيات', reports:'التقارير',
     kit:'مكتبة المكوّنات', numbers:'مختبر الأرقام (M2)', rules:'قواعد الأرقام والإجراءات', identity:'طبقة الهوية',
-    search:'ابحث أو نفّذ أمراً…', searchShort:'بحث', create:'إنشاء', inbox:'الوارد', menu:'القائمة', frequent:'الأكثر استخداماً', notOnLab:'هذه الوحدة غير ممثّلة في المختبر',
+    search:'ابحث أو نفّذ أمراً…', searchShort:'بحث', create:'إنشاء', inbox:'الوارد', menu:'القائمة', quickAccess:'وصول سريع', notOnLab:'هذه الوحدة غير ممثّلة في المختبر',
     branch:'الفرع', period:'الفترة', allBranches:'كل الفروع', periodOpen:'نوفمبر 2026 · مفتوحة', periodLocked:'مقفلة', ctxTitle:'سياق العمل',
     br_dmm:'الدمام', br_jbl:'الجبيل', br_khb:'الخبر', brChanged:'تغيّر الفرع النشط',
     priority:'الأولوية', all:'الكل', inbox1:'وردية الجبيل الصناعية بانتظار اعتمادك', inbox1d:'فرق نقدي −35.00 مع سبب مسجّل', inbox2:'3 فواتير تجاوزت 60 يوماً', inbox2d:'أكبرها لشركة الواحة بقيمة 148,920.00', inbox3:'أسمنت بورتلاندي تحت حد الطلب في الجبيل', inbox3d:'الرصيد 40 كيس · حد الطلب 120', open:'فتح', snooze:'تأجيل',
@@ -149,7 +149,7 @@ const T = {
     employees:'Employees', payroll:'Payroll', workorders:'Work orders', shift:'Station shift', stations:'Stations', tanks:'Tanks',
     taxSettings:'Tax settings', roles:'Roles & permissions', reports:'Reports',
     kit:'Component kit', numbers:'Numbers lab (M2)', rules:'Number & action rules', identity:'Identity layer',
-    search:'Search or run a command…', searchShort:'Search', create:'Create', inbox:'Inbox', menu:'Menu', frequent:'Frequent', notOnLab:'This module is not represented in the lab',
+    search:'Search or run a command…', searchShort:'Search', create:'Create', inbox:'Inbox', menu:'Menu', quickAccess:'Quick access', notOnLab:'This module is not represented in the lab',
     branch:'Branch', period:'Period', allBranches:'All branches', periodOpen:'Nov 2026 · open', periodLocked:'locked', ctxTitle:'Work context',
     br_dmm:'Dammam', br_jbl:'Jubail', br_khb:'Khobar', brChanged:'Active branch changed',
     priority:'Priority', all:'All', inbox1:'Jubail Industrial shift awaits your approval', inbox1d:'Cash variance −35.00 with a logged reason', inbox2:'3 invoices past 60 days', inbox2d:'Largest is Al Waha at 148,920.00', inbox3:'Portland cement below reorder in Jubail', inbox3d:'On hand 40 bags · reorder at 120', open:'Open', snooze:'Snooze',
@@ -697,10 +697,12 @@ function overlay() {
   if (o.t === 'palette') return `<div class="ovl top" data-scrim>${palette()}</div>`;
   const sheet = (title, body, side = 'start', cls = '') => `<div class="ovl ${windowClass() === 'compact' ? 'bottom' : side}" data-scrim><div class="sheet${cls ? ' ' + cls : ''}" role="dialog" aria-modal="true" aria-label="${title}"><div class="sheet-h"><h3>${title}</h3><button type="button" class="ibtn" data-act="close" aria-label="${t('close')}">${ic('x')}</button></div><div class="sheet-b">${body}</div></div></div>`;
   const navItem = (it, icn) => { const [k, r] = it; return `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}" data-icon="${navIcon(it) || icn}" ${r === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span class="lbl">${t(k)}</span></button>`; };
-  // Frequent: every NAV item that has a screen, in NAV order — a shortcut row, not a re-ordering of the groups below.
-  const frequent = NAV.flatMap(([, icn, items]) => items.filter(([, r]) => r && ROUTES.includes(r) && !['home','kit','numbers','rules','identity','dashboard'].includes(r) /* dashboard is already on the bottom bar */).map(it => [it, icn]));
-  const freqRow = frequent.length > 1 ? `<div class="nav-freq" role="group" aria-label="${t('frequent')}"><div class="sheet-grp">${t('frequent')}</div><div class="freq-g">${frequent.map(([it, icn]) => `<button type="button" class="freq-a" data-route="${it[1]}" data-label="${it[0]}" ${it[1] === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span>${t(it[0])}</span></button>`).join('')}</div></div>` : '';
-  if (o.t === 'navsheet') return sheet(t('menu'), `${freqRow}<div class="navlist">${NAV.map(([g, icn, items]) => `<div class="nav-sec"><div class="sheet-grp">${t(g)}</div>${items.map(it => navItem(it, icn)).join('')}</div>`).join('')}</div>`, 'start', 'sheet-nav');
+  /* Quick access: lab data — every NAV item that has a screen here, in NAV order; a shortcut row, not a re-ordering of the
+     groups below, and no usage tracking. In the product this list must be filtered by the user's permissions (never offer a
+     screen the server would refuse) and be adjustable as a user preference. */
+  const quick = NAV.flatMap(([, icn, items]) => items.filter(([, r]) => r && ROUTES.includes(r) && !['home','kit','numbers','rules','identity','dashboard'].includes(r) /* dashboard is already on the bottom bar */).map(it => [it, icn]));
+  const quickRow = quick.length > 1 ? `<div class="nav-quick" role="group" aria-label="${t('quickAccess')}"><div class="sheet-grp">${t('quickAccess')}</div><div class="quick-g">${quick.map(([it, icn]) => `<button type="button" class="quick-a" data-route="${it[1]}" data-label="${it[0]}" ${it[1] === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span>${t(it[0])}</span></button>`).join('')}</div></div>` : '';
+  if (o.t === 'navsheet') return sheet(t('menu'), `${quickRow}<div class="navlist">${NAV.map(([g, icn, items]) => `<div class="nav-sec"><div class="sheet-grp">${t(g)}</div>${items.map(it => navItem(it, icn)).join('')}</div>`).join('')}</div>`, 'start', 'sheet-nav');
   if (o.t === 'group') { const [g, icn, items] = NAV.find(n => n[0] === o.g); return sheet(t(g), `<div class="navlist">${items.map(it => navItem(it, icn)).join('')}</div>`, 'start', 'sheet-nav'); }
   if (o.t === 'create') return sheet(t('create'), [['newSales','file-plus-2','sales'],['newPurch','file-input','purchase'],['newReceipt','hand-coins',null],['newPermit','package-check',null]].map(([k, i, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}">${icon(i)}${t(k)}</button>`).join(''));
   if (o.t === 'context') return sheet(t('ctxTitle'), `<div class="sheet-grp">${t('branch')}</div>${['dmm','jbl','khb'].map(b => `<button type="button" class="sheet-a" data-branch="${b}" ${S.branch === b ? 'aria-current="page"' : ''}>${ic('building')}${t('br_' + b)}</button>`).join('')}<div class="sheet-grp">${t('period')}</div><div class="sheet-a" style="cursor:default">${ic('calendar')}${t('periodOpen')}</div><div class="sheet-a" style="cursor:default;color:var(--awj-text-tertiary)">${ic('lock')}${S.lang === 'ar' ? 'سبتمبر 2026 · مقفلة' : 'Sep 2026 · locked'}</div>`);

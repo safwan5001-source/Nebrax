@@ -422,25 +422,27 @@ test('Sidebar keeps its scroll position across re-renders, and a route change br
   }
 });
 
-test('Mobile menu: frequent screens one tap away (≥ 44px, current marked), full group order below unchanged', async () => {
+test('Mobile menu: quick access one tap away (≥ 44px, current marked, labelled «وصول سريع»), full group order below unchanged', async () => {
   for (const identity of IDS) for (const l of ['ar', 'en']) {
     const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=sales`, { width: 390, height: 844 }, { reducedMotion: 'reduce' });
     await page.click('.bbar [data-act="navsheet"]');
     const r = await page.evaluate(() => {
-      const tiles = [...document.querySelectorAll('.nav-freq .freq-a')];
+      const tiles = [...document.querySelectorAll('.nav-quick .quick-a')];
       const vw = document.documentElement.clientWidth;
       return { routes: tiles.map(b => b.dataset.route), minH: Math.min(...tiles.map(b => b.offsetHeight)), minW: Math.min(...tiles.map(b => b.offsetWidth)),
         current: tiles.filter(b => b.getAttribute('aria-current') === 'page').map(b => b.dataset.route),
         clipped: tiles.filter(b => b.scrollWidth > b.clientWidth + 1).length, inside: tiles.every(b => { const q = b.getBoundingClientRect(); return q.left >= 0 && q.right <= vw; }),
         order: [...document.querySelectorAll('.navlist .nav-sec .sheet-grp')].map(h => h.textContent), navOrder: window.__fx.NAV.map(([g]) => window.__fx.API.t(g)) };
     });
-    assert(JSON.stringify(r.routes) === JSON.stringify(['sales', 'purchase', 'inventory', 'shift']), `${identity}/${l}: frequent ${r.routes}`);
+    assert(JSON.stringify(r.routes) === JSON.stringify(['sales', 'purchase', 'inventory', 'shift']), `${identity}/${l}: quick access ${r.routes}`);
+    const head = await page.evaluate(() => document.querySelector('.nav-quick .sheet-grp').textContent);
+    assert(head === (l === 'ar' ? 'وصول سريع' : 'Quick access'), `${identity}/${l}: quick access heading ${head}`);
     assert(r.minH >= 44 && r.minW >= 44, `${identity}/${l}: tile ${r.minW}x${r.minH}`);
     assert(JSON.stringify(r.current) === '["sales"]', `${identity}/${l}: current ${r.current}`);
     assert(r.clipped === 0 && r.inside, `${identity}/${l}: tile label clipped or off-screen`);
     assert(JSON.stringify(r.order) === JSON.stringify(r.navOrder), `${identity}/${l}: group order changed`);
-    await page.click('.nav-freq [data-route="inventory"]'); await page.waitForTimeout(60);
-    assert(await page.evaluate(() => window.__fx.S.route === 'inventory' && !window.__fx.S.overlay), `${identity}/${l}: frequent tile did not navigate`);
+    await page.click('.nav-quick [data-route="inventory"]'); await page.waitForTimeout(60);
+    assert(await page.evaluate(() => window.__fx.S.route === 'inventory' && !window.__fx.S.overlay), `${identity}/${l}: quick-access tile did not navigate`);
     await ctx.close();
   }
 });
@@ -498,6 +500,46 @@ test('"#app" from the compare view shows the app, not a blank page', async () =>
   const r = await page.evaluate(() => { const st = document.getElementById('stage'), b = st.getBoundingClientRect(); return { display: getComputedStyle(st).display, w: b.width, h: b.height, app: !!document.querySelector('#fx-app .fx-shell') }; });
   assert(r.display !== 'none' && r.w > 0 && r.h > 0 && r.app, '#app from compare is blank ' + JSON.stringify(r));
   await ctx.close();
+});
+
+/* ---- Liwan refinement R2 (regression) ---- */
+test('Phone KPI labels: short, one line, keep the time context; desktop keeps the full labels', async () => {
+  for (const identity of IDS) for (const l of ['ar', 'en']) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=dashboard`, { width: 390, height: 844 });
+    const r = await page.evaluate(() => [...document.querySelectorAll('.kpi')].map(k => { const sp = k.querySelector('.kpi-h > span'), lh = parseFloat(getComputedStyle(sp).lineHeight); return { k: k.dataset.k, text: sp.innerText.trim(), lines: Math.round(sp.getBoundingClientRect().height / lh) }; }));
+    for (const x of r) assert(x.lines === 1, `${identity}/${l}: ${x.k} label on ${x.lines} lines "${x.text}"`);
+    const by = Object.fromEntries(r.map(x => [x.k, x.text]));
+    assert(l === 'ar' ? /الشهر/.test(by.kRev) && /7/.test(by.kAP) && /المستحقة/.test(by.kVat) : /MTD/.test(by.kRev) && /7/.test(by.kAP) && /payable/.test(by.kVat), `${identity}/${l}: time/accounting context lost ${JSON.stringify(by)}`);
+    await page.setViewportSize({ width: 1366, height: 900 }); await page.waitForTimeout(80);
+    const full = await page.evaluate(() => document.querySelector('.kpi[data-k="kRev"] .kpi-h > span').innerText.trim());
+    assert(l === 'ar' ? full === 'الإيرادات · الشهر حتى اليوم' : full === 'Revenue · month to date', `${identity}/${l}: desktop label ${full}`);
+    await ctx.close();
+  }
+});
+
+test('Tablet rail: every group name is readable in full (wraps, never cut)', async () => {
+  for (const identity of IDS) for (const l of ['ar', 'en']) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=purchase`, { width: 834, height: 1112 });
+    const bad = await page.evaluate(() => [...document.querySelectorAll('.rail .rail-b .lbl')].filter(s => s.scrollHeight > s.clientHeight + 1 || s.scrollWidth > s.clientWidth + 1).map(s => s.textContent));
+    assert(bad.length === 0, `${identity}/${l}: rail labels cut ${bad}`);
+    await ctx.close();
+  }
+});
+
+test('Phone «needs attention»: an item without an amount keeps its action beside the text; targets ≥ 44px; nothing overflows', async () => {
+  for (const identity of IDS) for (const l of ['ar', 'en']) for (const w of [390, 360]) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=dashboard`, { width: w, height: 844 });
+    const r = await page.evaluate(() => [...document.querySelectorAll('.att')].map(li => {
+      const tx = li.querySelector('.tx').getBoundingClientRect(), b = li.querySelector('.btn').getBoundingClientRect(), box = li.getBoundingClientRect();
+      return { amt: li.classList.contains('has-amt'), sameRow: b.top < tx.bottom, btnH: b.height, inside: b.left >= box.left - 0.5 && b.right <= box.right + 0.5, sub: parseFloat(getComputedStyle(li.querySelector('.tx span')).fontSize) };
+    }));
+    for (const x of r) {
+      assert(x.btnH >= 44 && x.inside, `${identity}/${l}/${w}: action ${JSON.stringify(x)}`);
+      assert(x.sub >= 12.5, `${identity}/${l}/${w}: secondary text ${x.sub}px`);
+      if (!x.amt) assert(x.sameRow, `${identity}/${l}/${w}: action on its own row ${JSON.stringify(x)}`);
+    }
+    await ctx.close();
+  }
 });
 
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {

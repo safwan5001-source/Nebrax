@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T23:37:17.908Z",
+ "generated": "2026-11-13T23:46:50.386Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3046,7 +3046,7 @@
    "ok": true
   },
   {
-   "name": "Mobile menu: frequent screens one tap away (≥ 44px, current marked), full group order below unchanged",
+   "name": "Mobile menu: quick access one tap away (≥ 44px, current marked, labelled «وصول سريع»), full group order below unchanged",
    "ok": true
   },
   {
@@ -3055,13 +3055,23 @@
   },
   {
    "name": "An active line search keeps its field when deletions bring the invoice to ten lines or fewer",
-   "ok": false,
-   "error": "lines hidden by a find with no field to clear it {\"n\":10,\"hidden\":6,\"field\":false}"
+   "ok": true
   },
   {
    "name": "\"#app\" from the compare view shows the app, not a blank page",
-   "ok": false,
-   "error": "#app from compare is blank {\"display\":\"none\",\"w\":0,\"h\":0,\"app\":true}"
+   "ok": true
+  },
+  {
+   "name": "Phone KPI labels: short, one line, keep the time context; desktop keeps the full labels",
+   "ok": true
+  },
+  {
+   "name": "Tablet rail: every group name is readable in full (wraps, never cut)",
+   "ok": true
+  },
+  {
+   "name": "Phone «needs attention»: an item without an amount keeps its action beside the text; targets ≥ 44px; nothing overflows",
+   "ok": true
   },
   {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
@@ -3090,8 +3100,8 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 28,
-   "failed": 2
+   "tests": 31,
+   "failed": 0
   },
   "matrix": {
    "configs": 370,
