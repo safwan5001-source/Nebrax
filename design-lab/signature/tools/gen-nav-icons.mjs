@@ -9,11 +9,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const lucide = path.resolve(here, '../../../web/node_modules/lucide-react');
 const outFile = path.resolve(here, '../nav-icons.js');
 
-// One icon per navigation item. Names are Lucide's own; meaning is documented in design-lab/signature/docs/AWJ-SIGNATURE-V3-NAV-ICONS-REPORT.md.
+// One icon per navigation item and group. Names are Lucide's own; meaning is documented in design-lab/signature/docs/AWJ-SIGNATURE-V3-NAV-ICONS-REPORT.md.
 export const NAMES = [
   'layout-dashboard', 'file-plus-2', 'files', 'file-text', 'file-minus-2', 'file-input', 'clipboard-list', 'building-2',
   'boxes', 'package-check', 'clipboard-check', 'users', 'scroll-text', 'book-open-text', 'list-tree', 'landmark',
   'receipt-text', 'id-card', 'banknote', 'wrench', 'calendar-clock', 'fuel', 'cylinder', 'percent', 'shield-check', 'chart-column',
+  // group icons (tablet rail) and shared actions — one Lucide family for the whole navigation
+  'house', 'shopping-cart', 'truck', 'package', 'calculator', 'hard-hat', 'settings', 'hand-coins', 'flask-conical',
 ];
 
 const version = JSON.parse(fs.readFileSync(path.join(lucide, 'package.json'), 'utf8')).version;

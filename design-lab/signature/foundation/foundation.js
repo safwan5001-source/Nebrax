@@ -61,8 +61,15 @@ const ic = (n, cls = '') => svg(P[n] || '', cls, DIRECTIONAL.has(n));
 const NAVP = window.AWJ_NAV_ICONS || {};
 const navIcon = (item) => (item[2] && NAVP[item[2]] ? item[2] : null);
 /** On opening the menu/group sheet, bring the current page's item into view (below the sticky sheet header). */
-const revealNav = () => app.querySelector('.navlist [aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
-const navIc = (item, groupIcon) => { const n = navIcon(item); return n ? svg(NAVP[n], 'nav-ic') : ic(groupIcon, 'nav-ic'); };
+/** Navigation and shared actions draw from ONE family: the Lucide dictionary first, the foundation set only as a fallback
+ *  (both sets name some shapes alike — users, fuel — and navigation must not mix the two). */
+const icon = (n, cls = '') => (NAVP[n] ? svg(NAVP[n], cls) : ic(n, cls));
+/** Scroll a nav container (sidebar list or menu sheet) so its current item is visible below any sticky header — the container
+ *  only, never the page: scrollIntoView would also scroll the document in embedded/compact frames. */
+const keepInView = (box, el, pad = 8) => { if (!box || !el) return; const b = box.getBoundingClientRect(), r = el.getBoundingClientRect(), head = box.querySelector('.sheet-h')?.getBoundingClientRect().height || 0;
+  if (r.top < b.top + head + pad) box.scrollTop -= (b.top + head + pad) - r.top; else if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad); };
+const revealNav = () => keepInView(app.querySelector('.sheet-nav'), app.querySelector('.navlist [aria-current="page"]'));
+const navIc = (item, groupIcon) => { const n = navIcon(item); return n ? svg(NAVP[n], 'nav-ic') : icon(groupIcon, 'nav-ic'); };
 
 /* ------------------------------------------------------------------ i18n */
 const T = {
@@ -75,7 +82,7 @@ const T = {
     employees:'الموظفون', payroll:'مسيّر الرواتب', workorders:'أوامر الشغل', shift:'وردية المحطة', stations:'المحطات', tanks:'الخزانات',
     taxSettings:'إعدادات الضرائب', roles:'الأدوار والصلاحيات', reports:'التقارير',
     kit:'مكتبة المكوّنات', numbers:'مختبر الأرقام (M2)', rules:'قواعد الأرقام والإجراءات', identity:'طبقة الهوية',
-    search:'ابحث أو نفّذ أمراً…', searchShort:'بحث', create:'إنشاء', inbox:'الوارد', menu:'القائمة', notOnLab:'هذه الوحدة غير ممثّلة في المختبر',
+    search:'ابحث أو نفّذ أمراً…', searchShort:'بحث', create:'إنشاء', inbox:'الوارد', menu:'القائمة', frequent:'الأكثر استخداماً', notOnLab:'هذه الوحدة غير ممثّلة في المختبر',
     branch:'الفرع', period:'الفترة', allBranches:'كل الفروع', periodOpen:'نوفمبر 2026 · مفتوحة', periodLocked:'مقفلة', ctxTitle:'سياق العمل',
     br_dmm:'الدمام', br_jbl:'الجبيل', br_khb:'الخبر', brChanged:'تغيّر الفرع النشط',
     priority:'الأولوية', all:'الكل', inbox1:'وردية الجبيل الصناعية بانتظار اعتمادك', inbox1d:'فرق نقدي −35.00 مع سبب مسجّل', inbox2:'3 فواتير تجاوزت 60 يوماً', inbox2d:'أكبرها لشركة الواحة بقيمة 148,920.00', inbox3:'أسمنت بورتلاندي تحت حد الطلب في الجبيل', inbox3d:'الرصيد 40 كيس · حد الطلب 120', open:'فتح', snooze:'تأجيل',
@@ -142,7 +149,7 @@ const T = {
     employees:'Employees', payroll:'Payroll', workorders:'Work orders', shift:'Station shift', stations:'Stations', tanks:'Tanks',
     taxSettings:'Tax settings', roles:'Roles & permissions', reports:'Reports',
     kit:'Component kit', numbers:'Numbers lab (M2)', rules:'Number & action rules', identity:'Identity layer',
-    search:'Search or run a command…', searchShort:'Search', create:'Create', inbox:'Inbox', menu:'Menu', notOnLab:'This module is not represented in the lab',
+    search:'Search or run a command…', searchShort:'Search', create:'Create', inbox:'Inbox', menu:'Menu', frequent:'Frequent', notOnLab:'This module is not represented in the lab',
     branch:'Branch', period:'Period', allBranches:'All branches', periodOpen:'Nov 2026 · open', periodLocked:'locked', ctxTitle:'Work context',
     br_dmm:'Dammam', br_jbl:'Jubail', br_khb:'Khobar', brChanged:'Active branch changed',
     priority:'Priority', all:'All', inbox1:'Jubail Industrial shift awaits your approval', inbox1d:'Cash variance −35.00 with a logged reason', inbox2:'3 invoices past 60 days', inbox2d:'Largest is Al Waha at 148,920.00', inbox3:'Portland cement below reorder in Jubail', inbox3d:'On hand 40 bags · reorder at 120', open:'Open', snooze:'Snooze',
@@ -304,16 +311,16 @@ const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;',
 // [groupKey, groupIcon, items]; item = [labelKey, route, icon] — the icon is the item's own meaning (Lucide name in nav-icons.js);
 // the group icon stays for the tablet rail. Same item icon in the sidebar, the mobile menu sheet and the tablet group sheet.
 const NAV = [
-  ['g_sales','cart',[['salesInv','sales','file-plus-2'],['salesList',null,'files'],['quotes',null,'file-text'],['creditNotes',null,'file-minus-2']]],
+  ['g_sales','shopping-cart',[['salesInv','sales','file-plus-2'],['salesList',null,'files'],['quotes',null,'file-text'],['creditNotes',null,'file-minus-2']]],
   ['g_purch','truck',[['purchInv','purchase','file-input'],['purchOrders',null,'clipboard-list'],['suppliers',null,'building-2']]],
-  ['g_inv','box',[['stock','inventory','boxes'],['permits',null,'package-check'],['stocktaking',null,'clipboard-check']]],
+  ['g_inv','package',[['stock','inventory','boxes'],['permits',null,'package-check'],['stocktaking',null,'clipboard-check']]],
   ['g_parties','users',[['customers',null,'users'],['statements',null,'scroll-text']]],
-  ['g_fin','ledger',[['journal',null,'book-open-text'],['accounts',null,'list-tree'],['treasury',null,'landmark'],['expenses',null,'receipt-text']]],
-  ['g_hr','idcard',[['employees',null,'id-card'],['payroll',null,'banknote']]],
-  ['g_ops','building',[['workorders',null,'wrench']]],
+  ['g_fin','calculator',[['journal',null,'book-open-text'],['accounts',null,'list-tree'],['treasury',null,'landmark'],['expenses',null,'receipt-text']]],
+  ['g_hr','id-card',[['employees',null,'id-card'],['payroll',null,'banknote']]],
+  ['g_ops','hard-hat',[['workorders',null,'wrench']]],
   ['g_fuel','fuel',[['shift','shift','calendar-clock'],['stations',null,'fuel'],['tanks',null,'cylinder']]],
-  ['g_set','cog',[['taxSettings',null,'percent'],['roles',null,'shield-check'],['reports',null,'chart-column']]],
-  ['g_lab','flask',[['home','home'],['kit','kit'],['numbers','numbers'],['rules','rules'],['identity','identity']]],
+  ['g_set','settings',[['taxSettings',null,'percent'],['roles',null,'shield-check'],['reports',null,'chart-column']]],
+  ['g_lab','flask-conical',[['home','home'],['kit','kit'],['numbers','numbers'],['rules','rules'],['identity','identity']]],
 ];
 const ROUTES = ['home','kit','numbers','rules','sales','purchase','inventory','shift','identity'];
 if (EXT.nav) EXT.nav(NAV, ROUTES);
@@ -329,7 +336,7 @@ function shell(content) {
   const home = EXT.homeRoute || 'home';
   const side = `<div class="side">${EXT.brand ? EXT.brand('side', API) : `<div class="brand"><span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span><div style="min-width:0"><b>${t('company')}</b><span>${t('product')}</span></div></div>`}
     <nav class="nav-scroll" aria-label="${t('menu')}">${NAV.map(([g, icn, items]) => `<div class="nav-grp">${t(g)}${g === 'g_lab' ? '<span class="tag-lab" style="font-size:9.5px">LAB</span>' : ''}</div>${items.map((it) => { const [k, r] = it; return `<button type="button" class="nav-a" data-route="${r || ''}" data-label="${k}" data-icon="${navIcon(it) || icn}" ${r === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span class="lbl">${t(k)}</span></button>`; }).join('')}`).join('')}</nav></div>`;
-  const rail = `<nav class="rail" aria-label="${t('menu')}">${EXT.brand ? EXT.brand('rail', API) : `<span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span>`}${NAV.map(([g, icn]) => `<button type="button" class="rail-b" data-group="${g}" aria-current="${g === gKey}" title="${t(g)}">${ic(icn)}<span class="lbl">${t(g)}</span></button>`).join('')}</nav>`;
+  const rail = `<nav class="rail" aria-label="${t('menu')}">${EXT.brand ? EXT.brand('rail', API) : `<span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span>`}${NAV.map(([g, icn]) => `<button type="button" class="rail-b" data-group="${g}" aria-current="${g === gKey}" title="${t(g)}">${icon(icn)}<span class="lbl">${t(g)}</span></button>`).join('')}</nav>`;
   const brChip = `<button type="button" class="ctx-chip" data-act="context" aria-haspopup="dialog">${ic('building')}<span class="hide-c">${t('branch')}:</span> <b>${t('br_' + S.branch)}</b></button>`;
   const periodChip = `<span class="ctx-chip hide-m" data-locked="false"><span class="dot"></span>${t('period')}: <b>${t('periodOpen')}</b></span>`;
   const crumbs = `<nav class="crumbs" aria-label="breadcrumb"><span class="hide-c">${t(gKey)}</span>${ic('chevS', 'hide-c')}<b>${t(routeLabel(S.route))}</b></nav>`;
@@ -378,7 +385,7 @@ function kitTable() {
   if (S.demo !== 'ready') body = stateBlock(S.demo);
   else if (!rows.length) body = stateBlock('nores', K.q);
   else body = `<div class="tscroll cardable" tabindex="0" role="region" aria-label="${t('invList')}"><table class="dt"><thead><tr><th class="c-chk"><input type="checkbox" data-ksel="all" aria-label="select all" ${view.every(v => K.sel.has(v.no)) ? 'checked' : ''}></th>${th('no','number')}${th('c','customer')}${th('date','date','p2')}${th('total','totalCol','c-amt p3')}${th('bal','balance','c-amt')}<th>${t('status')}</th></tr></thead><tbody>${view.map(v => `<tr aria-selected="${K.sel.has(v.no)}"><td class="c-chk"><input type="checkbox" data-ksel="${v.no}" aria-label="${v.no}" ${K.sel.has(v.no) ? 'checked' : ''}></td><td><span class="docno">${v.no}</span></td><td><div class="two"><b>${esc(nm(v.c))}</b><span class="num">${v.c.vat}</span></div></td><td class="num p2">${fmtDate(v.date)}</td><td class="c-amt p3">${money(v.total)}</td><td class="c-amt">${v.doc === 'posted' ? money(v.total - v.paid) : '<span class="muted">—</span>'}</td><td>${statusBadge('invoice', invStatus(v))}</td></tr>`).join('')}</tbody></table></div>
-    <div class="mlist">${view.map(v => `<div class="mcard"><div class="r"><b>${esc(nm(v.c))}</b>${statusBadge('invoice', invStatus(v))}</div><dl class="kv"><dt>${t('number')}</dt><dd class="num">${v.no}</dd><dt>${t('date')}</dt><dd class="num">${fmtDate(v.date)}</dd><dt>${t('totalCol')}</dt><dd class="c-amt">${money(v.total)}</dd><dt>${t('balance')}</dt><dd class="c-amt">${v.doc === 'posted' ? money(v.total - v.paid) : '—'}</dd></dl></div>`).join('')}</div>
+    <div class="mlist">${view.map(v => `<div class="mcard"><div class="r"><b>${esc(nm(v.c))}</b>${statusBadge('invoice', invStatus(v))}</div><dl class="kv kv2"><dt>${t('number')}</dt><dd class="num">${v.no}</dd><dt>${t('date')}</dt><dd class="num">${fmtDate(v.date)}</dd><dt>${t('totalCol')}</dt><dd class="c-amt">${money(v.total)}</dd><dt>${t('balance')}</dt><dd class="c-amt">${v.doc === 'posted' ? money(v.total - v.paid) : '—'}</dd></dl></div>`).join('')}</div>
     <div class="dt-foot"><span class="tot"><span>${t('footCount', { n: rows.length })}</span><span>·</span><span>${t('footInvTot')}:</span><b>${money(balTot)}</b></span><span class="pager"><button type="button" data-kpage="-1" ${K.page === 0 ? 'disabled' : ''} aria-label="prev">${ic('chevS')}</button><span class="num">${K.page + 1}/${pages}</span><button type="button" data-kpage="1" ${K.page >= pages - 1 ? 'disabled' : ''} aria-label="next">${ic('chevE')}</button></span></div>`;
   return `<section class="panel dt-wrap"><div class="panel-h"><h2>${t('k_table')}</h2><span class="sub">DataTable · ListToolbar · Pagination</span></div>
     <div class="fbar"><label class="srch">${ic('search')}<input class="inp" id="kq" type="search" placeholder="${t('searchShort')}" aria-label="${t('searchShort')}" value="${esc(K.q)}"></label><div class="chips" role="group" aria-label="${t('status')}">${chips}</div></div>
@@ -585,7 +592,7 @@ function pageInventory() {
   if (S.demo !== 'ready') body = stateBlock(S.demo);
   else if (!rows.length) body = stateBlock('nores', I.q);
   else body = `<div class="tscroll cardable" tabindex="0" role="region" aria-label="${t('invTitle')}"><table class="dt"><thead><tr><th class="c-chk"><input type="checkbox" data-isel="all" aria-label="select all" ${rows.every(p => I.sel.has(p.sku)) ? 'checked' : ''}></th>${th('name','item')}<th class="p3">${t('category')}</th>${th('qty','onHand','c-qty')}<th class="p2 c-qty">${t('reorder')}</th><th>${t('status')}</th>${cost ? `<th class="c-amt p3">${t('avgCost')}</th>${th('value','value','c-amt')}` : ''}</tr></thead><tbody>${rows.map(p => { const qn = stockOf(p, I.wh); return `<tr data-peek="${p.sku}" aria-selected="${I.sel.has(p.sku)}" class="${I.peek === p.sku || I.active === p.sku ? 'active' : ''}"><td class="c-chk"><input type="checkbox" data-isel="${p.sku}" aria-label="${p.sku}" ${I.sel.has(p.sku) ? 'checked' : ''}></td><td><div class="two"><b>${esc(nm(p))}</b><span class="num">${p.sku}</span></div></td><td class="p3">${nm(p.cat)}</td><td class="c-qty"><span class="num">${qtyFmt(qn * 1000)}</span> <span class="muted" style="font-size:12px">${nm(p.u)}</span></td><td class="c-qty p2"><span class="num">${I.wh === 'all' ? p.reorder * 3 : p.reorder}</span></td><td>${statusBadge('stock', stockStatus(p, I.wh))}</td>${cost ? `<td class="c-amt p3">${money(p.cost)}</td><td class="c-amt">${money(qn * p.cost)}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
-    <div class="mlist">${rows.map(p => { const qn = stockOf(p, I.wh); return `<button type="button" class="mcard" data-peek="${p.sku}"><div class="r"><b>${esc(nm(p))}</b>${statusBadge('stock', stockStatus(p, I.wh))}</div><dl class="kv"><dt>${t('sku')}</dt><dd class="num">${p.sku}</dd><dt>${t('onHand')}</dt><dd class="num c-amt">${qtyFmt(qn * 1000)} ${nm(p.u)}</dd><dt>${t('reorder')}</dt><dd class="num">${I.wh === 'all' ? p.reorder * 3 : p.reorder}</dd>${cost ? `<dt>${t('value')}</dt><dd class="c-amt">${money(qn * p.cost)}</dd>` : ''}</dl></button>`; }).join('')}</div>
+    <div class="mlist">${rows.map(p => { const qn = stockOf(p, I.wh); return `<button type="button" class="mcard" data-peek="${p.sku}"><div class="r"><b>${esc(nm(p))}</b>${statusBadge('stock', stockStatus(p, I.wh))}</div><dl class="kv kv2"><dt>${t('sku')}</dt><dd class="num">${p.sku}</dd><dt>${t('onHand')}</dt><dd class="num c-amt">${qtyFmt(qn * 1000)} ${nm(p.u)}</dd><dt>${t('reorder')}</dt><dd class="num">${I.wh === 'all' ? p.reorder * 3 : p.reorder}</dd>${cost ? `<dt>${t('value')}</dt><dd class="c-amt">${money(qn * p.cost)}</dd>` : ''}</dl></button>`; }).join('')}</div>
     <div class="dt-foot"><span class="tot"><span>${t('footCount', { n: rows.length })}</span>${cost ? `<span>·</span><span>${t('footValue')}:</span><b>${money(value)}</b>` : `<span>·</span><span class="muted">${t('footNoCost')}</span>`}</span></div>`;
   const peekP = I.peek && windowClass() === 'large' ? PROD.find(p => p.sku === I.peek) : null;
   return `<div class="page">${pageHeader({ eyebrow: t('g_inv'), title: t('invTitle'), desc: t('invDesc'),
@@ -690,9 +697,12 @@ function overlay() {
   if (o.t === 'palette') return `<div class="ovl top" data-scrim>${palette()}</div>`;
   const sheet = (title, body, side = 'start', cls = '') => `<div class="ovl ${windowClass() === 'compact' ? 'bottom' : side}" data-scrim><div class="sheet${cls ? ' ' + cls : ''}" role="dialog" aria-modal="true" aria-label="${title}"><div class="sheet-h"><h3>${title}</h3><button type="button" class="ibtn" data-act="close" aria-label="${t('close')}">${ic('x')}</button></div><div class="sheet-b">${body}</div></div></div>`;
   const navItem = (it, icn) => { const [k, r] = it; return `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}" data-icon="${navIcon(it) || icn}" ${r === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span class="lbl">${t(k)}</span></button>`; };
-  if (o.t === 'navsheet') return sheet(t('menu'), `<div class="navlist">${NAV.map(([g, icn, items]) => `<div class="nav-sec"><div class="sheet-grp">${t(g)}</div>${items.map(it => navItem(it, icn)).join('')}</div>`).join('')}</div>`, 'start', 'sheet-nav');
+  // Frequent: every NAV item that has a screen, in NAV order — a shortcut row, not a re-ordering of the groups below.
+  const frequent = NAV.flatMap(([, icn, items]) => items.filter(([, r]) => r && ROUTES.includes(r) && !['home','kit','numbers','rules','identity','dashboard'].includes(r) /* dashboard is already on the bottom bar */).map(it => [it, icn]));
+  const freqRow = frequent.length > 1 ? `<div class="nav-freq" role="group" aria-label="${t('frequent')}"><div class="sheet-grp">${t('frequent')}</div><div class="freq-g">${frequent.map(([it, icn]) => `<button type="button" class="freq-a" data-route="${it[1]}" data-label="${it[0]}" ${it[1] === S.route ? 'aria-current="page"' : ''}>${navIc(it, icn)}<span>${t(it[0])}</span></button>`).join('')}</div></div>` : '';
+  if (o.t === 'navsheet') return sheet(t('menu'), `${freqRow}<div class="navlist">${NAV.map(([g, icn, items]) => `<div class="nav-sec"><div class="sheet-grp">${t(g)}</div>${items.map(it => navItem(it, icn)).join('')}</div>`).join('')}</div>`, 'start', 'sheet-nav');
   if (o.t === 'group') { const [g, icn, items] = NAV.find(n => n[0] === o.g); return sheet(t(g), `<div class="navlist">${items.map(it => navItem(it, icn)).join('')}</div>`, 'start', 'sheet-nav'); }
-  if (o.t === 'create') return sheet(t('create'), [['newSales','cart','sales'],['newPurch','truck','purchase'],['newReceipt','send',null],['newPermit','box',null]].map(([k, i, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}">${ic(i)}${t(k)}</button>`).join(''));
+  if (o.t === 'create') return sheet(t('create'), [['newSales','file-plus-2','sales'],['newPurch','file-input','purchase'],['newReceipt','hand-coins',null],['newPermit','package-check',null]].map(([k, i, r]) => `<button type="button" class="sheet-a" data-route="${r || ''}" data-label="${k}">${icon(i)}${t(k)}</button>`).join(''));
   if (o.t === 'context') return sheet(t('ctxTitle'), `<div class="sheet-grp">${t('branch')}</div>${['dmm','jbl','khb'].map(b => `<button type="button" class="sheet-a" data-branch="${b}" ${S.branch === b ? 'aria-current="page"' : ''}>${ic('building')}${t('br_' + b)}</button>`).join('')}<div class="sheet-grp">${t('period')}</div><div class="sheet-a" style="cursor:default">${ic('calendar')}${t('periodOpen')}</div><div class="sheet-a" style="cursor:default;color:var(--awj-text-tertiary)">${ic('lock')}${S.lang === 'ar' ? 'سبتمبر 2026 · مقفلة' : 'Sep 2026 · locked'}</div>`);
   if (o.t === 'inbox') return sheet(t('inbox'), `<div class="tabs" role="tablist" style="padding:0;margin-bottom:6px"><button type="button" role="tab" aria-selected="true">${t('priority')} · 3</button><button type="button" role="tab" aria-selected="false" data-act="demo">${t('all')}</button></div>${[['inbox1','inbox1d','fuel','shift'],['inbox2','inbox2d','alert','kit'],['inbox3','inbox3d','box','inventory']].map(([h, d, i, r]) => `<div style="display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--awj-border-hairline)">${ic(i).replace('<svg', '<svg width="18" height="18" style="flex:none;color:var(--awj-status-warning-fg);margin-top:2px"')}<div style="flex:1;min-width:0"><b style="font-weight:600;font-size:13.5px">${t(h)}</b><div class="muted" style="font-size:12.5px">${t(d)}</div><div style="display:flex;gap:6px;margin-top:6px"><button class="btn primary" type="button" data-route="${r}" style="height:30px">${t('open')}</button><button class="btn ghost" type="button" data-act="demo" style="height:30px">${t('snooze')}</button></div></div></div>`).join('')}`, 'start');
   if (o.t === 'sheet-demo') return sheet(t('sheetT'), `<p style="margin:0">${t('sheetP')}</p>`);
@@ -732,7 +742,7 @@ function palette() {
 /* ------------------------------------------------------------------ render + routing */
 const app = document.getElementById('fx-app');
 const PAGES = { home:pageHome, kit:pageKit, numbers:pageNumbers, rules:pageRules, sales:() => docPage('sales'), purchase:() => docPage('purchase'), inventory:pageInventory, shift:pageShift, identity:pageIdentity };
-const API = { S, t, ic, esc, nm, money, plain, moneyOutcome, qtyFmt, grp, statusBadge, pageHeader, stateBlock, CUST, SUPP, PROD, INV, invStatus, NOZ, WH, TODAY, fmtDate, addDays, totals, lineCalc, stockOf, stockStatus, readOf, shiftReady, windowClass, render: (f) => render(f), go: (r, f) => go(r, f), toast: (m) => toast(m), persist: () => persist(), contract: (i) => contract(i), newDoc };
+const API = { S, t, ic, icon, esc, nm, money, plain, moneyOutcome, qtyFmt, grp, statusBadge, pageHeader, stateBlock, CUST, SUPP, PROD, INV, invStatus, NOZ, WH, TODAY, fmtDate, addDays, totals, lineCalc, stockOf, stockStatus, readOf, shiftReady, windowClass, render: (f) => render(f), go: (r, f) => go(r, f), toast: (m) => toast(m), persist: () => persist(), contract: (i) => contract(i), newDoc };
 if (EXT.pages) Object.assign(PAGES, EXT.pages(API));
 // Focus return for overlays. render() replaces the whole app, so a stored element would be detached:
 // keep a stable key (id · the menu's trigger · nth [data-act]) and resolve it after rendering.
@@ -755,12 +765,13 @@ function render(focusSel) {
   dev.style.setProperty('--dev-w', DEVICES[S.device].w ? DEVICES[S.device].w + 'px' : '100%'); dev.style.setProperty('--dev-h', DEVICES[S.device].h + 'px');
   Object.assign(app.dataset, { mode:S.mode, theme:S.theme, identity:S.identity, amt:S.amt, density:S.density });
   app.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr'); app.setAttribute('lang', S.lang);
-  const scroll = document.getElementById('main')?.scrollTop || 0;
+  const scroll = document.getElementById('main')?.scrollTop || 0, navScroll = app.querySelector('.nav-scroll')?.scrollTop || 0, routed = !!S._reset;
   const lineBox = app.querySelector('.tscroll.tall'), lineScroll = lineBox ? [lineBox.scrollTop, lineBox.scrollLeft] : null; /* long invoices scroll their own lines: keep the user's place */
   // Keep the caret/selection of the field being edited: re-rendering replaces it, and jumping to the end would corrupt mid-field edits
   let caret = null; try { const a = document.activeElement; if (a && app.contains(a) && a.id && typeof a.selectionStart === 'number') caret = { id: a.id, s: a.selectionStart, e: a.selectionEnd, v: a.value }; } catch (e) {}
   app.innerHTML = shell(PAGES[S.route]());
   if (!S._reset) { document.getElementById('main').scrollTop = scroll; const nb = app.querySelector('.tscroll.tall'); if (nb && lineScroll) { nb.scrollTop = lineScroll[0]; nb.scrollLeft = lineScroll[1]; } } S._reset = false;
+  const ns = app.querySelector('.nav-scroll'); if (ns) { ns.scrollTop = navScroll; if (routed) keepInView(ns, ns.querySelector('[aria-current="page"]')); } /* re-rendering replaced the sidebar: keep the user's place; a route change brings its item into view */
   S.toasts.forEach(drawToast);
   if (S.route === 'numbers') requestAnimationFrame(() => measureNumbers());
   if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { if (caret && el.id === caret.id && el.value === caret.v) el.setSelectionRange(caret.s, caret.e); else { const n = el.value.length; el.setSelectionRange(n, n); } } catch (e) {} } }

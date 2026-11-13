@@ -60,7 +60,7 @@
   --awj-brand-soft: #ECEFFA; --awj-state-hover: #F7F3EC; --awj-state-selected: #E7ECFA; --awj-state-selected-edge: #C2CDF0;
   --awj-state-focus-ring: #2747C2; --awj-state-focus-halo: rgba(39,71,194,.18);
   --awj-surface-outcome: #131A2C; --awj-outcome-rule: #D7B679;
-  --awj-panel-border: #E6DDCE; --awj-panel-shadow: 0 1px 2px rgba(48,36,18,.06), 0 2px 8px rgba(48,36,18,.04);
+  --awj-panel-border: #E6DDCE; --awj-panel-shadow: 0 1px 2px rgba(48,36,18,.06);
   --awj-hero-bg: #131A2C; --awj-hero-fg: #FFFFFF; --awj-hero-muted: #B5BCCE; --awj-hero-line: #252E46;
   --awj-hero-cta-bg: #D7B679; --awj-hero-cta-fg: #131A2C;
   --awj-wordmark: #FFFFFF;
@@ -84,12 +84,14 @@
   --awj-font-ui: 'Rubik', system-ui, sans-serif;
   --awj-font-num: 'Rubik', system-ui, sans-serif;
   --awj-font-display: 'Rubik', system-ui, sans-serif;
-  --awj-radius-control: 10px; --awj-radius-surface: 14px; --awj-radius-sheet: 20px; --awj-pill-radius: 999px;
-  --awj-panel-title-size: 15px; --awj-panel-title-weight: 600; --awj-panel-title-tracking: normal; --awj-panel-title-case: none;
-  --awj-display-size: 26px; --awj-display-weight: 600; --awj-display-tracking: normal;
-  --awj-figure-font: 'Rubik', system-ui, sans-serif; --awj-figure-weight: 500; --awj-figure-size: 28px;
+  /* refinement R1: Liwan keeps the frame, the warm ground and the soft corners, and takes Nasaq's restraint where the
+     work is dense — tighter radii, one-layer shadow, smaller section titles and lighter figures (colours unchanged) */
+  --awj-radius-control: 8px; --awj-radius-surface: 12px; --awj-radius-sheet: 16px; --awj-pill-radius: 999px;
+  --awj-panel-title-size: 14px; --awj-panel-title-weight: 600; --awj-panel-title-tracking: normal; --awj-panel-title-case: none;
+  --awj-display-size: 24px; --awj-display-weight: 600; --awj-display-tracking: normal;
+  --awj-figure-font: 'Rubik', system-ui, sans-serif; --awj-figure-weight: 450; --awj-figure-size: 26px;
   --awj-icon-stroke: 1.75; --awj-page-max: 2240px;
-  --awj-hero-bleed: 20px; --awj-kpi-gap: 12px; --awj-kpi-frame: transparent; --awj-kpi-radius: var(--awj-radius-surface); --awj-kpi-clip: visible;
+  --awj-hero-bleed: 20px; --awj-kpi-gap: 8px; --awj-kpi-frame: transparent; --awj-kpi-radius: var(--awj-radius-surface); --awj-kpi-clip: visible;
 }
 
 /* ---------- amounts: tabular figures in every identity (D1) ---------- */
@@ -235,6 +237,8 @@
   .hero h1 { font-size: calc(var(--awj-display-size) + 1px); }
 }
 @container dash (max-width: 359px) { .kpi { padding: 10px 10px 6px; } }
+/* phones: the KPI pair reads as one sheet of figures, not a stack of floating cards (borders stay, the lift goes) */
+@container dash (max-width: 559px) { .fx[data-identity="liwan"] .kpi { box-shadow: none; } }
 @container dash (min-width: 960px) {
   .dgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "attn cash" "aging branch" "recent stn"; }
 }

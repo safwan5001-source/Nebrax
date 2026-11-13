@@ -348,8 +348,8 @@ test('Navigation icons: an item without an icon, or with an unknown one, keeps i
     grp[2].splice(-2, 2); F.render();
     return out;
   });
-  assert(r.plain.icon === 'cart' && r.plain.shapes > 0, 'plain item did not fall back ' + JSON.stringify(r.plain));
-  assert(r.unknown.icon === 'cart' && r.unknown.shapes > 0, 'unknown icon did not fall back ' + JSON.stringify(r.unknown));
+  assert(r.plain.icon === 'shopping-cart' && r.plain.shapes > 0, 'plain item did not fall back ' + JSON.stringify(r.plain));
+  assert(r.unknown.icon === 'shopping-cart' && r.unknown.shapes > 0, 'unknown icon did not fall back ' + JSON.stringify(r.unknown));
   await ctx.close();
 });
 
@@ -370,6 +370,106 @@ test('Mobile menu sheet: 44px rows, current item revealed below the sticky heade
     assert(r.current === label, `${identity}/${route}: current ${r.current}`);
     assert(r.curTop >= r.headBottom - 0.5 && r.curBottom <= r.boxBottom + 0.5, `${identity}/${route}: current item hidden ${JSON.stringify(r)}`);
     assert(r.lastBottom <= r.boxBottom + 0.5, `${identity}/${route}: last item unreachable ${JSON.stringify(r)}`);
+    await ctx.close();
+  }
+});
+
+/* ---- Liwan refinement R1 (regression) ---- */
+const GROUP_ICON_TABLE = { g_home: 'house', g_sales: 'shopping-cart', g_purch: 'truck', g_inv: 'package', g_parties: 'users', g_fin: 'calculator', g_hr: 'id-card', g_ops: 'hard-hat', g_fuel: 'fuel', g_set: 'settings' };
+const ACTION_ICON_TABLE = { newSales: 'file-plus-2', newPurch: 'file-input', newReceipt: 'hand-coins', newPermit: 'package-check' };
+
+test('One icon family: rail groups, create sheet and dashboard quick actions draw the approved Lucide shapes, the same as the menu for the same meaning', async () => {
+  for (const identity of IDS) {
+    const tb = await open(`embed=1&id=${identity}&r=purchase`, { width: 834, height: 1112 });
+    const rail = await tb.page.evaluate(() => [...document.querySelectorAll('.rail .rail-b')].map(b => [b.dataset.group, b.querySelector('svg').innerHTML]));
+    // the dictionary as the browser serialises it (self-closing tags come back expanded)
+    const dict = await tb.page.evaluate(() => Object.fromEntries(Object.entries(window.AWJ_NAV_ICONS).map(([k, v]) => { const g = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); g.innerHTML = v; return [k, g.innerHTML]; })));
+    assert(rail.length === Object.keys(GROUP_ICON_TABLE).length, `${identity}: rail groups ${rail.length}`);
+    for (const [g, body] of rail) assert(GROUP_ICON_TABLE[g] && body === dict[GROUP_ICON_TABLE[g]], `${identity}: rail ${g} is not ${GROUP_ICON_TABLE[g]}`);
+    await tb.ctx.close();
+    const m = await open(`embed=1&id=${identity}&r=dashboard`, { width: 390, height: 844 });
+    await m.page.click('.bbar [data-act="create"]');
+    const create = await m.page.evaluate(() => [...document.querySelectorAll('.sheet .sheet-a')].map(b => [b.dataset.label, b.querySelector('svg').innerHTML]));
+    for (const [k, want] of Object.entries(ACTION_ICON_TABLE)) { const hit = create.find(([l]) => l === k); assert(hit && hit[1] === dict[want], `${identity}: create ${k} is not ${want}`); }
+    await m.page.keyboard.press('Escape');
+    const qa = await m.page.evaluate(() => [...document.querySelectorAll('.qa .btn')].map(b => [b.dataset.route || '', b.querySelector('svg').innerHTML]));
+    const want = { sales: 'file-plus-2', purchase: 'file-input', '': 'hand-coins', inventory: 'package-check', shift: 'calendar-clock' };
+    assert(qa.length === 5 && qa.every(([r, body]) => body === dict[want[r]]), `${identity}: quick actions ${qa.map(q => q[0])}`);
+    // a quick action shows the same shape as the menu item with the same meaning
+    const side = await open(`embed=1&id=${identity}&r=dashboard`, { width: 1366, height: 900 });
+    const sv = await side.page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.side .nav-a')].map(b => [b.dataset.label, b.querySelector('svg').innerHTML])));
+    assert(sv.salesInv === dict['file-plus-2'] && sv.purchInv === dict['file-input'] && sv.permits === dict['package-check'] && sv.shift === dict['calendar-clock'], `${identity}: menu and quick actions disagree`);
+    await side.ctx.close(); await m.ctx.close();
+  }
+});
+
+test('Sidebar keeps its scroll position across re-renders, and a route change brings the current item into view', async () => {
+  for (const identity of IDS) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&r=sales`, { width: 1366, height: 640 });
+    const r = await page.evaluate(() => {
+      const ns = () => document.querySelector('.nav-scroll');
+      const max = ns().scrollHeight - ns().clientHeight; ns().scrollTop = Math.min(140, max); const set = ns().scrollTop;
+      window.__fx.render(); const kept = ns().scrollTop;
+      return { max, set, kept };
+    });
+    assert(r.max > 100, `${identity}: precondition: sidebar scrolls ${r.max}`);
+    assert(Math.abs(r.kept - r.set) <= 1, `${identity}: sidebar scroll reset by re-render ${JSON.stringify(r)}`);
+    await page.evaluate(() => { document.querySelector('.nav-scroll').scrollTop = 0; });
+    await page.evaluate(() => window.__fx.go('shift', true)); await page.waitForTimeout(60);
+    const v = await page.evaluate(() => { const box = document.querySelector('.nav-scroll').getBoundingClientRect(), cur = document.querySelector('.nav-scroll [aria-current="page"]').getBoundingClientRect(); return { top: cur.top, bottom: cur.bottom, boxTop: box.top, boxBottom: box.bottom }; });
+    assert(v.top >= v.boxTop - 0.5 && v.bottom <= v.boxBottom + 0.5, `${identity}: current item off-screen after route change ${JSON.stringify(v)}`);
+    await ctx.close();
+  }
+});
+
+test('Mobile menu: frequent screens one tap away (≥ 44px, current marked), full group order below unchanged', async () => {
+  for (const identity of IDS) for (const l of ['ar', 'en']) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=sales`, { width: 390, height: 844 }, { reducedMotion: 'reduce' });
+    await page.click('.bbar [data-act="navsheet"]');
+    const r = await page.evaluate(() => {
+      const tiles = [...document.querySelectorAll('.nav-freq .freq-a')];
+      const vw = document.documentElement.clientWidth;
+      return { routes: tiles.map(b => b.dataset.route), minH: Math.min(...tiles.map(b => b.offsetHeight)), minW: Math.min(...tiles.map(b => b.offsetWidth)),
+        current: tiles.filter(b => b.getAttribute('aria-current') === 'page').map(b => b.dataset.route),
+        clipped: tiles.filter(b => b.scrollWidth > b.clientWidth + 1).length, inside: tiles.every(b => { const q = b.getBoundingClientRect(); return q.left >= 0 && q.right <= vw; }),
+        order: [...document.querySelectorAll('.navlist .nav-sec .sheet-grp')].map(h => h.textContent), navOrder: window.__fx.NAV.map(([g]) => window.__fx.API.t(g)) };
+    });
+    assert(JSON.stringify(r.routes) === JSON.stringify(['sales', 'purchase', 'inventory', 'shift']), `${identity}/${l}: frequent ${r.routes}`);
+    assert(r.minH >= 44 && r.minW >= 44, `${identity}/${l}: tile ${r.minW}x${r.minH}`);
+    assert(JSON.stringify(r.current) === '["sales"]', `${identity}/${l}: current ${r.current}`);
+    assert(r.clipped === 0 && r.inside, `${identity}/${l}: tile label clipped or off-screen`);
+    assert(JSON.stringify(r.order) === JSON.stringify(r.navOrder), `${identity}/${l}: group order changed`);
+    await page.click('.nav-freq [data-route="inventory"]'); await page.waitForTimeout(60);
+    assert(await page.evaluate(() => window.__fx.S.route === 'inventory' && !window.__fx.S.overlay), `${identity}/${l}: frequent tile did not navigate`);
+    await ctx.close();
+  }
+});
+
+test('Phone density: invoice line cards in three columns, inventory and invoice cards in paired rows, amounts never clipped or wrapped', async () => {
+  for (const identity of IDS) for (const [l, m] of [['ar', 'light'], ['en', 'dark']]) for (const w of [390, 360]) {
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&m=${m}&r=sales&ln=6`, { width: w, height: 844 });
+    const lines = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.lines tbody tr:not([hidden])')];
+      const cols = getComputedStyle(rows[0]).gridTemplateColumns.split(' ').length;
+      const ro = rows.flatMap(r => [...r.querySelectorAll('td.ro')]);
+      const wrapped = (el) => { const tn = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).pop(); if (!tn) return false; const rg = document.createRange(); rg.selectNodeContents(tn); return rg.getClientRects().length > 1; };
+      return { cols, maxH: Math.max(...rows.map(r => r.offsetHeight)), roBad: ro.filter(td => td.scrollWidth > td.clientWidth + 1 || wrapped(td)).length,
+        inputs: rows.flatMap(r => [...r.querySelectorAll('.inp')]).filter(i => i.offsetWidth < 64 || i.offsetHeight < 44).length,
+        del: Math.min(...rows.map(r => r.querySelector('.del .ibtn').offsetHeight)) };
+    });
+    assert(lines.cols === 3, `${identity}/${l}/${w}: line card has ${lines.cols} columns`);
+    assert(lines.maxH <= 240, `${identity}/${l}/${w}: line card ${lines.maxH}px tall (was ~510)`);
+    assert(lines.roBad === 0, `${identity}/${l}/${w}: VAT/total clipped or wrapped`);
+    assert(lines.inputs === 0 && lines.del >= 44, `${identity}/${l}/${w}: touch target below 44px`);
+    await page.evaluate(() => window.__fx.go('inventory', true)); await page.waitForTimeout(60);
+    const inv = await page.evaluate(() => {
+      const kv = [...document.querySelectorAll('.mlist .mcard .kv2')];
+      const amt = kv.flatMap(d => [...d.querySelectorAll('dd')]);
+      return { n: kv.length, cols: kv.length ? getComputedStyle(kv[0]).gridTemplateColumns.split(' ').length : 0,
+        bad: amt.filter(dd => dd.scrollWidth > dd.clientWidth + 1 || dd.getClientRects().length > 1 || dd.getBoundingClientRect().height > 22).length };
+    });
+    assert(inv.n > 0 && inv.cols === 4, `${identity}/${l}/${w}: inventory cards not paired ${JSON.stringify(inv)}`);
+    assert(inv.bad === 0, `${identity}/${l}/${w}: inventory value clipped or wrapped ${JSON.stringify(inv)}`);
     await ctx.close();
   }
 });

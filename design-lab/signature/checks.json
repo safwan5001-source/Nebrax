@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T22:49:14.151Z",
+ "generated": "2026-11-13T23:26:30.177Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3038,6 +3038,22 @@
    "ok": true
   },
   {
+   "name": "One icon family: rail groups, create sheet and dashboard quick actions draw the approved Lucide shapes, the same as the menu for the same meaning",
+   "ok": true
+  },
+  {
+   "name": "Sidebar keeps its scroll position across re-renders, and a route change brings the current item into view",
+   "ok": true
+  },
+  {
+   "name": "Mobile menu: frequent screens one tap away (≥ 44px, current marked), full group order below unchanged",
+   "ok": true
+  },
+  {
+   "name": "Phone density: invoice line cards in three columns, inventory and invoice cards in paired rows, amounts never clipped or wrapped",
+   "ok": true
+  },
+  {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
    "ok": true
   },
@@ -3064,7 +3080,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 22,
+   "tests": 26,
    "failed": 0
   },
   "matrix": {
@@ -3089,7 +3105,7 @@
   },
   "liwan": {
    "accepted": true,
-   "allowedChanged": 56,
+   "allowedChanged": 55,
    "lockedChanged": [],
    "checks": 21,
    "failing": {

@@ -162,10 +162,11 @@ function dashboard(api) {
   </div></div>`;
 }
 function hero(api) {
-  const { t, ic } = api;
-  const qa = [['qaSales','cart','sales',true],['qaPurch','truck','purchase'],['qaReceipt','receipt',''],['qaPermit','box','inventory'],['qaShift','fuel','shift']];
+  const { t, icon } = api;
+  // same meaning → same icon as the navigation and the create sheet (one Lucide family across every surface)
+  const qa = [['qaSales','file-plus-2','sales',true],['qaPurch','file-input','purchase'],['qaReceipt','hand-coins',''],['qaPermit','package-check','inventory'],['qaShift','calendar-clock','shift']];
   return `<section class="hero" aria-labelledby="dash-h"><div class="hero-t"><p class="hero-e"><span>${t('today')}</span><span class="tag-lab">${t('demoData')}</span></p><h1 id="dash-h">${t('dashT')}</h1><p class="hero-s">${t('dashSub')}</p></div>
-    <div class="qa" role="group" aria-label="${t('quick')}">${qa.map(([k, icn, r, primary]) => `<button type="button" class="btn${primary ? ' primary' : ''}" ${r ? `data-route="${r}"` : 'data-act="v3-na"'}>${ic(icn)}<span>${t(k)}</span></button>`).join('')}</div></section>`;
+    <div class="qa" role="group" aria-label="${t('quick')}">${qa.map(([k, icn, r, primary]) => `<button type="button" class="btn${primary ? ' primary' : ''}" ${r ? `data-route="${r}"` : 'data-act="v3-na"'}>${icon(icn)}<span>${t(k)}</span></button>`).join('')}</div></section>`;
 }
 
 /* ------------------------------------------------------------------ draft recovery (errors and crashes must not lose data) */
@@ -191,7 +192,7 @@ window.FX_EXT = {
   homeRoute: 'dashboard', devices: DEVICES, icons: ICONS, i18n: { ar: AR, en: EN },
   state: { route: 'dashboard', identity: 'nasaq', amt: 'b', device: 'laptop', lines: '24', scenario: 'normal', recovered: null },
   routeLabels: { dashboard: 'dash' },
-  nav(NAV, ROUTES) { NAV.splice(NAV.length - 1, 1); NAV.unshift(['g_home', 'home', [['dash', 'dashboard', 'layout-dashboard']]]); ROUTES.push('dashboard'); },
+  nav(NAV, ROUTES) { NAV.splice(NAV.length - 1, 1); NAV.unshift(['g_home', 'house', [['dash', 'dashboard', 'layout-dashboard']]]); ROUTES.push('dashboard'); },
   init(S) {
     // URL state (embed / compare / tests): id, r, m, l, dn, ln, sc, st, dev
     const map = { id:'identity', r:'route', m:'mode', l:'lang', dn:'density', ln:'lines', sc:'scenario', st:'demo', dev:'device' };
