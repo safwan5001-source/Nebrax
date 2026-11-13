@@ -28,6 +28,12 @@ design-lab/
   foundation/screens/           28 لقطة 2× (الشاشات الأربع، جوال/لوحي/محمول/2560، داكن، LTR، الهوية)
   foundation/checks.json        نتائج 151 تهيئة + 31 اختبار تفاعل + قياسات M2 وعقد الهوية
   scripts/foundation.mjs        فحوص المرحلة 1 (مصفوفة + تفاعل + لقطات)
+  signature/index.html          AWJ Signature V3: اتجاهان (نَسَق · ليوان) بعرض فردي أو مقارنة جنباً إلى جنب
+  signature/screens/            39 لقطة 2× (320 → 2560، داكن، إنجليزي، فاتورة 80 بنداً، أخطاء)
+  signature/checks.json         370 تهيئة + 12 اختبار تفاعل + العقد
+  scripts/signature.mjs         فحوص V3 (مصفوفة بصرية/وظيفية + تفاعل + لقطات)
+  docs/AWJ-SIGNATURE-V3-DESIGN-RATIONALE.md     مبررات التصميم، المقارنة، توكنز الهوية المقترحة
+  docs/AWJ-SIGNATURE-V3-IMPLEMENTATION-REPORT.md تقرير تنفيذ V3
   directions-v2/index.html      مستكشف V2 التفاعلي (هويات جديدة كلياً)
   directions-v2/screens/        لقطات 2× (جوال، محمول، عريض 2560) + لوحي/LTR/حالات
   directions/index.html         مستكشف الاتجاهات التفاعلي (ملف واحد، بلا تبعيات بناء)
@@ -54,6 +60,8 @@ LAB=v2 node design-lab/scripts/capture.mjs --shots --scale=2   # مصفوفة V2
 LAB=v2 node design-lab/scripts/interactions.mjs                # 52 اختبار تفاعل على V2
 node design-lab/scripts/foundation.mjs                         # المرحلة 1: 151 تهيئة + 31 اختبار تفاعل
 node design-lab/scripts/foundation.mjs --shots --scale=2       # + 28 لقطة WebP
+node design-lab/scripts/signature.mjs                          # V3: 370 تهيئة + 12 اختبار تفاعل
+node design-lab/scripts/signature.mjs --shots --scale=2        # + 39 لقطة WebP
 ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة تصوير شاشة واحدة (لا يمثّل المصفوفة الكاملة)
 ```
 
@@ -65,4 +73,5 @@ ONLY=mash/inv LAB=v2 node design-lab/scripts/capture.mjs --shots  # إعادة �
 | 0.2 — الاستكشاف البصري V2 | مكتمل · تجريبي غير معتمد | 3 هويات جديدة (أسطرلاب، مشربية، كوفي) + مستكشف + تقرير |
 | 0.3 — البحث واستراتيجية النظام الموحّد | **مكتمل · بانتظار الاعتماد** | بحث 12 مصدراً + تقييم بالأدلة + معمارية موحّدة + مصفوفة الوحدات + خطة V3 + قرارات M1–M12 |
 | 1 — Unified UX Foundation | **مكتملة في المختبر · بانتظار المراجعة** | غلاف موحّد + مكوّنات مرجعية + مقارنة M2 مقاسة + طبقة هوية L4 بمدقّق عقد + 4 شاشات إثبات. M2 غير معتمد، ولا تفعيل لـ v3 (M8) |
+| 1.5 — Signature V3 | **مكتمل في المختبر · بانتظار اختيار الاتجاه** | اتجاهان (نَسَق، ليوان) + لوحة تحكم مؤسسية + فاتورة طويلة + مقارنة + 35 توكناً بصرياً في L4 |
 | 2 — خارطة الترحيل | لم تبدأ | مهام مستقلة قابلة للدمج في `web/` عبر v3 |

@@ -32,6 +32,21 @@
   --awj-space-1: 4px; --awj-space-2: 8px; --awj-space-3: 12px; --awj-space-4: 16px; --awj-space-5: 20px; --awj-space-6: 24px;
 }
 
+/* ---------- L4 visual hooks — defaults = Phase 1 look (identity packs may override; validated by the contract) ---------- */
+.fx {
+  --awj-topbar-bg: var(--awj-surface-paper); --awj-topbar-fg: var(--awj-text-primary); --awj-topbar-muted: var(--awj-text-secondary);
+  --awj-topbar-line: var(--awj-border-hairline); --awj-topbar-chip-bg: var(--awj-surface-paper); --awj-topbar-field-bg: var(--awj-surface-sunken); --awj-topbar-focus: var(--awj-state-focus-ring);
+  --awj-panel-border: var(--awj-border-hairline); --awj-panel-shadow: none;
+  --awj-panel-title-size: 14px; --awj-panel-title-weight: 600; --awj-panel-title-tracking: normal; --awj-panel-title-case: none;
+  --awj-font-display: var(--awj-font-ui); --awj-display-size: 20px; --awj-display-weight: 600; --awj-display-tracking: normal;
+  --awj-figure-font: var(--awj-font-num); --awj-figure-weight: 600; --awj-figure-size: 26px;
+  --awj-pill-radius: 999px; --awj-icon-stroke: 1.7; --awj-page-max: 1680px;
+  --awj-hero-bg: var(--awj-surface-desk); --awj-hero-fg: var(--awj-text-primary); --awj-hero-muted: var(--awj-text-secondary); --awj-hero-line: var(--awj-border-hairline);
+  --awj-wordmark: var(--awj-shell-apex);
+  --awj-hero-bleed: 0px; --awj-hero-cta-bg: var(--awj-action-primary); --awj-hero-cta-fg: var(--awj-action-primary-fg);
+  --awj-kpi-gap: 12px; --awj-kpi-frame: transparent; --awj-kpi-radius: var(--awj-radius-surface); --awj-kpi-clip: visible;
+}
+
 /* ---------- L1 semantic — light (v3 Default, verbatim) ---------- */
 .fx[data-mode="light"] {
   --awj-surface-desk: #E9E8E4;
