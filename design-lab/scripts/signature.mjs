@@ -276,6 +276,20 @@ test('"With errors" filter keeps the row being corrected visible until the field
   await ctx.close();
 });
 
+test('"Add line" and Alt+N under find / error filter add a visible, focused line (no hidden lines)', async () => {
+  const { ctx, page } = await open('embed=1&r=sales&ln=24&sc=errors', { width: 1366, height: 768 });
+  for (const how of ['button', 'alt']) {
+    await page.click('[data-act="lines-filter"][data-v="err"]').catch(() => {});
+    await page.fill('#sales-lq', 'CMT-50'); await page.waitForTimeout(250);
+    const n = await page.evaluate(() => window.__fx.S.docs.sales.lines.length);
+    if (how === 'button') await page.click('[data-act="add-line"]'); else { await page.locator('#main').focus(); await page.keyboard.press('Alt+n'); }
+    await page.waitForTimeout(80);
+    const r = await page.evaluate(() => { const a = document.activeElement; return { id: a?.id, hidden: a?.closest('tr')?.hidden, lq: window.__fx.S.docs.sales.lq, n: window.__fx.S.docs.sales.lines.length }; });
+    assert(r.n === n + 1 && /^sales-l\d+-qty$/.test(r.id || '') && !r.hidden && r.lq === '', `${how}: new line hidden or unfocused ` + JSON.stringify(r));
+  }
+  await ctx.close();
+});
+
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
   const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });

@@ -834,7 +834,7 @@ app.addEventListener('click', (e) => {
   }
 });
 function openPeek(sku) { S.inv.active = sku; if (windowClass() === 'large') { S.inv.peek = sku; render(); } else { S.overlay = { t:'peek', sku }; render(); } }
-function addLine(kind) { const D = S.docs[kind], id = Math.max(0, ...D.lines.map(l => l.id)) + 1; D.lines.push({ id, p:4, qtyM:1000, price: kind === 'sales' ? PROD[4].price : PROD[4].cost, disc:0 }); D.dirty = true; render(`#${kind}-l${id}-qty`); }
+function addLine(kind) { const D = S.docs[kind], id = Math.max(0, ...D.lines.map(l => l.id)) + 1; D.lq = ''; D.lf = 'all'; /* a new line must be visible to take focus (find / error filter would hide it) */ D.lines.push({ id, p:4, qtyM:1000, price: kind === 'sales' ? PROD[4].price : PROD[4].cost, disc:0 }); D.dirty = true; render(`#${kind}-l${id}-qty`); }
 function saveDraft(kind) { const D = S.docs[kind]; D.dirty = false; D.saved = snapDoc(D); render(); toast(t('toastSaved')); }
 function requestPost(kind) {
   const D = S.docs[kind];
@@ -899,7 +899,7 @@ app.addEventListener('keydown', (e) => {
     render('#pal-q'); return;
   }
   if (el.dataset?.party) { const D = S.docs[el.dataset.party], items = app.querySelectorAll('[data-pick]'); if (e.key === 'ArrowDown') { e.preventDefault(); D.comboIdx = Math.min(items.length - 1, D.comboIdx + 1); render('#' + el.id); } else if (e.key === 'ArrowUp') { e.preventDefault(); D.comboIdx = Math.max(0, D.comboIdx - 1); render('#' + el.id); } else if (e.key === 'Enter' && items[D.comboIdx]) { e.preventDefault(); items[D.comboIdx].click(); } else if (e.key === 'Escape') { D.comboOpen = false; render('#' + el.id); } return; }
-  if (el.dataset?.lf && e.key === 'Enter' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); const row = el.closest('tr'); let nx = row.nextElementSibling; while (nx && nx.hidden) nx = nx.nextElementSibling; /* skip rows hidden by find / error filter */ if (nx) nx.querySelector(`[data-lf="${el.dataset.lf}"]`)?.focus(); else { const Dk = S.docs[el.dataset.doc]; Dk.lq = ''; Dk.lf = 'all'; addLine(el.dataset.doc); } /* last visible row: the new line must be visible to take focus */ return; }
+  if (el.dataset?.lf && e.key === 'Enter' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); const row = el.closest('tr'); let nx = row.nextElementSibling; while (nx && nx.hidden) nx = nx.nextElementSibling; /* skip rows hidden by find / error filter */ if (nx) nx.querySelector(`[data-lf="${el.dataset.lf}"]`)?.focus(); else addLine(el.dataset.doc); /* last visible row: addLine clears find / filter so the new line shows */ return; }
   if (S.overlay?.menu && ['ArrowDown', 'ArrowUp', 'Escape'].includes(e.key)) { const items = [...app.querySelectorAll('.menu [role="menuitem"]')]; const i = items.indexOf(document.activeElement); if (e.key === 'Escape') { S.overlay = null; render(); app.querySelector('[data-act="menu"]')?.focus(); } else { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); } return; }
   if (S.overlay && !S.overlay.menu && e.key === 'Tab') { const f = [...app.querySelectorAll('.ovl button:not([disabled]), .ovl input, .ovl [tabindex="0"]')]; if (f.length) { const i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } } }
 });

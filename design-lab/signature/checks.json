@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T20:24:50.322Z",
+ "generated": "2026-11-13T20:28:28.118Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3022,6 +3022,10 @@
    "ok": true
   },
   {
+   "name": "\"Add line\" and Alt+N under find / error filter add a visible, focused line (no hidden lines)",
+   "ok": true
+  },
+  {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
    "ok": true
   },
@@ -3048,7 +3052,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 18,
+   "tests": 19,
    "failed": 0
   },
   "matrix": {
