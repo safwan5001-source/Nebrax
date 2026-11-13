@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\FuelStationAuditEventResource;
 use App\Models\FuelStationAuditEvent;
 use App\Models\FuelTanker;
+use App\Models\FuelTankerFill;
 use App\Models\FuelTankerOwner;
 use App\Models\FuelTankerOwnerCompanyLink;
 use App\Support\Rbac;
@@ -27,11 +28,19 @@ class FuelStationAuditController extends ApiController
      */
     private const TANKER_SUBJECTS = [FuelTankerOwner::class, FuelTanker::class, FuelTankerOwnerCompanyLink::class];
 
+    /**
+     * أحداث سجل المرفقات التاريخي (المستبدَلة/المزالة): لقطاتها تحمل بيانات مرفقات لا تراها مسارات التعبئة إلا بـ`fuel.tanker.fill.attachment.remove`
+     * (`?history=1`)، فلا تُكشف هنا لمن يملك العرض فقط.
+     *
+     * @var list<string>
+     */
+    private const FILL_ATTACHMENT_HISTORY_ACTIONS = ['tanker_fill.attachment_replaced', 'tanker_fill.attachment_removed'];
+
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
             'fuel_station_id' => ['nullable', 'uuid'],
-            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink'],
+            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink,FuelTankerFill'],
             'subject_id' => ['nullable', 'uuid'],
             'actor_id' => ['nullable', 'uuid'],
             'action' => ['nullable', 'string', 'max:80'],
@@ -43,6 +52,7 @@ class FuelStationAuditController extends ApiController
         $query = FuelStationAuditEvent::query()->with('actor:id,name')->orderByDesc('occurred_at')->orderByDesc('id');
         $this->restrictEventsToUserScope($query, $request);
         $this->restrictTankerSubjects($query, $request);
+        $this->restrictTankerFillSubjects($query, $request);
         if (! empty($filters['fuel_station_id'])) {
             $query->where('fuel_station_id', $filters['fuel_station_id']);
         }
@@ -74,6 +84,29 @@ class FuelStationAuditController extends ApiController
             && $user !== null && Rbac::allows((string) $user->role, 'fuel.tanker.manage');
         if (! $allowed) {
             $query->whereNotIn('subject_type', self::TANKER_SUBJECTS);
+        }
+    }
+
+    /**
+     * TANKER-SEC-1: أحداث سندات التعبئة ومرفقاتها (موضوعها `FuelTankerFill`). لقطاتها تحوي الكمية والسند الورقي والملاحظات وبيانات المرفقات، ومحكومة
+     * في مساراتها ببوابتَي PR-1 وPR-4 معاً وبصلاحية `fuel.tanker.fill.view` — فلا يكفي لقراءتها `fuel_stations.manage` المطلوب لهذا المسار.
+     * البوابتان مغلقتان ⇒ لا يراها أحد (بمن فيهم المالك) حتى ما كُتب قبل الإغلاق. أحداث الإزالة/الاستبدال تتطلب أيضاً `fuel.tanker.fill.attachment.remove`
+     * كما تتطلبه قراءة السجل التاريخي للمرفقات. السجل الأصلي لا يُمسّ؛ التصفية على القراءة فقط. نطاق المحطة/الفرع يطبّقه `restrictEventsToUserScope`.
+     */
+    private function restrictTankerFillSubjects(Builder $query, Request $request): void
+    {
+        $user = $request->user();
+        $role = (string) $user?->role;
+        $canView = (bool) config('fuel_stations.tanker_management_enabled', false)
+            && (bool) config('fuel_stations.tanker_fills_enabled', false)
+            && $user !== null && Rbac::allows($role, 'fuel.tanker.fill.view');
+        if (! $canView) {
+            $query->where('subject_type', '!=', FuelTankerFill::class);
+
+            return;
+        }
+        if (! Rbac::allows($role, 'fuel.tanker.fill.attachment.remove')) {
+            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereNotIn('action', self::FILL_ATTACHMENT_HISTORY_ACTIONS));
         }
     }
 
