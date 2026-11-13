@@ -52,6 +52,7 @@ body{margin:0;font-family:var(--lab-font);font-size:14px;line-height:1.55}
 .device .frame-h{height:var(--dev-h)}
 #cmp{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .compare #cmp{display:grid} .compare #stage{display:none}
+.embed .compare #stage{display:block} /* #app from the compare view: the app alone, never a blank page */
 .cframe{min-width:0}
 .cframe h3{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:baseline}
 .cframe h3 small{color:var(--lab-muted);font-weight:400}

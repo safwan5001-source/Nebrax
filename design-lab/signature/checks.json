@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T23:26:30.177Z",
+ "generated": "2026-11-13T23:37:17.908Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3054,6 +3054,16 @@
    "ok": true
   },
   {
+   "name": "An active line search keeps its field when deletions bring the invoice to ten lines or fewer",
+   "ok": false,
+   "error": "lines hidden by a find with no field to clear it {\"n\":10,\"hidden\":6,\"field\":false}"
+  },
+  {
+   "name": "\"#app\" from the compare view shows the app, not a blank page",
+   "ok": false,
+   "error": "#app from compare is blank {\"display\":\"none\",\"w\":0,\"h\":0,\"app\":true}"
+  },
+  {
    "name": "Long invoice keeps its line-scroll position when a line is deleted",
    "ok": true
   },
@@ -3080,8 +3090,8 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 26,
-   "failed": 0
+   "tests": 28,
+   "failed": 2
   },
   "matrix": {
    "configs": 370,

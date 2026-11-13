@@ -474,6 +474,32 @@ test('Phone density: invoice line cards in three columns, inventory and invoice 
   }
 });
 
+test('An active line search keeps its field when deletions bring the invoice to ten lines or fewer', async () => {
+  const { ctx, page } = await open('embed=1&l=en&r=sales&ln=24', { width: 1366, height: 900 });
+  await page.fill('#sales-lq', 'p'); await page.waitForTimeout(300); // the find re-renders after a 140ms debounce
+  for (let guard = 0; guard < 40; guard++) {
+    const n = await page.evaluate(() => window.__fx.S.docs.sales.lines.length); if (n <= 10) break;
+    await page.click('.lines tbody tr:not([hidden]) [data-del]'); await page.waitForTimeout(40);
+  }
+  const r = await page.evaluate(() => ({ n: window.__fx.S.docs.sales.lines.length, hidden: document.querySelectorAll('.lines tbody tr[hidden]').length, field: !!document.querySelector('#sales-lq') }));
+  assert(r.n <= 10, 'precondition: ten lines or fewer ' + JSON.stringify(r));
+  assert(r.hidden === 0 || r.field, 'lines hidden by a find with no field to clear it ' + JSON.stringify(r));
+  await page.fill('#sales-lq', ''); await page.waitForTimeout(300);
+  // clearing shows every line again (the field itself stays while focused, so typing never loses focus mid-edit)
+  assert(await page.evaluate(() => document.querySelectorAll('.lines tbody tr[hidden]').length === 0), 'clearing the find did not show every line');
+  await ctx.close();
+});
+
+test('"#app" from the compare view shows the app, not a blank page', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+  const page = await ctx.newPage(); await page.goto(`${base}`); await page.evaluate(() => localStorage.clear()); await page.reload();
+  await page.click('#c-view [data-view="compare"]'); await page.waitForTimeout(300);
+  await page.click('a[href="#app"]'); await page.waitForTimeout(300);
+  const r = await page.evaluate(() => { const st = document.getElementById('stage'), b = st.getBoundingClientRect(); return { display: getComputedStyle(st).display, w: b.width, h: b.height, app: !!document.querySelector('#fx-app .fx-shell') }; });
+  assert(r.display !== 'none' && r.w > 0 && r.h > 0 && r.app, '#app from compare is blank ' + JSON.stringify(r));
+  await ctx.close();
+});
+
 test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
   const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });
