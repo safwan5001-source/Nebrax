@@ -2941,6 +2941,8 @@
       "ai": "AI"
     },
     "perm_actions": {
+      "add": "Add",
+      "remove": "Remove",
       "post": "Post",
       "execution_approve": "Approve execution",
       "resolve_blocked": "Resolve blocked",
@@ -3069,6 +3071,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "attachment": "Attachments",
       "cost": "Cost",
       "late": "Late readings",
       "actions": "Executable actions",
