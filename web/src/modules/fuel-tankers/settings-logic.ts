@@ -22,6 +22,11 @@ export const ATTACHMENT_AFTER_CLOSE = ['allow', 'deny'] as const;
 export type AttachmentAfterClose = (typeof ATTACHMENT_AFTER_CLOSE)[number];
 export const ATTACHMENT_REMOVAL = ['open_shift_only', 'always', 'never'] as const;
 export type AttachmentRemoval = (typeof ATTACHMENT_REMOVAL)[number];
+/** TANKER-PR6A: مراجعة السندات المعلّقة قبل الدمج المخزني (تخزين وعرض فقط — **لا خصم ولا ترحيل**). لا خيار «سماح بالسالب» ولا «تسوية صامتة». */
+export const INVENTORY_POLICIES = ['block', 'hold_for_review'] as const;
+export type InventoryPolicy = (typeof INVENTORY_POLICIES)[number];
+export const INVENTORY_REVIEW_HOURS_MAX = 720;
+
 /** السقوف الصلبة في الخادم (الحجم بالميغابايت، عدد المرفقات للسند). */
 export const ATTACHMENT_HARD_MAX_MB = 10;
 export const ATTACHMENT_HARD_MAX_COUNT = 20;
@@ -36,12 +41,15 @@ export interface TankerPolicy {
   attachmentMaxCount: number;
   attachmentAfterClose: AttachmentAfterClose;
   attachmentRemoval: AttachmentRemoval;
+  inventoryPolicy: InventoryPolicy;
+  inventoryReviewHours: number;
 }
 
 /** الافتراضات المعتمدة (تطابق `Settings::DEFAULTS`)؛ غياب مفتاح أو قيمة تالفة في الاستجابة ⇒ الافتراضي الآمن لا تخمين. */
 export const POLICY_DEFAULTS: TankerPolicy = {
   selectionRequired: false, voucherScope: 'station', overrunPolicy: 'allow_with_confirmation',
   attachmentRequired: 'never', attachmentTypes: 'images_and_pdf', attachmentMaxMb: 10, attachmentMaxCount: 10, attachmentAfterClose: 'allow', attachmentRemoval: 'open_shift_only',
+  inventoryPolicy: 'block', inventoryReviewHours: 24,
 };
 
 export const SERVER_KEYS = {
@@ -54,12 +62,14 @@ export const SERVER_KEYS = {
   attachmentMaxCount: 'tanker_fill_attachment_max_count',
   attachmentAfterClose: 'tanker_fill_attachment_after_close',
   attachmentRemoval: 'tanker_fill_attachment_removal',
+  inventoryPolicy: 'tanker_inventory_insufficient_policy',
+  inventoryReviewHours: 'tanker_inventory_review_after_hours',
 } as const;
 export type PolicyField = keyof typeof SERVER_KEYS;
 export const POLICY_FIELDS = Object.keys(SERVER_KEYS) as PolicyField[];
 
 /** حقول الحوكمة (يتطلب تغييرها `fuel.governance.manage` مع `fuel_stations.manage`)؛ الأنواع والحجم والعدد تكفيها `fuel_stations.manage`. يفرضها الخادم — هذا للعرض فقط. */
-export const GOVERNANCE_FIELDS: readonly PolicyField[] = ['selectionRequired', 'voucherScope', 'overrunPolicy', 'attachmentRequired', 'attachmentAfterClose', 'attachmentRemoval'];
+export const GOVERNANCE_FIELDS: readonly PolicyField[] = ['selectionRequired', 'voucherScope', 'overrunPolicy', 'attachmentRequired', 'attachmentAfterClose', 'attachmentRemoval', 'inventoryPolicy'];
 const GOVERNANCE_SERVER_KEYS = new Set<string>(GOVERNANCE_FIELDS.map((field) => SERVER_KEYS[field]));
 export const touchesGovernance = (changes: Record<string, unknown>): boolean => Object.keys(changes).some((key) => GOVERNANCE_SERVER_KEYS.has(key));
 
@@ -79,6 +89,8 @@ export function readPolicy(raw: unknown): TankerPolicy {
     attachmentMaxCount: boundedInt(source[SERVER_KEYS.attachmentMaxCount], ATTACHMENT_HARD_MAX_COUNT, POLICY_DEFAULTS.attachmentMaxCount),
     attachmentAfterClose: oneOf(ATTACHMENT_AFTER_CLOSE, source[SERVER_KEYS.attachmentAfterClose], POLICY_DEFAULTS.attachmentAfterClose),
     attachmentRemoval: oneOf(ATTACHMENT_REMOVAL, source[SERVER_KEYS.attachmentRemoval], POLICY_DEFAULTS.attachmentRemoval),
+    inventoryPolicy: oneOf(INVENTORY_POLICIES, source[SERVER_KEYS.inventoryPolicy], POLICY_DEFAULTS.inventoryPolicy),
+    inventoryReviewHours: boundedInt(source[SERVER_KEYS.inventoryReviewHours], INVENTORY_REVIEW_HOURS_MAX, POLICY_DEFAULTS.inventoryReviewHours),
   };
 }
 
@@ -87,7 +99,7 @@ export const INHERIT = 'inherit';
 export type PolicyDraft = Record<PolicyField, string>;
 
 const BOOLEAN_FIELDS: readonly PolicyField[] = ['selectionRequired'];
-const NUMBER_FIELDS: readonly PolicyField[] = ['attachmentMaxMb', 'attachmentMaxCount'];
+const NUMBER_FIELDS: readonly PolicyField[] = ['attachmentMaxMb', 'attachmentMaxCount', 'inventoryReviewHours'];
 const draftValue = (policy: TankerPolicy, field: PolicyField): string => String(policy[field]);
 
 /**

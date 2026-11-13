@@ -105,6 +105,7 @@ use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelTankerController;
 use App\Http\Controllers\Api\FuelTankerFillAttachmentController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryReviewController;
 use App\Http\Controllers\Api\FuelTankerFillController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
@@ -1761,6 +1762,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         $tankerFillGate = EnsureFuelTankerFillsEnabled::class;
         Route::get('fuel-stations/tanker-fills', [FuelTankerFillController::class, 'index'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/tanker-fills', [FuelTankerFillController::class, 'store'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.record'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR6A: مراجعة جاهزية الدمج المخزني للسندات المعلّقة — قراءة فقط (لا ترحيل). قبل `{id}` كي لا يُحسب «inventory-review» معرّفاً.
+        Route::get('fuel-stations/tanker-fills/inventory-review', [FuelTankerFillInventoryReviewController::class, 'index'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/tanker-fills/{id}', [FuelTankerFillController::class, 'show'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/tanker-fills/{id}/void', [FuelTankerFillController::class, 'void'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.void'), $commercialApp('fuel_stations.core', 'write')]);
         // TANKER-PR5: مرفقات سندات التعبئة (دليل فقط). العرض والتنزيل `fuel.tanker.fill.view`؛ الرفع `…attachment.add`؛ الإزالة والاستبدال `…attachment.remove`. خلف البوابتين نفسيهما؛ جلسة PIN لا تصل (PR-7).

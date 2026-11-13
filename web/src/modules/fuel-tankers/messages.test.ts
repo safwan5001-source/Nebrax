@@ -41,6 +41,19 @@ function usedKeys(): Set<string> {
   for (const value of ['images_and_pdf', 'images_only']) keys.add(`settings.attachments.types.${value}`);
   for (const value of ['allow', 'deny']) keys.add(`settings.attachments.afterClose.${value}`);
   for (const value of ['open_shift_only', 'always', 'never']) keys.add(`settings.attachments.removal.${value}`);
+  // TANKER-PR6A: مراجعة الدمج المخزني (`useTranslations('fuelTankers.inventory')` في المجلد الفرعي) + خيارات سياستها الديناميكية.
+  const inventoryDir = join(dir, 'inventory');
+  for (const file of readdirSync(inventoryDir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))) {
+    for (const m of readFileSync(join(inventoryDir, file), 'utf8').matchAll(/\bt\(\s*(['`])([A-Za-z0-9_.${}]+)\1/g)) keys.add(`inventory.${m[2]}`);
+  }
+  const inventoryGroups: Record<string, string[]> = {
+    readiness: ['ready', 'needs_review', 'blocked'],
+    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'unknown'],
+    reason: ['capacity_overrun', 'insufficient_balance', 'overdue', 'unknown'],
+    summary: ['total', 'ready', 'needs_review', 'blocked', 'overdue'],
+  };
+  for (const [group, values] of Object.entries(inventoryGroups)) for (const value of values) keys.add(`inventory.${group}.${value}`);
+  for (const value of ['block', 'hold_for_review']) keys.add(`settings.inventory.policy.${value}`);
   for (const key of [...keys]) if (key.includes('${')) keys.delete(key);
   return keys;
 }
