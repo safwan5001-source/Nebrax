@@ -10139,7 +10139,9 @@
         "shortfall": "العجز مقابل الرصيد: {liters} لتر",
         "inSync": "متطابقان",
         "outOfSync": "غير متطابقين",
-        "syncUnknown": "غير محدّد"
+        "syncUnknown": "غير محدّد",
+        "unnamedWarehouse": "مخزن غير مسمّى",
+        "unnamedProduct": "منتج غير مسمّى"
       },
       "requirements": {
         "title": "متطلبات المطابقة قبل التفعيل",

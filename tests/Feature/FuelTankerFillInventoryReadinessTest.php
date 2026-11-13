@@ -278,6 +278,39 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     }
 
     /** @test */
+    public function the_cumulative_and_pool_totals_come_from_sql_not_from_loading_the_pending_backlog(): void
+    {
+        $this->seedStock(2_500_000);
+        $fills = collect(range(1, 5))->map(fn () => $this->fill(1_000_000))->values(); // 5 × 1,000,000 مقابل رصيد 2,500,000
+        $viewer = $this->staff();
+        $this->review($viewer['token']); // يسخّن (جلب الأدوار...)
+
+        // تقييم الثالث وحده (كأن الصفحة تحمل سنداً واحداً): تراكمياً يشمل السندين السابقين دون تحميلهما.
+        $third = $fills[2]->fresh();
+        DB::enableQueryLog();
+        $result = app(Readiness::class)->evaluate(collect([$third]));
+        $log = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $item = $result['items'][$fills[2]->id];
+        $this->assertSame(3_000_000, $item['pool']['cumulative_milliliters']);
+        $this->assertSame(2_500_000, $item['pool']['available_milliliters']);
+        $this->assertSame([Readiness::B_INSUFFICIENT_BALANCE], $item['blockers']);
+        $this->assertSame(5, $result['pools'][0]['pending_count']);
+        $this->assertSame(5_000_000, $result['pools'][0]['pending_total_milliliters']);
+        $this->assertSame(2_500_000, $result['pools'][0]['shortfall_milliliters']);
+        $this->assertSame('وقود B3', $result['pools'][0]['fuel_product_name']);
+        $this->assertNotEmpty($result['pools'][0]['warehouse_name']);
+
+        // لا استعلام يجلب صفوف السندات المعلّقة نفسها: كلها تجميع/نافذة.
+        foreach ($log as $entry) {
+            if (str_contains($entry['query'], 'fuel_tanker_fills')) {
+                $this->assertMatchesRegularExpression('/sum\(|count\(\*\)/i', $entry['query'], 'استعلام السندات يجب أن يكون تجميعاً: ' . $entry['query']);
+            }
+        }
+    }
+
+    /** @test */
     public function a_confirmed_capacity_overrun_and_an_overdue_fill_need_review_per_the_hours_setting(): void
     {
         $this->seedStock(9_000_000);

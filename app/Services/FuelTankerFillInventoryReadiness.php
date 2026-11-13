@@ -89,8 +89,10 @@ class FuelTankerFillInventoryReadiness
         $openHistories = DB::table('fuel_cost_pool_open_histories')->where('tenant_id', $tenantId)->whereIn('warehouse_id', $warehouseIds)->whereNull('resolved_at')
             ->get(['warehouse_id', 'fuel_product_id'])->mapWithKeys(fn ($row) => [$row->warehouse_id . '|' . $row->fuel_product_id => true]);
 
-        // السندات المعلّقة كلها في كل مجمّع معني (لا الصفحة الحالية وحدها) لحساب التراكمي بترتيب التسجيل.
-        $pending = $this->pendingByPool($stations, $products, $warehouseIds->all());
+        // التراكمي والمجاميع تُحسب في قاعدة البيانات (نافذة `SUM … OVER` وتجميع) لا بتحميل كل السندات المعلّقة إلى الذاكرة: الأرشيف المعلّق ينمو بلا سقف في هذه المرحلة
+        // (لا ترحيل)، فلا يتناسب استهلاك الذاكرة مع حجمه. يُرجَع فقط تراكمي السندات المُقيَّمة (≤ سقف المتحكّم) ومجموع كل مجمّع.
+        $cumulative = $this->cumulativeByFill($tenantId, $active->pluck('id')->all(), $warehouseIds->all());
+        $poolTotals = $this->poolTotals($tenantId, $warehouseIds->all());
 
         $policies = [];
         $pools = [];
@@ -125,14 +127,7 @@ class FuelTankerFillInventoryReadiness
                 $row = $stock->get($key);
                 $state = $costStates->get($costKey);
                 $available = $row === null ? 0 : (int) $row->quantity;
-                $poolFills = $pending[$key] ?? collect();
-                $cumulative = 0;
-                foreach ($poolFills as $candidate) {
-                    $cumulative += (int) $candidate->quantity_milliliters;
-                    if ($candidate->id === $fill->id) {
-                        break;
-                    }
-                }
+                $cumulativeQuantity = (int) ($cumulative[$fill->id] ?? $fill->quantity_milliliters);
 
                 if ($row === null) {
                     $blockers[] = self::B_STOCK_RECORD_MISSING;
@@ -144,12 +139,12 @@ class FuelTankerFillInventoryReadiness
                 if ($openHistories->has($costKey)) {
                     $blockers[] = self::B_COST_HISTORY_OPEN;
                 }
-                if ($row !== null && $cumulative > $available) {
+                if ($row !== null && $cumulativeQuantity > $available) {
                     $policy['insufficient_policy'] === 'hold_for_review' ? $reasons[] = self::R_INSUFFICIENT_BALANCE : $blockers[] = self::B_INSUFFICIENT_BALANCE;
                 }
 
-                $poolInfo = ['warehouse_id' => $warehouse->id, 'fuel_product_id' => $product->id, 'available_milliliters' => $available, 'cumulative_milliliters' => $cumulative];
-                $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolFills, $includeCost);
+                $poolInfo = ['warehouse_id' => $warehouse->id, 'fuel_product_id' => $product->id, 'available_milliliters' => $available, 'cumulative_milliliters' => $cumulativeQuantity];
+                $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolTotals[$key] ?? ['count' => 0, 'total' => 0], $includeCost);
             }
 
             if ($fill->capacity_overrun_milliliters !== null) {
@@ -207,20 +202,22 @@ class FuelTankerFillInventoryReadiness
     }
 
     /**
-     * @param  Collection<int, FuelTankerFill>  $poolFills  السندات المعلّقة في المجمّع بترتيب التسجيل
+     * @param  array{count: int, total: int}  $pending  عدد ومجموع السندات المعلّقة في المجمّع (مجمَّعة في القاعدة)
      * @return array<string, mixed>
      */
-    private function poolSummary(Warehouse $warehouse, FuelProduct $product, ?ProductWarehouseStock $stock, ?FuelInventoryCostState $state, Collection $poolFills, bool $includeCost): array
+    private function poolSummary(Warehouse $warehouse, FuelProduct $product, ?ProductWarehouseStock $stock, ?FuelInventoryCostState $state, array $pending, bool $includeCost): array
     {
         $available = $stock === null ? null : (int) $stock->quantity;
-        $pendingTotal = (int) $poolFills->sum('quantity_milliliters');
+        $pendingTotal = $pending['total'];
         $summary = [
             'warehouse_id' => $warehouse->id,
+            'warehouse_name' => $warehouse->name,
             'fuel_product_id' => $product->id,
+            'fuel_product_name' => $product->name,
             'stock_milliliters' => $available,
             'cost_pool_milliliters' => $state === null ? null : (int) $state->quantity_milliliters,
             'quantity_in_sync' => $state === null || $available === null ? null : (int) $state->quantity_milliliters === $available,
-            'pending_count' => $poolFills->count(),
+            'pending_count' => $pending['count'],
             'pending_total_milliliters' => $pendingTotal,
             'shortfall_milliliters' => $available === null ? null : max(0, $pendingTotal - $available),
             'ledger_1140' => 'not_checked',
@@ -233,36 +230,60 @@ class FuelTankerFillInventoryReadiness
     }
 
     /**
-     * كل السندات المعلّقة (لا الصفحة وحدها) في المجمّعات المعنية، مرتّبة بوقت التسجيل فالمعرّف، مفهرسة بمفتاح `warehouse|product`.
+     * التراكمي لكل سند مُقيَّم داخل مجمّعه (مخزن × منتج) بترتيب (وقت التسجيل، المعرّف) — نافذة SQL واحدة، لا تحميل للأرشيف المعلّق.
      *
-     * @param  Collection<string, FuelStation>  $stations
-     * @param  Collection<string, FuelProduct>  $products
+     * @param  list<string>  $fillIds
      * @param  list<string>  $warehouseIds
-     * @return array<string, Collection<int, FuelTankerFill>>
+     * @return array<string, int>
      */
-    private function pendingByPool(Collection $stations, Collection $products, array $warehouseIds): array
+    private function cumulativeByFill(string $tenantId, array $fillIds, array $warehouseIds): array
+    {
+        if ($fillIds === [] || $warehouseIds === []) {
+            return [];
+        }
+        $windowed = DB::table('fuel_tanker_fills as f')
+            ->join('fuel_stations as s', 's.id', '=', 'f.fuel_station_id')
+            ->join('fuel_products as p', 'p.id', '=', 'f.fuel_product_id')
+            ->where('f.tenant_id', $tenantId)
+            ->where('f.status', FuelTankerFill::STATUS_RECORDED)->where('f.inventory_status', FuelTankerFill::INVENTORY_PENDING_INTEGRATION)
+            ->whereIn('s.warehouse_id', $warehouseIds)
+            ->selectRaw('f.id as id, SUM(f.quantity_milliliters) OVER (PARTITION BY s.warehouse_id, p.product_id ORDER BY f.recorded_at, f.id) as cumulative');
+
+        $rows = [];
+        foreach (array_chunk($fillIds, 400) as $chunk) {
+            foreach (DB::query()->fromSub($windowed, 't')->whereIn('t.id', $chunk)->get(['t.id', 't.cumulative']) as $row) {
+                $rows[(string) $row->id] = (int) $row->cumulative;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * عدد ومجموع السندات المعلّقة لكل مجمّع (مفتاح `warehouse|product`) — تجميع في القاعدة.
+     *
+     * @param  list<string>  $warehouseIds
+     * @return array<string, array{count: int, total: int}>
+     */
+    private function poolTotals(string $tenantId, array $warehouseIds): array
     {
         if ($warehouseIds === []) {
             return [];
         }
-        $stationIds = FuelStation::query()->whereIn('warehouse_id', $warehouseIds)->pluck('warehouse_id', 'id');
-        $all = FuelTankerFill::query()
-            ->where('status', FuelTankerFill::STATUS_RECORDED)->where('inventory_status', FuelTankerFill::INVENTORY_PENDING_INTEGRATION)
-            ->whereIn('fuel_station_id', $stationIds->keys())->whereIn('fuel_product_id', $products->keys())
-            ->orderBy('recorded_at')->orderBy('id')
-            ->get(['id', 'fuel_station_id', 'fuel_product_id', 'quantity_milliliters', 'recorded_at']);
-
-        $byPool = [];
-        foreach ($all as $fill) {
-            $warehouseId = $stationIds->get($fill->fuel_station_id);
-            $productId = $products->get($fill->fuel_product_id)?->product_id;
-            if ($warehouseId === null || $productId === null) {
-                continue;
-            }
-            $byPool[$warehouseId . '|' . $productId] ??= collect();
-            $byPool[$warehouseId . '|' . $productId]->push($fill);
+        $totals = [];
+        $rows = DB::table('fuel_tanker_fills as f')
+            ->join('fuel_stations as s', 's.id', '=', 'f.fuel_station_id')
+            ->join('fuel_products as p', 'p.id', '=', 'f.fuel_product_id')
+            ->where('f.tenant_id', $tenantId)
+            ->where('f.status', FuelTankerFill::STATUS_RECORDED)->where('f.inventory_status', FuelTankerFill::INVENTORY_PENDING_INTEGRATION)
+            ->whereIn('s.warehouse_id', $warehouseIds)
+            ->groupBy('s.warehouse_id', 'p.product_id')
+            ->selectRaw('s.warehouse_id as warehouse_id, p.product_id as product_id, COUNT(*) as pending_count, SUM(f.quantity_milliliters) as pending_total')
+            ->get();
+        foreach ($rows as $row) {
+            $totals[$row->warehouse_id . '|' . $row->product_id] = ['count' => (int) $row->pending_count, 'total' => (int) $row->pending_total];
         }
 
-        return $byPool;
+        return $totals;
     }
 }

@@ -21,7 +21,7 @@ describe('readReview', () => {
       { id: 'a', number: 'FTF-1', voucher_number: '04052', fuel_station_id: 's', quantity_liters: '1.000', quantity_milliliters: 1000, owner: { name: 'عسكر' }, tanker: null, recorded_at: '2027-01-26T09:00:00+03:00', inventory_readiness: { readiness: 'ready' } },
       { id: 7, number: 'bad' }, // صف مشوّه يُهمَل
     ],
-    meta: { page: 2, last_page: 3, total: 41, truncated: true, posting_enabled: false, summary: { total: 5, ready: 2, needs_review: 1, blocked: 2, overdue: 1 }, pools: [{ warehouse_id: 'w', fuel_product_id: 'p', stock_milliliters: 9, cost_pool_milliliters: 9, quantity_in_sync: true, pending_count: 1, pending_total_milliliters: 5, shortfall_milliliters: 0 }, { x: 1 }], reconciliation_requirements: ['pool_quantity_equals_warehouse_stock'] },
+    meta: { page: 2, last_page: 3, total: 41, truncated: true, posting_enabled: false, summary: { total: 5, ready: 2, needs_review: 1, blocked: 2, overdue: 1 }, pools: [{ warehouse_id: 'w', warehouse_name: 'م', fuel_product_id: 'p', fuel_product_name: 'ب', stock_milliliters: 9, cost_pool_milliliters: 9, quantity_in_sync: true, pending_count: 1, pending_total_milliliters: 5, shortfall_milliliters: 0 }, { x: 1 }], reconciliation_requirements: ['pool_quantity_equals_warehouse_stock'] },
   };
 
   it('parses rows, pools and meta, dropping malformed entries', () => {
@@ -31,6 +31,7 @@ describe('readReview', () => {
     expect(page.rows[0].readiness.readiness).toBe('ready');
     expect(page.pools).toHaveLength(1);
     expect(page.pools[0].costPoolValueMinor).toBeNull();
+    expect(page.pools[0]).toMatchObject({ warehouseName: 'م', fuelProductName: 'ب' });
     expect(page).toMatchObject({ page: 2, lastPage: 3, total: 41, truncated: true, postingEnabled: false });
     expect(page.summary).toEqual({ total: 5, ready: 2, needsReview: 1, blocked: 2, overdue: 1 });
   });

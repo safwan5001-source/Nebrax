@@ -10139,7 +10139,9 @@
         "shortfall": "Shortfall against balance: {liters} L",
         "inSync": "In sync",
         "outOfSync": "Out of sync",
-        "syncUnknown": "Undetermined"
+        "syncUnknown": "Undetermined",
+        "unnamedWarehouse": "Unnamed warehouse",
+        "unnamedProduct": "Unnamed product"
       },
       "requirements": {
         "title": "Reconciliation requirements before activation",

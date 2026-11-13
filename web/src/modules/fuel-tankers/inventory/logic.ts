@@ -39,7 +39,9 @@ export interface ReviewRow {
 
 export interface PoolSummary {
   warehouseId: string;
+  warehouseName: string | null;
   fuelProductId: string;
+  fuelProductName: string | null;
   stockMilliliters: number | null;
   costPoolMilliliters: number | null;
   quantityInSync: boolean | null;
@@ -108,7 +110,9 @@ function readPool(raw: unknown): PoolSummary | null {
   if (typeof pool.warehouse_id !== 'string' || typeof pool.fuel_product_id !== 'string') return null;
   return {
     warehouseId: pool.warehouse_id,
+    warehouseName: text(pool.warehouse_name),
     fuelProductId: pool.fuel_product_id,
+    fuelProductName: text(pool.fuel_product_name),
     stockMilliliters: int(pool.stock_milliliters),
     costPoolMilliliters: int(pool.cost_pool_milliliters),
     quantityInSync: typeof pool.quantity_in_sync === 'boolean' ? pool.quantity_in_sync : null,

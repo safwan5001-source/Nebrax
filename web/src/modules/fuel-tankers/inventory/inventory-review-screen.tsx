@@ -191,6 +191,7 @@ function PoolRow({ pool }: { pool: PoolSummary }) {
   const t = useTranslations('fuelTankers.inventory');
   return (
     <li className="space-y-1 rounded-md border border-border p-3 text-sm" data-pool-row="">
+      <p className="text-sm font-semibold text-text" data-pool-title="">{pool.warehouseName ?? t('pools.unnamedWarehouse')} · {pool.fuelProductName ?? t('pools.unnamedProduct')}</p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium text-text">{t('pools.stock')}: <span className="num">{litersOf(pool.stockMilliliters)}</span> {t('liters')}</span>
         {pool.quantityInSync === null ? <Badge tone="neutral">{t('pools.syncUnknown')}</Badge> : pool.quantityInSync ? <Badge tone="positive">{t('pools.inSync')}</Badge> : <Badge tone="negative">{t('pools.outOfSync')}</Badge>}
