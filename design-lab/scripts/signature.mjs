@@ -234,6 +234,32 @@ test('Recovery keeps the last saved draft: discard after reload returns to the s
   await page.evaluate(() => localStorage.clear()); await ctx.close();
 });
 
+test('Keyboard actions update recovery: Ctrl+S survives a reload with no "unsaved" notice; Alt+N line survives a reload', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  const page = await ctx.newPage();
+  await page.goto(`${base}?r=sales&ln=3`); await page.evaluate(() => { localStorage.clear(); }); await page.reload();
+  await page.fill('#sales-ref', 'KBD-SAVED'); await page.locator('#main').focus(); await page.keyboard.press('Control+s'); await page.waitForTimeout(80);
+  await page.reload(); await page.waitForTimeout(200);
+  assert(await page.inputValue('#sales-ref') === 'KBD-SAVED' && await page.locator('.msg.recovered').count() === 0, 'Ctrl+S save not kept across reload: ' + await page.inputValue('#sales-ref') + ' notice=' + await page.locator('.msg.recovered').count());
+  const n = await page.locator('.lines tbody tr').count();
+  await page.locator('#main').focus(); await page.keyboard.press('Alt+n'); await page.waitForTimeout(80);
+  await page.reload(); await page.waitForTimeout(200);
+  assert(await page.locator('.lines tbody tr').count() === n + 1 && await page.locator('.msg.recovered').count() === 1, 'Alt+N line lost on reload');
+  await page.click('[data-act="v3-discard"]'); await page.waitForTimeout(80);
+  assert(await page.locator('.lines tbody tr').count() === n && await page.inputValue('#sales-ref') === 'KBD-SAVED', 'discard did not return to the keyboard save');
+  await page.evaluate(() => localStorage.clear()); await ctx.close();
+});
+
+test('Long invoice keeps its line-scroll position when a line is deleted', async () => {
+  const { ctx, page } = await open('embed=1&r=sales&ln=24', { width: 1366, height: 768 });
+  const before = await page.evaluate(() => { const b = document.querySelector('.tscroll.tall'); b.scrollTop = b.scrollHeight; return b.scrollTop; });
+  assert(before > 100, 'precondition: line box scrolls ' + before);
+  await page.click('.lines tbody tr:nth-last-child(2) [data-del]'); await page.waitForTimeout(80);
+  const after = await page.evaluate(() => document.querySelector('.tscroll.tall').scrollTop);
+  assert(after > before - 120, `line scroll reset after delete: ${before} -> ${after}`);
+  await ctx.close();
+});
+
 test('Draft vs post is explicit: lifecycle captions, draft note, Save draft keeps the document editable', async () => {
   const { ctx, page } = await open('embed=1&r=sales&ln=3', { width: 1366, height: 768 });
   assert(await page.locator('.lifecycle li small').count() === 3, 'lifecycle captions');

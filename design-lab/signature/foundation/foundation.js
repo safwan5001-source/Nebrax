@@ -745,10 +745,11 @@ function render(focusSel) {
   Object.assign(app.dataset, { mode:S.mode, theme:S.theme, identity:S.identity, amt:S.amt, density:S.density });
   app.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr'); app.setAttribute('lang', S.lang);
   const scroll = document.getElementById('main')?.scrollTop || 0;
+  const lineBox = app.querySelector('.tscroll.tall'), lineScroll = lineBox ? [lineBox.scrollTop, lineBox.scrollLeft] : null; /* long invoices scroll their own lines: keep the user's place */
   // Keep the caret/selection of the field being edited: re-rendering replaces it, and jumping to the end would corrupt mid-field edits
   let caret = null; try { const a = document.activeElement; if (a && app.contains(a) && a.id && typeof a.selectionStart === 'number') caret = { id: a.id, s: a.selectionStart, e: a.selectionEnd, v: a.value }; } catch (e) {}
   app.innerHTML = shell(PAGES[S.route]());
-  if (!S._reset) document.getElementById('main').scrollTop = scroll; S._reset = false;
+  if (!S._reset) { document.getElementById('main').scrollTop = scroll; const nb = app.querySelector('.tscroll.tall'); if (nb && lineScroll) { nb.scrollTop = lineScroll[0]; nb.scrollLeft = lineScroll[1]; } } S._reset = false;
   S.toasts.forEach(drawToast);
   if (S.route === 'numbers') requestAnimationFrame(() => measureNumbers());
   if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); try { if (caret && el.id === caret.id && el.value === caret.v) el.setSelectionRange(caret.s, caret.e); else { const n = el.value.length; el.setSelectionRange(n, n); } } catch (e) {} } }

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T20:12:49.259Z",
+ "generated": "2026-11-13T20:16:16.463Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3010,6 +3010,14 @@
    "ok": true
   },
   {
+   "name": "Keyboard actions update recovery: Ctrl+S survives a reload with no \"unsaved\" notice; Alt+N line survives a reload",
+   "ok": true
+  },
+  {
+   "name": "Long invoice keeps its line-scroll position when a line is deleted",
+   "ok": true
+  },
+  {
    "name": "Draft vs post is explicit: lifecycle captions, draft note, Save draft keeps the document editable",
    "ok": true
   },
@@ -3032,7 +3040,7 @@
  ],
  "summary": {
   "interactions": {
-   "tests": 14,
+   "tests": 16,
    "failed": 0
   },
   "matrix": {

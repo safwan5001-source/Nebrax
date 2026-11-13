@@ -172,9 +172,10 @@ function hero(api) {
 function saveRecovery() {
   const S = window.__fx?.S; if (!S || EMBED) return;
   const D = S.docs.sales;
-  try { if (D.dirty) localStorage.setItem(RECOVERY_KEY, JSON.stringify({ at: new Date().toISOString(), doc: D })); /* keeps D.saved: discard must return to the acknowledged save */ else localStorage.removeItem(RECOVERY_KEY); } catch (e) {}
+  try { if (D.dirty || D.saved) localStorage.setItem(RECOVERY_KEY, JSON.stringify({ at: new Date().toISOString(), doc: D })); /* keeps D.saved: the lab has no server, so the acknowledged save survives a reload and discard returns to it */ else localStorage.removeItem(RECOVERY_KEY); } catch (e) {}
 }
 document.addEventListener('input', () => setTimeout(saveRecovery, 0));
+document.addEventListener('keydown', () => setTimeout(saveRecovery, 0)); /* Ctrl+S and Alt+N change the document from the keyboard */
 document.addEventListener('click', (e) => {
   setTimeout(saveRecovery, 0);
   const b = e.target.closest?.('[data-act^="v3-"]'); if (!b || !window.__fx) return;
@@ -202,7 +203,7 @@ window.FX_EXT = {
   pages(api) {
     // fixtures need api.newDoc/PROD, so build lazily on first render
     if (api.S._built !== `${Number(api.S.lines) || 3}|${api.S.scenario}`) buildDocs(api.S, api);
-    if (!EMBED) { try { const r = JSON.parse(localStorage.getItem(RECOVERY_KEY) || 'null'); if (r?.doc?.lines) { api.S.docs.sales = r.doc; api.S.recovered = r.at; } } catch (e) {} }
+    if (!EMBED) { try { const r = JSON.parse(localStorage.getItem(RECOVERY_KEY) || 'null'); if (r?.doc?.lines) { api.S.docs.sales = r.doc; api.S.recovered = r.doc.dirty ? r.at : null; } } catch (e) {} }
     return { dashboard: () => dashboard(api) };
   },
   docNotice(kind, api) {
