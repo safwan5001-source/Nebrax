@@ -896,6 +896,33 @@ jobs:
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
           rm -f database/migrations/0001_01_01_000000_create_users_table.php
 
+      # PG-PERF-LOCKS: `RefreshDatabase` في أول اختبار يُسقط كل جداول المخطط في عبارة `DROP TABLE … CASCADE` واحدة، وهي تأخذ
+      # ≈12.8 ألف قفل (420 جدولاً مع فهارسها وجداول TOAST، مقيساً على هذا المخطط) بينما السعة الافتراضية 64 × 100 = 6400 خانة.
+      # تجاوزٌ بضعفين يمرّ أحياناً بفضل فائض الذاكرة المشتركة ويفشل أحياناً بـ«out of shared memory» — وهذا عدم الاستقرار المرصود.
+      # نفس قيمة وظيفة `test` (1024)، لكن بآلية مختلفة إلزامياً: البيانات هنا على tmpfs (PERF-TMPFS) فإعادة تشغيل الحاوية تمحوها،
+      # فلا يبقى `ALTER SYSTEM` (يُكتب داخل PGDATA). نضع القيمة في قالب الإعداد (طبقة الحاوية، خارج tmpfs) الذي ينسخه initdb،
+      # ثم نعيد التشغيل فيُنشئ مدخل الصورة عنقوداً جديداً على tmpfs بالقيمة، وننتظر اكتمال التهيئة ونتحقق منها قبل أي ترحيل.
+      - name: رفع حدّ أقفال PostgreSQL (tmpfs — عبر قالب الإعداد)
+        run: |
+          set -euo pipefail
+          CID="$(docker ps -q --filter ancestor=postgres:16)"
+          [ -n "$CID" ] && [ "$(echo "$CID" | wc -l)" -eq 1 ] || { echo "::error::تعذّر تحديد حاوية postgres الوحيدة"; exit 1; }
+          SAMPLE="$(docker exec "$CID" sh -c 'readlink -f "/usr/share/postgresql/$PG_MAJOR/postgresql.conf.sample"')"
+          docker exec "$CID" test -f "$SAMPLE" || { echo "::error::قالب إعداد PostgreSQL غير موجود: $SAMPLE"; exit 1; }
+          docker exec "$CID" sh -c "printf '\nmax_locks_per_transaction = 1024\n' >> '$SAMPLE'"
+          inits() { docker logs "$CID" 2>&1 | awk '/PostgreSQL init process complete/ {n++} END {print n+0}'; }
+          BEFORE="$(inits)"
+          docker restart "$CID" >/dev/null
+          # لا نكتفي بـpg_isready: خادم التهيئة المؤقت يجيب على المقبس قبل أن يُستبدل بالخادم النهائي.
+          for i in $(seq 1 90); do
+            [ "$(inits)" -gt "$BEFORE" ] && docker exec "$CID" pg_isready -U nibras -d nibras >/dev/null 2>&1 && break
+            sleep 1
+          done
+          [ "$(inits)" -gt "$BEFORE" ] || { echo "::error::لم تكتمل تهيئة PostgreSQL بعد إعادة التشغيل"; exit 1; }
+          LIMIT="$(docker exec "$CID" psql -U nibras -d nibras -Atc "SHOW max_locks_per_transaction")"
+          echo "max_locks_per_transaction=$LIMIT"
+          [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
+
       - name: تهيئة قاعدة بيانات القياس (pgsql)
         working-directory: ${{ env.APP_DIR }}
         run: |
