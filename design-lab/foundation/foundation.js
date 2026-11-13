@@ -53,7 +53,6 @@ const P = {
 };
 /** Directional icons (back, chevrons) mirror in RTL — one component, not scattered rotate-180. */
 const DIRECTIONAL = new Set(['chevS', 'chevE', 'back']);
-Object.assign(P, (window.FX_EXT || {}).icons || {});
 const ic = (n, cls = '') => `<svg class="${cls}${DIRECTIONAL.has(n) ? ' dir-icon' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 
 /* ------------------------------------------------------------------ i18n */
@@ -184,19 +183,6 @@ const T = {
     demoToast:'Illustrative action in the lab',
   },
 };
-/* Extension point (Signature V3 lab). Absent ⇒ behaviour is byte-for-byte the Phase 1 foundation. */
-const EXT = window.FX_EXT || {};
-Object.assign(T.ar, {
-  lineN:'البند {n}', linesCount:'{n} بنداً', linesErr:'بها أخطاء ({n})', linesAll:'كل البنود', linesFind:'ابحث في البنود (صنف أو رمز)', linesNoMatch:'لا بنود مطابقة. البيانات محفوظة؛ امسح البحث لعرض كل البنود.',
-  lcDraftC:'قابلة للتعديل · بلا قيد', lcPostedC:'قيد نهائي · ZATCA', lcPaidC:'مسدّدة بالكامل',
-  afterPostT:'بعد الترحيل', afterPost1:'يُنشأ قيد متوازن أعلاه ويُربط بالفاتورة', afterPost2:'تُصدر بيانات ZATCA (تسلسل ICV والختم) ولا يُعاد استعمالها', afterPost3:'لا تُعدّل الفاتورة؛ التصحيح بإشعار دائن', draftNote:'الحفظ كمسودة لا يُنشئ قيداً ولا يُصدر بيانات ZATCA، وتبقى قابلة للتعديل أو الحذف.',
-});
-Object.assign(T.en, {
-  lineN:'Line {n}', linesCount:'{n} lines', linesErr:'With errors ({n})', linesAll:'All lines', linesFind:'Find in lines (item or SKU)', linesNoMatch:'No matching lines. Data is kept; clear the search to show every line.',
-  lcDraftC:'Editable · no entry', lcPostedC:'Final entry · ZATCA', lcPaidC:'Fully paid',
-  afterPostT:'After posting', afterPost1:'The balanced entry above is created and linked to the invoice', afterPost2:'ZATCA data (ICV sequence and stamp) is issued and never reused', afterPost3:'The invoice cannot be edited; corrections use a credit note', draftNote:'Saving a draft creates no entry and issues no ZATCA data; it stays editable or deletable.',
-});
-if (EXT.i18n) { Object.assign(T.ar, EXT.i18n.ar || {}); Object.assign(T.en, EXT.i18n.en || {}); }
 let L = T.ar; const t = (k, v = {}) => String(L[k] ?? k).replace(/\{(\w+)\}/g, (_, n) => v[n] ?? '');
 
 /* ------------------------------------------------------------------ money (integer halalas; same contract as web/src/lib/money.ts) */
@@ -283,12 +269,9 @@ const S = {
   num:{ neg:true, sym:true, font:'mono', guides:true },
   readings:{}, gSeq:false,
 };
-if (EXT.state) Object.assign(S, EXT.state);
-const STORE = EXT.storageKey || 'awj-foundation', PKEYS = ['route','device','mode','theme','identity','amt','lang','density', ...(EXT.persistKeys || [])];
-if (EXT.persist !== false) try { const sv = JSON.parse(localStorage.getItem(STORE) || '{}'); PKEYS.forEach(k => { if (sv[k]) S[k] = sv[k]; }); } catch (e) {}
-EXT.init?.(S);
+try { const sv = JSON.parse(localStorage.getItem('awj-foundation') || '{}'); ['route','device','mode','theme','identity','amt','lang','density'].forEach(k => { if (sv[k]) S[k] = sv[k]; }); } catch (e) {}
 if (innerWidth < 560) S.device = 'wide';
-const persist = () => { if (EXT.persist === false) return; try { localStorage.setItem(STORE, JSON.stringify(Object.fromEntries(PKEYS.map(k => [k, S[k]])))); } catch (e) {} };
+const persist = () => { try { localStorage.setItem('awj-foundation', JSON.stringify({ route:S.route, device:S.device, mode:S.mode, theme:S.theme, identity:S.identity, amt:S.amt, lang:S.lang, density:S.density })); } catch (e) {} };
 const nm = (o) => o ? (S.lang === 'ar' ? o.ar : o.en) : '';
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
@@ -306,25 +289,22 @@ const NAV = [
   ['g_lab','flask',[['home','home'],['kit','kit'],['numbers','numbers'],['rules','rules'],['identity','identity']]],
 ];
 const ROUTES = ['home','kit','numbers','rules','sales','purchase','inventory','shift','identity'];
-if (EXT.nav) EXT.nav(NAV, ROUTES);
 const groupOf = (route) => NAV.find(([, , items]) => items.some(([, r]) => r === route)) || NAV[NAV.length - 1];
-const routeLabel = (r) => ({ home:'home', kit:'kit', numbers:'numbers', rules:'rules', sales:'salesInv', purchase:'purchInv', inventory:'stock', shift:'shift', identity:'identity', ...(EXT.routeLabels || {}) })[r];
+const routeLabel = (r) => ({ home:'home', kit:'kit', numbers:'numbers', rules:'rules', sales:'salesInv', purchase:'purchInv', inventory:'stock', shift:'shift', identity:'identity' })[r];
 const DEVICES = { phone:{ w:390, h:844, l:'جوال 390' }, tablet:{ w:834, h:1112, l:'لوحي عمودي 834' }, tabletL:{ w:1194, h:834, l:'لوحي أفقي 1194' }, laptop:{ w:1366, h:860, l:'محمول 1366' }, wide:{ w:null, h:920, l:'عريض' } };
-if (EXT.devices) { Object.keys(DEVICES).forEach(k => delete DEVICES[k]); Object.assign(DEVICES, EXT.devices); }
 const windowClass = () => { const w = app.clientWidth; return w < 600 ? 'compact' : w < 1200 ? 'medium' : 'large'; };
 
 /* ------------------------------------------------------------------ shell */
 function shell(content) {
   const [gKey] = groupOf(S.route);
-  const home = EXT.homeRoute || 'home';
-  const side = `<div class="side">${EXT.brand ? EXT.brand('side', API) : `<div class="brand"><span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span><div style="min-width:0"><b>${t('company')}</b><span>${t('product')}</span></div></div>`}
+  const side = `<div class="side"><div class="brand"><span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span><div style="min-width:0"><b>${t('company')}</b><span>${t('product')}</span></div></div>
     <nav class="nav-scroll" aria-label="${t('menu')}">${NAV.map(([g, icn, items]) => `<div class="nav-grp">${t(g)}${g === 'g_lab' ? '<span class="tag-lab" style="font-size:9.5px">LAB</span>' : ''}</div>${items.map(([k, r]) => `<button type="button" class="nav-a" data-route="${r || ''}" data-label="${k}" ${r === S.route ? 'aria-current="page"' : ''}>${ic(r === S.route || g !== 'g_lab' ? icn : 'flask')}<span class="lbl">${t(k)}</span></button>`).join('')}`).join('')}</nav></div>`;
-  const rail = `<nav class="rail" aria-label="${t('menu')}">${EXT.brand ? EXT.brand('rail', API) : `<span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span>`}${NAV.map(([g, icn]) => `<button type="button" class="rail-b" data-group="${g}" aria-current="${g === gKey}" title="${t(g)}">${ic(icn)}<span class="lbl">${t(g)}</span></button>`).join('')}</nav>`;
+  const rail = `<nav class="rail" aria-label="${t('menu')}"><span class="mk" aria-hidden="true">${S.lang === 'ar' ? 'أ' : 'A'}</span>${NAV.map(([g, icn]) => `<button type="button" class="rail-b" data-group="${g}" aria-current="${g === gKey}" title="${t(g)}">${ic(icn)}<span class="lbl">${t(g)}</span></button>`).join('')}</nav>`;
   const brChip = `<button type="button" class="ctx-chip" data-act="context" aria-haspopup="dialog">${ic('building')}<span class="hide-c">${t('branch')}:</span> <b>${t('br_' + S.branch)}</b></button>`;
   const periodChip = `<span class="ctx-chip hide-m" data-locked="false"><span class="dot"></span>${t('period')}: <b>${t('periodOpen')}</b></span>`;
   const crumbs = `<nav class="crumbs" aria-label="breadcrumb"><span class="hide-c">${t(gKey)}</span>${ic('chevS', 'hide-c')}<b>${t(routeLabel(S.route))}</b></nav>`;
   const ctx = `<header class="ctx">${crumbs}<span class="grow"></span><button type="button" class="cmd-trigger" data-act="palette">${ic('search')}<span class="t">${t('search')}</span><span class="kbd">Ctrl K</span></button>${brChip}${periodChip}<button type="button" class="ibtn hide-c" data-act="inbox">${ic('bell')}<span class="sr">${t('inbox')} · ${S.lang === 'ar' ? '3 غير مقروءة' : '3 unread'}</span><span class="count" aria-hidden="true">3</span></button><button type="button" class="avatar hide-c" data-act="usermenu"><span aria-hidden="true">${S.lang === 'ar' ? 'سد' : 'SD'}</span><span class="sr">${S.lang === 'ar' ? 'قائمة المستخدم' : 'User menu'}</span></button></header>`;
-  const bbar = `<nav class="bbar" aria-label="${t('menu')}"><button type="button" data-route="${home}" aria-current="${S.route === home}">${ic('home')}<span>${t('home')}</span></button><button type="button" data-act="palette">${ic('search')}<span>${t('searchShort')}</span></button><button type="button" class="make" data-act="create" aria-label="${t('create')}"><span class="c">${ic('plus')}</span></button><button type="button" data-act="inbox">${ic('bell')}<span class="count">3</span><span>${t('inbox')}</span></button><button type="button" data-act="navsheet" aria-current="${S.route !== home}">${ic('menu')}<span>${t('menu')}</span></button></nav>`;
+  const bbar = `<nav class="bbar" aria-label="${t('menu')}"><button type="button" data-route="home" aria-current="${S.route === 'home'}">${ic('home')}<span>${t('home')}</span></button><button type="button" data-act="palette">${ic('search')}<span>${t('searchShort')}</span></button><button type="button" class="make" data-act="create" aria-label="${t('create')}"><span class="c">${ic('plus')}</span></button><button type="button" data-act="inbox">${ic('bell')}<span class="count">3</span><span>${t('inbox')}</span></button><button type="button" data-act="navsheet" aria-current="${S.route !== 'home'}">${ic('menu')}<span>${t('menu')}</span></button></nav>`;
   const banner = S.banner ? `<div class="banner" role="status">${ic('alert')}<span class="grow">${t('bannerTxt')}</span><button type="button" class="btn ghost" data-act="banner-off" style="height:28px">${t('dismiss')}</button></div>` : '';
   return `<div class="fx-shell"><aside class="nav">${side}${rail}</aside>${ctx}<main class="main" id="main" tabindex="-1">${banner}${content}</main>${bbar}</div><div class="toasts" aria-live="polite" id="toasts"></div>${overlay()}`;
 }
@@ -495,10 +475,10 @@ function docErrors(D) {
   return e;
 }
 const lineVal = (l, f) => l.raw?.[f] !== undefined ? l.raw[f] : f === 'qty' ? fromMinor(l.qtyM, 3) : fromMinor(f === 'price' ? l.price : l.disc, 2);
-function lineRow(D, l, i, visible = true) {
+function lineRow(D, l, i) {
   const p = PROD[l.p], c = lineCalc(l), priceKey = D.kind === 'sales' ? 'price' : 'cost';
   const inp = (f, w) => `<td data-l="${t(f === 'price' ? priceKey : f === 'disc' ? 'discount' : 'qty')}" style="width:${w}px"><input class="inp n" id="${D.kind}-l${l.id}-${f}" data-lf="${f}" data-doc="${D.kind}" inputmode="decimal" value="${esc(lineVal(l, f))}" aria-label="${t(f === 'price' ? priceKey : f === 'disc' ? 'discount' : 'qty')} ${i + 1}" ${l.bad?.[f] ? 'aria-invalid="true"' : ''}></td>`;
-  return `<tr data-line="${l.id}"${visible ? '' : ' hidden'}><td class="hide-c num muted">${i + 1}</td><td class="pr" data-l="${t('item')}"><select class="sel" id="${D.kind}-l${l.id}-p" data-lf="p" data-doc="${D.kind}" aria-label="${t('item')} ${i + 1}">${PROD.filter(x => D.kind === 'sales' || x.stock).map(x => `<option value="${PROD.indexOf(x)}" ${PROD.indexOf(x) === l.p ? 'selected' : ''}>${esc(nm(x))}</option>`).join('')}</select><small>${p.sku}</small></td>${inp('qty', 96)}<td class="hide-c muted" style="width:60px">${nm(p.u)}</td>${inp('price', 116)}${inp('disc', 100)}<td class="ro c-amt" data-l="${t('vat')}" data-lt="vat">${ic('lock', 'lock')}${plain(c.vat)}</td><td class="ro c-amt" data-l="${t('lineTotal')}" data-lt="total" style="font-weight:600">${ic('lock', 'lock')}${plain(c.total)}</td><td class="del" style="width:44px"><button type="button" class="ibtn" data-del="${l.id}" data-doc="${D.kind}" aria-label="delete line ${i + 1}">${ic('trash')}</button></td></tr>`;
+  return `<tr data-line="${l.id}"><td class="hide-c num muted">${i + 1}</td><td class="pr" data-l="${t('item')}"><select class="sel" id="${D.kind}-l${l.id}-p" data-lf="p" data-doc="${D.kind}" aria-label="${t('item')} ${i + 1}">${PROD.filter(x => D.kind === 'sales' || x.stock).map(x => `<option value="${PROD.indexOf(x)}" ${PROD.indexOf(x) === l.p ? 'selected' : ''}>${esc(nm(x))}</option>`).join('')}</select><small>${p.sku}</small></td>${inp('qty', 96)}<td class="hide-c muted" style="width:60px">${nm(p.u)}</td>${inp('price', 116)}${inp('disc', 100)}<td class="ro c-amt" data-l="${t('vat')}" data-lt="vat">${ic('lock', 'lock')}${plain(c.vat)}</td><td class="ro c-amt" data-l="${t('lineTotal')}" data-lt="total" style="font-weight:600">${ic('lock', 'lock')}${plain(c.total)}</td><td class="del" style="width:44px"><button type="button" class="ibtn" data-del="${l.id}" data-doc="${D.kind}" aria-label="delete line ${i + 1}">${ic('trash')}</button></td></tr>`;
 }
 function docPage(kind) {
   const D = S.docs[kind], tot = totals(D.lines), errs = D.showErrs ? docErrors(D) : {}, nerr = Object.keys(errs).length;
@@ -515,25 +495,20 @@ function docPage(kind) {
       ? `<div class="field"><label for="sales-pl">${t('priceList')}</label><select class="sel" id="sales-pl"><option>${t('plStd')}</option></select></div><div class="field"><label for="sales-ref">${t('ref')}</label><input class="inp" id="sales-ref" data-hf="ref" data-doc="sales" value="${esc(D.ref)}"></div>`
       : `<div class="field"><label for="purchase-wh">${t('whIn')}</label><select class="sel" id="purchase-wh" data-hf="wh" data-doc="purchase">${WH.map(w => `<option value="${w}" ${w === D.wh ? 'selected' : ''}>${t('wh_' + w)}</option>`).join('')}</select></div><div class="field"><label for="purchase-ref">${t('supRef')} <span class="req" aria-hidden="true">*</span></label><input class="inp num" id="purchase-ref" data-hf="ref" data-doc="purchase" value="${esc(D.ref)}" ${errs.ref ? 'aria-invalid="true" aria-describedby="purchase-ref-e"' : ''}>${errs.ref ? `<span class="err" id="purchase-ref-e">${ic('alert')}${t('errSupRef')}</span>` : ''}</div>`}
     <div class="field span2"><span class="label">${t('branch')}</span><div class="ro-val">${ic('building')}${t('br_' + S.branch)}</div></div></div>`;
-  const lerr = new Set(D.lines.filter(l => Object.values(l.bad || {}).some(Boolean)).map(l => l.id)), lq = (D.lq || '').trim().toLowerCase(), onlyErr = D.lf === 'err' && lerr.size > 0;
-  const shown = (l) => (!onlyErr || lerr.has(l.id)) && (!lq || nm(PROD[l.p]).toLowerCase().includes(lq) || PROD[l.p].sku.toLowerCase().includes(lq));
-  const nShown = D.lines.filter(shown).length, tall = D.lines.length > 10;
-  const lbar = `<div class="lines-bar"><span class="cnt num">${t('linesCount', { n: D.lines.length })}</span>${lerr.size ? `<span class="chips" role="group" aria-label="${t('lines')}"><button type="button" class="chip" data-act="lines-filter" data-doc="${kind}" data-v="all" aria-pressed="${!onlyErr}">${t('linesAll')}</button><button type="button" class="chip warn" data-act="lines-filter" data-doc="${kind}" data-v="err" aria-pressed="${onlyErr}">${ic('alert')}${t('linesErr', { n: lerr.size })}</button></span>` : ''}${tall ? `<label class="srch lfind">${ic('search')}<input class="inp" id="${kind}-lq" data-lq="${kind}" type="search" placeholder="${t('linesFind')}" aria-label="${t('linesFind')}" value="${esc(D.lq || '')}"></label>` : ''}</div>`;
-  const lines = `${lbar}<div class="tscroll${tall ? ' tall' : ''}"${tall ? ` tabindex="0" role="region" aria-label="${t('lines')}"` : ''}><table class="lines"><thead><tr><th class="hide-c">#</th><th>${t('item')}</th><th class="c-amt">${t('qty')}</th><th class="hide-c">${t('unit')}</th><th class="c-amt">${t(kind === 'sales' ? 'price' : 'cost')}</th><th class="c-amt">${t('discount')}</th><th class="c-amt">${t('vat')}</th><th class="c-amt">${t('lineTotal')}</th><th><span class="sr">actions</span></th></tr></thead><tbody>${D.lines.map((l, i) => lineRow(D, l, i, shown(l))).join('')}</tbody></table>${nShown ? '' : `<p class="state" style="padding:16px">${t('linesNoMatch')}</p>`}</div>
+  const lines = `<div class="tscroll"><table class="lines"><thead><tr><th class="hide-c">#</th><th>${t('item')}</th><th class="c-amt">${t('qty')}</th><th class="hide-c">${t('unit')}</th><th class="c-amt">${t(kind === 'sales' ? 'price' : 'cost')}</th><th class="c-amt">${t('discount')}</th><th class="c-amt">${t('vat')}</th><th class="c-amt">${t('lineTotal')}</th><th><span class="sr">actions</span></th></tr></thead><tbody>${D.lines.map((l, i) => lineRow(D, l, i)).join('')}</tbody></table></div>
     <div style="display:flex;gap:10px;align-items:center;padding:10px 12px"><button class="btn" type="button" id="${kind}-addline" data-act="add-line" data-doc="${kind}">${ic('plus')}${t('addLine')}</button><span class="muted hide-c" style="font-size:12px">${t('addHint')}</span></div>`;
   const cells = [['sub', tot.sub], ['disc', -tot.disc], ['vat15', tot.vat]];
   const outcome = `<div class="outcome" aria-live="polite"><span class="lbl"><span>${t(kind === 'sales' ? 'grand' : 'grandP')}</span><span>${D.lines.length} ${t('lines')}</span></span><span class="amt" data-tot="total">${moneyOutcome(tot.total)}</span></div>`;
   const postDisabled = locked;
   return `<div class="page">
     <div class="doc-h"><div class="id"><span class="type">${t(kind === 'sales' ? 'salesInv' : 'purchInv')} · ${t(kind === 'sales' ? 'salesNote' : 'purchNote')}</span><h1><span class="num">${kind === 'sales' ? 'INV-2026-0437' : 'PUR-0513'}</span>${statusBadge('document', 'draft')}</h1></div>
-      <ol class="lifecycle" aria-label="lifecycle"><li class="on cur" aria-current="step"><i></i><span><b>${t('draft')}</b><small>${t('lcDraftC')}</small></span></li><li><i></i><span><b>${t('posted')}</b><small>${t('lcPostedC')}</small></span></li><li><i></i><span><b>${t('paidSt')}</b><small>${t('lcPaidC')}</small></span></li></ol></div>
+      <div class="lifecycle" aria-label="lifecycle"><span class="on cur"><i></i>${t('draft')}</span><span><i></i>${t('posted')}</span><span><i></i>${t('paidSt')}</span></div></div>
     <div class="cmdbar" role="toolbar" aria-label="${t('more')}"><span class="state-l"><span class="${D.dirty ? 'dirty' : 'clean'}"></span>${D.dirty ? t('unsaved') : t('savedAt')}</span><span class="grow"></span>
       <button class="btn hide-c" type="button" data-act="save-draft" data-doc="${kind}">${ic('save')}${t('saveDraft')}<span class="kbd hide-m">Ctrl S</span></button>
       <span class="menu-wrap"><button type="button" class="btn" data-act="menu" data-menu="doc" aria-label="${t('more')}" aria-haspopup="menu" aria-expanded="${S.overlay?.menu === 'doc'}">${ic('more')}<span class="hide-c">${t('more')}</span></button>${S.overlay?.menu === 'doc' ? `<ul class="menu" role="menu" style="inset-inline-end:0;top:100%"><li role="none"><button type="button" role="menuitem" data-act="save-draft" data-doc="${kind}">${ic('save')}${t('saveDraft')}</button></li><li role="none"><button type="button" role="menuitem" data-act="demo">${ic('printer')}${t('print')}</button></li><li role="none"><button type="button" role="menuitem" data-act="demo">${ic('copy')}${t('duplicate')}</button></li><li role="none"><button type="button" role="menuitem" class="danger" data-act="confirm-delete" data-doc="${kind}">${ic('trash')}${t('deleteDraft')}</button></li></ul>` : ''}</span>
       <button class="btn primary hide-c" type="button" data-act="post" data-doc="${kind}" ${postDisabled ? `aria-disabled="true" aria-describedby="${kind}-lock"` : ''}>${ic('check')}${t('post')}</button></div>
-    <p class="draft-note">${ic('info')}<span>${t('draftNote')}</span></p>${EXT.docNotice ? EXT.docNotice(kind, API) : ''}
     ${locked ? `<div class="msg warn" id="${kind}-lock" role="status">${ic('lock')}<div><b>${t('lockedPeriodT')}</b>${t('lockedPeriodP')}</div></div>` : ''}
-    ${nerr ? `<div class="err-summary" role="alert" tabindex="-1" id="${kind}-sum"><b>${t('errSummary', { n: nerr })}</b><ul>${Object.entries(errs).map(([k, v]) => { const m = k.match(/^l(\d+)-/), n = m ? D.lines.findIndex(l => l.id === Number(m[1])) + 1 : 0; return `<li><button type="button" class="lnk" data-focus="${k === 'party' ? '#' + kind + '-party' : k === 'ref' ? '#purchase-ref' : k === 'lines' ? '#' + kind + '-addline' : '#' + kind + '-' + k}">${n ? `<b class="num">${t('lineN', { n })}</b> · ` : ''}${t(v)}</button></li>`; }).join('')}</ul></div>` : ''}
+    ${nerr ? `<div class="err-summary" role="alert" tabindex="-1" id="${kind}-sum"><b>${t('errSummary', { n: nerr })}</b><ul>${Object.entries(errs).map(([k, v]) => `<li><button type="button" class="lnk" data-focus="${k === 'party' ? '#' + kind + '-party' : k === 'ref' ? '#purchase-ref' : k === 'lines' ? '#' + kind + '-addline' : '#' + kind + '-' + k}">${t(v)}</button></li>`).join('')}</ul></div>` : ''}
     <section class="panel"><div class="panel-b">${facts}</div></section>
     <section class="panel"><div class="panel-h"><h2>${t('lines')}</h2><span class="sub">LineGrid</span></div>${lines}</section>
     <div class="dock"><div class="cells">${cells.map(([k, v]) => `<div class="cell"><span>${t(k)}</span><b data-tot="${k}">${money(v, { sym: false })}</b></div>`).join('')}</div>${outcome}</div>
@@ -615,9 +590,7 @@ function pageShift() {
 
 /* ------------------------------------------------------------------ pages: identity layer + contract checker */
 const ALLOW = new Set(['--awj-action-primary','--awj-action-primary-hover','--awj-action-primary-pressed','--awj-action-primary-fg','--awj-brand-soft','--awj-state-hover','--awj-state-selected','--awj-state-selected-edge','--awj-state-focus-ring','--awj-state-focus-halo','--awj-surface-desk','--awj-surface-outcome','--awj-outcome-rule','--awj-font-ui','--awj-font-num','--awj-radius-control','--awj-radius-surface','--awj-radius-sheet',
-  '--awj-shell-bg','--awj-shell-fg','--awj-shell-fg-muted','--awj-shell-line','--awj-shell-hover','--awj-shell-active-bg','--awj-shell-active-fg','--awj-shell-active-shadow','--awj-shell-apex','--awj-shell-field-bg','--awj-shell-field-line','--awj-shell-focus-ring','--awj-shell-brandmark-bg',
-  // L4 visual hooks (Signature V3 proposal): frame, panels, display type, figures, shape, hero band, wordmark
-  '--awj-topbar-bg','--awj-topbar-fg','--awj-topbar-muted','--awj-topbar-line','--awj-topbar-chip-bg','--awj-topbar-field-bg','--awj-topbar-focus','--awj-panel-border','--awj-panel-shadow','--awj-panel-title-size','--awj-panel-title-weight','--awj-panel-title-tracking','--awj-panel-title-case','--awj-font-display','--awj-display-size','--awj-display-weight','--awj-display-tracking','--awj-figure-font','--awj-figure-weight','--awj-figure-size','--awj-pill-radius','--awj-icon-stroke','--awj-page-max','--awj-hero-bg','--awj-hero-fg','--awj-hero-muted','--awj-hero-line','--awj-wordmark','--awj-hero-bleed','--awj-hero-cta-bg','--awj-hero-cta-fg','--awj-kpi-gap','--awj-kpi-frame','--awj-kpi-radius','--awj-kpi-clip']);
+  '--awj-shell-bg','--awj-shell-fg','--awj-shell-fg-muted','--awj-shell-line','--awj-shell-hover','--awj-shell-active-bg','--awj-shell-active-fg','--awj-shell-active-shadow','--awj-shell-apex','--awj-shell-field-bg','--awj-shell-field-line','--awj-shell-focus-ring','--awj-shell-brandmark-bg']);
 const TRACKED = [...ALLOW, '--awj-status-positive-fg','--awj-status-negative-fg','--awj-status-warning-fg','--awj-status-info-fg','--awj-status-positive-bg','--awj-status-negative-bg','--awj-text-primary','--awj-text-secondary','--awj-text-tertiary','--awj-surface-paper','--awj-surface-band','--awj-border-control','--awj-border-hairline','--awj-row-1l','--awj-control-h'];
 function probe(mode, identity, theme = 'default') { const p = document.createElement('div'); p.className = 'fx'; p.dataset.mode = mode; p.dataset.identity = identity; p.dataset.theme = theme; p.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0;contain:strict'; document.body.appendChild(p); const cs = getComputedStyle(p), o = {}; TRACKED.forEach(k => o[k] = cs.getPropertyValue(k).trim()); p.remove(); return o; }
 function hexOf(c) { if (!c) return null; c = c.trim(); if (c.startsWith('#')) return c.length === 4 ? '#' + [...c.slice(1)].map(x => x + x).join('') : c.slice(0, 7); const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const [r, g, b] = m[1].split(',').map(x => parseFloat(x)); return '#' + [r, g, b].map(x => Math.round(x).toString(16).padStart(2, '0')).join(''); }
@@ -637,14 +610,6 @@ const CHECKS = [
   ['positive / paper', '--awj-status-positive-fg', '--awj-surface-paper', 4.5],
   ['negative / paper', '--awj-status-negative-fg', '--awj-surface-paper', 4.5],
   ['warning / paper', '--awj-status-warning-fg', '--awj-surface-paper', 4.5],
-  ['topbar-fg / topbar-bg', '--awj-topbar-fg', '--awj-topbar-bg', 4.5],
-  ['topbar-muted / topbar-bg', '--awj-topbar-muted', '--awj-topbar-bg', 4.5],
-  ['topbar-focus / topbar-bg', '--awj-topbar-focus', '--awj-topbar-bg', 3],
-  ['hero-fg / hero-bg', '--awj-hero-fg', '--awj-hero-bg', 4.5],
-  ['hero-muted / hero-bg', '--awj-hero-muted', '--awj-hero-bg', 4.5],
-  ['wordmark / shell-bg', '--awj-wordmark', '--awj-shell-bg', 3],
-  ['hero-cta-fg / hero-cta-bg', '--awj-hero-cta-fg', '--awj-hero-cta-bg', 4.5],
-  ['text-secondary / desk', '--awj-text-secondary', '--awj-surface-desk', 4.5],
 ];
 /** Contract: allow-list only, locked tokens untouched, contrast pairs pass — in light and dark. */
 function contract(identity) {
@@ -697,7 +662,7 @@ function overlay() {
       ? [['1130','acc1130', tot.total, 0], ['4110','acc4110', 0, tot.net], ['2120','acc2120', 0, tot.vat]]
       : [['1140','acc1140', tot.net, 0], ['1150','acc1150', tot.vat, 0], ['2110','acc2110', 0, tot.total]];
     const dr = rows.reduce((s, r) => s + r[2], 0), cr = rows.reduce((s, r) => s + r[3], 0);
-    return `<div class="ovl center" data-scrim><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dlg-h"><span class="ic info">${ic('check')}</span><div><h3 id="dlg-t">${t('confirmPostT')}</h3><p>${t('confirmPostP')}</p></div></div><div class="dlg-b"><p style="margin:0 0 8px"><span class="tag-lab">${t('illus')}</span></p><div class="tscroll" tabindex="0" role="region" aria-label="${t('confirmPostT')}"><table class="je"><thead><tr><th>${t('account')}</th><th class="c-amt">${t('debit')}</th><th class="c-amt">${t('credit')}</th></tr></thead><tbody>${rows.map(([a, k, d, c]) => `<tr><td><span class="acc">${a}</span>${t(k)}</td><td class="c-amt">${d ? money(d) : '<span class="muted">—</span>'}</td><td class="c-amt">${c ? money(c) : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td>${t('total')}</td><td class="c-amt" data-dr="${dr}">${money(dr)}</td><td class="c-amt" data-cr="${cr}">${money(cr)}</td></tr></tfoot></table></div><div class="after-post"><b>${t('afterPostT')}</b><ul><li>${ic('check')}${t('afterPost1')}</li><li>${ic('hash')}${t('afterPost2')}</li><li>${ic('lock')}${t('afterPost3')}</li></ul></div></div><div class="dlg-f"><button class="btn" type="button" data-act="close">${t('cancel')}</button><button class="btn primary" type="button" data-act="do-post" data-doc="${o.doc}">${t('postShort')}</button></div></div></div>`;
+    return `<div class="ovl center" data-scrim><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dlg-h"><span class="ic info">${ic('check')}</span><div><h3 id="dlg-t">${t('confirmPostT')}</h3><p>${t('confirmPostP')}</p></div></div><div class="dlg-b"><p style="margin:0 0 8px"><span class="tag-lab">${t('illus')}</span></p><div class="tscroll" tabindex="0" role="region" aria-label="${t('confirmPostT')}"><table class="je"><thead><tr><th>${t('account')}</th><th class="c-amt">${t('debit')}</th><th class="c-amt">${t('credit')}</th></tr></thead><tbody>${rows.map(([a, k, d, c]) => `<tr><td><span class="acc">${a}</span>${t(k)}</td><td class="c-amt">${d ? money(d) : '<span class="muted">—</span>'}</td><td class="c-amt">${c ? money(c) : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td>${t('total')}</td><td class="c-amt" data-dr="${dr}">${money(dr)}</td><td class="c-amt" data-cr="${cr}">${money(cr)}</td></tr></tfoot></table></div></div><div class="dlg-f"><button class="btn" type="button" data-act="close">${t('cancel')}</button><button class="btn primary" type="button" data-act="do-post" data-doc="${o.doc}">${t('postShort')}</button></div></div></div>`;
   }
   return '';
 }
@@ -721,8 +686,6 @@ function palette() {
 /* ------------------------------------------------------------------ render + routing */
 const app = document.getElementById('fx-app');
 const PAGES = { home:pageHome, kit:pageKit, numbers:pageNumbers, rules:pageRules, sales:() => docPage('sales'), purchase:() => docPage('purchase'), inventory:pageInventory, shift:pageShift, identity:pageIdentity };
-const API = { S, t, ic, esc, nm, money, plain, moneyOutcome, qtyFmt, grp, statusBadge, pageHeader, stateBlock, CUST, SUPP, PROD, INV, invStatus, NOZ, WH, TODAY, fmtDate, addDays, totals, lineCalc, stockOf, stockStatus, readOf, shiftReady, windowClass, render: (f) => render(f), go: (r, f) => go(r, f), toast: (m) => toast(m), persist: () => persist(), contract: (i) => contract(i), newDoc };
-if (EXT.pages) Object.assign(PAGES, EXT.pages(API));
 // Focus return for overlays. render() replaces the whole app, so a stored element would be detached:
 // keep a stable key (id · the menu's trigger · nth [data-act]) and resolve it after rendering.
 function focusKey(el) {
@@ -755,7 +718,6 @@ function render(focusSel) {
   else if (S.overlay?.t === 'palette') document.getElementById('pal-q')?.focus();
   else if (S.overlay && !S.overlay.menu) app.querySelector('.ovl button:not([disabled]), .ovl [role="tab"]')?.focus();
   else if (S.overlay?.menu) app.querySelector('.menu [role="menuitem"]')?.focus();
-  EXT.afterRender?.(API);
   document.dispatchEvent(new CustomEvent('fx:render'));
 }
 function go(route, force) {
@@ -793,12 +755,7 @@ app.addEventListener('click', (e) => {
   if (d.pal !== undefined) { const c = palResults()[Number(d.pal)]; S.overlay = null; S.palQ = ''; c?.run(); render(); return; }
   if (d.pick) { const D = S.docs[d.doc]; D.party = (d.doc === 'sales' ? CUST : SUPP).find(c => c.id === d.pick); D.comboOpen = false; D.comboQ = ''; D.dirty = true; render(); return; }
   if (d.del) { const D = S.docs[d.doc]; D.lines = D.lines.filter(l => l.id !== Number(d.del)); D.dirty = true; render(); return; }
-  if (d.focus) {
-    const target = app.querySelector(d.focus);
-    // a line hidden by "find in lines" or the error filter cannot take focus: clear both, re-render, then focus
-    if (target?.closest('[hidden]') && S.docs[target.dataset.doc]) { Object.assign(S.docs[target.dataset.doc], { lq: '', lf: 'all' }); render(d.focus); return; }
-    target?.focus(); return;
-  }
+  if (d.focus) { app.querySelector(d.focus)?.focus(); return; }
   const doc = d.doc ? S.docs[d.doc] : null;
   switch (d.act) {
     case 'palette': S.overlay = { t:'palette' }; S.palQ = ''; S.palIdx = 0; render(); break;
@@ -822,7 +779,6 @@ app.addEventListener('click', (e) => {
     case 'peek-close': S.inv.peek = null; S.overlay = null; render(); break;
     case 'party-change': doc.party = null; doc.comboOpen = true; doc.dirty = true; render(`#${d.doc}-party`); break;
     case 'add-line': addLine(d.doc); break;
-    case 'lines-filter': { S.docs[d.doc].lf = d.v; render(); break; }
     case 'save-draft': { const fromMenu = !!el.closest('.menu'); if (fromMenu) { S.returnFocus = focusKey(el); S.overlay = null; } saveDraft(d.doc); if (fromMenu) restoreFocus(); break; }
     case 'post': requestPost(d.doc); break;
     case 'do-post': S.docs[d.doc] = newDoc(d.doc); S.overlay = null; render(); toast(t('toastPosted')); break;
@@ -872,7 +828,6 @@ app.addEventListener('input', (e) => {
   if (d.kf) { S.kit.form[d.kf] = el.value; if (S.kit.form.errs[d.kf]) { S.kit.form.errs = kitValidate(S.kit.form, false); } return; }
   if (d.party) { const D = S.docs[d.party]; D.comboQ = el.value; D.comboOpen = true; D.comboIdx = 0; render('#' + el.id); return; }
   if (d.reading) { const id = d.reading; S.readings[id + ':raw'] = el.value; const m = toMinor(el.value, 3); S.readings[id] = el.value.trim() === '' || m === null ? null : m; clearTimeout(S._r); S._r = setTimeout(() => { if (S.route === 'shift') render(focusedSelector()); }, 350); return; }
-  if (d.lq) { S.docs[d.lq].lq = el.value; clearTimeout(S._lq); S._lq = setTimeout(() => render(focusedSelector()), 140); return; }
   if (d.hf) { const D = S.docs[d.doc]; D[d.hf] = el.value; D.dirty = true; if (d.hf === 'date') render('#' + el.id); return; }
   if (d.lf) {
     const D = S.docs[d.doc], line = D.lines.find(l => l.id === Number(el.closest('tr').dataset.line)); if (!line) return; D.dirty = true;
@@ -928,7 +883,6 @@ new ResizeObserver(() => { if (S.route === 'numbers') { clearTimeout(S._rn); S._
 /* ------------------------------------------------------------------ lab chrome */
 function seg(id, items, key) { const el = document.getElementById(id); if (!el) return; el.innerHTML = items.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${S[key] === v}">${l}</button>`).join(''); el.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S[key] = b.dataset.v; if (key === 'route') S._reset = true; persist(); sync(); }; }
 function sync() {
-  if (EXT.chrome) { EXT.chrome(seg, API); render(); return; }
   seg('c-route', [['home','نظرة عامة'],['kit','المكوّنات'],['numbers','الأرقام M2'],['rules','القواعد'],['sales','فاتورة مبيعات'],['purchase','فاتورة مشتريات'],['inventory','المخزون'],['shift','وردية المحطة'],['identity','الهوية']], 'route');
   seg('c-device', Object.entries(DEVICES).map(([k, d]) => [k, d.l]), 'device');
   seg('c-mode', [['light','فاتح'],['dark','داكن']], 'mode');
@@ -941,5 +895,5 @@ function sync() {
   render();
 }
 sync();
-window.__fx = { S, render, go, totals, lineCalc, toMinor, measureNumbers, contract, windowClass, docErrors, setMode, setLang, newDoc, API };
+window.__fx = { S, render, go, totals, lineCalc, toMinor, measureNumbers, contract, windowClass, docErrors, setMode, setLang };
 })();

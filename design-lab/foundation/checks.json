@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T19:50:05.223Z",
+ "generated": "2026-11-10T04:36:27.446Z",
  "matrix": [
   {
    "route": "home",
@@ -2588,7 +2588,7 @@
    "ltr-c": 0
   },
   "mono/pos/sym": {
-   "rtl-a": 72.3,
+   "rtl-a": 72,
    "ltr-a": 0,
    "rtl-b": 0,
    "ltr-b": 0,
@@ -2680,7 +2680,7 @@
   },
   "brass": {
    "accepted": true,
-   "allowedChanged": 33,
+   "allowedChanged": 28,
    "lockedChanged": [],
    "failing": {
     "light": [],
@@ -2689,7 +2689,7 @@
   },
   "fayrouz": {
    "accepted": true,
-   "allowedChanged": 35,
+   "allowedChanged": 29,
    "lockedChanged": [],
    "failing": {
     "light": [],
@@ -2698,7 +2698,7 @@
   },
   "invalid": {
    "accepted": false,
-   "allowedChanged": 6,
+   "allowedChanged": 3,
    "lockedChanged": [
     "--awj-status-negative-fg"
    ],
@@ -2706,14 +2706,11 @@
     "light": [
      "action-fg / action 2",
      "action (link) / paper 2",
-     "focus-ring / paper 1.23",
-     "topbar-focus / topbar-bg 1.23",
-     "hero-cta-fg / hero-cta-bg 2"
+     "focus-ring / paper 1.23"
     ],
     "dark": [
      "action-fg / action 2",
-     "negative / paper 3.21",
-     "hero-cta-fg / hero-cta-bg 2"
+     "negative / paper 3.21"
     ]
    }
   }
