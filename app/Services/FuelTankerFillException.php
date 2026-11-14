@@ -33,6 +33,9 @@ class FuelTankerFillException extends Exception
     public const NOT_FOUND = 'not_found';
     public const FORBIDDEN = 'forbidden';
 
+    // TANKER-PR6B-2 — سند مرحَّل مخزنياً لا يُلغى (يُعكس الترحيل أولاً).
+    public const FILL_INVENTORY_POSTED = 'fill_inventory_posted';
+
     // TANKER-PR5 — مرفقات السند.
     public const ATTACHMENT_INVALID = 'attachment_invalid';
     public const ATTACHMENT_TYPE_NOT_ALLOWED = 'attachment_type_not_allowed';

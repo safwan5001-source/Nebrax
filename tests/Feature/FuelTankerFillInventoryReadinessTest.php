@@ -462,14 +462,14 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     }
 
     /** @test */
-    public function the_database_keeps_pending_integration_as_the_only_allowed_inventory_status(): void
+    public function the_database_refuses_any_inventory_transition_without_a_matching_posting(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql' && DB::connection()->getDriverName() !== 'sqlite') {
             $this->markTestSkipped('driver');
         }
         $fill = $this->fill();
         $error = $this->caught(fn () => DB::table('fuel_tanker_fills')->where('id', $fill->id)->update(['inventory_status' => 'posted']));
-        $this->assertInstanceOf(QueryException::class, $error, 'لا انتقال مخزني ممكن قبل PR-6B ولو بتجاوز النموذج');
+        $this->assertInstanceOf(QueryException::class, $error, 'لا انتقال مخزني ممكن بلا ترحيل مطابق ولو بتجاوز النموذج');
     }
 
     // ───────────────────────── الإعدادات ─────────────────────────
@@ -523,8 +523,9 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     /** @return array{fill: FuelTankerFill, rows: array<string, mixed>} */
     private function postingRow(FuelTankerFill $fill, ?StockMovement $stock = null, ?FuelInventoryCostMovement $cost = null, string $key = 'post-1'): array
     {
-        $stock ??= $this->stockMovement();
-        $cost ??= $this->costMovement($stock);
+        // PR-6B-2: الحركتان مربوطتان في القاعدة بالمخزن والمنتج والكمية والتكلفة التاريخية.
+        $stock ??= $this->stockMovement((int) $fill->quantity_milliliters);
+        $cost ??= $this->costMovement($stock, (int) $fill->quantity_milliliters, 500);
 
         return [
             'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $this->tenantId, 'branch_id' => $this->fx['branchA']->id, 'fuel_tanker_fill_id' => $fill->id,
@@ -535,19 +536,19 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         ];
     }
 
-    private function stockMovement(): StockMovement
+    private function stockMovement(int $quantity = 1, string $type = 'out'): StockMovement
     {
         return StockMovement::create([
             'product_id' => $this->fx['fuel']->product_id, 'warehouse_id' => $this->fx['wA1']->id, 'branch_id' => $this->fx['branchA']->id,
-            'type' => 'out', 'quantity' => 1, 'unit_cost' => 0, 'total_cost' => 0, 'balance_quantity' => 0, 'movement_date' => now()->toDateString(),
+            'type' => $type, 'quantity' => $quantity, 'unit_cost' => 0, 'total_cost' => 0, 'balance_quantity' => 0, 'movement_date' => now()->toDateString(),
         ]);
     }
 
-    private function costMovement(StockMovement $stock): FuelInventoryCostMovement
+    private function costMovement(StockMovement $stock, int $quantity = 1, int $cost = 0, string $type = 'issue'): FuelInventoryCostMovement
     {
         return FuelInventoryCostMovement::create([
-            'warehouse_id' => $this->fx['wA1']->id, 'fuel_product_id' => $this->fx['fuel']->id, 'stock_movement_id' => $stock->id, 'movement_type' => 'issue',
-            'quantity_milliliters' => 1, 'posted_cost_minor' => 0, 'cost_pool_minor_before' => 0, 'cost_numerator_before' => '0', 'cost_denominator_before' => '1',
+            'warehouse_id' => $this->fx['wA1']->id, 'fuel_product_id' => $this->fx['fuel']->id, 'stock_movement_id' => $stock->id, 'movement_type' => $type,
+            'quantity_milliliters' => $quantity, 'posted_cost_minor' => $cost, 'cost_pool_minor_before' => 0, 'cost_numerator_before' => '0', 'cost_denominator_before' => '1',
             'quantity_milliliters_before' => 0, 'carry_remainder_numerator_before' => '0', 'carry_remainder_denominator_before' => '1', 'cost_pool_minor_after' => 0,
             'cost_numerator_after' => '0', 'cost_denominator_after' => '1', 'quantity_milliliters_after' => 0, 'carry_remainder_numerator_after' => '0',
             'carry_remainder_denominator_after' => '1', 'occurred_at' => now(),
@@ -566,8 +567,8 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $this->assertInstanceOf(QueryException::class, $this->caught(fn () => DB::table('fuel_tanker_fill_inventory_postings')->insert($again)));
 
         // حركة المخزون نفسها لسند آخر ⇒ مرفوض.
-        $other = $this->fill(500_000);
-        $stolen = $this->postingRow($other, stock: StockMovement::query()->findOrFail($row['stock_movement_id']), cost: $this->costMovement($this->stockMovement()), key: 'post-3');
+        $other = $this->fill(1_000_000);
+        $stolen = $this->postingRow($other, stock: StockMovement::query()->findOrFail($row['stock_movement_id']), cost: FuelInventoryCostMovement::query()->findOrFail($row['cost_movement_id']), key: 'post-3');
         $this->assertInstanceOf(QueryException::class, $this->caught(fn () => DB::table('fuel_tanker_fill_inventory_postings')->insert($stolen)));
 
         // حركة تكلفة نفسها لسند آخر ⇒ مرفوض.
@@ -612,16 +613,16 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         // «معكوس» بلا أعمدة العكس ⇒ مرفوض.
         $this->assertInstanceOf(QueryException::class, $this->caught(fn () => $table()->update(['status' => 'reversed'])));
 
-        $reverseStock = $this->stockMovement();
+        $reverseStock = $this->stockMovement(1_000_000, 'in');
         $reversal = [
-            'status' => 'reversed', 'reversal_stock_movement_id' => $reverseStock->id, 'reversal_cost_movement_id' => $this->costMovement($reverseStock)->id,
+            'status' => 'reversed', 'reversal_stock_movement_id' => $reverseStock->id, 'reversal_cost_movement_id' => $this->costMovement($reverseStock, 1_000_000, 500, 'receipt')->id,
             'reversed_by' => $row['posted_by'], 'reversed_at' => now(), 'reversal_reason' => 'إلغاء السند',
         ];
         $table()->update($reversal);
         $this->assertSame('reversed', $table()->value('status'));
 
         // لا عكس ثانٍ ولا إعادة فتح ولا تبديل لحركة العكس.
-        $second = $this->stockMovement();
+        $second = $this->stockMovement(1_000_000, 'in');
         $this->assertInstanceOf(QueryException::class, $this->caught(fn () => $table()->update(['reversal_stock_movement_id' => $second->id])));
         $this->assertInstanceOf(QueryException::class, $this->caught(fn () => $table()->update(['status' => 'posted', 'reversal_stock_movement_id' => null, 'reversal_cost_movement_id' => null, 'reversed_by' => null, 'reversed_at' => null, 'reversal_reason' => null])));
         // حركة العكس الواحدة لا تُنسب لترحيلين.
@@ -668,7 +669,9 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
                 $hits[] = basename((string) $path);
             }
         }
-        $this->assertSame(['FuelTankerFillInventoryPosting.php'], $hits, 'لا كاتب للربط المخزني قبل PR-6B');
+        sort($hits);
+        // النموذجان اللذان يرفضان كل كتابة (الترحيل وسجل محاولاته — PR-6B-2) وحدهما؛ لا خدمة ولا متحكّم.
+        $this->assertSame(['FuelTankerFillInventoryPosting.php', 'FuelTankerFillInventoryPostingAttempt.php'], $hits, 'لا كاتب للربط المخزني قبل PR-6B-3');
     }
 
     /** @test */
