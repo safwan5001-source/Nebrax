@@ -637,8 +637,8 @@ class FuelTankerFillPostingStateTest extends TestCase
                 }
             }
         }
-        // القارئان الوحيدان خارج ذلك: الجاهزية (تقرأ الجدول) والمطابقة (تقرأ الدفتر) — قراءة فقط.
-        $readers = ['FuelTankerFillInventoryReadiness.php', 'FuelInventoryLedgerReconciliation.php'];
+        // القرّاء خارج ذلك: الجاهزية (تقرأ الجدول) والمطابقة (تقرأ الدفتر) وقارئ نشاط الدمج ومحرك تقارير الرقابة (PR-6B-5/6) — قراءة فقط (يفحصها الاختبار أدناه).
+        $readers = ['FuelTankerFillInventoryReadiness.php', 'FuelInventoryLedgerReconciliation.php', 'FuelTankerFillInventoryActivityReader.php', 'FuelTankerFillAccountingReportService.php'];
         foreach ($hits as $file => $found) {
             $this->assertTrue(in_array($file, array_merge($allowed, $readers), true), "{$file} يذكر " . implode(',', $found) . ' ولا يجوز');
         }
