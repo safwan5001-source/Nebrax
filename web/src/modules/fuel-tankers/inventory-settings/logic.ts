@@ -2,6 +2,9 @@
  * TANKER-PR6B-1 — منطق نقي لبطاقة «إعدادات الدمج المخزني» (الحساب الوسيط، توقيت الاعتراف، سياسة الانحراف، بدء الترحيل، التنبيهات).
  * **تخزين وتحقق وعرض فقط — لا خصم ولا قيد ولا ترحيل.** الخادم هو السلطة (التحقق والحوكمة والتدقيق)؛ هذا الملف يقرأ الاستجابات دفاعياً ويبني الحمولات.
  */
+import { isoToZonedLocal } from '@/lib/formatting';
+
+export { isoToZonedLocal };
 export const COST_RECOGNITIONS = ['clearing_until_invoice'] as const;
 export type CostRecognition = (typeof COST_RECOGNITIONS)[number];
 export const VARIANCE_POLICIES = ['block', 'warn'] as const;
@@ -140,20 +143,6 @@ export function toDraft(values: PostingValues, overrides: ReadonlySet<PostingFie
   const draft = {} as PostingDraft;
   for (const field of POSTING_FIELDS) draft[field] = overrides !== null && !overrides.has(field) ? INHERIT : own[field];
   return draft;
-}
-
-/** لحظة UTC ⇒ `YYYY-MM-DDTHH:mm` بتوقيت المنطقة (قيمة `datetime-local`)؛ فارغ/تالف ⇒ فارغ. */
-export function isoToZonedLocal(iso: string, timeZone: string): string {
-  if (iso === '') return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(date);
-    const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-    return `${pick('year')}-${pick('month')}-${pick('day')}T${pick('hour')}:${pick('minute')}`;
-  } catch {
-    return '';
-  }
 }
 
 /** حقل التاريخ المحلي ⇒ لحظة RFC3339 للخادم عبر المحوّل المشترك؛ غير صالح ⇒ `undefined` (يمنع الحفظ). */
