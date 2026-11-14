@@ -104,7 +104,7 @@ class FuelTankerFillInventoryPostingService
     }
 
     /**
-     * معاينة قراءة فقط: الموانع والتصنيف التاريخي والقيد المقترح (الحسابات دائماً، المبلغ لمن يملك `products.view_cost`). **لا قفل ولا كتابة.**
+     * معاينة قراءة فقط: الموانع والتصنيف التاريخي والقيد المقترح (معرّفات الحسابات لمن يملك `accounts.view`، والمبلغ لمن يملك `products.view_cost` — شرطان مستقلان). **لا قفل ولا كتابة.**
      *
      * @return array<string, mixed>
      *
@@ -137,9 +137,11 @@ class FuelTankerFillInventoryPostingService
         $entry = null;
         if ($warehouse !== null && $fuelProduct !== null) {
             $inventoryAccount = $this->inventoryAccountId($station);
+            // معرّفات الحسابات بحماية `accounts.view` (كمسار PR-6B-1)، والمبلغ بحماية `products.view_cost` — شرطان منفصلان.
+            $canSeeAccounts = $actor->hasPermission('accounts.view');
             $entry = ['lines' => [
-                ['side' => 'debit', 'account_id' => $config['clearing_account']['account_id'], 'role' => 'tanker_issue_clearing'],
-                ['side' => 'credit', 'account_id' => $inventoryAccount, 'role' => 'inventory'],
+                ['side' => 'debit', 'account_id' => $canSeeAccounts ? $config['clearing_account']['account_id'] : null, 'role' => 'tanker_issue_clearing'],
+                ['side' => 'credit', 'account_id' => $canSeeAccounts ? $inventoryAccount : null, 'role' => 'inventory'],
             ], 'entry_date' => $this->settings->businessDate($station, $fill->recorded_at), 'amount_minor' => null];
             if ($canSeeCost && $stock !== null && $stock >= $quantity && $quantity <= self::MAX_STOCK_QUANTITY) {
                 $quote = $this->costBasis->previewIssue($fuelProduct, $warehouse, $quantity);

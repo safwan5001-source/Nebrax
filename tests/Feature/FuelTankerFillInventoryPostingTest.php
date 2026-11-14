@@ -560,6 +560,44 @@ class FuelTankerFillInventoryPostingTest extends TestCase
         $this->withToken($this->userWith(['fuel_stations.view'])['token'])->getJson(self::FILLS . "/{$fill->id}/inventory-posting/preview")->assertForbidden();
     }
 
+    /** @test */
+    public function the_preview_hides_account_ids_without_accounts_view_independently_of_the_cost_permission(): void
+    {
+        $fill = $this->fill();
+        $base = ['fuel_stations.view', 'fuel.tanker.fill.view', 'fuel.tanker.fill.inventory.view'];
+        $url = self::FILLS . "/{$fill->id}/inventory-posting/preview";
+        $before = $this->state();
+
+        // أقل صلاحية: لا حسابات ولا مبلغ.
+        $low = $this->withToken($this->userWith($base)['token'])->getJson($url)->assertOk()->json('data');
+        $this->assertNull($low['entry']['amount_minor']);
+        foreach ($low['entry']['lines'] as $line) {
+            $this->assertNull($line['account_id']);
+        }
+        $this->assertSame(['debit', 'credit'], array_column($low['entry']['lines'], 'side'));
+        $this->assertStringNotContainsString($this->clearing->id, json_encode($low));
+
+        // التكلفة وحدها: المبلغ بلا معرّفات حسابات.
+        $costOnly = $this->withToken($this->userWith([...$base, 'products.view_cost'])['token'])->getJson($url)->assertOk()->json('data');
+        $this->assertSame(654_000, $costOnly['entry']['amount_minor']);
+        $this->assertNull($costOnly['entry']['lines'][0]['account_id']);
+        $this->assertNull($costOnly['entry']['lines'][1]['account_id']);
+
+        // الحسابات وحدها: المعرّفات بلا مبلغ.
+        $accountsOnly = $this->withToken($this->userWith([...$base, 'accounts.view'])['token'])->getJson($url)->assertOk()->json('data');
+        $this->assertNull($accountsOnly['entry']['amount_minor']);
+        $this->assertSame($this->clearing->id, $accountsOnly['entry']['lines'][0]['account_id']);
+        $this->assertNotNull($accountsOnly['entry']['lines'][1]['account_id']);
+
+        // المصرَّح له بالاثنين يرى التفاصيل كاملة (والمالك كذلك).
+        $both = $this->withToken($this->userWith([...$base, 'accounts.view', 'products.view_cost'])['token'])->getJson($url)->assertOk()->json('data');
+        $this->assertSame(654_000, $both['entry']['amount_minor']);
+        $this->assertSame($this->clearing->id, $both['entry']['lines'][0]['account_id']);
+        $this->assertSame($accountsOnly['entry']['lines'][1]['account_id'], $both['entry']['lines'][1]['account_id']);
+
+        $this->assertSame($before, $this->state(), 'المعاينة قراءة فقط');
+    }
+
     // ───────────────────────── حراسة ساكنة ─────────────────────────
 
     /** @test */

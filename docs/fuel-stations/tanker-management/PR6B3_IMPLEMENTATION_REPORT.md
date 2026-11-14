@@ -46,6 +46,7 @@
 - **التكلفة:** ثابتة بعد الترحيل (أعمدة الترحيل ثابتة في القاعدة)؛ لا إعادة احتساب؛ كلفة صفرية ⇒ `posted_cost_zero`.
 - **الصلاحيات/PIN:** `fuel.tanker.fill.inventory.post` (+`post_historical`) لـowner/admin فقط؛ لا قالب موظف؛ جلسة PIN لا تصل المسار.
 - **الأرقام المالية** (التكلفة ومعرّف القيد) في الاستجابة والمعاينة لمن يملك `products.view_cost` فقط.
+- **معرّفات حسابات القيد المقترح** (`entry.lines[].account_id` في المعاينة) لمن يملك `accounts.view` فقط، كمسار PR-6B-1 (إعدادات الدمج المخزني)؛ بدونها تبقى `side`/`role` و`account_id: null`. **شرطان منفصلان:** `products.view_cost` للمبلغ وحده و`accounts.view` للمعرّفات وحدها (يحرسه `the_preview_hides_account_ids_without_accounts_view_independently_of_the_cost_permission`: أدنى صلاحية / تكلفة فقط / حسابات فقط / كلاهما). مراجعة ChatGPT على PR #2119؛ لا تغيير في القيود أو المخزون أو البوابة.
 
 ## 5) تغييرات على خدمات/مخططات قائمة (موثَّقة ومختبرة)
 
