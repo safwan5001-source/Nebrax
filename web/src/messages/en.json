@@ -2944,6 +2944,8 @@
       "add": "Add",
       "remove": "Remove",
       "post": "Post",
+      "reverse": "Reverse",
+      "post_historical": "Post historical",
       "execution_approve": "Approve execution",
       "resolve_blocked": "Resolve blocked",
       "request": "Request",

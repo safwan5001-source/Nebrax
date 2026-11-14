@@ -2944,6 +2944,8 @@
       "add": "إضافة",
       "remove": "إزالة",
       "post": "ترحيل",
+      "reverse": "عكس",
+      "post_historical": "ترحيل تاريخي",
       "execution_approve": "الموافقة على التنفيذ",
       "resolve_blocked": "معالجة المحجوبة",
       "request": "طلب",
