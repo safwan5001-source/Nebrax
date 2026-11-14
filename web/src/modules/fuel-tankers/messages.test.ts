@@ -48,7 +48,7 @@ function usedKeys(): Set<string> {
   }
   const inventoryGroups: Record<string, string[]> = {
     readiness: ['ready', 'needs_review', 'blocked'],
-    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'clearing_account_missing', 'unknown'],
+    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'clearing_account_missing', 'clearing_account_invalid', 'unknown'],
     reason: ['capacity_overrun', 'insufficient_balance', 'overdue', 'unknown'],
     summary: ['total', 'ready', 'needs_review', 'blocked', 'overdue'],
     // PR-6B-0: لوحة مطابقة الأستاذ (مفاتيح ديناميكية بحسب رموز الخادم).
@@ -61,6 +61,19 @@ function usedKeys(): Set<string> {
   };
   for (const [group, values] of Object.entries(inventoryGroups)) for (const value of values) keys.add(`inventory.${group}.${value}`);
   for (const value of ['block', 'hold_for_review']) keys.add(`settings.inventory.policy.${value}`);
+  // TANKER-PR6B-1: بطاقة إعدادات الدمج المخزني (`useTranslations('fuelTankers.inventorySettings')` في المجلد الفرعي) + مفاتيحها الديناميكية من قوائم مغلقة.
+  const inventorySettingsDir = join(dir, 'inventory-settings');
+  for (const file of readdirSync(inventorySettingsDir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))) {
+    for (const m of readFileSync(join(inventorySettingsDir, file), 'utf8').matchAll(/\bt\(\s*(['`])([A-Za-z0-9_.${}]+)\1/g)) keys.add(`inventorySettings.${m[2]}`);
+  }
+  const inventorySettingsGroups: Record<string, string[]> = {
+    blocker: ['clearing_account_missing', 'clearing_account_invalid', 'settlement_mode_conflict', 'unknown'],
+    notice: ['posting_start_not_set', 'posting_gate_closed', 'unknown'],
+    reason: ['not_found', 'group', 'inactive', 'not_asset', 'inventory_account', 'cash_or_bank', 'tax_account', 'reserved_role', 'other'],
+    'cost.option': ['clearing_until_invoice'],
+    'variance.option': ['block', 'warn'],
+  };
+  for (const [group, values] of Object.entries(inventorySettingsGroups)) for (const value of values) keys.add(`inventorySettings.${group}.${value}`);
   for (const key of [...keys]) if (key.includes('${')) keys.delete(key);
   return keys;
 }
