@@ -215,7 +215,10 @@ class FuelTankerFillTest extends TestCase
         $this->record($staff['token'], ['voucher_number' => '004052'])->assertCreated();
         $this->record($staff['token'], ['voucher_number' => '04052'])->assertStatus(409);
 
-        $this->assertEqualsCanonicalizing(['04052', '4052', '004052'], FuelTankerFill::query()->pluck('voucher_number')->all());
+        // مقارنة نصية صريحة: `assertEqualsCanonicalizing` تفرز بـ`sort()` الافتراضي فتُعدّ '04052' و'4052' و'004052' متساوية عددياً فيتوقف ترتيبها (ونتيجة المقارنة) على ترتيب صفوف القاعدة.
+        $actual = FuelTankerFill::query()->pluck('voucher_number')->all();
+        sort($actual, SORT_STRING);
+        $this->assertSame(['004052', '04052', '4052'], $actual);
     }
 
     /** @test */

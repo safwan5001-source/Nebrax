@@ -368,12 +368,11 @@ class FuelTankerInventorySettingsTest extends TestCase
             }
         }
 
-        // owner/admin عبر `*` فقط. PR-6B-3: مسار الترحيل وحده يستعمل `…inventory.post` (مرة واحدة بالضبط)؛ `post_historical` تُفحص في الخدمة لا في مسار، و`reverse` بلا مسار (PR-6B-4).
+        // owner/admin عبر `*` فقط. PR-6B-3: مسار الترحيل وحده يستعمل `…inventory.post` (مرة واحدة بالضبط)؛ `post_historical` تُفحص في الخدمة لا في مسار، و`reverse` لمسار العكس الوحيد (PR-6B-4).
         $routes = (string) file_get_contents(base_path('routes/api.php'));
         $this->assertSame(1, preg_match_all("/fuel\.tanker\.fill\.inventory\.post'/", $routes), 'مسار ترحيل واحد فقط');
-        foreach (['fuel.tanker.fill.inventory.post_historical', 'fuel.tanker.fill.inventory.reverse'] as $permission) {
-            $this->assertStringNotContainsString($permission, $routes, "لا مسار يستعمل {$permission}");
-        }
+        $this->assertStringNotContainsString('fuel.tanker.fill.inventory.post_historical', $routes, 'لا مسار يستعمل post_historical');
+        $this->assertSame(1, preg_match_all("/fuel\.tanker\.fill\.inventory\.reverse'/", $routes), 'PR-6B-4: مسار عكس واحد فقط');
         // أي دور مخزَّن لم يُمنحها بهجرة.
         $this->assertSame(0, (int) DB::table('roles')->get(['permissions'])->filter(fn ($r) => array_intersect(self::NEW_PERMISSIONS, (array) json_decode((string) $r->permissions, true)) !== [])->count());
     }
