@@ -10122,6 +10122,9 @@
         "cost_history_open": "تسوية محجوبة لم تُحسم لهذا المجمّع",
         "cost_pool_quantity_mismatch": "كمية مجمّع التكلفة لا تطابق رصيد المخزن",
         "insufficient_balance": "الرصيد غير كافٍ",
+        "period_locked": "الفترة المحاسبية أو السنة المالية لتاريخ التعبئة مقفلة",
+        "settlement_mode_conflict": "المحطة على تسوية الوردية من العدادات (post_on_close): الترحيل معها يخصم الكمية مرتين",
+        "clearing_account_missing": "لم يُعيَّن الحساب الوسيط بعد (شرط للترحيل المستقبلي)",
         "unknown": "مانع غير معروف"
       },
       "reason": {
@@ -10151,7 +10154,89 @@
         "other": "متطلب مطابقة آخر.",
         "ledgerNotChecked": "مطابقة حساب 1140 غير محسوبة هنا (الحساب يضم مخزوناً غير وقودي)؛ تُنفَّذ عند التفعيل بعد الاعتماد المحاسبي."
       },
-      "settingsLink": "إعدادات المراجعة"
+      "settingsLink": "إعدادات المراجعة",
+      "reconciliation": {
+        "title": "مطابقة الأستاذ العام",
+        "hint": "قراءة فقط: مجمّع تكلفة الوقود مقابل رصيد المخزن والأستاذ. لا تُجرى أي تسوية ولا قيد من هذه الشاشة.",
+        "loadFailed": "تعذّر تحميل المطابقة",
+        "status": {
+          "consistent": "متطابقة",
+          "differences": "فروقات"
+        },
+        "quantity": {
+          "title": "الكمية لكل مخزن ومنتج",
+          "summary": "{pools} مجمّع: {inSync} متطابق، {mismatched} بفرق كمية",
+          "empty": "لا مجمّعات وقود بعد",
+          "unnamedWarehouse": "مخزن غير مسمّى",
+          "unnamedProduct": "منتج غير مسمّى",
+          "stock": "رصيد المخزن",
+          "pool": "كمية المجمّع",
+          "difference": "الفرق (المجمّع − المخزن): {liters} لتر",
+          "poolValue": "قيمة المجمّع"
+        },
+        "value": {
+          "title": "القيمة مقابل الأستاذ لكل فرع",
+          "hint": "حصة الوقود من حسابات المخزون = القيود المرتبطة بحركات تكلفة الوقود وعكوسها؛ لا كامل رصيد 1140 لأنه يضم أصنافاً غير وقودية.",
+          "empty": "لا قيود وقود بعد",
+          "noBranch": "بلا فرع",
+          "pool": "قيمة المجمّع",
+          "ledger": "حصة الوقود في الأستاذ",
+          "difference": "الفرق",
+          "inSync": "متطابقة",
+          "outOfSync": "غير متطابقة",
+            "restricted_warehouse_scope": "حسابك مقيَّد بمخزن أو محطة: تظهر الكمية فقط، وتُحجب القيمة لأن الفرع يضم مخازن لا تراها.",
+          "hidden_no_cost_permission": "القيمة المالية تتطلب صلاحية عرض التكلفة؛ تظهر الكمية فقط."
+        },
+        "causes": {
+          "entryAmountDiffers": "قيد لا يطابق مجموع حركاته",
+          "reversedEntries": "قيود عُكست في الأستاذ دون المجمّع",
+          "movementsWithoutJournal": "حركات تكلفة بلا قيد",
+          "stateVsMovements": "قيمة الحالة تنحرف عن مجموع حركاتها",
+          "movementsWithoutJournalCount": "{count} حركة بلا قيد"
+        },
+        "entries": {
+          "title": "قيود لا تطابق حركاتها ({count})",
+          "movements": "مجموع الحركات",
+          "ledger": "صافي الأستاذ",
+          "difference": "الفرق"
+        },
+        "findings": {
+          "title": "النتائج",
+          "pool_quantity_mismatch": "كمية المجمّع لا تساوي رصيد المخزن",
+          "stock_without_cost_pool": "مخزون بلا مجمّع تكلفة",
+          "cost_pool_without_stock_record": "مجمّع بلا سجل رصيد",
+          "state_not_derived_from_movements": "حالة المجمّع تنحرف عن مجموع حركاته",
+          "open_cost_history": "تاريخ تكلفة مفتوح",
+          "value_difference": "فرق قيمة بين المجمّع والأستاذ",
+          "entry_amount_differs_from_movements": "قيد لا يطابق حركاته",
+          "movements_without_journal": "حركات تكلفة بلا قيد",
+          "inventory_account_split_configured": "حساب مخزون محطة يختلف عن دور المخزون",
+          "inventory_account_split_in_ledger": "الاستلام والصرف مسّا حسابات مخزون مختلفة",
+          "unknown": "نتيجة غير معروفة"
+        },
+        "accounts": {
+          "title": "حسابات مخزون الوقود",
+          "attention": "يحتاج انتباهاً",
+          "hint": "المطابقة تجمع كل هذه الحسابات. الاستلام يستعمل دور المخزون فقط، بينما البيع والتسوية يستعملان حساب المحطة إن وُجد.",
+          "overrides": "{count} محطة بحساب مخزون يختلف عن دور المخزون.",
+          "splitInLedger": "قيود الاستلام والصرف في الأستاذ مسّت حسابات مخزون مختلفة.",
+          "source": {
+            "role_current": "الدور الحالي",
+            "system_default": "الحساب النظامي",
+            "history": "سجل التعيينات",
+            "station_override": "تجاوز محطة",
+            "other": "مصدر آخر"
+          }
+        },
+        "limits": {
+          "title": "حدود دقة المطابقة",
+          "price_and_average_correctness": "لا تثبت صحة الأسعار والمتوسطات التاريخية.",
+          "manual_inventory_entries_not_linked_to_fuel_movements": "لا تكشف قيداً يدوياً على المخزون غير مرتبط بحركة وقود.",
+          "non_fuel_lines_inside_linked_entries": "لا تفصل أسطراً غير وقودية داخل قيد مرتبط.",
+          "tank_level_vs_book_stock": "لا تقارن مستوى الخزان الفعلي بالرصيد الدفتري.",
+          "other": "حد غير معروف."
+        }
+      }
     },
     "settings": {
       "inventory": {

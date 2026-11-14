@@ -10122,6 +10122,9 @@
         "cost_history_open": "An unresolved held settlement exists for this pool",
         "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse balance",
         "insufficient_balance": "Insufficient balance",
+        "period_locked": "The accounting period or fiscal year of the fill date is locked",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting with it would deduct stock twice",
+        "clearing_account_missing": "The clearing account is not assigned yet (a prerequisite for future posting)",
         "unknown": "Unknown blocker"
       },
       "reason": {
@@ -10151,7 +10154,89 @@
         "other": "Another reconciliation requirement.",
         "ledgerNotChecked": "Account 1140 is not computed here (it also holds non-fuel stock); it is reconciled at activation after the accounting approval."
       },
-      "settingsLink": "Review settings"
+      "settingsLink": "Review settings",
+      "reconciliation": {
+        "title": "General ledger reconciliation",
+        "hint": "Read-only: the fuel cost pool against the warehouse balance and the ledger. No adjustment or entry is made from this screen.",
+        "loadFailed": "Could not load the reconciliation",
+        "status": {
+          "consistent": "Consistent",
+          "differences": "Differences"
+        },
+        "quantity": {
+          "title": "Quantity per warehouse and product",
+          "summary": "{pools} pools: {inSync} in sync, {mismatched} with a quantity difference",
+          "empty": "No fuel pools yet",
+          "unnamedWarehouse": "Unnamed warehouse",
+          "unnamedProduct": "Unnamed product",
+          "stock": "Warehouse balance",
+          "pool": "Pool quantity",
+          "difference": "Difference (pool − warehouse): {liters} L",
+          "poolValue": "Pool value"
+        },
+        "value": {
+          "title": "Value against the ledger per branch",
+          "hint": "The fuel share of the inventory accounts = entries linked to fuel cost movements and their reversals; not the whole 1140 balance, which includes non-fuel stock.",
+          "empty": "No fuel entries yet",
+          "noBranch": "No branch",
+          "pool": "Pool value",
+          "ledger": "Fuel share in the ledger",
+          "difference": "Difference",
+          "inSync": "In sync",
+          "outOfSync": "Out of sync",
+            "restricted_warehouse_scope": "Your access is limited to a warehouse or station: only quantity is shown, and value is withheld because the branch includes warehouses you cannot see.",
+          "hidden_no_cost_permission": "Monetary values need the cost-view permission; only quantity is shown."
+        },
+        "causes": {
+          "entryAmountDiffers": "Entry differs from the sum of its movements",
+          "reversedEntries": "Entries reversed in the ledger but not in the pool",
+          "movementsWithoutJournal": "Cost movements without an entry",
+          "stateVsMovements": "Pool state drifts from the sum of its movements",
+          "movementsWithoutJournalCount": "{count} movements without an entry"
+        },
+        "entries": {
+          "title": "Entries that differ from their movements ({count})",
+          "movements": "Movements total",
+          "ledger": "Ledger net",
+          "difference": "Difference"
+        },
+        "findings": {
+          "title": "Findings",
+          "pool_quantity_mismatch": "Pool quantity differs from the warehouse balance",
+          "stock_without_cost_pool": "Stock without a cost pool",
+          "cost_pool_without_stock_record": "Pool without a stock record",
+          "state_not_derived_from_movements": "Pool state drifts from the sum of its movements",
+          "open_cost_history": "Open cost history",
+          "value_difference": "Value difference between the pool and the ledger",
+          "entry_amount_differs_from_movements": "Entry differs from its movements",
+          "movements_without_journal": "Cost movements without an entry",
+          "inventory_account_split_configured": "A station inventory account differs from the inventory role",
+          "inventory_account_split_in_ledger": "Receipts and issues hit different inventory accounts",
+          "unknown": "Unknown finding"
+        },
+        "accounts": {
+          "title": "Fuel inventory accounts",
+          "attention": "Needs attention",
+          "hint": "The reconciliation covers all of these accounts. Receiving uses the inventory role only, while sales and settlement use the station account when set.",
+          "overrides": "{count} stations have an inventory account different from the inventory role.",
+          "splitInLedger": "Receipt and issue entries in the ledger hit different inventory accounts.",
+          "source": {
+            "role_current": "Current role",
+            "system_default": "System default",
+            "history": "Mapping history",
+            "station_override": "Station override",
+            "other": "Other source"
+          }
+        },
+        "limits": {
+          "title": "Accuracy limits",
+          "price_and_average_correctness": "It does not prove historical prices or averages are correct.",
+          "manual_inventory_entries_not_linked_to_fuel_movements": "It does not detect a manual inventory entry not linked to a fuel movement.",
+          "non_fuel_lines_inside_linked_entries": "It does not separate non-fuel lines inside a linked entry.",
+          "tank_level_vs_book_stock": "It does not compare the physical tank level with the book balance.",
+          "other": "Unknown limit."
+        }
+      }
     },
     "settings": {
       "inventory": {

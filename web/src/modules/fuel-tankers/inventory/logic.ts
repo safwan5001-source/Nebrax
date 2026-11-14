@@ -9,6 +9,8 @@ export type Readiness = (typeof READINESS)[number];
 export const BLOCKERS = [
   'station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing',
   'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance',
+  // PR-6B-0 (قراءة فقط): الفترة المقفلة، تعارض تسوية الوردية، غياب الحساب الوسيط.
+  'period_locked', 'settlement_mode_conflict', 'clearing_account_missing',
 ] as const;
 export const REVIEW_REASONS = ['capacity_overrun', 'insufficient_balance', 'overdue'] as const;
 export const REQUIREMENTS = ['pool_quantity_equals_warehouse_stock', 'pool_value_equals_fuel_share_of_ledger_1140'] as const;
@@ -155,4 +157,111 @@ export function litersOf(milliliters: number | null): string {
   const sign = milliliters < 0 ? '-' : '';
   const abs = Math.abs(milliliters);
   return `${sign}${Math.trunc(abs / 1000)}.${String(abs % 1000).padStart(3, '0')}`;
+}
+
+// ───────────────────────── PR-6B-0: مطابقة الأستاذ (قراءة فقط) ─────────────────────────
+
+/** رموز النتائج التي يُصدرها الخادم (`FuelInventoryLedgerReconciliation`)؛ غير المعروف يُعرض بنص عام. */
+export const FINDINGS = [
+  'pool_quantity_mismatch', 'stock_without_cost_pool', 'cost_pool_without_stock_record', 'state_not_derived_from_movements', 'open_cost_history',
+  'value_difference', 'entry_amount_differs_from_movements', 'movements_without_journal', 'inventory_account_split_configured', 'inventory_account_split_in_ledger',
+] as const;
+export const isKnownFinding = (code: string) => (FINDINGS as readonly string[]).includes(code);
+/** حدود الدقة المعلنة من الخادم (`data_quality.not_checked`) ومصادر حسابات المخزون المعروفة. */
+export const LIMITS = ['price_and_average_correctness', 'manual_inventory_entries_not_linked_to_fuel_movements', 'non_fuel_lines_inside_linked_entries', 'tank_level_vs_book_stock'] as const;
+export const ACCOUNT_SOURCES = ['role_current', 'system_default', 'history', 'station_override'] as const;
+export const isKnownLimit = (code: string) => (LIMITS as readonly string[]).includes(code);
+export const isKnownAccountSource = (code: string) => (ACCOUNT_SOURCES as readonly string[]).includes(code);
+
+export interface ReconPool {
+  warehouseName: string | null;
+  fuelProductName: string | null;
+  stockMilliliters: number | null;
+  costPoolMilliliters: number | null;
+  differenceMilliliters: number | null;
+  findings: string[];
+  /** يغيب لمن لا يملك `products.view_cost`. */
+  valueMinor: number | null;
+  stateVsMovementsValueMinor: number | null;
+}
+
+export interface ReconBranch {
+  branchName: string | null;
+  poolValueMinor: number;
+  ledgerShareMinor: number;
+  differenceMinor: number;
+  inSync: boolean;
+  causes: { entryAmountDiffers: number; reversedEntries: number; movementsWithoutJournal: number; stateVsMovements: number };
+  unexplainedMinor: number;
+  movementsWithoutJournalCount: number;
+}
+
+export interface ReconEntry { number: string; entryDate: string; source: string; movementDeltaMinor: number; ledgerNetMinor: number; differenceMinor: number }
+export interface ReconAccount { code: string | null; name: string | null; sources: string[] }
+export interface ReconFinding { code: string; severity: 'error' | 'warning'; count: number | null }
+
+export type ValueScope = 'tenant_by_branch' | 'restricted_warehouse_scope' | 'hidden_no_cost_permission';
+
+export interface Reconciliation {
+  consistent: boolean;
+  pools: ReconPool[];
+  poolSummary: { pools: number; inSync: number; mismatched: number };
+  valueScope: ValueScope;
+  branches: ReconBranch[];
+  entriesTotal: number;
+  entries: ReconEntry[];
+  accounts: ReconAccount[];
+  splitInLedger: boolean;
+  stationOverrides: number;
+  findings: ReconFinding[];
+  notChecked: string[];
+}
+
+const VALUE_SCOPES: readonly ValueScope[] = ['tenant_by_branch', 'restricted_warehouse_scope', 'hidden_no_cost_permission'];
+
+/** تحليل دفاعي: غياب حقل ⇒ قيمة آمنة؛ نطاق قيمة مجهول ⇒ «مخفي» (لا نفترض أن القيمة معروضة). الحالة «متطابقة» لا تُعلن إلا إن أعلنها الخادم وخلت النتائج. */
+export function readReconciliation(payload: unknown): Reconciliation {
+  const data = obj(obj(payload).data);
+  const quantity = obj(data.quantity);
+  const summary = obj(quantity.summary);
+  const value = obj(data.value);
+  const accounts = obj(data.inventory_accounts);
+  const scope = VALUE_SCOPES.includes(data.value_scope as ValueScope) ? (data.value_scope as ValueScope) : 'hidden_no_cost_permission';
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const findings = list(data.findings).map((raw): ReconFinding | null => {
+    const f = obj(raw);
+    return typeof f.code === 'string' ? { code: f.code, severity: f.severity === 'error' ? 'error' : 'warning', count: int(f.count) } : null;
+  }).filter((f): f is ReconFinding => f !== null);
+
+  return {
+    consistent: data.status === 'consistent' && findings.length === 0,
+    pools: list(quantity.pools).map((raw): ReconPool => {
+      const p = obj(raw);
+      return {
+        warehouseName: text(p.warehouse_name), fuelProductName: text(p.fuel_product_name), stockMilliliters: int(p.stock_milliliters), costPoolMilliliters: int(p.cost_pool_milliliters),
+        differenceMilliliters: int(p.quantity_difference_milliliters), findings: strings(p.findings), valueMinor: int(p.cost_pool_value_minor), stateVsMovementsValueMinor: int(p.state_vs_movements_value_minor),
+      };
+    }),
+    poolSummary: { pools: int(summary.pools) ?? 0, inSync: int(summary.in_sync) ?? 0, mismatched: int(summary.mismatched) ?? 0 },
+    valueScope: scope,
+    branches: list(value.branches).map((raw): ReconBranch => {
+      const b = obj(raw);
+      const c = obj(b.causes);
+      return {
+        branchName: text(b.branch_name), poolValueMinor: int(b.pool_value_minor) ?? 0, ledgerShareMinor: int(b.ledger_share_minor) ?? 0, differenceMinor: int(b.difference_minor) ?? 0,
+        inSync: b.in_sync === true, unexplainedMinor: int(b.unexplained_minor) ?? 0, movementsWithoutJournalCount: int(b.movements_without_journal_count) ?? 0,
+        causes: { entryAmountDiffers: int(c.entry_amount_differs_minor) ?? 0, reversedEntries: int(c.reversed_entries_minor) ?? 0, movementsWithoutJournal: int(c.movements_without_journal_minor) ?? 0, stateVsMovements: int(c.state_vs_movements_minor) ?? 0 },
+      };
+    }),
+    entriesTotal: int(obj(value.entries_with_amount_difference).total) ?? 0,
+    entries: list(obj(value.entries_with_amount_difference).sample).map((raw): ReconEntry => {
+      const e = obj(raw);
+      return { number: text(e.number) ?? '', entryDate: text(e.entry_date) ?? '', source: text(e.source) ?? '', movementDeltaMinor: int(e.movement_delta_minor) ?? 0, ledgerNetMinor: int(e.ledger_net_minor) ?? 0, differenceMinor: int(e.difference_minor) ?? 0 };
+    }),
+    accounts: list(accounts.accounts).map((raw): ReconAccount => { const a = obj(raw); return { code: text(a.code), name: text(a.name), sources: strings(a.sources) }; }),
+    splitInLedger: accounts.split_in_ledger === true,
+    stationOverrides: list(accounts.station_overrides).length,
+    findings,
+    notChecked: strings(obj(data.data_quality).not_checked),
+  };
 }

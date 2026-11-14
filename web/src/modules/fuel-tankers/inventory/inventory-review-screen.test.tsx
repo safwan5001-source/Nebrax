@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderIntl, TEST_MESSAGES } from '@/test-utils/intl';
 
-const state = vi.hoisted(() => ({ permissions: ['*'] as string[], fail: 0, payload: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ permissions: ['*'] as string[], fail: 0, reconFail: 0, payload: {} as Record<string, unknown>, recon: {} as Record<string, unknown> }));
 const calls = vi.hoisted(() => [] as Array<{ path: string; method: string }>);
 const ST1 = '00000000-0000-4000-8000-0000000000a1';
 
@@ -15,6 +15,10 @@ vi.mock('@/lib/api', async (original) => ({
   api: vi.fn(async (path: string, opts: { method?: string } = {}) => {
     calls.push({ path, method: opts.method ?? 'GET' });
     if (path === '/fuel-stations/stations') return { data: [{ id: ST1, name: 'محطة أ', code: 'A', status: 'active' }] };
+    if (path === '/fuel-stations/tanker-fills/inventory-review/reconciliation') {
+      if (state.reconFail) throw new (await import('@/lib/api')).ApiError(state.reconFail, 'x', {});
+      return state.recon;
+    }
     if (path.startsWith('/fuel-stations/tanker-fills/inventory-review')) {
       if (state.fail) throw new (await import('@/lib/api')).ApiError(state.fail, 'x', {});
       return state.payload;
@@ -41,7 +45,22 @@ const payload = (rows: unknown[] = [row()], meta: Record<string, unknown> = {}) 
   },
 });
 
-beforeEach(() => { calls.length = 0; state.permissions = ['*']; state.fail = 0; state.payload = payload(); });
+const recon = (over: Record<string, unknown> = {}) => ({
+  data: {
+    status: 'differences', value_scope: 'tenant_by_branch',
+    quantity: { summary: { pools: 1, in_sync: 0, mismatched: 1 }, pools: [{ warehouse_name: 'المخزن الرئيسي', fuel_product_name: 'بنزين 91', stock_milliliters: 1000, cost_pool_milliliters: 3000, quantity_difference_milliliters: 2000, findings: ['pool_quantity_mismatch', 'made_up_code'], cost_pool_value_minor: 654000 }] },
+    value: {
+      branches: [{ branch_name: 'الفرع الرئيسي', pool_value_minor: 654000, ledger_share_minor: 0, difference_minor: -654000, in_sync: false, unexplained_minor: 0, movements_without_journal_count: 0, causes: { entry_amount_differs_minor: 0, reversed_entries_minor: -654000, movements_without_journal_minor: 0, state_vs_movements_minor: 0 } }],
+      entries_with_amount_difference: { total: 1, sample: [{ number: 'JE-2027-00001', entry_date: '2027-01-26', source: 'FuelOpeningBalance', movement_delta_minor: 654000, ledger_net_minor: 0, difference_minor: -654000 }] },
+    },
+    inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current', 'weird_source'] }], split_in_ledger: true, station_overrides: [{ station_id: 's' }] },
+    findings: [{ code: 'value_difference', severity: 'error' }, { code: 'brand_new_code', severity: 'warning' }],
+    data_quality: { not_checked: ['price_and_average_correctness', 'future_limit'] },
+    ...over,
+  },
+});
+
+beforeEach(() => { calls.length = 0; state.permissions = ['*']; state.fail = 0; state.reconFail = 0; state.payload = payload(); state.recon = recon(); });
 afterEach(() => cleanup());
 
 describe.each(['ar', 'en'] as const)('InventoryReviewScreen (%s)', (locale) => {
@@ -113,5 +132,49 @@ describe.each(['ar', 'en'] as const)('InventoryReviewScreen (%s)', (locale) => {
     mount();
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeTruthy());
     expect(calls).toHaveLength(0);
+  });
+
+  it('renders the reconciliation panel: status, quantity, per-branch value with its causes, accounts, findings and limits — read only', async () => {
+    mount();
+    const panel = await waitFor(() => { const el = document.querySelector('[data-reconciliation-panel]'); if (!el) throw new Error('panel'); return el as HTMLElement; });
+    const r = TEST_MESSAGES[locale].fuelTankers.inventory.reconciliation;
+    expect(panel.getAttribute('data-consistent')).toBe('false');
+    expect(within(panel).getByText(r.status.differences)).toBeTruthy();
+    expect(panel.querySelector('[data-reconciliation-pool]')?.textContent).toContain(r.findings.pool_quantity_mismatch);
+    expect(panel.querySelector('[data-reconciliation-pool]')?.textContent).toContain(r.findings.unknown); // رمز غير معروف ⇒ نص عام
+    const branch = panel.querySelector('[data-reconciliation-branch]') as HTMLElement;
+    expect(branch.getAttribute('data-in-sync')).toBe('false');
+    expect(branch.querySelector('[data-reconciliation-causes]')?.textContent).toContain(r.causes.reversedEntries);
+    expect(branch.querySelector('[data-reconciliation-causes]')?.textContent).not.toContain(r.causes.movementsWithoutJournal); // الأسباب الصفرية لا تُعرض
+    expect(panel.querySelector('[data-reconciliation-entries]')?.textContent).toContain('JE-2027-00001');
+    expect(panel.querySelector('[data-reconciliation-accounts]')?.textContent).toContain(r.accounts.source.role_current);
+    expect(panel.querySelector('[data-reconciliation-accounts]')?.textContent).toContain(r.accounts.source.other);
+    expect(panel.querySelector('[data-reconciliation-findings]')?.textContent).toContain(r.findings.value_difference);
+    expect(panel.querySelector('[data-reconciliation-findings]')?.textContent).toContain(r.findings.unknown);
+    expect(panel.querySelector('[data-reconciliation-limits]')?.textContent).toContain(r.limits.price_and_average_correctness);
+    expect(panel.querySelector('[data-reconciliation-limits]')?.textContent).toContain(r.limits.other);
+    expect(calls.filter((c) => c.path.endsWith('/reconciliation')).every((c) => c.method === 'GET')).toBe(true);
+    expect(within(panel).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('shows no monetary value when the server withholds it, and says why', async () => {
+    const r = TEST_MESSAGES[locale].fuelTankers.inventory.reconciliation;
+    for (const scope of ['hidden_no_cost_permission', 'restricted_warehouse_scope'] as const) {
+      state.recon = recon({ value_scope: scope, value: null, inventory_accounts: null, quantity: { summary: { pools: 1, in_sync: 1, mismatched: 0 }, pools: [{ warehouse_name: 'م', fuel_product_name: 'ب', stock_milliliters: 5, cost_pool_milliliters: 5, findings: [] }] }, findings: [], status: 'consistent' });
+      mount();
+      const note = await waitFor(() => { const el = document.querySelector('[data-value-hidden]'); if (!el) throw new Error('note'); return el as HTMLElement; });
+      expect(note.getAttribute('data-value-hidden')).toBe(scope);
+      expect(note.textContent).toBe(r.value[scope]);
+      expect(document.querySelector('[data-reconciliation-value]')).toBeNull();
+      expect(document.querySelector('[data-reconciliation-branch]')).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('a failing reconciliation request keeps the review usable and offers a retry', async () => {
+    state.reconFail = 500;
+    mount();
+    expect(await screen.findByText(TEST_MESSAGES[locale].fuelTankers.inventory.reconciliation.loadFailed)).toBeTruthy();
+    expect(document.querySelector('[data-fill-row]')).not.toBeNull();
   });
 });

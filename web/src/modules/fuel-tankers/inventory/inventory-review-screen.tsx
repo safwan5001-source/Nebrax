@@ -16,6 +16,7 @@ import { ForbiddenState, GateClosedState } from '../states';
 import { usePermissions } from '../use-permissions';
 import { getInventoryReview } from './client';
 import { isKnownBlocker, isKnownReason, litersOf, READINESS, type PoolSummary, type Readiness, type ReviewPage, type ReviewRow } from './logic';
+import { ReconciliationPanel } from './reconciliation-panel';
 import { INVENTORY_REVIEW_PERMISSION } from './routes';
 
 type Phase = 'loading' | 'ready' | 'gate_closed' | 'forbidden' | 'error';
@@ -144,6 +145,8 @@ export function InventoryReviewScreen() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ReconciliationPanel />
 
       <p className="text-xs text-muted">
         <Link href="/fuel-stations/tanker-settings" className="text-primary underline-offset-2 hover:underline">{t('settingsLink')}</Link>

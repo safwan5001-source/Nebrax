@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isKnownBlocker, isKnownReason, litersOf, readReadiness, readReview } from './logic';
+import { isKnownBlocker, isKnownFinding, isKnownReason, litersOf, readReadiness, readReconciliation, readReview } from './logic';
 
 describe('readReadiness is defensive and fails closed', () => {
   it('maps a full item', () => {
@@ -60,5 +60,58 @@ describe('codes and quantities', () => {
     expect(litersOf(0)).toBe('0.000');
     expect(litersOf(-1500)).toBe('-1.500');
     expect(litersOf(null)).toBe('—');
+  });
+});
+
+describe('readReconciliation is defensive and never assumes values are visible', () => {
+  const full = {
+    data: {
+      status: 'differences', value_scope: 'tenant_by_branch',
+      quantity: { summary: { pools: 3, in_sync: 2, mismatched: 1 }, pools: [{ warehouse_name: 'م', fuel_product_name: 'ب', stock_milliliters: 10, cost_pool_milliliters: 12, quantity_difference_milliliters: 2, findings: ['pool_quantity_mismatch'], cost_pool_value_minor: 500 }, 5] },
+      value: {
+        branches: [{ branch_name: 'الرئيسي', pool_value_minor: 100, ledger_share_minor: 90, difference_minor: -10, in_sync: false, unexplained_minor: 0, movements_without_journal_count: 1, causes: { entry_amount_differs_minor: 0, reversed_entries_minor: -10, movements_without_journal_minor: 0, state_vs_movements_minor: 0 } }],
+        entries_with_amount_difference: { total: 2, sample: [{ number: 'JE-1', entry_date: '2027-01-02', source: 'Invoice', movement_delta_minor: 5, ledger_net_minor: 7, difference_minor: 2 }] },
+      },
+      inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current'] }], split_in_ledger: true, station_overrides: [{}] },
+      findings: [{ code: 'value_difference', severity: 'error' }, { code: 'movements_without_journal', severity: 'warning', count: 3 }, { nope: 1 }],
+      data_quality: { not_checked: ['price_and_average_correctness'] },
+    },
+  };
+
+  it('maps quantity, branches, entries, accounts, findings and limits', () => {
+    const r = readReconciliation(full);
+    expect(r.consistent).toBe(false);
+    expect(r.poolSummary).toEqual({ pools: 3, inSync: 2, mismatched: 1 });
+    expect(r.pools).toHaveLength(2); // الصف غير الكائن يُقرأ كحقول فارغة لا يُسقط التحليل
+    expect(r.pools[0].valueMinor).toBe(500);
+    expect(r.branches[0].causes.reversedEntries).toBe(-10);
+    expect(r.entriesTotal).toBe(2);
+    expect(r.entries[0].number).toBe('JE-1');
+    expect(r.splitInLedger).toBe(true);
+    expect(r.stationOverrides).toBe(1);
+    expect(r.findings.map((f) => f.code)).toEqual(['value_difference', 'movements_without_journal']);
+    expect(r.findings[1].count).toBe(3);
+    expect(r.notChecked).toEqual(['price_and_average_correctness']);
+  });
+
+  it('is consistent only when the server says so and there are no findings', () => {
+    expect(readReconciliation({ data: { status: 'consistent', value_scope: 'tenant_by_branch', findings: [] } }).consistent).toBe(true);
+    expect(readReconciliation({ data: { status: 'consistent', findings: [{ code: 'value_difference', severity: 'error' }] } }).consistent).toBe(false);
+    expect(readReconciliation({}).consistent).toBe(false);
+    expect(readReconciliation(null).consistent).toBe(false);
+  });
+
+  it('treats an unknown value scope as hidden and a missing payload as empty', () => {
+    expect(readReconciliation({ data: { value_scope: 'everything' } }).valueScope).toBe('hidden_no_cost_permission');
+    const empty = readReconciliation(undefined);
+    expect(empty.branches).toEqual([]);
+    expect(empty.pools).toEqual([]);
+    expect(empty.valueScope).toBe('hidden_no_cost_permission');
+  });
+
+  it('knows the server finding codes and the three new blockers', () => {
+    expect(isKnownFinding('value_difference')).toBe(true);
+    expect(isKnownFinding('made_up')).toBe(false);
+    for (const code of ['period_locked', 'settlement_mode_conflict', 'clearing_account_missing']) expect(isKnownBlocker(code)).toBe(true);
   });
 });

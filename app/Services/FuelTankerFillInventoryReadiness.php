@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\AccountingPeriodLock;
+use App\Models\FiscalYear;
 use App\Models\FuelInventoryCostState;
 use App\Models\FuelProduct;
 use App\Models\FuelStation;
@@ -47,6 +49,10 @@ class FuelTankerFillInventoryReadiness
     public const B_COST_HISTORY_OPEN = 'cost_history_open';
     public const B_COST_POOL_MISMATCH = 'cost_pool_quantity_mismatch';
     public const B_INSUFFICIENT_BALANCE = 'insufficient_balance';
+    // TANKER-PR6B-0: موانع إضافية (قراءة فقط، تُحسب بلا أي قفل مِرساة).
+    public const B_PERIOD_LOCKED = 'period_locked';
+    public const B_SETTLEMENT_MODE_CONFLICT = 'settlement_mode_conflict';
+    public const B_CLEARING_ACCOUNT_MISSING = 'clearing_account_missing';
 
     // أسباب مراجعة (لا تمنع، تحتاج نظرة بشرية).
     public const R_CAPACITY_OVERRUN = 'capacity_overrun';
@@ -100,6 +106,8 @@ class FuelTankerFillInventoryReadiness
         $poolTotals = $visibleStationIds === null ? $poolTotalsAll : $this->poolTotals($tenantId, $warehouseIds->all(), $visibleStationIds);
 
         $policies = [];
+        $stationModes = [];
+        $closedPeriods = null;
         $pools = [];
         foreach ($active as $fill) {
             /** @var FuelStation|null $station */
@@ -152,6 +160,20 @@ class FuelTankerFillInventoryReadiness
                 $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolTotals[$key] ?? ['count' => 0, 'total' => 0], ($poolTotalsAll[$key]['count'] ?? 0) > ($poolTotals[$key]['count'] ?? 0), $includeCost);
             }
 
+            // PR-6B-0 — C-1: تسوية الوردية من العدادات (`post_on_close`) تصرف كل لترات الفوهة ومنها تعبئات الصهاريج؛ ترحيل التعبئة معها يخصم مرتين.
+            // **فشل مغلق**: الوضع المخزَّن وحده كافٍ (حتى لو أُغلقت بوابات التسوية لاحقاً) — لا يُفترض أنها لن تعمل.
+            if ($station !== null && ($stationModes[$station->id] ??= $this->settings->get($station, 'shift_settlement_mode')) === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
+                $blockers[] = self::B_SETTLEMENT_MODE_CONFLICT;
+            }
+            // الحساب الوسيط: لا بديل ولا تعيين تلقائي (الإعداد نفسه يُضاف في PR-6B-1) ⇒ مانع دائم حتى يُعيَّن صراحةً.
+            if ($station !== null && ! $this->clearingAccountResolved($station)) {
+                $blockers[] = self::B_CLEARING_ACCOUNT_MISSING;
+            }
+            // الفترة المحاسبية/السنة المالية المقفلة لتاريخ التعبئة بتوقيت المحطة: يُرفض الترحيل لاحقاً ولا يُنقل صامتاً إلى اليوم (D-6B-8).
+            if ($station !== null && $fill->recorded_at !== null && $this->periodLockedFor($closedPeriods ??= $this->closedPeriods($tenantId), $this->settings->businessDate($station, $fill->recorded_at))) {
+                $blockers[] = self::B_PERIOD_LOCKED;
+            }
+
             if ($fill->capacity_overrun_milliliters !== null) {
                 $reasons[] = self::R_CAPACITY_OVERRUN;
             }
@@ -172,6 +194,42 @@ class FuelTankerFillInventoryReadiness
         }
 
         return ['items' => $items, 'pools' => array_values($pools)];
+    }
+
+    /**
+     * الحساب الوسيط (PR-6B-1 يضيف إعداده). **لا يُنشأ ولا يُعيَّن تلقائياً** ولا يُفترض 1145 أو غيره: ما دام الإعداد غير موجود فالحساب غير محلول دائماً.
+     */
+    private function clearingAccountResolved(FuelStation $station): bool
+    {
+        return false;
+    }
+
+    /**
+     * الأقفال النشطة والسنوات المقفلة للمستأجر **قراءة عادية بلا قفل مِرساة** (قراءة `AccountingDateGuard::activeLockFor` تقفل صف المستأجر فلا تصلح لمسار قراءة).
+     * المحمولان نفسهما: قفل فترة `active` وسنة `closed` تشمل التاريخ (حدّان شاملان). يُحمَّلان مرة واحدة لكل تقييم.
+     *
+     * @return array{locks: list<array{0:string,1:string}>, years: list<array{0:string,1:string}>}
+     */
+    private function closedPeriods(string $tenantId): array
+    {
+        $range = fn ($row) => [$row->start_date->toDateString(), $row->end_date->toDateString()];
+
+        return [
+            'locks' => AccountingPeriodLock::query()->where('tenant_id', $tenantId)->where('status', 'active')->get(['start_date', 'end_date'])->map($range)->all(),
+            'years' => FiscalYear::query()->where('tenant_id', $tenantId)->where('status', FiscalYear::STATUS_CLOSED)->get(['start_date', 'end_date'])->map($range)->all(),
+        ];
+    }
+
+    /** @param array{locks: list<array{0:string,1:string}>, years: list<array{0:string,1:string}>} $periods */
+    private function periodLockedFor(array $periods, string $date): bool
+    {
+        foreach ([...$periods['locks'], ...$periods['years']] as [$from, $to]) {
+            if ($date >= $from && $date <= $to) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

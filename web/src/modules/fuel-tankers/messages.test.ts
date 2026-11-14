@@ -48,9 +48,16 @@ function usedKeys(): Set<string> {
   }
   const inventoryGroups: Record<string, string[]> = {
     readiness: ['ready', 'needs_review', 'blocked'],
-    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'unknown'],
+    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'clearing_account_missing', 'unknown'],
     reason: ['capacity_overrun', 'insufficient_balance', 'overdue', 'unknown'],
     summary: ['total', 'ready', 'needs_review', 'blocked', 'overdue'],
+    // PR-6B-0: لوحة مطابقة الأستاذ (مفاتيح ديناميكية بحسب رموز الخادم).
+    'reconciliation.status': ['consistent', 'differences'],
+    'reconciliation.value': ['restricted_warehouse_scope', 'hidden_no_cost_permission'],
+    'reconciliation.causes': ['entryAmountDiffers', 'reversedEntries', 'movementsWithoutJournal', 'stateVsMovements'],
+    'reconciliation.findings': ['pool_quantity_mismatch', 'stock_without_cost_pool', 'cost_pool_without_stock_record', 'state_not_derived_from_movements', 'open_cost_history', 'value_difference', 'entry_amount_differs_from_movements', 'movements_without_journal', 'inventory_account_split_configured', 'inventory_account_split_in_ledger', 'unknown'],
+    'reconciliation.accounts.source': ['role_current', 'system_default', 'history', 'station_override', 'other'],
+    'reconciliation.limits': ['price_and_average_correctness', 'manual_inventory_entries_not_linked_to_fuel_movements', 'non_fuel_lines_inside_linked_entries', 'tank_level_vs_book_stock', 'other'],
   };
   for (const [group, values] of Object.entries(inventoryGroups)) for (const value of values) keys.add(`inventory.${group}.${value}`);
   for (const value of ['block', 'hold_for_review']) keys.add(`settings.inventory.policy.${value}`);
