@@ -176,7 +176,7 @@ class FuelTankerFillInventoryActivityReader
     /** الحسابان التاريخيان من سطرَي قيد الترحيل الأصلي: المدين = الوسيط، الدائن = مخزون الوقود. @return array<string, array<string, mixed>>|null */
     private function accounts(string $entryId): ?array
     {
-        $lines = DB::table('journal_lines')->where('journal_entry_id', $entryId)->get(['account_id', 'debit', 'credit']);
+        $lines = DB::table('journal_lines as jl')->where('journal_entry_id', $entryId)->get(['account_id', 'debit', 'credit']);
         $debit = $lines->firstWhere(fn ($l) => (int) $l->debit > 0);
         $credit = $lines->firstWhere(fn ($l) => (int) $l->credit > 0);
         if ($debit === null || $credit === null) {

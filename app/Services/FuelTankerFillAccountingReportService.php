@@ -189,8 +189,8 @@ class FuelTankerFillAccountingReportService
 
         // الحسابات الوسيطة المعنية: المعيَّن حالياً + كل حساب مدين في قيود ترحيل السندات تاريخياً.
         $current = $this->settings->tankerInventoryPostingConfig(null)['clearing_account']['account_id'] ?? null;
-        $postingEntryIds = DB::table('journal_entries')->where('tenant_id', $tenantId)->where('source_type', FuelTankerFill::class)->whereNull('reversal_of')->select('id');
-        $historical = DB::table('journal_lines')->where('tenant_id', $tenantId)->whereIn('journal_entry_id', $postingEntryIds)->where('debit', '>', 0)->distinct()->pluck('account_id')->all();
+        $postingEntryIds = DB::table('journal_entries as je')->where('tenant_id', $tenantId)->where('source_type', FuelTankerFill::class)->whereNull('reversal_of')->select('id');
+        $historical = DB::table('journal_lines as jl')->where('tenant_id', $tenantId)->whereIn('journal_entry_id', $postingEntryIds)->where('debit', '>', 0)->distinct()->pluck('account_id')->all();
         $accountIds = array_values(array_unique(array_filter([...$historical, $current])));
         $accounts = Account::query()->whereIn('id', $accountIds)->orderBy('code')->get(['id', 'code', 'name']);
 
@@ -422,11 +422,11 @@ class FuelTankerFillAccountingReportService
             $stocks = $stockIds === [] ? collect() : DB::table('stock_movements')->where('tenant_id', $tenantId)->whereIn('id', $stockIds)->get()->keyBy('id');
             $costs = $costIds === [] ? collect() : DB::table('fuel_inventory_cost_movements')->where('tenant_id', $tenantId)->whereIn('id', $costIds)->get()->keyBy('id');
             $ledgers = DB::table('fuel_operational_ledgers')->where('tenant_id', $tenantId)->whereIn('source_id', $ids)->whereIn('movement_type', [FuelOperationalLedger::TYPE_TANKER_FILL, FuelOperationalLedger::TYPE_TANKER_FILL_REVERSAL])->get()->groupBy('source_id');
-            $entries = DB::table('journal_entries')->where('tenant_id', $tenantId)->where('source_type', FuelTankerFill::class)->whereIn('source_id', $ids)->get()->groupBy('source_id');
+            $entries = DB::table('journal_entries as je')->where('tenant_id', $tenantId)->where('source_type', FuelTankerFill::class)->whereIn('source_id', $ids)->get()->groupBy('source_id');
             $entryIds = $entries->flatten(1)->pluck('id')->all();
-            $reversalsByOriginal = $entryIds === [] ? collect() : DB::table('journal_entries')->where('tenant_id', $tenantId)->whereIn('reversal_of', $entryIds)->get()->groupBy('reversal_of');
+            $reversalsByOriginal = $entryIds === [] ? collect() : DB::table('journal_entries as je')->where('tenant_id', $tenantId)->whereIn('reversal_of', $entryIds)->get()->groupBy('reversal_of');
             $allEntryIds = array_values(array_unique([...$entryIds, ...$reversalsByOriginal->flatten(1)->pluck('id')->all()]));
-            $lines = $allEntryIds === [] ? collect() : DB::table('journal_lines')->where('tenant_id', $tenantId)->whereIn('journal_entry_id', $allEntryIds)->get()->groupBy('journal_entry_id');
+            $lines = $allEntryIds === [] ? collect() : DB::table('journal_lines as jl')->where('tenant_id', $tenantId)->whereIn('journal_entry_id', $allEntryIds)->get()->groupBy('journal_entry_id');
             $attempts = DB::table('fuel_tanker_fill_inventory_posting_attempts')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $ids)->orderBy('attempted_at')->orderBy('created_at')->orderBy('operation_type')->get()->groupBy('fuel_tanker_fill_id');
 
             $shape = function (?object $entry) use ($lines): ?array {
@@ -450,10 +450,10 @@ class FuelTankerFillAccountingReportService
                 $fillEntries = $entries->get($id, collect());
                 $original = $posting === null ? null : $fillEntries->first(fn ($e) => $e->reversal_of === null);
                 $originalCostEntryId = $posting === null ? null : ($costs->get($posting->cost_movement_id)->journal_entry_id ?? null);
-                $original = $originalCostEntryId === null ? $original : ($fillEntries->firstWhere('id', $originalCostEntryId) ?? DB::table('journal_entries')->where('id', $originalCostEntryId)->first());
+                $original = $originalCostEntryId === null ? $original : ($fillEntries->firstWhere('id', $originalCostEntryId) ?? DB::table('journal_entries as je')->where('id', $originalCostEntryId)->first());
                 $reversalRows = $original === null ? collect() : $reversalsByOriginal->get($original->id, collect());
                 $reversalCost = $posting?->reversal_cost_movement_id === null ? null : $costs->get($posting->reversal_cost_movement_id);
-                $reversalEntry = $reversalCost?->journal_entry_id !== null ? ($reversalRows->firstWhere('id', $reversalCost->journal_entry_id) ?? DB::table('journal_entries')->where('id', $reversalCost->journal_entry_id)->first()) : $reversalRows->first();
+                $reversalEntry = $reversalCost?->journal_entry_id !== null ? ($reversalRows->firstWhere('id', $reversalCost->journal_entry_id) ?? DB::table('journal_entries as je')->where('id', $reversalCost->journal_entry_id)->first()) : $reversalRows->first();
                 $ledgerRows = $ledgers->get($id, collect());
                 $last = $attempts->get($id)?->last();
                 $out[$id] = [
@@ -487,7 +487,7 @@ class FuelTankerFillAccountingReportService
         $postings = DB::table('fuel_tanker_fill_inventory_postings')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $fills->pluck('id')->all())->get()->keyBy('fuel_tanker_fill_id');
         $costIds = $postings->flatMap(fn ($p) => [$p->cost_movement_id, $p->reversal_cost_movement_id])->filter()->all();
         $journalByCost = $costIds === [] ? collect() : DB::table('fuel_inventory_cost_movements')->whereIn('id', $costIds)->pluck('journal_entry_id', 'id');
-        $entryNumbers = DB::table('journal_entries')->whereIn('id', $journalByCost->filter()->values()->all())->pluck('number', 'id');
+        $entryNumbers = DB::table('journal_entries as je')->whereIn('id', $journalByCost->filter()->values()->all())->pluck('number', 'id');
         $out = [];
         foreach ($postings as $fillId => $p) {
             $e = $journalByCost->get($p->cost_movement_id);
