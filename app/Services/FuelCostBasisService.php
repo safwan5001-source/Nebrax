@@ -194,6 +194,52 @@ class FuelCostBasisService
         });
     }
 
+    /**
+     * TANKER-PR6B-4 (D-6B-3) — **عكس صرفٍ بتكلفته التاريخية المثبَّتة** (إضافة مستقلة: لا تغيّر `recordReceipt` ولا `recordIssue` ولا `recordGain` ولا حراس FS-04).
+     * الكمية والتكلفة تُؤخذان **من حركة الصرف الأصلية المحفوظة** (`$original`) لا من المستدعي، فلا يُسعَّر العكس بمتوسط اليوم (ربحٌ/خسارةٌ مصطنعة) ولا بقيمة يمليها العميل.
+     * رياضياً = وارد بتكلفة تاريخية: معدل المجمّع الجديد = (المعدل × الكمية الحالية + التكلفة التاريخية) ÷ (الكمية الحالية + الكمية المعكوسة) بالكسور الدقيقة نفسها،
+     * وقيمة المجمّع += التكلفة التاريخية **والباقي الكسري المحمول لا يُمسّ** ⇒ قيمة المجمّع الكلية تعود بالضبط إلى ما قبل الصرف مهما تغيّر المتوسط بينهما
+     * (P2 = P1 + posted = P0، وc2 = c1 ⇒ P = E + c محفوظ). تُسجَّل حركة `issue_reversal` بحالتَي قبل/بعد وربط قيد العكس. **لا مسار آخر يستدعيها** (يحرسه اختبار ساكن).
+     * يُستدعى داخل معاملة المُستدعي وبعد أقفاله (المنتج ← المِرساة ← رصيد المخزن)؛ حالة التكلفة تُقفل هنا `FOR UPDATE` كبقية البدائيات.
+     *
+     * @throws RuntimeException عند عدم تطابق الحركة الأصلية (ليست `issue`، مخزن/منتج مختلف) أو تجاوز الحدّ
+     */
+    public function recordIssueReversal(FuelProduct $fuelProduct, Warehouse $warehouse, StockMovement $reversalMovement, FuelInventoryCostMovement $original, JournalEntry $reversalEntry): FuelInventoryCostMovement
+    {
+        if ($original->movement_type !== 'issue' || $original->warehouse_id !== $warehouse->id || $original->fuel_product_id !== $fuelProduct->id
+            || (int) $original->quantity_milliliters <= 0 || (int) $original->posted_cost_minor < 0) {
+            throw new RuntimeException('FUEL_REVERSAL_ORIGINAL_INVALID: حركة الصرف الأصلية لا تطابق المخزن والمنتج أو ليست صرفاً صالحاً للعكس.');
+        }
+        $quantity = (int) $original->quantity_milliliters;
+        $historicalCost = (int) $original->posted_cost_minor;
+
+        return DB::transaction(function () use ($fuelProduct, $warehouse, $reversalMovement, $reversalEntry, $quantity, $historicalCost) {
+            $state = $this->assertReady($fuelProduct, $warehouse);
+            $before = $this->snapshot($state);
+            $quantityBefore = (int) $state->quantity_milliliters;
+            $quantityAfter = $this->addInt($quantityBefore, $quantity, 'كمية تكلفة الوقود');
+            [$numerator, $denominator] = $this->normalise(
+                $this->add(
+                    $this->mul((string) $state->cost_numerator_minor, (string) $quantityBefore),
+                    $this->mul((string) $historicalCost, (string) $state->cost_denominator),
+                ),
+                $this->mul((string) $state->cost_denominator, (string) $quantityAfter),
+            );
+            $this->updateState($state, [
+                'quantity_milliliters' => $quantityAfter,
+                'cost_pool_minor' => $this->addInt((int) $state->cost_pool_minor, $historicalCost, 'قيمة تكلفة الوقود'),
+                'cost_numerator_minor' => $numerator,
+                'cost_denominator' => $denominator,
+                'allocation_mode' => 'none',
+                // الباقي الكسري المحمول لا يُمسّ (حُمل عند الصرف الأصلي ويبقى).
+                'carry_remainder_numerator' => (string) $state->carry_remainder_numerator,
+                'carry_remainder_denominator' => (string) $state->carry_remainder_denominator,
+            ]);
+
+            return $this->movement($fuelProduct, $warehouse, $reversalMovement, 'issue_reversal', $quantity, $historicalCost, $before, $state->fresh(), $reversalEntry, null);
+        });
+    }
+
     /** زيادة جرد لا تخلق GRNI: تسعّر من متوسط Cost Basis الدقيق الحالي فقط. */
     public function quoteGain(FuelProduct $fuelProduct, Warehouse $warehouse, int $quantityMilliliters): array
     {

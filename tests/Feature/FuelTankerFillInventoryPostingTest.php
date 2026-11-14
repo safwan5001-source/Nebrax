@@ -601,16 +601,16 @@ class FuelTankerFillInventoryPostingTest extends TestCase
     // ───────────────────────── حراسة ساكنة ─────────────────────────
 
     /** @test */
-    public function the_posting_service_is_the_only_writer_and_never_touches_revenue_tax_cogs_invoicing_or_reversal(): void
+    public function the_posting_services_are_the_only_writers_and_never_touch_revenue_tax_cogs_or_invoicing(): void
     {
         $source = (string) file_get_contents(app_path('Services/FuelTankerFillInventoryPostingService.php'));
         $code = (string) preg_replace('~/\*.*?\*/|//[^\n]*~s', '', $source);
         foreach (['InvoiceService', 'PaymentService', 'recordGain', 'applyReceipt', 'reverse(', "'5110'", "'4110'", "'2120'", "'1130'", 'cogs'] as $needle) {
             $this->assertStringNotContainsString($needle, $code, "خدمة الترحيل لا تستعمل {$needle}");
         }
-        // لا مسار عكس HTTP ولا أمر.
+        // PR-6B-4: مساران للعكس فقط (معاينة وتنفيذ) في خدمته المستقلة؛ خدمة الترحيل لا تعكس.
         $routes = (string) file_get_contents(base_path('routes/api.php'));
-        $this->assertStringNotContainsString('inventory-reversal', $routes);
+        $this->assertSame(2, preg_match_all('/tanker-fills\/\{id\}\/inventory-reversal/', $routes));
         $this->assertSame(1, preg_match_all('/tanker-fills\/\{id\}\/inventory-posting\'/', $routes));
 
         // لا كاتب آخر لجدولي الترحيل والمحاولات خارج الخدمة ونماذجها.
@@ -624,6 +624,8 @@ class FuelTankerFillInventoryPostingTest extends TestCase
                 $hits[] = basename((string) $path);
             }
         }
-        $this->assertSame(['FuelTankerFillInventoryPostingService.php'], $hits);
+        sort($hits);
+        // PR-6B-4: الكاتبان خدمتا الترحيل والعكس (وسمتهما لتسجيل المحاولات الفاشلة).
+        $this->assertSame(['FuelTankerFillInventoryPostingService.php', 'FuelTankerFillInventoryReversalService.php', 'FuelTankerFillInventorySupport.php'], $hits);
     }
 }

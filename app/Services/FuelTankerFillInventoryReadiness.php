@@ -221,6 +221,12 @@ class FuelTankerFillInventoryReadiness
         ];
     }
 
+    /** TANKER-PR6B-4: هل تاريخٌ محاسبي واقع في فترة مقفلة أو سنة مالية مقفلة؟ (قراءة بلا قفل؛ الحكم النهائي عند الترحيل/العكس لـ`AccountingDateGuard` تحت المِرساة.) */
+    public function dateClosed(string $tenantId, string $date): bool
+    {
+        return $this->periodLockedFor($this->closedPeriods($tenantId), $date);
+    }
+
     /** @param array{locks: list<array{0:string,1:string}>, years: list<array{0:string,1:string}>} $periods */
     private function periodLockedFor(array $periods, string $date): bool
     {

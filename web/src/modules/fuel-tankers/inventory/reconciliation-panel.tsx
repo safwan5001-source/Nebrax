@@ -39,6 +39,15 @@ export function ReconciliationPanel() {
   if (phase === 'loading') return <LoadingState variant="cards" rows={2} />;
   if (phase === 'error' || data === null) return <ErrorState message={t('reconciliation.loadFailed')} onRetry={() => void load()} />;
 
+  return <ReconciliationView data={data} />;
+}
+
+/**
+ * العرض البحت لمطابقة المجمّع (بلا جلب): تستعمله اللوحة أعلاه وتقرير مطابقة المخزون في `reports/` فلا نسخة ثانية من العرض.
+ * التحليل الدفاعي `readReconciliation` هو مدخله الوحيد (نطاق قيمة مجهول ⇒ «مخفي»).
+ */
+export function ReconciliationView({ data }: { data: Reconciliation }) {
+  const t = useTranslations('fuelTankers.inventory');
   return (
     <Card data-reconciliation-panel="" data-consistent={data.consistent ? 'true' : 'false'}>
       <CardHeader>

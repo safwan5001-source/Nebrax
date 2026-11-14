@@ -273,7 +273,8 @@ class FuelInventoryLedgerReconciliation
         $none = '∅';
         // قيود وقود مرتبطة بحركات التكلفة (IN على استعلام فرعي ⇒ كل قيد مرة واحدة مهما تعدّدت حركاته) وقيودها العكسية.
         $linked = fn () => DB::table('fuel_inventory_cost_movements')->where('tenant_id', $tenantId)->whereNotNull('journal_entry_id')->select('journal_entry_id');
-        $reversals = fn () => DB::table('journal_entries as r')->where('r.tenant_id', $tenantId)->whereIn('r.reversal_of', $linked())->select('r.id');
+        // TANKER-PR6B-4: قيد عكسٍ **مرتبط نفسه بحركة تكلفة** (`issue_reversal`) يُحسب ضمن `$linked` ولا يُعدّ مرة ثانية هنا (وإلا ضُوعفت قيمته)؛ القيد العكسي غير المرتبط (عكس يدوي بـ`LedgerService::reverse`) يبقى كما كان.
+        $reversals = fn () => DB::table('journal_entries as r')->where('r.tenant_id', $tenantId)->whereIn('r.reversal_of', $linked())->whereNotIn('r.id', $linked())->select('r.id');
 
         $lines = function (callable $entries) use ($tenantId, $accountIds) {
             return DB::table('journal_lines as l')->join('journal_entries as e', 'e.id', '=', 'l.journal_entry_id')

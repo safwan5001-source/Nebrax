@@ -50,6 +50,11 @@ class FuelTankerFillException extends Exception
     public const DISTINCT_APPROVER_REQUIRED = 'distinct_approver_required';
     public const PERIOD_LOCKED = 'period_locked';
     public const POSTING_FAILED = 'posting_failed';
+    // TANKER-PR6B-4: العكس.
+    public const REVERSAL_REASON_REQUIRED = 'reversal_reason_required';
+    public const FILL_NOT_POSTED = 'fill_not_posted';
+    public const REVERSAL_BLOCKED = 'reversal_blocked';
+    public const ORIGINAL_ENTRY_INVALID = 'original_entry_invalid';
 
     // TANKER-PR5 — مرفقات السند.
     public const ATTACHMENT_INVALID = 'attachment_invalid';
