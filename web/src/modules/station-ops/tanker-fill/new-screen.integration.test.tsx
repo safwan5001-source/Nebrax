@@ -236,6 +236,26 @@ describe('policy and validation (client-side guidance; the server decides)', () 
     expect((btn('Next') as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('required tanker: Next stays disabled until the owner’s tankers have LOADED (an empty list while loading must not read as "no tankers")', async () => {
+    setup({ settings: { tanker_selection_required: true, tanker_capacity_overrun_policy: 'allow_with_confirmation' }, tankers: [
+      { id: TANKER_A, fuel_tanker_owner_id: OWNER_A, plate_number: 'ABJ 1234', capacity_milliliters: 5_000_000, status: 'active' },
+      { id: UID(202), fuel_tanker_owner_id: OWNER_A, plate_number: 'XYZ 9', capacity_milliliters: null, status: 'active' },
+    ] });
+    const inner = apiMock.getMockImplementation() as (...args: unknown[]) => Promise<unknown>;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    apiMock.mockImplementation(((url: string, init?: unknown) => (url.startsWith('/fuel-stations/tankers') ? gate.then(() => inner(url, init)) : inner(url, init))) as never);
+    const user = userEvent.setup();
+    mount();
+    await pickOwner(user);
+    expect((btn('Next') as HTMLButtonElement).disabled).toBe(true); // الصهاريج لم تصل بعد
+    release();
+    await screen.findByRole('radio', { name: /XYZ 9/ });
+    expect((btn('Next') as HTMLButtonElement).disabled).toBe(true); // وصلت وصهريج مطلوب لم يُختر
+    await user.click(screen.getByRole('radio', { name: /XYZ 9/ }));
+    expect((btn('Next') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('required tanker but the owner has none registered: never blocked (approved rule)', async () => {
     setup({ settings: { tanker_selection_required: true }, tankers: [] });
     const user = userEvent.setup();

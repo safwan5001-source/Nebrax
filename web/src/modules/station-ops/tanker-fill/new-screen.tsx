@@ -207,7 +207,9 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
     if (submitting.current) return;
     if (!shiftId) return;
     const payload = buildIntentPayload({ stationId: station.id, shiftId, draft, tankers, policy });
-    if (!payload || firstInvalidStep(draft, ctx) !== null) return;
+    if (!payload) return;
+    const invalid = firstInvalidStep(draft, ctx);
+    if (invalid !== null) { setStep(invalid); return; } // معلومات وصلت متأخرة (مثلاً صهاريج الصاحب) ⇒ يعود الموظف إلى الخطوة التي تشرح المطلوب بدل زر حفظ صامت
     submitting.current = true;
     setFailure(null);
     setPhase({ name: 'sending' });
@@ -312,7 +314,9 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
 
   const here = STEPS.indexOf(step);
   const problem = stepProblem(step, draft, ctx);
-  const canContinue = problem === null;
+  // لا تقدّم من خطوة الصاحب قبل اكتمال تحميل صهاريجه (وإلا يُفترض «لا صهاريج» فيفوت اختيار مطلوب)؛ فشل التحميل يُحلّ بإعادة المحاولة المعروضة.
+  const tankersReady = step !== 'owner' || !draft.ownerId || tankersQuery.state.status === 'success';
+  const canContinue = problem === null && tankersReady;
   const next = () => { if (canContinue) setStep(STEPS[here + 1]); };
   const back = () => { setFailure(null); setStep(STEPS[Math.max(0, here - 1)]); };
   const sending = phase.name === 'sending';

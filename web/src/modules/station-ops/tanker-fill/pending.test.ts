@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FillBody } from './logic';
-import { PENDING_TTL_MS, createPendingStore } from './pending';
+import { createPendingStore } from './pending';
 
 const body: FillBody = { fuel_station_id: 's1', fuel_nozzle_id: 'n1', fuel_tanker_owner_id: 'o1', fuel_shift_id: 'sh1', voucher_number: '04052', quantity_milliliters: 2_000_000, idempotency_key: 'awj-ops-key12345' };
 
@@ -23,15 +23,14 @@ describe('pending (unresolved) attempt store', () => {
     expect(createPendingStore('T|U1|S2', { storage }).load()).toBeNull();
   });
 
-  it('clear removes it; expiry drops it', () => {
+  it('clear removes it; elapsed time NEVER drops an unresolved attempt (only explicit settle does)', () => {
     const storage = memoryStorage();
     let now = 1_000;
     const store = createPendingStore('s', { storage, now: () => now });
     store.save(body);
     expect(store.load()).not.toBeNull();
-    now += PENDING_TTL_MS + 1;
-    expect(createPendingStore('s', { storage, now: () => now }).load()).toBeNull();
-    now = 1_000;
+    now += 30 * 24 * 60 * 60_000; // شهر لاحقاً (تبويب متروك مفتوحاً)
+    expect(createPendingStore('s', { storage, now: () => now }).load()?.body).toEqual(body);
     store.clear();
     expect(createPendingStore('s', { storage }).load()).toBeNull();
   });

@@ -1,12 +1,11 @@
 import type { FillBody } from './logic';
 
 /**
- * TANKER-PR7 — المحاولة **غير المحسومة** (مهلة/انقطاع/5xx بعد الإرسال): قد يكون السند سُجِّل فعلاً. تُحفظ مؤقتاً في `sessionStorage` (تموت بإغلاق التبويب)
+ * TANKER-PR7 — المحاولة **غير المحسومة** (مهلة/انقطاع/5xx بعد الإرسال): قد يكون السند سُجِّل فعلاً. تُحفظ مؤقتاً في `sessionStorage` (تموت بإغلاق التبويب وحده)
  * بمفتاح (مستأجر|مستخدم|محطة) كي تبقى «تحقق من الحالة» متاحة بعد إعادة تحميل الصفحة، **ولا يُسمح بسند جديد قبل حسمها** (يمنع تكرار السند عند ضياع الرد).
- * تحفظ الحمولة والمفتاح فقط (معرّفات وكمية ورقم سند — لا رمز ولا بيانات شخصية)، وتُمسح عند الحسم (نجاح مؤكد/عدم وجود السند وقرار الموظف).
+ * تحفظ الحمولة والمفتاح فقط (معرّفات وكمية ورقم سند — لا رمز ولا بيانات شخصية)، وتُمسح عند الحسم (نجاح مؤكد/قرار الموظف الصريح بالتجاهل) فقط — **لا بانقضاء الوقت**: محاولة قد يكون الخادم التزمها تبقى قابلة للحسم مهما طال غياب الموظف.
  */
 
-export const PENDING_TTL_MS = 6 * 60 * 60_000;
 const PREFIX = 'awj:fuel-ops:tanker-fill:pending:';
 
 export interface PendingAttempt {
@@ -44,7 +43,6 @@ export function createPendingStore(scope: string, options: { storage?: Storage |
         }
       }
       if (!current || typeof current.at !== 'number' || typeof current.body?.idempotency_key !== 'string' || typeof current.body?.fuel_station_id !== 'string') return null;
-      if (now() - current.at > PENDING_TTL_MS) return null;
       return current;
     },
     save(body) {
