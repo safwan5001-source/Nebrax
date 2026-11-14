@@ -72,7 +72,7 @@ describe('readReconciliation is defensive and never assumes values are visible',
         branches: [{ branch_name: 'الرئيسي', pool_value_minor: 100, ledger_share_minor: 90, difference_minor: -10, in_sync: false, unexplained_minor: 0, movements_without_journal_count: 1, causes: { entry_amount_differs_minor: 0, reversed_entries_minor: -10, movements_without_journal_minor: 0, state_vs_movements_minor: 0 } }],
         entries_with_amount_difference: { total: 2, sample: [{ number: 'JE-1', entry_date: '2027-01-02', source: 'Invoice', movement_delta_minor: 5, ledger_net_minor: 7, difference_minor: 2 }] },
       },
-      inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current'] }], split_in_ledger: true, station_overrides: [{}] },
+      inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current'] }], split_in_ledger: true, station_overrides: [{}], unlisted_asset_accounts: [{ code: '1141', name: 'مخزون محطة' }], ledger_evidence_hidden_by_branch_scope: true },
       findings: [{ code: 'value_difference', severity: 'error' }, { code: 'movements_without_journal', severity: 'warning', count: 3 }, { nope: 1 }],
       data_quality: { not_checked: ['price_and_average_correctness'] },
     },
@@ -88,6 +88,8 @@ describe('readReconciliation is defensive and never assumes values are visible',
     expect(r.entriesTotal).toBe(2);
     expect(r.entries[0].number).toBe('JE-1');
     expect(r.splitInLedger).toBe(true);
+    expect(r.unlistedAccounts).toEqual([{ code: '1141', name: 'مخزون محطة', sources: [] }]);
+    expect(r.evidenceHidden).toBe(true);
     expect(r.stationOverrides).toBe(1);
     expect(r.findings.map((f) => f.code)).toEqual(['value_difference', 'movements_without_journal']);
     expect(r.findings[1].count).toBe(3);

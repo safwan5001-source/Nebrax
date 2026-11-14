@@ -53,7 +53,7 @@ const recon = (over: Record<string, unknown> = {}) => ({
       branches: [{ branch_name: 'الفرع الرئيسي', pool_value_minor: 654000, ledger_share_minor: 0, difference_minor: -654000, in_sync: false, unexplained_minor: 0, movements_without_journal_count: 0, causes: { entry_amount_differs_minor: 0, reversed_entries_minor: -654000, movements_without_journal_minor: 0, state_vs_movements_minor: 0 } }],
       entries_with_amount_difference: { total: 1, sample: [{ number: 'JE-2027-00001', entry_date: '2027-01-26', source: 'FuelOpeningBalance', movement_delta_minor: 654000, ledger_net_minor: 0, difference_minor: -654000 }] },
     },
-    inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current', 'weird_source'] }], split_in_ledger: true, station_overrides: [{ station_id: 's' }] },
+    inventory_accounts: { accounts: [{ code: '1140', name: 'المخزون', sources: ['role_current', 'weird_source'] }], split_in_ledger: true, station_overrides: [{ station_id: 's' }], unlisted_asset_accounts: [{ code: '1141', name: 'مخزون محطة' }], ledger_evidence_hidden_by_branch_scope: true },
     findings: [{ code: 'value_difference', severity: 'error' }, { code: 'brand_new_code', severity: 'warning' }],
     data_quality: { not_checked: ['price_and_average_correctness', 'future_limit'] },
     ...over,
@@ -149,6 +149,8 @@ describe.each(['ar', 'en'] as const)('InventoryReviewScreen (%s)', (locale) => {
     expect(panel.querySelector('[data-reconciliation-entries]')?.textContent).toContain('JE-2027-00001');
     expect(panel.querySelector('[data-reconciliation-accounts]')?.textContent).toContain(r.accounts.source.role_current);
     expect(panel.querySelector('[data-reconciliation-accounts]')?.textContent).toContain(r.accounts.source.other);
+    expect(panel.querySelector('[data-reconciliation-unlisted]')?.textContent).toContain('1141');
+    expect(panel.querySelector('[data-reconciliation-evidence-hidden]')?.textContent).toBe(r.accounts.evidenceHidden);
     expect(panel.querySelector('[data-reconciliation-findings]')?.textContent).toContain(r.findings.value_difference);
     expect(panel.querySelector('[data-reconciliation-findings]')?.textContent).toContain(r.findings.unknown);
     expect(panel.querySelector('[data-reconciliation-limits]')?.textContent).toContain(r.limits.price_and_average_correctness);

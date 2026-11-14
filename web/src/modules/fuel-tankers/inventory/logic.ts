@@ -165,11 +165,12 @@ export function litersOf(milliliters: number | null): string {
 export const FINDINGS = [
   'pool_quantity_mismatch', 'stock_without_cost_pool', 'cost_pool_without_stock_record', 'state_not_derived_from_movements', 'open_cost_history',
   'value_difference', 'entry_amount_differs_from_movements', 'movements_without_journal', 'inventory_account_split_configured', 'inventory_account_split_in_ledger',
+  'linked_entries_touch_unlisted_asset_accounts',
 ] as const;
 export const isKnownFinding = (code: string) => (FINDINGS as readonly string[]).includes(code);
 /** حدود الدقة المعلنة من الخادم (`data_quality.not_checked`) ومصادر حسابات المخزون المعروفة. */
 export const LIMITS = ['price_and_average_correctness', 'manual_inventory_entries_not_linked_to_fuel_movements', 'non_fuel_lines_inside_linked_entries', 'tank_level_vs_book_stock'] as const;
-export const ACCOUNT_SOURCES = ['role_current', 'system_default', 'history', 'station_override'] as const;
+export const ACCOUNT_SOURCES = ['role_current', 'system_default', 'history', 'station_override', 'station_override_history'] as const;
 export const isKnownLimit = (code: string) => (LIMITS as readonly string[]).includes(code);
 export const isKnownAccountSource = (code: string) => (ACCOUNT_SOURCES as readonly string[]).includes(code);
 
@@ -211,6 +212,10 @@ export interface Reconciliation {
   entriesTotal: number;
   entries: ReconEntry[];
   accounts: ReconAccount[];
+  /** أصول مسّتها قيود وقود ولا تنتمي للمجموعة المعلنة (المجموعة ناقصة). */
+  unlistedAccounts: ReconAccount[];
+  /** المراجع مقيَّد بفروع: دليل الأستاذ (عدّ قيود وحسابات) محجوب. */
+  evidenceHidden: boolean;
   splitInLedger: boolean;
   stationOverrides: number;
   findings: ReconFinding[];
@@ -259,6 +264,8 @@ export function readReconciliation(payload: unknown): Reconciliation {
       return { number: text(e.number) ?? '', entryDate: text(e.entry_date) ?? '', source: text(e.source) ?? '', movementDeltaMinor: int(e.movement_delta_minor) ?? 0, ledgerNetMinor: int(e.ledger_net_minor) ?? 0, differenceMinor: int(e.difference_minor) ?? 0 };
     }),
     accounts: list(accounts.accounts).map((raw): ReconAccount => { const a = obj(raw); return { code: text(a.code), name: text(a.name), sources: strings(a.sources) }; }),
+    unlistedAccounts: list(accounts.unlisted_asset_accounts).map((raw): ReconAccount => { const a = obj(raw); return { code: text(a.code), name: text(a.name), sources: [] }; }),
+    evidenceHidden: accounts.ledger_evidence_hidden_by_branch_scope === true,
     splitInLedger: accounts.split_in_ledger === true,
     stationOverrides: list(accounts.station_overrides).length,
     findings,

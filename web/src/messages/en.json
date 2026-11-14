@@ -10212,6 +10212,7 @@
           "movements_without_journal": "Cost movements without an entry",
           "inventory_account_split_configured": "A station inventory account differs from the inventory role",
           "inventory_account_split_in_ledger": "Receipts and issues hit different inventory accounts",
+          "linked_entries_touch_unlisted_asset_accounts": "Assets touched by fuel entries that are not in the declared inventory account set",
           "unknown": "Unknown finding"
         },
         "accounts": {
@@ -10220,11 +10221,14 @@
           "hint": "The reconciliation covers all of these accounts. Receiving uses the inventory role only, while sales and settlement use the station account when set.",
           "overrides": "{count} stations have an inventory account different from the inventory role.",
           "splitInLedger": "Receipt and issue entries in the ledger hit different inventory accounts.",
+          "unlisted": "Asset accounts touched by entries linked to fuel movements that are not in the declared set — the set is incomplete and false differences may appear:",
+          "evidenceHidden": "Your access is limited to branches: ledger evidence (entry and account counts) is hidden because it touches branches you cannot see.",
           "source": {
             "role_current": "Current role",
             "system_default": "System default",
             "history": "Mapping history",
             "station_override": "Station override",
+            "station_override_history": "Past station override",
             "other": "Other source"
           }
         },

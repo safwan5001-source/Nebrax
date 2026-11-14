@@ -178,6 +178,13 @@ function AccountsSection({ data }: { data: Reconciliation }) {
             </li>
           ))}
         </ul>
+        {data.unlistedAccounts.length > 0 ? (
+          <div className="space-y-1" data-reconciliation-unlisted="">
+            <p className="text-warning">{t('reconciliation.accounts.unlisted')}</p>
+            <ul className="flex flex-wrap gap-1.5">{data.unlistedAccounts.map((account, index) => <li key={index}><Badge tone="warning" wrap><span className="num">{account.code ?? '—'}</span> {account.name ?? ''}</Badge></li>)}</ul>
+          </div>
+        ) : null}
+        {data.evidenceHidden ? <p className="text-xs text-muted" data-reconciliation-evidence-hidden="">{t('reconciliation.accounts.evidenceHidden')}</p> : null}
         {data.stationOverrides > 0 ? <p className="text-warning">{t('reconciliation.accounts.overrides', { count: data.stationOverrides })}</p> : null}
         {data.splitInLedger ? <p className="text-warning">{t('reconciliation.accounts.splitInLedger')}</p> : null}
       </div>

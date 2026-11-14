@@ -58,6 +58,7 @@ class FuelInventoryLedgerReconciliation
     public const F_MOVEMENTS_WITHOUT_JOURNAL = 'movements_without_journal';
     public const F_ACCOUNT_SPLIT_CONFIGURED = 'inventory_account_split_configured';
     public const F_ACCOUNT_SPLIT_IN_LEDGER = 'inventory_account_split_in_ledger';
+    public const F_UNLISTED_ASSET_ACCOUNTS = 'linked_entries_touch_unlisted_asset_accounts';
 
     public const ENTRY_SAMPLE_LIMIT = 20;
 
@@ -83,7 +84,7 @@ class FuelInventoryLedgerReconciliation
             $valueScope = 'tenant_by_branch';
             $set = $this->inventoryAccountSet($tenantId);
             $value = $this->valueLevel($tenantId, array_keys($set['accounts']), $visibleBranchIds);
-            $accountUsage = $this->accountUsage($tenantId, $set, $visibleWarehouseIds);
+            $accountUsage = $this->accountUsage($tenantId, $set, $visibleWarehouseIds, $visibleBranchIds);
             foreach ($value['findings'] as $finding) {
                 $findings[] = $finding;
             }
@@ -246,6 +247,17 @@ class FuelInventoryLedgerReconciliation
         foreach (FuelStation::query()->whereNotNull('default_inventory_account_id')->pluck('default_inventory_account_id') as $id) {
             $add($id, 'station_override');
         }
+        // تجاوز محطة **سابق** (غُيّر أو مُسح أو حُذفت المحطة): البيع/التسوية رحّلا عليه فعلاً، فيبقى ضمن المجموعة وإلا حُذفت أرصدته التاريخية من الحصة فظهر فرق زائف.
+        // المصدر سجل تدقيق المحطات (`station.created|updated|deleted`: لقطتا قبل/بعد). استعلام خام مقيَّد بالمستأجر صراحةً لأن النموذج مقيَّد بالفرع النشط.
+        $auditTenant = $tenantId ?? (string) $this->tenant->id();
+        foreach (DB::table('fuel_station_audit_events')->where('tenant_id', $auditTenant)->where('subject_type', FuelStation::class)
+            ->whereIn('action', ['station.created', 'station.updated', 'station.deleted'])->get(['before', 'after']) as $event) {
+            foreach ([$event->before, $event->after] as $snapshot) {
+                $decoded = is_string($snapshot) ? json_decode($snapshot, true) : $snapshot;
+                $id = is_array($decoded) ? ($decoded['default_inventory_account_id'] ?? null) : null;
+                $add(is_string($id) && $id !== '' ? $id : null, 'station_override_history');
+            }
+        }
         $existing = Account::query()->whereIn('id', array_keys($accounts))->pluck('id')->all();
 
         return ['accounts' => array_intersect_key($accounts, array_flip($existing)), 'role_current' => $current];
@@ -342,7 +354,7 @@ class FuelInventoryLedgerReconciliation
             }
         }
 
-        $entries = $this->entriesWithAmountDifference($tenantId, $accountIds);
+        $entries = $this->entriesWithAmountDifference($tenantId, $accountIds, $visibleBranchIds);
         if ($entries['total'] > 0) {
             $findings[] = ['code' => self::F_ENTRY_AMOUNT_DIFFERS, 'severity' => 'error', 'count' => $entries['total']];
         }
@@ -358,18 +370,30 @@ class FuelInventoryLedgerReconciliation
     /**
      * قيود مرتبطة بحركات تكلفة لا يطابق صافي أسطر المخزون فيها مجموع تغيّرات قيمة حركاتها (عيّنة محدودة + العدد الكلي).
      *
+     * **نطاق الفروع:** لمراجع مقيَّد بفروع تُستبعد **كلياً** كل قيد له حركة في مخزن خارج فروعه أو أي سطر (من أي حساب) بوسم فرع خارج فروعه أو بلا فرع — فلا يظهر رقم قيد ولا تاريخ ولا مبلغ
+     * ولا عدّ لقيد يمسّ فرعاً لا يصله (حتى لو شمل فرعه أيضاً: لا تقسيم لمبالغ القيد).
+     *
      * @param  list<string>  $accountIds
-     * @return array{total: int, sample: list<array<string,mixed>>}
+     * @param  list<string>|null  $visibleBranchIds
+     * @return array{total: int, sample: list<array<string,mixed>>, hidden_by_branch_scope: bool}
      */
-    private function entriesWithAmountDifference(string $tenantId, array $accountIds): array
+    private function entriesWithAmountDifference(string $tenantId, array $accountIds, ?array $visibleBranchIds): array
     {
-        $movements = DB::table('fuel_inventory_cost_movements')->where('tenant_id', $tenantId)->whereNotNull('journal_entry_id')->groupBy('journal_entry_id')
-            ->selectRaw('journal_entry_id as entry_id, SUM(cost_pool_minor_after - cost_pool_minor_before) as movement_delta, COUNT(*) as movements');
-        $net = DB::table('journal_lines as l')->where('l.tenant_id', $tenantId)->whereIn('l.account_id', $accountIds === [] ? [''] : $accountIds)->groupBy('l.journal_entry_id')
-            ->selectRaw('l.journal_entry_id as entry_id, SUM(l.debit - l.credit) as ledger_net');
+        // 0/1 لكل صف: خارج الفروع المرئية؟ (قائمة فارغة ⇒ كل شيء خارج؛ بلا تقييد ⇒ لا شيء خارج).
+        $outside = fn (string $column) => $visibleBranchIds === null ? '0' : ($visibleBranchIds === [] ? '1' : "CASE WHEN {$column} IN (" . implode(',', array_fill(0, count($visibleBranchIds), '?')) . ') THEN 0 ELSE 1 END');
+        $branchBindings = $visibleBranchIds ?? [];
+
+        $movements = DB::table('fuel_inventory_cost_movements as mv')->join('warehouses as w', 'w.id', '=', 'mv.warehouse_id')
+            ->where('mv.tenant_id', $tenantId)->whereNotNull('mv.journal_entry_id')->groupBy('mv.journal_entry_id')
+            ->selectRaw('mv.journal_entry_id as entry_id, SUM(mv.cost_pool_minor_after - mv.cost_pool_minor_before) as movement_delta, COUNT(*) as movements, SUM(' . $outside('w.branch_id') . ') as outside_movements', $branchBindings);
+        $inventorySet = $accountIds === [] ? '?' : implode(',', array_fill(0, count($accountIds), '?'));
+        $net = DB::table('journal_lines as l')->where('l.tenant_id', $tenantId)->groupBy('l.journal_entry_id')
+            ->selectRaw("l.journal_entry_id as entry_id, SUM(CASE WHEN l.account_id IN ({$inventorySet}) THEN l.debit - l.credit ELSE 0 END) as ledger_net, SUM(" . $outside('l.branch_id') . ') as outside_lines',
+                [...($accountIds === [] ? [''] : $accountIds), ...$branchBindings]);
         $query = fn () => DB::query()->fromSub($movements, 'm')->leftJoinSub($net, 'n', 'n.entry_id', '=', 'm.entry_id')
             ->join('journal_entries as e', 'e.id', '=', 'm.entry_id')->whereIn('e.status', ['posted', 'reversed'])
-            ->whereRaw('m.movement_delta <> COALESCE(n.ledger_net, 0)');
+            ->whereRaw('m.movement_delta <> COALESCE(n.ledger_net, 0)')
+            ->when($visibleBranchIds !== null, fn ($q) => $q->where('m.outside_movements', 0)->whereRaw('COALESCE(n.outside_lines, 0) = 0'));
 
         $total = (int) $query()->count();
         $sample = $query()->orderBy('e.entry_date')->orderBy('e.number')->limit(self::ENTRY_SAMPLE_LIMIT)
@@ -380,7 +404,7 @@ class FuelInventoryLedgerReconciliation
                 'difference_minor' => (int) ($r->ledger_net ?? 0) - (int) $r->movement_delta,
             ])->all();
 
-        return ['total' => $total, 'sample' => $sample];
+        return ['total' => $total, 'sample' => $sample, 'hidden_by_branch_scope' => $visibleBranchIds !== null];
     }
 
     // ───────────────────────── C-2: حساب المخزون ─────────────────────────
@@ -389,7 +413,7 @@ class FuelInventoryLedgerReconciliation
      * @param  array{accounts: array<string, list<string>>, role_current: ?string}  $set
      * @return array<string, mixed>
      */
-    private function accountUsage(string $tenantId, array $set, ?array $visibleWarehouseIds): array
+    private function accountUsage(string $tenantId, array $set, ?array $visibleWarehouseIds, ?array $visibleBranchIds): array
     {
         $accountIds = array_keys($set['accounts']);
         $names = Account::query()->whereIn('id', $accountIds)->get(['id', 'code', 'name'])->keyBy('id');
@@ -404,22 +428,39 @@ class FuelInventoryLedgerReconciliation
             $findings[] = ['code' => self::F_ACCOUNT_SPLIT_CONFIGURED, 'severity' => 'warning', 'stations' => count($overrides)];
         }
 
-        // الحسابات التي مسّتها فعلاً قيود كل نوع حركة (عدد القيود المميّزة لكل (نوع، حساب) — لا مبالغ لأن القيد قد يرتبط بعدة حركات).
-        $rows = $accountIds === [] ? collect() : DB::table('journal_lines as l')->join('journal_entries as e', 'e.id', '=', 'l.journal_entry_id')
-            ->join('fuel_inventory_cost_movements as m', 'm.journal_entry_id', '=', 'e.id')
-            ->where('e.tenant_id', $tenantId)->whereIn('e.status', ['posted', 'reversed'])->whereIn('l.account_id', $accountIds)
-            ->groupBy('m.movement_type', 'l.account_id')->selectRaw('m.movement_type as movement_type, l.account_id as account_id, COUNT(DISTINCT e.id) as entries')->get();
+        // الدليل من الأستاذ نفسه (أي قيد وأي فرع) لا يُعرض لمراجع مقيَّد بفروع: عدّ قيود وحسابات تمسّ فروعاً لا يصلها. تبقى إعدادات المحطات المرئية فقط.
+        $evidence = $visibleBranchIds === null;
         $byType = [];
-        foreach ($rows as $row) {
-            $byType[$row->movement_type][$row->account_id] = (int) $row->entries;
-        }
-        $receiptAccounts = array_keys($byType['receipt'] ?? []);
-        $otherAccounts = array_values(array_unique([...array_keys($byType['issue'] ?? []), ...array_keys($byType['adjustment'] ?? [])]));
-        sort($receiptAccounts);
-        sort($otherAccounts);
-        $splitInLedger = $receiptAccounts !== [] && $otherAccounts !== [] && $receiptAccounts !== $otherAccounts;
-        if ($splitInLedger) {
-            $findings[] = ['code' => self::F_ACCOUNT_SPLIT_IN_LEDGER, 'severity' => 'warning'];
+        $unlisted = [];
+        $splitInLedger = false;
+        if ($evidence) {
+            // الحسابات التي مسّتها فعلاً قيود كل نوع حركة (عدد القيود المميّزة لكل (نوع، حساب) — لا مبالغ لأن القيد قد يرتبط بعدة حركات).
+            $rows = $accountIds === [] ? collect() : DB::table('journal_lines as l')->join('journal_entries as e', 'e.id', '=', 'l.journal_entry_id')
+                ->join('fuel_inventory_cost_movements as m', 'm.journal_entry_id', '=', 'e.id')
+                ->where('e.tenant_id', $tenantId)->whereIn('e.status', ['posted', 'reversed'])->whereIn('l.account_id', $accountIds)
+                ->groupBy('m.movement_type', 'l.account_id')->selectRaw('m.movement_type as movement_type, l.account_id as account_id, COUNT(DISTINCT e.id) as entries')->get();
+            foreach ($rows as $row) {
+                $byType[$row->movement_type][$row->account_id] = (int) $row->entries;
+            }
+            $receiptAccounts = array_keys($byType['receipt'] ?? []);
+            $otherAccounts = array_values(array_unique([...array_keys($byType['issue'] ?? []), ...array_keys($byType['adjustment'] ?? [])]));
+            sort($receiptAccounts);
+            sort($otherAccounts);
+            $splitInLedger = $receiptAccounts !== [] && $otherAccounts !== [] && $receiptAccounts !== $otherAccounts;
+            if ($splitInLedger) {
+                $findings[] = ['code' => self::F_ACCOUNT_SPLIT_IN_LEDGER, 'severity' => 'warning'];
+            }
+
+            // حسابات **أصول** مسّتها قيود مرتبطة بحركات وقود ولا تنتمي للمجموعة المعلنة: المجموعة ناقصة (تجاوز لم يُسجَّل تاريخه مثلاً) فتظهر فروق زائفة. إفصاح لا تعديل.
+            $unlisted = DB::table('journal_lines as l')->join('journal_entries as e', 'e.id', '=', 'l.journal_entry_id')->join('accounts as a', 'a.id', '=', 'l.account_id')
+                ->where('e.tenant_id', $tenantId)->whereIn('e.status', ['posted', 'reversed'])->where('a.type', 'asset')
+                ->whereIn('e.id', DB::table('fuel_inventory_cost_movements')->where('tenant_id', $tenantId)->whereNotNull('journal_entry_id')->select('journal_entry_id'))
+                ->when($accountIds !== [], fn ($q) => $q->whereNotIn('l.account_id', $accountIds))
+                ->groupBy('a.id', 'a.code', 'a.name')->orderBy('a.code')->get(['a.id', 'a.code', 'a.name'])
+                ->map(fn ($a) => ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name])->all();
+            if ($unlisted !== []) {
+                $findings[] = ['code' => self::F_UNLISTED_ASSET_ACCOUNTS, 'severity' => 'warning', 'count' => count($unlisted)];
+            }
         }
 
         return [
@@ -427,6 +468,8 @@ class FuelInventoryLedgerReconciliation
             'station_overrides' => $overrides,
             'entries_by_movement_type' => collect($byType)->map(fn (array $accounts) => collect($accounts)->map(fn (int $entries, string $id) => ['account_id' => $id, 'code' => $names->get($id)?->code, 'entries' => $entries])->values()->all())->all(),
             'split_in_ledger' => $splitInLedger,
+            'unlisted_asset_accounts' => $unlisted,
+            'ledger_evidence_hidden_by_branch_scope' => ! $evidence,
             'findings' => $findings,
         ];
     }

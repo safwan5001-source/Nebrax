@@ -10,6 +10,7 @@ use App\Models\JournalEntry;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Accounting\LedgerService;
+use App\Services\FuelStationAuditTrail;
 use App\Services\FuelInventoryLedgerReconciliation as Recon;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -276,6 +277,96 @@ class FuelInventoryLedgerReconciliationTest extends TestCase
         $this->assertContains(Recon::F_ACCOUNT_SPLIT_IN_LEDGER, $this->codes($result));
         $this->assertArrayHasKey('receipt', $result['inventory_accounts']['entries_by_movement_type']);
         $this->assertArrayHasKey('issue', $result['inventory_accounts']['entries_by_movement_type']);
+    }
+
+    // ───────────────────────── مراجعة Codex: نطاق الفروع وتاريخ تجاوزات المحطات ─────────────────────────
+
+    /** صرف محاكى على حساب مخزون معيَّن: قيد Dr 5110 / Cr الحساب مرتبط بحركة تكلفة issue تغيّر قيمتها −المبلغ (يطابق القيد). */
+    private function forgeIssue(array $w, Account $inventoryAccount, int $amount): string
+    {
+        app(TenantContext::class)->set($w['tenant_id']);
+        $cogs = Account::query()->where('code', '5110')->firstOrFail();
+        $entry = app(LedgerService::class)->post([
+            ['account_id' => $cogs->id, 'debit' => $amount], ['account_id' => $inventoryAccount->id, 'credit' => $amount],
+        ], ['description' => 'صرف محاكى']);
+        $template = DB::table('fuel_inventory_cost_movements')->where('tenant_id', $w['tenant_id'])->first();
+        $stock = (array) DB::table('stock_movements')->where('id', $template->stock_movement_id)->first();
+        $stock['id'] = (string) Str::uuid();
+        DB::table('stock_movements')->insert($stock);
+        $movement = (array) $template;
+        $movement['id'] = (string) Str::uuid();
+        $movement['stock_movement_id'] = $stock['id'];
+        $movement['journal_entry_id'] = $entry->id;
+        $movement['movement_type'] = 'issue';
+        $movement['cost_pool_minor_before'] = $amount;
+        $movement['cost_pool_minor_after'] = 0;
+        DB::table('fuel_inventory_cost_movements')->insert($movement);
+
+        return (string) $entry->id;
+    }
+
+    /** @test */
+    public function a_branch_restricted_reviewer_never_sees_entry_discrepancies_that_touch_other_branches(): void
+    {
+        [$w, , $entryId] = $this->postedWorld();
+        $inventory = Account::query()->where('code', '1140')->firstOrFail();
+        DB::table('journal_lines')->where('journal_entry_id', $entryId)->where('account_id', $inventory->id)->where('debit', '>', 0)->limit(1)->update(['debit' => DB::raw('debit + 1000')]);
+        $main = $w['branch']->id;
+        $other = Branch::create(['code' => 'BR-OTHER', 'name' => 'فرع آخر'])->id;
+
+        $unrestricted = $this->recon($w);
+        $this->assertSame(1, $unrestricted['value']['entries_with_amount_difference']['total']);
+
+        // فرع آخر وحده: لا رقم قيد ولا مبلغ ولا عدّ ولا نتيجة تخصّ القيد.
+        $elsewhere = $this->recon($w, true, null, [$other]);
+        $this->assertSame(0, $elsewhere['value']['entries_with_amount_difference']['total']);
+        $this->assertSame([], $elsewhere['value']['entries_with_amount_difference']['sample']);
+        $this->assertTrue($elsewhere['value']['entries_with_amount_difference']['hidden_by_branch_scope']);
+        $this->assertNotContains(Recon::F_ENTRY_AMOUNT_DIFFERS, $this->codes($elsewhere));
+        $this->assertTrue($elsewhere['inventory_accounts']['ledger_evidence_hidden_by_branch_scope']);
+        $this->assertSame([], $elsewhere['inventory_accounts']['entries_by_movement_type']);
+        $this->assertStringNotContainsString($entryId, (string) json_encode($elsewhere));
+
+        // فرع القيد: يراه.
+        $own = $this->recon($w, true, null, [$main]);
+        $this->assertSame(1, $own['value']['entries_with_amount_difference']['total']);
+        $this->assertSame($entryId, $own['value']['entries_with_amount_difference']['sample'][0]['journal_entry_id']);
+
+        // قيد يمسّ فرعاً لا يصله (سطر واحد بوسم فرع آخر): يُستبعد كلياً من المقيَّد بفرعه، ويراه من يصل الفرعين.
+        DB::table('journal_lines')->where('journal_entry_id', $entryId)->where('account_id', '!=', $inventory->id)->limit(1)->update(['branch_id' => $other]);
+        $this->assertSame(0, $this->recon($w, true, null, [$main])['value']['entries_with_amount_difference']['total']);
+        $this->assertSame(1, $this->recon($w, true, null, [$main, $other])['value']['entries_with_amount_difference']['total']);
+        $this->assertSame(1, $this->recon($w)['value']['entries_with_amount_difference']['total']);
+        $this->assertSame(0, $this->recon($w, true, null, [])['value']['entries_with_amount_difference']['total'], 'لا فروع مرئية ⇒ لا شيء');
+    }
+
+    /** @test */
+    public function a_cleared_station_override_stays_in_the_account_set_through_the_audit_history(): void
+    {
+        [$w] = $this->postedWorld();
+        app(TenantContext::class)->set($w['tenant_id']);
+        $parent = Account::query()->where('code', '1140')->firstOrFail();
+        $override = Account::create(['code' => '1141', 'name' => 'مخزون محطة (تجاوز سابق)', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true, 'parent_id' => $parent->parent_id]);
+        FuelStation::query()->whereKey($w['station']->id)->update(['default_inventory_account_id' => $override->id]);
+        $this->forgeIssue($w, $override, 100);
+        $this->assertSame(0, $this->recon($w)['value']['entries_with_amount_difference']['total'], 'المجموعة تشمل التجاوز الحالي');
+
+        // مُسح التجاوز مباشرةً (بلا سجل تدقيق): يخرج الحساب من المجموعة فيظهر فرق زائف — ويُفصَح عنه صراحةً بدل أن يمرّ صامتاً.
+        FuelStation::query()->whereKey($w['station']->id)->update(['default_inventory_account_id' => null]);
+        $blind = $this->recon($w);
+        $this->assertSame(1, $blind['value']['entries_with_amount_difference']['total']);
+        $this->assertContains(Recon::F_UNLISTED_ASSET_ACCOUNTS, $this->codes($blind));
+        $this->assertSame([$override->id], array_column($blind['inventory_accounts']['unlisted_asset_accounts'], 'account_id'));
+
+        // المسح عبر المسار الرسمي يسجّل حدث تدقيق (قبل/بعد) فيبقى الحساب ضمن المجموعة بمصدره التاريخي ويزول الفرق الزائف.
+        app(FuelStationAuditTrail::class)->record('station.updated', FuelStation::query()->findOrFail($w['station']->id), ['default_inventory_account_id' => $override->id], ['default_inventory_account_id' => null], $w['actor']);
+        $healed = $this->recon($w);
+        $accounts = collect($healed['inventory_accounts']['accounts'])->keyBy('account_id');
+        $this->assertContains('station_override_history', $accounts[$override->id]['sources']);
+        $this->assertSame(0, $healed['value']['entries_with_amount_difference']['total']);
+        $this->assertSame([], $healed['inventory_accounts']['unlisted_asset_accounts']);
+        $this->assertNotContains(Recon::F_UNLISTED_ASSET_ACCOUNTS, $this->codes($healed));
+        $this->assertNotContains(Recon::F_ENTRY_AMOUNT_DIFFERS, $this->codes($healed));
     }
 
     // ───────────────────────── العزل والصلاحيات ─────────────────────────
