@@ -36,7 +36,7 @@ const AR = {
   qaSales:'فاتورة مبيعات', qaPurch:'فاتورة مشتريات', qaReceipt:'سند قبض', qaPermit:'إذن مخزني', qaShift:'وردية المحطة',
   kpis:'المؤشرات المالية', kRev:'الإيرادات · الشهر حتى اليوم', kCash:'النقد والبنوك', kAR:'الذمم المدينة', kAP:'مستحق للموردين خلال 7 أيام', kMargin:'هامش الربح الإجمالي', kVat:'ضريبة القيمة المضافة المستحقة',
   /* phone labels (R2): shorter, same accounting meaning; the time context stays (الشهر · 7 أيام) and the footer keeps the comparison basis */
-  kRevS:'إيرادات الشهر', kAPS:'مستحق للموردين · 7 أيام', kVatS:'ض.ق.م المستحقة',
+  kRevS:'إيرادات الشهر', kAPS:'مستحق للموردين · 7 أيام', kVatS:'ضريبة القيمة المضافة', vatDueTag:'المستحقة', /* no abbreviated tax term; «المستحقة» moves to the note */
   vsOct:'مقارنة بالفترة نفسها من أكتوبر', vsWeek:'منذ بداية الأسبوع', nAccounts:'5 حسابات', overdue:'متأخر', bills:'6 فواتير موردين', pts:'نقطة', vatDue:'الربع الرابع · الإقرار حتى 31 يناير 2027',
   attn:'يحتاج انتباهك', attnSub:'مرتّب حسب الأثر المالي',
   a1:'4 فواتير متأخرة أكثر من 30 يوماً', a1m:'أقدمها 46 يوماً · مؤسسة الخليج الحديثة للتجارة', a1b:'عرض وتذكير',
@@ -61,7 +61,7 @@ const EN = {
   today:'Tuesday, 10 November 2026', demoData:'Sample data', quick:'Quick actions',
   qaSales:'Sales invoice', qaPurch:'Purchase invoice', qaReceipt:'Receipt voucher', qaPermit:'Stock permit', qaShift:'Station shift',
   kpis:'Financial indicators', kRev:'Revenue · month to date', kCash:'Cash & banks', kAR:'Receivables', kAP:'Payables due in 7 days', kMargin:'Gross margin', kVat:'VAT payable',
-  kRevS:'Revenue · MTD', kAPS:'Payables · 7 days', kVatS:'VAT payable',
+  kRevS:'Revenue · MTD', kAPS:'Payables · 7 days', kVatS:'VAT', vatDueTag:'Payable',
   vsOct:'vs same period in October', vsWeek:'since start of week', nAccounts:'5 accounts', overdue:'Overdue', bills:'6 supplier bills', pts:'pts', vatDue:'Q4 · return due 31 Jan 2027',
   attn:'Needs your attention', attnSub:'Ordered by financial impact',
   a1:'4 invoices overdue by 30+ days', a1m:'Oldest 46 days · Modern Gulf Trading Est.', a1b:'Review & remind',
@@ -89,7 +89,7 @@ const KPI = [
   { k:'kAR', icon:'users', v:218460000, overdue:73230000, spark:[51,50,53,55,54,57,56,58,60,59,62,61] },
   { k:'kAP', icon:'truck', v:64218000, sub:'bills', spark:[30,34,31,29,35,33,36,32,34,37,35,38] },
   { k:'kMargin', icon:'percent', pct:'31.8%', delta:'+1.2', good:true, unit:'pts', spark:[27,28,28,29,30,29,30,31,30,31,31,32] },
-  { k:'kVat', icon:'landmark', v:18739410, sub:'vatDue', spark:[10,12,13,15,14,16,17,18,18,19,20,21] },
+  { k:'kVat', icon:'landmark', v:18739410, sub:'vatDue', subTag:'vatDueTag', spark:[10,12,13,15,14,16,17,18,18,19,20,21] },
 ];
 const CASH = [['m6',241000000,202000000],['m7',258000000,221000000],['m8',233000000,240000000],['m9',279000000,236000000],['m10',302000000,251000000],['m11',146000000,119000000]];
 const AGING = [['ag0',145230000,'ok'],['ag1',34585000,'info'],['ag2',19800000,'warn'],['ag3',11220000,'neg'],['ag4',7625000,'neg2']];
@@ -131,9 +131,9 @@ function dashboard(api) {
   const { t, ic, money, statusBadge, S, esc, nm, INV, invStatus, fmtDate, grp } = api;
   const loading = S.demo === 'loading', failed = S.demo === 'error';
   const sk = (w = '60%') => `<span class="sk" style="width:${w};display:block;height:14px"></span>`;
-  const kpi = (x) => `<li class="kpi" data-k="${x.k}"><div class="kpi-h">${ic(x.icon)}<span>${SHORT_KPI.has(x.k) ? `<span class="kl has-s">${t(x.k)}</span><span class="ks">${t(x.k + 'S')}</span>` : t(x.k)}</span></div>
+  const kpi = (x) => `<li class="kpi" data-k="${x.k}"><div class="kpi-h">${ic(x.icon)}<span>${SHORT_KPI.has(x.k) ? `<span class="kl has-s">${t(x.k)}</span><span class="ks" aria-hidden="true">${t(x.k + 'S')}</span>` : t(x.k)}</span></div>
     ${loading ? `<div class="kpi-v">${sk('70%')}</div>` : `<div class="kpi-v">${x.pct ? `<span class="m pct">${x.pct}</span>` : money(x.v)}</div>`}
-    <div class="kpi-f">${x.delta ? `<span class="delta ${x.good ? 'good' : 'bad'}">${ic(x.delta.startsWith('+') ? 'trendUp' : 'trendDown')}<b class="num">${x.delta}</b>${x.unit ? ` ${t(x.unit)}` : ''}</span><span class="muted">${t(x.note || '')}</span>` : ''}${x.overdue ? `<span class="delta bad">${ic('alert')}${t('overdue')} <b>${money(x.overdue, { sym: false })}</b></span>` : ''}${x.sub ? `<span class="muted">${t(x.sub)}</span>` : ''}</div>
+    <div class="kpi-f">${x.delta ? `<span class="delta ${x.good ? 'good' : 'bad'}">${ic(x.delta.startsWith('+') ? 'trendUp' : 'trendDown')}<b class="num">${x.delta}</b>${x.unit ? ` ${t(x.unit)}` : ''}</span><span class="muted">${t(x.note || '')}</span>` : ''}${x.overdue ? `<span class="delta bad">${ic('alert')}${t('overdue')} <b>${money(x.overdue, { sym: false })}</b></span>` : ''}${x.sub ? `<span class="muted">${x.subTag ? `<span class="kl has-s">${t(x.sub)}</span><span class="ks" aria-hidden="true"><b>${t(x.subTag)}</b> · ${t(x.sub)}</span>` : t(x.sub)}</span>` : ''}</div>
     ${loading ? '' : spark(x.spark)}</li>`;
   const SHORT_KPI = new Set(['kRev', 'kAP', 'kVat']);
   const att = [['neg','alert','a1',38645000,'sales'],['warn','fuel','a2',null,'shift'],['warn','box','a3',null,'inventory'],['info','file','a4',null,'sales'],['neutral','calendar','a5',null,'']];

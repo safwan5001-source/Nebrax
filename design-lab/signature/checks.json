@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T23:46:50.386Z",
+ "generated": "2026-11-14T09:33:01.454Z",
  "matrix": [
   {
    "identity": "nasaq",
@@ -3062,7 +3062,7 @@
    "ok": true
   },
   {
-   "name": "Phone KPI labels: short, one line, keep the time context; desktop keeps the full labels",
+   "name": "Phone KPI labels: short (one line at 390, never cut below), no abbreviated tax term, «payable» in the note, full labels for screen readers; desktop unchanged",
    "ok": true
   },
   {

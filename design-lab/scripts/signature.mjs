@@ -503,16 +503,35 @@ test('"#app" from the compare view shows the app, not a blank page', async () =>
 });
 
 /* ---- Liwan refinement R2 (regression) ---- */
-test('Phone KPI labels: short, one line, keep the time context; desktop keeps the full labels', async () => {
-  for (const identity of IDS) for (const l of ['ar', 'en']) {
-    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&r=dashboard`, { width: 390, height: 844 });
-    const r = await page.evaluate(() => [...document.querySelectorAll('.kpi')].map(k => { const sp = k.querySelector('.kpi-h > span'), lh = parseFloat(getComputedStyle(sp).lineHeight); return { k: k.dataset.k, text: sp.innerText.trim(), lines: Math.round(sp.getBoundingClientRect().height / lh) }; }));
-    for (const x of r) assert(x.lines === 1, `${identity}/${l}: ${x.k} label on ${x.lines} lines "${x.text}"`);
-    const by = Object.fromEntries(r.map(x => [x.k, x.text]));
-    assert(l === 'ar' ? /الشهر/.test(by.kRev) && /7/.test(by.kAP) && /المستحقة/.test(by.kVat) : /MTD/.test(by.kRev) && /7/.test(by.kAP) && /payable/.test(by.kVat), `${identity}/${l}: time/accounting context lost ${JSON.stringify(by)}`);
-    await page.setViewportSize({ width: 1366, height: 900 }); await page.waitForTimeout(80);
-    const full = await page.evaluate(() => document.querySelector('.kpi[data-k="kRev"] .kpi-h > span').innerText.trim());
-    assert(l === 'ar' ? full === 'الإيرادات · الشهر حتى اليوم' : full === 'Revenue · month to date', `${identity}/${l}: desktop label ${full}`);
+test('Phone KPI labels: short (one line at 390, never cut below), no abbreviated tax term, «payable» in the note, full labels for screen readers; desktop unchanged', async () => {
+  const FULL = { ar: { kRev: 'الإيرادات · الشهر حتى اليوم', kAP: 'مستحق للموردين خلال 7 أيام', kVat: 'ضريبة القيمة المضافة المستحقة', note: 'الربع الرابع · الإقرار حتى 31 يناير 2027' },
+                 en: { kRev: 'Revenue · month to date', kAP: 'Payables due in 7 days', kVat: 'VAT payable', note: 'Q4 · return due 31 Jan 2027' } };
+  for (const identity of IDS) for (const l of ['ar', 'en']) for (const [w, m] of [[390, 'light'], [320, 'dark']]) {
+    const tag = `${identity}/${l}/${w}/${m}`;
+    const { ctx, page } = await open(`embed=1&id=${identity}&l=${l}&m=${m}&r=dashboard`, { width: w, height: 844 });
+    const r = await page.evaluate(() => {
+      const seen = (el) => [...el.childNodes].filter(n => n.nodeType === 3 || getComputedStyle(n).display !== 'none' && !(n.classList && n.classList.contains('kl') && getComputedStyle(n).position === 'absolute')).map(n => n.textContent).join('').trim();
+      return [...document.querySelectorAll('.kpi')].map(k => { const sp = k.querySelector('.kpi-h > span'), lh = parseFloat(getComputedStyle(sp).lineHeight), note = k.querySelector('.kpi-f .muted:last-child');
+        return { k: k.dataset.k, text: seen(sp), lines: Math.round(sp.getBoundingClientRect().height / lh), cut: sp.scrollHeight > sp.clientHeight + 1, note: note ? seen(note) : '', tagW: note?.querySelector('.ks b') ? getComputedStyle(note.querySelector('.ks b')).fontWeight : null }; });
+    });
+    // one line at 390; on the narrowest phones (320) a label may take its second line, but is never cut
+    for (const x of r) assert(w >= 390 ? x.lines === 1 : x.lines <= 2 && !x.cut, `${tag}: ${x.k} label on ${x.lines} lines${x.cut ? ', cut' : ''} "${x.text}"`);
+    const by = Object.fromEntries(r.map(x => [x.k, x]));
+    assert(!/ض\.ق\.م/.test(JSON.stringify(r)), `${tag}: abbreviated tax term still shown`);
+    assert(by.kVat.text === (l === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'), `${tag}: VAT label "${by.kVat.text}"`);
+    const [tagWord, ...rest] = l === 'ar' ? ['المستحقة', 'الربع الرابع', '31 يناير 2027'] : ['Payable', 'Q4', '31 Jan 2027'];
+    assert(by.kVat.note.startsWith(tagWord) && rest.every(s => by.kVat.note.includes(s)) && Number(by.kVat.tagW) >= 600, `${tag}: VAT note "${by.kVat.note}" (weight ${by.kVat.tagW})`);
+    assert(l === 'ar' ? /الشهر/.test(by.kRev.text) && /7/.test(by.kAP.text) : /MTD/.test(by.kRev.text) && /7/.test(by.kAP.text), `${tag}: time context lost ${JSON.stringify(by)}`);
+    // screen readers get the full, correct wording — and only once
+    const aria = await page.locator('.kpi[data-k="kVat"]').ariaSnapshot();
+    assert(aria.includes(FULL[l].kVat) && aria.includes(FULL[l].note), `${tag}: accessible text ${aria}`);
+    assert(!aria.includes(`${tagWord} ·`), `${tag}: short note read aloud ${aria}`);
+    for (const k of ['kRev', 'kAP']) assert((await page.locator(`.kpi[data-k="${k}"]`).ariaSnapshot()).includes(FULL[l][k]), `${tag}: ${k} full label missing for screen readers`);
+    if (w === 390) {
+      await page.setViewportSize({ width: 1366, height: 900 }); await page.waitForTimeout(80);
+      const d = await page.evaluate(() => ({ rev: document.querySelector('.kpi[data-k="kRev"] .kpi-h > span').innerText.trim(), vat: document.querySelector('.kpi[data-k="kVat"] .kpi-h > span').innerText.trim(), note: document.querySelector('.kpi[data-k="kVat"] .kpi-f .muted:last-child').innerText.trim() }));
+      assert(d.rev === FULL[l].kRev && d.vat === FULL[l].kVat && d.note === FULL[l].note, `${tag}: desktop changed ${JSON.stringify(d)}`);
+    }
     await ctx.close();
   }
 });

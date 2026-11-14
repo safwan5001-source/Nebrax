@@ -137,7 +137,7 @@
 .kpi-h { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--awj-text-secondary); min-width: 0; }
 .kpi-h span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
 .kpi-h svg { width: 16px; height: 16px; flex: none; color: var(--awj-text-secondary); }
-.kpi-h .ks { display: none; }
+.kpi-h .ks, .kpi-f .ks { display: none; }
 .kpi-v { min-height: 1.2em; }
 .kpi-v .m { font-family: var(--awj-figure-font); font-size: min(var(--awj-figure-size), 12.5cqi); font-weight: var(--awj-figure-weight); line-height: 1.15; letter-spacing: -.01em; color: var(--awj-text-primary); }
 .kpi-v .m .fr { font-size: .56em; font-weight: 400; color: var(--awj-text-secondary); }
@@ -227,7 +227,9 @@
   /* R2: an item without an amount keeps its action beside the text (no row of its own); targets stay 44px */
   .att:not(.has-amt) { grid-template-areas: "sev tx btn"; } .att:not(.has-amt) .amt { display: none; } .att:not(.has-amt) .btn { align-self: center; }
   .att .tx { gap: 2px; } .att .tx b { line-height: 1.35; } .att .tx span { font-size: 12.5px; line-height: 1.45; }
-  .kpi-h .kl.has-s { display: none; } .kpi-h .ks { display: inline; }
+  /* phone: the short label is what is seen (aria-hidden); the full label stays in the accessibility tree, visually hidden */
+  .kpi .kl.has-s { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .kpi .ks { display: inline; } .kpi-f .ks b { font-weight: 600; color: var(--awj-text-primary); }
   .doc { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "no st" "cu cu" "dt am"; }
   .doc .no { grid-area: no; } .doc .cu { grid-area: cu; } .doc .dt { grid-area: dt; } .doc .am { grid-area: am; } .doc .st { grid-area: st; justify-self: end; }
   .bars { height: 140px; gap: 4px; }
