@@ -633,4 +633,118 @@ class FuelShiftSettlementPostingTest extends TestCase
         $this->assertStringContainsString('public function prepareSettlementSale(', $sales);
         $this->assertStringContainsString('public function postSettlementSale(', $sales);
     }
+
+    // ───────── TANKER-PR8: لا خصم مزدوج بين تسوية الوردية وترحيل سند التعبئة ─────────
+
+    private function tankerFillBeforeClose(int $ml): callable
+    {
+        return function (FuelShift $shift) use ($ml): void {
+            $owner = \App\Models\FuelTankerOwner::create(['name' => 'عسكر', 'code' => 'ASK-' . uniqid(), 'status' => 'active']);
+            app(\App\Services\FuelTankerFillService::class)->record([
+                'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $shift->id,
+                'fuel_tanker_owner_id' => $owner->id, 'voucher_number' => 'PR8-' . uniqid(), 'quantity_milliliters' => $ml, 'idempotency_key' => 'pr8-fill-' . uniqid(),
+            ], $this->f['actor']);
+        };
+    }
+
+    private function warehouseStock(): int
+    {
+        return (int) DB::table('product_warehouse_stock')->where('warehouse_id', $this->f['warehouse']->id)->value('quantity');
+    }
+
+    /** @test */
+    public function tanker_fill_liters_are_excluded_from_the_settlement_residual_and_never_invoiced_as_a_sale(): void
+    {
+        // عدّاد 20 لتراً، سند تعبئة 8 لترات ⇒ البقية 12 لتراً فقط (12 × 2.30 = 27.60) لا 20.
+        $shift = $this->closedShift('pr8a', beforeClose: $this->tankerFillBeforeClose(8_000), cashMinor: 2760);
+        $stockBefore = $this->warehouseStock();
+        $invoicesBefore = Invoice::count();
+
+        $result = $this->engine()->post($shift, $this->f['actor']);
+
+        $this->assertSame(SettlementPostingResult::POSTED, $result->outcome, json_encode($result->reasons));
+        $this->assertSame($invoicesBefore + 1, Invoice::count());
+        $this->assertSame(2760, (int) Invoice::latest('created_at')->first()->total);
+        $this->assertSame($stockBefore - 12_000, $this->warehouseStock(), 'خصمت التسوية البقية فقط');
+        $line = DB::table('fuel_shift_settlement_lines')->sole();
+        $this->assertSame(20_000, (int) $line->metered_milliliters);
+        $this->assertSame(0, (int) $line->erp_milliliters);
+        $this->assertSame(8_000, (int) $line->tanker_milliliters);
+        $this->assertSame(12_000, (int) $line->residual_milliliters);
+        $this->assertTrue((bool) (json_decode((string) DB::table('fuel_shift_settlements')->value('policy_snapshot'), true)['tanker_exclusion'] ?? false));
+        // سند التعبئة لم يُمسّ: لا خصم ولا قيد له.
+        $this->assertSame('pending_integration', DB::table('fuel_tanker_fills')->value('inventory_status'));
+    }
+
+    /** @test */
+    public function settlement_then_tanker_posting_deducts_each_liter_exactly_once(): void
+    {
+        config(['fuel_stations.tanker_management_enabled' => true, 'fuel_stations.tanker_fills_enabled' => true, 'fuel_stations.tanker_inventory_posting_enabled' => true]);
+        $clearing = \App\Models\Account::create(['code' => '1145', 'name' => 'وسيط وقود مصروف لصهاريج', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        app(FuelStationSettingsService::class)->putTenant([
+            'tanker_issue_clearing_account_id' => $clearing->id, 'tanker_inventory_posting_start_at' => now()->subDay()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'fuel_pool_ledger_variance_policy' => 'warn',   // fixture اصطناعي: رصيده الدفتري لا يطابق دفتر الأستاذ؛ المطابقة بينهما ليست موضوع هذا الاختبار
+        ], $this->f['actor'], 'إعداد ترحيل التعبئة');
+
+        $stockStart = $this->warehouseStock();
+        $poolStart = (int) DB::table('fuel_inventory_cost_states')->sum('quantity_milliliters');
+        $shift = $this->closedShift('pr8b', beforeClose: $this->tankerFillBeforeClose(8_000), cashMinor: 2760);
+
+        // المحطة `post_on_close` وسند التعبئة معلَّق: لا مانع كلّي (يحلّ استبعاد اللترات محل المانع القديم).
+        $this->assertSame(SettlementPostingResult::POSTED, $this->engine()->post($shift, $this->f['actor'])->outcome);
+        $fill = \App\Models\FuelTankerFill::sole();
+        $posted = app(\App\Services\FuelTankerFillInventoryPostingService::class)->post($fill, $this->f['actor']);
+        $this->assertFalse($posted['replayed']);
+
+        // المجموع المخصوم = قراءة العدّاد بالضبط (12 تسوية + 8 تعبئة)، والمخزن = المجمّع.
+        $this->assertSame($stockStart - 20_000, $this->warehouseStock());
+        $this->assertSame($poolStart - 20_000, (int) DB::table('fuel_inventory_cost_states')->sum('quantity_milliliters'));
+        $this->assertSame($this->warehouseStock(), (int) DB::table('fuel_inventory_cost_states')->sum('quantity_milliliters'));
+
+        // الإعادة بلا أثر لكلا المسارين.
+        $this->assertTrue(app(\App\Services\FuelTankerFillInventoryPostingService::class)->post($fill->fresh(), $this->f['actor'])['replayed']);
+        $this->assertSame(SettlementPostingResult::REPLAYED, $this->engine()->post($shift, $this->f['actor'])->outcome);
+        $this->assertSame($stockStart - 20_000, $this->warehouseStock());
+    }
+
+    /** @test */
+    public function tanker_posting_then_settlement_also_deducts_each_liter_exactly_once(): void
+    {
+        config(['fuel_stations.tanker_management_enabled' => true, 'fuel_stations.tanker_fills_enabled' => true, 'fuel_stations.tanker_inventory_posting_enabled' => true]);
+        $clearing = \App\Models\Account::create(['code' => '1145', 'name' => 'وسيط وقود مصروف لصهاريج', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        app(FuelStationSettingsService::class)->putTenant([
+            'tanker_issue_clearing_account_id' => $clearing->id, 'tanker_inventory_posting_start_at' => now()->subDay()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'fuel_pool_ledger_variance_policy' => 'warn',   // fixture اصطناعي: رصيده الدفتري لا يطابق دفتر الأستاذ؛ المطابقة بينهما ليست موضوع هذا الاختبار
+        ], $this->f['actor'], 'إعداد ترحيل التعبئة');
+        $stockStart = $this->warehouseStock();
+
+        $shift = $this->closedShift('pr8c', beforeClose: $this->tankerFillBeforeClose(8_000), cashMinor: 2760);
+        // الترحيل أولاً: السند يخصم 8 لترات (التسوية لم تعمل بعد).
+        app(\App\Services\FuelTankerFillInventoryPostingService::class)->post(\App\Models\FuelTankerFill::sole(), $this->f['actor']);
+        $this->assertSame($stockStart - 8_000, $this->warehouseStock());
+
+        // ثم التسوية: بقية 12 لتراً فقط (لا تعدّ الـ8 مرة ثانية).
+        $this->assertSame(SettlementPostingResult::POSTED, $this->engine()->post($shift, $this->f['actor'])->outcome);
+        $this->assertSame($stockStart - 20_000, $this->warehouseStock());
+        $this->assertSame(12_000, (int) DB::table('fuel_shift_settlement_lines')->value('residual_milliliters'));
+    }
+
+    /** @test */
+    public function tanker_and_direct_sale_liters_over_the_meter_block_the_settlement_instead_of_inventing_a_negative_residual(): void
+    {
+        // مبيعات مباشرة 15 + تعبئة 10 > عدّاد 20 ⇒ مانع قائم (ERP يتجاوز العدّاد) وبلا أي كتابة.
+        $shift = $this->closedShift('pr8d', beforeClose: function (FuelShift $s) {
+            $service = app(\App\Services\FuelSaleService::class);
+            $service->finalize($service->createDraft([
+                'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $s->id,
+                'partner_id' => $this->f['customer']->id, 'quantity_milliliters' => 15_000, 'idempotency_key' => 'pr8d-sale',
+            ], $this->f['actor']), $this->f['actor']);
+            ($this->tankerFillBeforeClose(10_000))($s);
+        }, cashMinor: 2300);
+        $before = $this->counts();
+        $r = $this->engine()->post($shift, $this->f['actor']);
+        $this->assertSame(SettlementPostingResult::BLOCKED, $r->outcome);
+        $this->assertContains('FUEL_SETTLEMENT_ERP_EXCEEDS_METER', $r->reasons);
+        $this->assertSame($before, $this->counts());
+    }
 }

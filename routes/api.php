@@ -113,6 +113,7 @@ use App\Http\Controllers\Api\FuelTankerFillInventoryReviewController;
 use App\Http\Controllers\Api\FuelTankerFillController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
+use App\Http\Controllers\Api\FuelShiftMeterReconciliationController;
 use App\Http\Controllers\Api\FuelShiftSettlementPreviewController;
 use App\Http\Controllers\Api\FuelStationWalkInPartnerController;
 use App\Http\Controllers\Api\FuelSaleController;
@@ -1718,6 +1719,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'show'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/shifts/{id}/collection', [FuelShiftCollectionController::class, 'store'])->middleware([$perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/collection/review', [FuelShiftCollectionController::class, 'review'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR8: مطابقة قراءات الفوهات عند الإغلاق ومراجعة فروقها (تشغيلية بحتة) — مغلقة خلف FUEL_SHIFT_METER_RECONCILIATION_ENABLED (404).
+        Route::get('fuel-stations/shifts/{id}/meter-reconciliation', [FuelShiftMeterReconciliationController::class, 'show'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/shifts/{id}/meter-reconciliation/review', [FuelShiftMeterReconciliationController::class, 'review'])->middleware([$perm('fuel.shift.meter_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
         // P1-3a: معاينة تسوية الوردية (قراءة فقط) — مغلقة خلف FUEL_SHIFT_SETTLEMENT_ENABLED + مرجع الرأي الضريبي (404). لا كتابة محاسبية.
         Route::get('fuel-stations/shifts/{id}/settlement-preview', [FuelShiftSettlementPreviewController::class, 'show'])->middleware([$perm('fuel.shift.close'), $commercialApp('fuel_stations.core')]);
         Route::get('fuel-stations/stations/{id}/walk-in-partner', [FuelStationWalkInPartnerController::class, 'show'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);

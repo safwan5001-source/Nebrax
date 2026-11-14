@@ -29,6 +29,9 @@ class FuelShiftEvent extends BaseModel
     public const TYPE_COLLECTION_DECLARED = 'collection_declared';
     public const TYPE_COLLECTION_FROZEN = 'collection_frozen';
     public const TYPE_COLLECTION_REVIEWED = 'collection_reviewed';
+    // TANKER-PR8: لقطة مطابقة الفوهات عند الإغلاق ومراجعة المشرف لفرق العدّاد (تصنيف وصفي، بلا أثر مالي).
+    public const TYPE_METER_RECONCILIATION_FROZEN = 'meter_reconciliation_frozen';
+    public const TYPE_METER_VARIANCE_REVIEWED = 'meter_variance_reviewed';
 
     protected $fillable = ['tenant_id', 'branch_id', 'fuel_shift_id', 'type', 'payload', 'actor_id', 'occurred_at'];
 

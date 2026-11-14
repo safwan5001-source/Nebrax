@@ -1077,4 +1077,28 @@ class FuelShiftSettlementPreviewTest extends TestCase
     {
         return (string) \Illuminate\Support\Str::uuid();
     }
+
+    /** @test */
+    public function the_preview_excludes_tanker_fill_liters_from_the_residual_and_exposes_them_separately(): void
+    {
+        // TANKER-PR8: عدّاد 20 لتراً = بيع ERP 10 + تعبئة صهريج 6 ⇒ بقية التسوية 4 لترات فقط (لا فاتورة بيع للتعبئة).
+        $shift = $this->open('pr8-preview');
+        $this->meters($shift);
+        $this->walkInSale('pr8-preview-sale', $shift, 10_000);
+        $owner = \App\Models\FuelTankerOwner::create(['name' => 'عسكر', 'code' => 'ASK-' . uniqid(), 'status' => 'active']);
+        app(\App\Services\FuelTankerFillService::class)->record([
+            'fuel_station_id' => $this->f['station']->id, 'fuel_nozzle_id' => $this->f['nozzle']->id, 'fuel_shift_id' => $shift->id,
+            'fuel_tanker_owner_id' => $owner->id, 'voucher_number' => 'PRV-1', 'quantity_milliliters' => 6_000, 'idempotency_key' => 'pr8-preview-fill',
+        ], $this->f['actor']);
+        $this->declare($shift, 920);
+
+        $p = $this->preview($shift);
+        $line = $p['lines'][0];
+        $this->assertSame(20_000, $line['metered_milliliters']);
+        $this->assertSame(10_000, $line['erp_milliliters']);
+        $this->assertSame(6_000, $line['tanker_milliliters']);
+        $this->assertSame(4_000, $line['residual_milliliters']);
+        $this->assertSame(920, $line['expected_gross_minor']);
+        $this->assertNotContains('FUEL_SETTLEMENT_ERP_EXCEEDS_METER', $p['blockers']);
+    }
 }

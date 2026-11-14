@@ -27,6 +27,10 @@ use RuntimeException;
  * (لا إجمالي جزئي يُقدَّم كإجمالي). اللترات تُعاد دائماً مع علم اكتمالها.
  *
  * هذه المبيعات **تقدير تشغيلي من العدادات** — ليست فواتير بيع (`FuelSale`) ولا تتضمن أي بيع آجل أو تسوية غير مسجّلة.
+ *
+ * TANKER-PR8 — `$excludeTankerFills` (افتراضياً `false`: كل المستهلكين القدامى كما كانوا حرفياً): تعبئة الصهريج **ليست بيعاً نقدياً ولا شبكة**، فمطابقة التحصيل
+ * (`FuelShiftCollectionService`) تطلب مبيعات العدّاد **بعد خصم لترات سندات التعبئة المسجَّلة** (`milliliters`/`amount_minor` على أساس المباع)، وسطر الفوهة يحتفظ
+ * بفرق العدّاد الخام ويضيف `tanker_milliliters`. لترات التعبئة فوق فرق العدّاد ⇒ ثغرة `tanker_fills_exceed_meter` (لا مبلغ جزئي).
  */
 class FuelShiftSalesCalculator
 {
@@ -37,6 +41,7 @@ class FuelShiftSalesCalculator
     public const GAP_TAX_MODE_UNSET = 'tax_mode_unset';
     public const GAP_PRODUCT_UNAVAILABLE = 'product_unavailable';
     public const GAP_NO_NOZZLES = 'no_nozzles';
+    public const GAP_TANKER_EXCEEDS_METER = 'tanker_fills_exceed_meter';
 
     public function __construct(
         private FuelEffectivePriceReadService $prices,
@@ -49,7 +54,7 @@ class FuelShiftSalesCalculator
      *   products:list<array<string,mixed>>, nozzles:list<array<string,mixed>>, gaps:list<string>
      * }
      */
-    public function compute(FuelShift $shift, CarbonInterface $at): array
+    public function compute(FuelShift $shift, CarbonInterface $at, bool $excludeTankerFills = false): array
     {
         $station = FuelStation::findOrFail($shift->fuel_station_id);
         $readings = FuelShiftMeterReading::where('fuel_shift_id', $shift->id)->get()->groupBy('fuel_nozzle_id');
@@ -58,6 +63,7 @@ class FuelShiftSalesCalculator
             ->orderBy('nozzle_number')->orderBy('id')   // nozzle_number فريد لكل مضخة لا لكل محطة: id يحسم الترتيب فتثبت البصمة
             ->get();
 
+        $tankerByNozzle = $excludeTankerFills ? app(FuelShiftNozzleLiters::class)->tankerByNozzle($shift) : [];
         $gaps = [];
         $nozzleRows = [];
         $byProduct = [];
@@ -73,7 +79,7 @@ class FuelShiftSalesCalculator
                 'closing_milliliters' => $closing?->meter_milliliters === null ? null : (int) $closing->meter_milliliters,
                 'milliliters' => null,
                 'status' => 'ok',
-            ];
+            ] + ($excludeTankerFills ? ['tanker_milliliters' => (int) ($tankerByNozzle[$nozzle->id] ?? 0)] : []);
             if ($opening === null || $closing === null) {
                 $row['status'] = $opening === null && $closing === null ? 'missing_both' : ($opening === null ? 'missing_opening' : 'missing_closing');
                 $gaps[self::GAP_MISSING_READING] = true;
@@ -88,7 +94,15 @@ class FuelShiftSalesCalculator
                 } else {
                     $row['milliliters'] = $delta;
                     $row['status'] = $delta === 0 ? 'no_movement' : 'ok';
-                    $byProduct[$nozzle->fuel_product_id]['milliliters'] = ($byProduct[$nozzle->fuel_product_id]['milliliters'] ?? 0) + $delta;
+                    $tanker = (int) ($row['tanker_milliliters'] ?? 0);
+                    if ($tanker > $delta) {
+                        // سندات تعبئة أكثر من فرق العدّاد: لا مباع سالب ولا مبلغ جزئي.
+                        $row['status'] = 'tanker_exceeds_meter';
+                        $gaps[self::GAP_TANKER_EXCEEDS_METER] = true;
+                        $byProduct[$nozzle->fuel_product_id]['gaps'][self::GAP_TANKER_EXCEEDS_METER] = true;
+                    } else {
+                        $byProduct[$nozzle->fuel_product_id]['milliliters'] = ($byProduct[$nozzle->fuel_product_id]['milliliters'] ?? 0) + $delta - $tanker;
+                    }
                 }
             }
             $byProduct[$nozzle->fuel_product_id]['nozzles'] = ($byProduct[$nozzle->fuel_product_id]['nozzles'] ?? 0) + 1;
@@ -163,7 +177,7 @@ class FuelShiftSalesCalculator
             $productRows[] = $row;
         }
 
-        $mlComplete = ! isset($gaps[self::GAP_MISSING_READING]) && ! isset($gaps[self::GAP_CLOSING_BELOW_OPENING]) && ! isset($gaps[self::GAP_NO_NOZZLES]);
+        $mlComplete = ! isset($gaps[self::GAP_MISSING_READING]) && ! isset($gaps[self::GAP_CLOSING_BELOW_OPENING]) && ! isset($gaps[self::GAP_NO_NOZZLES]) && ! isset($gaps[self::GAP_TANKER_EXCEEDS_METER]);
 
         return [
             'evaluated_at' => $at->toIso8601String(),

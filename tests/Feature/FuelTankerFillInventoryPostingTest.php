@@ -376,12 +376,41 @@ class FuelTankerFillInventoryPostingTest extends TestCase
     }
 
     /** @test */
-    public function post_on_close_stations_cannot_post_to_avoid_a_double_deduction(): void
+    public function post_on_close_stations_post_without_double_deduction_because_settlement_excludes_tanker_liters(): void
+    {
+        // TANKER-PR8: المانع الكلّي القديم (`settlement_mode_conflict`) حلّ محله استبعاد لترات التعبئة من بقية التسوية؛ المحطة `post_on_close` تُرحَّل تعبئتها بلا مانع.
+        $fill = $this->fill();
+        FuelStationSettingOverride::create(['tenant_id' => $this->w['tenant_id'], 'fuel_station_id' => $this->w['station']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
+        $before = $this->state();
+        $this->postFill($fill)->assertStatus(201);
+        $this->assertSame(FuelTankerFill::INVENTORY_POSTED, $fill->fresh()->inventory_status);
+        $this->assertNotSame($before, $this->state());   // خُصمت الكمية مرة واحدة بترحيل السند (التسوية لاحقاً تستبعدها)
+    }
+
+    /** @test */
+    public function a_legacy_settlement_that_did_not_exclude_tanker_liters_blocks_posting_exactly_that_fill(): void
     {
         $fill = $this->fill();
         $before = $this->state();
-        FuelStationSettingOverride::create(['tenant_id' => $this->w['tenant_id'], 'fuel_station_id' => $this->w['station']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
-        $this->assertContains('settlement_mode_conflict', $this->postFill($fill)->assertStatus(422)->json('details.blockers'));
+
+        $insertLegacySettlement = function (FuelTankerFill $fill, ?int $tanker): void {
+            $settlementId = (string) \Illuminate\Support\Str::uuid();
+            \Illuminate\Support\Facades\DB::table('fuel_shift_settlements')->insert([
+                'id' => $settlementId, 'tenant_id' => $fill->tenant_id, 'branch_id' => $fill->branch_id, 'fuel_station_id' => $fill->fuel_station_id,
+                'fuel_shift_id' => $fill->fuel_shift_id, 'status' => 'posted', 'sales_basis' => 'per_invoice', 'preview_hash' => str_repeat('a', 64),
+                'policy_snapshot' => json_encode(['mode' => 'post_on_close']), 'metered_milliliters' => 3000000, 'erp_milliliters' => 0, 'residual_milliliters' => 3000000,
+                'settled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+                'supply_started_at' => '2026-10-15 08:00:00', 'supply_ended_at' => '2026-10-15 16:00:00', 'supply_business_date' => '2026-10-15', 'accounting_date' => '2026-10-15',
+            ]);
+            \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_lines')->insert([
+                'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $fill->tenant_id, 'branch_id' => $fill->branch_id, 'fuel_shift_settlement_id' => $settlementId,
+                'fuel_nozzle_id' => $fill->fuel_nozzle_id, 'fuel_product_id' => $fill->fuel_product_id, 'warehouse_id' => \App\Models\FuelStation::find($fill->fuel_station_id)->warehouse_id,
+                'metered_milliliters' => 3000000, 'erp_milliliters' => 0, 'tanker_milliliters' => $tanker, 'residual_milliliters' => 3000000 - (int) $tanker, 'state' => 'no_residual',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        };
+        $insertLegacySettlement($fill, null);   // تسوية سابقة لاستبعاد التعبئات: لترات السند عُدَّت بيعاً
+        $this->assertContains('settlement_covers_fill', $this->postFill($fill)->assertStatus(422)->json('details.blockers'));
         $this->assertSame($before, $this->state());
     }
 

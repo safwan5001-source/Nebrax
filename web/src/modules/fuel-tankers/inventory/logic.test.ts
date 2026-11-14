@@ -114,6 +114,6 @@ describe('readReconciliation is defensive and never assumes values are visible',
   it('knows the server finding codes and the three new blockers', () => {
     expect(isKnownFinding('value_difference')).toBe(true);
     expect(isKnownFinding('made_up')).toBe(false);
-    for (const code of ['period_locked', 'settlement_mode_conflict', 'clearing_account_missing']) expect(isKnownBlocker(code)).toBe(true);
+    for (const code of ['period_locked', 'settlement_mode_conflict', 'settlement_covers_fill', 'clearing_account_missing']) expect(isKnownBlocker(code)).toBe(true);
   });
 });

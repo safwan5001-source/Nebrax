@@ -16,7 +16,7 @@ class FuelShiftSettlementLine extends BaseModel
     protected $guarded = ['*'];
 
     protected $casts = [
-        'metered_milliliters' => 'integer', 'erp_milliliters' => 'integer', 'residual_milliliters' => 'integer',
+        'metered_milliliters' => 'integer', 'erp_milliliters' => 'integer', 'tanker_milliliters' => 'integer', 'residual_milliliters' => 'integer',
         'price_per_liter_minor' => 'integer', 'expected_gross_minor' => 'integer', 'pending_value_minor' => 'integer',
     ];
 

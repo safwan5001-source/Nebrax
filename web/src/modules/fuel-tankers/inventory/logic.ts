@@ -10,7 +10,7 @@ export const BLOCKERS = [
   'station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing',
   'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance',
   // PR-6B-0 (قراءة فقط): الفترة المقفلة، تعارض تسوية الوردية، غياب الحساب الوسيط.
-  'period_locked', 'settlement_mode_conflict', 'clearing_account_missing',
+  'period_locked', 'settlement_mode_conflict', 'settlement_covers_fill', 'clearing_account_missing',
   // PR-6B-1: الحساب الوسيط معيَّن لكن لم يعد صالحاً.
   'clearing_account_invalid',
 ] as const;

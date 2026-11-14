@@ -775,21 +775,36 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     }
 
     /** @test */
-    public function post_on_close_stations_conflict_with_tanker_fills_to_prevent_a_double_deduction(): void
+    public function post_on_close_alone_no_longer_blocks_but_a_legacy_settlement_that_counted_the_liters_as_sales_does(): void
     {
         $this->seedStock(5_000_000);
         $fill = $this->fill(1_000_000);
         $viewer = $this->staff();
-        $this->assertNotContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $this->rawItem($viewer['token'], $fill)['blockers']);
 
-        $override = FuelStationSettingOverride::create(['tenant_id' => $this->tenantId, 'fuel_station_id' => $this->fx['s1']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
+        // TANKER-PR8: وضع `post_on_close` وحده لا يمنع (لترات التعبئة مستبعدة من بقية التسوية).
+        FuelStationSettingOverride::create(['tenant_id' => $this->tenantId, 'fuel_station_id' => $this->fx['s1']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
         $item = $this->rawItem($viewer['token'], $fill);
-        $this->assertContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $item['blockers']);
-        $this->assertSame(Readiness::BLOCKED, $item['readiness']);
+        $this->assertNotContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $item['blockers']);
+        $this->assertNotContains(Readiness::B_SETTLEMENT_COVERS_FILL, $item['blockers']);
 
-        // الوضع `none` يرفع المانع؛ ومحطة أخرى لا تتأثر بوضع هذه.
-        $override->update(['value' => 'none']);
-        $this->assertNotContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $this->rawItem($viewer['token'], $fill)['blockers']);
+        // تسوية سابقة لم تستبعد التعبئات (`tanker_milliliters IS NULL`) عدّت لتراتها بيعاً ⇒ ترحيل السند يخصمها مرة ثانية.
+        $settlementId = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('fuel_shift_settlements')->insert([
+            'id' => $settlementId, 'tenant_id' => $fill->tenant_id, 'branch_id' => $fill->branch_id, 'fuel_station_id' => $fill->fuel_station_id,
+            'fuel_shift_id' => $fill->fuel_shift_id, 'status' => 'posted', 'sales_basis' => 'per_invoice', 'preview_hash' => str_repeat('a', 64),
+            'policy_snapshot' => json_encode(['mode' => 'post_on_close']), 'metered_milliliters' => 3000000, 'erp_milliliters' => 0, 'residual_milliliters' => 3000000,
+            'settled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            'supply_started_at' => '2026-10-15 08:00:00', 'supply_ended_at' => '2026-10-15 16:00:00', 'supply_business_date' => '2026-10-15', 'accounting_date' => '2026-10-15',
+        ]);
+        \Illuminate\Support\Facades\DB::table('fuel_shift_settlement_lines')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $fill->tenant_id, 'branch_id' => $fill->branch_id, 'fuel_shift_settlement_id' => $settlementId,
+            'fuel_nozzle_id' => $fill->fuel_nozzle_id, 'fuel_product_id' => $fill->fuel_product_id, 'warehouse_id' => $this->fx['s1']->warehouse_id,
+            'metered_milliliters' => 3000000, 'erp_milliliters' => 0, 'tanker_milliliters' => null, 'residual_milliliters' => 3000000, 'state' => 'no_residual',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertContains(Readiness::B_SETTLEMENT_COVERS_FILL, $item['blockers']);
+        $this->assertSame(Readiness::BLOCKED, $item['readiness']);
     }
 
     /** @test */

@@ -51,7 +51,10 @@ class FuelTankerFillInventoryReadiness
     public const B_INSUFFICIENT_BALANCE = 'insufficient_balance';
     // TANKER-PR6B-0: موانع إضافية (قراءة فقط، تُحسب بلا أي قفل مِرساة).
     public const B_PERIOD_LOCKED = 'period_locked';
+    // الاسم القديم يبقى لمراجعة **العكس** (D-8-1: عكس سند في وردية سُوِّيت يعيد المخزون لترات خرجت فعلاً — محجوب تحت `post_on_close` بانتظار قرار المالك).
     public const B_SETTLEMENT_MODE_CONFLICT = 'settlement_mode_conflict';
+    // TANKER-PR8: بديل دقيق للمانع الكلّي القديم عند **الترحيل**: تسوية وردية سابقة لاستبعاد التعبئات (سطر فوهتها `tanker_milliliters IS NULL`) سبق أن عدّت لتراتها بيعاً ⇒ ترحيل السند يخصمها مرة ثانية.
+    public const B_SETTLEMENT_COVERS_FILL = 'settlement_covers_fill';
     public const B_CLEARING_ACCOUNT_MISSING = 'clearing_account_missing';
     // TANKER-PR6B-1: الحساب الوسيط معيَّن لكن لم يعد صالحاً (معطَّل/تجميعي/صار حساب مخزون أو نقد أو ضريبة أو دوراً آخر…).
     public const B_CLEARING_ACCOUNT_INVALID = 'clearing_account_invalid';
@@ -107,8 +110,8 @@ class FuelTankerFillInventoryReadiness
         $visibleCumulative = $visibleStationIds === null ? $cumulative : $this->cumulativeByFill($tenantId, $active->pluck('id')->all(), $warehouseIds->all(), $visibleStationIds);
         $poolTotals = $visibleStationIds === null ? $poolTotalsAll : $this->poolTotals($tenantId, $warehouseIds->all(), $visibleStationIds);
 
+        $legacySettlementCoverage = $this->legacySettlementCoverage($tenantId, $active->pluck('fuel_shift_id')->unique()->all());
         $policies = [];
-        $stationModes = [];
         $postingConfigs = [];
         $closedPeriods = null;
         $pools = [];
@@ -163,10 +166,10 @@ class FuelTankerFillInventoryReadiness
                 $pools[$key] ??= $this->poolSummary($warehouse, $product, $row, $state, $poolTotals[$key] ?? ['count' => 0, 'total' => 0], ($poolTotalsAll[$key]['count'] ?? 0) > ($poolTotals[$key]['count'] ?? 0), $includeCost);
             }
 
-            // PR-6B-0 — C-1: تسوية الوردية من العدادات (`post_on_close`) تصرف كل لترات الفوهة ومنها تعبئات الصهاريج؛ ترحيل التعبئة معها يخصم مرتين.
-            // **فشل مغلق**: الوضع المخزَّن وحده كافٍ (حتى لو أُغلقت بوابات التسوية لاحقاً) — لا يُفترض أنها لن تعمل.
-            if ($station !== null && ($stationModes[$station->id] ??= $this->settings->get($station, 'shift_settlement_mode')) === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
-                $blockers[] = self::B_SETTLEMENT_MODE_CONFLICT;
+            // TANKER-PR8 (يحلّ محل المانع الكلّي C-1): لترات سند التعبئة تُستبعد من بقية تسوية الوردية (`FuelShiftNozzleLiters`)، فلا خصم مزدوج في `post_on_close` — يُحجب فقط
+            // السند الذي سبقته تسوية **لم تستبعد** التعبئات (لا Backfill: صفوفها `tanker_milliliters IS NULL`). الحقيقة ساكنة: التسويات الجديدة تكتب العمود دائماً.
+            if (isset($legacySettlementCoverage[$fill->fuel_shift_id . '|' . $fill->fuel_nozzle_id])) {
+                $blockers[] = self::B_SETTLEMENT_COVERS_FILL;
             }
             // الحساب الوسيط (PR-6B-1): بلا بديل ولا تعيين تلقائي ولا إنشاء — غيابه مانع `clearing_account_missing`، وتعيين لم يعد صالحاً مانع `clearing_account_invalid`.
             // بدء الترحيل (`tanker_inventory_posting_start_at`): فارغ أو لاحق لتسجيل السند ⇒ سند **تاريخي** (وسم عرض فقط؛ لا يمنع ولا يرحّل، والترحيل المنفرد للتاريخي بصلاحيته لاحقاً).
@@ -203,6 +206,26 @@ class FuelTankerFillInventoryReadiness
         }
 
         return ['items' => $items, 'pools' => array_values($pools)];
+    }
+
+    /**
+     * (وردية، فوهة) لها سطر تسوية **سابق لاستبعاد التعبئات** (`tanker_milliliters IS NULL`): ترحيل سندات هذه الفوهة يخصم لتراً سبق أن عُدَّ بيعاً. قراءة فقط بعبارة واحدة.
+     *
+     * @param  list<string>  $shiftIds
+     * @return array<string,true>  مفتاحه `shift_id|nozzle_id`
+     */
+    private function legacySettlementCoverage(string $tenantId, array $shiftIds): array
+    {
+        if ($shiftIds === []) {
+            return [];
+        }
+
+        // قراءة عبر النموذجين (نطاق المستأجر تلقائي)؛ لا كتابة ولا SQL خام على جداول التسوية.
+        $settlementIds = \App\Models\FuelShiftSettlement::query()->where('tenant_id', $tenantId)->whereIn('fuel_shift_id', $shiftIds)->get(['id', 'fuel_shift_id'])->pluck('fuel_shift_id', 'id');
+
+        return \App\Models\FuelShiftSettlementLine::query()->whereIn('fuel_shift_settlement_id', $settlementIds->keys()->all())->whereNull('tanker_milliliters')
+            ->get(['fuel_shift_settlement_id', 'fuel_nozzle_id'])
+            ->mapWithKeys(fn ($row) => [$settlementIds[$row->fuel_shift_settlement_id] . '|' . $row->fuel_nozzle_id => true])->all();
     }
 
     /**
