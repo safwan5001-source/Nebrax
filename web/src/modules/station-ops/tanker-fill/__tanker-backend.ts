@@ -37,6 +37,12 @@ export interface World {
   dropReplyAfterApply: boolean;
   /** يفشل الطلب قبل أن يصل (لا أثر). */
   failBeforeApply: boolean;
+  /** خادم أقدم يتجاهل `attempt_key` فلا يعيد علامة التطبيق (لا تأكيد بلا علامة). */
+  lookupWithoutMarker?: boolean;
+  /** سند المحاولة غير مرئي لمن يسأل (موظف آخر/خارج النطاق). */
+  lookupBlind?: boolean;
+  /** منع تكرار السند معطَّل (`tanker_voucher_unique_scope = none`): سندات متطابقة المحتوى مسموحة بمفاتيح مختلفة. */
+  voucherUniqueDisabled?: boolean;
   /** رفض صريح من الخادم لكل POST. */
   rejectWith: { status: number; reason: string; message?: string } | null;
 }
@@ -90,7 +96,7 @@ export function connect(world: World, apiMock: { mockImplementation: (fn: (path:
       }
       if (!world.openShift) throw new ApiError(422, 'لا توجد وردية مفتوحة', { message: 'لا توجد وردية مفتوحة', reason: 'shift_required' });
       if (body.fuel_shift_id && body.fuel_shift_id !== world.openShift.id) throw new ApiError(422, 'الوردية المحددة ليست الوردية المفتوحة', { reason: 'shift_not_open' });
-      if (world.fills.some((row) => row.voucher_number === body.voucher_number)) throw new ApiError(409, 'السند الورقي مسجَّل سابقاً', { reason: 'voucher_duplicate' });
+      if (!world.voucherUniqueDisabled && world.fills.some((row) => row.voucher_number === body.voucher_number)) throw new ApiError(409, 'السند الورقي مسجَّل سابقاً', { reason: 'voucher_duplicate' });
       const nz = world.nozzles.find((row) => row.id === body.fuel_nozzle_id);
       const owner = world.owners.find((row) => row.id === body.fuel_tanker_owner_id) ?? null;
       const tk = world.tankers.find((row) => row.id === body.fuel_tanker_id) ?? null;
@@ -123,6 +129,12 @@ export function connect(world: World, apiMock: { mockImplementation: (fn: (path:
       case '/fuel-stations/tankers':
         return { data: world.tankers.filter((row) => (!query.get('owner_id') || row.fuel_tanker_owner_id === query.get('owner_id')) && (!query.get('status') || row.status === query.get('status'))), meta: { current_page: 1, last_page: 1 } };
       case '/fuel-stations/tanker-fills': {
+        const attempt = query.get('attempt_key');
+        if (attempt !== null) {
+          // مطابقة تامة على مفتاح المحاولة وحدها (لا محتوى)، مع علامة التطبيق؛ يحاكي الخادم: المفتاح لا يُعاد في أي استجابة.
+          const mine = world.fills.filter((row) => row._key === attempt && (world.lookupBlind ? false : true));
+          return { data: mine.map(publicRow), meta: { current_page: 1, last_page: 1 }, ...(world.lookupWithoutMarker ? {} : { attempt: { applied: true } }) };
+        }
         const rows = world.fills.filter((row) => (!query.get('station_id') || row.fuel_station_id === query.get('station_id')) && (!query.get('shift_id') || row.fuel_shift_id === query.get('shift_id')) && (!query.get('voucher_number') || row.voucher_number === query.get('voucher_number')));
         return { data: rows.map(publicRow), meta: { current_page: 1, last_page: 1 } };
       }

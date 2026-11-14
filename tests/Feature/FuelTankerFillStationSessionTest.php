@@ -282,6 +282,124 @@ class FuelTankerFillStationSessionTest extends TestCase
         $this->assertSame(2, FuelTankerFill::query()->count());
     }
 
+    // ───────────────────────── هوية المحاولة (attempt_key) ─────────────────────────
+
+    /** @return array<string,mixed> */
+    private function lookup(string $session, string $key, string $extra = ''): array
+    {
+        return $this->withToken($session)->getJson(self::BASE . '?attempt_key=' . urlencode($key) . $extra)->assertOk()->json();
+    }
+
+    /** @test */
+    public function two_identical_fills_are_told_apart_by_the_attempt_key_never_by_content(): void
+    {
+        // منع تكرار السند معطَّل: سندان متطابقان تماماً (السند والكمية والفوهة والوردية) يُسجَّلان بمفتاحين مختلفين.
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', ['tanker_voucher_unique_scope' => 'none', 'reason' => 'اختبار هوية المحاولة'])->assertOk();
+        $w = $this->worker($this->recorder());
+        $a = $this->payload(['voucher_number' => '9001', 'idempotency_key' => 'attempt-a-0123456789']);
+        $b = $this->payload(['voucher_number' => '9001', 'idempotency_key' => 'attempt-b-0123456789']);
+        $idA = $this->withToken($w['session'])->postJson(self::BASE, $a)->assertCreated()->json('data.id');
+        $idB = $this->withToken($w['session'])->postJson(self::BASE, $b)->assertCreated()->json('data.id');
+        $this->assertNotSame($idA, $idB);
+        $this->assertSame(2, FuelTankerFill::query()->count());
+
+        $foundA = $this->lookup($w['session'], $a['idempotency_key']);
+        $foundB = $this->lookup($w['session'], $b['idempotency_key']);
+        $this->assertTrue($foundA['attempt']['applied']);
+        $this->assertSame([$idA], array_column($foundA['data'], 'id'), 'مفتاح المحاولة أ يعيد سندها وحده رغم تطابق المحتوى مع ب');
+        $this->assertSame([$idB], array_column($foundB['data'], 'id'));
+    }
+
+    /** @test */
+    public function a_lost_attempt_is_not_confirmed_by_an_identical_older_fill(): void
+    {
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', ['tanker_voucher_unique_scope' => 'none', 'reason' => 'اختبار هوية المحاولة'])->assertOk();
+        $w = $this->worker($this->recorder());
+        $this->withToken($w['session'])->postJson(self::BASE, $this->payload(['voucher_number' => '9002', 'idempotency_key' => 'older-attempt-0123456']))->assertCreated();
+
+        // محاولة ثانية بالمحتوى نفسه ضاع طلبها قبل أن يصل الخادم: لا سند لها.
+        $missing = $this->lookup($w['session'], 'never-reached-0123456');
+        $this->assertTrue($missing['attempt']['applied']);
+        $this->assertSame([], $missing['data'], 'لا تأكيد بالمطابقة على المحتوى: السند الأقدم ليس هذه المحاولة');
+    }
+
+    /** @test */
+    public function the_attempt_lookup_is_bound_to_the_recording_user_and_never_exposes_keys(): void
+    {
+        $w = $this->worker($this->recorder());
+        $mate = $this->worker($this->recorder());
+        $body = $this->payload(['idempotency_key' => 'owned-attempt-0123456789']);
+        $id = $this->withToken($w['session'])->postJson(self::BASE, $body)->assertCreated()->json('data.id');
+
+        $own = $this->withToken($w['session'])->getJson(self::BASE . '?attempt_key=' . $body['idempotency_key'])->assertOk();
+        $this->assertSame([$id], array_column($own->json('data'), 'id'));
+        foreach (['idempotency_key', 'request_fingerprint'] as $leak) {
+            $this->assertStringNotContainsString($leak, $own->getContent());
+        }
+        $this->assertStringNotContainsString($body['idempotency_key'], $own->getContent(), 'المفتاح لا يُعاد في أي استجابة');
+
+        // زميل بالصلاحيات نفسها على المحطة نفسها وبحوزته المفتاح: لا يؤكد محاولة غيره.
+        $this->assertSame([], $this->lookup($mate['session'], $body['idempotency_key'])['data']);
+        // ولا يرى مفاتيح الآخرين ولا بياناتهم عبر القائمة العادية للمفتاح نفسه (يرى السند كسجل وردية فقط، بلا مفتاح).
+        $this->assertStringNotContainsString($body['idempotency_key'], $this->withToken($mate['session'])->getJson(self::BASE)->assertOk()->getContent());
+    }
+
+    /** @test */
+    public function the_attempt_lookup_respects_station_and_tenant_scope_and_validation(): void
+    {
+        $w = $this->worker($this->recorder(), [$this->fx['s1']->id]);
+        $body = $this->payload(['idempotency_key' => 'scoped-attempt-0123456789']);
+        $this->withToken($w['session'])->postJson(self::BASE, $body)->assertCreated();
+
+        // الموظف نفسه بعد سحب إسناده من المحطة: لا يراها ولو كان هو من سجّل.
+        $w['user']->fuelStations()->detach();
+        $other = $this->worker($this->recorder(), [$this->fx['s2']->id]);
+        $this->assertSame([], $this->lookup($other['session'], $body['idempotency_key'])['data']);
+
+        // التحقق: مفتاح أقصر من 8 أو أطول من 128 ⇒ 422 لا مطابقة.
+        $this->withToken($w['session'])->getJson(self::BASE . '?attempt_key=short')->assertStatus(422);
+        $this->withToken($w['session'])->getJson(self::BASE . '?attempt_key=' . str_repeat('x', 129))->assertStatus(422);
+
+        // بلا المعامل لا علامة `attempt` (القائمة العادية لا تدّعي مطابقة).
+        $this->assertArrayNotHasKey('attempt', $this->withToken($w['session'])->getJson(self::BASE)->json());
+    }
+
+    /** @test */
+    public function a_voided_fill_is_still_reported_for_its_attempt_and_the_lookup_never_changes_anything(): void
+    {
+        $w = $this->worker($this->recorder());
+        $body = $this->payload(['idempotency_key' => 'voided-attempt-0123456789']);
+        $id = $this->withToken($w['session'])->postJson(self::BASE, $body)->assertCreated()->json('data.id');
+        $this->withToken($this->fx['owner'])->postJson(self::BASE . "/{$id}/void", ['reason' => 'اختبار'])->assertOk();
+
+        $before = $this->footprint();
+        $found = $this->lookup($w['session'], $body['idempotency_key']);
+        $this->assertSame('voided', $found['data'][0]['status']);
+        $this->assertSame($before, $this->footprint());
+        $this->assertSame(1, FuelTankerFill::query()->count());
+
+        // الإعادة بالمفتاح نفسه تعيد الأثر الأول ولا تنشئ سنداً جديداً.
+        $this->withToken($w['session'])->postJson(self::BASE, $body)->assertOk()->assertJsonPath('data.id', $id);
+        $this->assertSame(1, FuelTankerFill::query()->count());
+    }
+
+    /** @test */
+    public function a_pin_session_can_use_the_attempt_lookup_but_still_cannot_reach_any_other_tanker_route(): void
+    {
+        $w = $this->worker($this->recorder());
+        $body = $this->payload(['idempotency_key' => 'boundary-attempt-01234567']);
+        $id = $this->withToken($w['session'])->postJson(self::BASE, $body)->assertCreated()->json('data.id');
+        $this->lookup($w['session'], $body['idempotency_key']);
+
+        foreach ([
+            ['POST', self::BASE . "/{$id}/void", ['reason' => 'x']], ['POST', self::BASE . "/{$id}/inventory-posting", []], ['POST', self::BASE . "/{$id}/inventory-reversal", ['reason' => 'x']],
+            ['GET', self::BASE . "/{$id}/inventory", []], ['GET', self::BASE . "/{$id}/attachments", []], ['GET', self::BASE . '/inventory-review', []],
+        ] as [$method, $uri, $data]) {
+            $this->withToken($w['session'])->json($method, $uri, $data)->assertForbidden();
+        }
+        $this->assertSame('pending_integration', FuelTankerFill::query()->findOrFail($id)->inventory_status);
+    }
+
     /** @test */
     public function recording_is_rejected_without_an_open_shift_and_for_a_shift_that_is_not_the_current_one(): void
     {

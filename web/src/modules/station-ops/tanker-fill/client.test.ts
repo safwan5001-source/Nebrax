@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn() }));
 
 import { ApiError, api } from '@/lib/api';
-import { ATTEMPT_CLOCK_SKEW_MS, MAX_TANKER_PAGES, classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
-import type { FillBody, IntentPayload } from './logic';
+import { MAX_TANKER_PAGES, classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
+import type { FillBody } from './logic';
 
 const apiMock = vi.mocked(api);
 const UID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -172,43 +172,6 @@ describe('reads — whitelist, validation and station scoping', () => {
     apiMock.mockReset();
   });
 
-  describe('findRecordedFill attributes a fill to THIS attempt only', () => {
-    const payload = { fuel_station_id: UID(1), fuel_nozzle_id: UID(5), fuel_tanker_owner_id: UID(3), fuel_tanker_id: UID(7), fuel_shift_id: UID(4), voucher_number: '04052', quantity_milliliters: 2_000_000 };
-    const mine = (over: Record<string, unknown> = {}) => fillRow({ fuel_nozzle_id: UID(5), fuel_tanker_owner_id: UID(3), fuel_tanker_id: UID(7), fuel_shift_id: UID(4), voucher_number: '04052', quantity_milliliters: 2_000_000, recorded_at: '2027-01-26T09:00:00+03:00', ...over });
-    const attemptAt = Date.parse('2027-01-26T09:00:00+03:00') - 30_000;
-
-    it('accepts exactly one matching fill recorded after the attempt started', async () => {
-      apiMock.mockResolvedValueOnce({ data: [mine()] });
-      expect((await findRecordedFill(payload, { attemptAt }))?.id).toBeTruthy();
-    });
-
-    it('ignores an identical OLDER fill (voucher uniqueness disabled): not recovered, so the user resends with the same key', async () => {
-      apiMock.mockResolvedValueOnce({ data: [mine({ id: UID(50), recorded_at: '2027-01-25T09:00:00+03:00' })] });
-      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
-    });
-
-    it('tolerates device/server clock skew but not more', async () => {
-      const at = Date.parse('2027-01-26T09:00:00+03:00');
-      apiMock.mockResolvedValueOnce({ data: [mine()] });
-      expect(await findRecordedFill(payload, { attemptAt: at + ATTEMPT_CLOCK_SKEW_MS - 1_000 })).not.toBeNull();
-      apiMock.mockResolvedValueOnce({ data: [mine()] });
-      expect(await findRecordedFill(payload, { attemptAt: at + ATTEMPT_CLOCK_SKEW_MS + 1_000 })).toBeNull();
-    });
-
-    it('a different tanker of the same owner is not this attempt, and a tankerless attempt does not match a tanker fill', async () => {
-      apiMock.mockResolvedValueOnce({ data: [mine({ fuel_tanker_id: UID(8) })] });
-      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
-      const { fuel_tanker_id: _t, ...tankerless } = payload;
-      apiMock.mockResolvedValueOnce({ data: [mine()] });
-      expect(await findRecordedFill(tankerless, { attemptAt })).toBeNull();
-    });
-
-    it('more than one candidate cannot be attributed ⇒ not recovered (never a false success)', async () => {
-      apiMock.mockResolvedValueOnce({ data: [mine({ id: UID(60) }), mine({ id: UID(61) })] });
-      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
-    });
-  });
-
   it('listFills sends the station and shift filters and drops rows of other stations (defence in depth)', async () => {
     apiMock.mockResolvedValueOnce({ data: [fillRow(), fillRow({ id: UID(10), fuel_station_id: UID(99) })] });
     const listing = await listFills({ stationId: UID(1), shiftId: UID(4) });
@@ -227,22 +190,51 @@ describe('reads — whitelist, validation and station scoping', () => {
   });
 });
 
-describe('findRecordedFill — "check status" is read-only and exact', () => {
-  const payload: IntentPayload = { fuel_station_id: UID(1), fuel_nozzle_id: UID(2), fuel_tanker_owner_id: UID(3), fuel_shift_id: UID(4), voucher_number: '04052', quantity_milliliters: 2_000_000 };
+describe('findRecordedFill — the attempt is identified by its idempotency key, never by content', () => {
+  const KEY = 'awj-ops-0f8a1c2d-3e4b-4a5c-9d6e-7f8091a2b3c4';
+  const mine = (over: Record<string, unknown> = {}) => fillRow(over);
 
-  it('finds the matching recorded fill using GET only', async () => {
-    apiMock.mockResolvedValueOnce({ data: [fillRow()] });
-    expect(await findRecordedFill(payload)).toMatchObject({ number: 'FTF-2027-00001' });
+  it('asks the server by attempt_key with GET only, and returns the fill the server tied to that key', async () => {
+    apiMock.mockResolvedValueOnce({ data: [mine()], attempt: { applied: true } });
+    expect(await findRecordedFill(KEY, { stationId: UID(1) })).toMatchObject({ number: 'FTF-2027-00001' });
     expect(apiMock).toHaveBeenCalledTimes(1);
     expect((apiMock.mock.calls[0][1] as { method: string }).method).toBe('GET');
-    expect(String(apiMock.mock.calls[0][0])).toContain('voucher_number=04052');
+    expect(String(apiMock.mock.calls[0][0])).toBe(`/fuel-stations/tanker-fills?attempt_key=${KEY}&per_page=2`);
+    // لا مطابقة محتوى في الطلب: لا سند ولا كمية ولا فوهة ولا وقت.
+    for (const forbidden of ['voucher', 'quantity', 'nozzle', 'shift', 'from', 'to']) expect(String(apiMock.mock.calls[0][0])).not.toContain(forbidden);
   });
 
-  it.each([
-    ['another quantity', { quantity_milliliters: 2_000_001 }], ['another nozzle', { fuel_nozzle_id: UID(77) }], ['another owner', { fuel_tanker_owner_id: UID(78) }],
-    ['another shift', { fuel_shift_id: UID(79) }], ['a voided fill', { status: 'voided' }], ['another voucher (04052 vs 4052)', { voucher_number: '4052' }],
-  ])('does not treat %s as the same attempt', async (_label, over) => {
-    apiMock.mockResolvedValueOnce({ data: [fillRow(over)] });
-    expect(await findRecordedFill(payload)).toBeNull();
+  it('applied marker + empty list = the server has no fill for THIS attempt (null), whatever identical fills exist', async () => {
+    apiMock.mockResolvedValueOnce({ data: [], attempt: { applied: true } });
+    expect(await findRecordedFill(KEY, { stationId: UID(1) })).toBeNull();
+  });
+
+  it('a voided fill of the attempt is still reported (the attempt WAS recorded)', async () => {
+    apiMock.mockResolvedValueOnce({ data: [mine({ status: 'voided' })], attempt: { applied: true } });
+    expect((await findRecordedFill(KEY, { stationId: UID(1) }))?.status).toBe('voided');
+  });
+
+  it('no applied marker (an older server ignoring attempt_key and returning unrelated fills) is NEVER a confirmation', async () => {
+    apiMock.mockResolvedValueOnce({ data: [mine()] });
+    await expect(findRecordedFill(KEY, { stationId: UID(1) })).rejects.toMatchObject({ kind: 'invalid_shape' });
+    apiMock.mockResolvedValueOnce({ data: [mine()], attempt: { applied: false } });
+    await expect(findRecordedFill(KEY, { stationId: UID(1) })).rejects.toMatchObject({ kind: 'invalid_shape' });
+  });
+
+  it('more than one row, or a row of another station, cannot be attributed ⇒ unverifiable, not success', async () => {
+    apiMock.mockResolvedValueOnce({ data: [mine({ id: UID(60) }), mine({ id: UID(61) })], attempt: { applied: true } });
+    await expect(findRecordedFill(KEY, { stationId: UID(1) })).rejects.toMatchObject({ kind: 'invalid_shape' });
+    apiMock.mockResolvedValueOnce({ data: [mine({ fuel_station_id: UID(99) })], attempt: { applied: true } });
+    await expect(findRecordedFill(KEY, { stationId: UID(1) })).rejects.toMatchObject({ kind: 'invalid_shape' });
+  });
+
+  it('a malformed key never reaches the network', async () => {
+    for (const bad of ['', 'short', 'has space in it 12345', 'x'.repeat(129), '../etc/passwd1234']) await expect(findRecordedFill(bad, { stationId: UID(1) })).rejects.toMatchObject({ kind: 'invalid_shape' });
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('a network failure is an error (cannot check), never "found" nor "not found"', async () => {
+    apiMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(findRecordedFill(KEY, { stationId: UID(1) })).rejects.toBeTruthy();
   });
 });

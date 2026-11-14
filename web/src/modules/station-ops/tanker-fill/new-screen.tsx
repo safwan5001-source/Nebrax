@@ -17,7 +17,7 @@ import { findRecordedFill, recordFill, type FillWriteResult } from './client';
 import { useOwnerTankers, useOwners, useTankerFillAccess, useTankerFillFeature, useTankerPolicy } from './data';
 import {
   EMPTY_DRAFT, STEPS, buildIntentPayload, capacityCheck, eligibleNozzleCount, firstInvalidStep, litersFromMl, normalizeVoucher, parseLiters, pumpChoices, stepProblem,
-  type FillBody, type FillDraft, type IntentPayload, type Step, type StepContext, type StepProblem,
+  type FillBody, type FillDraft, type Step, type StepContext, type StepProblem,
 } from './logic';
 import { FillNotice, FillStatusBadge, Liters, NoStockNote, TANKER_BASE, TextField, ChoiceCard, describeFillFailure, mayHaveApplied, shouldClearKey } from './parts';
 import { createPendingStore, type PendingAttempt } from './pending';
@@ -233,8 +233,8 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
     setChecking(true);
     setCheckResult(null);
     try {
-      const { idempotency_key: _key, ...payload } = pending.body;
-      const found = await findRecordedFill(payload as IntentPayload, { branchId: station.branch_id, attemptAt: pending.at });
+      // الهوية = مفتاح المحاولة الأصلي (لا مطابقة محتوى): الخادم يؤكد أن سنداً مرتبطاً بهذه المحاولة بعينها موجود.
+      const found = await findRecordedFill(pending.body.idempotency_key, { stationId: pending.body.fuel_station_id }, { branchId: station.branch_id });
       if (found) {
         intents.clear(INTENT);
         pendingStore.clear();

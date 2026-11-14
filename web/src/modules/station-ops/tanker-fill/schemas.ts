@@ -58,7 +58,7 @@ const pageMeta = z.object({ current_page: z.number().int().optional(), last_page
 
 export const ownersResponse = z.object({ data: z.array(ownerSchema), meta: pageMeta.optional() });
 export const tankersResponse = z.object({ data: z.array(tankerSchema), meta: pageMeta.optional() });
-export const fillsResponse = z.object({ data: z.array(fillSchema), meta: pageMeta.optional() });
+export const fillsResponse = z.object({ data: z.array(fillSchema), meta: pageMeta.optional(), attempt: z.object({ applied: z.boolean() }).optional() });
 export const fillResponse = z.object({ data: fillSchema, meta: z.object({ replayed: z.boolean().optional() }).partial().optional() });
 
 /** سياسة التعبئة الفعّالة للمحطة من `GET stations/{id}/settings` (الخادم يفرضها دائماً؛ الواجهة تعرضها إرشاداً فقط). الحقول غير المعروفة تُتجاهل. */

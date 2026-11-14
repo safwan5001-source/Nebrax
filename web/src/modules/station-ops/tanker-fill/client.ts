@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { api, ApiError } from '@/lib/api';
 import { isDemo } from '@/lib/demo';
 import { StationOpsError, isAbort, toStationOpsError } from '../read-client';
-import { isKnownReason, type FillBody, type IntentPayload, type KnownReason } from './logic';
+import { isKnownReason, type FillBody, type KnownReason } from './logic';
 import { fillResponse, fillsResponse, ownersResponse, tankersResponse, type Owner, type Tanker, type TankerFill } from './schemas';
 
 /**
@@ -109,32 +109,25 @@ export async function getFill(id: string, options: { branchId?: string | null; s
   return response.data;
 }
 
-/** سماحية فرق الساعة بين جهاز الموظف والخادم عند إسناد سند إلى محاولة (الساعتان مستقلتان). */
-export const ATTEMPT_CLOCK_SKEW_MS = 10 * 60_000;
+const ATTEMPT_KEY = /^[A-Za-z0-9_-]{8,128}$/;
 
 /**
- * «تحقق من الحالة» بعد نتيجة غير مؤكدة: **قراءة فقط** — هل سُجِّل السند فعلاً؟ المطابقة بالسند الورقي ثم الفوهة والصاحب **والصهريج** والكمية والوردية.
- * **الإسناد لمحاولة بعينها:** الخادم لا يكشف مفتاح idempotency، وحين يُعطَّل منع تكرار السند (`tanker_voucher_unique_scope = none`) قد يتطابق سند أقدم مع المحاولة. لذلك لا يُقبل إلا سند
- * سُجِّل **بعد بدء المحاولة** (`attemptAt` ناقص سماحية الساعة)، ويُعدّ أكثر من مرشّح غير منسوب (يُرجَع «لم يُعثر عليه» — والموظف يعيد الإرسال بالمفتاح نفسه، والخادم يعيد الأثر الأول إن وُجد
- * فلا تكرار). «لم يُعثر» دائماً الجهة الآمنة؛ الخطأ الخطر هو إعلان نجاح كاذب.
- * لا تُنشئ شيئاً ولا تعيد إرسال أي طلب.
+ * «تحقق من الحالة» بعد نتيجة غير مؤكدة: **قراءة فقط** — هل سجّل الخادم **هذه المحاولة بعينها**؟ الهوية = مفتاح idempotency الأصلي للمحاولة (عشوائي ثابت): يسأل الخادم
+ * `GET tanker-fills?attempt_key=` بمطابقة تامة على المفتاح المخزَّن وبحصر على من سجّل (لا يؤكد مستخدمٌ محاولةَ غيره)، ولا يعيد المفتاح في أي استجابة.
+ * **لا مطابقة على السند أو الكمية أو الفوهة أو الوقت** (سندان متطابقان تماماً قد يكونان مشروعين حين يُعطَّل منع التكرار).
+ * - علامة `attempt.applied` إلزامية: خادم أقدم يتجاهل المعامل ويعيد سندات غير ذات صلة، فغيابها ⇒ لا تأكيد (`invalid_shape` ⇒ «تعذّر التحقق»، لا نجاح كاذب).
+ * - أكثر من نتيجة لمفتاح واحد مستحيل (فهرس فريد) ⇒ يُعامل كتعذّر تحقق لا كنجاح.
+ * - لا شيء يُرسَل ولا يُعاد إرساله؛ المفتاح الأصلي يبقى لإعادة الإرسال الصريحة.
+ *
+ * @returns السند المرتبط بالمحاولة (قد يكون `voided` إن أُلغي بعد التسجيل) أو `null` = لا سند لهذه المحاولة عند الخادم.
  */
-export async function findRecordedFill(payload: IntentPayload, options: { branchId?: string | null; signal?: AbortSignal; attemptAt?: number } = {}): Promise<TankerFill | null> {
-  const listing = await listFills({ stationId: payload.fuel_station_id, shiftId: payload.fuel_shift_id, voucher: payload.voucher_number, perPage: 25 }, options);
-  const earliest = typeof options.attemptAt === 'number' ? options.attemptAt - ATTEMPT_CLOCK_SKEW_MS : null;
-  const candidates = listing.rows.filter((fill) => {
-    if (fill.status !== 'recorded'
-      || fill.voucher_number !== payload.voucher_number
-      || fill.fuel_nozzle_id !== payload.fuel_nozzle_id
-      || fill.fuel_tanker_owner_id !== payload.fuel_tanker_owner_id
-      || (fill.fuel_tanker_id ?? null) !== (payload.fuel_tanker_id ?? null)
-      || fill.quantity_milliliters !== payload.quantity_milliliters
-      || fill.fuel_shift_id !== payload.fuel_shift_id) return false;
-    if (earliest === null) return true;
-    const at = Date.parse(fill.recorded_at ?? '');
-    return Number.isFinite(at) && at >= earliest;
-  });
-  return candidates.length === 1 ? candidates[0] : null;
+export async function findRecordedFill(attemptKey: string, expected: { stationId: string }, options: { branchId?: string | null; signal?: AbortSignal } = {}): Promise<TankerFill | null> {
+  if (!ATTEMPT_KEY.test(attemptKey)) throw new StationOpsError('invalid_shape');
+  const page = await tankerGet('/fuel-stations/tanker-fills', fillsResponse, { signal: options.signal, branchId: options.branchId, query: { attempt_key: attemptKey, per_page: 2 } });
+  if (page.attempt?.applied !== true) throw new StationOpsError('invalid_shape');
+  if (page.data.length === 0) return null;
+  if (page.data.length !== 1 || page.data[0].fuel_station_id !== expected.stationId) throw new StationOpsError('invalid_shape');
+  return page.data[0];
 }
 
 // ───────────────────────── الكتابة الوحيدة ─────────────────────────

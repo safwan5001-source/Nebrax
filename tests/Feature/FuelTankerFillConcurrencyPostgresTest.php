@@ -105,6 +105,33 @@ class FuelTankerFillConcurrencyPostgresTest extends TestCase
     }
 
     /** @test */
+    public function identical_fills_racing_under_different_attempt_keys_stay_distinct_and_each_key_maps_to_exactly_one_fill(): void
+    {
+        $f = $this->fixture();
+        app(TenantContext::class)->set($f['tenant_id']);
+        // منع تكرار السند معطَّل ⇒ سندات متطابقة المحتوى كلياً مسموحة؛ هوية كل محاولة مفتاحها وحده (يُسأل عنه بـ attempt_key).
+        app(FuelStationSettingsService::class)->putTenant(['tanker_voucher_unique_scope' => 'none'], User::findOrFail($f['actor_id']), 'اختبار هوية المحاولة');
+
+        $jobs = [];
+        foreach (range(1, 6) as $i) {
+            // محاولتان متزامنتان لكل مفتاح (إعادة) + مفاتيح مختلفة بمحتوى متطابق.
+            $key = 'conc-attempt-' . intdiv($i + 1, 2);
+            $jobs[] = fn () => $this->attempt($f, ['voucher_number' => 'SAME-1', 'idempotency_key' => $key]);
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllCompleted($results);
+        $this->assertSame(3, (int) DB::table('fuel_tanker_fills')->where('tenant_id', $f['tenant_id'])->count(), 'ثلاثة مفاتيح ⇒ ثلاثة سندات متطابقة المحتوى بالضبط');
+        foreach (['conc-attempt-1', 'conc-attempt-2', 'conc-attempt-3'] as $key) {
+            $this->assertSame(1, (int) DB::table('fuel_tanker_fills')->where('tenant_id', $f['tenant_id'])->where('idempotency_key', $key)->where('recorded_by', $f['actor_id'])->count(), $key);
+        }
+        // كل مفتاح يشير إلى سنده وحده (لا يخلط المحتوى المتطابق بين المحاولات).
+        $byKey = array_map(fn ($v) => explode(':', $v)[1] ?? $v, array_column($results, 'value'));
+        $this->assertCount(3, array_unique($byKey), json_encode($results));
+        $this->assertSame(0, (int) DB::table('fuel_tanker_fills')->where('tenant_id', $f['tenant_id'])->where('idempotency_key', 'conc-attempt-never')->count());
+    }
+
+    /** @test */
     public function concurrent_distinct_vouchers_get_unique_contiguous_ftf_numbers(): void
     {
         $f = $this->fixture();

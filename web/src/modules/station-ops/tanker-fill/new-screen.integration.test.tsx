@@ -384,8 +384,11 @@ describe('duplicates and network loss', () => {
     expect(posts()).toHaveLength(1);
     expect(world.fills).toHaveLength(1);
     expect((document.querySelector('[data-fill-number]') as HTMLElement).textContent).toBe('FTF-2027-00001');
-    // لم يُجرَ إلا قراءة للتحقق (GET) — مع مرشّح السند الورقي.
-    expect(world.gets.some((url) => url.includes('tanker-fills') && url.includes('voucher_number=04052'))).toBe(true);
+    // لم يُجرَ إلا قراءة للتحقق (GET) بمفتاح المحاولة وحده — لا سند ولا كمية ولا فوهة في الاستعلام.
+    const lookups = world.gets.filter((url) => url.includes('attempt_key='));
+    expect(lookups).toHaveLength(1);
+    expect(lookups[0]).toContain(`attempt_key=${posts()[0].idempotency_key}`);
+    for (const content of ['voucher_number', 'quantity', 'nozzle']) expect(lookups[0]).not.toContain(content);
   });
 
   it('reply lost BEFORE the server applied it: the check finds nothing, then an explicit resend uses the SAME key and records once', async () => {
@@ -414,19 +417,95 @@ describe('duplicates and network loss', () => {
     await toReview(user);
     await user.click(btn('Save fill'));
     await screen.findByText('Unresolved recording attempt');
-    // قراءة التحقق تفشل مرة (شبكة) ثم يعيد الموظف الإرسال صراحةً بالمفتاح نفسه بعد أن يجد الخادم الأصل.
     world.dropReplyAfterApply = false;
-    const original = world.fills[0];
-    original.recorded_at = '2027-01-26T09:00:00+03:00';
-    world.fills[0] = { ...original, voucher_number: 'OTHER' }; // التحقق لن يجده (سند مختلف) فيظهر «إعادة الإرسال»
+    world.lookupBlind = true; // التحقق لا يجد السند (أسوأ حالة: لم يعد مرئياً للسائل) فيظهر «إعادة الإرسال»
     await user.click(btn('Check status'));
     await screen.findByText(/most likely not recorded/);
-    world.fills[0] = original;
+    world.lookupBlind = false;
     await user.click(screen.getByRole('button', { name: 'Resend' }));
     await screen.findByText('Voucher was already recorded (not duplicated)');
     expect(world.fills).toHaveLength(1);
     expect(posts()).toHaveLength(2);
     expect(posts()[1].idempotency_key).toBe(posts()[0].idempotency_key);
+  });
+
+  it('TWO IDENTICAL FILLS: an older identical fill never confirms a lost attempt; only the server tying THIS attempt\'s key does', async () => {
+    // منع تكرار السند معطَّل: سند قديم مطابق تماماً (السند والكمية والفوهة والصاحب والصهريج والوردية) سجّله الموظف نفسه بمفتاح آخر.
+    setup({ voucherUniqueDisabled: true, failBeforeApply: true });
+    world.fills.push({
+      id: UID(850), number: 'FTF-2027-00099', voucher_number: '04052', status: 'recorded', inventory_status: 'pending_integration', fuel_station_id: ST, fuel_shift_id: 'sh1', fuel_pump_id: 'pu1',
+      fuel_nozzle_id: 'nz1', fuel_tank_id: 'tk1', fuel_product_id: 'p1', fuel_tanker_owner_id: OWNER_A, fuel_tanker_id: TANKER_A, quantity_milliliters: 2_000_000, quantity_liters: '2000.000',
+      capacity_overrun_milliliters: null, recorded_at: '2027-01-26T08:00:00+03:00', voided_at: null, owner: { id: OWNER_A, name: 'Askar', code: 'ASK' }, tanker: { id: TANKER_A, plate_number: 'ABJ 1234', capacity_milliliters: 5_000_000 },
+      attachments_count: 0, _key: 'awj-ops-older-attempt-key-0001', _fingerprint: 'older',
+    });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    await user.click(btn('Check status'));
+    expect(await screen.findByText(/most likely not recorded/)).toBeTruthy(); // لا نجاح كاذب بسند مطابق المحتوى
+    expect(document.querySelector('[data-fill-success]')).toBeNull();
+    expect(world.fills).toHaveLength(1);
+    // إعادة صريحة بالمفتاح الأصلي نفسه تسجّل السند الثاني المطابق (مشروع هنا) مرة واحدة، ثم يؤكده الخادم بمفتاحه.
+    world.failBeforeApply = false;
+    const key = posts()[0].idempotency_key;
+    await user.click(screen.getByRole('button', { name: 'Resend' }));
+    await screen.findByText('Fill recorded');
+    expect(posts()[1].idempotency_key).toBe(key);
+    expect(world.fills).toHaveLength(2);
+    expect(world.fills.filter((row) => row._key === key)).toHaveLength(1);
+  });
+
+  it('two identical fills where BOTH reached the server: each attempt is confirmed with ITS OWN fill', async () => {
+    setup({ voucherUniqueDisabled: true, dropReplyAfterApply: true });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    await user.click(btn('Check status'));
+    await screen.findByText('Voucher was already recorded (not duplicated)');
+    const firstId = (document.querySelector('[data-fill-success]') as HTMLElement).getAttribute('data-fill-id');
+    await user.click(btn('Record another fill'));
+    await toReview(user, '2000', '04052'); // المحتوى نفسه تماماً، مفتاح جديد
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    await user.click(btn('Check status'));
+    await screen.findByText('Voucher was already recorded (not duplicated)');
+    const secondId = (document.querySelector('[data-fill-success]') as HTMLElement).getAttribute('data-fill-id');
+    expect(world.fills).toHaveLength(2);
+    expect(secondId).not.toBe(firstId);
+    expect(posts()[0].idempotency_key).not.toBe(posts()[1].idempotency_key);
+  });
+
+  it('a server that does not apply the attempt lookup (no marker) can NEVER confirm: "could not check", attempt stays unresolved, nothing re-sent', async () => {
+    setup({ dropReplyAfterApply: true, lookupWithoutMarker: true });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    await user.click(btn('Check status'));
+    expect(await screen.findByText('Could not check right now. Try again.')).toBeTruthy();
+    expect(document.querySelector('[data-fill-success]')).toBeNull();
+    expect(document.querySelector('[data-pending-attempt]')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resend' })).toBeNull();
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('an attempt that was recorded and then cancelled is reported as that attempt (voided badge), not as a fresh success', async () => {
+    setup({ dropReplyAfterApply: true });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    world.fills[0].status = 'voided';
+    await user.click(btn('Check status'));
+    await screen.findByText('Voucher was already recorded (not duplicated)');
+    expect(within(document.querySelector('[data-fill-success]') as HTMLElement).getByText('Voided')).toBeTruthy();
+    expect(posts()).toHaveLength(1);
   });
 
   it('the attempt is saved BEFORE the request is sent: closing the page mid-flight still leaves "Check status" on return', async () => {
