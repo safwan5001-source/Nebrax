@@ -283,6 +283,20 @@ describe('policy and validation (client-side guidance; the server decides)', () 
     expect(posts()).toHaveLength(0);
   });
 
+  it('a field-level quantity error is shown ONCE (no duplicate note under the buttons that screen readers would announce twice)', async () => {
+    setup();
+    const user = userEvent.setup();
+    mount();
+    await toQuantityStep(user);
+    await fillQuantity(user, '99999999', '04052');
+    expect(screen.getAllByText('The quantity is too large. Check it.')).toHaveLength(1);
+    expect(document.querySelector('[data-step-problem]')?.textContent ?? '').toBe('');
+    // الخطأ الإرشادي «مطلوب للمتابعة» يبقى حين لا يعرض الحقل خطأه (سند فارغ والكمية صحيحة).
+    await fillQuantity(user, '10', '');
+    await fillQuantity(user, '10', ' ');
+    expect(document.querySelector('[data-step-problem]')?.textContent).toContain('Enter the paper voucher number.');
+  });
+
   it('an empty voucher blocks the step', async () => {
     setup();
     const user = userEvent.setup();
@@ -405,6 +419,8 @@ describe('duplicates and network loss', () => {
     const firstKey = posts()[0].idempotency_key;
     await user.click(btn('Check status'));
     expect(await screen.findByText(/most likely not recorded/)).toBeTruthy();
+    // لا تناقض: بعد أن حُسمت الحالة بالقراءة لا تبقى رسالة «لا نعرف إن سُجِّل» فوق «غالباً لم يُسجَّل».
+    expect(document.querySelector('[data-pending-attempt] [data-fill-notice]')).toBeNull();
     expect(posts()).toHaveLength(1);
     world.failBeforeApply = false;
     await user.click(await screen.findByRole('button', { name: 'Resend' }));

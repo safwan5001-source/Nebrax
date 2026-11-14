@@ -244,6 +244,7 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
         setPhase({ name: 'done', fill: found, replayed: true });
       } else {
         setCheckResult('not_found');
+        setFailure(null); // رسالة «لا نعرف إن سُجِّل» حُسمت للتوّ بالقراءة؛ إبقاؤها فوق «غالباً لم يُسجَّل» تناقض.
       }
     } catch {
       setCheckResult('error');
@@ -255,6 +256,7 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
   const resendPending = useCallback(async () => {
     if (!pending || submitting.current) return;
     submitting.current = true;
+    setCheckResult(null); // نتيجة الفحص السابقة لا تعني شيئاً بعد إعادة إرسال جديدة (قد تُنتج رسالة فشل جديدة).
     setPhase({ name: 'sending' });
     try {
       settle(await recordFill(pending.body, { branchId: station.branch_id }), pending.body, true);
@@ -368,7 +370,13 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
 function showProblem(step: Step, draft: FillDraft, problem: StepProblem): boolean {
   if (step === 'owner') return problem === 'tanker_required' || draft.ownerId !== null;
   if (step === 'nozzle') return false;
-  if (step === 'quantity') return problem === 'capacity_confirmation_required' ? false : draft.quantityInput.trim() !== '' || draft.voucherInput.trim() !== '';
+  if (step === 'quantity') {
+    // لا تكرار: حين يعرض الحقل نفسه خطأه (إدخال غير فارغ وغير صالح) أو تعرض كتلة السعة تنبيهها، لا نكرّر النص كملاحظة ثانية (كان يظهر مرتين ويُعلَن مرتين لقارئ الشاشة).
+    if (problem === 'capacity_confirmation_required' || problem === 'capacity_blocked') return false;
+    if (problem.startsWith('quantity_') && draft.quantityInput.trim() !== '') return false;
+    if (problem.startsWith('voucher_') && draft.voucherInput.trim() !== '') return false;
+    return draft.quantityInput.trim() !== '' || draft.voucherInput.trim() !== '';
+  }
   return false;
 }
 

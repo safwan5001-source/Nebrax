@@ -316,6 +316,8 @@ test.describe('input validation', () => {
       await expect(page.getByRole('alert').filter({ hasText: t('en', `tankerFill.problem.${problem}`) }).first(), `${value} → ${problem}`).toBeVisible();
       await expect(next(page), value).toBeDisabled();
       await expect(page.getByTestId('quantity-input')).toHaveAttribute('aria-invalid', 'true');
+      // الرسالة تظهر مرة واحدة فقط (تحت الحقل)، لا نسخة ثانية تحت الأزرار.
+      await expect(page.getByText(t('en', `tankerFill.problem.${problem}`), { exact: true }), `${value}: message shown once`).toHaveCount(1);
     }
     await shot(page, info, 'en', '14-quantity-error', false);
     for (const good of ['0.001', '1', '10.5', '4999.250']) {
@@ -527,6 +529,7 @@ test.describe('offline, reconnect and pending-attempt recovery', () => {
     await page.getByRole('button', { name: t('en', 'write.check') }).first().click();
     await expect(page.locator('[data-pending-attempt]')).toBeVisible();
     await expect(page.getByText(t('en', 'tankerFill.pending.notFound'))).toBeVisible();
+    await expect(page.locator('[data-pending-attempt] [data-fill-notice]')).toHaveCount(0); // لا تناقض مع «غالباً لم يُسجَّل»
     await shot(page, info, 'en', '19-pending-notfound');
     expect(mock.fills).toHaveLength(0);
     await page.locator('[data-resend]').click();
