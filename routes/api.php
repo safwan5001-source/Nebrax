@@ -105,6 +105,7 @@ use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelTankerController;
 use App\Http\Controllers\Api\FuelTankerFillAttachmentController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryPostingController;
 use App\Http\Controllers\Api\FuelTankerFillInventoryReviewController;
 use App\Http\Controllers\Api\FuelTankerFillController;
 use App\Http\Controllers\Api\FuelShiftController;
@@ -227,6 +228,7 @@ use App\Http\Controllers\Api\AiAuditController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureFuelTankerFillsEnabled;
+use App\Http\Middleware\EnsureFuelTankerInventoryPostingEnabled;
 use App\Http\Middleware\EnsureFuelTankerManagementEnabled;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
@@ -1769,6 +1771,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('fuel-stations/tanker-fills/{id}', [FuelTankerFillController::class, 'show'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/tanker-fills/{id}/void', [FuelTankerFillController::class, 'void'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.void'), $commercialApp('fuel_stations.core', 'write')]);
         // TANKER-PR5: مرفقات سندات التعبئة (دليل فقط). العرض والتنزيل `fuel.tanker.fill.view`؛ الرفع `…attachment.add`؛ الإزالة والاستبدال `…attachment.remove`. خلف البوابتين نفسيهما؛ جلسة PIN لا تصل (PR-7).
+        // TANKER-PR6B-3 — الترحيل المخزني والمحاسبي لسند تعبئة (سند واحد بطلب صريح، معاملة واحدة). **ثلاث بوابات**: PR-1 وPR-4 و`fuel_stations.tanker_inventory_posting_enabled` (مغلقة افتراضياً) ⇒ 404 موحَّد.
+        // لا مسار منها يصل جلسة PIN (خارج `StationSessionBoundary` = فشل مغلق). العكس المالي = PR-6B-4 (لا مسار له هنا).
+        $tankerPostingGate = EnsureFuelTankerInventoryPostingEnabled::class;
+        Route::get('fuel-stations/tanker-fills/{id}/inventory-posting/preview', [FuelTankerFillInventoryPostingController::class, 'preview'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/inventory-posting', [FuelTankerFillInventoryPostingController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.post'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'index'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.add'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/download', [FuelTankerFillAttachmentController::class, 'download'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);

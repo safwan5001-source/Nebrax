@@ -36,6 +36,21 @@ class FuelTankerFillException extends Exception
     // TANKER-PR6B-2 — سند مرحَّل مخزنياً لا يُلغى (يُعكس الترحيل أولاً).
     public const FILL_INVENTORY_POSTED = 'fill_inventory_posted';
 
+    // TANKER-PR6B-3 — ترحيل السند مخزنياً ومحاسبياً (معاملة واحدة، مغلق خلف بوابة نشر).
+    public const POSTING_DISABLED = 'posting_disabled';
+    public const POSTING_BLOCKED = 'posting_blocked';
+    public const FILL_VOIDED = 'fill_voided';
+    public const FILL_NOT_PENDING = 'fill_not_pending';
+    public const HISTORICAL_PERMISSION_REQUIRED = 'historical_permission_required';
+    public const HISTORICAL_REVIEW_REQUIRED = 'historical_review_required';
+    public const QUANTITY_EXCEEDS_STOCK_LIMIT = 'quantity_exceeds_stock_limit';
+    public const INSUFFICIENT_STOCK = 'insufficient_stock';
+    public const POSTED_COST_ZERO = 'posted_cost_zero';
+    public const LEDGER_VARIANCE_BLOCKED = 'ledger_variance_blocked';
+    public const DISTINCT_APPROVER_REQUIRED = 'distinct_approver_required';
+    public const PERIOD_LOCKED = 'period_locked';
+    public const POSTING_FAILED = 'posting_failed';
+
     // TANKER-PR5 — مرفقات السند.
     public const ATTACHMENT_INVALID = 'attachment_invalid';
     public const ATTACHMENT_TYPE_NOT_ALLOWED = 'attachment_type_not_allowed';

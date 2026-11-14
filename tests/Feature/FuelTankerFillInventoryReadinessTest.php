@@ -670,8 +670,8 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
             }
         }
         sort($hits);
-        // النموذجان اللذان يرفضان كل كتابة (الترحيل وسجل محاولاته — PR-6B-2) وحدهما؛ لا خدمة ولا متحكّم.
-        $this->assertSame(['FuelTankerFillInventoryPosting.php', 'FuelTankerFillInventoryPostingAttempt.php'], $hits, 'لا كاتب للربط المخزني قبل PR-6B-3');
+        // النموذجان الرافضان لكل كتابة (الترحيل وسجل محاولاته) + كاتب PR-6B-3 الوحيد (الخدمة) ومتحكّمه؛ أي ملف آخر يذكر النموذج ممنوع. كاتب الجدولين الفعلي مفحوص في FuelTankerFillInventoryPostingTest.
+        $this->assertSame(['FuelTankerFillInventoryPosting.php', 'FuelTankerFillInventoryPostingAttempt.php', 'FuelTankerFillInventoryPostingController.php', 'FuelTankerFillInventoryPostingService.php'], $hits, 'الكاتب الوحيد: خدمة PR-6B-3');
     }
 
     /** @test */
