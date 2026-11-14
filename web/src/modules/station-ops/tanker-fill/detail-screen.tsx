@@ -42,11 +42,18 @@ function Detail({ station, id }: { station: Station; id: string }) {
   const fill = useFill(station, valid ? id : '00000000-0000-0000-0000-000000000000');
   const assets = useStationAssets(station);
 
-  const nozzle = useMemo(() => {
-    if (fill.state.status !== 'success' || !assets.catalog) return null;
-    for (const pump of assets.catalog.pumps) for (const view of pump.nozzles) if (view.nozzle.id === fill.state.data.fuel_nozzle_id) return { pump: pump.pump.pump_number, view };
-    return null;
-  }, [fill.state, assets.catalog]);
+  // المضخة والخزان والمنتج تُحلّ من **معرّفات السند المخزَّنة** لا من تكوين الفوهة الحالي (الفوهة قد تُعاد نسبتها بعد التسجيل فيُحرَّف السند التاريخي).
+  const equipment = useMemo(() => {
+    if (fill.state.status !== 'success' || assets.state.status !== 'success') return null;
+    const row = fill.state.data;
+    const data = assets.state.data;
+    return {
+      pump: data.pumps.find((pump) => pump.id === row.fuel_pump_id)?.pump_number ?? null,
+      nozzle: data.nozzles.find((nozzle) => nozzle.id === row.fuel_nozzle_id)?.nozzle_number ?? null,
+      product: data.products.find((product) => product.id === row.fuel_product_id)?.name ?? null,
+      tank: data.tanks.find((tank) => tank.id === row.fuel_tank_id)?.name ?? null,
+    };
+  }, [fill.state, assets.state]);
 
   if (!access.view) return <EmptyState title={t('tankerFill.noAccess.title')} body={t('tankerFill.noAccess.body')} />;
   if (!valid) return <ErrorState error={new StationOpsError('not_found', 404)} />;
@@ -61,10 +68,10 @@ function Detail({ station, id }: { station: Station; id: string }) {
     [t('tankerFill.field.status'), <FillStatusBadge key="s" fill={row} />],
     [t('tankerFill.field.owner'), row.owner?.name ?? '—'],
     [t('tankerFill.field.tanker'), row.tanker ? <bdi key="p">{row.tanker.plate_number}</bdi> : t('tankerFill.review.noTanker')],
-    [t('tankerFill.field.pump'), <span key="u" className="num" dir="ltr">{nozzle?.pump ?? '—'}</span>],
-    [t('tankerFill.field.nozzle'), <span key="z" className="num" dir="ltr">{nozzle?.view.nozzle.nozzle_number ?? '—'}</span>],
-    [t('tankerFill.field.product'), nozzle?.view.product?.name ?? '—'],
-    [t('tankerFill.field.tank'), nozzle?.view.tank?.name ?? '—'],
+    [t('tankerFill.field.pump'), <span key="u" className="num" dir="ltr">{equipment?.pump ?? '—'}</span>],
+    [t('tankerFill.field.nozzle'), <span key="z" className="num" dir="ltr">{equipment?.nozzle ?? '—'}</span>],
+    [t('tankerFill.field.product'), equipment?.product ?? '—'],
+    [t('tankerFill.field.tank'), equipment?.tank ?? '—'],
     [t('tankerFill.field.quantity'), <Liters key="q" ml={row.quantity_milliliters} />],
     [t('tankerFill.field.recordedAt'), <When key="t" value={row.recorded_at} timeZone={station.timezone} />],
   ];

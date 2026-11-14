@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn() }));
 
 import { ApiError, api } from '@/lib/api';
-import { MAX_TANKER_PAGES, classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
+import { ATTEMPT_CLOCK_SKEW_MS, MAX_TANKER_PAGES, classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
 import type { FillBody, IntentPayload } from './logic';
 
 const apiMock = vi.mocked(api);
@@ -170,6 +170,43 @@ describe('reads — whitelist, validation and station scoping', () => {
     expect(apiMock).toHaveBeenCalledTimes(MAX_TANKER_PAGES);
     expect(listing.truncated).toBe(true);
     apiMock.mockReset();
+  });
+
+  describe('findRecordedFill attributes a fill to THIS attempt only', () => {
+    const payload = { fuel_station_id: UID(1), fuel_nozzle_id: UID(5), fuel_tanker_owner_id: UID(3), fuel_tanker_id: UID(7), fuel_shift_id: UID(4), voucher_number: '04052', quantity_milliliters: 2_000_000 };
+    const mine = (over: Record<string, unknown> = {}) => fillRow({ fuel_nozzle_id: UID(5), fuel_tanker_owner_id: UID(3), fuel_tanker_id: UID(7), fuel_shift_id: UID(4), voucher_number: '04052', quantity_milliliters: 2_000_000, recorded_at: '2027-01-26T09:00:00+03:00', ...over });
+    const attemptAt = Date.parse('2027-01-26T09:00:00+03:00') - 30_000;
+
+    it('accepts exactly one matching fill recorded after the attempt started', async () => {
+      apiMock.mockResolvedValueOnce({ data: [mine()] });
+      expect((await findRecordedFill(payload, { attemptAt }))?.id).toBeTruthy();
+    });
+
+    it('ignores an identical OLDER fill (voucher uniqueness disabled): not recovered, so the user resends with the same key', async () => {
+      apiMock.mockResolvedValueOnce({ data: [mine({ id: UID(50), recorded_at: '2027-01-25T09:00:00+03:00' })] });
+      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
+    });
+
+    it('tolerates device/server clock skew but not more', async () => {
+      const at = Date.parse('2027-01-26T09:00:00+03:00');
+      apiMock.mockResolvedValueOnce({ data: [mine()] });
+      expect(await findRecordedFill(payload, { attemptAt: at + ATTEMPT_CLOCK_SKEW_MS - 1_000 })).not.toBeNull();
+      apiMock.mockResolvedValueOnce({ data: [mine()] });
+      expect(await findRecordedFill(payload, { attemptAt: at + ATTEMPT_CLOCK_SKEW_MS + 1_000 })).toBeNull();
+    });
+
+    it('a different tanker of the same owner is not this attempt, and a tankerless attempt does not match a tanker fill', async () => {
+      apiMock.mockResolvedValueOnce({ data: [mine({ fuel_tanker_id: UID(8) })] });
+      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
+      const { fuel_tanker_id: _t, ...tankerless } = payload;
+      apiMock.mockResolvedValueOnce({ data: [mine()] });
+      expect(await findRecordedFill(tankerless, { attemptAt })).toBeNull();
+    });
+
+    it('more than one candidate cannot be attributed ⇒ not recovered (never a false success)', async () => {
+      apiMock.mockResolvedValueOnce({ data: [mine({ id: UID(60) }), mine({ id: UID(61) })] });
+      expect(await findRecordedFill(payload, { attemptAt })).toBeNull();
+    });
   });
 
   it('listFills sends the station and shift filters and drops rows of other stations (defence in depth)', async () => {

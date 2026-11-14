@@ -36,6 +36,18 @@ describe('pending (unresolved) attempt store', () => {
     expect(createPendingStore('s', { storage }).load()).toBeNull();
   });
 
+  it('re-saving the SAME attempt keeps its original start time; a different key restarts it', () => {
+    const storage = memoryStorage();
+    let now = 1_000;
+    const store = createPendingStore('s', { storage, now: () => now });
+    store.save(body);
+    now = 90_000;
+    store.save(body);
+    expect(store.load()?.at).toBe(1_000);
+    store.save({ ...body, idempotency_key: 'awj-ops-other999' });
+    expect(store.load()?.at).toBe(90_000);
+  });
+
   it('tolerates blocked/corrupt storage (falls back to memory, never throws)', () => {
     const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } } as unknown as Storage;
     const store = createPendingStore('s', { storage: broken });

@@ -232,7 +232,7 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
     setCheckResult(null);
     try {
       const { idempotency_key: _key, ...payload } = pending.body;
-      const found = await findRecordedFill(payload as IntentPayload, { branchId: station.branch_id });
+      const found = await findRecordedFill(payload as IntentPayload, { branchId: station.branch_id, attemptAt: pending.at });
       if (found) {
         intents.clear(INTENT);
         pendingStore.clear();

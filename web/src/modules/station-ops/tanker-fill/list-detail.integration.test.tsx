@@ -125,6 +125,17 @@ describe('fill detail (read-only)', () => {
     expect(world.posts).toHaveLength(0);
   });
 
+  it('equipment comes from the FILL’s stored ids, not the nozzle’s current configuration (nozzle reassigned after recording)', async () => {
+    const row = fillRow(1, { fuel_pump_id: 'pu2', fuel_tank_id: 'tk-old', fuel_product_id: 'p-old' });
+    setup({ fills: [row] });
+    world.tanks = [...world.tanks, { ...world.tanks[0], id: 'tk-old', name: 'Old Petrol Tank', fuel_product_id: 'p-old' }];
+    mountDetail(row.id);
+    await screen.findByText('FTF-2027-00001');
+    await screen.findByText('Old Petrol Tank');
+    expect(screen.queryByText('Tank Diesel')).toBeNull(); // الخزان الحالي للفوهة لا يُعرض لسند تاريخي
+    expect(screen.queryByText('Diesel')).toBeNull();
+  });
+
   it('a fill that belongs to another station/tenant (server 404) is simply "not found"', async () => {
     setup({ fills: [] });
     mountDetail(UID(555));

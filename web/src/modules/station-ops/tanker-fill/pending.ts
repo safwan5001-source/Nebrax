@@ -48,7 +48,9 @@ export function createPendingStore(scope: string, options: { storage?: Storage |
       return current;
     },
     save(body) {
-      memory = { body, at: now() };
+      // المحاولة نفسها (المفتاح نفسه) تحتفظ بوقت بدئها الأصلي: إسناد السند إلى المحاولة يعتمد عليه (`findRecordedFill`)، فلا يتأخر بإعادة الحفظ بعد ردّ غير مؤكد.
+      const existing = this.load();
+      memory = { body, at: existing && existing.body.idempotency_key === body.idempotency_key ? existing.at : now() };
       try {
         storage?.setItem(slot, JSON.stringify(memory));
       } catch {

@@ -109,18 +109,32 @@ export async function getFill(id: string, options: { branchId?: string | null; s
   return response.data;
 }
 
+/** سماحية فرق الساعة بين جهاز الموظف والخادم عند إسناد سند إلى محاولة (الساعتان مستقلتان). */
+export const ATTEMPT_CLOCK_SKEW_MS = 10 * 60_000;
+
 /**
- * «تحقق من الحالة» بعد نتيجة غير مؤكدة: **قراءة فقط** — هل سُجِّل السند فعلاً؟ المطابقة بالسند الورقي (المعيار الذي يفلتره الخادم) ثم الفوهة والصاحب والكمية والوردية.
+ * «تحقق من الحالة» بعد نتيجة غير مؤكدة: **قراءة فقط** — هل سُجِّل السند فعلاً؟ المطابقة بالسند الورقي ثم الفوهة والصاحب **والصهريج** والكمية والوردية.
+ * **الإسناد لمحاولة بعينها:** الخادم لا يكشف مفتاح idempotency، وحين يُعطَّل منع تكرار السند (`tanker_voucher_unique_scope = none`) قد يتطابق سند أقدم مع المحاولة. لذلك لا يُقبل إلا سند
+ * سُجِّل **بعد بدء المحاولة** (`attemptAt` ناقص سماحية الساعة)، ويُعدّ أكثر من مرشّح غير منسوب (يُرجَع «لم يُعثر عليه» — والموظف يعيد الإرسال بالمفتاح نفسه، والخادم يعيد الأثر الأول إن وُجد
+ * فلا تكرار). «لم يُعثر» دائماً الجهة الآمنة؛ الخطأ الخطر هو إعلان نجاح كاذب.
  * لا تُنشئ شيئاً ولا تعيد إرسال أي طلب.
  */
-export async function findRecordedFill(payload: IntentPayload, options: { branchId?: string | null; signal?: AbortSignal } = {}): Promise<TankerFill | null> {
+export async function findRecordedFill(payload: IntentPayload, options: { branchId?: string | null; signal?: AbortSignal; attemptAt?: number } = {}): Promise<TankerFill | null> {
   const listing = await listFills({ stationId: payload.fuel_station_id, shiftId: payload.fuel_shift_id, voucher: payload.voucher_number, perPage: 25 }, options);
-  return listing.rows.find((fill) => fill.status === 'recorded'
-    && fill.voucher_number === payload.voucher_number
-    && fill.fuel_nozzle_id === payload.fuel_nozzle_id
-    && fill.fuel_tanker_owner_id === payload.fuel_tanker_owner_id
-    && fill.quantity_milliliters === payload.quantity_milliliters
-    && fill.fuel_shift_id === payload.fuel_shift_id) ?? null;
+  const earliest = typeof options.attemptAt === 'number' ? options.attemptAt - ATTEMPT_CLOCK_SKEW_MS : null;
+  const candidates = listing.rows.filter((fill) => {
+    if (fill.status !== 'recorded'
+      || fill.voucher_number !== payload.voucher_number
+      || fill.fuel_nozzle_id !== payload.fuel_nozzle_id
+      || fill.fuel_tanker_owner_id !== payload.fuel_tanker_owner_id
+      || (fill.fuel_tanker_id ?? null) !== (payload.fuel_tanker_id ?? null)
+      || fill.quantity_milliliters !== payload.quantity_milliliters
+      || fill.fuel_shift_id !== payload.fuel_shift_id) return false;
+    if (earliest === null) return true;
+    const at = Date.parse(fill.recorded_at ?? '');
+    return Number.isFinite(at) && at >= earliest;
+  });
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 // ───────────────────────── الكتابة الوحيدة ─────────────────────────
