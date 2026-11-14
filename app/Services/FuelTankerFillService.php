@@ -84,6 +84,11 @@ class FuelTankerFillService
             if ($locked->status === FuelTankerFill::STATUS_VOIDED) {
                 return $locked; // idempotent: السند ملغى سابقاً، بلا أثر ولا تغيير للسبب/المنفّذ/الوقت
             }
+            // TANKER-PR6B-2: سند مرحَّل مخزنياً (posted) لا يُلغى — العكس والإلغاء عمليتان منفصلتان. الفحص بعد قفل السند (يقرأ آخر حالة ملتزَمة) فلا يفلت سباق ترحيل↔إلغاء،
+            // ومُشغّل القاعدة وقيد CHECK يحرسان المسار نفسه لو وصل إليه كود آخر.
+            if ($locked->inventory_status === FuelTankerFill::INVENTORY_POSTED) {
+                throw new FuelTankerFillException(FuelTankerFillException::FILL_INVENTORY_POSTED, 'لا يُلغى سند تعبئة مرحَّل مخزنياً؛ يُعكس الترحيل أولاً ثم يُلغى السند.', 409);
+            }
             $shift = FuelShift::query()->withoutGlobalScope(BranchScope::class)->lock('for share')->find($locked->fuel_shift_id);
             if ($shift === null || ! $shift->isOpen()) {
                 throw new FuelTankerFillException(FuelTankerFillException::SHIFT_NOT_OPEN, 'لا يُلغى سند تعبئة بعد إغلاق وردية المحطة؛ يُعالج الفرق عبر مراجعة الوردية.');

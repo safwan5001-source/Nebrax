@@ -30,6 +30,14 @@ class FuelTankerFill extends BaseModel
     /** السند لم يُدمج مخزنياً بعد؛ يتغيّر فقط بهجرة التكامل المعتمدة (PR-6). */
     public const INVENTORY_PENDING_INTEGRATION = 'pending_integration';
 
+    /**
+     * TANKER-PR6B-2 — حالتان **مُجهَّزتان في القاعدة فقط**: لا مسار يكتبهما الآن (النموذج يرفض أي تعديل لـ`inventory_status`، والترحيل غير مبنيّ). تنتقل بمُشغّلات متزامنة
+     * مع جدول `fuel_tanker_fill_inventory_postings` حصراً (`pending_integration → posted → reversed`، بلا قفز ولا رجوع)؛ الكاتب الوحيد المستقبلي = PR-6B-3.
+     */
+    public const INVENTORY_POSTED = 'posted';
+    public const INVENTORY_REVERSED = 'reversed';
+    public const INVENTORY_STATUSES = [self::INVENTORY_PENDING_INTEGRATION, self::INVENTORY_POSTED, self::INVENTORY_REVERSED];
+
     public const SCOPE_STATION = 'station';
     public const SCOPE_TENANT = 'tenant';
     public const SCOPE_OWNER = 'owner';
@@ -80,6 +88,9 @@ class FuelTankerFill extends BaseModel
             }
             if ($fill->getOriginal('status') === self::STATUS_VOIDED) {
                 throw new LogicException('السند الملغى لا يتغيّر.');
+            }
+            if ($fill->isDirty('status') && $fill->getOriginal('inventory_status') === self::INVENTORY_POSTED) {
+                throw new LogicException('لا يُلغى سند مرحَّل مخزنياً (posted)؛ يُعكس الترحيل أولاً (العكس والإلغاء عمليتان منفصلتان).');
             }
         });
         static::deleting(fn () => throw new LogicException('سند التعبئة لا يُحذف؛ يُلغى بسبب ويبقى رقم السند محجوزاً.'));
