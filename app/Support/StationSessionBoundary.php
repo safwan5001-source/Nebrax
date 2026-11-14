@@ -16,6 +16,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * - **قائمة بيضاء بمسارات** (URI المسجَّل) لا بالأسماء: كل مسار جديد خارج القائمة محجوب افتراضياً. تُحرس بـ`StationSessionBoundaryTest`.
  * - **التفويض لا يتغيّر:** داخل القائمة يطبّق كل مسار RBAC + نطاق المستأجر/الفرع/المحطة كما لو دخل صاحبه بالبريد.
  * - **حياة الجلسة:** موظف غير نشط/محذوف ⇒ 403 عند أول طلب (لا ينتظر انتهاء التوكن). تعطيل المستخدم تغطّيه `SetTenant`.
+ * - **تعبئة الصهاريج (TANKER-PR7):** قراءات صريحة بأربعة أنماط (`READ_RULES`) وكتابة واحدة (`POST tanker-fills`) — لا بادئة، فلا تصل جلسة PIN مراجعة الدمج المخزني ولا الترحيل ولا العكس ولا الإلغاء ولا المرفقات ولا التقارير.
  * - **أقل امتياز:** قراءات بالبادئات، وكتابات بقائمة (طريقة+مسار) صريحة؛ الوظائف الإدارية (أصول المحطة، الأسعار، صلاحيات الموظفين وPIN، إعدادات الحوكمة،
  *   المبيعات، التصحيح، الرصيد الافتتاحي) مرفوضة لجلسة PIN حتى لمدير/مالك — تتطلب جلسة كاملة.
  */
@@ -48,6 +49,21 @@ final class StationSessionBoundary
     ];
 
     /**
+     * قراءات **صريحة** (GET/HEAD، تعبير نمطي على الـURI المسجَّل) لا ببادئة — TANKER-PR7: تسجيل تعبئة الصهاريج من التطبيق يحتاج أربع قراءات فقط:
+     * قائمة السندات (للمطابقة بعد انقطاع الشبكة وسجل الوردية) وسند واحد، وقائمة أصحاب الصهاريج وقائمة الصهاريج (لاختيارهما في المعالج). **بادئة `fuel-stations/tanker-fills`
+     * مرفوضة عمداً** لأنها تشمل `inventory-review|inventory-workspace|inventory-settings|{id}/inventory*|…/preview|attachments|download` (مراجعة الدمج المخزني والحسابات
+     * والمرفقات) — وكلها محجوبة عن جلسة PIN. وكذلك لا `tanker-owners/{id}` ولا `company-links` (ملف المالك وربط الشركات).
+     *
+     * @var list<string>
+     */
+    private const READ_RULES = [
+        '#^api/fuel-stations/tanker-fills$#',
+        '#^api/fuel-stations/tanker-fills/\{[a-zA-Z]+\}$#',
+        '#^api/fuel-stations/tanker-owners$#',
+        '#^api/fuel-stations/tankers$#',
+    ];
+
+    /**
      * كتابات مسموحة لجلسة PIN — **قائمة صريحة (طريقة + مسار)** بما يفعله تطبيق المحطات فعلاً (تشغيل الورديات والقراءات والاستلام وقرارات الطلبات)،
      * لا بادئات. كل ما عداها يُرفض 403 مهما كانت صلاحيات RBAC لصاحب الحساب (مدير/مالك أيضاً): أصول المحطة (إنشاء/تعديل/حذف محطات ومضخات
      * وفوهات وخزانات ومنتجات)، الأسعار، المبيعات/تحصيلها، تصحيح الورديات، إعدادات المحطة (الحوكمة)، صلاحيات الموظفين وPIN، الرصيد الافتتاحي.
@@ -65,6 +81,9 @@ final class StationSessionBoundary
         ['DELETE', '#^api/fuel-stations/deliveries/\{[a-zA-Z]+\}/attachments/\{[a-zA-Z]+\}$#'],
         // تدقيق الطباعة/PDF/المشاركة من تطبيق المحطة (يسجّل حدثاً فقط، بلا أثر تشغيلي).
         ['POST', '#^api/fuel-stations/report-center/\{[a-zA-Z]+\}/audit$#'],
+        // TANKER-PR7: تسجيل تعبئة صهريج **وحده**. ليس منها `{id}/void` ولا `inventory-posting` ولا `inventory-reversal` ولا المرفقات (رفع/استبدال/إزالة): تسجيل السند لا يخصم مخزوناً
+        // ولا يولّد قيداً، والترحيل/العكس/الإلغاء وظائف مخوَّلة تتطلب جلسة كاملة. تظل خلف بوابتي `tanker_management` و`tanker_fills` المغلقتين افتراضياً (404 موحَّد قبل الصلاحية).
+        ['POST', '#^api/fuel-stations/tanker-fills$#'],
     ];
 
     /** مسارات عامة لازمة لأي جلسة (قراءة الهوية والخروج). */
@@ -141,6 +160,11 @@ final class StationSessionBoundary
                     return true;
                 }
             }
+            foreach (self::READ_RULES as $pattern) {
+                if (preg_match($pattern, $uri) === 1) {
+                    return true;
+                }
+            }
 
             return false;
         }
@@ -157,6 +181,12 @@ final class StationSessionBoundary
     public static function readPrefixes(): array
     {
         return self::READ_PREFIXES;
+    }
+
+    /** @return list<string> */
+    public static function readRules(): array
+    {
+        return self::READ_RULES;
     }
 
     /** @return list<array{0: string, 1: string}> */

@@ -501,12 +501,16 @@ class FuelTankerFoundationTest extends TestCase
     }
 
     /** @test */
-    public function a_station_pin_session_cannot_reach_any_tanker_route(): void
+    public function a_station_pin_session_reaches_only_the_two_list_reads_of_the_master_data(): void
     {
+        // TANKER-PR7: قراءتا القائمة (الأصحاب والصهاريج) لاختيارهما في تسجيل التعبئة؛ ملف الصاحب وربط الشركات والكتابة كلها محجوبة.
+        foreach ([['GET', 'api/fuel-stations/tanker-owners'], ['GET', 'api/fuel-stations/tankers']] as [$method, $uri]) {
+            $this->assertTrue(StationSessionBoundary::routeAllowed($method, $uri), "{$method} {$uri} is the only master-data read a PIN session needs");
+        }
         foreach ([
-            ['GET', 'api/fuel-stations/tanker-owners'], ['POST', 'api/fuel-stations/tanker-owners'], ['PUT', 'api/fuel-stations/tanker-owners/{id}'],
-            ['GET', 'api/fuel-stations/tanker-owners/{id}/company-links'], ['POST', 'api/fuel-stations/tanker-owners/{id}/company-links/{linkId}/end'],
-            ['GET', 'api/fuel-stations/tankers'], ['POST', 'api/fuel-stations/tankers'], ['PUT', 'api/fuel-stations/tankers/{id}'],
+            ['POST', 'api/fuel-stations/tanker-owners'], ['PUT', 'api/fuel-stations/tanker-owners/{id}'], ['GET', 'api/fuel-stations/tanker-owners/{id}'],
+            ['GET', 'api/fuel-stations/tanker-owners/{id}/company-links'], ['POST', 'api/fuel-stations/tanker-owners/{id}/company-links'], ['POST', 'api/fuel-stations/tanker-owners/{id}/company-links/{linkId}/end'],
+            ['POST', 'api/fuel-stations/tankers'], ['PUT', 'api/fuel-stations/tankers/{id}'], ['GET', 'api/fuel-stations/tankers/{id}'],
         ] as [$method, $uri]) {
             $this->assertFalse(StationSessionBoundary::routeAllowed($method, $uri), "{$method} {$uri} must be denied to a PIN session");
         }

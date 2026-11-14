@@ -17,3 +17,15 @@ describe('station-ops uses logical (RTL-safe) utilities only', () => {
     for (const value of classNames) expect(` ${value} `, value).not.toMatch(PHYSICAL);
   });
 });
+
+/** TANKER-PR7: مساحة تعبئة الصهاريج (`tanker-fill/`) تلتزم الخصائص المنطقية نفسها. */
+const tankerDir = join(dir, 'tanker-fill');
+const tankerFiles = readdirSync(tankerDir).filter((file) => /\.tsx$/.test(file) && !/\.test\.tsx$/.test(file) && !file.startsWith('__'));
+
+describe('station-ops tanker-fill uses logical (RTL-safe) utilities only', () => {
+  it('has screens to scan', () => expect(tankerFiles.length).toBeGreaterThanOrEqual(5));
+  it.each(tankerFiles)('tanker-fill/%s', (file) => {
+    const classNames = [...readFileSync(join(tankerDir, file), 'utf8').matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{cn\(([\s\S]*?)\)\})/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '');
+    for (const value of classNames) expect(` ${value} `, value).not.toMatch(PHYSICAL);
+  });
+});

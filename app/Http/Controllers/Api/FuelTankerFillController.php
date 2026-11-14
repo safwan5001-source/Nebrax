@@ -15,7 +15,8 @@ use Illuminate\Http\Request;
  *
  * - بوابة نشر منفصلة `fuel_stations.tanker_fills_enabled` (مغلقة افتراضياً ⇒ 404 موحَّد قبل أي صلاحية) فوق بوابة PR-1.
  * - صلاحيات دقيقة (`fuel.tanker.fill.view|record|void`) + قدرة `fuel_stations.core`؛ نطاق المحطة (فرع/مخزن/محطة مسنَدة) 404 موحَّد قبل أي أثر؛ العزل بالمستأجر من `BaseModel`.
- * - لا `tenant_id` من العميل. جلسة PIN لا تصل هذه المسارات (خارج `StationSessionBoundary`، فشل مغلق): لا واجهة تشغيلية لموظف المحطة قبل اكتمال التكامل.
+ * - لا `tenant_id` من العميل. **جلسة PIN (TANKER-PR7) تصل ثلاثة مسارات فقط**: `index` و`show` و`store` (تسجيل التعبئة من التطبيق)؛ `void` وكل مسارات الترحيل/العكس/المراجعة/المرفقات خارج
+ *   `StationSessionBoundary` (فشل مغلق). التسجيل لا يخصم مخزوناً: `inventory_status` يبقى `pending_integration` حتى ترحيل مخوَّل بجلسة كاملة.
  */
 class FuelTankerFillController extends ApiController
 {

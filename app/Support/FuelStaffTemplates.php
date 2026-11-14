@@ -52,6 +52,24 @@ final class FuelStaffTemplates
         'fuel.maintenance.view', 'fuel.safety.view', 'fuel.device.view',
     ];
 
+    /**
+     * TANKER-PR7 — **توسيع مقترح لقالب «بائع»، غير مفعَّل ولا يدخل `all()`** (اعتماده قرار المالك منفصل). الصلاحيات التي يحتاجها موظف المحطة بجلسة PIN لتسجيل تعبئة صهريج
+     * من التطبيق: قراءة أصحاب الصهاريج/الصهاريج (لاختيارهما)، وقراءة سندات التعبئة (سجل الوردية و«تحقّق من الحالة»)، وتسجيلها. **ليس فيه** `fuel.tanker.fill.void` ولا أي
+     * `fuel.tanker.fill.inventory.*` ولا مفاتيح المرفقات ولا `products.view_cost`/`accounts.view` ولا `fuel.tanker.manage` (تسجيل السند لا يخصم المخزون ولا يولّد قيداً).
+     * يحرس تطابقه مع مسارات `StationSessionBoundary` اختبارُ `FuelTankerFillStationSessionTest`. **المنح الفردي** عبر محرر الموظف ممكن من حامل `*` قبل الاعتماد.
+     *
+     * @var list<string>
+     */
+    public const PROPOSED_TANKER_FILL_RECORDING = ['fuel.tanker.view', 'fuel.tanker.fill.view', 'fuel.tanker.fill.record'];
+
+    /**
+     * TANKER-PR7 — مقترح **منفصل** لرفع صور السند من التطبيق: يتطلب أولاً توسيع قائمة `StationSessionBoundary` البيضاء بمسارات المرفقات (قراءة/تنزيل/رفع — غير مضافة اليوم)،
+     * ثم منح هذا المفتاح. **غير مفعَّل**، ولا يُنفَّذ إلزام الصورة (D-T2).
+     *
+     * @var list<string>
+     */
+    public const PROPOSED_TANKER_FILL_ATTACHMENT_UPLOAD = ['fuel.tanker.fill.attachment.add'];
+
     /** @return array<string, array{label_ar: string, label_en: string, permissions: list<string>}> */
     public static function all(): array
     {

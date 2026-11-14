@@ -725,8 +725,9 @@ class FuelTankerFillTest extends TestCase
     }
 
     /** @test */
-    public function a_station_pin_session_cannot_reach_the_fill_endpoints(): void
+    public function a_station_pin_session_without_an_active_linked_employee_is_rejected_everywhere(): void
     {
+        // TANKER-PR7: جلسة PIN تصل القائمة والسند والتسجيل فقط لموظف نشط مرتبط (الاختبار الكامل في FuelTankerFillStationSessionTest)؛ توكن بلا موظف مرتبط فشل مغلق.
         $staff = $this->staff();
         $session = $staff['user']->createToken(StationSessionBoundary::TOKEN_NAME, [StationSessionBoundary::ABILITY])->plainTextToken;
 
