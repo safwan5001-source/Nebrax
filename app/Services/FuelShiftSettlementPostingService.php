@@ -318,6 +318,7 @@ class FuelShiftSettlementPostingService
             'policy_snapshot' => json_encode(['mode' => FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE, 'granularity' => 'per_nozzle', 'engine' => 'p1-3b-2b', 'tanker_exclusion' => true], JSON_UNESCAPED_UNICODE),
             'metered_milliliters' => (int) array_sum(array_column($lines, 'metered_milliliters')),
             'erp_milliliters' => (int) array_sum(array_column($lines, 'erp_milliliters')),
+            'tanker_milliliters' => (int) array_sum(array_column($lines, 'tanker_milliliters')),
             'residual_milliliters' => (int) array_sum(array_column($lines, 'residual_milliliters')),
             'settled_invoice_total_minor' => (int) array_sum(array_map(fn ($l) => $l['state'] === 'posted' ? (int) $l['expected_gross_minor'] : 0, $lines)),
             'pending_value_minor' => (int) array_sum(array_map(fn ($l) => (int) ($l['pending_value_minor'] ?? 0), $lines)),

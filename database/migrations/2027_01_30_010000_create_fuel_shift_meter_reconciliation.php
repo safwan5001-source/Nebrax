@@ -64,12 +64,34 @@ return new class extends Migration
             $table->index(['tenant_id', 'fuel_shift_id'], 'fuel_meter_variance_review_shift_idx');
         });
 
-        Schema::table('fuel_shift_settlement_lines', function (Blueprint $table) {
-            $table->bigInteger('tanker_milliliters')->nullable()->after('erp_milliliters');
-        });
+        foreach (['fuel_shift_settlements', 'fuel_shift_settlement_lines'] as $settlementTable) {
+            Schema::table($settlementTable, function (Blueprint $table) {
+                $table->bigInteger('tanker_milliliters')->nullable()->after('erp_milliliters');
+            });
+        }
 
         $driver = DB::connection()->getDriverName();
         if ($driver === 'pgsql') {
+            // M = erp + tanker + residual حين يُسجَّل الاستبعاد؛ NULL (تسوية سابقة) يبقى على القاعدة القديمة M = erp + residual.
+            foreach (['fuel_shift_settlements', 'fuel_shift_settlement_lines'] as $settlementTable) {
+                DB::statement("ALTER TABLE {$settlementTable} DROP CONSTRAINT {$settlementTable}_check");
+            }
+            DB::statement("ALTER TABLE fuel_shift_settlements ADD CONSTRAINT fuel_shift_settlements_check CHECK (
+                status IN ('posted','allocation_only','no_residual','withheld')
+                AND sales_basis IN ('per_invoice')
+                AND metered_milliliters >= 0 AND erp_milliliters >= 0 AND residual_milliliters >= 0 AND (tanker_milliliters IS NULL OR tanker_milliliters >= 0)
+                AND metered_milliliters = erp_milliliters + COALESCE(tanker_milliliters, 0) + residual_milliliters
+                AND settled_invoice_total_minor >= 0 AND pending_value_minor >= 0
+            )");
+            DB::statement("ALTER TABLE fuel_shift_settlement_lines ADD CONSTRAINT fuel_shift_settlement_lines_check CHECK (
+                state IN ('no_residual','posted','withheld_cost_pool_changed','withheld_pool_history_open','withheld_period_boundary')
+                AND metered_milliliters >= 0 AND erp_milliliters >= 0 AND residual_milliliters >= 0 AND (tanker_milliliters IS NULL OR tanker_milliliters >= 0)
+                AND metered_milliliters = erp_milliliters + COALESCE(tanker_milliliters, 0) + residual_milliliters
+                AND (price_per_liter_minor IS NULL OR price_per_liter_minor >= 0)
+                AND (expected_gross_minor IS NULL OR expected_gross_minor >= 0)
+                AND (pending_value_minor IS NULL OR pending_value_minor >= 0)
+                AND ((state LIKE 'withheld\\_%') = (withheld_reason IS NOT NULL))
+            )");
             DB::statement("ALTER TABLE ".self::RECONCILIATIONS." ADD CONSTRAINT fuel_nozzle_reconciliation_shape CHECK (
                 status IN ('balanced', 'within_tolerance', 'variance', 'incomplete')
                 AND direct_sale_milliliters >= 0 AND tanker_fill_milliliters >= 0 AND draft_sale_milliliters >= 0 AND tolerance_milliliters >= 0
@@ -123,13 +145,40 @@ return new class extends Migration
                 throw new RuntimeException("Rollback refused: {$table} contains meter reconciliation records.");
             }
         }
-        if (Schema::hasColumn('fuel_shift_settlement_lines', 'tanker_milliliters') && DB::table('fuel_shift_settlement_lines')->whereNotNull('tanker_milliliters')->exists()) {
-            throw new RuntimeException('Rollback refused: settlement lines carry tanker exclusion facts.');
+        foreach (['fuel_shift_settlements', 'fuel_shift_settlement_lines'] as $settlementTable) {
+            if (Schema::hasColumn($settlementTable, 'tanker_milliliters') && DB::table($settlementTable)->whereNotNull('tanker_milliliters')->exists()) {
+                throw new RuntimeException("Rollback refused: {$settlementTable} carries tanker exclusion facts.");
+            }
         }
 
-        Schema::table('fuel_shift_settlement_lines', function (Blueprint $table) {
-            $table->dropColumn('tanker_milliliters');
-        });
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            foreach (['fuel_shift_settlements', 'fuel_shift_settlement_lines'] as $settlementTable) {
+                DB::statement("ALTER TABLE {$settlementTable} DROP CONSTRAINT {$settlementTable}_check");
+            }
+        }
+        foreach (['fuel_shift_settlements', 'fuel_shift_settlement_lines'] as $settlementTable) {
+            Schema::table($settlementTable, function (Blueprint $table) {
+                $table->dropColumn('tanker_milliliters');
+            });
+        }
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE fuel_shift_settlements ADD CONSTRAINT fuel_shift_settlements_check CHECK (
+                status IN ('posted','allocation_only','no_residual','withheld')
+                AND sales_basis IN ('per_invoice')
+                AND metered_milliliters >= 0 AND erp_milliliters >= 0 AND residual_milliliters >= 0
+                AND metered_milliliters = erp_milliliters + residual_milliliters
+                AND settled_invoice_total_minor >= 0 AND pending_value_minor >= 0
+            )");
+            DB::statement("ALTER TABLE fuel_shift_settlement_lines ADD CONSTRAINT fuel_shift_settlement_lines_check CHECK (
+                state IN ('no_residual','posted','withheld_cost_pool_changed','withheld_pool_history_open','withheld_period_boundary')
+                AND metered_milliliters >= 0 AND erp_milliliters >= 0 AND residual_milliliters >= 0
+                AND metered_milliliters = erp_milliliters + residual_milliliters
+                AND (price_per_liter_minor IS NULL OR price_per_liter_minor >= 0)
+                AND (expected_gross_minor IS NULL OR expected_gross_minor >= 0)
+                AND (pending_value_minor IS NULL OR pending_value_minor >= 0)
+                AND ((state LIKE 'withheld\\_%') = (withheld_reason IS NOT NULL))
+            )");
+        }
         if (DB::connection()->getDriverName() === 'pgsql') {
             foreach ([self::REVIEWS, self::RECONCILIATIONS] as $table) {
                 DB::statement("DROP FUNCTION IF EXISTS {$table}_guard() CASCADE");

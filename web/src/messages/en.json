@@ -16947,6 +16947,7 @@
       "frozenHint": "Frozen at close.",
       "allMatched": "All nozzles match.",
       "pendingReview": "Differences awaiting supervisor review: {count}",
+      "liveDifferences": "Differences found on {count} nozzle(s). They will need a supervisor review after the shift is closed.",
       "reviewDone": "All differences have been reviewed.",
       "reviewedOnly": "Differences were reviewed. Nothing else is needed.",
       "nozzle": "Nozzle {number}",

@@ -198,6 +198,21 @@ describe('meter reconciliation section', () => {
     expect(document.querySelector('[data-meter-review-form]')).toBeNull();
   });
 
+  it('a live result with a variance is never summarised as all-matched', async () => {
+    connect(REVIEWER, () => view({ frozen: false, can_review: false, summary: { variance_nozzles: 1, incomplete_nozzles: 0, pending_review: 0, review_complete: false } }, [row({ frozen: false })]));
+    mount();
+    expect(await screen.findByText('Differences found on 1 nozzle(s). They will need a supervisor review after the shift is closed.')).toBeTruthy();
+    expect(screen.queryByText('All nozzles match.')).toBeNull();
+    expect(document.querySelector('[data-meter-recon-summary]')?.getAttribute('data-meter-recon-summary')).toBe('live_differences');
+  });
+
+  it('a live result with a missing reading is also flagged, not all-matched', async () => {
+    connect(REVIEWER, () => view({ frozen: false, can_review: false, summary: { variance_nozzles: 0, incomplete_nozzles: 1, pending_review: 0, review_complete: false } }, [row({ frozen: false, status: 'incomplete', unexplained_milliliters: null, metered_milliliters: null, incompleteness: 'missing_reading' })]));
+    mount();
+    await screen.findByText('Meter reconciliation');
+    expect(document.querySelector('[data-meter-recon-summary]')?.getAttribute('data-meter-recon-summary')).toBe('live_differences');
+  });
+
   it('renders in Arabic (RTL) without accounting jargon and passes an accessibility scan', async () => {
     connect(REVIEWER, () => view());
     reviewHandler = () => view();

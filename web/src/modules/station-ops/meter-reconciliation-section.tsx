@@ -56,11 +56,7 @@ function Body({ station, shiftId, data, refreshing, stale, onReload }: { station
 
       {stale ? <p role="status" data-meter-recon-stale="" className="flex items-start gap-2 text-sm leading-6 text-warning"><CircleAlert aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" strokeWidth={1.8} />{t('meterRecon.unavailable')}</p> : null}
 
-      <p className="flex items-center gap-2 text-sm font-semibold text-text" data-meter-recon-summary={pending > 0 ? 'pending' : 'clear'}>
-        {pending > 0
-          ? <><CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.9} />{t('meterRecon.pendingReview', { count: pending })}</>
-          : <><CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-positive" strokeWidth={1.9} />{data.summary.variance_nozzles + data.summary.incomplete_nozzles > 0 && data.frozen ? t('meterRecon.reviewDone') : t('meterRecon.allMatched')}</>}
-      </p>
+      <SummaryLine data={data} pending={pending} />
 
       <ul className="divide-y divide-border" data-meter-recon-rows="">
         {data.nozzles.map((row) => (
@@ -68,6 +64,29 @@ function Body({ station, shiftId, data, refreshing, stale, onReload }: { station
         ))}
       </ul>
     </section>
+  );
+}
+
+/** ملخص الحالة: «كلها مطابقة» لا تُعلَن إلا إن لم يوجد فرق ولا قراءة ناقصة؛ ولقطة حيّة بفروق تُعلَن بوضوح (لا مراجعة قبل الإغلاق، فلا يعني `pending = 0` المطابقة). */
+function SummaryLine({ data, pending }: { data: MeterReconciliation; pending: number }) {
+  const t = useTranslations('stationOps');
+  const differences = data.summary.variance_nozzles + data.summary.incomplete_nozzles;
+  let state: 'pending' | 'live_differences' | 'reviewed' | 'clear';
+  if (pending > 0) state = 'pending';
+  else if (differences > 0) state = data.frozen ? 'reviewed' : 'live_differences';
+  else state = 'clear';
+  const warn = state === 'pending' || state === 'live_differences';
+
+  return (
+    <p className="flex items-center gap-2 text-sm font-semibold text-text" data-meter-recon-summary={state}>
+      {warn
+        ? <CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.9} />
+        : <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-positive" strokeWidth={1.9} />}
+      {state === 'pending' ? t('meterRecon.pendingReview', { count: pending })
+        : state === 'live_differences' ? t('meterRecon.liveDifferences', { count: differences })
+        : state === 'reviewed' ? t('meterRecon.reviewDone')
+        : t('meterRecon.allMatched')}
+    </p>
   );
 }
 
