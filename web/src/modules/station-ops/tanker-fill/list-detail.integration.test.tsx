@@ -213,10 +213,14 @@ describe('fill detail (read-only)', () => {
   it('full ERP-credential session in the app: the existing attachments component is wired', async () => {
     const row = fillRow(1);
     setup({ fills: [row] }, [...VIEWER, 'fuel.tanker.fill.attachment.add']);
+    world.station = { ...world.station, branch_id: 'branch-b' }; // محطة من فرع غير الفرع النشط
     mountDetail(row.id);
     await screen.findByText('FTF-2027-00001');
     await waitFor(() => expect(world.gets.some((url) => url.includes('/attachments'))).toBe(true));
     expect(document.querySelector('[data-attachments-pin]')).toBeNull();
+    // محطة من فرع غير الفرع النشط: طلبات المرفقات تحمل فرع المحطة صراحةً (كقراءة السند نفسها).
+    const attachmentCall = apiMock.mock.calls.find((call) => String(call[0]).includes('/attachments'));
+    expect((attachmentCall?.[1] as { headers?: Record<string, string> } | undefined)?.headers?.['X-Branch-Id']).toBe('branch-b');
   });
 });
 

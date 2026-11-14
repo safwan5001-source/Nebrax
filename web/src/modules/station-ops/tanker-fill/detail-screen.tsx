@@ -99,7 +99,7 @@ function Detail({ station, id }: { station: Station; id: string }) {
           </div>
         ) : (
           <ToastProvider>
-            <TankerFillAttachments fillId={row.id} />
+            <TankerFillAttachments fillId={row.id} branchId={station.branch_id} />
           </ToastProvider>
         )}
       </SectionCard>

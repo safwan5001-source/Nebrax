@@ -70,7 +70,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     mount({ onCountChange: onCount });
     expect(await screen.findByRole('button', { name: text.openNamed.replace('{name}', 'voucher.jpg') })).toBeTruthy();
     await waitFor(() => expect(document.querySelector('[data-attachment-list] img')).not.toBeNull());
-    expect(api.preview).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'image/jpeg');
+    expect(api.preview).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'image/jpeg', undefined);
     expect(api.preview).not.toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a2', expect.anything());
     expect(onCount).toHaveBeenLastCalledWith(2);
     expect(document.querySelector('[data-attachment-status="present"]')).not.toBeNull();
@@ -108,7 +108,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     // الأزرار معطّلة أثناء الرفع فلا إرسال مكرر.
     expect((screen.getByRole('button', { name: text.takePhoto }) as HTMLButtonElement).disabled).toBe(true);
     expect(api.upload).toHaveBeenCalledTimes(1);
-    expect(api.upload).toHaveBeenCalledWith(FILL, expect.objectContaining({ name: 'captured.jpg' }));
+    expect(api.upload).toHaveBeenCalledWith(FILL, expect.objectContaining({ name: 'captured.jpg' }), undefined);
     finish({ rows: [row({ original_name: 'captured.jpg' })], state: stateOf({ active_count: 1, status: 'present' }) });
     await waitFor(() => expect(document.querySelector('[data-upload-queue]')).toBeNull());
     expect(await screen.findByRole('button', { name: text.openNamed.replace('{name}', 'captured.jpg') })).toBeTruthy();
@@ -172,7 +172,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     fireEvent.click(within(viewer).getByRole('button', { name: text.fit }));
     await waitFor(() => expect(viewer.querySelector('img')?.getAttribute('data-zoom')).toBe('1'));
     fireEvent.click(within(viewer).getByRole('button', { name: text.download }));
-    await waitFor(() => expect(api.download).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'voucher.jpg'));
+    await waitFor(() => expect(api.download).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'voucher.jpg', undefined));
     // الإدارة محجوبة بقرار الخادم: لا إزالة ولا استبدال، والسبب ظاهر.
     expect(within(viewer).queryByRole('button', { name: text.removeAction })).toBeNull();
     expect(viewer.querySelector('[data-remove-blocked="shift_closed"]')).not.toBeNull();
@@ -193,7 +193,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     expect(confirm.disabled).toBe(false);
     api.list.mockResolvedValue({ rows: [], state: stateOf() });
     fireEvent.click(confirm);
-    await waitFor(() => expect(api.remove).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'صورة غير واضحة'));
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', 'صورة غير واضحة', undefined));
     await waitFor(() => expect(toast).toHaveBeenCalledWith(text.removed));
     await waitFor(() => expect(screen.queryByRole('button', { name: text.openNamed.replace('{name}', 'voucher.jpg') })).toBeNull());
   });
@@ -219,7 +219,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     fireEvent.click(await screen.findByRole('button', { name: text.replaceAction }));
     expect(await screen.findByText(text.replace.keepNote)).toBeTruthy();
     fireEvent.change(document.querySelector('[data-replace-input]')!, { target: { files: [image('new.jpg')] } });
-    await waitFor(() => expect(api.replace).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', expect.objectContaining({ name: 'new.jpg' })));
+    await waitFor(() => expect(api.replace).toHaveBeenCalledWith(FILL, '00000000-0000-4000-8000-0000000000a1', expect.objectContaining({ name: 'new.jpg' }), undefined));
     await waitFor(() => expect(toast).toHaveBeenCalledWith(text.replaced));
   });
 
@@ -234,7 +234,7 @@ describe.each(['ar', 'en'] as const)('TankerFillAttachments (%s)', (locale) => {
     expect(history.textContent).toContain('old.jpg');
     expect(history.textContent).toContain('منى');
     expect(history.textContent).toContain('صورة مكررة');
-    expect(api.list).toHaveBeenLastCalledWith(FILL, true);
+    expect(api.list).toHaveBeenLastCalledWith(FILL, true, undefined);
     cleanup();
     api.list.mockResolvedValue({ rows: [row()], state: stateOf({ can_view_history: false }) });
     mount();

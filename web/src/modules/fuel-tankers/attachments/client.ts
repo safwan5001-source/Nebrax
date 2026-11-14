@@ -23,6 +23,11 @@ function listOf(payload: unknown): AttachmentList {
   return { rows, state: toState(body.meta) };
 }
 
+/** فرع صريح (محطة من فرع غير الفرع النشط): ترويسة `X-Branch-Id` تتقدّم على الفرع النشط؛ غيابه = السلوك القديم. */
+function branchOptions(branchId?: string | null): { headers?: Record<string, string> } {
+  return branchId ? { headers: { 'X-Branch-Id': branchId } } : {};
+}
+
 function oneOf(payload: unknown): { row: FillAttachment; state: AttachmentState } {
   const body = (typeof payload === 'object' && payload !== null ? payload : {}) as { data?: unknown; meta?: unknown };
   const row = toAttachment(body.data);
@@ -31,32 +36,32 @@ function oneOf(payload: unknown): { row: FillAttachment; state: AttachmentState 
 }
 
 /** @param history يضيف المُزال/المُستبدَل (لمن يملك صلاحية الإزالة فقط؛ غيره يتجاهله الخادم). */
-export async function listAttachments(fillId: string, history = false): Promise<AttachmentList> {
-  return listOf(await api<unknown>(`${base(fillId)}${history ? '?history=1' : ''}`));
+export async function listAttachments(fillId: string, history = false, branchId?: string | null): Promise<AttachmentList> {
+  return listOf(await api<unknown>(`${base(fillId)}${history ? '?history=1' : ''}`, branchOptions(branchId)));
 }
 
 /** رفع ملف واحد (كل ملف بطلبه: إعادة المحاولة مستقلة، والخادم idempotent بالمحتوى فلا نسخة ثانية). */
-export async function uploadAttachment(fillId: string, file: File): Promise<AttachmentList> {
+export async function uploadAttachment(fillId: string, file: File, branchId?: string | null): Promise<AttachmentList> {
   const form = new FormData();
   form.append('attachments[]', file);
-  return listOf(await api<unknown>(base(fillId), { method: 'POST', body: form }));
+  return listOf(await api<unknown>(base(fillId), { method: 'POST', body: form, ...branchOptions(branchId) }));
 }
 
-export async function replaceAttachment(fillId: string, attachmentId: string, file: File): Promise<{ row: FillAttachment; state: AttachmentState }> {
+export async function replaceAttachment(fillId: string, attachmentId: string, file: File, branchId?: string | null): Promise<{ row: FillAttachment; state: AttachmentState }> {
   const form = new FormData();
   form.append('attachment', file);
-  return oneOf(await api<unknown>(`${base(fillId)}/${assertId(attachmentId)}/replace`, { method: 'POST', body: form }));
+  return oneOf(await api<unknown>(`${base(fillId)}/${assertId(attachmentId)}/replace`, { method: 'POST', body: form, ...branchOptions(branchId) }));
 }
 
-export async function removeAttachment(fillId: string, attachmentId: string, reason: string): Promise<{ row: FillAttachment; state: AttachmentState }> {
-  return oneOf(await api<unknown>(`${base(fillId)}/${assertId(attachmentId)}`, { method: 'DELETE', body: { reason: reason.trim() } }));
+export async function removeAttachment(fillId: string, attachmentId: string, reason: string, branchId?: string | null): Promise<{ row: FillAttachment; state: AttachmentState }> {
+  return oneOf(await api<unknown>(`${base(fillId)}/${assertId(attachmentId)}`, { method: 'DELETE', body: { reason: reason.trim() }, ...branchOptions(branchId) }));
 }
 
 /** رابط معاينة محلي (`blob:`) — المستدعي مسؤول عن `URL.revokeObjectURL`. */
-export function previewUrl(fillId: string, attachmentId: string, mime: string): Promise<string> {
-  return fetchPrivateFileUrl(`${base(fillId)}/${assertId(attachmentId)}/download`, mime);
+export function previewUrl(fillId: string, attachmentId: string, mime: string, branchId?: string | null): Promise<string> {
+  return fetchPrivateFileUrl(`${base(fillId)}/${assertId(attachmentId)}/download`, mime, branchId === undefined ? {} : { branchId });
 }
 
-export function downloadAttachment(fillId: string, attachmentId: string, fallbackName: string): Promise<'downloaded' | 'demo-unavailable'> {
-  return downloadFile(`${base(fillId)}/${assertId(attachmentId)}/download`, fallbackName);
+export function downloadAttachment(fillId: string, attachmentId: string, fallbackName: string, branchId?: string | null): Promise<'downloaded' | 'demo-unavailable'> {
+  return downloadFile(`${base(fillId)}/${assertId(attachmentId)}/download`, fallbackName, branchId === undefined ? {} : { branchId });
 }
