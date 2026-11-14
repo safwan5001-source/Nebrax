@@ -303,6 +303,8 @@ const todayFills=(nz,kind)=>FILLS.filter(f=>f.at.startsWith(TODAY)&&(!nz||f.nz==
 function recorded(nz){const direct=DIRECT[nz]||0,tanker=todayFills(nz,'tanker').reduce((a,f)=>a+f.l,0),internal=todayFills(nz,'internal').reduce((a,f)=>a+f.l,0);return {direct,tanker,internal,total:direct+tanker+internal}}
 const ownName=id=>id==='org'?X('المؤسسة (صرف داخلي)','Organization (internal)'):nm(ownById(id));
 const monthFills=oid=>FILLS.filter(f=>f.oid===oid&&f.at.startsWith('2026-11'));
+/* Operational litres come from the live fills only. calc() returns the frozen settlement snapshot after approval, so it must never feed operational reports. */
+const monthLiters=oid=>monthFills(oid).reduce((a,f)=>a+f.l,0);
 function calc(oid){
   const st0=S.erp.settle[oid],snap=S.erp.snap&&S.erp.snap[oid];
   if(st0&&st0!=='draft'&&snap){const paid=st0==='paid'?snap.net:0;return {...snap,paid,due:snap.net-paid}}
@@ -633,7 +635,7 @@ function ownerPage(){
 }
 function overviewTab(o){
   const c=calc(o.id),b=supBal(o.id),pending=COL.filter(x=>x.oid===null&&LNK.some(l=>l.oid===o.id&&l.cid===x.cid&&!l.to)),unInv=SUP.filter(s=>s.oid===o.id&&!s.inv);
-  return `<div class="stats"><div class="card stat"><div class="l">${X('لترات الشهر','Litres this month')}</div><div class="v">${LIT(c.liters)}</div></div><div class="card stat"><div class="l">${X('قيمة المسحوبات (توضيحي)','Withdrawals value (illustrative)')}</div><div class="v">${SAR(c.withdrawals)}</div></div><div class="card stat"><div class="l">${X('تحصيلات مؤهلة','Qualifying collections')}</div><div class="v">${SAR(c.coll)}</div></div><div class="card stat"><div class="l">${X('صافي المستحق قبل الدفع','Net due before payout')}</div><div class="v" style="color:${c.net>=0?'var(--positive)':'var(--negative)'}">${SAR(c.net)}</div></div></div>
+  return `<div class="stats"><div class="card stat"><div class="l">${X('لترات الشهر','Litres this month')}</div><div class="v">${LIT(monthLiters(o.id))}</div></div><div class="card stat"><div class="l">${X('قيمة المسحوبات (توضيحي)','Withdrawals value (illustrative)')}</div><div class="v">${SAR(c.withdrawals)}</div></div><div class="card stat"><div class="l">${X('تحصيلات مؤهلة','Qualifying collections')}</div><div class="v">${SAR(c.coll)}</div></div><div class="card stat"><div class="l">${X('صافي المستحق قبل الدفع','Net due before payout')}</div><div class="v" style="color:${c.net>=0?'var(--positive)':'var(--negative)'}">${SAR(c.net)}</div></div></div>
   <div class="grid2"><div class="card sec"><h2>${X('يحتاج إجراء','Needs attention')}</h2>
    ${pending.map(p=>`<div class="row between"><span>${X('تحصيل غير منسوب','Unattributed collection')} <span class="ltr num">${p.id}</span> · ${coName(p.cid)} · ${SAR(p.amt)}</span><button class="btn sm" data-act="erp-tab" data-id="collections">${X('مراجعة','Review')}</button></div>`).join('')}
    ${unInv.map(s=>`<div class="row between"><span>${X('توريد بلا فاتورة','Supply without invoice')} · ${coName(s.cid)} · ${LIT(s.l)}</span><button class="btn sm" data-act="erp-tab" data-id="supplies">${X('فتح','Open')}</button></div>`).join('')}
@@ -723,7 +725,7 @@ function statementTab(o){
 function reportsPage(){
   const reps=[['r1',X('اللترات لكل صاحب صهريج','Litres per tanker owner')],['r2',X('المسحوبات لكل صهريج','Withdrawals per tanker')],['r5',X('عمليات الوردية لكل فوهة','Shift operations per nozzle')],['r3',X('التوريدات والفواتير والتحصيل','Supplies, invoices & collection')],['r4',X('التسويات والمستحقات','Settlements & dues')]];
   const k=S.erp.rep||'r1';let body='';
-  if(k==='r1')body=tbl([{h:X('صاحب الصهريج','Owner'),r:o=>esc(nm(o))},{h:X('عدد التعبئات','Fills'),n:1,r:o=>`<span class="num">${monthFills(o.id).length}</span>`},{h:X('اللترات','Litres'),n:1,r:o=>LIT(calc(o.id).liters)}],OWN);
+  if(k==='r1')body=tbl([{h:X('صاحب الصهريج','Owner'),r:o=>esc(nm(o))},{h:X('عدد التعبئات','Fills'),n:1,r:o=>`<span class="num">${monthFills(o.id).length}</span>`},{h:X('اللترات','Litres'),n:1,r:o=>LIT(monthLiters(o.id))}],OWN);
   if(k==='r2'){const rows=[...TNK.filter(t=>t.oid!=='org').map(t=>({id:t.id,plate:t.plate,oid:t.oid,l:FILLS.filter(f=>f.tid===t.id).reduce((a,f)=>a+f.l,0)})),...OWN.filter(o=>FILLS.some(f=>f.oid===o.id&&!f.tid)).map(o=>({id:'n-'+o.id,plate:null,oid:o.id,l:FILLS.filter(f=>f.oid===o.id&&!f.tid).reduce((a,f)=>a+f.l,0)}))];body=tbl([{h:X('الصهريج','Tanker'),r:t=>t.plate?LTR(t.plate):`<span class="muted">${tankLabel(null)}</span>`},{h:X('الصاحب','Owner'),r:t=>esc(ownName(t.oid))},{h:X('اللترات','Litres'),n:1,r:t=>LIT(t.l)}],rows)}
   if(k==='r5')body=tbl([{h:X('الفوهة','Nozzle'),r:z=>`<b>${nozLabel(z)}</b> · ${prodOf(z)}`},{h:opName('direct'),n:1,r:z=>LIT(recorded(z.id).direct)},{h:opName('tanker'),n:1,r:z=>LIT(recorded(z.id).tanker)},{h:opName('internal'),n:1,r:z=>LIT(recorded(z.id).internal)},{h:X('إجمالي المسجَّل','Total recorded'),n:1,r:z=>`<b>${LIT(recorded(z.id).total)}</b>`}],NOZ.map(z=>({...z})));
   if(k==='r3')body=tbl([{h:X('الشركة','Company'),r:s=>coName(s.cid)},{h:X('الكمية','Quantity'),n:1,r:s=>LIT(s.l)},{h:X('الفاتورة','Invoice'),r:s=>s.inv?LTR(s.inv):'—'},{h:X('المسدَّد','Paid'),n:1,r:s=>SAR(s.paid)},{h:X('الحالة','Status'),r:s=>supStatus(s)}],SUP);
