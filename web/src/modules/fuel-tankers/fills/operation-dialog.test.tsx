@@ -150,6 +150,23 @@ describe.each(['ar', 'en'] as const)('OperationDialog posting (%s)', (locale) =>
     expect(confirmButton()).not.toBeNull();
   });
 
+  it('after a server rejection the preview is refreshed silently (new blockers appear) without any second write', async () => {
+    let previews = 0;
+    state.handler = async (path, opts) => {
+      if (path === `${POST_PATH}/preview`) { previews += 1; return previews === 1 ? postingPreview() : postingPreview({ status: 'blocked', blockers: ['period_locked'] }); }
+      if (opts.method === 'POST') return new ApiError(422, 'x', { message: 'x', reason: 'period_locked' });
+      return {};
+    };
+    mount(locale, 'post');
+    await readyDialog();
+    fireEvent.click(confirmButton() as HTMLElement);
+    await waitFor(() => expect(flow()).toBe('rejected'));
+    await waitFor(() => expect(previews).toBe(2));
+    await waitFor(() => expect(screen.getByText(text.dialog.status.post.blocked)).toBeTruthy());
+    expect(confirmButton()).toBeNull();
+    expect(writes()).toHaveLength(1);
+  });
+
   it.each([[403, 'forbidden'], [404, 'not_found'], [409, 'fill_not_pending'], [422, 'insufficient_stock']])('translates a %s rejection with reason %s', async (status, reason) => {
     serve({ post: () => new ApiError(status, 'x', { message: 'x', reason }) });
     mount(locale, 'post');

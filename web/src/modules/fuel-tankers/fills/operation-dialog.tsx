@@ -53,14 +53,15 @@ export function OperationDialog({ operation, fillId, fillNumber, quantityMillili
   const lock = useRef(false);
   const previewSequence = useRef(0);
 
-  const loadPreview = useCallback(async () => {
+  /** `silent`: تحديث المعاينة بعد رفض الخادم (موانع/حالة جديدة) دون إخفاء ما هو معروض؛ فشله يُبقي المعاينة السابقة. */
+  const loadPreview = useCallback(async (silent = false) => {
     const mine = ++previewSequence.current;
-    setPreview({ status: 'loading' });
+    if (!silent) setPreview({ status: 'loading' });
     try {
       const data = await (operation === 'post' ? previewPosting(fillId) : previewReversal(fillId));
       if (mine === previewSequence.current) setPreview({ status: 'ready', data });
     } catch (error) {
-      if (mine !== previewSequence.current) return;
+      if (mine !== previewSequence.current || silent) return;
       const kind = classifyError(error, 'record');
       setPreview({ status: 'error', problem: kind === 'forbidden' ? 'forbidden' : kind === 'not_found' ? 'gone' : 'other' });
     }
@@ -93,7 +94,12 @@ export function OperationDialog({ operation, fillId, fillNumber, quantityMillili
       : await reverseInventory(fillId, reversalPayload(reason));
     setOutcome(result);
     if (result.kind === 'ok') { setFlow('ok'); onChanged(); return; } // الإقفال يبقى: تمّ التنفيذ فلا إرسال ثانٍ.
-    if (result.kind === 'rejected' || result.kind === 'not_sent') { lock.current = false; setFlow('rejected'); return; }
+    if (result.kind === 'rejected' || result.kind === 'not_sent') {
+      lock.current = false;
+      setFlow('rejected');
+      if (result.kind === 'rejected') void loadPreview(true); // الرفض لا أثر له، وقد تغيّرت الموانع/الحالة: تُحدَّث المعاينة.
+      return;
+    }
     setFlow('unknown'); // القفل يبقى حتى تحسم القراءة الحالة.
   }
 
