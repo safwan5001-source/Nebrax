@@ -136,8 +136,13 @@ export async function mockTankerApi(page: Page, opts: MockOptions) {
   const forbidden: string[] = [];
   const issues: string[] = [];
   const controls: { fault: Fault | null; lookupFails: boolean; lookupWithoutMarker: boolean; gate: Gate; shiftOpen: boolean; offline: boolean } = { fault: null, lookupFails: opts.lookupFails ?? false, lookupWithoutMarker: opts.lookupWithoutMarker ?? false, gate, shiftOpen: !opts.noShift, offline: false };
-  page.on('console', (m) => { if (m.type() === 'error' && !/INVALID_KEY|Namespace keys|Failed to load resource|net::ERR/.test(m.text())) issues.push(`console: ${m.text().slice(0, 200)}`); });
-  page.on('pageerror', (e) => issues.push(`pageerror: ${e.message.slice(0, 200)}`));
+  // ضوضاء إلغاء الطلبات عند التنقل/الرجوع/إعادة التحميل (WebKit: «Load failed» لجلب RSC المسبق و«due to access control checks» لطلب قُطع أثناء إلغاء الصفحة): لا خلل في الواجهة،
+  // تُسجَّل في `noise` للتقرير ولا تُسقط الاختبار. أي رسالة أخرى تبقى في `issues` وتُسقطه.
+  const NAV_ABORT = /Failed to fetch RSC payload|Load failed|due to access control checks/;
+  const noise: string[] = [];
+  const record = (kind: string, text: string) => (NAV_ABORT.test(text) ? noise : issues).push(`${kind}: ${text.slice(0, 200)}`);
+  page.on('console', (m) => { if (m.type() === 'error' && !/INVALID_KEY|Namespace keys|Failed to load resource|net::ERR/.test(m.text())) record('console', m.text()); });
+  page.on('pageerror', (e) => record('pageerror', e.message));
 
   const user = { id: 'fx-attendant', name: n.user, email: 'fixture@example.test', tenant_id: 'fx-tenant', role: 'staff', branch_ids: [], warehouse_ids: [], permissions, employee_id: opts.pin ? 'fx-emp' : null, ...(opts.pin ? { station_session: true } : {}) };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -252,7 +257,7 @@ export async function mockTankerApi(page: Page, opts: MockOptions) {
     } catch { /* تخزين محجوب */ }
   }, [JSON.stringify(user), opts.theme ?? 'light', opts.pin ? '1' : '0', 'fx-token'] as const);
 
-  return { posts, requests, forbidden, issues, controls, fills, owners, tankers, names: n, user };
+  return { posts, requests, forbidden, issues, noise, controls, fills, owners, tankers, names: n, user };
 }
 
 export type TankerMock = Awaited<ReturnType<typeof mockTankerApi>>;
