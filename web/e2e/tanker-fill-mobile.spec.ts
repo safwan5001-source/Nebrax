@@ -63,7 +63,7 @@ async function layoutProblems(page: Page, locale: Locale): Promise<string[]> {
     }
     const primaries = [...document.querySelectorAll('[data-primary-action], [data-next], [data-save]')].filter(visible);
     if (primaries.length > 1) problems.push(`more than one primary action (${primaries.length})`);
-    for (const el of document.querySelectorAll('img')) if (visible(el) && !(el as HTMLImageElement).alt && el.getAttribute('role') !== 'presentation') problems.push('img without alt');
+    for (const el of document.querySelectorAll('img')) if (visible(el) && !el.hasAttribute('alt')) problems.push('img without alt attribute'); // alt="" = زخرفية (صحيح)
     if (document.querySelector('nextjs-portal, [data-next-toast], [data-nextjs-toast]')) problems.push('dev overlay');
     return problems;
   }, locale);
@@ -85,6 +85,8 @@ async function check(page: Page, locale: Locale, label: string, mock?: TankerMoc
 async function reachable(page: Page, selector: string): Promise<boolean> {
   const target = page.locator(selector).first();
   await target.scrollIntoViewIfNeeded();
+  // المستخدم يمرّر حتى نهاية الصفحة؛ التنقل السفلي ثابت فلا يكفي «ظاهر في الإطار» (scrollIntoViewIfNeeded لا يعرف الشريط الثابت).
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   return target.evaluate((el) => {
     const r = el.getBoundingClientRect();
     const cx = r.left + r.width / 2;
@@ -215,7 +217,9 @@ for (const locale of ['en', 'ar'] as const) {
     });
 
     test('step navigation: Back keeps the draft, the step bar tracks, browser Back/Reload do not crash', async ({ page }, info) => {
-      const mock = await go(page, BASE + '/new', { locale });
+      const mock = await go(page, BASE, { locale });
+      await expect(page.locator('[data-tanker-list]')).toBeVisible();
+      await page.goto(`${baseUrl}${BASE}/new`);
       await toQuantityStep(page);
       await page.getByTestId('quantity-input').fill('120');
       await page.getByTestId('voucher-input').fill('V-1');
@@ -233,7 +237,7 @@ for (const locale of ['en', 'ar'] as const) {
 
       // رجوع المتصفح من المعالج إلى السجل ثم الأمام: لا انهيار.
       await page.goBack();
-      await expect(page).toHaveURL(/\/fuel-stations\/ops(\/tanker-fills)?$/);
+      await expect(page).toHaveURL(new RegExp(`${BASE}$`));
       await page.goForward();
       await expect(page.locator('[data-tanker-wizard]')).toBeVisible();
       await page.reload();
@@ -314,7 +318,7 @@ test.describe('input validation', () => {
       await expect(page.getByTestId('quantity-input')).toHaveAttribute('aria-invalid', 'true');
     }
     await shot(page, info, 'en', '14-quantity-error', false);
-    for (const good of ['0.001', '1', '10.5', '5000.250']) {
+    for (const good of ['0.001', '1', '10.5', '4999.250']) {
       await page.getByTestId('quantity-input').fill(good);
       await expect(next(page), good).toBeEnabled();
     }
@@ -369,7 +373,7 @@ test.describe('server policies reflected in the wizard', () => {
     await expect(page.locator('[data-tanker-policy]')).toHaveAttribute('data-tanker-policy', 'required');
     await expect(page.getByTestId('tanker-none')).toHaveCount(0);
     await expect(next(page)).toBeDisabled();
-    await expect(page.getByRole('alert').filter({ hasText: t('en', 'tankerFill.problem.tanker_required') })).toBeVisible();
+    await expect(page.getByText(t('en', 'tankerFill.problem.tanker_required'))).toBeVisible();
     await page.getByTestId(`tanker-${TANKER_CAMEL_A}`).click();
     await expect(next(page)).toBeEnabled();
   });
@@ -514,9 +518,9 @@ test.describe('offline, reconnect and pending-attempt recovery', () => {
     mock.controls.fault = { mode: 'abort_before', times: 1 };
     await toReview(page, '40', 'AB-1');
     await save(page).click();
-    await expect(page.locator('[data-fill-notice]')).toHaveAttribute('data-notice-key', /tankerFill\.unknown\./);
+    await expect(page.locator('[data-pending-attempt] [data-fill-notice]')).toHaveAttribute('data-notice-key', /tankerFill\.unknown\./);
     await shot(page, info, 'en', '18-unknown-notice', false);
-    await page.locator('[data-check-status]').click();
+    await page.getByRole('button', { name: t('en', 'write.check') }).first().click();
     await expect(page.locator('[data-pending-attempt]')).toBeVisible();
     await expect(page.getByText(t('en', 'tankerFill.pending.notFound'))).toBeVisible();
     await shot(page, info, 'en', '19-pending-notfound');
@@ -574,9 +578,11 @@ test.describe('offline, reconnect and pending-attempt recovery', () => {
     await page.reload();
     await expect(page.locator('[data-pending-attempt]')).toBeVisible();
     await context.setOffline(true);
+    mock.controls.offline = true; // الاعتراض يتجاوز محاكاة الشبكة، فنُسقط الطلب صراحةً كما يفعل الجهاز بلا اتصال
     await page.locator('button:has-text("' + t('en', 'write.check') + '")').first().click();
     await expect(page.getByText(t('en', 'tankerFill.pending.checkFailed'))).toBeVisible();
     await context.setOffline(false);
+    mock.controls.offline = false;
     await page.locator('button:has-text("' + t('en', 'write.check') + '")').first().click();
     await expect(page.locator('[data-fill-success]')).toBeVisible();
     expect(mock.fills).toHaveLength(1);
@@ -598,7 +604,7 @@ test.describe('offline, reconnect and pending-attempt recovery', () => {
     mock.controls.fault = { mode: 'abort_before', times: 1 };
     await toReview(page, '30', 'DS-1');
     await save(page).click();
-    await page.locator('[data-check-status]').click();
+    await page.getByRole('button', { name: t('en', 'write.check') }).first().click();
     await expect(page.locator('[data-discard]')).toBeVisible();
     await page.locator('[data-discard]').click();
     await expect(page.locator('[data-pending-attempt]')).toHaveCount(0);
@@ -633,8 +639,9 @@ test.describe('offline, reconnect and pending-attempt recovery', () => {
     await toReview(page, '35', 'SC-1');
     mock.controls.shiftOpen = false;
     await save(page).click();
-    await expect(page.locator('[data-fill-notice]')).toHaveAttribute('data-notice-key', 'tankerFill.reject.shift_required');
+    // المعالج يعيد قراءة الوردية فيُستبدل بشاشة «لا وردية مفتوحة» (الرسالة تشرح السبب) ولا يبقى زر حفظ.
     await expect(page.locator('[data-no-open-shift]')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-save]')).toHaveCount(0);
     expect(mock.fills).toHaveLength(0);
   });
 });

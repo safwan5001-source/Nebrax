@@ -91,7 +91,7 @@ export async function mockTankerApi(page: Page, opts: MockOptions) {
       nozzleRow('nz3', 'u2', '3', { status: 'inactive' }),
       nozzleRow('nz4', 'u2', '4'),
     ];
-  const shift = opts.noShift ? null : { id: 'sh1', number: 'FSH-0001', status: 'open', station_id: 'sa', opening_float_minor: 0, operational_liters: '0', cash_variance_minor: null, opened_at: '2026-11-14T03:00:00+00:00', closed_at: null, approved_at: null, cash_variance: null };
+  const shift = { id: 'sh1', number: 'FSH-0001', status: 'open', station_id: 'sa', opening_float_minor: 0, operational_liters: '0', cash_variance_minor: null, opened_at: '2026-11-14T03:00:00+00:00', closed_at: null, approved_at: null, cash_variance: null };
 
   const owners: Dict[] = [
     { id: OWNER_ASKAR, name: n.owners[0], code: 'ASK', status: 'active' },
@@ -135,7 +135,7 @@ export async function mockTankerApi(page: Page, opts: MockOptions) {
   const requests: Array<{ method: string; path: string; query: string; branch?: string }> = [];
   const forbidden: string[] = [];
   const issues: string[] = [];
-  const controls: { fault: Fault | null; lookupFails: boolean; lookupWithoutMarker: boolean; gate: Gate; shiftOpen: boolean } = { fault: null, lookupFails: opts.lookupFails ?? false, lookupWithoutMarker: opts.lookupWithoutMarker ?? false, gate, shiftOpen: shift !== null };
+  const controls: { fault: Fault | null; lookupFails: boolean; lookupWithoutMarker: boolean; gate: Gate; shiftOpen: boolean; offline: boolean } = { fault: null, lookupFails: opts.lookupFails ?? false, lookupWithoutMarker: opts.lookupWithoutMarker ?? false, gate, shiftOpen: !opts.noShift, offline: false };
   page.on('console', (m) => { if (m.type() === 'error' && !/INVALID_KEY|Namespace keys|Failed to load resource|net::ERR/.test(m.text())) issues.push(`console: ${m.text().slice(0, 200)}`); });
   page.on('pageerror', (e) => issues.push(`pageerror: ${e.message.slice(0, 200)}`));
 
@@ -157,6 +157,7 @@ export async function mockTankerApi(page: Page, opts: MockOptions) {
     const method = request.method();
     const q = url.searchParams;
     requests.push({ method, path: p, query: url.search, branch: request.headers()['x-branch-id'] });
+    if (controls.offline) return route.abort('internetdisconnected');
 
     if (opts.pin) {
       const allowed = (method === 'GET' || method === 'HEAD' ? PIN_READ : PIN_WRITE).some((re) => re.test(p));

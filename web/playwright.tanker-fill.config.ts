@@ -30,7 +30,7 @@ const projects = [
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /tanker-fill-mobile\.spec\.ts/,
+  testMatch: new RegExp(process.env.TANKER_SPEC ?? 'tanker-fill-mobile\\.spec\\.ts'),
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
