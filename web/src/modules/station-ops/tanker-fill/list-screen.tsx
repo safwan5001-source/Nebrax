@@ -15,7 +15,7 @@ import { EmptyState, ErrorState, InlineNote, LoadingBlock } from '../state-views
 import { SecondaryButton } from '../write-ui';
 import { useShiftFills, useTankerFillAccess, useTankerFillFeature } from './data';
 import { FillStatusBadge, Liters, NoStockNote, TANKER_BASE, When } from './parts';
-import { createPendingStore } from './pending';
+import { createPendingStore, pendingScopeKey } from './pending';
 import type { TankerFill } from './schemas';
 
 /**
@@ -52,11 +52,11 @@ function Row({ fill, timeZone }: { fill: TankerFill; timeZone: string | null | u
 function List({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
   const access = useTankerFillAccess();
-  const { scopeKey } = useStationOps();
+  const { actorKey } = useStationOps();
   const feature = useTankerFillFeature(station);
   const current = useCurrentShift(station);
   // محاولة غير محسومة لهذا الموظف/المحطة: مدخل الحسم يبقى ظاهراً **بمعزل عن الوردية** (الإغلاق لا يخفيه) — الحسم قراءة فقط، والتسجيل الجديد وحده يتطلب وردية مفتوحة.
-  const hasPending = access.canStart && createPendingStore(`${scopeKey}|${station.id}`).load() !== null;
+  const hasPending = access.canStart && createPendingStore(pendingScopeKey(actorKey, station.id)).load() !== null;
   const shift = current.state.status === 'success' ? current.state.data.shift : null;
   const fills = useShiftFills(station, shift?.id ?? null);
 

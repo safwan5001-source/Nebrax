@@ -673,6 +673,26 @@ describe('employee switching and session isolation', () => {
     expect(await screen.findByText('Unresolved recording attempt')).toBeTruthy();
   });
 
+  it('an unresolved attempt survives a branch/access-list change of the SAME employee (no duplicate via a fresh key)', async () => {
+    setup({ dropReplyAfterApply: true }, RECORDER, 'u-a');
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    cleanup();
+    // تحديث قوائم الفرع/المخزن للموظف نفسه ⇒ scopeKey مختلف للمزوّد، والمحاولة المعلّقة تبقى.
+    const stored = JSON.parse(localStorage.getItem('user') as string);
+    localStorage.setItem('user', JSON.stringify({ ...stored, branch_ids: ['b-other'], warehouse_ids: ['w-other'] }));
+    mount();
+    expect(await screen.findByText('Unresolved recording attempt')).toBeTruthy();
+    expect(document.querySelector('[data-tanker-wizard]')).toBeNull();
+    await user.click(btn('Check status'));
+    await screen.findByText('Voucher was already recorded (not duplicated)');
+    expect(world.fills).toHaveLength(1);
+    expect(posts()).toHaveLength(1);
+  });
+
   it('state does not leak between mounts: a fresh wizard starts empty', async () => {
     setup();
     const user = userEvent.setup();

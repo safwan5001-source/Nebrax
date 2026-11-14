@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FillBody } from './logic';
-import { createPendingStore } from './pending';
+import { createPendingStore, pendingScopeKey } from './pending';
 
 const body: FillBody = { fuel_station_id: 's1', fuel_nozzle_id: 'n1', fuel_tanker_owner_id: 'o1', fuel_shift_id: 'sh1', voucher_number: '04052', quantity_milliliters: 2_000_000, idempotency_key: 'awj-ops-key12345' };
 
@@ -8,6 +8,14 @@ function memoryStorage(): Storage {
   const data = new Map<string, string>();
   return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v), removeItem: (k) => void data.delete(k), clear: () => data.clear(), key: () => null, get length() { return data.size; } } as Storage;
 }
+
+describe('pendingScopeKey', () => {
+  it('is actor|station only — distinct per user and per station, with no branch or access list in it', () => {
+    expect(pendingScopeKey('T1|u1', 'st1')).toBe('T1|u1|st1');
+    expect(pendingScopeKey('T1|u2', 'st1')).not.toBe(pendingScopeKey('T1|u1', 'st1'));
+    expect(pendingScopeKey('T1|u1', 'st2')).not.toBe(pendingScopeKey('T1|u1', 'st1'));
+  });
+});
 
 describe('pending (unresolved) attempt store', () => {
   it('survives a "reload" (new store over the same storage) with the same body and key', () => {

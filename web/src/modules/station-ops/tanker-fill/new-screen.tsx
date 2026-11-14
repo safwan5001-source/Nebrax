@@ -20,7 +20,7 @@ import {
   type FillBody, type FillDraft, type Step, type StepContext, type StepProblem,
 } from './logic';
 import { FillNotice, FillStatusBadge, Liters, NoStockNote, TANKER_BASE, TextField, ChoiceCard, describeFillFailure, mayHaveApplied, shouldClearKey } from './parts';
-import { createPendingStore, type PendingAttempt } from './pending';
+import { createPendingStore, pendingScopeKey, type PendingAttempt } from './pending';
 import type { TankerFill } from './schemas';
 
 /**
@@ -85,7 +85,7 @@ export function TankerFillNewScreen() {
 
 function Flow({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
-  const { scopeKey } = useStationOps();
+  const { actorKey } = useStationOps();
   const access = useTankerFillAccess();
   const feature = useTankerFillFeature(station);
   const current = useCurrentShift(station);
@@ -102,7 +102,7 @@ function Flow({ station }: { station: Station }) {
   const shift = current.state.data.shift;
   if (!shift) {
     // محاولة غير محسومة سابقة تبقى قابلة للحسم (قراءة فقط) حتى بعد إغلاق الوردية؛ **التسجيل الجديد** وحده مشروط بوردية مفتوحة.
-    if (createPendingStore(`${scopeKey}|${station.id}`).load()) return <Wizard station={station} shiftId={null} shiftNumber={null} reloadShift={current.reload} />;
+    if (createPendingStore(pendingScopeKey(actorKey, station.id)).load()) return <Wizard station={station} shiftId={null} shiftNumber={null} reloadShift={current.reload} />;
     return (
       <div data-no-open-shift="" className="space-y-3 pt-5">
         <EmptyState title={t('tankerFill.noShift.title')} body={t('tankerFill.noShift.body')} />
@@ -115,11 +115,13 @@ function Flow({ station }: { station: Station }) {
 
 function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Station; shiftId: string | null; shiftNumber: string | null; reloadShift: () => void }) {
   const t = useTranslations('stationOps');
-  const { scopeKey } = useStationOps();
+  const { actorKey } = useStationOps();
   const assets = useStationAssets(station);
   const { policy } = useTankerPolicy(station);
-  const intents = useMemo(() => createIntentStore(`${scopeKey}|${station.id}|tanker`), [scopeKey, station.id]);
-  const pendingStore = useMemo(() => createPendingStore(`${scopeKey}|${station.id}`), [scopeKey, station.id]);
+  // هوية ثابتة (مؤسسة|مستخدم|محطة) للمحاولة المعلّقة ومفتاح النية: تبديل الفرع النشط أو تحديث قوائم الصلاحيات لا يُيتّم محاولة قد التزمها الخادم.
+  const identity = pendingScopeKey(actorKey, station.id);
+  const intents = useMemo(() => createIntentStore(`${identity}|tanker`), [identity]);
+  const pendingStore = useMemo(() => createPendingStore(identity), [identity]);
   const submitting = useRef(false);
 
   const [step, setStep] = useState<Step>('owner');

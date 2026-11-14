@@ -14,6 +14,14 @@ export interface PendingAttempt {
   at: number;
 }
 
+/**
+ * مفتاح تخزين المحاولة المعلّقة: **هوية ثابتة** (مؤسسة|مستخدم|محطة) — `actorKey` من سياق التطبيق (مؤسسة|مستخدم) + المحطة؛ لا الفرع النشط ولا قوائم صلاحيات الفرع/المخزن
+ * (تتغيّر بتبديل الفرع أو تحديث الصلاحيات فتُيتّم محاولة قد يكون الخادم التزمها). الوصول الحالي يُفرض عند القراءة/إعادة الإرسال من الخادم، لا من هذا المفتاح.
+ */
+export function pendingScopeKey(actorKey: string, stationId: string): string {
+  return `${actorKey}|${stationId}`;
+}
+
 export interface PendingStore {
   load(): PendingAttempt | null;
   save(body: FillBody): void;

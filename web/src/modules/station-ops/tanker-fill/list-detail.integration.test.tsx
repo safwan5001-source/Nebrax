@@ -111,7 +111,7 @@ describe('fills list (current shift only)', () => {
 
 describe('recovery entry point', () => {
   const pendingBody = { fuel_station_id: ST, fuel_nozzle_id: 'nz1', fuel_tanker_owner_id: OWNER_A, fuel_shift_id: 'sh1', voucher_number: '04052', quantity_milliliters: 2_000_000, idempotency_key: 'awj-ops-0f8a1c2d-3e4b-4a5c-9d6e-7f8091a2b3c4' };
-  const savePending = (userId = 'u1') => sessionStorage.setItem(`awj:fuel-ops:tanker-fill:pending:T1|${userId}|default|||${ST}`, JSON.stringify({ body: pendingBody, at: Date.now() }));
+  const savePending = (userId = 'u1') => sessionStorage.setItem(`awj:fuel-ops:tanker-fill:pending:T1|${userId}|${ST}`, JSON.stringify({ body: pendingBody, at: Date.now() }));
 
   it('an unresolved attempt keeps a link to the recovery screen even when the shift is closed', async () => {
     setup({ openShift: null }, RECORDER);
@@ -123,6 +123,16 @@ describe('recovery entry point', () => {
     expect(link.getAttribute('href')).toBe('/fuel-stations/ops/tanker-fills/new');
     expect(link.textContent).toContain('Unresolved recording attempt');
     expect(screen.queryByRole('link', { name: /Record a new fill/ })).toBeNull(); // التسجيل الجديد ما زال يتطلب وردية
+  });
+
+  it('the attempt survives an ERP branch switch / access-list change (stable tenant|user|station identity)', async () => {
+    setup({ openShift: null }, RECORDER);
+    savePending();
+    const user = JSON.parse(localStorage.getItem('user') as string);
+    localStorage.setItem('user', JSON.stringify({ ...user, branch_ids: ['b-new'], warehouse_ids: ['w-new'] })); // قوائم وصول مختلفة ⇒ scopeKey مختلف
+    mountList();
+    await screen.findByText('No open shift');
+    expect(document.querySelector('[data-pending-link]')).not.toBeNull();
   });
 
   it('with an open shift the recovery link is shown next to the normal action', async () => {
