@@ -109,6 +109,52 @@ describe('fills list (current shift only)', () => {
   });
 });
 
+describe('recovery entry point', () => {
+  const pendingBody = { fuel_station_id: ST, fuel_nozzle_id: 'nz1', fuel_tanker_owner_id: OWNER_A, fuel_shift_id: 'sh1', voucher_number: '04052', quantity_milliliters: 2_000_000, idempotency_key: 'awj-ops-0f8a1c2d-3e4b-4a5c-9d6e-7f8091a2b3c4' };
+  const savePending = (userId = 'u1') => sessionStorage.setItem(`awj:fuel-ops:tanker-fill:pending:T1|${userId}|default|||${ST}`, JSON.stringify({ body: pendingBody, at: Date.now() }));
+
+  it('an unresolved attempt keeps a link to the recovery screen even when the shift is closed', async () => {
+    setup({ openShift: null }, RECORDER);
+    savePending();
+    mountList();
+    await screen.findByText('No open shift');
+    const link = document.querySelector('[data-pending-link]') as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    expect(link.getAttribute('href')).toBe('/fuel-stations/ops/tanker-fills/new');
+    expect(link.textContent).toContain('Unresolved recording attempt');
+    expect(screen.queryByRole('link', { name: /Record a new fill/ })).toBeNull(); // التسجيل الجديد ما زال يتطلب وردية
+  });
+
+  it('with an open shift the recovery link is shown next to the normal action', async () => {
+    setup({}, RECORDER);
+    savePending();
+    mountList();
+    await screen.findByRole('link', { name: /Record a new fill/ });
+    expect(document.querySelector('[data-pending-link]')).not.toBeNull();
+  });
+
+  it('no unresolved attempt, another employee’s attempt, or no record permission ⇒ no recovery link', async () => {
+    setup({ openShift: null }, RECORDER);
+    mountList();
+    await screen.findByText('No open shift');
+    expect(document.querySelector('[data-pending-link]')).toBeNull();
+    cleanup();
+
+    setup({ openShift: null }, RECORDER);
+    savePending('someone-else');
+    mountList();
+    await screen.findByText('No open shift');
+    expect(document.querySelector('[data-pending-link]')).toBeNull();
+    cleanup();
+
+    setup({ openShift: null }, VIEWER);
+    savePending();
+    mountList();
+    await screen.findByText('No open shift');
+    expect(document.querySelector('[data-pending-link]')).toBeNull();
+  });
+});
+
 describe('fill detail (read-only)', () => {
   it('shows both numbers separately, status "awaiting stock integration", derived product/tank, and no write buttons', async () => {
     const row = fillRow(1, { voucher_number: '04052', capacity_overrun_milliliters: 250_000 });

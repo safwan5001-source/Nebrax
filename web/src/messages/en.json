@@ -16152,7 +16152,9 @@
         "total": "Total litres",
         "truncated": "Only the first results are shown; the total covers what is shown.",
         "emptyTitle": "No fills yet",
-        "emptyBody": "No tanker fills have been recorded in this shift."
+        "emptyBody": "No tanker fills have been recorded in this shift.",
+        "pendingTitle": "Unresolved recording attempt",
+        "pendingHint": "A fill was sent and we do not know if it was recorded. Check its status."
       },
       "detail": {
         "title": "Voucher details",

@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus } from 'lucide-react';
+import { Plus, TriangleAlert } from 'lucide-react';
 import { LinkCard } from '../admin/ui';
+import { useStationOps } from '../context';
 import { useCurrentShift } from '../data';
 import { PageMasthead, ScreenBody } from '../masthead';
 import { StationOpsError } from '../read-client';
@@ -14,6 +15,7 @@ import { EmptyState, ErrorState, InlineNote, LoadingBlock } from '../state-views
 import { SecondaryButton } from '../write-ui';
 import { useShiftFills, useTankerFillAccess, useTankerFillFeature } from './data';
 import { FillStatusBadge, Liters, NoStockNote, TANKER_BASE, When } from './parts';
+import { createPendingStore } from './pending';
 import type { TankerFill } from './schemas';
 
 /**
@@ -50,8 +52,11 @@ function Row({ fill, timeZone }: { fill: TankerFill; timeZone: string | null | u
 function List({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
   const access = useTankerFillAccess();
+  const { scopeKey } = useStationOps();
   const feature = useTankerFillFeature(station);
   const current = useCurrentShift(station);
+  // محاولة غير محسومة لهذا الموظف/المحطة: مدخل الحسم يبقى ظاهراً **بمعزل عن الوردية** (الإغلاق لا يخفيه) — الحسم قراءة فقط، والتسجيل الجديد وحده يتطلب وردية مفتوحة.
+  const hasPending = access.canStart && createPendingStore(`${scopeKey}|${station.id}`).load() !== null;
   const shift = current.state.status === 'success' ? current.state.data.shift : null;
   const fills = useShiftFills(station, shift?.id ?? null);
 
@@ -68,6 +73,19 @@ function List({ station }: { station: Station }) {
   return (
     <div className="space-y-4 pt-5" data-tanker-list="">
       <NoStockNote />
+      {hasPending ? (
+        <Link
+          href={`${TANKER_BASE}/new`}
+          data-pending-link=""
+          className="flex min-h-14 w-full items-start gap-3 rounded-[13px] border border-border bg-[color:var(--fo-warning-tint)] p-3.5 text-start text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <TriangleAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+          <span className="min-w-0">
+            <span className="block text-[15px] font-bold">{t('tankerFill.list.pendingTitle')}</span>
+            <span className="mt-0.5 block text-sm leading-5">{t('tankerFill.list.pendingHint')}</span>
+          </span>
+        </Link>
+      ) : null}
       {access.canStart && shift ? (
         <Link
           href={`${TANKER_BASE}/new`}
