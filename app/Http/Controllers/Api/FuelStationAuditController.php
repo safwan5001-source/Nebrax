@@ -40,6 +40,14 @@ class FuelStationAuditController extends ApiController
      */
     private const FILL_VIEW_ACTIONS = ['tanker_fill.recorded', 'tanker_fill.voided'];
 
+    /**
+     * TANKER-PR6B-3: حدث ترحيل السند مخزنياً (`tanker_fill.inventory_posted`) لقطته بلا أي مبلغ (حالة السند فقط)؛ يراه حامل `fuel.tanker.fill.inventory.view` مع `fuel.tanker.fill.view`
+     * دون صلاحية السجل التاريخي للمرفقات. نوع حدث مستقبلي آخر يبقى مخفياً حتى يُضاف عمداً.
+     *
+     * @var list<string>
+     */
+    private const FILL_INVENTORY_ACTIONS = ['tanker_fill.inventory_posted'];
+
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
@@ -111,7 +119,8 @@ class FuelStationAuditController extends ApiController
             return;
         }
         if (! Rbac::allows($role, 'fuel.tanker.fill.attachment.remove')) {
-            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereIn('action', self::FILL_VIEW_ACTIONS));
+            $visible = Rbac::allows($role, 'fuel.tanker.fill.inventory.view') ? array_merge(self::FILL_VIEW_ACTIONS, self::FILL_INVENTORY_ACTIONS) : self::FILL_VIEW_ACTIONS;
+            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereIn('action', $visible));
         }
     }
 

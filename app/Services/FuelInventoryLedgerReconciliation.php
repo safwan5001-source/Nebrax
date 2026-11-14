@@ -456,6 +456,9 @@ class FuelInventoryLedgerReconciliation
                 ->where('e.tenant_id', $tenantId)->whereIn('e.status', ['posted', 'reversed'])->where('a.type', 'asset')
                 ->whereIn('e.id', DB::table('fuel_inventory_cost_movements')->where('tenant_id', $tenantId)->whereNotNull('journal_entry_id')->select('journal_entry_id'))
                 ->when($accountIds !== [], fn ($q) => $q->whereNotIn('l.account_id', $accountIds))
+                // PR-6B-3: الحساب الوسيط لقيود ترحيل سندات التعبئة (المدين فيها) طرف مقابل **متوقَّع** لا نقص في المجموعة؛ يُستخرج من قيود الترحيل نفسها (مصدرها السند) فلا إعداد يُقرأ هنا.
+                ->whereNotIn('l.account_id', DB::table('journal_lines as tl')->join('journal_entries as te', 'te.id', '=', 'tl.journal_entry_id')
+                    ->where('te.tenant_id', $tenantId)->where('te.source_type', \App\Models\FuelTankerFill::class)->where('tl.debit', '>', 0)->select('tl.account_id'))
                 ->groupBy('a.id', 'a.code', 'a.name')->orderBy('a.code')->get(['a.id', 'a.code', 'a.name'])
                 ->map(fn ($a) => ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name])->all();
             if ($unlisted !== []) {

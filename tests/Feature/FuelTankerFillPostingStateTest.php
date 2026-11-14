@@ -616,12 +616,12 @@ class FuelTankerFillPostingStateTest extends TestCase
     // ───────────────────────── لا مسار كتابة ─────────────────────────
 
     /** @test */
-    public function no_application_path_writes_posted_or_reversed_states_posting_rows_attempts_or_the_new_ledger_types(): void
+    public function only_the_pr6b3_posting_service_writes_posted_state_posting_rows_attempts_or_the_new_ledger_types(): void
     {
+        // PR-6B-3: الكاتب الوحيد الآن هو خدمة الترحيل (ومتحكّمها يمرّر إليها)؛ النموذجان يبقيان رافضين لكل كتابة. العكس غير مبنيّ (PR-6B-4).
         $allowed = [
-            // الإعلانات والنماذج الرافضة وحارس الإلغاء فقط.
             'FuelTankerFill.php', 'FuelTankerFillInventoryPosting.php', 'FuelTankerFillInventoryPostingAttempt.php', 'FuelOperationalLedger.php',
-            'FuelTankerFillService.php', 'FuelTankerFillException.php',
+            'FuelTankerFillService.php', 'FuelTankerFillException.php', 'FuelTankerFillInventoryPostingService.php', 'FuelTankerFillInventoryPostingController.php',
         ];
         $needles = ['INVENTORY_POSTED', 'INVENTORY_REVERSED', 'TYPE_TANKER_FILL', 'TYPE_TANKER_FILL_REVERSAL', 'fuel_tanker_fill_inventory_posting_attempts', 'fuel_tanker_fill_inventory_postings', 'FuelTankerFillInventoryPostingAttempt', 'tanker_fill_reversal'];
         $hits = [];
@@ -636,7 +636,7 @@ class FuelTankerFillPostingStateTest extends TestCase
                 }
             }
         }
-        // القارئان الوحيدان خارج النماذج: الجاهزية (تقرأ الجدول) والمطابقة (تقرأ الدفتر) — قراءة فقط.
+        // القارئان الوحيدان خارج ذلك: الجاهزية (تقرأ الجدول) والمطابقة (تقرأ الدفتر) — قراءة فقط.
         $readers = ['FuelTankerFillInventoryReadiness.php', 'FuelInventoryLedgerReconciliation.php'];
         foreach ($hits as $file => $found) {
             $this->assertTrue(in_array($file, array_merge($allowed, $readers), true), "{$file} يذكر " . implode(',', $found) . ' ولا يجوز');
@@ -645,10 +645,11 @@ class FuelTankerFillPostingStateTest extends TestCase
             $code = preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents(app_path("Services/{$reader}")));
             $this->assertDoesNotMatchRegularExpression('/->(create|insert|update|delete|save|forceFill|increment|decrement)\(/', (string) $code, "{$reader} قراءة فقط");
         }
-        // لا مسار HTTP للترحيل أو العكس.
+        // لا مسار HTTP للعكس ولا أمر؛ والبوابة مغلقة افتراضياً (مصدر الإعداد).
         $routes = (string) file_get_contents(base_path('routes/api.php'));
-        $this->assertDoesNotMatchRegularExpression('#tanker-fills[^\n]*(post|reverse)\b#i', $routes);
-        $this->assertFalse(Artisan::all() === [] || array_key_exists('fuel:post-tanker-fills', Artisan::all()), 'لا أمر ترحيل');
+        $this->assertStringNotContainsString('inventory-reversal', $routes);
+        $this->assertStringNotContainsString('inventory-reverse', $routes);
+        $this->assertFalse(array_key_exists('fuel:post-tanker-fills', Artisan::all()), 'لا أمر ترحيل');
         $this->assertFalse(\App\Services\FuelTankerFillInventoryReadiness::POSTING_ENABLED);
     }
 }

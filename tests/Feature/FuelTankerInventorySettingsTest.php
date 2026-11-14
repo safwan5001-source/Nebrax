@@ -139,7 +139,9 @@ class FuelTankerInventorySettingsTest extends TestCase
                 $hits[] = $file->getFilename();
             }
         }
-        $this->assertSame(['FuelTankerFillInventoryReviewController.php'], $hits, 'القارئ الوحيد: عرض حالة البوابة في تقييم الإعدادات');
+        sort($hits);
+        // PR-6B-3: القارئان الجديدان هما بوابة الترحيل (الوسيط) وخدمة الترحيل نفسها (ترفض عند الإغلاق)؛ والمراجعة تعرض حالتها فقط.
+        $this->assertSame(['EnsureFuelTankerInventoryPostingEnabled.php', 'FuelTankerFillInventoryPostingService.php', 'FuelTankerFillInventoryReviewController.php'], $hits, 'قرّاء البوابة: الوسيط والخدمة وعرض الحالة');
     }
 
     // ───────────────────────── التحقق من الحساب ─────────────────────────
@@ -366,10 +368,11 @@ class FuelTankerInventorySettingsTest extends TestCase
             }
         }
 
-        // owner/admin عبر `*` فقط: لا مسار يستعملها بعد (الكاتب = PR-6B-3/4) فلا تظهر في أي تعريف مسار.
-        $routes = file_get_contents(base_path('routes/api.php'));
-        foreach (self::NEW_PERMISSIONS as $permission) {
-            $this->assertStringNotContainsString($permission, (string) $routes, "لا مسار يستعمل {$permission} في هذه الشريحة");
+        // owner/admin عبر `*` فقط. PR-6B-3: مسار الترحيل وحده يستعمل `…inventory.post` (مرة واحدة بالضبط)؛ `post_historical` تُفحص في الخدمة لا في مسار، و`reverse` بلا مسار (PR-6B-4).
+        $routes = (string) file_get_contents(base_path('routes/api.php'));
+        $this->assertSame(1, preg_match_all("/fuel\.tanker\.fill\.inventory\.post'/", $routes), 'مسار ترحيل واحد فقط');
+        foreach (['fuel.tanker.fill.inventory.post_historical', 'fuel.tanker.fill.inventory.reverse'] as $permission) {
+            $this->assertStringNotContainsString($permission, $routes, "لا مسار يستعمل {$permission}");
         }
         // أي دور مخزَّن لم يُمنحها بهجرة.
         $this->assertSame(0, (int) DB::table('roles')->get(['permissions'])->filter(fn ($r) => array_intersect(self::NEW_PERMISSIONS, (array) json_decode((string) $r->permissions, true)) !== [])->count());
