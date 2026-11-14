@@ -134,7 +134,7 @@ class FuelTankerFillAccountingReportService
         ]];
 
         // مطابقة مستوى المجمّع (كمية/قيمة/تاريخ التكلفة المفتوح) بالمحرك القائم نفسه — لا نسخ لمنطقه.
-        $pool = $this->reconciliation->reconcile($visibleWarehouseIds, $visibleBranchIds, $actor->hasPermission('products.view_cost') && $fullScope, $fullScope);
+        $pool = $this->reconciliation->reconcile($visibleWarehouseIds, $visibleBranchIds, $actor->hasPermission('products.view_cost'), $fullScope);
 
         return [
             'rows' => $rows->values()->all(), 'summary' => $summary, 'pool' => $pool,
@@ -161,15 +161,39 @@ class FuelTankerFillAccountingReportService
             }
         }
 
-        // اختلاف رصيد الحساب الوسيط عن الرصيد المدعوم بالحركات (كل الحسابات الوسيطة المعنية) — مستوى التقرير.
-        $clearing = $actor->hasPermission('products.view_cost') && $actor->hasPermission('accounts.view') ? $this->clearingAccount($actor, $visibleBranchIds, $period) : null;
+        // اختلاف رصيد الحساب الوسيط عن الرصيد المدعوم بالحركات (كل الحسابات الوسيطة المعنية) — مستوى التقرير. أرصدة الأستاذ لا تُعزل بالمحطة (سطر القيد يحمل الفرع لا المحطة)،
+        // فلا تُعرض لمستخدم مقيَّد بمحطات/مخازن ولا بلا صلاحيتي التكلفة والحسابات، ويُعلَن السبب صراحةً بدل إخفاء صامت.
+        $balanceScope = $this->ledgerBalanceScope($actor);
+        $clearing = $balanceScope['allowed'] ? $this->clearingAccount($actor, $visibleBranchIds, $period) : null;
 
         return [
             'rows' => $rows->values()->all(),
             'summary' => $this->summarize($rows) + ['findings_by_code' => array_values($byCode)],
-            'clearing' => $clearing === null ? null : ['accounts' => array_map(fn (array $a) => ['account' => $a['account'], 'closing_balance_minor' => $a['closing_balance_minor'], 'supported_balance_minor' => $a['supported_balance_minor'], 'unexplained_difference_minor' => $a['unexplained_difference_minor'], 'findings' => $a['findings']], $clearing['accounts'])],
+            'clearing' => $clearing === null
+                ? ['available' => false, 'reason' => $balanceScope['reason'], 'accounts' => []]
+                : ['available' => true, 'reason' => null, 'period' => $clearing['period'], 'scope' => $clearing['scope'],
+                    'accounts' => array_map(fn (array $a) => ['account' => $a['account'], 'closing_balance_minor' => $a['closing_balance_minor'], 'supported_balance_minor' => $a['supported_balance_minor'], 'unexplained_difference_minor' => $a['unexplained_difference_minor'], 'findings' => $a['findings']], $clearing['accounts'])],
             'truncated' => $chain['truncated'], 'masking' => ['costs' => ! $actor->hasPermission('products.view_cost'), 'accounts' => ! $actor->hasPermission('accounts.view')],
         ];
+    }
+
+    /**
+     * هل يملك المستخدم نطاقاً مالياً كافياً لرؤية **أرصدة الأستاذ** للحساب الوسيط؟ سطر القيد يحمل الفرع لا المحطة، فلا يمكن عزل رصيد حساب مشترك بين محطات الفرع بدقة؛ ولذلك:
+     * يتطلب `products.view_cost` و`accounts.view` **ولا يكفيان وحدهما** — يجب ألا يكون المستخدم مقيَّداً بمحطات (`allowedFuelStationIds`) أو مخازن (`allowedWarehouseIds`).
+     * التقييد بالفروع وحده مقبول: كل سطر يحمل فرعه فالرصيد على فروعه مُثبَت لا مقدَّر.
+     *
+     * @return array{allowed: bool, reason: ?string}
+     */
+    public function ledgerBalanceScope(User $actor): array
+    {
+        if (! $actor->hasPermission('products.view_cost') || ! $actor->hasPermission('accounts.view')) {
+            return ['allowed' => false, 'reason' => 'financial_permissions_required'];
+        }
+        if ($actor->allowedFuelStationIds() !== null || $actor->allowedWarehouseIds() !== null) {
+            return ['allowed' => false, 'reason' => 'station_scope_restricted'];
+        }
+
+        return ['allowed' => true, 'reason' => null];
     }
 
     // ───────────────────────── ③ الحساب الوسيط ─────────────────────────
@@ -183,6 +207,12 @@ class FuelTankerFillAccountingReportService
      */
     public function clearingAccount(User $actor, ?array $visibleBranchIds, array $period): array
     {
+        $balanceScope = $this->ledgerBalanceScope($actor);
+        if (! $balanceScope['allowed']) {
+            throw new FuelTankerFillException(FuelTankerFillException::FORBIDDEN, $balanceScope['reason'] === 'station_scope_restricted'
+                ? 'أرصدة الحساب الوسيط أرصدة أستاذ على مستوى الفرع/المؤسسة ولا تُعزل بالمحطة؛ لا تُعرض لمستخدم مقيَّد بمحطات أو مخازن.'
+                : 'تقرير الحساب الوسيط ماليٌّ ويتطلب صلاحيتَي عرض التكلفة والحسابات.', 403, ['reason' => $balanceScope['reason']]);
+        }
         $tenantId = (string) $this->tenant->id();
         $to = $period['to'] ?? now()->toDateString();
         $from = $period['from'] ?? \Carbon\CarbonImmutable::parse($to)->startOfMonth()->toDateString();
@@ -245,7 +275,12 @@ class FuelTankerFillAccountingReportService
 
         return [
             'period' => ['from' => $from, 'to' => $to], 'accounts' => $result,
-            'scope' => ['branch_restricted' => $visibleBranchIds !== null, 'filters_applied' => ['period', 'branch']],
+            'scope' => [
+                // أرصدة الأستاذ مُجمَّعة بسطر القيد: تُقيَّد بالفرع (السطر يحمل `branch_id`) ولا تُقيَّد بالمحطة/الصاحب/الوقود/الحالة (لا مرجع لها على سطر القيد فلا تُقدَّر).
+                'level' => $visibleBranchIds === null ? 'organization' : 'branches', 'branch_ids' => $visibleBranchIds, 'station_restricted' => false,
+                'basis' => 'ledger_lines_by_branch', 'filters_applied' => $visibleBranchIds === null ? ['period'] : ['period', 'branch'],
+                'filters_not_applicable' => ['station_id', 'owner_id', 'fuel_product_id', 'status', 'inventory_status'],
+            ],
         ];
     }
 

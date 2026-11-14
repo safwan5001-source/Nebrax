@@ -313,7 +313,7 @@ class FuelTankerFillReportsTest extends TestCase
         $this->assertNull($row['values']);
         $this->assertNull($row['chain']);
         $this->assertNull($row['accounts']);
-        $this->assertNull($control['clearing']);
+        $this->assertSame(['available' => false, 'reason' => 'financial_permissions_required', 'accounts' => []], $control['clearing']);
         $this->assertTrue($control['masking']['costs']);
         $fills = $this->report('fills', [], $low['token'])->json('data');
         $this->assertArrayNotHasKey('posted_cost_minor', $this->rowOf($fills['rows'], $f['posted']));
@@ -330,5 +330,79 @@ class FuelTankerFillReportsTest extends TestCase
         $this->assertNull($this->rowOf($accountsOnly['rows'], $f['posted'])['values']);
 
         $this->assertSame($before, $this->state(), 'تقارير قراءة فقط');
+    }
+
+    // ───────────────────────── نطاق المحطات لأرصدة الأستاذ ─────────────────────────
+
+    /** @test */
+    public function a_station_restricted_user_with_cost_and_accounts_permissions_never_sees_ledger_balances_or_other_stations_data(): void
+    {
+        $f = $this->seedFills();
+        $today = now()->toDateString();
+        // قيد يدوي على الحساب الوسيط بفرع المحطة نفسه (يمثّل نشاط محطة أخرى في الفرع: سطر القيد يحمل الفرع لا المحطة).
+        app(TenantContext::class)->set($this->w['tenant_id']);
+        $counter = Account::create(['code' => '9997', 'name' => 'مقابل اختباري', 'type' => 'liability', 'normal_balance' => 'credit', 'is_group' => false, 'is_active' => true]);
+        $manual = app(LedgerService::class)->post([
+            ['account_id' => $this->clearing->id, 'debit' => 7_700, 'branch_id' => $this->w['station']->branch_id],
+            ['account_id' => $counter->id, 'credit' => 7_700, 'branch_id' => $this->w['station']->branch_id],
+        ], ['entry_date' => $today, 'description' => 'قيد محطة أخرى في الفرع', 'source_type' => null]);
+        $before = $this->state();
+
+        $financial = [...self::VIEW, 'accounts.view', 'products.view_cost'];
+        $otherStation = FuelStation::create(['branch_id' => $this->w['station']->branch_id, 'warehouse_id' => $this->w['warehouse']->id, 'code' => 'RP-SCOPE', 'name' => 'محطة مقيَّدة']);
+        $elsewhere = $this->userWith($financial, [$otherStation->id]);   // مقيَّد بمحطة لا سندات لها
+        $sameStation = $this->userWith($financial, [$this->w['station']->id]); // مقيَّد بمحطة السندات نفسها، وفي الفرع نشاط خارجها
+
+        foreach ([$elsewhere, $sameStation] as $i => $restricted) {
+            // الحساب الوسيط: 403 برمز السبب، بلا أي رصيد أو قيد.
+            $response = $this->report('clearing-account', ['from' => $today, 'to' => $today], $restricted['token'])->assertForbidden();
+            $this->assertSame('station_scope_restricted', $response->json('details.reason'), "مستخدم {$i}");
+            $this->assertStringNotContainsString('7700', (string) $response->getContent());
+            $this->assertStringNotContainsString($manual->number, (string) $response->getContent());
+
+            // الرقابة المحاسبية: القسم المالي غير متاح بسبب معلن، ولا يظهر رصيد ولا قيد خارج محطات المستخدم.
+            $control = $this->report('accounting-control', ['from' => $today, 'to' => $today], $restricted['token'])->assertOk()->json('data');
+            $this->assertSame(['available' => false, 'reason' => 'station_scope_restricted', 'accounts' => []], $control['clearing']);
+            $json = json_encode($control);
+            $this->assertStringNotContainsString($manual->number, $json);
+            $this->assertStringNotContainsString('closing_balance_minor', $json);
+            $this->assertStringNotContainsString('"code":"1145"', $json);
+        }
+
+        // المحطة الأخرى بلا سندات: لا صفوف ولا أعداد؛ المقيَّد بمحطة السندات يرى سنداتها فقط (لا غيرها).
+        $this->assertSame([], $this->report('accounting-control', [], $elsewhere['token'])->json('data.rows'));
+        $this->assertSame(0, $this->report('fills', [], $elsewhere['token'])->json('data.summary.total_count'));
+        $mine = $this->report('accounting-control', [], $sameStation['token'])->json('data');
+        $this->assertSame(3, $mine['summary']['total']);
+        $this->assertTrue($mine['rows'][0]['station_id'] === $this->w['station']->id);
+        $this->assertSame(654_000, $this->rowOf($mine['rows'], $f['posted'])['values']['posting_cost_minor']);
+
+        // مطابقة المخزون: قيمة المجمّع/الأستاذ تُحجب عن المقيَّد بمحطة (نطاق مالي ناقص) والكمية تبقى.
+        $recon = $this->report('inventory-reconciliation', [], $sameStation['token'])->assertOk()->json('data');
+        $this->assertSame('restricted_warehouse_scope', $recon['pool']['value_scope']);
+        $this->assertNull($recon['pool']['value']);
+
+        // مستخدم بنطاق المؤسسة الكامل: يرى الرصيد الحقيقي (يشمل القيد الآخر) مع نطاق معلن، وفلاتر المحطة تُعلَن «غير مطبَّقة على الأرصدة».
+        $org = $this->userWith($financial);
+        $full = $this->report('clearing-account', ['from' => $today, 'to' => $today, 'station_id' => $this->w['station']->id, 'owner_id' => $this->owner->id], $org['token'])->assertOk();
+        $account = $full->json('data.accounts.0');
+        $this->assertSame(654_000 + 7_700, $account['closing_balance_minor']);
+        $this->assertSame('organization', $full->json('data.scope.level'));
+        $this->assertSame(['period'], $full->json('data.scope.filters_applied'));
+        $this->assertContains('station_id', $full->json('meta.balance_filters_not_applicable'));
+        $this->assertContains('owner_id', $full->json('meta.balance_filters_not_applicable'));
+        $this->assertFalse($full->json('meta.row_scope.station_restricted'));
+        $ctl = $this->report('accounting-control', ['station_id' => $this->w['station']->id], $org['token'])->assertOk();
+        $this->assertTrue($ctl->json('data.clearing.available'));
+        $this->assertSame(['station_id'], $ctl->json('meta.balance_filters_not_applicable'));
+
+        // مرشّح الفرع يؤثر فعلاً في الأرصدة ويُعلَن: فرع آخر ⇒ لا قيود له.
+        $otherBranch = \App\Models\Branch::create(['name' => 'فرع آخر', 'code' => 'BR-RP-2']);
+        $filtered = $this->report('clearing-account', ['from' => $today, 'to' => $today, 'branch_id' => $otherBranch->id], $org['token']);
+        $this->assertSame(0, $filtered->assertOk()->json('data.accounts.0.closing_balance_minor'));
+        $this->assertSame(['period', 'branch'], $filtered->json('data.scope.filters_applied'));
+        $this->assertSame([$otherBranch->id], $filtered->json('data.scope.branch_ids'));
+
+        $this->assertSame($before['journal_lines'], $this->state()['journal_lines'], 'قراءة فقط');
     }
 }

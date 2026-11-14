@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
  *
  * البوابات الثلاث نفسها للترحيل (PR-1 وPR-4 والترحيل) ⇒ 404 موحَّد مغلقاً؛ `fuel.tanker.fill.inventory.view` + قدرة `fuel_stations.core`؛ نطاق المحطة/الفرع كسندات PR-4 و404 موحَّد.
  * المرشّحات: المحطة، الفرع، صاحب الصهريج، نوع الوقود، حالة السند (`status` و`inventory_status`)، والفترة (`from`/`to`). المبالغ والمعرّفات المالية لـ`products.view_cost` فقط ومعرّفات الحسابات لـ`accounts.view` فقط؛
- * **تقرير الحساب الوسيط ماليٌّ بالكامل فيتطلب الصلاحيتين معاً (403 وإلا)**. لا مسار يصل جلسة PIN.
+ * **تقرير الحساب الوسيط ماليٌّ بالكامل فيتطلب الصلاحيتين معاً وألا يكون المستخدم مقيَّداً بمحطات/مخازن (403 برمز `reason` وإلا): أرصدة الأستاذ لا تُعزل بالمحطة.** لا مسار يصل جلسة PIN.
  */
 class FuelTankerFillReportController extends ApiController
 {
@@ -58,6 +58,8 @@ class FuelTankerFillReportController extends ApiController
         $query = $this->scopeToActiveBranch($query, $request);
 
         $period = ['from' => $filters['from'] ?? null, 'to' => $filters['to'] ?? null];
+        // فرع الأرصدة: مرشّح الفرع (ضمن المسموح) وإلا فروع المستخدم المسموحة (null = المؤسسة).
+        $effectiveBranches = ! empty($filters['branch_id']) ? [$filters['branch_id']] : $allowedBranches;
         $stationIds = $this->accessibleStationIds();
         $visibleWarehouses = $stationIds === null ? null : FuelStation::query()->whereIn('id', $stationIds)->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->all();
         $fullScope = $user->allowedWarehouseIds() === null && $user->allowedFuelStationIds() === null;
@@ -65,24 +67,19 @@ class FuelTankerFillReportController extends ApiController
         $data = match ($key) {
             'fills' => $this->reports->fills($query, $user, (int) ($filters['page'] ?? 1), (int) ($filters['per_page'] ?? self::PER_PAGE)),
             'inventory-reconciliation' => $this->reports->inventoryReconciliation($query, $user, $visibleWarehouses, $allowedBranches, $fullScope),
-            'accounting-control' => $this->reports->accountingControl($query, $user, $allowedBranches, $period),
-            'clearing-account' => $this->clearing($user, $allowedBranches, $period),
+            'accounting-control' => $this->reports->accountingControl($query, $user, $effectiveBranches, $period),
+            'clearing-account' => $this->reports->clearingAccount($user, $effectiveBranches, $period),
         };
+        // مرشّحات لا تؤثر في أرصدة الأستاذ (لا مرجع لها على سطر القيد) تُعلَن صراحةً بدل أن تبدو مطبَّقة.
+        $notApplicableToBalances = array_values(array_intersect(['station_id', 'owner_id', 'fuel_product_id', 'status', 'inventory_status'], array_keys(array_filter($filters, fn ($v) => $v !== null && $v !== ''))));
 
         return response()->json(['data' => $data, 'meta' => [
             'report' => $key, 'read_only' => true, 'generated_at' => now()->toIso8601String(),
             'filters' => array_filter($filters, fn ($v) => $v !== null && $v !== ''),
             'scan_limit' => FuelTankerFillAccountingReportService::SCAN_LIMIT,
+            // نطاق ما طُبِّق فعلاً: الصفوف تُقيَّد بمحطات المستخدم وفروعه والمرشّحات؛ أرصدة الأستاذ بالفرع والفترة فقط.
+            'row_scope' => ['station_restricted' => $stationIds !== null, 'branch_restricted' => $allowedBranches !== null],
+            'balance_filters_not_applicable' => in_array($key, ['clearing-account', 'accounting-control'], true) ? $notApplicableToBalances : [],
         ]]);
-    }
-
-    /** @param list<string>|null $branches @param array{from: ?string, to: ?string} $period @return array<string, mixed> */
-    private function clearing(\App\Models\User $user, ?array $branches, array $period): array
-    {
-        if (! $user->hasPermission('products.view_cost') || ! $user->hasPermission('accounts.view')) {
-            abort(403, 'تقرير الحساب الوسيط ماليٌّ ويتطلب صلاحيتَي عرض التكلفة والحسابات.');
-        }
-
-        return $this->reports->clearingAccount($user, $branches, $period);
     }
 }
