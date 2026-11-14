@@ -463,6 +463,31 @@ class FuelTankerFillInventoryReversalTest extends TestCase
         $this->reverseFill($fill)->assertOk()->assertJsonPath('meta.replayed', true);
     }
 
+    /** @test */
+    public function the_cost_primitive_refuses_a_non_issue_or_foreign_original_movement_and_changes_nothing(): void
+    {
+        $fill = $this->postedFill();
+        $fuel = $this->w['fuels']['91'];
+        $warehouse = $this->w['warehouse'];
+        $receipt = \App\Models\FuelInventoryCostMovement::query()->where('movement_type', 'receipt')->firstOrFail();
+        $issue = \App\Models\FuelInventoryCostMovement::query()->where('movement_type', 'issue')->firstOrFail();
+        $stock = \App\Models\StockMovement::query()->firstOrFail();
+        $entry = JournalEntry::query()->firstOrFail();
+        $before = $this->state();
+        $poolBefore = $this->pool91();
+
+        // أصل ليس صرفاً (وارد) ⇒ مرفوض.
+        $error = $this->caught(fn () => app(FuelCostBasisService::class)->recordIssueReversal($fuel, $warehouse, $stock, $receipt, $entry));
+        $this->assertStringContainsString('FUEL_REVERSAL_ORIGINAL_INVALID', $error->getMessage());
+        // صرف لمخزن آخر ⇒ مرفوض.
+        $otherWarehouse = \App\Models\Warehouse::create(['code' => 'WH-RV-2', 'name' => 'مخزن آخر', 'branch_id' => $this->w['station']->branch_id, 'is_active' => true]);
+        $error = $this->caught(fn () => app(FuelCostBasisService::class)->recordIssueReversal($fuel, $otherWarehouse, $stock, $issue, $entry));
+        $this->assertStringContainsString('FUEL_REVERSAL_ORIGINAL_INVALID', $error->getMessage());
+        $this->assertSame($poolBefore, $this->pool91());
+        $this->assertSame($before['cost_movements'], $this->state()['cost_movements'], 'لا حركة تكلفة نشأت');
+        $this->assertSame('posted', $fill->fresh()->inventory_status);
+    }
+
     // ───────────────────────── حراسة ساكنة ─────────────────────────
 
     /** @test */
