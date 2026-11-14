@@ -320,3 +320,18 @@ export function zonedLocalToIso(local: string, timeZone: string | null | undefin
   return Number.isNaN(device.getTime()) ? null : device.toISOString();
 }
 
+/**
+ * لحظة ISO (UTC) ⇒ `YYYY-MM-DDTHH:mm` (قيمة `datetime-local`) **بتوقيت المنطقة المعطاة** — عكس `zonedLocalToIso`. فارغ/تالف/منطقة غير صالحة ⇒ سلسلة فارغة (لا تخمين).
+ */
+export function isoToZonedLocal(iso: string, timeZone: string): string {
+  if (iso === '') return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(date);
+    const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+    return `${pick('year')}-${pick('month')}-${pick('day')}T${pick('hour')}:${pick('minute')}`;
+  } catch {
+    return '';
+  }
+}

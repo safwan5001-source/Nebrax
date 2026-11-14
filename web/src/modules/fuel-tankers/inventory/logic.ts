@@ -11,6 +11,8 @@ export const BLOCKERS = [
   'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance',
   // PR-6B-0 (قراءة فقط): الفترة المقفلة، تعارض تسوية الوردية، غياب الحساب الوسيط.
   'period_locked', 'settlement_mode_conflict', 'clearing_account_missing',
+  // PR-6B-1: الحساب الوسيط معيَّن لكن لم يعد صالحاً.
+  'clearing_account_invalid',
 ] as const;
 export const REVIEW_REASONS = ['capacity_overrun', 'insufficient_balance', 'overdue'] as const;
 export const REQUIREMENTS = ['pool_quantity_equals_warehouse_stock', 'pool_value_equals_fuel_share_of_ledger_1140'] as const;
@@ -20,6 +22,8 @@ export interface ReadinessItem {
   blockers: string[];
   reviewReasons: string[];
   overdue: boolean;
+  /** PR-6B-1: سند تاريخي (قبل بدء الترحيل أو بدء غير محدد) — وسم عرض فقط. */
+  historical: boolean;
   ageHours: number;
   availableMilliliters: number | null;
   cumulativeMilliliters: number | null;
@@ -85,6 +89,7 @@ export function readReadiness(raw: unknown): ReadinessItem {
     blockers: strings(item.blockers),
     reviewReasons: strings(item.review_reasons),
     overdue: item.overdue === true,
+    historical: item.historical === true,
     ageHours: Math.max(0, int(item.age_hours) ?? 0),
     availableMilliliters: int(pool.available_milliliters),
     cumulativeMilliliters: int(pool.cumulative_milliliters),

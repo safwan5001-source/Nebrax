@@ -53,6 +53,8 @@ class FuelTankerFillInventoryReadiness
     public const B_PERIOD_LOCKED = 'period_locked';
     public const B_SETTLEMENT_MODE_CONFLICT = 'settlement_mode_conflict';
     public const B_CLEARING_ACCOUNT_MISSING = 'clearing_account_missing';
+    // TANKER-PR6B-1: الحساب الوسيط معيَّن لكن لم يعد صالحاً (معطَّل/تجميعي/صار حساب مخزون أو نقد أو ضريبة أو دوراً آخر…).
+    public const B_CLEARING_ACCOUNT_INVALID = 'clearing_account_invalid';
 
     // أسباب مراجعة (لا تمنع، تحتاج نظرة بشرية).
     public const R_CAPACITY_OVERRUN = 'capacity_overrun';
@@ -107,6 +109,7 @@ class FuelTankerFillInventoryReadiness
 
         $policies = [];
         $stationModes = [];
+        $postingConfigs = [];
         $closedPeriods = null;
         $pools = [];
         foreach ($active as $fill) {
@@ -165,10 +168,15 @@ class FuelTankerFillInventoryReadiness
             if ($station !== null && ($stationModes[$station->id] ??= $this->settings->get($station, 'shift_settlement_mode')) === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
                 $blockers[] = self::B_SETTLEMENT_MODE_CONFLICT;
             }
-            // الحساب الوسيط: لا بديل ولا تعيين تلقائي (الإعداد نفسه يُضاف في PR-6B-1) ⇒ مانع دائم حتى يُعيَّن صراحةً.
-            if ($station !== null && ! $this->clearingAccountResolved($station)) {
+            // الحساب الوسيط (PR-6B-1): بلا بديل ولا تعيين تلقائي ولا إنشاء — غيابه مانع `clearing_account_missing`، وتعيين لم يعد صالحاً مانع `clearing_account_invalid`.
+            // بدء الترحيل (`tanker_inventory_posting_start_at`): فارغ أو لاحق لتسجيل السند ⇒ سند **تاريخي** (وسم عرض فقط؛ لا يمنع ولا يرحّل، والترحيل المنفرد للتاريخي بصلاحيته لاحقاً).
+            $config = $station === null ? null : ($postingConfigs[$station->id] ??= $this->settings->tankerInventoryPostingConfig($station));
+            if ($config !== null && ! $config['clearing_account']['configured']) {
                 $blockers[] = self::B_CLEARING_ACCOUNT_MISSING;
+            } elseif ($config !== null && ! $config['clearing_account']['valid']) {
+                $blockers[] = self::B_CLEARING_ACCOUNT_INVALID;
             }
+            $historical = $config === null || $config['posting_start_at'] === null || $fill->recorded_at === null || $fill->recorded_at->lt(\Carbon\CarbonImmutable::parse($config['posting_start_at']));
             // الفترة المحاسبية/السنة المالية المقفلة لتاريخ التعبئة بتوقيت المحطة: يُرفض الترحيل لاحقاً ولا يُنقل صامتاً إلى اليوم (D-6B-8).
             if ($station !== null && $fill->recorded_at !== null && $this->periodLockedFor($closedPeriods ??= $this->closedPeriods($tenantId), $this->settings->businessDate($station, $fill->recorded_at))) {
                 $blockers[] = self::B_PERIOD_LOCKED;
@@ -190,18 +198,11 @@ class FuelTankerFillInventoryReadiness
                 $overdue,
                 $ageHours,
                 $poolInfo,
+                $historical,
             );
         }
 
         return ['items' => $items, 'pools' => array_values($pools)];
-    }
-
-    /**
-     * الحساب الوسيط (PR-6B-1 يضيف إعداده). **لا يُنشأ ولا يُعيَّن تلقائياً** ولا يُفترض 1145 أو غيره: ما دام الإعداد غير موجود فالحساب غير محلول دائماً.
-     */
-    private function clearingAccountResolved(FuelStation $station): bool
-    {
-        return false;
     }
 
     /**
@@ -259,9 +260,9 @@ class FuelTankerFillInventoryReadiness
      * @param  array<string, mixed>|null  $pool
      * @return array<string, mixed>
      */
-    private function item(string $readiness, array $blockers, array $reasons, bool $overdue, int $ageHours, ?array $pool): array
+    private function item(string $readiness, array $blockers, array $reasons, bool $overdue, int $ageHours, ?array $pool, bool $historical = true): array
     {
-        return ['readiness' => $readiness, 'blockers' => $blockers, 'review_reasons' => $reasons, 'overdue' => $overdue, 'age_hours' => $ageHours, 'pool' => $pool];
+        return ['readiness' => $readiness, 'blockers' => $blockers, 'review_reasons' => $reasons, 'overdue' => $overdue, 'age_hours' => $ageHours, 'pool' => $pool, 'historical' => $historical];
     }
 
     /**

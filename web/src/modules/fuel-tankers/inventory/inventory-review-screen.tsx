@@ -165,6 +165,7 @@ function FillRow({ row, locale }: { row: ReviewRow; locale: string }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone={TONE[item.readiness]} data-readiness-badge="">{t(`readiness.${item.readiness}`)}</Badge>
           {item.overdue ? <Badge tone="warning">{t('overdueBadge')}</Badge> : null}
+          {item.historical ? <Badge tone="neutral" data-historical-badge="">{t('historicalBadge')}</Badge> : null}
         </div>
       </div>
       <p className="text-sm text-text">

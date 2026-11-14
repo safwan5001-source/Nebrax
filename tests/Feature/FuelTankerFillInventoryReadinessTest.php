@@ -506,10 +506,13 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     /** @test */
     public function there_is_no_setting_that_enables_posting_or_bypasses_the_duplicate_guards(): void
     {
-        $defaults = array_keys(\App\Support\Settings::DEFAULTS['fuel_stations']);
-        foreach ($defaults as $key) {
-            if (str_contains($key, 'tanker_inventory')) {
-                $this->assertDoesNotMatchRegularExpression('/(post|enable|allow_negative|bypass|skip|duplicate)/', $key, "مفتاح {$key} لا يجوز أن يفعّل الترحيل أو يتجاوز الضوابط");
+        $defaults = \App\Support\Settings::DEFAULTS['fuel_stations'];
+        // PR-6B-1: المفتاحان الوحيدان المسموحان بهذه الكلمات — لحظة بدء (طابع زمني لا مفتاح تشغيل) وتنبيهات (إشعار فقط). لا مفتاح يفعّل الترحيل أو يتجاوز الضوابط.
+        $allowed = ['tanker_inventory_posting_start_at' => null, 'tanker_inventory_alerts_enabled' => true];
+        foreach ($defaults as $key => $default) {
+            if (str_contains($key, 'tanker_inventory') && preg_match('/(post|enable|allow_negative|bypass|skip|duplicate)/', $key) === 1) {
+                $this->assertArrayHasKey($key, $allowed, "مفتاح {$key} لا يجوز أن يفعّل الترحيل أو يتجاوز الضوابط");
+                $this->assertSame($allowed[$key], $default, "افتراضي {$key} ثابت: لا بدء ترحيل مفترض");
             }
         }
         $this->assertFalse(Readiness::POSTING_ENABLED);
@@ -691,7 +694,7 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     }
 
     /** @test */
-    public function the_clearing_account_is_a_permanent_blocker_and_nothing_creates_or_maps_an_account(): void
+    public function the_clearing_account_is_a_blocker_until_explicitly_configured_and_nothing_creates_or_maps_an_account(): void
     {
         $this->seedStock(5_000_000);
         $fill = $this->fill(1_000_000);
@@ -708,6 +711,64 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $this->assertSame($accounts, Account::query()->count());
         $this->assertSame($mappings, AccountRoleMapping::query()->count());
         $this->assertFalse(Account::query()->where('code', '1145')->exists());
+    }
+
+    /** @test */
+    public function a_valid_configured_clearing_account_lifts_the_missing_blocker_and_an_invalid_one_raises_a_distinct_blocker(): void
+    {
+        $this->seedStock(5_000_000);
+        $fill = $this->fill(1_000_000);
+        $viewer = $this->staff();
+        $account = Account::create(['code' => '1145', 'name' => 'وقود لدى أصحاب الصهاريج', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $before = $this->effects();
+
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', ['tanker_issue_clearing_account_id' => $account->id, 'reason' => 'تعيين الوسيط'])->assertOk();
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertSame([], $item['blockers'], 'السند سليم والحساب الوسيط صالح');
+        $this->assertSame(Readiness::READY, $item['readiness']);
+
+        // الحساب يصير غير صالح لاحقاً ⇒ مانع مميَّز (لا «مفقود»).
+        $account->forceFill(['is_active' => false])->save();
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertSame([Readiness::B_CLEARING_ACCOUNT_INVALID], $item['blockers']);
+        $this->assertSame(Readiness::BLOCKED, $item['readiness']);
+        $account->forceFill(['is_active' => true])->save();
+
+        // تجاوز محطة بقيمة صالحة ثم مسحه ⇒ الوراثة من المؤسسة.
+        $other = Account::create(['code' => '1146', 'name' => 'وسيط المحطة', 'type' => 'asset', 'normal_balance' => 'debit', 'is_group' => false, 'is_active' => true]);
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/stations/' . $this->fx['s1']->id . '/settings', ['tanker_issue_clearing_account_id' => $other->id, 'reason' => 'تجاوز'])->assertOk();
+        $other->forceFill(['is_active' => false])->save();
+        $this->assertSame([Readiness::B_CLEARING_ACCOUNT_INVALID], $this->rawItem($viewer['token'], $fill)['blockers'], 'التجاوز غير الصالح لا يسقط إلى حساب المؤسسة');
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/stations/' . $this->fx['s1']->id . '/settings', ['tanker_issue_clearing_account_id' => null, 'reason' => 'مسح'])->assertOk();
+        $this->assertSame([], $this->rawItem($viewer['token'], $fill)['blockers']);
+
+        // لا أثر مالي/مخزني ولا تغيير للسند.
+        $after = $this->effects();
+        $this->assertSame($before, $after);
+        $this->assertSame('pending_integration', $fill->fresh()->inventory_status);
+    }
+
+    /** @test */
+    public function the_posting_start_marks_fills_as_historical_for_display_only(): void
+    {
+        $this->seedStock(5_000_000);
+        $fill = $this->fill(1_000_000);
+        $viewer = $this->staff();
+
+        // فارغ ⇒ كل السندات تاريخية.
+        $this->assertTrue($this->rawItem($viewer['token'], $fill)['historical']);
+
+        $future = now()->addDay()->toIso8601String();
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', ['tanker_inventory_posting_start_at' => $future, 'reason' => 'بدء مستقبلي'])->assertOk();
+        $this->assertTrue($this->rawItem($viewer['token'], $fill)['historical'], 'سند سابق لبدء الترحيل ⇒ تاريخي');
+
+        $past = now()->subDays(30)->toIso8601String();
+        $this->withToken($this->fx['owner'])->putJson('/api/fuel-stations/settings', ['tanker_inventory_posting_start_at' => $past, 'reason' => 'بدء سابق'])->assertOk();
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertFalse($item['historical']);
+        // وسم عرض فقط: لا يغيّر التصنيف ولا الحالة.
+        $this->assertSame('pending_integration', $fill->fresh()->inventory_status);
+        $this->assertSame(FuelTankerFill::STATUS_RECORDED, $fill->fresh()->status);
     }
 
     /** @test */

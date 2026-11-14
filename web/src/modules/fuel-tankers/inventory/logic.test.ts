@@ -4,7 +4,7 @@ import { isKnownBlocker, isKnownFinding, isKnownReason, litersOf, readReadiness,
 describe('readReadiness is defensive and fails closed', () => {
   it('maps a full item', () => {
     expect(readReadiness({ readiness: 'blocked', blockers: ['insufficient_balance'], review_reasons: [], overdue: true, age_hours: 30, pool: { available_milliliters: 500, cumulative_milliliters: 900 } })).toEqual({
-      readiness: 'blocked', blockers: ['insufficient_balance'], reviewReasons: [], overdue: true, ageHours: 30, availableMilliliters: 500, cumulativeMilliliters: 900,
+      readiness: 'blocked', blockers: ['insufficient_balance'], reviewReasons: [], overdue: true, historical: false, ageHours: 30, availableMilliliters: 500, cumulativeMilliliters: 900,
     });
   });
 

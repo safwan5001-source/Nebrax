@@ -21,6 +21,7 @@ import {
   type PolicyDraft, type PolicyField, type TankerOperation, type TankerPolicy,
 } from './settings-logic';
 import { INVENTORY_REVIEW_HREF, INVENTORY_REVIEW_PERMISSION } from './inventory/routes';
+import { InventorySettingsCard } from './inventory-settings/inventory-settings-card';
 import { ForbiddenState, GateClosedState } from './states';
 import { usePermissions } from './use-permissions';
 
@@ -325,6 +326,8 @@ export function TankerSettingsScreen() {
           </Button>
         </CardContent>
       </Card>
+
+      <InventorySettingsCard key={stationId} stationId={stationId} permissions={permissions} canManage={canManage} canGovern={canGovern} />
 
       <NozzleOperations key={stationId} stationId={stationId} canManage={canManage} />
     </div>

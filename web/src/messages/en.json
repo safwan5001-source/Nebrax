@@ -2944,6 +2944,8 @@
       "add": "Add",
       "remove": "Remove",
       "post": "Post",
+      "reverse": "Reverse",
+      "post_historical": "Post historical",
       "execution_approve": "Approve execution",
       "resolve_blocked": "Resolve blocked",
       "request": "Request",
@@ -10107,6 +10109,7 @@
       "voucher": "voucher",
       "liters": "L",
       "overdueBadge": "Overdue",
+      "historicalBadge": "Historical",
       "recordedAt": "Recorded {when} · {hours} h ago",
       "blockers": "Blockers",
       "reasons": "Review reasons",
@@ -10125,6 +10128,7 @@
         "period_locked": "The accounting period or fiscal year of the fill date is locked",
         "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting with it would deduct stock twice",
         "clearing_account_missing": "The clearing account is not assigned yet (a prerequisite for future posting)",
+        "clearing_account_invalid": "The assigned clearing account is no longer valid (inactive/group/now an inventory, cash, tax or other-role account)",
         "unknown": "Unknown blocker"
       },
       "reason": {
@@ -10241,6 +10245,89 @@
           "other": "Unknown limit."
         }
       }
+    },
+    "inventorySettings": {
+      "title": "Inventory integration settings",
+      "intro": "Configure the clearing account and future integration policies for tanker fills. Settings are stored and validated only — no stock deduction, no journal entry, no posting.",
+      "gateClosedNote": "The fill posting gate is closed. Saving these settings does not allow posting: no stock deduction, no journal entry, no receivable on the tanker owner, no revenue.",
+      "gateOpenNote": "The posting gate is open at deployment level, but this card only shows settings and performs no posting.",
+      "needView": "Viewing these settings requires the “{permission}” permission.",
+      "unavailable": "This feature is currently unavailable for this account.",
+      "loadFailed": "Could not load the inventory integration settings.",
+      "status": {
+        "title": "Configuration readiness",
+        "ready": "Configuration complete (no configuration blockers)"
+      },
+      "blocker": {
+        "clearing_account_missing": "The clearing account is not assigned yet — required for future posting",
+        "clearing_account_invalid": "The assigned clearing account is no longer valid — choose another account",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting alongside it would deduct the quantity twice",
+        "unknown": "Unknown blocker"
+      },
+      "notice": {
+        "posting_start_not_set": "Posting start is not set: every fill is treated as historical (no bulk or retroactive posting)",
+        "posting_gate_closed": "The posting gate is closed and nothing is posted",
+        "unknown": "Unknown notice"
+      },
+      "reason": {
+        "not_found": "The account does not exist in this organization",
+        "group": "The account is a group account and cannot take direct postings",
+        "inactive": "The account is inactive",
+        "not_asset": "The clearing account must be an asset account",
+        "inventory_account": "The clearing account cannot be an inventory account",
+        "cash_or_bank": "The clearing account cannot be a cash or bank account",
+        "tax_account": "The clearing account cannot be a tax account",
+        "reserved_role": "The account is reserved for another accounting role (receivables/payables/revenue/cost…)",
+        "other": "The account is not valid as a clearing account"
+      },
+      "inherit": "Inherited from organization ({value})",
+      "clearing": {
+        "label": "Clearing account (fuel held by tanker owners)",
+        "hint": "An active, non-group asset account assigned explicitly. There is no default choice, and the account is never created automatically.",
+        "none": "Not assigned",
+        "assignedHidden": "Assigned account (name hidden)",
+        "needAccountsView": "Choosing the account and seeing its name require the “{permission}” permission.",
+        "noCandidates": "There are no active, non-group asset accounts in the chart of accounts.",
+        "createHint": "Suggested code 1145 “Fuel held by tanker owners”. Create it in the chart of accounts, then pick it here; it cannot be an inventory, cash, bank or tax account, or any other accounting role."
+      },
+      "cost": {
+        "label": "Cost recognition timing",
+        "hint": "Currently supported: cost stays in the clearing account until invoicing.",
+        "option": {
+          "clearing_until_invoice": "Clearing account until invoice"
+        },
+        "note": "Later accounting recognition follows the delivery conditions being met and control transferring, not merely the invoice issue date. Immediate cost recognition is not available at this stage."
+      },
+      "variance": {
+        "label": "Pool-vs-ledger variance policy",
+        "hint": "Future posting behavior when the fuel cost pool value differs from the fuel share of the ledger.",
+        "option": {
+          "block": "Block posting (default)",
+          "warn": "Warn only"
+        }
+      },
+      "advanced": "Advanced settings",
+      "start": {
+        "label": "Posting start ({zone} time)",
+        "hint": "Fills recorded before it — or all fills if left empty — are historical: no bulk or retroactive posting; a historical fill is posted individually later with a separate permission.",
+        "notSet": "Not set",
+        "invalid": "The date and time are not valid."
+      },
+      "alerts": {
+        "label": "Inventory integration variance alerts",
+        "hint": "Turns on in-app alerts when a variance appears (no external delivery).",
+        "on": "Enabled",
+        "off": "Disabled"
+      },
+      "fixedNote": "Fixed, not configurable: one posting per fill, quantity and cost come from the fill, no negative balance, and a locked period is rejected.",
+      "reasonLabel": "Reason for the change (kept in the audit log)",
+      "reasonHint": "Optional, up to 500 characters.",
+      "governanceNeeded": "Changing the clearing account, timing, policy and posting start requires “{governance}” together with “{manage}”. You can change alerts with “{manage}” only.",
+      "governanceRefused": "The server refused the change: it requires both “{governance}” and “{manage}”.",
+      "save": "Save settings",
+      "saving": "Saving…",
+      "saved": "Inventory integration settings saved",
+      "saveFailed": "Could not save the settings."
     },
     "settings": {
       "inventory": {
