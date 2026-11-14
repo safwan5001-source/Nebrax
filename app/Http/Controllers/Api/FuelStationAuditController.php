@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\FuelStationAuditEventResource;
 use App\Models\FuelStationAuditEvent;
+use App\Models\FuelOpeningBalance;
 use App\Models\FuelTanker;
 use App\Models\FuelTankerFill;
 use App\Models\FuelTankerOwner;
 use App\Models\FuelTankerOwnerCompanyLink;
+use App\Services\FuelOpeningBalanceService;
 use App\Support\Rbac;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,7 +44,7 @@ class FuelStationAuditController extends ApiController
     {
         $filters = $request->validate([
             'fuel_station_id' => ['nullable', 'uuid'],
-            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink,FuelTankerFill'],
+            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink,FuelTankerFill,FuelOpeningBalance'],
             'subject_id' => ['nullable', 'uuid'],
             'actor_id' => ['nullable', 'uuid'],
             'action' => ['nullable', 'string', 'max:80'],
@@ -55,6 +57,7 @@ class FuelStationAuditController extends ApiController
         $this->restrictEventsToUserScope($query, $request);
         $this->restrictTankerSubjects($query, $request);
         $this->restrictTankerFillSubjects($query, $request);
+        $this->restrictOpeningBalanceSubjects($query);
         if (! empty($filters['fuel_station_id'])) {
             $query->where('fuel_station_id', $filters['fuel_station_id']);
         }
@@ -109,6 +112,19 @@ class FuelStationAuditController extends ApiController
         }
         if (! Rbac::allows($role, 'fuel.tanker.fill.attachment.remove')) {
             $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereIn('action', self::FILL_VIEW_ACTIONS));
+        }
+    }
+
+    /**
+     * FUEL-OPEN-AUDIT-SEC (#2114): بوابة الرصيد الافتتاحي تحكم قراءة أحداثه
+     * كما تحكم مسارات مستنداته. لا نُغيّر أو نمسح السجل الأصلي.
+     * حجب التكلفة داخل before/after يتم في FuelStationAuditEventResource
+     * باستخدام سلطة التكلفة نفسها التي تحكم FuelOpeningBalanceResource.
+     */
+    private function restrictOpeningBalanceSubjects(Builder $query): void
+    {
+        if (! FuelOpeningBalanceService::enabled()) {
+            $query->where('subject_type', '!=', FuelOpeningBalance::class);
         }
     }
 
