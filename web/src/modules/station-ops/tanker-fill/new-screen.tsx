@@ -347,7 +347,10 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
         />
       ) : null}
 
-      {step !== 'review' && problem && showProblem(step, draft, problem) ? <InlineNote tone="warning">{t(problemKey(problem))}</InlineNote> : null}
+      {/* منطقة حيّة ثابتة الموضع: نص «المطلوب للمتابعة» يُعلَن لقارئ الشاشة (إدراج عنصر بدور حيّ دفعةً واحدة لا يُعلَن بموثوقية). فارغة ⇒ لا مسافة (`empty:hidden`). */}
+      <div role="status" aria-live="polite" data-step-problem="" className="empty:hidden">
+        {step !== 'review' && problem && showProblem(step, draft, problem) ? <InlineNote tone="warning">{t(problemKey(problem))}</InlineNote> : null}
+      </div>
 
       <div className="space-y-2" data-wizard-actions="">
         {step === 'review' ? (

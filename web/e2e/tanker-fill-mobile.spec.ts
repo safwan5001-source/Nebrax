@@ -374,8 +374,12 @@ test.describe('server policies reflected in the wizard', () => {
     await expect(page.getByTestId('tanker-none')).toHaveCount(0);
     await expect(next(page)).toBeDisabled();
     await expect(page.getByText(t('en', 'tankerFill.problem.tanker_required'))).toBeVisible();
+    // الرسالة داخل منطقة حيّة (role=status) كي يُعلنها قارئ الشاشة، وهي فارغة/مخفية حين لا مشكلة.
+    await expect(page.locator('[data-step-problem]')).toHaveAttribute('role', 'status');
+    await expect(page.locator('[data-step-problem]')).toContainText(t('en', 'tankerFill.problem.tanker_required'));
     await page.getByTestId(`tanker-${TANKER_CAMEL_A}`).click();
     await expect(next(page)).toBeEnabled();
+    await expect(page.locator('[data-step-problem]')).toBeHidden(); // فارغة ⇒ لا مسافة زائدة
   });
 
   test('optional tanker: “without a tanker” is allowed and sends no tanker id', async ({ page }) => {

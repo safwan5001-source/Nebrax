@@ -232,6 +232,10 @@ describe('policy and validation (client-side guidance; the server decides)', () 
     expect(screen.getByText('Choosing the tanker is required at this station.')).toBeTruthy();
     expect(screen.queryByRole('radio', { name: /Without a tanker/ })).toBeNull();
     expect((btn('Next') as HTMLButtonElement).disabled).toBe(true);
+    // «اختر الصهريج للمتابعة» يُعلَن عبر منطقة حيّة (role=status)، لا نصاً صامتاً.
+    const live = document.querySelector('[data-step-problem]') as HTMLElement;
+    expect(live.getAttribute('role')).toBe('status');
+    expect(live.textContent).toContain('Choose the tanker to continue.');
     await user.click(screen.getByRole('radio', { name: /XYZ 9/ }));
     expect((btn('Next') as HTMLButtonElement).disabled).toBe(false);
   });
