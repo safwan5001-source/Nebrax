@@ -170,6 +170,8 @@ class FuelCostPoolIntegrityTest extends TestCase
             'Services' . DIRECTORY_SEPARATOR . 'FuelSupplyReceivingService.php',
             // TANKER-PR6B-3: ترحيل سند تعبئة الصهريج — مسار وقود معتمد جديد يمرّر الوسم نفسه (مراجَع ومحروس باختباراته).
             'Services' . DIRECTORY_SEPARATOR . 'FuelTankerFillInventoryPostingService.php',
+            // TANKER-PR6B-4: عكس ترحيل السند بالتكلفة التاريخية — وارد بوسم المجمّع (مراجَع ومحروس باختباراته).
+            'Services' . DIRECTORY_SEPARATOR . 'FuelTankerFillInventoryReversalService.php',
         ], $holders);
     }
 

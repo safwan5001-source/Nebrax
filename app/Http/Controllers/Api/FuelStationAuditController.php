@@ -46,7 +46,7 @@ class FuelStationAuditController extends ApiController
      *
      * @var list<string>
      */
-    private const FILL_INVENTORY_ACTIONS = ['tanker_fill.inventory_posted'];
+    private const FILL_INVENTORY_ACTIONS = ['tanker_fill.inventory_posted', 'tanker_fill.inventory_reversed'];
 
     public function index(Request $request): JsonResponse
     {

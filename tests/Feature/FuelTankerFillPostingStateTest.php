@@ -618,10 +618,11 @@ class FuelTankerFillPostingStateTest extends TestCase
     /** @test */
     public function only_the_pr6b3_posting_service_writes_posted_state_posting_rows_attempts_or_the_new_ledger_types(): void
     {
-        // PR-6B-3: الكاتب الوحيد الآن هو خدمة الترحيل (ومتحكّمها يمرّر إليها)؛ النموذجان يبقيان رافضين لكل كتابة. العكس غير مبنيّ (PR-6B-4).
+        // PR-6B-3/4: الكاتبان الوحيدان خدمتا الترحيل والعكس (وسمتهما المشتركة `FuelTankerFillInventorySupport` لتسجيل المحاولات الفاشلة، ومتحكّماهما يمرّران إليهما)؛ النموذجان يبقيان رافضين لكل كتابة.
         $allowed = [
             'FuelTankerFill.php', 'FuelTankerFillInventoryPosting.php', 'FuelTankerFillInventoryPostingAttempt.php', 'FuelOperationalLedger.php',
             'FuelTankerFillService.php', 'FuelTankerFillException.php', 'FuelTankerFillInventoryPostingService.php', 'FuelTankerFillInventoryPostingController.php',
+            'FuelTankerFillInventoryReversalService.php', 'FuelTankerFillInventoryReversalController.php', 'FuelTankerFillInventorySupport.php',
         ];
         $needles = ['INVENTORY_POSTED', 'INVENTORY_REVERSED', 'TYPE_TANKER_FILL', 'TYPE_TANKER_FILL_REVERSAL', 'fuel_tanker_fill_inventory_posting_attempts', 'fuel_tanker_fill_inventory_postings', 'FuelTankerFillInventoryPostingAttempt', 'tanker_fill_reversal'];
         $hits = [];
@@ -645,9 +646,9 @@ class FuelTankerFillPostingStateTest extends TestCase
             $code = preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents(app_path("Services/{$reader}")));
             $this->assertDoesNotMatchRegularExpression('/->(create|insert|update|delete|save|forceFill|increment|decrement)\(/', (string) $code, "{$reader} قراءة فقط");
         }
-        // لا مسار HTTP للعكس ولا أمر؛ والبوابة مغلقة افتراضياً (مصدر الإعداد).
+        // PR-6B-4: مسار العكس الوحيد (POST) ومعاينته (GET) خلف البوابات الثلاث؛ والبوابة مغلقة افتراضياً (مصدر الإعداد).
         $routes = (string) file_get_contents(base_path('routes/api.php'));
-        $this->assertStringNotContainsString('inventory-reversal', $routes);
+        $this->assertSame(2, preg_match_all('/inventory-reversal/', $routes), 'مساران فقط للعكس: المعاينة والتنفيذ');
         $this->assertStringNotContainsString('inventory-reverse', $routes);
         $this->assertFalse(array_key_exists('fuel:post-tanker-fills', Artisan::all()), 'لا أمر ترحيل');
         $this->assertFalse(\App\Services\FuelTankerFillInventoryReadiness::POSTING_ENABLED);
