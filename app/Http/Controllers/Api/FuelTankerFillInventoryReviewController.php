@@ -6,6 +6,9 @@ use App\Http\Resources\FuelTankerFillResource;
 use App\Models\FuelStation;
 use App\Models\FuelTankerFill;
 use App\Services\FuelInventoryLedgerReconciliation;
+use App\Services\FuelShiftSettlementReadiness;
+use App\Services\FuelStationSettingsService;
+use App\Services\FuelTankerClearingAccountGuard;
 use App\Services\FuelTankerFillInventoryReadiness;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +28,12 @@ class FuelTankerFillInventoryReviewController extends ApiController
     private const PER_PAGE = 25;
     private const MAX_PER_PAGE = 100;
 
-    public function __construct(private FuelTankerFillInventoryReadiness $readiness, private FuelInventoryLedgerReconciliation $reconciliation) {}
+    public function __construct(
+        private FuelTankerFillInventoryReadiness $readiness,
+        private FuelInventoryLedgerReconciliation $reconciliation,
+        private FuelStationSettingsService $settings,
+        private FuelTankerClearingAccountGuard $clearingGuard,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -97,6 +105,58 @@ class FuelTankerFillInventoryReviewController extends ApiController
         return response()->json([
             'data' => $result,
             'meta' => ['read_only' => true, 'posting_enabled' => FuelTankerFillInventoryReadiness::POSTING_ENABLED],
+        ]);
+    }
+
+    /**
+     * TANKER-PR6B-1 — تقييم **إعدادات الدمج المخزني** (قراءة فقط): الحساب الوسيط (صلاحيته وسببه)، توقيت الاعتراف، سياسة الانحراف، بدء الترحيل، التنبيهات، وموانع الإعداد.
+     * `station_id` (اختياري): نطاق محطة (القيم الفعّالة بالوراثة محطة ← مؤسسة)، وإلا نطاق المؤسسة. **لا أثر مالي أو مخزني**، وبوابة الترحيل (`posting_gate_open`) مغلقة افتراضياً ولا تُفتح من هنا.
+     * اسم/كود الحساب الوسيط لمن يملك `accounts.view` فقط؛ لا مبالغ في الحمولة إطلاقاً. الصلاحية والبوابتان نفسها لمراجعة الجاهزية.
+     */
+    public function settings(Request $request): JsonResponse
+    {
+        $filters = $request->validate(['station_id' => ['nullable', 'uuid']]);
+        $station = empty($filters['station_id']) ? null : $this->accessibleStation($filters['station_id']);
+        $config = $this->settings->tankerInventoryPostingConfig($station);
+        $clearing = $config['clearing_account'];
+
+        $account = null;
+        if ($clearing['account_id'] !== null && $request->user()->hasPermission('accounts.view')) {
+            $found = $this->clearingGuard->find($clearing['account_id']);
+            $account = $found === null ? null : ['id' => $found->id, 'code' => $found->code, 'name' => $found->name, 'name_en' => $found->name_en ?? null];
+        }
+
+        $blockers = [];
+        if (! $clearing['configured']) {
+            $blockers[] = FuelTankerFillInventoryReadiness::B_CLEARING_ACCOUNT_MISSING;
+        } elseif (! $clearing['valid']) {
+            $blockers[] = FuelTankerFillInventoryReadiness::B_CLEARING_ACCOUNT_INVALID;
+        }
+        if ($station !== null && $this->settings->get($station, 'shift_settlement_mode') === FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE) {
+            $blockers[] = FuelTankerFillInventoryReadiness::B_SETTLEMENT_MODE_CONFLICT;
+        }
+        $gateOpen = (bool) config('fuel_stations.tanker_inventory_posting_enabled', false);
+        $notices = [];
+        if ($config['posting_start_at'] === null) {
+            $notices[] = 'posting_start_not_set';
+        }
+        if (! $gateOpen) {
+            $notices[] = 'posting_gate_closed';
+        }
+
+        return response()->json([
+            'data' => [
+                'scope' => $station === null ? 'tenant' : 'station',
+                'station_id' => $station?->id,
+                'clearing_account' => ['configured' => $clearing['configured'], 'valid' => $clearing['valid'], 'reason' => $clearing['reason'], 'account' => $account],
+                'cost_recognition' => $config['cost_recognition'],
+                'variance_policy' => $config['variance_policy'],
+                'posting_start_at' => $config['posting_start_at'],
+                'alerts_enabled' => $config['alerts_enabled'],
+                'blockers' => $blockers,
+                'notices' => $notices,
+            ],
+            'meta' => ['read_only' => true, 'posting_enabled' => FuelTankerFillInventoryReadiness::POSTING_ENABLED, 'posting_gate_open' => $gateOpen],
         ]);
     }
 }
