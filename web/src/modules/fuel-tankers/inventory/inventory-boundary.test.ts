@@ -12,15 +12,16 @@ const read = (file: string) => readFileSync(join(dir, file), 'utf8');
 const code = (file: string) => read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
 describe('TANKER-PR6A inventory review boundary', () => {
-  it('only client.ts calls api(), and only once, as a plain GET on the review route', () => {
+  it('only client.ts calls api(), exactly twice, as plain GETs on the review and reconciliation routes', () => {
     for (const file of sources) {
       const body = code(file);
       if (file !== 'client.ts') expect(body, `${file} must not call api()`).not.toMatch(/\bapi\s*[<(]/);
       expect(body, `${file} must not use fetch/XMLHttpRequest/axios`).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|axios/);
     }
     const client = code('client.ts');
-    expect([...client.matchAll(/\bapi\s*</g)]).toHaveLength(1);
+    expect([...client.matchAll(/\bapi\s*</g)]).toHaveLength(2);
     expect(client).toContain("const REVIEW = '/fuel-stations/tanker-fills/inventory-review'");
+    expect(client).toContain("const RECONCILIATION = '/fuel-stations/tanker-fills/inventory-review/reconciliation'");
     expect(client).not.toMatch(/method\s*:|\bPOST\b|\bPUT\b|\bPATCH\b|\bDELETE\b|body\s*:/);
     expect(client).not.toMatch(/tenant_id|tenantId|branch_id/);
   });
@@ -31,6 +32,12 @@ describe('TANKER-PR6A inventory review boundary', () => {
       expect(body, file).not.toMatch(/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)/);
       expect(body, file).not.toMatch(/\b(?:postFill|approveFill|deduct|executePosting|reverseFill)\b/i);
     }
+  });
+
+  it('the reconciliation panel is display-only: no button, form, write verb or adjustment wording', () => {
+    const panel = code('reconciliation-panel.tsx');
+    expect(panel).not.toMatch(/<Button\b|<form\b|type="submit"|onClick/);
+    expect(panel).not.toMatch(/\b(?:settle|adjust|correct|repost|fix)\w*\(/i);
   });
 
   it('the screen renders no write action (only pagination and retry buttons)', () => {

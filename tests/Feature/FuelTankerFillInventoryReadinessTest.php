@@ -2,7 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
+use App\Models\AccountRoleMapping;
+use App\Models\AccountingPeriodLock;
+use App\Models\FiscalYear;
 use App\Models\FuelInventoryCostMovement;
+use App\Models\FuelStationSettingOverride;
 use App\Models\FuelInventoryCostState;
 use App\Models\FuelNozzle;
 use App\Models\FuelPump;
@@ -131,10 +136,28 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     {
         foreach ($payload['data'] as $row) {
             if ($row['id'] === $fill->id) {
-                return $row['inventory_readiness'];
+                return $this->withoutClearingBlocker($row['inventory_readiness']);
             }
         }
         $this->fail('السند غير موجود في المراجعة');
+    }
+
+    /**
+     * PR-6B-0 أضاف مانع `clearing_account_missing` **دائماً** (الإعداد نفسه يُضاف في PR-6B-1)، فصار كل سند «blocked» مهما كان. اختبارات 6A تقيّس موانع 6A وأسبابها وتصنيفها بدونه؛
+     * المانع الجديد نفسه مغطّى في قسم «PR-6B-0» أدناه. يُعاد حساب التصنيف من بقية الموانع والأسباب (لا يُغيَّر شيء في الخدمة).
+     *
+     * @param  array<string,mixed>  $item
+     * @return array<string,mixed>
+     */
+    private function withoutClearingBlocker(array $item): array
+    {
+        $this->assertContains(Readiness::B_CLEARING_ACCOUNT_MISSING, $item['blockers'] ?? [], 'المانع الجديد حاضر دائماً قبل PR-6B-1');
+        $item['blockers'] = array_values(array_diff($item['blockers'], [Readiness::B_CLEARING_ACCOUNT_MISSING]));
+        if ($item['readiness'] === Readiness::BLOCKED && $item['blockers'] === []) {
+            $item['readiness'] = $item['review_reasons'] === [] ? Readiness::READY : Readiness::NEEDS_REVIEW;
+        }
+
+        return $item;
     }
 
     /** لقطة كل ما لا يجوز أن يتغيّر بهذه الشريحة. */
@@ -173,11 +196,12 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
     public function the_review_is_a_pure_read_with_no_write_routes(): void
     {
         $writes = collect(\Route::getRoutes()->getRoutes())->filter(fn ($route) => str_contains($route->uri(), 'tanker-fills/inventory-review'));
-        $this->assertCount(1, $writes);
-        $this->assertSame(['GET', 'HEAD'], $writes->first()->methods());
+        // مساران: المراجعة (6A) والمطابقة (6B-0)، كلاهما GET/HEAD وحدهما.
+        $this->assertSame([self::REVIEW => ['GET', 'HEAD'], self::REVIEW . '/reconciliation' => ['GET', 'HEAD']], $writes->mapWithKeys(fn ($route) => ['/' . $route->uri() => $route->methods()])->sortKeys()->all());
         $viewer = $this->staff();
         foreach (['post', 'put', 'patch', 'delete'] as $method) {
             $this->withToken($viewer['token'])->{$method . 'Json'}(self::REVIEW)->assertStatus(405);
+            $this->withToken($viewer['token'])->{$method . 'Json'}(self::REVIEW . '/reconciliation')->assertStatus(405);
         }
     }
 
@@ -224,7 +248,7 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $this->assertFalse($payload['meta']['posting_enabled']);
         $this->assertSame(Readiness::RECONCILIATION_REQUIREMENTS, $payload['meta']['reconciliation_requirements']);
         $this->assertSame(FuelTankerFill::INVENTORY_PENDING_INTEGRATION, FuelTankerFill::query()->findOrFail($fill->id)->inventory_status);
-        $this->assertSame(['total' => 1, 'ready' => 1, 'needs_review' => 0, 'blocked' => 0, 'overdue' => 0], $payload['meta']['summary']);
+        $this->assertSame(['total' => 1, 'ready' => 0, 'needs_review' => 0, 'blocked' => 1, 'overdue' => 0], $payload['meta']['summary'], 'محجوب بالحساب الوسيط وحده (PR-6B-0)');
     }
 
     /** @test */
@@ -292,7 +316,7 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $log = DB::getQueryLog();
         DB::disableQueryLog();
 
-        $item = $result['items'][$fills[2]->id];
+        $item = $this->withoutClearingBlocker($result['items'][$fills[2]->id]);
         $this->assertSame(3_000_000, $item['pool']['cumulative_milliliters']);
         $this->assertSame(2_500_000, $item['pool']['available_milliliters']);
         $this->assertSame([Readiness::B_INSUFFICIENT_BALANCE], $item['blockers']);
@@ -393,8 +417,10 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $blocked = $this->fill(900_000);
         $viewer = $this->staff();
 
-        $this->assertSame([$blocked->id], array_column($this->review($viewer['token'], '?readiness=blocked')['data'], 'id'));
-        $this->assertSame([$ready->id], array_column($this->review($viewer['token'], '?readiness=ready')['data'], 'id'));
+        // كلاهما «blocked» الآن بالحساب الوسيط (PR-6B-0)، فالمرشّح يعيدهما بترتيب التسجيل ولا يعيد `ready` شيئاً.
+        $this->assertSame([$ready->id, $blocked->id], array_column($this->review($viewer['token'], '?readiness=blocked')['data'], 'id'));
+        $this->assertSame([], $this->review($viewer['token'], '?readiness=ready')['data']);
+        $this->assertSame([Readiness::B_INSUFFICIENT_BALANCE], array_values(array_diff($this->itemOf($this->review($viewer['token']), $blocked)['blockers'], [])));
         $this->assertSame(1, $this->review($viewer['token'], '?per_page=1')['meta']['last_page'] - 1);
 
         $this->assertArrayNotHasKey('cost_pool_value_minor', $this->review($viewer['token'])['meta']['pools'][0], 'بلا products.view_cost لا مبلغ');
@@ -648,6 +674,107 @@ class FuelTankerFillInventoryReadinessTest extends TestCase
         $sales = (string) file_get_contents(base_path('app/Services/FuelSaleService.php'));
         foreach (['TankerFill', 'tanker_inventory', 'FuelTankerFillInventory'] as $needle) {
             $this->assertStringNotContainsString($needle, $sales);
+        }
+    }
+
+    // ───────────────────────── PR-6B-0: موانع قراءة فقط ─────────────────────────
+
+    /** @return array<string,mixed> العنصر الخام (بالمانع الجديد) */
+    private function rawItem(string $token, FuelTankerFill $fill): array
+    {
+        foreach ($this->review($token)['data'] as $row) {
+            if ($row['id'] === $fill->id) {
+                return $row['inventory_readiness'];
+            }
+        }
+        $this->fail('السند غير موجود في المراجعة');
+    }
+
+    /** @test */
+    public function the_clearing_account_is_a_permanent_blocker_and_nothing_creates_or_maps_an_account(): void
+    {
+        $this->seedStock(5_000_000);
+        $fill = $this->fill(1_000_000);
+        $viewer = $this->staff();
+        $accounts = Account::query()->count();
+        $mappings = AccountRoleMapping::query()->count();
+
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertSame(Readiness::BLOCKED, $item['readiness']);
+        $this->assertSame([Readiness::B_CLEARING_ACCOUNT_MISSING], $item['blockers'], 'السند سليم عدا الحساب الوسيط');
+
+        // لا إنشاء ولا تعيين تلقائي مهما تكررت القراءة: لا 1145 ولا غيره.
+        $this->rawItem($viewer['token'], $fill);
+        $this->assertSame($accounts, Account::query()->count());
+        $this->assertSame($mappings, AccountRoleMapping::query()->count());
+        $this->assertFalse(Account::query()->where('code', '1145')->exists());
+    }
+
+    /** @test */
+    public function post_on_close_stations_conflict_with_tanker_fills_to_prevent_a_double_deduction(): void
+    {
+        $this->seedStock(5_000_000);
+        $fill = $this->fill(1_000_000);
+        $viewer = $this->staff();
+        $this->assertNotContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $this->rawItem($viewer['token'], $fill)['blockers']);
+
+        $override = FuelStationSettingOverride::create(['tenant_id' => $this->tenantId, 'fuel_station_id' => $this->fx['s1']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
+        $item = $this->rawItem($viewer['token'], $fill);
+        $this->assertContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $item['blockers']);
+        $this->assertSame(Readiness::BLOCKED, $item['readiness']);
+
+        // الوضع `none` يرفع المانع؛ ومحطة أخرى لا تتأثر بوضع هذه.
+        $override->update(['value' => 'none']);
+        $this->assertNotContains(Readiness::B_SETTLEMENT_MODE_CONFLICT, $this->rawItem($viewer['token'], $fill)['blockers']);
+    }
+
+    /** @test */
+    public function an_active_period_lock_or_a_closed_fiscal_year_blocks_by_the_stations_business_date_not_utc(): void
+    {
+        $this->seedStock(5_000_000);
+        $fill = $this->fill(1_000_000);
+        $viewer = $this->staff();
+
+        // منطقة المحطة تُختار بحيث يختلف تاريخها عن تاريخ UTC للحظة التسجيل (أقصى زحزحتين ممكنتين: +14 و−11)، فيثبت اختبار «تاريخ المحطة لا UTC» في أي ساعة تشغيل.
+        $recorded = \Carbon\CarbonImmutable::instance($fill->recorded_at);
+        $utcDate = $recorded->utc()->toDateString();
+        $zone = collect(['Pacific/Kiritimati', 'Pacific/Pago_Pago'])->first(fn (string $tz) => $recorded->setTimezone($tz)->toDateString() !== $utcDate);
+        $this->assertNotNull($zone);
+        FuelStation::query()->whereKey($this->fx['s1']->id)->update(['timezone' => $zone]);
+        $stationDate = app(FuelStationSettingsService::class)->businessDate(FuelStation::query()->findOrFail($this->fx['s1']->id), $fill->recorded_at);
+        $this->assertNotSame($utcDate, $stationDate);
+        $this->assertNotContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers']);
+
+        // قفل يوم UTC فقط: لا يمنع (التاريخ المحاسبي بتوقيت المحطة).
+        $utcLock = AccountingPeriodLock::create(['tenant_id' => $this->tenantId, 'start_date' => $utcDate, 'end_date' => $utcDate, 'status' => 'active', 'reason' => 'اختبار']);
+        $this->assertNotContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers']);
+        $utcLock->update(['status' => 'released']);
+
+        $lock = AccountingPeriodLock::create(['tenant_id' => $this->tenantId, 'start_date' => $stationDate, 'end_date' => $stationDate, 'status' => 'active', 'reason' => 'اختبار']);
+        $this->assertContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers']);
+        $lock->update(['status' => 'released']);
+        $this->assertNotContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers'], 'القفل المحرَّر لا يمنع');
+
+        $year = FiscalYear::create(['tenant_id' => $this->tenantId, 'name' => 'FY-T6', 'start_date' => $recorded->subYear()->toDateString(), 'end_date' => $recorded->addYear()->toDateString(), 'status' => FiscalYear::STATUS_OPEN]);
+        $this->assertNotContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers'], 'سنة مفتوحة');
+        $year->update(['status' => FiscalYear::STATUS_CLOSED]);
+        $this->assertContains(Readiness::B_PERIOD_LOCKED, $this->rawItem($viewer['token'], $fill)['blockers']);
+    }
+
+    /** @test */
+    public function the_new_blockers_are_pure_reads_without_the_ledger_anchor_lock(): void
+    {
+        $this->seedStock(5_000_000);
+        $this->fill(1_000_000);
+        FuelStationSettingOverride::create(['tenant_id' => $this->tenantId, 'fuel_station_id' => $this->fx['s1']->id, 'device_key' => '', 'setting_key' => 'shift_settlement_mode', 'value' => 'post_on_close']);
+        $before = $this->effects();
+        $this->review($this->staff()['token']);
+        $this->assertSame($before, $this->effects());
+
+        // `AccountingDateGuard` يقفل صف المستأجر (مِرساة الأستاذ) ⇒ لا يُستعمل في مسار قراءة؛ الفحص هنا استعلام عادي بلا قفل.
+        $source = (string) preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents(base_path('app/Services/FuelTankerFillInventoryReadiness.php')));
+        foreach (['AccountingDateGuard', 'activeLockFor', 'assertOpen', 'lockLedgerAnchor', 'lockForUpdate', 'sharedLock'] as $needle) {
+            $this->assertStringNotContainsString($needle, $source);
         }
     }
 }

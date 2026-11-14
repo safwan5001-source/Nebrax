@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\FuelTankerFillResource;
+use App\Models\FuelStation;
 use App\Models\FuelTankerFill;
+use App\Services\FuelInventoryLedgerReconciliation;
 use App\Services\FuelTankerFillInventoryReadiness;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ class FuelTankerFillInventoryReviewController extends ApiController
     private const PER_PAGE = 25;
     private const MAX_PER_PAGE = 100;
 
-    public function __construct(private FuelTankerFillInventoryReadiness $readiness) {}
+    public function __construct(private FuelTankerFillInventoryReadiness $readiness, private FuelInventoryLedgerReconciliation $reconciliation) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -75,6 +77,26 @@ class FuelTankerFillInventoryReviewController extends ApiController
                 'posting_enabled' => FuelTankerFillInventoryReadiness::POSTING_ENABLED,
                 'reconciliation_requirements' => FuelTankerFillInventoryReadiness::RECONCILIATION_REQUIREMENTS,
             ],
+        ]);
+    }
+
+    /**
+     * TANKER-PR6B-0 — مطابقة مجمّع تكلفة الوقود مع رصيد المخزن والأستاذ العام. **قراءة فقط** (GET وحده): لا قفل ولا قيد ولا حركة ولا تسوية.
+     * الكمية لكل مجمّع ضمن مخازن المراجع؛ **القيمة** (لكل فرع) تتطلب `products.view_cost` **وعدم التقييد بمخزن/محطة** (الفرع يضم مخازن لا يراها المقيَّد)، وإلا لا تظهر أي قيمة مالية في الحمولة.
+     * الصلاحية والبوابتان نفسها لمراجعة الجاهزية؛ لا صلاحية جديدة.
+     */
+    public function reconciliation(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $stationIds = $this->accessibleStationIds();
+        $visibleWarehouses = $stationIds === null ? null : FuelStation::query()->whereIn('id', $stationIds)->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->all();
+        $fullScope = $user->allowedWarehouseIds() === null && $user->allowedFuelStationIds() === null;
+
+        $result = $this->reconciliation->reconcile($visibleWarehouses, $user->allowedBranchIds(), $user->hasPermission('products.view_cost'), $fullScope);
+
+        return response()->json([
+            'data' => $result,
+            'meta' => ['read_only' => true, 'posting_enabled' => FuelTankerFillInventoryReadiness::POSTING_ENABLED],
         ]);
     }
 }
