@@ -73,7 +73,7 @@ class FuelTankerFillInventoryActivityReader
         $ids = $fills->pluck('id')->all();
         $postings = DB::table('fuel_tanker_fill_inventory_postings')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $ids)->get()->keyBy('fuel_tanker_fill_id');
         $attempts = DB::table('fuel_tanker_fill_inventory_posting_attempts')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $ids)
-            ->orderBy('attempted_at')->orderBy('created_at')->get()->groupBy('fuel_tanker_fill_id');
+            ->orderBy('attempted_at')->orderBy('created_at')->orderBy('operation_type')->get()->groupBy('fuel_tanker_fill_id');
 
         $out = [];
         foreach ($fills as $fill) {
@@ -104,7 +104,7 @@ class FuelTankerFillInventoryActivityReader
         $canSeeAccounts = $actor->hasPermission('accounts.view');
         $posting = DB::table('fuel_tanker_fill_inventory_postings')->where('tenant_id', $tenantId)->where('fuel_tanker_fill_id', $fill->id)->first();
         $attempts = DB::table('fuel_tanker_fill_inventory_posting_attempts')->where('tenant_id', $tenantId)->where('fuel_tanker_fill_id', $fill->id)
-            ->orderByDesc('attempted_at')->orderByDesc('created_at')->limit(50)->get();
+            ->orderByDesc('attempted_at')->orderByDesc('created_at')->orderByDesc('operation_type')->limit(50)->get();
 
         $userIds = collect([$posting?->posted_by, $posting?->reversed_by, ...$attempts->pluck('actor_id')->all()])->filter()->unique()->values()->all();
         $users = $userIds === [] ? collect() : User::query()->whereIn('id', $userIds)->pluck('name', 'id');

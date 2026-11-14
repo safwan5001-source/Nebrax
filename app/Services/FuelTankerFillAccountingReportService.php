@@ -427,7 +427,7 @@ class FuelTankerFillAccountingReportService
             $reversalsByOriginal = $entryIds === [] ? collect() : DB::table('journal_entries')->where('tenant_id', $tenantId)->whereIn('reversal_of', $entryIds)->get()->groupBy('reversal_of');
             $allEntryIds = array_values(array_unique([...$entryIds, ...$reversalsByOriginal->flatten(1)->pluck('id')->all()]));
             $lines = $allEntryIds === [] ? collect() : DB::table('journal_lines')->where('tenant_id', $tenantId)->whereIn('journal_entry_id', $allEntryIds)->get()->groupBy('journal_entry_id');
-            $attempts = DB::table('fuel_tanker_fill_inventory_posting_attempts')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $ids)->orderBy('attempted_at')->orderBy('created_at')->get()->groupBy('fuel_tanker_fill_id');
+            $attempts = DB::table('fuel_tanker_fill_inventory_posting_attempts')->where('tenant_id', $tenantId)->whereIn('fuel_tanker_fill_id', $ids)->orderBy('attempted_at')->orderBy('created_at')->orderBy('operation_type')->get()->groupBy('fuel_tanker_fill_id');
 
             $shape = function (?object $entry) use ($lines): ?array {
                 if ($entry === null) {
