@@ -15993,6 +15993,214 @@
     "settingsLink": "Manage prices"
   },
   "stationOps": {
+    "tankerFill": {
+      "liters": "L",
+      "next": "Next",
+      "back": "Back",
+      "backToList": "Fill log",
+      "noStockNote": "Recording this voucher does not deduct fuel from station stock. It stays “Awaiting stock integration” until an authorised person posts it.",
+      "serverSays": "Server note: {message}",
+      "home": {
+        "title": "Tanker fills",
+        "hint": "Record a tanker fill or review this shift’s fills"
+      },
+      "closed": {
+        "title": "Feature not enabled",
+        "body": "Recording tanker fills is not enabled for this account yet."
+      },
+      "noAccess": {
+        "title": "You cannot record tanker fills",
+        "body": "Your administrator must grant you the tanker-fill permissions. Contact your supervisor."
+      },
+      "noShift": {
+        "title": "No open shift",
+        "body": "Fills are recorded inside the station’s open shift only. Open a shift, then come back.",
+        "listBody": "There is no open shift for this station right now, so there are no fills to show."
+      },
+      "header": {
+        "station": "Station",
+        "shift": "Current shift"
+      },
+      "steps": {
+        "label": "Recording steps",
+        "owner": "Owner",
+        "nozzle": "Nozzle",
+        "quantity": "Quantity",
+        "review": "Review"
+      },
+      "new": {
+        "title": "Tanker fill",
+        "subtitle": "Record what was dispensed to the tanker in the current shift"
+      },
+      "owner": {
+        "title": "Tanker owner",
+        "search": "Search by name or code",
+        "none": "There are no active tanker owners.",
+        "noResults": "No results for this search.",
+        "truncated": "Only the first results are shown. Narrow the search to see others."
+      },
+      "tanker": {
+        "title": "Tanker",
+        "required": "Choosing the tanker is required at this station.",
+        "optional": "Choosing the tanker is optional; the fill is recorded on the owner’s account either way.",
+        "noneRegistered": "This owner has no registered tankers. The fill is recorded on their account.",
+        "capacity": "Capacity {liters} L",
+        "capacityUnknown": "Capacity not set",
+        "withoutTanker": "Without a tanker",
+        "withoutHint": "The fill is recorded on the owner with no plate"
+      },
+      "nozzle": {
+        "pump": "Pump {number}",
+        "nozzle": "Nozzle {number}",
+        "derived": "Product and tank",
+        "derivedNote": "Taken from the selected nozzle; they cannot be changed here.",
+        "noneTitle": "No allowed nozzle",
+        "noneBody": "No active nozzle is allowed for tanker fills at this station. Tell your supervisor.",
+        "blocked": {
+          "station_inactive": "Station is not active",
+          "nozzle_inactive": "Nozzle is not active",
+          "pump_missing": "Pump not found",
+          "pump_inactive": "Pump is not active",
+          "tank_missing": "Tank not found",
+          "tank_inactive": "Tank is not active",
+          "product_missing": "Product not found",
+          "product_inactive": "Product is not active",
+          "product_tank_mismatch": "Nozzle product does not match its tank",
+          "operation_not_allowed": "Tanker fills not allowed"
+        }
+      },
+      "field": {
+        "number": "Voucher no.",
+        "voucher": "Paper voucher no.",
+        "status": "Status",
+        "owner": "Owner",
+        "tanker": "Tanker",
+        "pump": "Pump",
+        "nozzle": "Nozzle",
+        "product": "Product",
+        "tank": "Tank",
+        "quantity": "Quantity",
+        "recordedAt": "Recorded at"
+      },
+      "quantity": {
+        "hint": "In litres, up to three decimals. Use a dot for the fraction."
+      },
+      "voucher": {
+        "hint": "Saved exactly as typed; leading zeros are part of it.",
+        "willSave": "It will be saved as: {value}"
+      },
+      "capacity": {
+        "over": "The quantity exceeds tanker {plate} capacity by {overrun} L (capacity {capacity} L).",
+        "confirm": "I confirm the quantity is correct",
+        "blocked": "The quantity exceeds the tanker capacity by {overrun} L and the station policy does not allow it. Reduce the quantity.",
+        "allowed": "The quantity exceeds the tanker capacity by {overrun} L. The policy allows it and the excess will be recorded."
+      },
+      "problem": {
+        "owner_required": "Choose the tanker owner to continue.",
+        "tanker_required": "Choose the tanker to continue.",
+        "nozzle_required": "Choose a nozzle to continue.",
+        "nozzle_not_eligible": "The selected nozzle is not allowed for tanker fills.",
+        "quantity_empty": "Enter the quantity in litres.",
+        "quantity_invalid": "The quantity is not valid. Use digits only, with a dot for the fraction.",
+        "quantity_negative": "The quantity cannot be negative.",
+        "quantity_zero": "The quantity must be greater than zero.",
+        "quantity_too_many_decimals": "At most three decimals.",
+        "quantity_too_large": "The quantity is too large. Check it.",
+        "voucher_empty": "Enter the paper voucher number.",
+        "voucher_too_long": "The voucher number is too long.",
+        "capacity_blocked": "The quantity exceeds the tanker capacity and the policy does not allow it.",
+        "capacity_confirmation_required": "Confirm the quantity is correct to continue."
+      },
+      "review": {
+        "title": "Review before saving",
+        "save": "Save fill",
+        "saving": "Saving…",
+        "noTanker": "No tanker",
+        "ownerSelected": "Selected owner",
+        "overrun": "Capacity excess confirmed: {overrun} L.",
+        "noEdit": "A voucher cannot be edited after saving. Check the numbers carefully."
+      },
+      "success": {
+        "title": "Fill recorded",
+        "replayed": "Voucher was already recorded (not duplicated)",
+        "number": "Voucher no.",
+        "another": "Record another fill",
+        "open": "Voucher details",
+        "list": "This shift’s fills"
+      },
+      "pending": {
+        "title": "Unresolved recording attempt",
+        "body": "The connection dropped after the fill was sent and we do not know if it was recorded. Check the status before recording another so the voucher is not duplicated.",
+        "notFound": "We could not find the voucher. It was most likely not recorded; you can resend with the same key (it will not duplicate) or discard the attempt.",
+        "checkFailed": "Could not check right now. Try again.",
+        "resend": "Resend",
+        "discard": "Discard attempt"
+      },
+      "status": {
+        "pending_integration": "Awaiting stock integration",
+        "posted": "Stock integrated",
+        "reversed": "Integration reversed",
+        "other": "Other status",
+        "voided": "Voided"
+      },
+      "list": {
+        "title": "Tanker fills",
+        "subtitle": "Current shift log",
+        "new": "Record a new fill",
+        "shiftLine": "Shift {number}",
+        "count": "Fills",
+        "total": "Total litres",
+        "truncated": "Only the first results are shown; the total covers what is shown.",
+        "emptyTitle": "No fills yet",
+        "emptyBody": "No tanker fills have been recorded in this shift.",
+        "pendingTitle": "Unresolved recording attempt",
+        "pendingHint": "A fill was sent and we do not know if it was recorded. Check its status."
+      },
+      "detail": {
+        "title": "Voucher details",
+        "overrun": "A capacity excess of {overrun} L was confirmed.",
+        "voided": "This voucher is voided."
+      },
+      "attachments": {
+        "title": "Voucher photos",
+        "count": "Photos: {count}",
+        "pinNote": "Uploading voucher photos from this app is not enabled yet and awaits owner approval. Hand the paper voucher to your supervisor."
+      },
+      "reject": {
+        "shift_required": "There is no open shift for this station. Open a shift first, then record the fill.",
+        "shift_not_open": "The shift that was open is no longer the current one. Check the shift, then try again.",
+        "nozzle_operation_not_allowed": "This nozzle is not allowed for tanker fills. Choose another nozzle.",
+        "equipment_not_operational": "The nozzle, pump or tank is not active. Choose another nozzle.",
+        "product_mismatch": "The nozzle product does not match its tank. Choose another nozzle or tell your supervisor.",
+        "owner_inactive": "The tanker owner is not active. Choose another owner.",
+        "tanker_required": "Choosing the tanker is required at this station. Choose a tanker.",
+        "tanker_mismatch": "This tanker does not belong to the selected owner. Choose the tanker again.",
+        "tanker_inactive": "The tanker is not active. Choose another tanker.",
+        "voucher_duplicate": "This paper voucher number is already recorded. A voucher is recorded only once.",
+        "voucher_invalid": "The paper voucher number is not valid. Correct it and try again.",
+        "quantity_invalid": "The quantity is not valid. Enter litres greater than zero, up to three decimals.",
+        "capacity_overrun_blocked": "The quantity exceeds the tanker capacity and the station policy does not allow it.",
+        "capacity_overrun_confirmation_required": "The quantity exceeds the tanker capacity. Confirm the quantity is correct to continue.",
+        "idempotency_key_reused": "This attempt could not be saved because its key was used for a different operation. Review and save again.",
+        "invalid_input": "Some data is not valid. Review the steps and try again.",
+        "unauthorized": "Your session has ended. Sign in again.",
+        "forbidden": "You do not have permission to record tanker fills.",
+        "not_found": "The feature or the station is not available for this account.",
+        "conflict": "Conflict with another operation. Review the data and try again.",
+        "rate_limited": "Too many attempts. Wait a moment and try again.",
+        "validation": "The server rejected this data. Review the steps and try again."
+      },
+      "unknown": {
+        "timeout": "The request timed out after sending and we do not know if the voucher was recorded. Check the status before any retry.",
+        "network": "The connection dropped after sending and we do not know if the voucher was recorded. Check the status before any retry.",
+        "server": "A server error occurred after sending and we do not know if the voucher was recorded. Check the status before any retry."
+      },
+      "unverified": "An unclear reply came back and we do not know if the voucher was recorded. Check the status before any retry.",
+      "notSent": {
+        "offline": "No internet connection. Nothing was sent; try again when the connection returns.",
+        "demo": "Preview mode: nothing is sent to the server."
+      }
+    },
     "productName": "AWJ Fuel Stations",
     "login": {
       "subtitle": "Sign in with your employee number and PIN",

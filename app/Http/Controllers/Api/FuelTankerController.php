@@ -23,7 +23,7 @@ use Illuminate\Http\Request;
  *
  * البوابة `fuel_stations.tanker_management_enabled` (وسيط `EnsureFuelTankerManagementEnabled` أول المسار) مغلقة ⇒ 404 موحَّد. التفويض بمفتاحَي `fuel.tanker.view|manage`
  * + قدرة `fuel_stations.core` التجارية؛ العزل بالمستأجر من `BaseModel`. كل الكتابة عبر `FuelTankerService` (الكاتب الوحيد، مع التدقيق). جلسة PIN لا تصل هذه المسارات
- * (خارج `StationSessionBoundary`، فشل مغلق) — وصول الموظف الميداني لقراءة صاحب الصهريج شريحة لاحقة منفصلة.
+ * (خارج `StationSessionBoundary`، فشل مغلق) **إلا قراءتَي القائمة `owners` و`tankers`** (TANKER-PR7: اختيار الصاحب والصهريج في تسجيل التعبئة)؛ ملف الصاحب وربط الشركات وكل الكتابة محجوبة.
  */
 class FuelTankerController extends ApiController
 {

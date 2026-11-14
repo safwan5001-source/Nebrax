@@ -15,7 +15,8 @@ use Illuminate\Http\Request;
  *
  * - بوابة نشر منفصلة `fuel_stations.tanker_fills_enabled` (مغلقة افتراضياً ⇒ 404 موحَّد قبل أي صلاحية) فوق بوابة PR-1.
  * - صلاحيات دقيقة (`fuel.tanker.fill.view|record|void`) + قدرة `fuel_stations.core`؛ نطاق المحطة (فرع/مخزن/محطة مسنَدة) 404 موحَّد قبل أي أثر؛ العزل بالمستأجر من `BaseModel`.
- * - لا `tenant_id` من العميل. جلسة PIN لا تصل هذه المسارات (خارج `StationSessionBoundary`، فشل مغلق): لا واجهة تشغيلية لموظف المحطة قبل اكتمال التكامل.
+ * - لا `tenant_id` من العميل. **جلسة PIN (TANKER-PR7) تصل ثلاثة مسارات فقط**: `index` و`show` و`store` (تسجيل التعبئة من التطبيق)؛ `void` وكل مسارات الترحيل/العكس/المراجعة/المرفقات خارج
+ *   `StationSessionBoundary` (فشل مغلق). التسجيل لا يخصم مخزوناً: `inventory_status` يبقى `pending_integration` حتى ترحيل مخوَّل بجلسة كاملة.
  */
 class FuelTankerFillController extends ApiController
 {
@@ -36,6 +37,9 @@ class FuelTankerFillController extends ApiController
             'nozzle_id' => ['nullable', 'uuid'],
             'status' => ['nullable', 'in:' . implode(',', FuelTankerFill::STATUSES)],
             'voucher_number' => ['nullable', 'string', 'max:64'],
+            // هوية المحاولة (TANKER-PR7): «هل سُجِّلت محاولتي أنا؟» — مطابقة تامة على مفتاح idempotency الفريد للمؤسسة، **مقيَّدة بمن سجّل** (لا يؤكد مستخدمٌ محاولةَ غيره)،
+            // ولا يُعاد المفتاح في أي استجابة. المفتاح عشوائي 122 بتاً من العميل فلا يُخمَّن.
+            'attempt_key' => ['nullable', 'string', 'min:8', 'max:128'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PER_PAGE],
@@ -52,6 +56,10 @@ class FuelTankerFillController extends ApiController
             $voucher = FuelTankerFill::normalizeVoucher($filters['voucher_number']);
             $query->where('voucher_key', $voucher['key'] ?? '__invalid__');
         }
+        $attemptLookup = isset($filters['attempt_key']) && $filters['attempt_key'] !== '';
+        if ($attemptLookup) {
+            $query->where('idempotency_key', $filters['attempt_key'])->where('recorded_by', $request->user()->id);
+        }
         if (! empty($filters['from'])) {
             $query->where('recorded_at', '>=', $this->instant($filters['from']));
         }
@@ -62,9 +70,12 @@ class FuelTankerFillController extends ApiController
         // محطات المستخدم (فرع + مخزن + إسناد) — `FuelTankerFill` BranchScoped فرعاً فقط، فبلا هذا تظهر تعبئات محطة أخرى من الفرع نفسه.
         $this->restrictToAccessibleStations($query);
 
-        return FuelTankerFillResource::collection(
+        $response = FuelTankerFillResource::collection(
             $this->scopeToActiveBranch($query, $request)->paginate((int) ($filters['per_page'] ?? self::PER_PAGE))
-        )->response();
+        );
+
+        // علامة صريحة بأن الخادم **طبّق** مطابقة المحاولة: خادم أقدم يتجاهل المعامل المجهول ويعيد سندات غير ذات صلة، فلا يجوز للعميل أن يعدّ غياب العلامة تأكيداً.
+        return ($attemptLookup ? $response->additional(['attempt' => ['applied' => true]]) : $response)->response();
     }
 
     public function show(Request $request, string $id): JsonResponse

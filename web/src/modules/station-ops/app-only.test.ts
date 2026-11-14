@@ -17,8 +17,8 @@ const read = (base: string, prefix: string) => readdirSync(join(dir, base))
 // FUEL-B4/B5: مساحتا الإدارة (`admin/`) والاستلام (`receiving/`) جزء من التطبيق نفسه وتخضعان للقواعد نفسها. PR-2: ومعالج الرصيد الافتتاحي (`opening/`) كذلك
 // (روابطه داخل التطبيق فقط). نصوصه في فضاء `stationOpsOpening` المستقل: هو تدفّق مالي بسلطة مالية (ترحيل + تكلفة) يعرض القيد المحاسبي صراحةً بطلب المالك،
 // فلا يخضع لحارس «لغة الموظف» الذي يحرس نصوص البائع والمشرف في `stationOps` وحدها.
-// FUEL-B6: ومساحة الخزانات (`tanks/`) كذلك.
-const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/'), ...read('opening', 'opening/'), ...read('login', 'login/'), ...read('pin', 'pin/'), ...read('help', 'help/'), ...read('shift-report', 'shift-report/')];
+// FUEL-B6: ومساحة الخزانات (`tanks/`) كذلك. TANKER-PR7: وتعبئة الصهاريج (`tanker-fill/`) — روابطها داخل التطبيق ولغتها لغة موظف (لا مصطلحات محاسبية).
+const sources = [...read('.', ''), ...read('admin', 'admin/'), ...read('receiving', 'receiving/'), ...read('tanks', 'tanks/'), ...read('opening', 'opening/'), ...read('login', 'login/'), ...read('pin', 'pin/'), ...read('help', 'help/'), ...read('shift-report', 'shift-report/'), ...read('tanker-fill', 'tanker-fill/')];
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
 
 type Tree = { [key: string]: string | Tree };

@@ -170,11 +170,12 @@ export async function fetchImageUrl(path: string): Promise<string | null> {
  * لا تستخدم عناصر iframe/img رابط API مباشرةً لأن تنقّل المتصفح لا يرسل Bearer.
  * يرفض JSON (مثل رد 401) قبل أن يصل إلى عارض PDF على أنه محتوى مستند.
  */
-export async function fetchPrivateFileUrl(pathOrUrl: string, expectedMime?: string): Promise<string> {
+export async function fetchPrivateFileUrl(pathOrUrl: string, expectedMime?: string, options: { branchId?: string | null } = {}): Promise<string> {
   if (isDemo()) throw new ApiError(0, 'demo-unavailable', null);
 
   const token = getToken();
-  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  // فرع صريح (محطة من فرع غير الفرع النشط) يتقدّم على الفرع النشط؛ غيابه = السلوك القديم حرفياً.
+  const branchId = options.branchId !== undefined ? options.branchId : typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
   const res = await fetch(resolveApiUrl(pathOrUrl), {
     headers: {
       Accept: expectedMime ?? '*/*',
@@ -232,11 +233,11 @@ export function filenameFromDisposition(header: string | null): string | null {
 export type DownloadOutcome = 'downloaded' | 'demo-unavailable';
 
 /** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
-export async function downloadFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+export async function downloadFile(path: string, fallbackName: string, options: { branchId?: string | null } = {}): Promise<DownloadOutcome> {
   if (isDemo()) return 'demo-unavailable';
 
   const token = getToken();
-  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const branchId = options.branchId !== undefined ? options.branchId : typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
   const res = await fetch(resolveApiUrl(path), {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

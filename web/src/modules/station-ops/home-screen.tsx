@@ -19,6 +19,7 @@ import type { Shift, Station } from './schemas';
 import { CurrentShiftBanner, FinancialSummary } from './shift-card';
 import { ProgressSummary } from './shift-progress';
 import { StationGate } from './station-gate';
+import { TankerFillHomeEntry } from './tanker-fill/home-entry';
 import { ErrorState, InlineNote, LoadingBlock } from './state-views';
 
 /**
@@ -202,6 +203,8 @@ function Body({ station }: { station: Station }) {
   return (
     <div className="space-y-5">
       <ShiftArea station={station} catalog={assets.catalog} />
+      {/* TANKER-PR7: بطاقة تعبئة الصهاريج — لا تظهر إلا إن أكد الخادم توفّر الميزة (بوابتان مفتوحتان + صلاحية)، وإلا الرئيسية كما كانت. */}
+      <TankerFillHomeEntry station={station} />
       <ProductsSection station={station} assets={assets} />
     </div>
   );

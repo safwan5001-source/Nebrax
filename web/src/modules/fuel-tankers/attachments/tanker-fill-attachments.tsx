@@ -30,7 +30,7 @@ const FALLBACK_STATE: AttachmentState = {
  * معاينة وتكبير وتنزيل، وإزالة/استبدال بسبب. **الخادم هو السلطة** (الصلاحيات والسياسة والمحتوى): المكوّن يعرض ما يعلنه `meta` ولا يستنتج. دليل فقط — لا يغيّر السند ولا يمسّ مخزوناً أو محاسبة.
  * يعتمد `useToast()` (مزوّد التنبيهات) و`useTranslations('fuelTankers')`. لا يقرأ تخزين المتصفح.
  */
-export function TankerFillAttachments({ fillId, onCountChange }: { fillId: string; onCountChange?: (activeCount: number) => void }) {
+export function TankerFillAttachments({ fillId, branchId, onCountChange }: { fillId: string; /** فرع المحطة إن اختلف عن الفرع النشط (يُمرَّر لكل الطلبات بما فيها المعاينة والتنزيل). */ branchId?: string | null; onCountChange?: (activeCount: number) => void }) {
   const t = useTranslations('fuelTankers.attachments');
   const locale = useLocale();
   const { success } = useToast();
@@ -61,7 +61,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
   const load = useCallback(async (withHistory: boolean) => {
     const mine = ++sequence.current;
     try {
-      const result = await listAttachments(fillId, withHistory);
+      const result = await listAttachments(fillId, withHistory, branchId);
       if (mine !== sequence.current) return;
       apply(result);
       setPhase('ready');
@@ -69,7 +69,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
       if (mine !== sequence.current) return;
       setPhase(error instanceof ApiError && (error.status === 404 || error.status === 403) ? 'unavailable' : 'error');
     }
-  }, [fillId, apply]);
+  }, [fillId, branchId, apply]);
 
   useEffect(() => { setPhase('loading'); void load(history); return () => { sequence.current += 1; }; }, [load, history]);
 
@@ -88,7 +88,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
       for (const item of items) {
         setQueue((current) => current.map((q) => (q.key === item.key ? { ...q, status: 'uploading', message: undefined } : q)));
         try {
-          const result = await uploadAttachment(fillId, item.file);
+          const result = await uploadAttachment(fillId, item.file, branchId);
           setQueue((current) => current.filter((q) => q.key !== item.key));
           apply({ rows: history ? undefined : result.rows, state: result.state }, true);
           if (history) void load(true);
@@ -128,7 +128,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
     }
     setReplacing({ row, busy: true, error: null });
     try {
-      const result = await replaceAttachment(fillId, row.id, ready);
+      const result = await replaceAttachment(fillId, row.id, ready, branchId);
       setState(result.state);
       onCountChange?.(result.state.active_count);
       success(t('replaced'));
@@ -213,7 +213,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
       <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-attachment-list="">
         {active.map((row) => (
           <li key={row.id} data-attachment={row.id}>
-            <AttachmentCard fillId={fillId} row={row} onOpen={() => setViewing(row)} />
+            <AttachmentCard fillId={fillId} branchId={branchId} row={row} onOpen={() => setViewing(row)} />
           </li>
         ))}
       </ul>
@@ -242,6 +242,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
       <input ref={replaceInput} type="file" accept={acceptAttr(state.policy)} className="sr-only" tabIndex={-1} aria-hidden="true" data-replace-input="" onChange={(event) => void replacePicked(event)} />
       <Viewer
         fillId={fillId}
+        branchId={branchId}
         row={viewing}
         canManage={state.can_remove && viewing?.status === 'active'}
         removeBlocked={viewing?.status === 'active' && !state.can_remove ? removeBlocked : null}
@@ -251,6 +252,7 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
       />
       <RemoveDialog
         fillId={fillId}
+        branchId={branchId}
         row={removing}
         onClose={() => setRemoving(null)}
         onDone={(result) => { setRemoving(null); setState(result); onCountChange?.(result.active_count); success(t('removed')); void load(history); }}
@@ -275,16 +277,16 @@ export function TankerFillAttachments({ fillId, onCountChange }: { fillId: strin
 }
 
 /** بطاقة مرفق: مصغَّرة للصور (تُجلب بترويسة المصادقة ككائن محلي) أو أيقونة PDF، واسم وحجم؛ الضغط يفتح المعاينة. */
-function AttachmentCard({ fillId, row, onOpen }: { fillId: string; row: FillAttachment; onOpen: () => void }) {
+function AttachmentCard({ fillId, branchId, row, onOpen }: { fillId: string; branchId?: string | null; row: FillAttachment; onOpen: () => void }) {
   const t = useTranslations('fuelTankers.attachments');
   const [thumb, setThumb] = useState<string | null>(null);
   useEffect(() => {
     if (row.kind !== 'image') return;
     let url: string | null = null;
     let cancelled = false;
-    previewUrl(fillId, row.id, row.mime_type).then((value) => { if (cancelled) URL.revokeObjectURL(value); else { url = value; setThumb(value); } }).catch(() => undefined);
+    previewUrl(fillId, row.id, row.mime_type, branchId).then((value) => { if (cancelled) URL.revokeObjectURL(value); else { url = value; setThumb(value); } }).catch(() => undefined);
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [fillId, row.id, row.kind, row.mime_type]);
+  }, [fillId, branchId, row.id, row.kind, row.mime_type]);
 
   return (
     <button type="button" onClick={onOpen} aria-label={t('openNamed', { name: row.original_name })} className="flex w-full flex-col overflow-hidden rounded-lg border border-border bg-surface text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -302,8 +304,8 @@ function AttachmentCard({ fillId, row, onOpen }: { fillId: string; row: FillAtta
 }
 
 /** معاينة مكبَّرة: صورة بتكبير/تصغير (والتمرير للتنقّل) أو PDF مضمَّن، مع بيانات الرفع والتنزيل وإجراءات الإدارة المعلنة من الخادم. */
-function Viewer({ fillId, row, canManage, removeBlocked, onClose, onRemove, onReplace }: {
-  fillId: string; row: FillAttachment | null; canManage: boolean; removeBlocked: 'fill_voided' | 'shift_closed' | 'limit_reached' | 'removal_disabled' | null;
+function Viewer({ fillId, branchId, row, canManage, removeBlocked, onClose, onRemove, onReplace }: {
+  fillId: string; branchId?: string | null; row: FillAttachment | null; canManage: boolean; removeBlocked: 'fill_voided' | 'shift_closed' | 'limit_reached' | 'removal_disabled' | null;
   onClose: () => void; onRemove: (row: FillAttachment) => void; onReplace: (row: FillAttachment) => void;
 }) {
   const t = useTranslations('fuelTankers.attachments');
@@ -319,15 +321,15 @@ function Viewer({ fillId, row, canManage, removeBlocked, onClose, onRemove, onRe
     if (!row) return;
     let created: string | null = null;
     let cancelled = false;
-    previewUrl(fillId, row.id, row.mime_type).then((value) => { if (cancelled) URL.revokeObjectURL(value); else { created = value; setUrl(value); } }).catch(() => { if (!cancelled) setFailed(true); });
+    previewUrl(fillId, row.id, row.mime_type, branchId).then((value) => { if (cancelled) URL.revokeObjectURL(value); else { created = value; setUrl(value); } }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; if (created) URL.revokeObjectURL(created); };
-  }, [fillId, row]);
+  }, [fillId, branchId, row]);
 
   async function download() {
     if (!row || busy) return;
     setBusy(true);
     try {
-      const outcome = await downloadAttachment(fillId, row.id, row.original_name);
+      const outcome = await downloadAttachment(fillId, row.id, row.original_name, branchId);
       if (outcome === 'downloaded') success(t('downloaded'));
     } catch {
       setFailed(true);
@@ -376,8 +378,8 @@ function Viewer({ fillId, row, canManage, removeBlocked, onClose, onRemove, onRe
 }
 
 /** إزالة بسبب إلزامي (3–500 حرف). الإزالة انتقال: الصف والملف يبقيان في السجل التاريخي. */
-function RemoveDialog({ fillId, row, onClose, onDone, message }: {
-  fillId: string; row: FillAttachment | null; onClose: () => void; onDone: (state: AttachmentState) => void; message: (error: unknown) => string;
+function RemoveDialog({ fillId, branchId, row, onClose, onDone, message }: {
+  fillId: string; branchId?: string | null; row: FillAttachment | null; onClose: () => void; onDone: (state: AttachmentState) => void; message: (error: unknown) => string;
 }) {
   const t = useTranslations('fuelTankers.attachments');
   const [reason, setReason] = useState('');
@@ -392,7 +394,7 @@ function RemoveDialog({ fillId, row, onClose, onDone, message }: {
     setBusy(true);
     setError(null);
     try {
-      const result = await removeAttachment(fillId, row.id, reason);
+      const result = await removeAttachment(fillId, row.id, reason, branchId);
       onDone(result.state);
     } catch (caught) {
       setError(message(caught));
