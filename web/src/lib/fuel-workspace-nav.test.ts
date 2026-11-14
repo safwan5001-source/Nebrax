@@ -79,3 +79,19 @@ describe('TANKER-PR2 deployment-gated navigation', () => {
     expect(before).toContain('/fuel-stations/corporate-contracts');
   });
 });
+
+describe('TANKER-PR6B-5 inventory workspace navigation', () => {
+  const routesWith = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+
+  it('stays hidden until the server confirms the workspace gate (its own probe, not the owners gate)', () => {
+    expect(routesWith(['*'])).not.toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['*'], ['tanker_management'])).not.toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['*'], ['tanker_fills_workspace'])).toContain('/fuel-stations/tanker-fills');
+  });
+
+  it('needs the exact inventory view permission; the owners or legacy station keys are not enough', () => {
+    expect(routesWith(['fuel.tanker.fill.inventory.view'], ['tanker_fills_workspace'])).toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'], ['tanker_fills_workspace', 'tanker_management'])).not.toContain('/fuel-stations/tanker-fills');
+  });
+});
