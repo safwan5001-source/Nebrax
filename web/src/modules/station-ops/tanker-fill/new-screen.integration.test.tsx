@@ -409,6 +409,56 @@ describe('duplicates and network loss', () => {
     expect(posts()[1].idempotency_key).toBe(posts()[0].idempotency_key);
   });
 
+  it('the attempt is saved BEFORE the request is sent: closing the page mid-flight still leaves "Check status" on return', async () => {
+    setup();
+    const user = userEvent.setup();
+    let release: (value: unknown) => void = () => undefined;
+    const inner = apiMock.getMockImplementation() as (...args: unknown[]) => Promise<unknown>;
+    apiMock.mockImplementation(((url: string, init?: { method?: string }) => (init?.method === 'POST' ? new Promise((resolve) => { release = resolve; }) : inner(url, init))) as never);
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await waitFor(() => expect(sessionStorage.length).toBeGreaterThan(0));
+    const saved = Object.keys(sessionStorage).filter((key) => key.includes('tanker-fill:pending'));
+    expect(saved).toHaveLength(1);
+    expect(JSON.parse(sessionStorage.getItem(saved[0]) as string).body.voucher_number).toBe('04052');
+    cleanup(); // الصفحة أُغلقت والطلب في الطريق
+    release({});
+    apiMock.mockImplementation(inner as never);
+    mount();
+    expect(await screen.findByText('Unresolved recording attempt')).toBeTruthy();
+  });
+
+  it('a definitive rejection clears the pre-saved attempt (nothing is left unresolved)', async () => {
+    setup({ rejectWith: { status: 422, reason: 'voucher_invalid' } });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('The paper voucher number is not valid. Correct it and try again.');
+    expect(Object.keys(sessionStorage).filter((key) => key.includes('tanker-fill:pending'))).toHaveLength(0);
+  });
+
+  it('an unresolved attempt stays checkable after the shift closed (only NEW recording needs an open shift)', async () => {
+    setup({ dropReplyAfterApply: true });
+    const user = userEvent.setup();
+    mount();
+    await toReview(user);
+    await user.click(btn('Save fill'));
+    await screen.findByText('Unresolved recording attempt');
+    cleanup();
+    world.openShift = null; // الوردية أُغلقت قبل عودة الموظف
+    mount();
+    expect(await screen.findByText('Unresolved recording attempt')).toBeTruthy();
+    await user.click(btn('Check status'));
+    await screen.findByText('Voucher was already recorded (not duplicated)');
+    expect(world.fills).toHaveLength(1);
+    expect(posts()).toHaveLength(1);
+    await user.click(btn('Record another fill'));
+    expect(await screen.findByText('No open shift')).toBeTruthy(); // بعد الحسم لا تسجيل جديد بلا وردية
+    expect(document.querySelector('[data-tanker-wizard]')).toBeNull();
+  });
+
   it('while an attempt is unresolved no new voucher can be started, and it survives a reload', async () => {
     setup({ dropReplyAfterApply: true });
     const user = userEvent.setup();

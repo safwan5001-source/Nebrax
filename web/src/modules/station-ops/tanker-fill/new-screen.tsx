@@ -43,13 +43,13 @@ function problemKey(problem: StepProblem): string {
   return `tankerFill.problem.${problem}`;
 }
 
-function Header({ station, shiftNumber }: { station: Station; shiftNumber: string }) {
+function Header({ station, shiftNumber }: { station: Station; shiftNumber: string | null }) {
   const t = useTranslations('stationOps');
   return (
     <SectionCard>
       <dl className="grid grid-cols-2 gap-3 text-sm" data-shift-card="">
         <div><dt className="text-xs text-muted">{t('tankerFill.header.station')}</dt><dd className="font-semibold text-text">{station.name}</dd></div>
-        <div><dt className="text-xs text-muted">{t('tankerFill.header.shift')}</dt><dd className="num font-semibold text-text" dir="ltr">{shiftNumber}</dd></div>
+        <div><dt className="text-xs text-muted">{t('tankerFill.header.shift')}</dt><dd className="num font-semibold text-text" dir="ltr">{shiftNumber ?? '—'}</dd></div>
       </dl>
     </SectionCard>
   );
@@ -85,6 +85,7 @@ export function TankerFillNewScreen() {
 
 function Flow({ station }: { station: Station }) {
   const t = useTranslations('stationOps');
+  const { scopeKey } = useStationOps();
   const access = useTankerFillAccess();
   const feature = useTankerFillFeature(station);
   const current = useCurrentShift(station);
@@ -100,6 +101,8 @@ function Flow({ station }: { station: Station }) {
   if (current.state.status === 'error') return <ErrorState error={current.state.error} onRetry={current.reload} />;
   const shift = current.state.data.shift;
   if (!shift) {
+    // محاولة غير محسومة سابقة تبقى قابلة للحسم (قراءة فقط) حتى بعد إغلاق الوردية؛ **التسجيل الجديد** وحده مشروط بوردية مفتوحة.
+    if (createPendingStore(`${scopeKey}|${station.id}`).load()) return <Wizard station={station} shiftId={null} shiftNumber={null} reloadShift={current.reload} />;
     return (
       <div data-no-open-shift="" className="space-y-3 pt-5">
         <EmptyState title={t('tankerFill.noShift.title')} body={t('tankerFill.noShift.body')} />
@@ -110,7 +113,7 @@ function Flow({ station }: { station: Station }) {
   return <Wizard station={station} shiftId={shift.id} shiftNumber={shift.number} reloadShift={current.reload} />;
 }
 
-function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Station; shiftId: string; shiftNumber: string; reloadShift: () => void }) {
+function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Station; shiftId: string | null; shiftNumber: string | null; reloadShift: () => void }) {
   const t = useTranslations('stationOps');
   const { scopeKey } = useStationOps();
   const assets = useStationAssets(station);
@@ -185,7 +188,10 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
       return;
     }
     const effective: FillWriteResult = result.kind === 'ok' ? { kind: 'unverified' } : result;
-    if (shouldClearKey(effective, priorUncertain)) intents.clear(INTENT);
+    if (shouldClearKey(effective, priorUncertain)) {
+      intents.clear(INTENT);
+      pendingStore.clear(); // رفض نهائي/لم يُرسل: المحاولة التي حُفظت قبل الإرسال لم تعد معلّقة
+    }
     if (mayHaveApplied(effective)) {
       pendingStore.save(body);
       setPending(pendingStore.load());
@@ -199,6 +205,7 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
 
   const submit = useCallback(async () => {
     if (submitting.current) return;
+    if (!shiftId) return;
     const payload = buildIntentPayload({ stationId: station.id, shiftId, draft, tankers, policy });
     if (!payload || firstInvalidStep(draft, ctx) !== null) return;
     submitting.current = true;
@@ -210,11 +217,13 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
       const priorUncertain = intents.isUncertain(INTENT);
       intents.markUncertain(INTENT);
       const body: FillBody = { ...payload, idempotency_key: key };
+      // تُحفظ المحاولة كاملةً **قبل** الإرسال: إغلاق الصفحة أثناء الطلب (قد يلتزم الخادم) يترك «تحقّق من الحالة» متاحاً عند العودة. تُمسح عند أي نتيجة حاسمة.
+      pendingStore.save(body);
       settle(await recordFill(body, { branchId: station.branch_id }), body, priorUncertain);
     } finally {
       submitting.current = false;
     }
-  }, [ctx, draft, intents, policy, settle, shiftId, station.branch_id, station.id, tankers]);
+  }, [ctx, draft, intents, pendingStore, policy, settle, shiftId, station.branch_id, station.id, tankers]);
 
   /** «تحقق من الحالة» لمحاولة غير محسومة: **قراءة فقط**. وُجد السند ⇒ نجاح مؤكد؛ لم يوجد ⇒ للموظف أن يعيد الإرسال بالمفتاح نفسه صراحةً أو يتجاهل. */
   const checkPending = useCallback(async () => {
@@ -291,6 +300,16 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
     );
   }
 
+  // بلا وردية مفتوحة (بعد حسم محاولة سابقة): لا تسجيل جديد.
+  if (!shiftId) {
+    return (
+      <div data-no-open-shift="" className="space-y-3 pt-5">
+        <EmptyState title={t('tankerFill.noShift.title')} body={t('tankerFill.noShift.body')} />
+        <SecondaryButton onClick={reloadShift}>{t('write.check')}</SecondaryButton>
+      </div>
+    );
+  }
+
   const here = STEPS.indexOf(step);
   const problem = stepProblem(step, draft, ctx);
   const canContinue = problem === null;
@@ -314,7 +333,7 @@ function Wizard({ station, shiftId, shiftNumber, reloadShift }: { station: Stati
       {step === 'quantity' ? <QuantityStep draft={draft} onChange={update} capacityMode={capacity.mode} overrunMl={capacity.overrunMilliliters} tankerCapacity={tanker?.capacity_milliliters ?? null} plate={tanker?.plate_number ?? null} /> : null}
       {step === 'review' ? (
         <ReviewStep
-          station={station} shiftNumber={shiftNumber} ownerName={ownerName} plate={tanker?.plate_number ?? null}
+          station={station} shiftNumber={shiftNumber ?? '—'} ownerName={ownerName} plate={tanker?.plate_number ?? null}
           pump={nozzleChoice?.group.pump.pump_number ?? ''} nozzle={nozzleChoice?.choice.view.nozzle.nozzle_number ?? ''}
           product={nozzleChoice?.choice.view.product?.name ?? ''} tank={nozzleChoice?.choice.view.tank?.name ?? ''}
           liters={quantity.ok ? quantity.liters : ''} voucher={(() => { const v = normalizeVoucher(draft.voucherInput); return v.ok ? v.value : ''; })()}

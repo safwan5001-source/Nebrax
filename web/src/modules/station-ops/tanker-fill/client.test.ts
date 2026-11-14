@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn() }));
 
 import { ApiError, api } from '@/lib/api';
-import { classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
+import { MAX_TANKER_PAGES, classifyRejection, fillPath, findRecordedFill, getFill, isAllowedTankerReadPath, listFills, listOwners, listTankers, recordFill } from './client';
 import type { FillBody, IntentPayload } from './logic';
 
 const apiMock = vi.mocked(api);
@@ -148,6 +148,28 @@ describe('reads — whitelist, validation and station scoping', () => {
     expect(listing.rows.map((t) => t.id)).toEqual(['t1']);
     expect(apiMock.mock.calls[0][0]).toBe(`/fuel-stations/tankers?owner_id=${UID(3)}&status=active`);
     await expect(listTankers('x')).rejects.toThrow();
+  });
+
+  it('listTankers fetches EVERY page so a tanker beyond the first 50 stays selectable', async () => {
+    const row = (id: string) => ({ id, fuel_tanker_owner_id: UID(3), plate_number: id, capacity_milliliters: null, status: 'active' });
+    apiMock
+      .mockResolvedValueOnce({ data: [row('a')], meta: { current_page: 1, last_page: 3 } })
+      .mockResolvedValueOnce({ data: [row('b')], meta: { current_page: 2, last_page: 3 } })
+      .mockResolvedValueOnce({ data: [row('c')], meta: { current_page: 3, last_page: 3 } });
+    const listing = await listTankers(UID(3));
+    expect(listing.rows.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    expect(listing.truncated).toBe(false);
+    expect(apiMock.mock.calls.map((call) => call[0])).toEqual([
+      `/fuel-stations/tankers?owner_id=${UID(3)}&status=active`, `/fuel-stations/tankers?owner_id=${UID(3)}&status=active&page=2`, `/fuel-stations/tankers?owner_id=${UID(3)}&status=active&page=3`,
+    ]);
+  });
+
+  it('listTankers stops at the page cap and says it is truncated (never silently hides rows)', async () => {
+    apiMock.mockImplementation(async () => ({ data: [], meta: { current_page: 1, last_page: 999 } }));
+    const listing = await listTankers(UID(3));
+    expect(apiMock).toHaveBeenCalledTimes(MAX_TANKER_PAGES);
+    expect(listing.truncated).toBe(true);
+    apiMock.mockReset();
   });
 
   it('listFills sends the station and shift filters and drops rows of other stations (defence in depth)', async () => {

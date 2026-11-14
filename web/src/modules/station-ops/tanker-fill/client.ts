@@ -74,11 +74,23 @@ export async function listOwners(options: { q?: string; branchId?: string | null
   return { rows: page.data.filter((owner) => owner.status === 'active'), truncated: truncatedOf(page.meta) };
 }
 
-/** صهاريج الصاحب **النشطة** فقط (الصهريج الموقوف لا يُسجَّل عليه). */
+/** أقصى عدد صفحات تُجلب لصهاريج صاحب واحد (50 لكل صفحة ⇒ 1000 صهريج). تجاوزه يُعلَن «محدوداً» ولا يُخفى. */
+export const MAX_TANKER_PAGES = 20;
+
+/** صهاريج الصاحب **النشطة** فقط (الصهريج الموقوف لا يُسجَّل عليه). تُجلب **كل الصفحات** كي لا يستحيل اختيار صهريج بعد الصفحة الأولى (لا بحث للصهاريج في الواجهة). */
 export async function listTankers(ownerId: string, options: { branchId?: string | null; signal?: AbortSignal } = {}): Promise<Listing<Tanker>> {
   if (!isValidFillId(ownerId)) throw new StationOpsError('not_found', 404);
-  const page = await tankerGet('/fuel-stations/tankers', tankersResponse, { signal: options.signal, branchId: options.branchId, query: { owner_id: ownerId, status: 'active' } });
-  return { rows: page.data.filter((tanker) => tanker.status === 'active' && tanker.fuel_tanker_owner_id === ownerId), truncated: truncatedOf(page.meta) };
+  const rows: Tanker[] = [];
+  let truncated = false;
+  for (let page = 1; page <= MAX_TANKER_PAGES; page += 1) {
+    const response = await tankerGet('/fuel-stations/tankers', tankersResponse, {
+      signal: options.signal, branchId: options.branchId, query: { owner_id: ownerId, status: 'active', page: page > 1 ? page : undefined },
+    });
+    rows.push(...response.data.filter((tanker) => tanker.status === 'active' && tanker.fuel_tanker_owner_id === ownerId));
+    if (!truncatedOf(response.meta)) { truncated = false; break; }
+    truncated = page === MAX_TANKER_PAGES;
+  }
+  return { rows, truncated };
 }
 
 export interface FillFilters { stationId: string; shiftId?: string; voucher?: string; perPage?: number }
