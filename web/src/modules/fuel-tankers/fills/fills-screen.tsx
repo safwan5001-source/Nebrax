@@ -16,6 +16,7 @@ import { listStations, type StationOption } from '../settings-client';
 import { ForbiddenState, GateClosedState } from '../states';
 import { usePermissions } from '../use-permissions';
 import { INVENTORY_REVIEW_HREF } from '../inventory/routes';
+import { REPORTS_HREF } from '../reports/routes';
 import { listFills } from './client';
 import { litersOf, TABS, type FillRow, type Tab, type TabCounts, type WorkspacePage } from './logic';
 import { AttemptChip, BlockerBadges, InventoryStatusBadge, ReadinessBadge, VoidedBadge } from './parts';
@@ -89,7 +90,12 @@ export function FillsScreen() {
         eyebrow={t('eyebrow')}
         title={t('title')}
         description={t('subtitle')}
-        actionsSlot={<Button asChild variant="outline" className="max-md:min-h-11"><Link href={INVENTORY_REVIEW_HREF}>{t('reviewLink')}</Link></Button>}
+        actionsSlot={(
+          <>
+            <Button asChild variant="outline" className="max-md:min-h-11"><Link href={REPORTS_HREF}>{t('reportsLink')}</Link></Button>
+            <Button asChild variant="outline" className="max-md:min-h-11"><Link href={INVENTORY_REVIEW_HREF}>{t('reviewLink')}</Link></Button>
+          </>
+        )}
       />
 
       <Tabs

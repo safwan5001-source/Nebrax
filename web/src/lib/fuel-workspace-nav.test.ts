@@ -95,3 +95,20 @@ describe('TANKER-PR6B-5 inventory workspace navigation', () => {
     expect(routesWith(['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'], ['tanker_fills_workspace', 'tanker_management'])).not.toContain('/fuel-stations/tanker-fills');
   });
 });
+
+describe('TANKER-PR6B-6 reports navigation', () => {
+  const routesWith = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+  const REPORTS = '/fuel-stations/tanker-fill-reports';
+
+  it('stays hidden until the server confirms the same three-gate probe as the fills workspace', () => {
+    expect(routesWith(['*'])).not.toContain(REPORTS);
+    expect(routesWith(['*'], ['tanker_management'])).not.toContain(REPORTS);
+    expect(routesWith(['*'], ['tanker_fills_workspace'])).toContain(REPORTS);
+  });
+
+  it('needs the exact inventory view permission (the owners or legacy station keys are not enough)', () => {
+    expect(routesWith(['fuel.tanker.fill.inventory.view'], ['tanker_fills_workspace'])).toContain(REPORTS);
+    expect(routesWith(['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'], ['tanker_fills_workspace', 'tanker_management'])).not.toContain(REPORTS);
+  });
+});

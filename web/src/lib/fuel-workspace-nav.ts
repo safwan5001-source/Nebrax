@@ -49,6 +49,8 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
       { href: '/fuel-stations/tanker-inventory-review', labelKey: 'tankerInventoryReview', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_management' },
       // TANKER-PR6B-5: سندات التعبئة — الدمج المخزني (ترحيل/عكس بمعاينة وتأكيد). تُخفى حتى يؤكد الخادم فتح بوابات الميزة الثلاث (مسبار قراءة خفيف في `FuelWorkspaceNav`).
       { href: '/fuel-stations/tanker-fills', labelKey: 'tankerFills', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_fills_workspace' },
+      // TANKER-PR6B-6: تقارير الرقابة والمطابقة المحاسبية (قراءة فقط) — البوابات الثلاث نفسها فتظهر مع المسبار نفسه؛ الخادم هو السلطة في كل تقرير.
+      { href: '/fuel-stations/tanker-fill-reports', labelKey: 'tankerFillReports', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_fills_workspace' },
     ],
   },
   {

@@ -40,6 +40,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/avi-rfid': Fingerprint,
   '/fuel-stations/tanker-owners': Container,
   '/fuel-stations/tanker-fills': ClipboardList,
+  '/fuel-stations/tanker-fill-reports': ClipboardList,
   '/fuel-stations/devices': Network,
   '/fuel-stations/maintenance': Wrench,
   '/fuel-stations/safety': ShieldCheck,

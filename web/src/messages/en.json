@@ -9778,6 +9778,7 @@
     "title": "Tanker fills — inventory posting",
     "subtitle": "Post tanker fill vouchers to inventory and the ledger, and reverse them. Posting deducts the fuel from the station warehouse once at historical cost and records one entry; it creates no invoice, revenue, tax or receivable for the tanker owner.",
     "reviewLink": "Integration readiness review",
+    "reportsLink": "Control & reconciliation reports",
     "back": "Back to fills",
     "liters": "L",
     "voided": "Voided",
@@ -10115,6 +10116,7 @@
     "tankerSettings": "Tanker fill settings",
     "tankerInventoryReview": "Fill inventory review",
     "tankerFills": "Tanker fills — inventory posting",
+    "tankerFillReports": "Tanker fill reports",
     "aviRfid": "AVI/RFID",
     "devices": "Devices",
     "deviceRegistry": "Device registry",
@@ -10395,6 +10397,265 @@
     "amount": "Amount (SAR)",
     "paymentSeparationHint": "This creates an official receipt and updates the invoice only. It does not add a shift cash movement or settle a Cycle 4 variance.",
     "paymentCollected": "Receipt posted and invoice payment status updated."
+  },
+  "fuelTankerReports": {
+    "eyebrow": "Inventory posting reports",
+    "switcher": "Tanker fill reports",
+    "backToFills": "Tanker fills",
+    "loading": "Loading report…",
+    "loadFailed": "Could not load the report. Try again.",
+    "liters": "L",
+    "tab": {
+      "fills": "Tanker fills",
+      "inventory-reconciliation": "Inventory reconciliation",
+      "clearing-account": "Clearing account",
+      "accounting-control": "Accounting control"
+    },
+    "title": {
+      "fills": "Tanker fills report",
+      "inventory-reconciliation": "Inventory reconciliation report",
+      "clearing-account": "Clearing account report",
+      "accounting-control": "Accounting control report"
+    },
+    "description": {
+      "fills": "Fills, tanker owners, quantities and posting / reversal states. Read-only.",
+      "inventory-reconciliation": "Compares each fill with the stock movement, cost pool and operational ledger, plus pool-level reconciliation. Read-only.",
+      "clearing-account": "Ledger balances of the clearing account: opening, debits, credits, closing, other entries and differences. Organisation- or branch-level balances, never station-level. Read-only.",
+      "accounting-control": "Trace from the tanker fill to the journal entry, with the reconciliation outcome. Read-only."
+    },
+    "result": {
+      "matched": "Matched",
+      "mismatch": "Confirmed difference",
+      "warning": "Warning",
+      "incomplete": "Cycle incomplete"
+    },
+    "summary": {
+      "total": "Fills examined",
+      "confirmedDifferences": "Confirmed differences",
+      "warnings": "Warnings",
+      "incomplete": "Incomplete"
+    },
+    "resultFilter": {
+      "label": "Reconciliation result",
+      "all": "All results",
+      "note": "Showing {shown} of {loaded} loaded fills (local filter; the summary is unchanged).",
+      "noMatch": "No rows with this result",
+      "noMatchHint": "Change the reconciliation result to see other rows."
+    },
+    "empty": {
+      "title": "No matching fills",
+      "body": "There are no tanker fills in the current scope and filters."
+    },
+    "truncated": {
+      "title": "Limited result — not exhaustive",
+      "body": "The scan reached its limit, so only part of the fills were examined; other differences may not appear here. Narrow the period or station.",
+      "bodyLimit": "Only the first {limit} fills (newest first) were examined; differences in older fills may not appear here. Narrow the period, station or owner."
+    },
+    "masking": {
+      "costs": "Amounts and movement/entry identifiers are hidden: you do not have the view-cost permission (products.view_cost).",
+      "accounts": "Account identifiers are hidden: you do not have the view-accounts permission (accounts.view)."
+    },
+    "scope": {
+      "rowsTitle": "Row scope",
+      "balancesTitle": "Balance scope",
+      "rows": {
+        "stations": "Limited to your authorised stations only",
+        "branches": "Limited to your authorised branches",
+        "organization": "All organisation fills"
+      },
+      "noFilters": "No filters applied.",
+      "filtersApplied": "Applied filters: {filters}.",
+      "level": {
+        "organization": "Organisation level",
+        "branches": "Authorised-branches level",
+        "unknown": "Unknown scope ({level})"
+      },
+      "organizationBody": "Ledger balance for the whole organisation — not the balance of a specific station.",
+      "branchesBody": "Ledger balance for the {count} branch(es) you are authorised on — not the balance of a specific station.",
+      "basis": {
+        "ledger_lines_by_branch": "Balances are aggregated from journal lines by branch; a line does not carry the station, so a shared account balance is never split across stations by estimate.",
+        "other": "Balance aggregation basis: unknown."
+      },
+      "balancesApplied": "Filters actually applied to balances: {filters}.",
+      "notApplicableTitle": "Filters that do not affect balances",
+      "notApplicableBody": "You selected filters ({filters}) that only restrict rows and do not change the clearing-account balances; the balances shown are unaffected."
+    },
+    "filterName": {
+      "station_id": "Station",
+      "owner_id": "Tanker owner",
+      "fuel_product_id": "Fuel type",
+      "status": "Fill status",
+      "inventory_status": "Inventory status",
+      "from": "From date",
+      "to": "To date",
+      "branch_id": "Branch",
+      "branch": "Branch",
+      "period": "Period",
+      "page": "Page",
+      "per_page": "Page size"
+    },
+    "filters": {
+      "title": "Report filters",
+      "station": "Station",
+      "allStations": "All stations",
+      "owner": "Tanker owner",
+      "allOwners": "All owners",
+      "inventoryStatus": "Inventory status",
+      "allStatuses": "All statuses",
+      "fillStatus": "Fill status",
+      "allFillStatuses": "All statuses",
+      "fillStatusValue": {
+        "recorded": "Recorded",
+        "voided": "Voided"
+      },
+      "from": "From date",
+      "to": "To date",
+      "periodReversed": "The start date is after the end date; fix the period.",
+      "clear": "Clear filters",
+      "clearingNote": "Ledger balances are not scoped by station, owner or status, so this report only filters by period."
+    },
+    "column": {
+      "stationProduct": "Station / fuel",
+      "postedReversed": "Posted / reversed",
+      "posted": "Posted",
+      "reversed": "Reversed",
+      "cost": "Cost",
+      "entries": "Entries",
+      "fill": "Fill",
+      "state": "State",
+      "result": "Result",
+      "values": "Values"
+    },
+    "fills": {
+      "summary": {
+        "total": "Fills",
+        "quantity": "Total quantity",
+        "voided": "Includes {count} voided fill(s)"
+      },
+      "mobileCaption": "Paper voucher {voucher} · {station}"
+    },
+    "quantity": {
+      "fill": "Fill",
+      "stock_out": "Stock out",
+      "cost_issue": "Cost issue",
+      "ledger": "Operational ledger",
+      "stock_reversal_in": "Reversal in (stock)",
+      "cost_reversal": "Cost reversal",
+      "ledger_reversal": "Ledger reversal"
+    },
+    "value": {
+      "posting_cost_minor": "Posting cost",
+      "stock_total_cost_minor": "Stock movement value",
+      "cost_movement_minor": "Cost movement value",
+      "entry_debit_minor": "Entry debit",
+      "ledger_value_minor": "Operational ledger value"
+    },
+    "reconciliation": {
+      "totalsTitle": "Quantity totals (posted fills)",
+      "totalsLimited": "Totals cover only the examined fills.",
+      "totals": {
+        "fills_posted_milliliters": "Posted fills",
+        "stock_out_milliliters": "Stock out",
+        "cost_issue_milliliters": "Cost issue",
+        "ledger_milliliters": "Operational ledger",
+        "reversed_milliliters": "Reversed fills"
+      },
+      "poolTitle": "Pool-level reconciliation",
+      "poolHint": "Warehouse stock, cost pool and general ledger per warehouse and product — the same engine used by the inventory-posting review."
+    },
+    "clearing": {
+      "period": "Period: {from} to {to}",
+      "current": "Current account",
+      "notCurrent": "Not the currently assigned account",
+      "levelOrganization": "Organisation balance",
+      "levelBranches": "Branch balance",
+      "ledgerNote": "Ledger balance, not a station balance. The check compares only fill entries against confirmed postings.",
+      "balance": {
+        "opening": "Opening balance",
+        "debits": "Debits",
+        "credits": "Credits",
+        "closing": "Closing balance",
+        "supported": "Balance supported by postings",
+        "difference": "Unexplained difference"
+      },
+      "tankerNet": "Net of fill entries (cumulative)",
+      "tankerEntries": "Fill entries (period)",
+      "otherEntries": "Other entries (period)",
+      "otherNet": "Net of other entries (cumulative)",
+      "otherEntriesList": "Other entries on the account in the period ({count})",
+      "clean": "No differences or notes",
+      "emptyTitle": "No clearing accounts",
+      "emptyBody": "No clearing account is assigned and no tanker-fill posting entries exist yet."
+    },
+    "control": {
+      "findingsTitle": "Findings by type",
+      "findingsCount": "{count} finding(s)",
+      "voucher": "Paper voucher",
+      "traceLabel": "Trace chain",
+      "openFill": "Open fill details",
+      "missing": "Missing",
+      "clearingTitle": "Clearing account summary",
+      "clearingUnavailableTitle": "Clearing account summary not shown",
+      "clearingUnavailable": {
+        "station_scope_restricted": "Clearing-account balances are organisation- or branch-level ledger balances and cannot be isolated by station, so they are not shown to a user restricted to stations or warehouses. The control results below cover your authorised fills only.",
+        "financial_permissions_required": "The clearing-account summary is financial and requires both the view-cost (products.view_cost) and view-accounts (accounts.view) permissions.",
+        "unknown": "The clearing-account summary is not shown for this account."
+      },
+      "step": {
+        "fill": "Tanker fill",
+        "stock": "Stock movement",
+        "cost": "Cost-pool movement",
+        "entry": "Journal entry",
+        "ledger": "Operational ledger",
+        "reversal": "Reversal",
+        "accounts": "Accounts (clearing ← inventory)",
+        "hiddenNoCost": "Hidden (cost permission)"
+      }
+    },
+    "forbidden": {
+      "station_scope_restricted": {
+        "title": "Report not available for your scope",
+        "body": "Clearing-account balances are organisation- or branch-level ledger balances and cannot be isolated by station, so they are not shown to a user restricted to stations or warehouses. No balances or entries are shown. Ask the owner for full financial scope if you need it."
+      },
+      "financial_permissions_required": {
+        "title": "Financial report: insufficient permissions",
+        "body": "This report requires both permissions below. No balances or entries are shown for your account."
+      },
+      "unknown": {
+        "title": "This report cannot be shown",
+        "body": "The clearing-account report is financial: it requires the view-cost and view-accounts permissions and a scope not restricted to stations or warehouses. No financial information is shown."
+      }
+    },
+    "finding": {
+      "status_without_posting": "Status is posted/reversed but no posting row exists",
+      "entry_without_posting": "Journal entry linked to the fill without a posting",
+      "last_attempt_failed": "Last posting attempt was rejected or failed",
+      "not_posted_yet": "Not posted yet (cycle not complete)",
+      "posting_quantity_differs_from_fill": "Posting quantity differs from the fill quantity",
+      "stock_movement_missing": "Stock movement is missing",
+      "stock_quantity_mismatch": "Stock movement quantity does not match the fill",
+      "stock_value_mismatch": "Stock movement value does not match the posted cost",
+      "cost_movement_missing": "Cost-pool movement is missing",
+      "cost_quantity_mismatch": "Cost movement quantity does not match the fill",
+      "cost_value_mismatch": "Cost movement value does not match the posted cost",
+      "posted_without_entry": "Posted without a valid journal entry",
+      "entry_amount_mismatch": "Journal entry amount does not match the posted cost",
+      "clearing_account_invalid": "Clearing account on the entry is invalid",
+      "clearing_account_differs_from_current": "Clearing account differs from the currently assigned one",
+      "entry_branch_mismatch": "Entry branch differs from the station branch",
+      "original_entry_not_reversed": "Fill is reversed but the original entry is not",
+      "ledger_missing": "Operational ledger row is missing",
+      "ledger_quantity_mismatch": "Operational ledger quantity does not match the fill",
+      "ledger_value_mismatch": "Operational ledger value does not match the posted cost",
+      "reversal_incomplete": "Reversal is incomplete",
+      "reversal_quantity_mismatch": "Reversal quantity/value does not match the original",
+      "reversal_entry_not_linked": "Reversal entry is not linked to the original entry",
+      "reversal_duplicate": "Duplicate reversal",
+      "reversal_value_mismatch": "Reversal value does not match the original",
+      "clearing_balance_differs_from_postings": "Clearing balance differs from the balance supported by postings",
+      "other_entries_on_clearing_account": "Other (non-fill) entries on the clearing account",
+      "unknown": "Unknown finding ({code})"
+    }
   },
   "fuelTankers": {
     "inventory": {
