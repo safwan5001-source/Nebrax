@@ -1,6 +1,6 @@
 /* Functional audit for prototype.html — Codex review notes on PR #2098.
    Run: NODE_PATH=$(npm root -g) node functional-audit.js   (requires Playwright + Chromium)
-   Covers the six review threads: 5 earlier fixes (regression guards) + the operational-litres report.
+   
    Runs at desktop and phone viewports. Exit code 1 on any failure. */
 const {chromium}=require('playwright');
 const URL='file://'+require('path').resolve(__dirname,'..')+'/prototype.html';
@@ -65,12 +65,38 @@ for(const [name,vp,extra] of VIEWPORTS){
   ok(tankerSum===10100,'per-tanker report agrees (10,100 L for Askar)',tankerSum);
   await h.page_('owners');await click('[data-act="erp-open"][data-id="o1"]');
   ok(/10,?100/.test(await p.evaluate(()=>document.querySelector('.stats .stat .v').innerText)),'owner overview "litres this month" = 10,100');
+  await h.page_('owners');r=await rows(p);const ownRow=r.find(x=>/Askar|عسكر/.test(x[0]));
+  ok(ownRow&&num(ownRow[5])===10100,'owners list "month litres" = 10,100 (live fills)',ownRow);
+  await click('[data-act="erp-open"][data-id="o1"]');
   // settlement data and printable statement unchanged
   const frozen2=await p.evaluate(()=>JSON.stringify({snap:S.erp.snap.o1,rows:S.erp.snapRows.o1,st:S.erp.settle.o1}));
   ok(frozen2===frozen,'approved snapshot (totals + rows) unchanged');
   const stmtAfter=await p.evaluate(()=>{S.erp.toast=null;S.erp.tab='statement';render();const t=document.querySelector('.erp-pg').innerText;S.erp.tab='settle';render();return t});
   ok(stmtAfter===stmtBefore,'approved statement text unchanged');
   ok(await p.evaluate(()=>calc('o1').liters)===10000,'calc() still returns the frozen 10,000 L for settlement');
+  ok(h.errs.length===0,'no page errors',h.errs);await h.c.close();}
+
+
+ /* ── Thread 7: commission inputs accept Arabic-Indic digits (and the Arabic decimal mark) ── */
+ {const h=await open(b,vp,extra);const {p,click}=h;
+  await h.erp();await click('[data-act="erp-open"][data-id="o1"]');await click('[data-act="erp-tab"][data-id="settle"]');
+  const net0=await p.evaluate(()=>calc('o1').net);
+  await p.fill('#cmPct','٥');await p.waitForTimeout(60);
+  ok(await p.evaluate(()=>calc('o1').commission)===1000&&await p.evaluate(()=>calc('o1').net)===net0,'Arabic digit ٥ = 5% commission (not zero)',await p.evaluate(()=>calc('o1')));
+  await p.fill('#cmPct','٢٫٥');await p.waitForTimeout(60);
+  ok(await p.evaluate(()=>calc('o1').commission)===500,'Arabic decimal ٢٫٥ = 2.5% commission',await p.evaluate(()=>calc('o1').commission));
+  await click('[data-act="cm-mode"][data-id="manual"]');await p.fill('#cmMan','١٠٠٠');await p.waitForTimeout(60);
+  ok(await p.evaluate(()=>calc('o1').commission)===1000,'Arabic digits ١٠٠٠ manual commission = 1,000 (not zero)',await p.evaluate(()=>calc('o1').commission));
+  ok(h.errs.length===0,'no page errors',h.errs);await h.c.close();}
+
+ /* ── Thread 8: printable statement reconciles after payout (net − paid = due) ── */
+ {const h=await open(b,vp,extra);const {p,click}=h;
+  await h.erp();await click('[data-act="erp-open"][data-id="o1"]');await click('[data-act="erp-tab"][data-id="settle"]');
+  await click('[data-act="stl-approve"]');await click('[data-act="dlg-confirm"]');
+  await click('[data-act="stl-pay"]');await click('[data-act="dlg-confirm"]');
+  const st=await p.evaluate(()=>{S.erp.toast=null;S.erp.tab='statement';render();const l=[...document.querySelectorAll('.stmt .calc .ln')].map(e=>e.innerText.replace(/\s+/g,' ').trim());return {l,c:calc('o1')}});
+  ok(st.c.paid===4000&&st.c.due===0&&st.c.net===4000,'payout recorded: net 4,000, paid 4,000, due 0',st.c);
+  ok(st.l.length===4&&/4,?000/.test(st.l[1])&&/4,?000/.test(st.l[2])&&/\b0\b|0\.00|٠/.test(st.l[3]),'printable statement shows commission, net, paid and due lines',st.l);
   ok(h.errs.length===0,'no page errors',h.errs);await h.c.close();}
 
  /* ── Thread 1: add owner → settlement tab must not throw ── */
