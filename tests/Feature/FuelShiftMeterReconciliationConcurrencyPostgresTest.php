@@ -111,6 +111,95 @@ class FuelShiftMeterReconciliationConcurrencyPostgresTest extends TestCase
         }
     }
 
+    // ───────── TANKER-PR8-S: تثبيت متطلب المراجعة تحت التزامن ─────────
+
+    /** @test */
+    public function approval_racing_the_review_never_approves_an_unreviewed_snapshot_even_with_the_gate_closed_in_the_approver(): void
+    {
+        foreach (range(1, 3) as $round) {
+            $f = $this->fixture();
+            $this->relaxApproverRules($f);
+            $this->closeShift($f);                                         // فرق 10 L غير مفسَّر + متطلب مثبَّت
+            $this->assertSame('required_before_approval', DB::table('fuel_shift_nozzle_reconciliations')->where('fuel_shift_id', $f['shift_id'])->value('review_requirement'));
+
+            $results = $this->runConcurrently([
+                fn () => $this->approveShift($f),
+                fn () => $this->approveShift($f, gateOpen: false),            // معتمِد تُغلق عنده بوابة النشر
+                fn () => $this->review($f, 'reading_error'),
+                fn () => $this->approveShift($f),
+            ]);
+
+            $this->assertAllCompleted($results);
+            $status = DB::table('fuel_shifts')->where('id', $f['shift_id'])->value('status');
+            $reviews = (int) DB::table('fuel_shift_meter_variance_reviews')->where('fuel_shift_id', $f['shift_id'])->count();
+            if ($status === 'approved') {
+                $this->assertSame(1, $reviews, "جولة {$round}: اعتمدت وردية بلا مراجعة: " . json_encode($results));
+                $this->assertLessThanOrEqual(
+                    strtotime((string) DB::table('fuel_shifts')->where('id', $f['shift_id'])->value('approved_at')),
+                    strtotime((string) DB::table('fuel_shift_meter_variance_reviews')->where('fuel_shift_id', $f['shift_id'])->value('reviewed_at')),
+                    'الاعتماد بعد التزام المراجعة',
+                );
+            }
+            foreach ($results as $result) {
+                $value = (string) ($result['value'] ?? '');
+                $this->assertTrue(in_array($value, ['approved', 'ok:reading_error', 'rejected:review_required', 'rejected:not_closed', 'rejected:already_reviewed'], true), "جولة {$round}: " . $value);
+            }
+            // بعد استقرار المراجعة يُعتمد حتماً (لا جمود).
+            if ($status !== 'approved') {
+                $this->assertSame(1, $reviews, json_encode($results));
+                $this->assertSame('approved', $this->approveShift($f, gateOpen: false));
+            }
+        }
+    }
+
+    /** @test */
+    public function disabling_the_setting_racing_the_close_leaves_either_no_snapshot_or_a_snapshot_with_a_frozen_requirement(): void
+    {
+        foreach (range(1, 3) as $round) {
+            $f = $this->fixture();
+            $this->relaxApproverRules($f);
+            $results = $this->runConcurrently([
+                fn () => $this->closeShift($f),
+                fn () => $this->setReconciliation($f, false),
+            ]);
+
+            $this->assertAllCompleted($results);
+            $this->assertSame('closed', $results[0]['value'], json_encode($results));
+            $snapshots = DB::table('fuel_shift_nozzle_reconciliations')->where('fuel_shift_id', $f['shift_id'])->get();
+            if ($snapshots->isEmpty()) {
+                // التعطيل سبق قراءة الإعداد وقت الإغلاق ⇒ لا متطلب، والاعتماد يمرّ.
+                $this->assertSame('approved', $this->approveShift($f), json_encode($results));
+            } else {
+                $this->assertSame(['required_before_approval'], $snapshots->pluck('review_requirement')->unique()->values()->all());
+                $this->assertSame('rejected:review_required', $this->approveShift($f), 'المتطلب ثابت رغم أن الإعداد أصبح معطَّلاً');
+                $this->assertSame('ok:reading_error', $this->review($f, 'reading_error'));
+                $this->assertSame('approved', $this->approveShift($f));
+            }
+        }
+    }
+
+    /** @test */
+    public function concurrent_approvals_after_the_review_approve_exactly_once_and_a_blocked_approval_leaves_no_trace(): void
+    {
+        $f = $this->fixture();
+        $this->relaxApproverRules($f);
+        $this->closeShift($f);
+        $blocked = $this->runConcurrently([fn () => $this->approveShift($f), fn () => $this->approveShift($f, gateOpen: false)]);
+        $this->assertAllCompleted($blocked);
+        foreach ($blocked as $result) {
+            $this->assertSame('rejected:review_required', $result['value']);
+        }
+        $this->assertSame('closed', DB::table('fuel_shifts')->where('id', $f['shift_id'])->value('status'));
+        $this->assertNull(DB::table('fuel_shifts')->where('id', $f['shift_id'])->value('approved_at'));
+        $this->assertSame(0, (int) DB::table('fuel_shift_events')->where('fuel_shift_id', $f['shift_id'])->where('type', 'approved_locked')->count());
+
+        $this->assertSame('ok:reading_error', $this->review($f, 'reading_error'));
+        $after = $this->runConcurrently([fn () => $this->approveShift($f), fn () => $this->approveShift($f, gateOpen: false), fn () => $this->approveShift($f)]);
+        $this->assertAllCompleted($after);
+        $this->assertSame(1, count(array_filter(array_column($after, 'value'), fn ($v) => $v === 'approved')), json_encode($after));
+        $this->assertSame(1, (int) DB::table('fuel_shift_events')->where('fuel_shift_id', $f['shift_id'])->where('type', 'approved_locked')->count());
+    }
+
     // ───────── أدوات ─────────
 
     /** @param array<string,string> $f */
@@ -156,6 +245,45 @@ class FuelShiftMeterReconciliationConcurrencyPostgresTest extends TestCase
     }
 
     /** @param array<string,string> $f */
+    private function approveShift(array $f, bool $gateOpen = true): string
+    {
+        $this->enter($f);
+        $previousGate = config('fuel_stations.shift_meter_reconciliation_enabled');
+        config(['fuel_stations.shift_meter_reconciliation_enabled' => $gateOpen]);
+        try {
+            app(FuelShiftService::class)->approve(FuelShift::findOrFail($f['shift_id']), null, User::findOrFail($f['actor_id']));
+
+            return 'approved';
+        } catch (\RuntimeException $exception) {
+            $message = $exception->getMessage();
+
+            return match (true) {
+                str_contains($message, 'FUEL_METER_VARIANCE_REVIEW_REQUIRED') => 'rejected:review_required',
+                str_contains($message, 'مغلقة') => 'rejected:not_closed',
+                default => 'rejected:' . $message,
+            };
+        } finally {
+            config(['fuel_stations.shift_meter_reconciliation_enabled' => $previousGate]);   // لا يتسرّب إغلاق البوابة إلى بقية الاختبار في العملية الأم.
+        }
+    }
+
+    /** @param array<string,string> $f */
+    private function setReconciliation(array $f, bool $on): string
+    {
+        $this->enter($f);
+        app(\App\Services\FuelStationSettingsService::class)->putTenant(['shift_meter_reconciliation_enabled' => $on], User::findOrFail($f['actor_id']), 'تزامن');
+
+        return $on ? 'on' : 'off';
+    }
+
+    /** المعتمِد هو فاتح الوردية في هذا الـfixture: يُعطَّل شرط «مشرف مختلف» كي يعزل الاختبار سباق المراجعة/الاعتماد وحده. @param array<string,string> $f */
+    private function relaxApproverRules(array $f): void
+    {
+        $this->enter($f);
+        app(\App\Services\FuelStationSettingsService::class)->putStationValues(FuelStation::findOrFail($f['station_id']), ['shift_supervisor_approval_required' => false], User::findOrFail($f['actor_id']), 'تهيئة');
+    }
+
+    /** @param array<string,string> $f */
     private function enter(array $f): void
     {
         app(TenantContext::class)->set($f['tenant_id']);
@@ -171,6 +299,8 @@ class FuelShiftMeterReconciliationConcurrencyPostgresTest extends TestCase
         $branch = Branch::where('tenant_id', $auth['tenant_id'])->sole();
         app(BranchContext::class)->set($branch->id);
         $actor = User::where('tenant_id', $auth['tenant_id'])->where('role', 'owner')->sole();
+        // PR8-S: المطابقة اشتراك اختياري؛ تُفعَّل للمؤسسة صراحةً.
+        app(\App\Services\FuelStationSettingsService::class)->putTenant(['shift_meter_reconciliation_enabled' => true], $actor, 'اختبار');
 
         $productId = $this->withToken($auth['token'])->postJson('/api/products', [
             'name' => 'وقود T4 mL', 'type' => 'good', 'unit' => 'mL', 'sale_price' => 1000, 'purchase_price' => 10, 'track_inventory' => true,

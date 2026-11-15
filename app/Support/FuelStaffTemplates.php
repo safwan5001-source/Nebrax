@@ -25,7 +25,7 @@ final class FuelStaffTemplates
      *
      * @var list<string>
      */
-    public const RESERVED = ['fuel.governance.manage', 'fuel.staff.manage', 'fuel.settlement.post'];
+    public const RESERVED = ['fuel.governance.manage', 'fuel.staff.manage', 'fuel.settlement.post', 'fuel.shift.meter_variance_review'];
 
     /** @var list<string> */
     private const SELLER_KEYS = [

@@ -18,6 +18,8 @@ import { describeLoadFailure } from '@/lib/load-failure';
 import { currentUser } from '@/lib/auth';
 import { litersToMilliliters, millilitersToLiters } from '@/lib/fuel-quantity';
 import { formatMinorRiyal, isValidRiyal, minorToRiyal, riyalToMinor, SAUDI_RIYAL_SYMBOL } from '@/lib/money';
+import { MeterReconciliationPolicy } from '@/modules/fuel-settings/meter-reconciliation-policy';
+import { canGovern, METER_RECONCILIATION_KEY, readMeterReconciliationMeta, type MeterReconciliationMeta } from '@/modules/fuel-settings/meter-reconciliation';
 
 type Settings = Record<string, string | number | boolean | string[] | null>;
 type Station = {
@@ -66,6 +68,8 @@ export default function FuelStationsSettingsPage() {
   const [products, setProducts] = useState<FuelProduct[]>([]);
   const [stationId, setStationId] = useState('');
   const [stationSettings, setStationSettings] = useState<Settings | null>(null);
+  const [tenantMeterMeta, setTenantMeterMeta] = useState<MeterReconciliationMeta | null>(null);
+  const [stationMeterMeta, setStationMeterMeta] = useState<MeterReconciliationMeta | null>(null);
   const [tenantPatch, setTenantPatch] = useState<Partial<Settings>>({});
   const [stationPatch, setStationPatch] = useState<Partial<Settings>>({});
   const [stationRecordPatch, setStationRecordPatch] = useState<Partial<Station>>({});
@@ -96,6 +100,7 @@ export default function FuelStationsSettingsPage() {
         api<{ data: Device[] | { data: Device[] } }>('/fuel-stations/devices').catch(() => ({ data: [] })),
       ]);
       setTenant(settingsResponse.data);
+      setTenantMeterMeta(readMeterReconciliationMeta(settingsResponse));
       setStations(asList<Station>(stationsResponse.data).filter((station) => station.status === 'active'));
       setAccounts(asList<Account>(accountsResponse.data));
       setPaymentMethods(asList<PaymentMethod>(paymentResponse.data).filter((method) => method.is_active));
@@ -112,7 +117,7 @@ export default function FuelStationsSettingsPage() {
   }, [t, tc]);
 
   const loadStationScope = useCallback(async (id: string) => {
-    if (!id) { setStationSettings(null); setStationPatch({}); setStationRecordPatch({}); setPrices([]); return; }
+    if (!id) { setStationSettings(null); setStationMeterMeta(null); setStationPatch({}); setStationRecordPatch({}); setPrices([]); return; }
     setError(null);
     try {
       const [settingsResponse, priceResponse] = await Promise.all([
@@ -120,6 +125,7 @@ export default function FuelStationsSettingsPage() {
         api<{ data: Price[] | { data: Price[] } }>(`/fuel-stations/prices?station_id=${encodeURIComponent(id)}`).catch(() => ({ data: [] })),
       ]);
       setStationSettings(settingsResponse.data);
+      setStationMeterMeta(readMeterReconciliationMeta(settingsResponse));
       setStationPatch({}); setStationRecordPatch({});
       setPrices(asList<Price>(priceResponse.data));
     } catch (cause) {
@@ -161,9 +167,11 @@ export default function FuelStationsSettingsPage() {
         ? await api<{ data: Settings }>(`/fuel-stations/stations/${stationId}/settings`, { method: 'PUT', body })
         : await api<{ data: Settings }>('/fuel-stations/settings', { method: 'PUT', body });
       if (isStationScope) {
+        setStationMeterMeta(readMeterReconciliationMeta(response));
         setStationSettings(response.data);
         setStationPatch((current) => omitKeys(current, keys));
       } else {
+        setTenantMeterMeta(readMeterReconciliationMeta(response));
         setTenant(response.data);
         setTenantPatch((current) => omitKeys(current, keys));
       }
@@ -242,9 +250,10 @@ export default function FuelStationsSettingsPage() {
       <a href="/fuel-stations/prices" className="mt-4 inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm font-medium text-primary hover:bg-primary-soft">{tPrices('settingsLink')}</a>
     </SettingsSection>
 
-    <SettingsSection id="shifts" icon={<Timer />} title={t('groups.shifts')} description={t('groups.shiftsDescription')} saving={saving === 'shifts'} canSave={canManageScope && hasChanges([...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters'])} onSave={() => void saveSettings('shifts', [...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters'])} saveLabel={t('save')}>
+    <SettingsSection id="shifts" icon={<Timer />} title={t('groups.shifts')} description={t('groups.shiftsDescription')} saving={saving === 'shifts'} canSave={canManageScope && hasChanges([...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters', METER_RECONCILIATION_KEY])} onSave={() => void saveSettings('shifts', [...SHIFT_KEYS, 'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters', METER_RECONCILIATION_KEY])} saveLabel={t('save')}>
       <div className="grid gap-3 lg:grid-cols-2">{SHIFT_KEYS.map((key) => <ToggleRow key={key} label={t(`fields.${key}`)} checked={Boolean(value(key))} onChange={(next) => patchValue(key, next)} disabled={!canManageScope} onInherit={isStationScope ? () => resetToInherited(key) : undefined} inheritLabel={t('useInherited')} />)}</div>
       <div className="mt-4 grid gap-4 border-t border-border pt-4 md:grid-cols-2"><VolumeInput label={t('fields.shift_meter_tolerance_milliliters')} value={millilitersToLiters(value('shift_meter_tolerance_milliliters') as number ?? 0)} onChange={(next) => { const parsed = litersToMilliliters(next, true); if (parsed !== null) patchValue('shift_meter_tolerance_milliliters', parsed); }} disabled={!canManageScope} hint={t('liters')} /><VolumeInput label={t('fields.shift_tank_tolerance_milliliters')} value={millilitersToLiters(value('shift_tank_tolerance_milliliters') as number ?? 0)} onChange={(next) => { const parsed = litersToMilliliters(next, true); if (parsed !== null) patchValue('shift_tank_tolerance_milliliters', parsed); }} disabled={!canManageScope} hint={t('liters')} /></div>
+          <MeterReconciliationPolicy checked={Boolean(value(METER_RECONCILIATION_KEY))} savedChecked={Boolean(scopeValues?.[METER_RECONCILIATION_KEY])} onChange={(next) => patchValue(METER_RECONCILIATION_KEY, next)} canEdit={canManageScope} canGovern={canGovern(permissions)} meta={isStationScope ? stationMeterMeta : tenantMeterMeta} onInherit={isStationScope ? () => resetToInherited(METER_RECONCILIATION_KEY) : undefined} />
     </SettingsSection>
 
     <SettingsSection id="avi" icon={<Radio />} title={t('groups.avi')} description={t('groups.aviDescription')} saving={saving === 'avi'} canSave={canManageScope && hasChanges([...AVI_KEYS, 'default_corporate_credit_limit_minor', 'odometer_policy', 'avi_min_refill_interval_seconds', 'avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds', 'fuel_sales_allowed_payment_method_ids'])} onSave={() => void saveSettings('avi', [...AVI_KEYS, 'default_corporate_credit_limit_minor', 'odometer_policy', 'avi_min_refill_interval_seconds', 'avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds', 'fuel_sales_allowed_payment_method_ids'])} saveLabel={t('save')}>

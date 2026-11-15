@@ -428,7 +428,7 @@ class FuelShiftService
             }
             // Q3: فرق مطابقة التحصيل غير الصفري يحتاج مراجعة مشرف مسجَّلة قبل الاعتماد (والبوابة مفتوحة فقط).
             app(FuelShiftCollectionService::class)->assertApprovable($shift);
-            // TANKER-PR8: كل فرق عدّاد خارج التفاوت يحتاج تصنيفاً ومراجعة مشرف مسجَّلة (والبوابة مفتوحة فقط).
+            // TANKER-PR8/PR8-S: كل فرق عدّاد خارج التفاوت في لقطة مجمَّدة ذات متطلب مراجعة يحتاج تصنيفاً ومراجعة مشرف مسجَّلة — **بمعزل عن إعداد المطابقة الحالي وبوابة النشر** (المتطلب مثبَّت على اللقطة وقت الإغلاق).
             app(FuelShiftMeterReconciliationService::class)->assertApprovable($shift);
 
             $shift->update([

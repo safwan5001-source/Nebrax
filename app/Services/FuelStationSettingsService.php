@@ -32,7 +32,7 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at', 'shift_meter_reconciliation_enabled'];
 
     /** @var list<string> نطاقات منع تكرار رقم السند الورقي (TANKER-PR3؛ الافتراضي المعتمد `station`). */
     public const TANKER_VOUCHER_SCOPES = ['station', 'tenant', 'owner', 'none'];
@@ -548,7 +548,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_inventory_review_after_hours', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at', 'tanker_inventory_alerts_enabled', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'shift_meter_reconciliation_enabled', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_inventory_review_after_hours', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at', 'tanker_inventory_alerts_enabled', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -642,7 +642,7 @@ class FuelStationSettingsService
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
             'device_simulated_ingress_enabled',
             'maintenance_overdue_alerts_enabled', 'safety_inspection_overdue_alerts_enabled',
-            'fuel_station_alerts_enabled', 'tanker_selection_required', 'tanker_inventory_alerts_enabled',
+            'fuel_station_alerts_enabled', 'tanker_selection_required', 'tanker_inventory_alerts_enabled', 'shift_meter_reconciliation_enabled',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {

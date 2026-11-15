@@ -11716,6 +11716,43 @@
     }
   },
   "fuelStationsSettings": {
+    "meterReconciliation": {
+      "title": "Meter reconciliation",
+      "description": "At close, each nozzle's reading is compared with direct sales and tanker fills, and a frozen snapshot is kept for variance review. Operational only: no journal entry and no stock movement.",
+      "toggle": "Reconcile meters when a shift is closed",
+      "useInherited": "Use organization value",
+      "unsaved": "Unsaved change: the state below reflects the last saved value.",
+      "governanceRequired": "Changing this setting needs the fuel governance permission in addition to settings management.",
+      "status": {
+        "active": {
+          "title": "Active",
+          "body": "Reconciliation snapshots are created when new shifts are closed."
+        },
+        "pending_deployment": {
+          "title": "Enabled — deployment gate is closed",
+          "body": "Your choice is saved but has no effect yet: no new snapshots until operation is opened by a separate decision."
+        },
+        "unknown_deployment": {
+          "title": "Enabled — deployment state unknown",
+          "body": "The operating state could not be determined; do not rely on reconciliation being active."
+        },
+        "disabled": {
+          "title": "Disabled",
+          "body": "No new snapshots for shifts closed from now on. Shifts closed earlier with frozen snapshots still need their variances reviewed before approval."
+        }
+      },
+      "source": {
+        "station": "Value comes from this station's setting.",
+        "organization": "Value is inherited from the organization setting."
+      },
+      "notes": {
+        "closeAllowed": "Closing a shift is always allowed, even with variances.",
+        "approvalNeedsReview": "When enabled, a shift cannot be approved until all required variances are reviewed.",
+        "frozenAtClose": "The requirement is fixed on the shift when it closes; disabling the setting later or closing the deployment gate does not remove it, and the supervisor can still complete the review with their permission.",
+        "historical": "Shifts closed without snapshots are not retroactively affected.",
+        "operationalOnly": "Variance review is a descriptive classification and changes no journal entry or stock movement."
+      }
+    },
     "eyebrow": "Fuel Stations · Settings",
     "title": "Fuel Stations settings",
     "subtitle": "Human-readable operational settings within available contracts only, separated by tenant and station scope.",

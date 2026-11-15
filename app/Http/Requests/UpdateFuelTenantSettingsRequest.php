@@ -31,6 +31,7 @@ class UpdateFuelTenantSettingsRequest extends FormRequest
             'fuel_distinct_approver_required' => ['sometimes', 'boolean'],
             'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'boolean'],
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'boolean'],
+            'shift_meter_reconciliation_enabled' => ['sometimes', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'integer', 'min:0'],
             'tank_reading_backdating_policy' => ['sometimes', 'in:deny,supervisor_approval,authorized_user'],
             'tank_reading_backdating_max_hours' => ['sometimes', 'integer', 'min:1', 'max:720'],

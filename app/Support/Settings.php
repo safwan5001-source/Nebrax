@@ -470,6 +470,10 @@ class Settings
             // فرق الخزان التشغيلي لا يغيّر Book Stock؛ يمنع الإغلاق فقط إن اختار المستأجر ذلك.
             'shift_allow_close_with_unresolved_operational_variance' => true,
             'shift_meter_tolerance_milliliters' => 0,
+            // TANKER-PR8-S: تفعيل مطابقة قراءات الفوهات عند إغلاق الوردية (اشتراك اختياري لكل مؤسسة/محطة، الافتراضي `false`). **مفتاح حوكمة.** لا يكفي وحده:
+            // الأثر الفعلي = هذا المفتاح ∧ بوابة النشر `fuel_stations.shift_meter_reconciliation_enabled` (مغلقة افتراضياً). يحكم **إنشاء لقطات جديدة عند الإغلاق فقط**؛
+            // متطلب المراجعة يُثبَّت على اللقطات وقت الإغلاق ولا يتأثر بتعطيله لاحقاً ولا بإغلاق البوابة (انظر FuelShiftMeterReconciliationService).
+            'shift_meter_reconciliation_enabled' => false,
             'shift_tank_tolerance_milliliters' => 0,
             // Cycle 5: تسعير الوقود يملك وضع VAT صريحاً قابلاً للوراثة
             // (المستأجر ثم المحطة). القيمة الفارغة ليست وضعاً تشغيلياً: تحلها

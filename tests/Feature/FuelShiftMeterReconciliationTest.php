@@ -40,6 +40,8 @@ class FuelShiftMeterReconciliationTest extends TestCase
         parent::setUp();
         config(['fuel_stations.shift_meter_reconciliation_enabled' => true, 'fuel_stations.shift_cash_receipts_enabled' => true]);
         $this->f = $this->fixture();
+        // PR8-S: المطابقة اشتراك اختياري (الافتراضي معطَّل) فوق بوابة النشر؛ هذا الاختبار يفعّلها للمؤسسة صراحةً.
+        app(FuelStationSettingsService::class)->putTenant(['shift_meter_reconciliation_enabled' => true], $this->f['actor'], 'اختبار');
         $this->owner = FuelTankerOwner::create(['name' => 'عسكر', 'code' => 'ASK-' . uniqid(), 'status' => 'active']);
         $this->travel(3)->seconds();
     }

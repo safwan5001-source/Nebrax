@@ -150,6 +150,39 @@ describe('meter reconciliation section', () => {
     expect(document.querySelector('[data-meter-review-form]')).toBeNull();
   });
 
+  it('PR8-S: the additive settings policy block does not disturb the section, and a disabled setting does not hide a frozen requirement from the supervisor', async () => {
+    const withPolicy = view({}, [row()]) as MeterReconciliation & { policy: unknown };
+    withPolicy.policy = { deployment_open: false, setting_enabled: false, active: false, source: 'organization', review_requirement: 'required_before_approval', approval_blocked: true };
+    connect(REVIEWER, () => withPolicy);
+    mount();
+    expect(await screen.findByText('Supervisor review')).toBeTruthy();       // التعطيل/إغلاق البوابة لا يُخفيان مسار المراجعة لمن يملك الصلاحية
+    expect(document.querySelector('[data-meter-review-form]')).not.toBeNull();
+    expect(document.querySelector('[data-meter-status]')?.getAttribute('data-meter-status')).toBe('variance');
+  });
+
+  it('PR8-S staff switching: the review form follows the signed-in user, never a stale session (supervisor → attendant → supervisor)', async () => {
+    const asServer = (permissions: string[]) => view({ can_review: permissions.includes('fuel.shift.meter_variance_review') });
+    connect(REVIEWER, () => asServer(REVIEWER));
+    const first = mount();
+    await screen.findByText('Supervisor review');
+    expect(document.querySelector('[data-meter-review-form]')).not.toBeNull();
+    first.unmount();
+
+    // الموظف التالي على الجهاز نفسه: لا صلاحية مراجعة ⇒ الخادم يعيد can_review=false ⇒ لا نموذج ولا زر، ونص صريح.
+    connect(VIEWER, () => asServer(VIEWER));
+    const second = mount();
+    await screen.findByText('Meter reconciliation');
+    await waitFor(() => expect(document.querySelector('[data-meter-no-permission]')).not.toBeNull());
+    expect(document.querySelector('[data-meter-review-form]')).toBeNull();
+    expect(reviewCalls()).toHaveLength(0);
+    second.unmount();
+
+    connect(REVIEWER, () => asServer(REVIEWER));
+    mount();
+    await screen.findByText('Supervisor review');
+    expect(document.querySelector('[data-meter-review-form]')).not.toBeNull();
+  });
+
   it('“Other” requires a note before the button enables', async () => {
     connect(REVIEWER, () => view());
     reviewHandler = () => view();

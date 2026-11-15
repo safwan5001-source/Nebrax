@@ -317,7 +317,7 @@ class FuelStaffAccessService
     {
         $reserved = array_values(array_intersect($added, FuelStaffTemplates::RESERVED));
         if ($reserved !== [] && ! in_array('*', $actorPermissions, true)) {
-            throw new AuthorizationException('منح صلاحيتَي حوكمة الوقود وإدارة موظفي المحطات حكرٌ على المالك أو المسؤول الأعلى.');
+            throw new AuthorizationException('منح صلاحيات الحوكمة وإدارة الموظفين والتسوية ومراجعة فروق العدّادات حكرٌ على المالك أو المسؤول الأعلى.');
         }
         if (! Rbac::covers($actorPermissions, $added)) {
             throw new AuthorizationException('لا يمكنك منح صلاحياتٍ لا تملك حق تفويضها.');
