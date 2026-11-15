@@ -198,6 +198,18 @@ export default function FuelStationsWorkspacePage() {
     <div className="space-y-5">
       {header}
 
+      {canAccess(permissions ?? [], 'fuel_stations.view') && (
+        <div className="flex">
+          <Button asChild className="min-h-11 w-full sm:w-auto">
+            <Link href="/fuel-stations/ops">
+              <Fuel className="h-4 w-4" aria-hidden="true" />
+              {locale.startsWith('ar') ? 'تشغيل المحطة' : 'Open station app'}
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {summary.dashboard ? (
         <section aria-label={t('operationalSummary')} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {metrics.map((metric) => <Metric key={metric.label} label={metric.label} value={metric.value} />)}

@@ -413,6 +413,42 @@ class Settings
             'tank_reading_backdating_policy' => 'deny',
             'tank_reading_backdating_max_hours' => 24,
             'tank_reading_backdating_reason_required' => true,
+            // TANKER-PR3: سياسات تعبئة صهاريج المتعاملين — قرارات المالك المعتمدة (PR3_DECISIONS.md). قابلة للضبط (قاعدة 6) وحوكمية (تتطلب `fuel.governance.manage`)
+            // وتخزَّن فقط: لا أثر مالي أو مخزني ولا تُفعَّل قبل بوابة `fuel_stations.tanker_management_enabled` (مغلقة).
+            // `tanker_selection_required`: اختيار الصهريج اختياري افتراضياً؛ صاحب الصهريج إلزامي دائماً لتعبئات المتعاملين ولا يُمنع صاحب بلا صهريج مسجَّل أبداً.
+            'tanker_selection_required' => false,
+            // نطاق منع تكرار رقم السند الورقي: `station` (المعتمد) | `tenant` | `owner` | `none`. الحجب صارم بلا تجاوز؛ الأصفار تُحفظ والملغى محجوز (ثوابت تُفرض في PR-4).
+            'tanker_voucher_unique_scope' => 'station',
+            // تجاوز سعة الصهريج: `allow_with_confirmation` (المعتمد: تحذير + تأكيد صريح يُسجَّل) | `block` | `allow`. `supervisor_approval` غير مبني فيُرفض.
+            'tanker_capacity_overrun_policy' => 'allow_with_confirmation',
+            // TANKER-PR5: مرفقات سندات التعبئة — سياسات عمل قابلة للضبط (قاعدة 6)، **الافتراضات تحفظ السلوك القائم**: الصورة اختيارية، PDF وJPG وPNG حتى 10 م.ب و10 مرفقات للسند،
+            // الإضافة مسموحة بعد إغلاق الوردية (دليل فقط لا يغيّر السجل)، والإزالة/الاستبدال أثناء الوردية المفتوحة فقط (وبصلاحية + تدقيق + سبب، ولا يُحذف الملف ولا الصف).
+            // الإلزام `tanker_voucher_attachment_required` (قرار المالك D-T2، PR3_DECISIONS #5): `never` (الافتراضي) | `before_shift_approval` | `before_settlement`. غير `never` يُعلن حالة «ناقص» فقط؛
+            // **لا إنفاذ في PR-5** (لا حجب لتسجيل التعبئة ولا إغلاق الوردية ولا الاعتماد ولا التسوية): ربطه بنقطتي الإنفاذ قرار منفصل عند تجهيز التطبيق التشغيلي.
+            // الثلاثة الحوكمية (الإلزام، بعد الإغلاق، الإزالة) تتطلب `fuel.governance.manage`؛ الأنواع والحجم والعدد تكفيها `fuel_stations.manage`.
+            'tanker_voucher_attachment_required' => 'never',
+            'tanker_fill_attachment_types' => 'images_and_pdf',
+            'tanker_fill_attachment_max_size_mb' => 10,
+            'tanker_fill_attachment_max_count' => 10,
+            'tanker_fill_attachment_after_close' => 'allow',
+            'tanker_fill_attachment_removal' => 'open_shift_only',
+            // TANKER-PR6A: سياسات مراجعة السندات المعلّقة قبل الدمج المخزني (تخزين وعرض فقط — **لا خصم ولا ترحيل في هذه الشريحة**). لا مفتاح «تفعيل الترحيل» عمداً:
+            // التفعيل المخزني قرار منفصل (PR-6B) ولا يُضبط من إعداد. `tanker_inventory_insufficient_policy`: `block` (الافتراضي: رصيد غير كافٍ = مانع) | `hold_for_review` (مراجعة بشرية)؛
+            // لا خيار «السماح بالسالب» ولا «تسوية صامتة». `tanker_inventory_review_after_hours`: عمر السند المعلّق (بالساعات) الذي يُوسَم بعده «متأخر».
+            'tanker_inventory_insufficient_policy' => 'block',
+            'tanker_inventory_review_after_hours' => 24,
+            // TANKER-PR6B-1: إعدادات الدمج المخزني للسندات (تخزين وتحقق وعرض فقط — **لا خصم ولا قيد ولا ترحيل**؛ لا شيء يقرؤها مسار كتابة قبل PR-6B-3 وبوابة التشغيل مغلقة).
+            // `tanker_issue_clearing_account_id`: الحساب الوسيط لقيد الترحيل المستقبلي (مقترح الكود 1145 «وقود لدى أصحاب الصهاريج»). **لا قيمة افتراضية ولا fallback ولا إنشاء تلقائي**:
+            // يعيّنه المستأجر/المحطة صراحةً بحساب أصل نشط غير تجميعي لا يساوي حساب مخزون/نقد/بنك/ضريبة/دور محاسبي آخر؛ غيابه مانع جاهزية.
+            'tanker_issue_clearing_account_id' => null,
+            // `tanker_cost_recognition`: `clearing_until_invoice` فقط (الاعتراف بالتكلفة يتبع تحقق شروط التسليم وانتقال السيطرة لا مجرد تاريخ الفاتورة). `immediate_cogs` غير مبني ويُرفض.
+            'tanker_cost_recognition' => 'clearing_until_invoice',
+            // `fuel_pool_ledger_variance_policy`: سلوك الترحيل المستقبلي عند انحراف قيمة مجمّع التكلفة عن حصة الوقود من الأستاذ — `block` (الافتراضي بقرار المالك) | `warn`.
+            'fuel_pool_ledger_variance_policy' => 'block',
+            // `tanker_inventory_posting_start_at`: لحظة بدء الترحيل (RFC3339). فارغ ⇒ كل السندات تاريخية (لا ترحيل جماعي ولا رجعي؛ ترحيل التاريخي منفرداً بصلاحية مستقلة لاحقاً).
+            'tanker_inventory_posting_start_at' => null,
+            // `tanker_inventory_alerts_enabled`: تنبيهات اختلاف الدمج المخزني (لا يرسل خارجياً؛ لا مستهلك قبل PR-6B-5).
+            'tanker_inventory_alerts_enabled' => true,
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,

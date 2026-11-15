@@ -15,6 +15,7 @@ use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\FuelOpeningBalance;
 use App\Models\FuelShift;
+use App\Models\FuelTankerFill;
 use App\Models\FuelSale;
 use App\Models\FuelStationSafetyInspection;
 use App\Models\FuelStationWorkOrder;
@@ -222,6 +223,11 @@ class DocumentNumberingCatalog
             'model'  => FuelSale::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'FSL']],
+        ],
+        'fuel_tanker_fill' => [
+            'model'  => FuelTankerFill::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FTF']],
         ],
         'fuel_opening_balance' => [
             'model'  => FuelOpeningBalance::class,

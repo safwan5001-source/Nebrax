@@ -25,6 +25,9 @@ class FuelOperationalLedger extends BaseModel
     public const TYPE_EVAPORATION = 'evaporation';
     public const TYPE_STOCKTAKE = 'stocktake';
     public const TYPE_RECONCILIATION_MATCHED = 'reconciliation_matched';
+    /** TANKER-PR6B-2 — نوعان **مُجهَّزان فقط** (لا كاتب): لا يُدرجان إلا مقابل ترحيل مخزني مطابق (مُشغّل في القاعدة)، وصف واحد لكل (سند، نوع). */
+    public const TYPE_TANKER_FILL = 'tanker_fill';
+    public const TYPE_TANKER_FILL_REVERSAL = 'tanker_fill_reversal';
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'fuel_station_id', 'fuel_tank_id', 'fuel_product_id', 'warehouse_id',

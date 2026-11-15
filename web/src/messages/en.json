@@ -2941,7 +2941,11 @@
       "ai": "AI"
     },
     "perm_actions": {
+      "add": "Add",
+      "remove": "Remove",
       "post": "Post",
+      "reverse": "Reverse",
+      "post_historical": "Post historical",
       "execution_approve": "Approve execution",
       "resolve_blocked": "Resolve blocked",
       "request": "Request",
@@ -2982,6 +2986,7 @@
       "build_draft": "Build draft",
       "cash_count": "Cash count",
       "cash_variance_review": "Cash variance review",
+      "meter_variance_review": "Meter variance review",
       "invoice": "Invoice",
       "access": "Access",
       "view_cost": "View cost",
@@ -3068,6 +3073,8 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "attachment": "Attachments",
+      "inventory": "Inventory",
       "cost": "Cost",
       "late": "Late readings",
       "actions": "Executable actions",
@@ -3106,6 +3113,7 @@
       "reconciliation": "Inventory reconciliation",
       "supplier_invoice": "Fuel supplier invoices",
       "tanker": "Tanker owners",
+      "fill": "Fills",
       "governance": "Fuel governance",
       "settlement": "Settlement",
       "staff": "Station staff"
@@ -9385,6 +9393,7 @@
     "entity_fuel_shift": "Fuel shift",
     "entity_fuel_sale": "Fuel sale",
     "entity_fuel_opening_balance": "Fuel opening balance",
+    "entity_fuel_tanker_fill": "Tanker fill",
     "entity_fuel_maintenance_work_order": "Station maintenance work order",
     "entity_fuel_safety_inspection": "Station safety inspection",
     "entity_corporate_fuel_contract": "Corporate fuel contract",
@@ -9764,6 +9773,329 @@
     "closeNavigation": "Close Fuel Stations navigation",
     "navigationTitle": "Fuel Stations navigation"
   },
+  "fuelTankerFills": {
+    "eyebrow": "Inventory integration",
+    "title": "Tanker fills — inventory posting",
+    "subtitle": "Post tanker fill vouchers to inventory and the ledger, and reverse them. Posting deducts the fuel from the station warehouse once at historical cost and records one entry; it creates no invoice, revenue, tax or receivable for the tanker owner.",
+    "reviewLink": "Integration readiness review",
+    "reportsLink": "Control & reconciliation reports",
+    "back": "Back to fills",
+    "liters": "L",
+    "voided": "Voided",
+    "hidden": "Hidden",
+    "hiddenHint": "You do not have permission to see this value",
+    "blockers": "Blockers",
+    "tabs": {
+      "pending": "Pending posting",
+      "posted": "Posted",
+      "reversed": "Reversed",
+      "attention": "Needs attention"
+    },
+    "inventoryStatus": {
+      "pending_integration": "Pending inventory posting",
+      "posted": "Posted",
+      "reversed": "Reversed"
+    },
+    "readiness": {
+      "ready": "Ready to integrate",
+      "needs_review": "Needs review",
+      "blocked": "Blocked",
+      "not_applicable": "Not applicable"
+    },
+    "operation": {
+      "post": "Posting",
+      "reverse": "Reversal"
+    },
+    "attempt": {
+      "label": "Last attempt",
+      "outcome": {
+        "succeeded": "succeeded",
+        "rejected": "rejected",
+        "failed": "failed"
+      }
+    },
+    "field": {
+      "number": "Electronic number",
+      "voucher": "Paper voucher number",
+      "owner": "Tanker owner",
+      "tanker": "Tanker",
+      "ownerTanker": "Owner and tanker",
+      "station": "Station",
+      "quantity": "Quantity",
+      "recordedAt": "Recorded at",
+      "notes": "Notes",
+      "voidedAt": "Voided at",
+      "voidReason": "Void reason",
+      "inventoryStatus": "Inventory status"
+    },
+    "list": {
+      "searchPlaceholder": "Search by electronic or paper voucher number",
+      "searchLabel": "Search fills",
+      "stationFilter": "Filter by station",
+      "allStations": "All stations",
+      "loading": "Loading fills",
+      "loadFailed": "Could not load the fills",
+      "noResults": "No matching results",
+      "noResultsHint": "Try another number or clear the filter.",
+      "clearFilters": "Clear filter",
+      "open": "Open",
+      "actions": "Actions",
+      "voucherLine": "Paper voucher: {voucher} · {station}",
+      "empty": {
+        "pending": "No fills pending posting",
+        "posted": "No posted fills",
+        "reversed": "No reversed fills",
+        "attention": "No fills need attention"
+      },
+      "emptyHint": {
+        "pending": "Recorded fills that have not been posted to inventory appear here.",
+        "posted": "Fills posted to inventory and the ledger appear here.",
+        "reversed": "Fills whose posting was reversed appear here.",
+        "attention": "Fills whose last posting or reversal attempt was rejected or failed appear here."
+      }
+    },
+    "detail": {
+      "notFoundTitle": "Fill not found",
+      "notFoundBody": "The fill does not exist, is outside your account, or the feature is not enabled.",
+      "loadFailed": "Could not load the fill",
+      "refreshFailed": "Could not refresh the fill state; what is shown may be stale.",
+      "basics": "Fill details",
+      "inventory": "Inventory posting",
+      "attachments": "Voucher attachments",
+      "historicalBadge": "Historical fill",
+      "overdueBadge": "Overdue",
+      "noPosting": "This fill has not been posted yet; it has no inventory or ledger effect.",
+      "statusHint": {
+        "pending_integration": "Recorded with no inventory or ledger effect until it is posted.",
+        "posted": "Posted to inventory and the ledger at historical cost. Corrections are made by reversing the posting only.",
+        "reversed": "Posting reversed with an independent reversing entry at the original cost."
+      }
+    },
+    "actions": {
+      "post": "Preview and post fill",
+      "reverse": "Preview and reverse posting"
+    },
+    "posting": {
+      "postedBy": "Posted by",
+      "postedAt": "Posted at",
+      "quantity": "Quantity deducted",
+      "cost": "Historical cost",
+      "journal": "Posting entry",
+      "reversedBy": "Reversed by",
+      "reversedAt": "Reversed at",
+      "reversalReason": "Reversal reason",
+      "reversalJournal": "Reversal entry",
+      "costHidden": "Amounts and entry numbers are shown to users who can view cost.",
+      "technical": "Movement technical ids",
+      "stockMovement": "Stock movement",
+      "costMovement": "Cost movement",
+      "reversalStockMovement": "Reversal stock movement",
+      "reversalCostMovement": "Reversal cost movement"
+    },
+    "accounts": {
+      "title": "Historical entry accounts",
+      "hint": "The two accounts used at posting time (they do not change if settings change later).",
+      "clearing": "Clearing account (debit)",
+      "inventory": "Fuel inventory (credit)"
+    },
+    "attempts": {
+      "title": "Attempt history",
+      "hint": "Every posting or reversal attempt is recorded with its outcome. An attempt outcome is separate from the fill state.",
+      "empty": "No recorded attempts.",
+      "reason": "Reason",
+      "actor": "By"
+    },
+    "blocker": {
+      "station_not_active": "Station is not active",
+      "station_warehouse_required": "No warehouse linked to the station",
+      "warehouse_unavailable": "Station warehouse is unavailable",
+      "warehouse_branch_mismatch": "Station warehouse belongs to a different branch",
+      "fuel_product_unavailable": "Fuel product is unavailable",
+      "stock_record_missing": "No stock record for the fuel product in the station warehouse",
+      "cost_baseline_required": "No cost baseline for the fuel pool",
+      "cost_history_open": "Open cost history on the pool",
+      "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse stock",
+      "insufficient_balance": "Warehouse balance does not cover this fill and the earlier ones",
+      "period_locked": "The accounting period is locked",
+      "settlement_mode_conflict": "Station settles on shift close (double deduction)",
+      "clearing_account_missing": "Clearing account is not set",
+      "clearing_account_invalid": "Clearing account is no longer valid",
+      "inventory_account_invalid": "Fuel inventory account is not valid for posting",
+      "quantity_exceeds_stock_limit": "Fill quantity exceeds the allowed stock movement limit",
+      "insufficient_stock": "Fuel stock in the station warehouse does not cover the fill quantity",
+      "quantity_not_positive": "Fill quantity is not valid",
+      "cost_state_missing": "Pool cost state is missing",
+      "exceeds_cost_pool": "Quantity exceeds the cost pool quantity",
+      "not_posted": "The fill is not posted",
+      "already_reversed": "The posting was already reversed",
+      "original_entry_invalid": "The original posting entry is not valid",
+      "downstream_invoiced": "Linked to a later invoicing step that blocks reversal",
+      "downstream_settled": "Linked to a later settlement that blocks reversal",
+      "downstream_supply": "Linked to a later supply that blocks reversal",
+      "unknown": "Unknown blocker: {code}"
+    },
+    "reason": {
+      "posting_disabled": "Inventory posting is not enabled",
+      "posting_blocked": "The fill is blocked from posting",
+      "fill_voided": "The fill is voided and cannot be posted",
+      "fill_not_pending": "The fill is not pending inventory integration",
+      "historical_permission_required": "The fill is historical and needs the historical posting permission",
+      "historical_review_required": "Posting a historical fill needs a review confirmation and a recorded reason",
+      "quantity_exceeds_stock_limit": "Fill quantity exceeds the allowed stock movement limit",
+      "insufficient_stock": "Fuel stock in the station warehouse does not cover the fill quantity",
+      "posted_cost_zero": "The current pool cost is zero; an entry with no value is not posted",
+      "ledger_variance_blocked": "A difference between the cost pool and the ledger blocks posting under the station policy",
+      "distinct_approver_required": "Station policy requires a different user than the one who recorded the fill",
+      "period_locked": "The accounting period is locked",
+      "posting_failed": "Posting failed and the whole operation was rolled back",
+      "reversal_reason_required": "A reversal reason is required",
+      "fill_not_posted": "The fill is not in the posted state",
+      "reversal_blocked": "Reversal is blocked",
+      "original_entry_invalid": "The original posting entry is not valid or was already reversed",
+      "forbidden": "You do not have permission for this operation",
+      "not_found": "The fill does not exist or is outside your scope",
+      "invalid_input": "Invalid input",
+      "unauthorized": "Your session expired; sign in again",
+      "rate_limited": "Too many attempts; try again shortly",
+      "conflict": "Conflicts with the current state of the fill",
+      "validation": "The request could not be accepted",
+      "unknown": "Unknown reason: {code}"
+    },
+    "dialog": {
+      "title": {
+        "post": "Post fill {number}",
+        "reverse": "Reverse posting of fill {number}"
+      },
+      "intro": {
+        "post": "Preview of posting fill {number} ({quantity}) before it runs. Nothing changes until you confirm.",
+        "reverse": "Preview of reversing the posting of fill {number} ({quantity}) before it runs. Nothing changes until you confirm."
+      },
+      "previewLoading": "Loading the preview",
+      "previewForbidden": "You do not have permission to preview this operation.",
+      "previewGone": "The fill does not exist or is outside your scope.",
+      "previewFailed": "Could not load the preview.",
+      "preview": "Preview",
+      "blockers": "Blockers",
+      "status": {
+        "post": {
+          "ready": "Ready to post",
+          "blocked": "Blocked",
+          "not_applicable": "Not applicable"
+        },
+        "reverse": {
+          "ready": "Ready to reverse",
+          "blocked": "Blocked",
+          "not_applicable": "Not applicable"
+        }
+      },
+      "notApplicable": {
+        "post": "The current state of the fill does not allow posting.",
+        "reverse": "The current state of the fill does not allow reversal."
+      },
+      "historical": {
+        "title": "Historical fill",
+        "body": "This fill is dated before the approved posting start. Posting it is an exception that needs a special permission, a review confirmation and a recorded reason.",
+        "noPermission": "This is a historical fill and you do not have the historical posting permission; the preview is for information only.",
+        "confirm": "I reviewed this historical fill and confirm posting it."
+      },
+      "entry": {
+        "date": "Entry date",
+        "reversalDate": "Reversing entry date",
+        "amount": "Amount",
+        "lines": "Entry lines",
+        "side": {
+          "debit": "Debit",
+          "credit": "Credit"
+        },
+        "role": {
+          "tanker_issue_clearing": "Tanker issue clearing account",
+          "inventory": "Fuel inventory account"
+        },
+        "account": "Account",
+        "costRecognition": "Cost recognition",
+        "costRecognitionValue": {
+          "clearing_until_invoice": "On the clearing account until invoicing"
+        },
+        "variancePolicy": "Ledger variance policy",
+        "variancePolicyValue": {
+          "block": "Block posting",
+          "warn": "Warn only"
+        },
+        "valuation": "Valuation",
+        "valuationValue": {
+          "historical_cost": "Original historical cost"
+        },
+        "quantity": "Quantity"
+      },
+      "consequences": {
+        "title": "What happens when you confirm",
+        "post": "The fuel is deducted once from the station warehouse by the fill quantity at the pool historical cost, and one ledger entry is recorded (debit clearing account / credit fuel inventory). No invoice, revenue, tax or receivable is created for the tanker owner, and ownership of the fuel does not change with this action. It can only be undone with the reversal action.",
+        "reverse": "The fuel returns to the station warehouse and the cost pool at the original historical cost with no repricing, and an independent reversing entry is recorded. A posting cannot be reversed twice. This action creates no invoice or credit note."
+      },
+      "noPermission": {
+        "post": "You do not have permission to post; the preview is for information only.",
+        "reverse": "You do not have permission to reverse; the preview is for information only."
+      },
+      "reason": {
+        "postLabel": "Note (optional)",
+        "historicalLabel": "Reason for posting the historical fill",
+        "reverseLabel": "Reversal reason",
+        "hint": "Up to {max} characters."
+      },
+      "problem": {
+        "historical_review_required": "Confirm the historical fill review first.",
+        "reason_required": "The reason is required.",
+        "reason_too_short": "The reason is too short (at least 3 characters).",
+        "reason_too_long": "The reason is longer than allowed."
+      },
+      "confirm": {
+        "post": "Confirm posting",
+        "reverse": "Confirm reversal"
+      },
+      "sending": "Sending the request… do not close this window.",
+      "cancel": "Cancel",
+      "close": "Close",
+      "outcome": {
+        "ok": {
+          "post": "Fill posted",
+          "reverse": "Posting reversed"
+        },
+        "okBody": {
+          "post": "The fuel was deducted once and one entry was recorded at historical cost. No invoice or revenue was created.",
+          "reverse": "The fuel was returned at the original cost and an independent reversing entry was recorded."
+        },
+        "replayed": "This operation was already done",
+        "replayedBody": "Nothing was repeated: no new deduction and no new entry.",
+        "rejected": "The operation did not happen",
+        "rejectedBody": "The server rejected the request and nothing changed in stock or the ledger.",
+        "notSent": {
+          "validation": "The request was not sent",
+          "offline": "No network connection",
+          "invalid_id": "The fill id is not valid"
+        },
+        "notSentBody": "Nothing was sent and nothing changed. Try again after fixing the cause.",
+        "unknown": "We could not confirm the result",
+        "unknownBody": {
+          "timeout": "The request timed out after it was sent, so the operation may have happened. Do not resend before checking the fill state.",
+          "network": "The connection dropped after the request was sent, so the operation may have happened. Do not resend before checking the fill state.",
+          "server": "The server returned an error after receiving the request, so the operation may have happened. Do not resend before checking the fill state.",
+          "unverified": "The request succeeded but the response was not understood, so the operation may have happened. Check the fill state before doing anything else."
+        },
+        "verify": "Check the state",
+        "verifying": "Checking the fill state",
+        "verifiedDone": {
+          "post": "Confirmed: the fill is posted now",
+          "reverse": "Confirmed: the posting is reversed now"
+        },
+        "verifiedDoneBody": "We read the fill state from the server and the operation did happen. Do not send anything again.",
+        "verifiedUnchanged": "Confirmed: the operation did not happen",
+        "verifiedUnchangedBody": "The fill state did not change. You can try again as an explicit decision.",
+        "verifyFailed": "Could not check",
+        "verifyFailedBody": "We could not read the fill state. Do not resend; try checking again.",
+        "retry": "Try again"
+      }
+    }
+  },
   "fuelWorkspaceNav": {
     "prices": "Fuel prices",
     "ariaLabel": "Fuel Stations workspace navigation",
@@ -9780,6 +10112,11 @@
     "masterData": "Tanks, pumps, and nozzles",
     "customersFleet": "Customers and fleet",
     "corporateContracts": "Corporate contracts",
+    "tankerOwners": "Tanker owners",
+    "tankerSettings": "Tanker fill settings",
+    "tankerInventoryReview": "Fill inventory review",
+    "tankerFills": "Tanker fills — inventory posting",
+    "tankerFillReports": "Tanker fill reports",
     "aviRfid": "AVI/RFID",
     "devices": "Devices",
     "deviceRegistry": "Device registry",
@@ -10060,6 +10397,888 @@
     "amount": "Amount (SAR)",
     "paymentSeparationHint": "This creates an official receipt and updates the invoice only. It does not add a shift cash movement or settle a Cycle 4 variance.",
     "paymentCollected": "Receipt posted and invoice payment status updated."
+  },
+  "fuelTankerReports": {
+    "eyebrow": "Inventory posting reports",
+    "switcher": "Tanker fill reports",
+    "backToFills": "Tanker fills",
+    "loading": "Loading report…",
+    "loadFailed": "Could not load the report. Try again.",
+    "liters": "L",
+    "tab": {
+      "fills": "Tanker fills",
+      "inventory-reconciliation": "Inventory reconciliation",
+      "clearing-account": "Clearing account",
+      "accounting-control": "Accounting control"
+    },
+    "title": {
+      "fills": "Tanker fills report",
+      "inventory-reconciliation": "Inventory reconciliation report",
+      "clearing-account": "Clearing account report",
+      "accounting-control": "Accounting control report"
+    },
+    "description": {
+      "fills": "Fills, tanker owners, quantities and posting / reversal states. Read-only.",
+      "inventory-reconciliation": "Compares each fill with the stock movement, cost pool and operational ledger, plus pool-level reconciliation. Read-only.",
+      "clearing-account": "Ledger balances of the clearing account: opening, debits, credits, closing, other entries and differences. Organisation- or branch-level balances, never station-level. Read-only.",
+      "accounting-control": "Trace from the tanker fill to the journal entry, with the reconciliation outcome. Read-only."
+    },
+    "result": {
+      "matched": "Matched",
+      "mismatch": "Confirmed difference",
+      "warning": "Warning",
+      "incomplete": "Cycle incomplete"
+    },
+    "summary": {
+      "total": "Fills examined",
+      "confirmedDifferences": "Confirmed differences",
+      "warnings": "Warnings",
+      "incomplete": "Incomplete"
+    },
+    "resultFilter": {
+      "label": "Reconciliation result",
+      "all": "All results",
+      "note": "Showing {shown} of {loaded} loaded fills (local filter; the summary is unchanged).",
+      "noMatch": "No rows with this result",
+      "noMatchHint": "Change the reconciliation result to see other rows."
+    },
+    "empty": {
+      "title": "No matching fills",
+      "body": "There are no tanker fills in the current scope and filters."
+    },
+    "truncated": {
+      "title": "Limited result — not exhaustive",
+      "body": "The scan reached its limit, so only part of the fills were examined; other differences may not appear here. Narrow the period or station.",
+      "bodyLimit": "Only the first {limit} fills (newest first) were examined; differences in older fills may not appear here. Narrow the period, station or owner."
+    },
+    "masking": {
+      "costs": "Amounts and movement/entry identifiers are hidden: you do not have the view-cost permission (products.view_cost).",
+      "accounts": "Account identifiers are hidden: you do not have the view-accounts permission (accounts.view)."
+    },
+    "scope": {
+      "rowsTitle": "Row scope",
+      "balancesTitle": "Balance scope",
+      "rows": {
+        "stations": "Limited to your authorised stations only",
+        "branches": "Limited to your authorised branches",
+        "organization": "All organisation fills"
+      },
+      "noFilters": "No filters applied.",
+      "filtersApplied": "Applied filters: {filters}.",
+      "level": {
+        "organization": "Organisation level",
+        "branches": "Authorised-branches level",
+        "unknown": "Unknown scope ({level})"
+      },
+      "organizationBody": "Ledger balance for the whole organisation — not the balance of a specific station.",
+      "branchesBody": "Ledger balance for the {count} branch(es) you are authorised on — not the balance of a specific station.",
+      "basis": {
+        "ledger_lines_by_branch": "Balances are aggregated from journal lines by branch; a line does not carry the station, so a shared account balance is never split across stations by estimate.",
+        "other": "Balance aggregation basis: unknown."
+      },
+      "balancesApplied": "Filters actually applied to balances: {filters}.",
+      "notApplicableTitle": "Filters that do not affect balances",
+      "notApplicableBody": "You selected filters ({filters}) that only restrict rows and do not change the clearing-account balances; the balances shown are unaffected."
+    },
+    "filterName": {
+      "station_id": "Station",
+      "owner_id": "Tanker owner",
+      "fuel_product_id": "Fuel type",
+      "status": "Fill status",
+      "inventory_status": "Inventory status",
+      "from": "From date",
+      "to": "To date",
+      "branch_id": "Branch",
+      "branch": "Branch",
+      "period": "Period",
+      "page": "Page",
+      "per_page": "Page size"
+    },
+    "filters": {
+      "title": "Report filters",
+      "station": "Station",
+      "allStations": "All stations",
+      "owner": "Tanker owner",
+      "allOwners": "All owners",
+      "inventoryStatus": "Inventory status",
+      "allStatuses": "All statuses",
+      "fillStatus": "Fill status",
+      "allFillStatuses": "All statuses",
+      "fillStatusValue": {
+        "recorded": "Recorded",
+        "voided": "Voided"
+      },
+      "from": "From date",
+      "to": "To date",
+      "periodReversed": "The start date is after the end date; fix the period.",
+      "clear": "Clear filters",
+      "clearingNote": "Ledger balances are not scoped by station, owner or status, so this report only filters by period."
+    },
+    "column": {
+      "stationProduct": "Station / fuel",
+      "postedReversed": "Posted / reversed",
+      "posted": "Posted",
+      "reversed": "Reversed",
+      "cost": "Cost",
+      "entries": "Entries",
+      "fill": "Fill",
+      "state": "State",
+      "result": "Result",
+      "values": "Values"
+    },
+    "fills": {
+      "summary": {
+        "total": "Fills",
+        "quantity": "Total quantity",
+        "voided": "Includes {count} voided fill(s)"
+      },
+      "mobileCaption": "Paper voucher {voucher} · {station}"
+    },
+    "quantity": {
+      "fill": "Fill",
+      "stock_out": "Stock out",
+      "cost_issue": "Cost issue",
+      "ledger": "Operational ledger",
+      "stock_reversal_in": "Reversal in (stock)",
+      "cost_reversal": "Cost reversal",
+      "ledger_reversal": "Ledger reversal"
+    },
+    "value": {
+      "posting_cost_minor": "Posting cost",
+      "stock_total_cost_minor": "Stock movement value",
+      "cost_movement_minor": "Cost movement value",
+      "entry_debit_minor": "Entry debit",
+      "ledger_value_minor": "Operational ledger value"
+    },
+    "reconciliation": {
+      "totalsTitle": "Quantity totals (posted fills)",
+      "totalsLimited": "Totals cover only the examined fills.",
+      "totals": {
+        "fills_posted_milliliters": "Posted fills",
+        "stock_out_milliliters": "Stock out",
+        "cost_issue_milliliters": "Cost issue",
+        "ledger_milliliters": "Operational ledger",
+        "reversed_milliliters": "Reversed fills"
+      },
+      "poolTitle": "Pool-level reconciliation",
+      "poolHint": "Warehouse stock, cost pool and general ledger per warehouse and product — the same engine used by the inventory-posting review."
+    },
+    "clearing": {
+      "period": "Period: {from} to {to}",
+      "current": "Current account",
+      "notCurrent": "Not the currently assigned account",
+      "levelOrganization": "Organisation balance",
+      "levelBranches": "Branch balance",
+      "ledgerNote": "Ledger balance, not a station balance. The check compares only fill entries against confirmed postings.",
+      "balance": {
+        "opening": "Opening balance",
+        "debits": "Debits",
+        "credits": "Credits",
+        "closing": "Closing balance",
+        "supported": "Balance supported by postings",
+        "difference": "Unexplained difference"
+      },
+      "tankerNet": "Net of fill entries (cumulative)",
+      "tankerEntries": "Fill entries (period)",
+      "otherEntries": "Other entries (period)",
+      "otherNet": "Net of other entries (cumulative)",
+      "otherEntriesList": "Other entries on the account in the period ({count})",
+      "clean": "No differences or notes",
+      "emptyTitle": "No clearing accounts",
+      "emptyBody": "No clearing account is assigned and no tanker-fill posting entries exist yet."
+    },
+    "control": {
+      "findingsTitle": "Findings by type",
+      "findingsCount": "{count} finding(s)",
+      "voucher": "Paper voucher",
+      "traceLabel": "Trace chain",
+      "openFill": "Open fill details",
+      "missing": "Missing",
+      "clearingTitle": "Clearing account summary",
+      "clearingUnavailableTitle": "Clearing account summary not shown",
+      "clearingUnavailable": {
+        "station_scope_restricted": "Clearing-account balances are organisation- or branch-level ledger balances and cannot be isolated by station, so they are not shown to a user restricted to stations or warehouses. The control results below cover your authorised fills only.",
+        "financial_permissions_required": "The clearing-account summary is financial and requires both the view-cost (products.view_cost) and view-accounts (accounts.view) permissions.",
+        "unknown": "The clearing-account summary is not shown for this account."
+      },
+      "step": {
+        "fill": "Tanker fill",
+        "stock": "Stock movement",
+        "cost": "Cost-pool movement",
+        "entry": "Journal entry",
+        "ledger": "Operational ledger",
+        "reversal": "Reversal",
+        "accounts": "Accounts (clearing ← inventory)",
+        "hiddenNoCost": "Hidden (cost permission)"
+      }
+    },
+    "forbidden": {
+      "station_scope_restricted": {
+        "title": "Report not available for your scope",
+        "body": "Clearing-account balances are organisation- or branch-level ledger balances and cannot be isolated by station, so they are not shown to a user restricted to stations or warehouses. No balances or entries are shown. Ask the owner for full financial scope if you need it."
+      },
+      "financial_permissions_required": {
+        "title": "Financial report: insufficient permissions",
+        "body": "This report requires both permissions below. No balances or entries are shown for your account."
+      },
+      "unknown": {
+        "title": "This report cannot be shown",
+        "body": "The clearing-account report is financial: it requires the view-cost and view-accounts permissions and a scope not restricted to stations or warehouses. No financial information is shown."
+      }
+    },
+    "finding": {
+      "status_without_posting": "Status is posted/reversed but no posting row exists",
+      "entry_without_posting": "Journal entry linked to the fill without a posting",
+      "last_attempt_failed": "Last posting attempt was rejected or failed",
+      "not_posted_yet": "Not posted yet (cycle not complete)",
+      "posting_quantity_differs_from_fill": "Posting quantity differs from the fill quantity",
+      "stock_movement_missing": "Stock movement is missing",
+      "stock_quantity_mismatch": "Stock movement quantity does not match the fill",
+      "stock_value_mismatch": "Stock movement value does not match the posted cost",
+      "cost_movement_missing": "Cost-pool movement is missing",
+      "cost_quantity_mismatch": "Cost movement quantity does not match the fill",
+      "cost_value_mismatch": "Cost movement value does not match the posted cost",
+      "posted_without_entry": "Posted without a valid journal entry",
+      "entry_amount_mismatch": "Journal entry amount does not match the posted cost",
+      "clearing_account_invalid": "Clearing account on the entry is invalid",
+      "clearing_account_differs_from_current": "Clearing account differs from the currently assigned one",
+      "entry_branch_mismatch": "Entry branch differs from the station branch",
+      "original_entry_not_reversed": "Fill is reversed but the original entry is not",
+      "ledger_missing": "Operational ledger row is missing",
+      "ledger_quantity_mismatch": "Operational ledger quantity does not match the fill",
+      "ledger_value_mismatch": "Operational ledger value does not match the posted cost",
+      "reversal_incomplete": "Reversal is incomplete",
+      "reversal_quantity_mismatch": "Reversal quantity/value does not match the original",
+      "reversal_entry_not_linked": "Reversal entry is not linked to the original entry",
+      "reversal_duplicate": "Duplicate reversal",
+      "reversal_value_mismatch": "Reversal value does not match the original",
+      "clearing_balance_differs_from_postings": "Clearing balance differs from the balance supported by postings",
+      "other_entries_on_clearing_account": "Other (non-fill) entries on the clearing account",
+      "unknown": "Unknown finding ({code})"
+    }
+  },
+  "fuelTankers": {
+    "inventory": {
+      "eyebrow": "Tanker fills",
+      "title": "Inventory integration readiness",
+      "subtitle": "Pending fill vouchers and what blocks them from the official stock, or needs review first.",
+      "notEnabled": "Inventory integration is not enabled yet: this screen is review-only. No fuel is deducted and no stock movement or journal entry is created. Vouchers stay “pending” until activation is approved.",
+      "loadFailed": "Could not load the pending-voucher review.",
+      "truncated": "Only the oldest 500 pending vouchers are shown; narrow the filters to see the rest.",
+      "summary": {
+        "total": "Pending vouchers",
+        "ready": "Ready",
+        "needs_review": "Need review",
+        "blocked": "Blocked",
+        "overdue": "Overdue"
+      },
+      "filters": {
+        "station": "Station",
+        "allStations": "All stations",
+        "readiness": "Readiness",
+        "allReadiness": "All states",
+        "overdue": "Age",
+        "anyAge": "Any age",
+        "overdueOnly": "Overdue only"
+      },
+      "readiness": {
+        "ready": "Ready",
+        "needs_review": "Needs review",
+        "blocked": "Blocked"
+      },
+      "empty": "No matching pending vouchers.",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {last}",
+      "voucher": "voucher",
+      "liters": "L",
+      "overdueBadge": "Overdue",
+      "historicalBadge": "Historical",
+      "recordedAt": "Recorded {when} · {hours} h ago",
+      "blockers": "Blockers",
+      "reasons": "Review reasons",
+      "balanceLine": "Warehouse balance {available} L · pending cumulative {cumulative} L",
+      "blocker": {
+        "station_not_active": "Station is not active",
+        "station_warehouse_required": "Station has no linked warehouse",
+        "warehouse_unavailable": "Station warehouse is unavailable",
+        "warehouse_branch_mismatch": "Warehouse does not match the station branch",
+        "fuel_product_unavailable": "Fuel product is unavailable",
+        "stock_record_missing": "No stock record for this product in the warehouse",
+        "cost_baseline_required": "A cost baseline is required first",
+        "cost_history_open": "An unresolved held settlement exists for this pool",
+        "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse balance",
+        "insufficient_balance": "Insufficient balance",
+        "period_locked": "The accounting period or fiscal year of the fill date is locked",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting with it would deduct stock twice",
+        "clearing_account_missing": "The clearing account is not assigned yet (a prerequisite for future posting)",
+        "clearing_account_invalid": "The assigned clearing account is no longer valid (inactive/group/now an inventory, cash, tax or other-role account)",
+        "unknown": "Unknown blocker"
+      },
+      "reason": {
+        "capacity_overrun": "Tanker capacity overrun (confirmed)",
+        "insufficient_balance": "Insufficient balance (awaiting review)",
+        "overdue": "Pending longer than the review window",
+        "unknown": "Unknown review reason"
+      },
+      "pools": {
+        "title": "Pools involved",
+        "hint": "Official warehouse balance versus the fuel cost pool per warehouse and product. Nothing is adjusted from here.",
+        "stock": "Warehouse balance",
+        "costPool": "Cost pool quantity",
+        "pending": "{count} pending vouchers totalling {liters} L",
+        "shortfall": "Shortfall against balance: {liters} L",
+        "inSync": "In sync",
+        "outOfSync": "Out of sync",
+        "syncUnknown": "Undetermined",
+        "shared": "The balance is shared with other stations; figures shown cover your stations only, while the classification accounts for the whole warehouse.",
+        "unnamedWarehouse": "Unnamed warehouse",
+        "unnamedProduct": "Unnamed product"
+      },
+      "requirements": {
+        "title": "Reconciliation requirements before activation",
+        "quantity": "Cost pool quantity equals the warehouse balance.",
+        "value": "Pool value equals the fuel share of the inventory account (1140).",
+        "other": "Another reconciliation requirement.",
+        "ledgerNotChecked": "Account 1140 is not computed here (it also holds non-fuel stock); it is reconciled at activation after the accounting approval."
+      },
+      "settingsLink": "Review settings",
+      "reconciliation": {
+        "title": "General ledger reconciliation",
+        "hint": "Read-only: the fuel cost pool against the warehouse balance and the ledger. No adjustment or entry is made from this screen.",
+        "loadFailed": "Could not load the reconciliation",
+        "status": {
+          "consistent": "Consistent",
+          "differences": "Differences"
+        },
+        "quantity": {
+          "title": "Quantity per warehouse and product",
+          "summary": "{pools} pools: {inSync} in sync, {mismatched} with a quantity difference",
+          "empty": "No fuel pools yet",
+          "unnamedWarehouse": "Unnamed warehouse",
+          "unnamedProduct": "Unnamed product",
+          "stock": "Warehouse balance",
+          "pool": "Pool quantity",
+          "difference": "Difference (pool − warehouse): {liters} L",
+          "poolValue": "Pool value"
+        },
+        "value": {
+          "title": "Value against the ledger per branch",
+          "hint": "The fuel share of the inventory accounts = entries linked to fuel cost movements and their reversals; not the whole 1140 balance, which includes non-fuel stock.",
+          "empty": "No fuel entries yet",
+          "noBranch": "No branch",
+          "pool": "Pool value",
+          "ledger": "Fuel share in the ledger",
+          "difference": "Difference",
+          "inSync": "In sync",
+          "outOfSync": "Out of sync",
+            "restricted_warehouse_scope": "Your access is limited to a warehouse or station: only quantity is shown, and value is withheld because the branch includes warehouses you cannot see.",
+          "hidden_no_cost_permission": "Monetary values need the cost-view permission; only quantity is shown."
+        },
+        "causes": {
+          "entryAmountDiffers": "Entry differs from the sum of its movements",
+          "reversedEntries": "Entries reversed in the ledger but not in the pool",
+          "movementsWithoutJournal": "Cost movements without an entry",
+          "stateVsMovements": "Pool state drifts from the sum of its movements",
+          "movementsWithoutJournalCount": "{count} movements without an entry"
+        },
+        "entries": {
+          "title": "Entries that differ from their movements ({count})",
+          "movements": "Movements total",
+          "ledger": "Ledger net",
+          "difference": "Difference"
+        },
+        "findings": {
+          "title": "Findings",
+          "pool_quantity_mismatch": "Pool quantity differs from the warehouse balance",
+          "stock_without_cost_pool": "Stock without a cost pool",
+          "cost_pool_without_stock_record": "Pool without a stock record",
+          "state_not_derived_from_movements": "Pool state drifts from the sum of its movements",
+          "open_cost_history": "Open cost history",
+          "value_difference": "Value difference between the pool and the ledger",
+          "entry_amount_differs_from_movements": "Entry differs from its movements",
+          "movements_without_journal": "Cost movements without an entry",
+          "inventory_account_split_configured": "A station inventory account differs from the inventory role",
+          "inventory_account_split_in_ledger": "Receipts and issues hit different inventory accounts",
+          "linked_entries_touch_unlisted_asset_accounts": "Assets touched by fuel entries that are not in the declared inventory account set",
+          "unknown": "Unknown finding"
+        },
+        "accounts": {
+          "title": "Fuel inventory accounts",
+          "attention": "Needs attention",
+          "hint": "The reconciliation covers all of these accounts. Receiving uses the inventory role only, while sales and settlement use the station account when set.",
+          "overrides": "{count} stations have an inventory account different from the inventory role.",
+          "splitInLedger": "Receipt and issue entries in the ledger hit different inventory accounts.",
+          "unlisted": "Asset accounts touched by entries linked to fuel movements that are not in the declared set — the set is incomplete and false differences may appear:",
+          "evidenceHidden": "Your access is limited to branches: ledger evidence (entry and account counts) is hidden because it touches branches you cannot see.",
+          "source": {
+            "role_current": "Current role",
+            "system_default": "System default",
+            "history": "Mapping history",
+            "station_override": "Station override",
+            "station_override_history": "Past station override",
+            "other": "Other source"
+          }
+        },
+        "limits": {
+          "title": "Accuracy limits",
+          "price_and_average_correctness": "It does not prove historical prices or averages are correct.",
+          "manual_inventory_entries_not_linked_to_fuel_movements": "It does not detect a manual inventory entry not linked to a fuel movement.",
+          "non_fuel_lines_inside_linked_entries": "It does not separate non-fuel lines inside a linked entry.",
+          "tank_level_vs_book_stock": "It does not compare the physical tank level with the book balance.",
+          "other": "Unknown limit."
+        }
+      }
+    },
+    "inventorySettings": {
+      "title": "Inventory integration settings",
+      "intro": "Configure the clearing account and future integration policies for tanker fills. Settings are stored and validated only — no stock deduction, no journal entry, no posting.",
+      "gateClosedNote": "The fill posting gate is closed. Saving these settings does not allow posting: no stock deduction, no journal entry, no receivable on the tanker owner, no revenue.",
+      "gateOpenNote": "The posting gate is open at deployment level, but this card only shows settings and performs no posting.",
+      "needView": "Viewing these settings requires the “{permission}” permission.",
+      "unavailable": "This feature is currently unavailable for this account.",
+      "loadFailed": "Could not load the inventory integration settings.",
+      "status": {
+        "title": "Configuration readiness",
+        "ready": "Configuration complete (no configuration blockers)"
+      },
+      "blocker": {
+        "clearing_account_missing": "The clearing account is not assigned yet — required for future posting",
+        "clearing_account_invalid": "The assigned clearing account is no longer valid — choose another account",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting alongside it would deduct the quantity twice",
+        "unknown": "Unknown blocker"
+      },
+      "notice": {
+        "posting_start_not_set": "Posting start is not set: every fill is treated as historical (no bulk or retroactive posting)",
+        "posting_gate_closed": "The posting gate is closed and nothing is posted",
+        "unknown": "Unknown notice"
+      },
+      "reason": {
+        "not_found": "The account does not exist in this organization",
+        "group": "The account is a group account and cannot take direct postings",
+        "inactive": "The account is inactive",
+        "not_asset": "The clearing account must be an asset account",
+        "inventory_account": "The clearing account cannot be an inventory account",
+        "cash_or_bank": "The clearing account cannot be a cash or bank account",
+        "tax_account": "The clearing account cannot be a tax account",
+        "reserved_role": "The account is reserved for another accounting role (receivables/payables/revenue/cost…)",
+        "other": "The account is not valid as a clearing account"
+      },
+      "inherit": "Inherited from organization ({value})",
+      "clearing": {
+        "label": "Clearing account (fuel held by tanker owners)",
+        "hint": "An active, non-group asset account assigned explicitly. There is no default choice, and the account is never created automatically.",
+        "none": "Not assigned",
+        "assignedHidden": "Assigned account (name hidden)",
+        "needAccountsView": "Choosing the account and seeing its name require the “{permission}” permission.",
+        "noCandidates": "There are no active, non-group asset accounts in the chart of accounts.",
+        "createHint": "Suggested code 1145 “Fuel held by tanker owners”. Create it in the chart of accounts, then pick it here; it cannot be an inventory, cash, bank or tax account, or any other accounting role."
+      },
+      "cost": {
+        "label": "Cost recognition timing",
+        "hint": "Currently supported: cost stays in the clearing account until invoicing.",
+        "option": {
+          "clearing_until_invoice": "Clearing account until invoice"
+        },
+        "note": "Later accounting recognition follows the delivery conditions being met and control transferring, not merely the invoice issue date. Immediate cost recognition is not available at this stage."
+      },
+      "variance": {
+        "label": "Pool-vs-ledger variance policy",
+        "hint": "Future posting behavior when the fuel cost pool value differs from the fuel share of the ledger.",
+        "option": {
+          "block": "Block posting (default)",
+          "warn": "Warn only"
+        }
+      },
+      "advanced": "Advanced settings",
+      "start": {
+        "label": "Posting start ({zone} time)",
+        "hint": "Fills recorded before it — or all fills if left empty — are historical: no bulk or retroactive posting; a historical fill is posted individually later with a separate permission.",
+        "notSet": "Not set",
+        "invalid": "The date and time are not valid."
+      },
+      "alerts": {
+        "label": "Inventory integration variance alerts",
+        "hint": "Turns on in-app alerts when a variance appears (no external delivery).",
+        "on": "Enabled",
+        "off": "Disabled"
+      },
+      "fixedNote": "Fixed, not configurable: one posting per fill, quantity and cost come from the fill, no negative balance, and a locked period is rejected.",
+      "reasonLabel": "Reason for the change (kept in the audit log)",
+      "reasonHint": "Optional, up to 500 characters.",
+      "governanceNeeded": "Changing the clearing account, timing, policy and posting start requires “{governance}” together with “{manage}”. You can change alerts with “{manage}” only.",
+      "governanceRefused": "The server refused the change: it requires both “{governance}” and “{manage}”.",
+      "save": "Save settings",
+      "saving": "Saving…",
+      "saved": "Inventory integration settings saved",
+      "saveFailed": "Could not save the settings."
+    },
+    "settings": {
+      "inventory": {
+        "title": "Inventory integration review",
+        "notEnabled": "Inventory integration is not enabled: these settings are stored and only govern the review display. No deduction, posting or journal entry.",
+        "policyLabel": "When the balance is insufficient",
+        "policyNote": "There is no allow-negative option and no silent adjustment; only an explicit block or human review.",
+        "policy": {
+          "block": "Block the voucher (blocker)",
+          "hold_for_review": "Hold it for human review"
+        },
+        "advanced": "Advanced options",
+        "hoursLabel": "Mark a pending voucher “overdue” after",
+        "hoursNote": "A voucher is flagged overdue in the review after this long.",
+        "hours": "{n} hours",
+        "fixedNote": "Fixed rules no setting can disable: duplicate-posting prevention, historical cost pinning, reversal once, tenant/branch/station isolation.",
+        "reviewLink": "Open the pending-voucher review"
+      },
+      "title": "Tanker fill settings",
+      "subtitle": "Customer-tanker fill policies and the operations each nozzle allows. Storage and validation only — no fills, stock or ledger entries at this stage.",
+      "scopeLabel": "Scope",
+      "scopeHint": "The organization default applies to every station; a station can override it.",
+      "orgScope": "Organization default (all stations)",
+      "inherit": "Organization default ({value})",
+      "governanceNeeded": "Changing these policies requires the {governance} permission in addition to {manage}. Fields are read-only.",
+      "governanceRefused": "The server refused the change: it requires {governance} in addition to {manage}.",
+      "reasonLabel": "Reason for the change (optional)",
+      "reasonHint": "Recorded in the audit log with the actor and the before/after values.",
+      "save": "Save policies",
+      "saving": "Saving…",
+      "stationUnavailable": "Could not open this station's settings. Showing organization settings instead.",
+      "saved": "Settings saved",
+      "saveFailed": "Could not save. Try again.",
+      "loadFailed": "Could not load the fill settings.",
+      "selection": {
+        "title": "Tanker selection when filling",
+        "owner": "Tanker owner (customer fills):",
+        "ownerAlways": "Always required",
+        "tanker": "Tanker",
+        "optional": "Optional (default)",
+        "required": "Required",
+        "ruleOne": "Owner with one tanker: auto-selected and can be changed or cleared when optional.",
+        "ruleMany": "Owner with several tankers: shown for choice; continuing without one is allowed when optional.",
+        "ruleNone": "Owner with no registered tanker: never blocked, even with “Required”.",
+        "ruleSaved": "The operation is always saved on the owner’s account with voucher, quantity, pump, nozzle and shift."
+      },
+      "voucher": {
+        "title": "Paper voucher number",
+        "scopeLabel": "Duplicate-prevention scope",
+        "scopeHint": "A duplicate voucher within this scope cannot be saved.",
+        "scope": {
+          "station": "Within a single station (default)",
+          "tenant": "Across the organization",
+          "owner": "Within a tanker owner",
+          "none": "No prevention"
+        },
+        "fixedTitle": "Fixed rules (not settings)",
+        "fixedBlock": "Prevention is strict, with no override.",
+        "fixedZeros": "Leading zeros are kept: 04052 differs from 4052.",
+        "fixedVoided": "A voided voucher keeps its number reserved and is never reused."
+      },
+      "overrun": {
+        "title": "Tanker capacity overrun",
+        "policyLabel": "Policy",
+        "hint": "Capacity is informational, not a physical limit. No check when no tanker is selected.",
+        "policy": {
+          "allow_with_confirmation": "Warn with explicit confirmation (default)",
+          "block": "Block",
+          "allow": "Allow without a warning"
+        }
+      },
+      "attachments": {
+        "title": "Voucher attachments",
+        "hint": "The photo of the paper voucher attached to each tanker fill.",
+        "requiredLabel": "Voucher photo",
+        "required": {
+          "never": "Optional (default)",
+          "before_shift_approval": "Required before shift approval",
+          "before_settlement": "Required before settlement"
+        },
+        "requiredNote": "A stage other than “Optional” only flags a voucher with no photo as missing; it does not block recording a fill, closing or approving the shift, or settlement yet. Enforcement is a separate decision.",
+        "typesLabel": "Allowed files",
+        "types": {
+          "images_and_pdf": "Photos and PDF (default)",
+          "images_only": "Photos only"
+        },
+        "advanced": "Advanced options",
+        "advancedHint": "Limits and rules for adding, removing and replacing attachments.",
+        "maxSizeLabel": "Maximum file size",
+        "size": "{n} MB",
+        "maxCountLabel": "Maximum attachments per voucher",
+        "count": "{n}",
+        "afterCloseLabel": "Adding after the shift is closed",
+        "afterClose": {
+          "allow": "Allowed (default)",
+          "deny": "Not allowed"
+        },
+        "removalLabel": "Removing and replacing",
+        "removal": {
+          "open_shift_only": "While the shift is open only (default)",
+          "always": "Always",
+          "never": "Never"
+        },
+        "removalNote": "Removing or replacing needs its own permission, asks for a reason and is audited. The record and the file always stay in the voucher history.",
+        "limitsNote": "Hard ceilings: JPG, PNG or PDF only, 10 MB per file, 20 attachments per voucher. Settings can only narrow them."
+      },
+      "nozzles": {
+        "title": "Allowed nozzle operations",
+        "description": "The operation types each nozzle allows. Default: all operations.",
+        "pickStation": "Pick a station to see its nozzles and set their allowed operations.",
+        "notEnforced": "The restriction is stored now and is applied to tanker fills and internal issues once they are enabled; existing direct sales are not affected by it for now.",
+        "none": "This station has no nozzles.",
+        "loadFailed": "Could not load the nozzles.",
+        "label": "Pump {pump} · Nozzle {nozzle}",
+        "opsLegend": "Allowed operations",
+        "ops": {
+          "direct_sale": "Direct sales",
+          "tanker_fill": "Customer tanker fills",
+          "internal_issue": "Internal issue"
+        },
+        "needOne": "Select at least one operation. To stop a nozzle, change its status in station data.",
+        "narrowHint": "Narrowing operations while a shift is open requires the {governance} permission in addition to station management, and is audited.",
+        "governanceRefused": "The server refused the narrowing: it requires {governance} in addition to {manage} because the station has an open shift.",
+        "save": "Save operations",
+        "saved": "Nozzle operations saved"
+      }
+    },
+    "attachments": {
+      "title": "Voucher attachments",
+      "loading": "Loading attachments…",
+      "unavailable": "Attachments are not available for this voucher.",
+      "loadFailed": "Could not load the attachments.",
+      "retry": "Try again",
+      "dismiss": "Dismiss",
+      "cancel": "Cancel",
+      "policy": "JPG, PNG or PDF up to {mb} MB each; up to {count} attachments per voucher.",
+      "status": {
+        "present": "{count, plural, one {# attachment} other {# attachments}}",
+        "missing": "Photo missing",
+        "none": "No attachments"
+      },
+      "missingNote": "This station requires the paper voucher photo and none is attached yet. This reminder does not block the fill or the shift.",
+      "takePhoto": "Take photo",
+      "chooseFile": "Choose file",
+      "blocked": {
+        "add": {
+          "fill_voided": "The voucher is voided; attachments cannot be added.",
+          "shift_closed": "Station policy does not allow adding attachments after the shift is closed.",
+          "limit_reached": "This voucher reached the maximum of {count} attachments.",
+          "removal_disabled": "Attachments cannot be added now."
+        },
+        "remove": {
+          "fill_voided": "The voucher is voided; its attachments are frozen.",
+          "shift_closed": "Attachments can be removed or replaced while the shift is open only.",
+          "limit_reached": "Attachments cannot be changed now.",
+          "removal_disabled": "Station policy does not allow removing or replacing attachments."
+        }
+      },
+      "rejected": {
+        "type": "{name}: file type is not allowed.",
+        "size": "{name}: larger than {mb} MB.",
+        "empty": "{name}: the file is empty.",
+        "limit": "{name}: the voucher cannot take more than {count} attachments."
+      },
+      "uploading": "Uploading {name}",
+      "empty": "No attachments yet.",
+      "openNamed": "Open {name}",
+      "loadingPreview": "Loading preview…",
+      "showHistory": "Show history",
+      "hideHistory": "Hide history",
+      "noHistory": "No removed or replaced attachments.",
+      "historyStatus": {
+        "active": "Active",
+        "removed": "Removed",
+        "replaced": "Replaced"
+      },
+      "removedBy": "By {name} · {when}",
+      "reason": "Reason: {reason}",
+      "open": "Open",
+      "replaced": "Attachment replaced",
+      "removed": "Attachment removed",
+      "replace": {
+        "title": "Replace attachment",
+        "body": "Choose the new file to replace {name}.",
+        "keepNote": "The old file stays in the voucher history; it is not deleted.",
+        "busy": "Replacing…",
+        "choose": "Choose new file"
+      },
+      "remove": {
+        "title": "Remove attachment",
+        "body": "Remove {name} from the voucher?",
+        "keepNote": "The record and the file are kept in the history with who removed it, when and why; the voucher itself is not changed.",
+        "reasonLabel": "Reason for removal",
+        "reasonHint": "Required (3–500 characters). Recorded in the audit log.",
+        "busy": "Removing…",
+        "confirm": "Remove"
+      },
+      "errors": {
+        "attachment_invalid": "The file is not valid or is corrupted.",
+        "attachment_type_not_allowed": "This file type is not allowed.",
+        "attachment_too_large": "The file is larger than {mb} MB.",
+        "attachment_limit_reached": "The voucher reached the maximum of {count} attachments.",
+        "attachment_add_blocked": "Station policy does not allow adding attachments now.",
+        "attachment_removal_blocked": "Station policy does not allow removing or replacing attachments now.",
+        "attachment_not_active": "The attachment is no longer active. Refresh and try again.",
+        "attachment_same_content": "The new file is identical to the current one.",
+        "attachment_duplicate": "This file is already attached to the voucher.",
+        "attachment_storage_failed": "Could not save the file; nothing was recorded. Try again.",
+        "attachment_conflict": "The voucher attachments changed while uploading. Refresh and try again.",
+        "forbidden": "You do not have permission for this action.",
+        "not_found": "The voucher or attachment was not found.",
+        "offline": "No connection. Nothing was uploaded; try again when you are online.",
+        "generic": "Could not complete the action. Try again."
+      },
+      "voucher": "voucher",
+      "uploadedBy": "Uploaded by {name} · {when}",
+      "previewFailed": "Could not load the preview. You can still download the file.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "download": "Download",
+      "downloaded": "Download started",
+      "replaceAction": "Replace",
+      "removeAction": "Remove"
+    },
+    "eyebrow": "Fuel stations",
+    "list": {
+      "title": "Tanker owners",
+      "subtitle": "Tanker owner profiles, their tankers, and the companies linked to them. Master data only — no fills, invoices, or settlements at this stage.",
+      "searchPlaceholder": "Search by name or code",
+      "searchLabel": "Search tanker owners",
+      "statusFilter": "Filter by status",
+      "allStatuses": "All statuses",
+      "createdAt": "Added on",
+      "open": "Open",
+      "loading": "Loading tanker owners",
+      "loadFailed": "Couldn't load tanker owners.",
+      "empty": "No tanker owners yet",
+      "emptyHint": "Add the first tanker owner to define their tankers and link companies.",
+      "noResults": "No matching results",
+      "noResultsHint": "Try changing the search or the status.",
+      "clearFilters": "Clear filters"
+    },
+    "owner": {
+      "create": "Add tanker owner",
+      "createTitle": "New tanker owner",
+      "editTitle": "Edit tanker owner",
+      "name": "Name",
+      "code": "Code",
+      "codeHint": "Optional. Must be unique within the organization.",
+      "phone": "Phone",
+      "notes": "Notes",
+      "status": "Status",
+      "statusHint": "Deactivating keeps history and deletes nothing. New tankers and links require an active owner.",
+      "created": "Tanker owner added",
+      "updated": "Changes saved"
+    },
+    "tanker": {
+      "sectionTitle": "Tankers",
+      "create": "Add tanker",
+      "createTitle": "New tanker",
+      "editTitle": "Edit tanker",
+      "plate": "Plate number",
+      "plateHint": "Plates are compared after normalizing spaces, dashes, and Arabic digits, so they can't repeat.",
+      "capacity": "Capacity (L)",
+      "capacityUnspecified": "Not specified",
+      "capacityHint": "Optional. Up to three decimal places.",
+      "country": "Country code",
+      "countryHint": "Optional, up to 8 characters.",
+      "status": "Status",
+      "notes": "Notes",
+      "created": "Tanker {plate} added",
+      "updated": "Tanker details saved",
+      "editAria": "Edit tanker {plate}",
+      "empty": "No tankers for this owner",
+      "emptyHint": "Define their tankers by plate number and capacity. This is identification data only, not inventory.",
+      "loading": "Loading tankers",
+      "loadFailed": "Couldn't load tankers.",
+      "ownerInactive": "Tankers can only be added to an active owner; activate the owner first."
+    },
+    "link": {
+      "sectionTitle": "Linked companies",
+      "rule": "A link doesn't change the official customer's identity or account and never re-attributes any past activity. It is ended with a date only; an ended link is never reopened or deleted.",
+      "create": "Link a company",
+      "createTitle": "Link a company to {name}",
+      "company": "Company",
+      "selectCompany": "Select a company",
+      "searchCompany": "Search customers",
+      "noCompanies": "No matching customers",
+      "lookupLoading": "Loading customers…",
+      "lookupFailed": "Couldn't load the customer list.",
+      "lookupTruncated": "Showing the first {count} customers only; if you can't find the company, make sure it exists among the organization's customers.",
+      "alreadyLinked": "Currently linked",
+      "validFrom": "Link start",
+      "validFromHint": "Leave empty to start today.",
+      "validTo": "Link end",
+      "validToHint": "Optional. Leave empty for an open-ended link.",
+      "note": "Note",
+      "created": "Company linked",
+      "period": "Period",
+      "state": "Status",
+      "openEnded": "Open",
+      "end": "End link",
+      "endTitle": "End the link with {name}",
+      "endAria": "End the link with {name}",
+      "endDate": "End date",
+      "endDateHint": "Leave empty to end today. Can't be before the start date.",
+      "endReason": "Reason for ending",
+      "endWarning": "Ending a link is final: it can't be reopened or its end date changed, and no past activity changes.",
+      "ended": "Link ended",
+      "empty": "No linked companies",
+      "emptyHint": "Link official companies from AWJ customers to the tanker owner for responsibility and reporting.",
+      "loading": "Loading linked companies",
+      "loadFailed": "Couldn't load linked companies.",
+      "ownerInactive": "Linking requires an active owner; activate the owner first."
+    },
+    "phase": {
+      "active": "Active",
+      "upcoming": "Scheduled",
+      "ended": "Ended"
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "inactive": "Inactive"
+    },
+    "detail": {
+      "back": "Back to tanker owners",
+      "basics": "Basic information",
+      "loadFailed": "Couldn't load the tanker owner.",
+      "refreshFailed": "Couldn't refresh the data. Showing the last loaded version.",
+      "managerOnly": "Visible to users with the manage permission only"
+    },
+    "states": {
+      "gateClosedTitle": "This feature isn't enabled for this account",
+      "gateClosedBody": "Tanker owner management is off by default and hasn't been enabled for your account yet. A platform administrator enables it as a separate decision.",
+      "backToWorkspace": "Back to the workspace",
+      "forbiddenTitle": "You don't have access",
+      "forbiddenBody": "This screen requires the permission below. The owner or an admin grants it from role management.",
+      "notFoundTitle": "Tanker owner not found",
+      "notFoundBody": "It may not belong to your account, or the feature isn't enabled.",
+      "backToList": "Back to the list",
+      "viewOnly": "View-only mode: you can read the data but not change it. Adding, editing, and linking require the {permission} permission, and contact details and notes are visible to managers only.",
+      "manageRequired": "Requires the {permission} permission"
+    },
+    "errors": {
+      "required": "This field is required.",
+      "too_long": "Maximum {max} characters.",
+      "invalid_capacity": "Enter a positive capacity in liters (up to three decimal places).",
+      "invalid_date": "Invalid date.",
+      "end_before_start": "The end date can't be before the start date.",
+      "saveFailed": "Couldn't save. Please try again.",
+      "forbidden": "You don't have permission for this action.",
+      "notFoundOrClosed": "The record doesn't exist or the feature isn't enabled."
+    },
+    "common": {
+      "actions": "Actions",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "reason": "Reason for the change",
+      "reasonHint": "Optional, recorded in the audit log.",
+      "retry": "Retry",
+      "saveChanges": "Save changes"
+    },
+    "units": {
+      "liter": "L"
+    }
   },
   "fuelStationsCorporate": {
     "eyebrow": "Fuel stations · corporate & fleet",
@@ -14774,6 +15993,214 @@
     "settingsLink": "Manage prices"
   },
   "stationOps": {
+    "tankerFill": {
+      "liters": "L",
+      "next": "Next",
+      "back": "Back",
+      "backToList": "Fill log",
+      "noStockNote": "Recording this voucher does not deduct fuel from station stock. It stays “Awaiting stock integration” until an authorised person posts it.",
+      "serverSays": "Server note: {message}",
+      "home": {
+        "title": "Tanker fills",
+        "hint": "Record a tanker fill or review this shift’s fills"
+      },
+      "closed": {
+        "title": "Feature not enabled",
+        "body": "Recording tanker fills is not enabled for this account yet."
+      },
+      "noAccess": {
+        "title": "You cannot record tanker fills",
+        "body": "Your administrator must grant you the tanker-fill permissions. Contact your supervisor."
+      },
+      "noShift": {
+        "title": "No open shift",
+        "body": "Fills are recorded inside the station’s open shift only. Open a shift, then come back.",
+        "listBody": "There is no open shift for this station right now, so there are no fills to show."
+      },
+      "header": {
+        "station": "Station",
+        "shift": "Current shift"
+      },
+      "steps": {
+        "label": "Recording steps",
+        "owner": "Owner",
+        "nozzle": "Nozzle",
+        "quantity": "Quantity",
+        "review": "Review"
+      },
+      "new": {
+        "title": "Tanker fill",
+        "subtitle": "Record what was dispensed to the tanker in the current shift"
+      },
+      "owner": {
+        "title": "Tanker owner",
+        "search": "Search by name or code",
+        "none": "There are no active tanker owners.",
+        "noResults": "No results for this search.",
+        "truncated": "Only the first results are shown. Narrow the search to see others."
+      },
+      "tanker": {
+        "title": "Tanker",
+        "required": "Choosing the tanker is required at this station.",
+        "optional": "Choosing the tanker is optional; the fill is recorded on the owner’s account either way.",
+        "noneRegistered": "This owner has no registered tankers. The fill is recorded on their account.",
+        "capacity": "Capacity {liters} L",
+        "capacityUnknown": "Capacity not set",
+        "withoutTanker": "Without a tanker",
+        "withoutHint": "The fill is recorded on the owner with no plate"
+      },
+      "nozzle": {
+        "pump": "Pump {number}",
+        "nozzle": "Nozzle {number}",
+        "derived": "Product and tank",
+        "derivedNote": "Taken from the selected nozzle; they cannot be changed here.",
+        "noneTitle": "No allowed nozzle",
+        "noneBody": "No active nozzle is allowed for tanker fills at this station. Tell your supervisor.",
+        "blocked": {
+          "station_inactive": "Station is not active",
+          "nozzle_inactive": "Nozzle is not active",
+          "pump_missing": "Pump not found",
+          "pump_inactive": "Pump is not active",
+          "tank_missing": "Tank not found",
+          "tank_inactive": "Tank is not active",
+          "product_missing": "Product not found",
+          "product_inactive": "Product is not active",
+          "product_tank_mismatch": "Nozzle product does not match its tank",
+          "operation_not_allowed": "Tanker fills not allowed"
+        }
+      },
+      "field": {
+        "number": "Voucher no.",
+        "voucher": "Paper voucher no.",
+        "status": "Status",
+        "owner": "Owner",
+        "tanker": "Tanker",
+        "pump": "Pump",
+        "nozzle": "Nozzle",
+        "product": "Product",
+        "tank": "Tank",
+        "quantity": "Quantity",
+        "recordedAt": "Recorded at"
+      },
+      "quantity": {
+        "hint": "In litres, up to three decimals. Use a dot for the fraction."
+      },
+      "voucher": {
+        "hint": "Saved exactly as typed; leading zeros are part of it.",
+        "willSave": "It will be saved as: {value}"
+      },
+      "capacity": {
+        "over": "The quantity exceeds tanker {plate} capacity by {overrun} L (capacity {capacity} L).",
+        "confirm": "I confirm the quantity is correct",
+        "blocked": "The quantity exceeds the tanker capacity by {overrun} L and the station policy does not allow it. Reduce the quantity.",
+        "allowed": "The quantity exceeds the tanker capacity by {overrun} L. The policy allows it and the excess will be recorded."
+      },
+      "problem": {
+        "owner_required": "Choose the tanker owner to continue.",
+        "tanker_required": "Choose the tanker to continue.",
+        "nozzle_required": "Choose a nozzle to continue.",
+        "nozzle_not_eligible": "The selected nozzle is not allowed for tanker fills.",
+        "quantity_empty": "Enter the quantity in litres.",
+        "quantity_invalid": "The quantity is not valid. Use digits only, with a dot for the fraction.",
+        "quantity_negative": "The quantity cannot be negative.",
+        "quantity_zero": "The quantity must be greater than zero.",
+        "quantity_too_many_decimals": "At most three decimals.",
+        "quantity_too_large": "The quantity is too large. Check it.",
+        "voucher_empty": "Enter the paper voucher number.",
+        "voucher_too_long": "The voucher number is too long.",
+        "capacity_blocked": "The quantity exceeds the tanker capacity and the policy does not allow it.",
+        "capacity_confirmation_required": "Confirm the quantity is correct to continue."
+      },
+      "review": {
+        "title": "Review before saving",
+        "save": "Save fill",
+        "saving": "Saving…",
+        "noTanker": "No tanker",
+        "ownerSelected": "Selected owner",
+        "overrun": "Capacity excess confirmed: {overrun} L.",
+        "noEdit": "A voucher cannot be edited after saving. Check the numbers carefully."
+      },
+      "success": {
+        "title": "Fill recorded",
+        "replayed": "Voucher was already recorded (not duplicated)",
+        "number": "Voucher no.",
+        "another": "Record another fill",
+        "open": "Voucher details",
+        "list": "This shift’s fills"
+      },
+      "pending": {
+        "title": "Unresolved recording attempt",
+        "body": "The connection dropped after the fill was sent and we do not know if it was recorded. Check the status before recording another so the voucher is not duplicated.",
+        "notFound": "We could not find the voucher. It was most likely not recorded; you can resend with the same key (it will not duplicate) or discard the attempt.",
+        "checkFailed": "Could not check right now. Try again.",
+        "resend": "Resend",
+        "discard": "Discard attempt"
+      },
+      "status": {
+        "pending_integration": "Awaiting stock integration",
+        "posted": "Stock integrated",
+        "reversed": "Integration reversed",
+        "other": "Other status",
+        "voided": "Voided"
+      },
+      "list": {
+        "title": "Tanker fills",
+        "subtitle": "Current shift log",
+        "new": "Record a new fill",
+        "shiftLine": "Shift {number}",
+        "count": "Fills",
+        "total": "Total litres",
+        "truncated": "Only the first results are shown; the total covers what is shown.",
+        "emptyTitle": "No fills yet",
+        "emptyBody": "No tanker fills have been recorded in this shift.",
+        "pendingTitle": "Unresolved recording attempt",
+        "pendingHint": "A fill was sent and we do not know if it was recorded. Check its status."
+      },
+      "detail": {
+        "title": "Voucher details",
+        "overrun": "A capacity excess of {overrun} L was confirmed.",
+        "voided": "This voucher is voided."
+      },
+      "attachments": {
+        "title": "Voucher photos",
+        "count": "Photos: {count}",
+        "pinNote": "Uploading voucher photos from this app is not enabled yet and awaits owner approval. Hand the paper voucher to your supervisor."
+      },
+      "reject": {
+        "shift_required": "There is no open shift for this station. Open a shift first, then record the fill.",
+        "shift_not_open": "The shift that was open is no longer the current one. Check the shift, then try again.",
+        "nozzle_operation_not_allowed": "This nozzle is not allowed for tanker fills. Choose another nozzle.",
+        "equipment_not_operational": "The nozzle, pump or tank is not active. Choose another nozzle.",
+        "product_mismatch": "The nozzle product does not match its tank. Choose another nozzle or tell your supervisor.",
+        "owner_inactive": "The tanker owner is not active. Choose another owner.",
+        "tanker_required": "Choosing the tanker is required at this station. Choose a tanker.",
+        "tanker_mismatch": "This tanker does not belong to the selected owner. Choose the tanker again.",
+        "tanker_inactive": "The tanker is not active. Choose another tanker.",
+        "voucher_duplicate": "This paper voucher number is already recorded. A voucher is recorded only once.",
+        "voucher_invalid": "The paper voucher number is not valid. Correct it and try again.",
+        "quantity_invalid": "The quantity is not valid. Enter litres greater than zero, up to three decimals.",
+        "capacity_overrun_blocked": "The quantity exceeds the tanker capacity and the station policy does not allow it.",
+        "capacity_overrun_confirmation_required": "The quantity exceeds the tanker capacity. Confirm the quantity is correct to continue.",
+        "idempotency_key_reused": "This attempt could not be saved because its key was used for a different operation. Review and save again.",
+        "invalid_input": "Some data is not valid. Review the steps and try again.",
+        "unauthorized": "Your session has ended. Sign in again.",
+        "forbidden": "You do not have permission to record tanker fills.",
+        "not_found": "The feature or the station is not available for this account.",
+        "conflict": "Conflict with another operation. Review the data and try again.",
+        "rate_limited": "Too many attempts. Wait a moment and try again.",
+        "validation": "The server rejected this data. Review the steps and try again."
+      },
+      "unknown": {
+        "timeout": "The request timed out after sending and we do not know if the voucher was recorded. Check the status before any retry.",
+        "network": "The connection dropped after sending and we do not know if the voucher was recorded. Check the status before any retry.",
+        "server": "A server error occurred after sending and we do not know if the voucher was recorded. Check the status before any retry."
+      },
+      "unverified": "An unclear reply came back and we do not know if the voucher was recorded. Check the status before any retry.",
+      "notSent": {
+        "offline": "No internet connection. Nothing was sent; try again when the connection returns.",
+        "demo": "Preview mode: nothing is sent to the server."
+      }
+    },
     "productName": "AWJ Fuel Stations",
     "login": {
       "subtitle": "Sign in with your employee number and PIN",

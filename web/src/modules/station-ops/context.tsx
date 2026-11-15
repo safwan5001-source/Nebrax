@@ -20,6 +20,8 @@ export const VIEW_PERMISSION = 'fuel_stations.view';
 
 export interface StationOpsContextValue {
   scopeKey: string;
+  /** هوية ثابتة (مؤسسة|مستخدم) بلا الفرع النشط ولا قوائم الصلاحيات — لتخزين ما يجب أن يصمد أمام تبديل الفرع (مثل محاولة تسجيل غير محسومة). */
+  actorKey: string;
   viewer: AuthUser;
   can: (permission: string) => boolean;
   /** يملك المستخدم قراءة وحدة المحطات أصلاً؛ بدونها لا يُرسل أي طلب. */
@@ -120,6 +122,7 @@ function ScopedProvider({ scopeKey, children }: { scopeKey: string; children: Re
   const value = useMemo<StationOpsContextValue>(
     () => ({
       scopeKey,
+      actorKey: `${user.tenant_id}|${user.id}`,
       viewer: user,
       can,
       canViewStations,

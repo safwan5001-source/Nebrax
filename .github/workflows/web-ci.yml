@@ -18,6 +18,8 @@ on:
       - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
       - 'app/Support/ApplicationCatalog.php'
       - 'app/Support/FuelReportCatalog.php'                # station-ops/nav.test.ts: تزامن صلاحيات التقارير
+      - 'app/Services/FuelTankerFillAccountingReportService.php'  # fuel-tankers/reports: تزامن رموز الملاحظات مع الواجهة
+      - 'app/Support/StationSessionBoundary.php'           # station-ops/tanker-fill: تطابق عميل التعبئة مع قائمة جلسة PIN البيضاء
       - 'app/Support/DocumentNumberingCatalog.php'
       - 'app/Support/PaymentMethodVisual.php'
       - 'app/Support/Commerce/IconRegistry.php'
@@ -41,6 +43,8 @@ on:
       - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
       - 'app/Support/ApplicationCatalog.php'
       - 'app/Support/FuelReportCatalog.php'                # station-ops/nav.test.ts: تزامن صلاحيات التقارير
+      - 'app/Services/FuelTankerFillAccountingReportService.php'  # fuel-tankers/reports: تزامن رموز الملاحظات مع الواجهة
+      - 'app/Support/StationSessionBoundary.php'           # station-ops/tanker-fill: تطابق عميل التعبئة مع قائمة جلسة PIN البيضاء
       - 'app/Support/DocumentNumberingCatalog.php'
       - 'app/Support/PaymentMethodVisual.php'
       - 'app/Support/Commerce/IconRegistry.php'

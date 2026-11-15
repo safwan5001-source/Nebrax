@@ -32,7 +32,150 @@ class FuelStationSettingsService
     public const GOVERNANCE_PERMISSION = 'fuel.governance.manage';
 
     /** @var list<string> سياسات الضبط الرقابي: كتابتها (بما فيها المسح والقيمة نفسها) لا تكون إلا لمخوَّل بالحوكمة. */
-    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode'];
+    public const GOVERNANCE_KEYS = ['fuel_distinct_approver_required', 'tank_reading_backdating_policy', 'tank_reading_backdating_max_hours', 'tank_reading_backdating_reason_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at'];
+
+    /** @var list<string> نطاقات منع تكرار رقم السند الورقي (TANKER-PR3؛ الافتراضي المعتمد `station`). */
+    public const TANKER_VOUCHER_SCOPES = ['station', 'tenant', 'owner', 'none'];
+
+    /** @var list<string> سياسات تجاوز سعة الصهريج (TANKER-PR3؛ `supervisor_approval` مؤجَّل ويُرفض). */
+    public const TANKER_CAPACITY_OVERRUN_POLICIES = ['allow_with_confirmation', 'block', 'allow'];
+
+    /**
+     * TANKER-PR3: سياسات تعبئة صهاريج المتعاملين الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة تُعامَل افتراضيها الآمن (فشل مغلق نحو المعتمد).
+     * القواعد الثابتة (ليست إعدادات): الحجب الصارم للسند المكرر بلا تجاوز، الأصفار البادئة تُحفظ، والسند الملغى يبقى محجوزاً.
+     *
+     * @return array{selection_required: bool, voucher_unique_scope: string, capacity_overrun_policy: string}
+     */
+    public function tankerFillPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $scope = $all['tanker_voucher_unique_scope'] ?? 'station';
+        $overrun = $all['tanker_capacity_overrun_policy'] ?? 'allow_with_confirmation';
+
+        return [
+            'selection_required' => ($all['tanker_selection_required'] ?? false) === true,
+            'voucher_unique_scope' => is_string($scope) && in_array($scope, self::TANKER_VOUCHER_SCOPES, true) ? $scope : 'station',
+            'capacity_overrun_policy' => is_string($overrun) && in_array($overrun, self::TANKER_CAPACITY_OVERRUN_POLICIES, true) ? $overrun : 'allow_with_confirmation',
+        ];
+    }
+
+    /** @var list<string> سياسة الرصيد غير الكافي للسند المعلّق (TANKER-PR6A): لا «سماح بالسالب» ولا «تسوية صامتة» مهما كانت القيمة. */
+    public const TANKER_INVENTORY_INSUFFICIENT_POLICIES = ['block', 'hold_for_review'];
+
+    /**
+     * TANKER-PR6A: سياسة مراجعة السندات المعلّقة الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة ⇒ الافتراضي الآمن. **لا أثر على أي رصيد**: تُستعمل لتصنيف الجاهزية وعرضها فقط.
+     *
+     * @return array{insufficient_policy: string, review_after_hours: int}
+     */
+    public function tankerInventoryPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $policy = $all['tanker_inventory_insufficient_policy'] ?? 'block';
+        $hours = $all['tanker_inventory_review_after_hours'] ?? 24;
+
+        return [
+            'insufficient_policy' => is_string($policy) && in_array($policy, self::TANKER_INVENTORY_INSUFFICIENT_POLICIES, true) ? $policy : 'block',
+            'review_after_hours' => is_int($hours) && $hours >= 1 && $hours <= 720 ? $hours : 24,
+        ];
+    }
+
+    /** @var list<string> توقيت الاعتراف بتكلفة الوقود المصروف لصهريج (TANKER-PR6B-1): `clearing_until_invoice` فقط. `immediate_cogs` غير مبني ويُرفض (لا يُنفَّذ قبل قرار مستقل). */
+    public const TANKER_COST_RECOGNITIONS = ['clearing_until_invoice'];
+
+    /** @var list<string> سلوك الترحيل المستقبلي عند انحراف قيمة المجمّع عن حصة الوقود من الأستاذ (الافتراضي `block` بقرار المالك). */
+    public const FUEL_POOL_LEDGER_VARIANCE_POLICIES = ['block', 'warn'];
+
+    /** @var list<string> مفاتيح تُمسح بقيمة فارغة على مستوى المؤسسة (`Settings::put` لا يكتب null). */
+    private const TENANT_CLEARABLE_KEYS = ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id', 'fuel_opening_balance_account_id', 'tanker_issue_clearing_account_id', 'tanker_inventory_posting_start_at'];
+
+    /**
+     * TANKER-PR6B-1: إعدادات الدمج المخزني الفعّالة (محطة ← مؤسسة ← الافتراضي) **وتقييم الحساب الوسيط**. قراءة فقط: لا أثر على أي رصيد أو قيد أو سند.
+     * `$station = null` ⇒ نطاق المؤسسة. قيمة تالفة ⇒ الافتراضي الآمن (فشل مغلق نحو `block` و`clearing_until_invoice`). الحساب الوسيط **بلا fallback**.
+     *
+     * @return array{clearing_account: array{configured: bool, account_id: ?string, valid: bool, reason: ?string}, cost_recognition: string, variance_policy: string, posting_start_at: ?string, alerts_enabled: bool}
+     */
+    public function tankerInventoryPostingConfig(?FuelStation $station = null): array
+    {
+        $all = $station === null ? $this->forTenant() : $this->forStation($station);
+        $id = $all['tanker_issue_clearing_account_id'] ?? null;
+        $id = is_string($id) && $id !== '' ? $id : null;
+        $reason = $id === null ? null : app(FuelTankerClearingAccountGuard::class)->violation($id);
+        $cost = $all['tanker_cost_recognition'] ?? null;
+        $variance = $all['fuel_pool_ledger_variance_policy'] ?? null;
+        $start = $all['tanker_inventory_posting_start_at'] ?? null;
+        $alerts = $all['tanker_inventory_alerts_enabled'] ?? true;
+
+        return [
+            'clearing_account' => ['configured' => $id !== null, 'account_id' => $id, 'valid' => $id !== null && $reason === null, 'reason' => $reason],
+            'cost_recognition' => is_string($cost) && in_array($cost, self::TANKER_COST_RECOGNITIONS, true) ? $cost : 'clearing_until_invoice',
+            'variance_policy' => is_string($variance) && in_array($variance, self::FUEL_POOL_LEDGER_VARIANCE_POLICIES, true) ? $variance : 'block',
+            'posting_start_at' => $this->normalizedPostingStart($start),
+            'alerts_enabled' => $alerts !== false,
+        ];
+    }
+
+    /** لحظة البدء بتوقيت UTC (RFC3339) أو `null` (فارغ/تالف ⇒ كل السندات تاريخية). */
+    private function normalizedPostingStart(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+        try {
+            return \Carbon\CarbonImmutable::parse($value)->utc()->format('Y-m-d\TH:i:s\Z');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @var array<string, list<string>> أنواع مرفقات سند التعبئة المسموحة (TANKER-PR5): السقف الصلب لا يتجاوز PDF وJPG وPNG (بلا WebP)، والإعداد يضيّق فقط. */
+    public const TANKER_ATTACHMENT_TYPES = [
+        'images_and_pdf' => ['image/jpeg', 'image/png', 'application/pdf'],
+        'images_only' => ['image/jpeg', 'image/png'],
+    ];
+
+    /** @var list<string> إلزام صورة السند (قرار المالك D-T2): `never` الافتراضي؛ والمرحلتان تُعلنان «ناقص» فقط — لا إنفاذ قبل قرار مستقل. */
+    public const TANKER_ATTACHMENT_REQUIRED = ['never', 'before_shift_approval', 'before_settlement'];
+
+    /** @var list<string> */
+    public const TANKER_ATTACHMENT_AFTER_CLOSE = ['allow', 'deny'];
+
+    /** @var list<string> */
+    public const TANKER_ATTACHMENT_REMOVAL = ['open_shift_only', 'always', 'never'];
+
+    /** السقف الصلب لحجم المرفق (م.ب) وعدد المرفقات للسند: الإعداد يضيّق فقط ولا يرفع. */
+    public const TANKER_ATTACHMENT_HARD_MAX_MB = 10;
+    public const TANKER_ATTACHMENT_HARD_MAX_COUNT = 20;
+
+    /**
+     * TANKER-PR5: سياسة مرفقات سند التعبئة الفعّالة للمحطة (محطة ← مؤسسة ← الافتراضي). قيمة تالفة تُعامَل افتراضيها الآمن (فشل مغلق نحو المعتمد)، وتُقصّ الحدود بالسقف الصلب.
+     *
+     * @return array{required: bool, required_stage: string, types: string, mime_types: list<string>, max_bytes: int, max_count: int, after_close: string, removal: string}
+     */
+    public function tankerAttachmentPolicy(FuelStation $station): array
+    {
+        $all = $this->forStation($station);
+        $types = $all['tanker_fill_attachment_types'] ?? 'images_and_pdf';
+        $types = is_string($types) && array_key_exists($types, self::TANKER_ATTACHMENT_TYPES) ? $types : 'images_and_pdf';
+        $mb = $all['tanker_fill_attachment_max_size_mb'] ?? self::TANKER_ATTACHMENT_HARD_MAX_MB;
+        $mb = is_int($mb) && $mb >= 1 ? min($mb, self::TANKER_ATTACHMENT_HARD_MAX_MB) : self::TANKER_ATTACHMENT_HARD_MAX_MB;
+        $count = $all['tanker_fill_attachment_max_count'] ?? 10;
+        $count = is_int($count) && $count >= 1 ? min($count, self::TANKER_ATTACHMENT_HARD_MAX_COUNT) : 10;
+        $stage = $all['tanker_voucher_attachment_required'] ?? 'never';
+        $stage = is_string($stage) && in_array($stage, self::TANKER_ATTACHMENT_REQUIRED, true) ? $stage : 'never';
+        $afterClose = $all['tanker_fill_attachment_after_close'] ?? 'allow';
+        $removal = $all['tanker_fill_attachment_removal'] ?? 'open_shift_only';
+
+        return [
+            'required' => $stage !== 'never',
+            'required_stage' => $stage,
+            'types' => $types,
+            'mime_types' => self::TANKER_ATTACHMENT_TYPES[$types],
+            'max_bytes' => $mb * 1024 * 1024,
+            'max_count' => $count,
+            'after_close' => is_string($afterClose) && in_array($afterClose, self::TANKER_ATTACHMENT_AFTER_CLOSE, true) ? $afterClose : 'allow',
+            'removal' => is_string($removal) && in_array($removal, self::TANKER_ATTACHMENT_REMOVAL, true) ? $removal : 'open_shift_only',
+        ];
+    }
 
     /** @var list<string> قيم سياسة التأريخ الرجعي لقراءات الخزانات (FUEL-B6). */
     public const BACKDATING_POLICIES = ['deny', 'supervisor_approval', 'authorized_user'];
@@ -72,6 +215,26 @@ class FuelStationSettingsService
     }
 
     /** @return array<string, mixed> */
+    /**
+     * TANKER-PR3 (Codex P2): مفاتيح الإعدادات التي **للمحطة تجاوز صريح لها** (على مستوى المحطة لا الجهاز). `forStation()` يعيد القيمة الفعّالة فقط فلا يميّز
+     * «موروث» من «مثبَّت بقيمة مساوية لقيمة المؤسسة»؛ الواجهة تحتاج الفرق كي لا يتغيّر تجاوز مثبَّت بتغيير لاحق في المؤسسة بلا قصد.
+     *
+     * @return list<string>
+     */
+    public function stationOverrideKeys(FuelStation $station): array
+    {
+        $this->assertStationTenant($station);
+
+        return FuelStationSettingOverride::query()
+            ->where('fuel_station_id', $station->id)
+            ->where('device_key', '')
+            ->orderBy('setting_key')
+            ->pluck('setting_key')
+            ->map(fn ($key) => (string) $key)
+            ->values()
+            ->all();
+    }
+
     public function forStation(FuelStation $station, ?string $deviceKey = null): array
     {
         $this->assertStationTenant($station);
@@ -227,7 +390,7 @@ class FuelStationSettingsService
         foreach ($known as $key => $value) {
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
             // مسح mapping الحساب والعودة إلى fallback الموثق لمحرك الجرد.
-            $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id', 'fuel_opening_balance_account_id'], true) && $value === null ? '' : $value;
+            $normalized = in_array($key, self::TENANT_CLEARABLE_KEYS, true) && $value === null ? '' : $value;
             // FUEL-B6: مسح مدة قِدم قراءة الخزان على مستوى المؤسسة (null ⇒ «غير مضبوطة»)؛ القارئ يعامل '' كـnull. لا تغيير إن كانت غير مضبوطة أصلاً.
             if ($key === 'tank_reading_stale_after_minutes' && $value === null) {
                 $normalized = in_array($current[$key] ?? null, [null, ''], true) ? $current[$key] : '';
@@ -385,7 +548,7 @@ class FuelStationSettingsService
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
         if (in_array($key, [
-            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'corporate_credit_enabled', 'require_active_contract',
+            'fuel_price_tax_mode', 'fuel_distinct_approver_required', 'shift_settlement_mode', 'tanker_selection_required', 'tanker_voucher_unique_scope', 'tanker_capacity_overrun_policy', 'tanker_voucher_attachment_required', 'tanker_fill_attachment_types', 'tanker_fill_attachment_max_size_mb', 'tanker_fill_attachment_max_count', 'tanker_fill_attachment_after_close', 'tanker_fill_attachment_removal', 'tanker_inventory_insufficient_policy', 'tanker_inventory_review_after_hours', 'tanker_issue_clearing_account_id', 'tanker_cost_recognition', 'fuel_pool_ledger_variance_policy', 'tanker_inventory_posting_start_at', 'tanker_inventory_alerts_enabled', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
@@ -479,11 +642,138 @@ class FuelStationSettingsService
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
             'device_simulated_ingress_enabled',
             'maintenance_overdue_alerts_enabled', 'safety_inspection_overdue_alerts_enabled',
-            'fuel_station_alerts_enabled',
+            'fuel_station_alerts_enabled', 'tanker_selection_required', 'tanker_inventory_alerts_enabled',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
                 throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_voucher_unique_scope') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_VOUCHER_SCOPES, true)) {
+                throw new RuntimeException('نطاق منع تكرار رقم السند الورقي يجب أن يكون station أو tenant أو owner أو none.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_capacity_overrun_policy') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_CAPACITY_OVERRUN_POLICIES, true)) {
+                throw new RuntimeException('سياسة تجاوز سعة الصهريج يجب أن تكون allow_with_confirmation أو block أو allow (supervisor_approval غير مدعومة بعد).');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_voucher_attachment_required') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_REQUIRED, true)) {
+                throw new RuntimeException('إلزام صورة السند يجب أن يكون never أو before_shift_approval أو before_settlement.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_types') {
+            if (! is_string($value) || ! array_key_exists($value, self::TANKER_ATTACHMENT_TYPES)) {
+                throw new RuntimeException('أنواع مرفقات السند يجب أن تكون images_and_pdf أو images_only.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_max_size_mb') {
+            if (! is_int($value) || $value < 1 || $value > self::TANKER_ATTACHMENT_HARD_MAX_MB) {
+                throw new RuntimeException('الحد الأقصى لحجم المرفق يجب أن يكون عدداً صحيحاً بين 1 و' . self::TANKER_ATTACHMENT_HARD_MAX_MB . ' ميغابايت.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_max_count') {
+            if (! is_int($value) || $value < 1 || $value > self::TANKER_ATTACHMENT_HARD_MAX_COUNT) {
+                throw new RuntimeException('الحد الأقصى لعدد المرفقات يجب أن يكون عدداً صحيحاً بين 1 و' . self::TANKER_ATTACHMENT_HARD_MAX_COUNT . '.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_after_close') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_AFTER_CLOSE, true)) {
+                throw new RuntimeException('سياسة إضافة المرفقات بعد إغلاق الوردية يجب أن تكون allow أو deny.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_inventory_insufficient_policy') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_INVENTORY_INSUFFICIENT_POLICIES, true)) {
+                throw new RuntimeException('سياسة الرصيد غير الكافي للسندات المعلّقة يجب أن تكون block أو hold_for_review.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_issue_clearing_account_id') {
+            if ($value === null || $value === '') {
+                return;
+            }
+            if (! is_string($value)) {
+                throw new RuntimeException('FUEL_TANKER_CLEARING_ACCOUNT_INVALID:not_found: معرّف الحساب الوسيط غير صالح.');
+            }
+            $reason = app(FuelTankerClearingAccountGuard::class)->violation($value);
+            if ($reason !== null) {
+                throw new RuntimeException('FUEL_TANKER_CLEARING_ACCOUNT_INVALID:'.$reason.': '.$this->clearingViolationMessage($reason));
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_cost_recognition') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_COST_RECOGNITIONS, true)) {
+                throw new RuntimeException('توقيت الاعتراف بتكلفة صهاريج التعبئة المدعوم هو clearing_until_invoice فقط (immediate_cogs غير مبني).');
+            }
+
+            return;
+        }
+
+        if ($key === 'fuel_pool_ledger_variance_policy') {
+            if (! is_string($value) || ! in_array($value, self::FUEL_POOL_LEDGER_VARIANCE_POLICIES, true)) {
+                throw new RuntimeException('سياسة انحراف مجمّع التكلفة عن الأستاذ يجب أن تكون block أو warn.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_inventory_posting_start_at') {
+            if ($value === null || $value === '') {
+                return;
+            }
+            if (! is_string($value) || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/', $value) !== 1) {
+                throw new RuntimeException('لحظة بدء الترحيل يجب أن تكون بصيغة RFC3339 مع المنطقة الزمنية (مثل 2026-12-01T00:00:00+03:00).');
+            }
+            try {
+                \Carbon\CarbonImmutable::parse($value);
+            } catch (\Throwable) {
+                throw new RuntimeException('لحظة بدء الترحيل غير صالحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_inventory_review_after_hours') {
+            if (! is_int($value) || $value < 1 || $value > 720) {
+                throw new RuntimeException('مهلة وسم السند المعلّق «متأخراً» يجب أن تكون عدداً صحيحاً بين 1 و720 ساعة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'tanker_fill_attachment_removal') {
+            if (! is_string($value) || ! in_array($value, self::TANKER_ATTACHMENT_REMOVAL, true)) {
+                throw new RuntimeException('سياسة إزالة المرفقات واستبدالها يجب أن تكون open_shift_only أو always أو never.');
             }
 
             return;
@@ -628,6 +918,21 @@ class FuelStationSettingsService
                 throw new RuntimeException('حساب الوقود يجب أن يكون نشطاً وقابلاً للترحيل ومن نفس المستأجر وباتجاهه المحاسبي الصحيح.');
             }
         }
+    }
+
+    /** نص مخالفة الحساب الوسيط (الرمز في بداية الرسالة يترجمه العميل). */
+    private function clearingViolationMessage(string $reason): string
+    {
+        return match ($reason) {
+            FuelTankerClearingAccountGuard::NOT_FOUND => 'الحساب الوسيط غير موجود في هذه المؤسسة.',
+            FuelTankerClearingAccountGuard::GROUP => 'الحساب الوسيط حساب تجميعي ولا يقبل ترحيلاً مباشراً.',
+            FuelTankerClearingAccountGuard::INACTIVE => 'الحساب الوسيط معطَّل.',
+            FuelTankerClearingAccountGuard::NOT_ASSET => 'الحساب الوسيط يجب أن يكون حساب أصل.',
+            FuelTankerClearingAccountGuard::INVENTORY_ACCOUNT => 'الحساب الوسيط لا يجوز أن يكون حساب مخزون.',
+            FuelTankerClearingAccountGuard::CASH_OR_BANK => 'الحساب الوسيط لا يجوز أن يكون حساب نقد أو بنك.',
+            FuelTankerClearingAccountGuard::TAX_ACCOUNT => 'الحساب الوسيط لا يجوز أن يكون حساب ضريبة.',
+            default => 'الحساب الوسيط لا يجوز أن يكون حساباً مخصَّصاً لدور محاسبي آخر (عملاء/موردون/إيراد/تكلفة…).',
+        };
     }
 
     private function accountAllowedFor(string $key, string $id): bool

@@ -42,6 +42,8 @@ class ImportIntakeGuardTest extends TestCase
         'PUT api/payments/{id}' => 'مرفق سند دفع، لا استيراد.',
         'POST api/purchases/{id}/attachments' => 'مرفق مشترى، لا استيراد.',
         'POST api/fuel-stations/deliveries/{id}/attachments' => 'مرفق سند مورد لاستلام وقود (FUEL-B5.1)، لا استيراد؛ يفحصه DocumentFileInspector (المحتوى الفعلي/النوع/الحجم).',
+        'POST api/fuel-stations/tanker-fills/{id}/attachments' => 'مرفق سند تعبئة صهريج (TANKER-PR5)، لا استيراد؛ يفحصه DocumentFileInspector (المحتوى الفعلي/النوع/الحجم) ثم سياسة المحطة.',
+        'POST api/fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/replace' => 'استبدال مرفق سند تعبئة صهريج (TANKER-PR5)، لا استيراد؛ الفحص نفسه.',
         'POST api/employees/{id}/photo' => 'صورة موظف، لا استيراد.',
         'POST api/payment-methods/{id}/logo' => 'شعار طريقة دفع (صورة PNG/JPEG/WebP ≤ 1MB بلا SVG)، لا استيراد.',
         'POST api/employees/{id}/attachments' => 'مرفق موظف، لا استيراد.',

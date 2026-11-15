@@ -61,16 +61,16 @@ describe('company browser identity', () => {
   });
 
   it('uses the approved AWJ fallback for missing or unsafe logos', async () => {
-    expect(safeCompanyIconUrl(null)).toBe('/icon.ico');
-    expect(safeCompanyIconUrl('javascript:alert(1)')).toBe('/icon.ico');
-    expect(safeCompanyIconUrl('data:image/svg+xml;base64,PHN2Zy8+')).toBe('/icon.ico');
+    expect(safeCompanyIconUrl(null)).toBe('/brand/awj/app-icon-v2.png');
+    expect(safeCompanyIconUrl('javascript:alert(1)')).toBe('/brand/awj/app-icon-v2.png');
+    expect(safeCompanyIconUrl('data:image/svg+xml;base64,PHN2Zy8+')).toBe('/brand/awj/app-icon-v2.png');
 
     useCompanyMock.mockReturnValue({ name: 'Fallback tenant', logo: 'javascript:alert(1)' });
     render(<CompanyBrowserIdentity />);
 
     await waitFor(() => {
-      expect(headLinks().icon?.getAttribute('href')).toBe('/icon.ico');
-      expect(headLinks().apple?.getAttribute('href')).toBe('/icon.ico');
+      expect(headLinks().icon?.getAttribute('href')).toBe('/brand/awj/app-icon-v2.png');
+      expect(headLinks().apple?.getAttribute('href')).toBe('/brand/awj/app-icon-v2.png');
     });
   });
 

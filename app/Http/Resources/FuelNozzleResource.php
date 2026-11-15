@@ -25,6 +25,9 @@ class FuelNozzleResource extends JsonResource
             'controller_key' => $this->controller_key,
             'meter_opening_milliliters' => $this->meter_opening_milliliters,
             'status' => $this->status,
+            // TANKER-PR3: `allowed_operations` = القيد المخزَّن (`null` = كل العمليات)، و`effective_operations` = المسموح فعلاً دائماً كقائمة.
+            'allowed_operations' => $this->allowed_operations,
+            'effective_operations' => $this->effectiveOperations(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

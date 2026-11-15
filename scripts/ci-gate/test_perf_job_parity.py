@@ -77,6 +77,32 @@ class PerfJobParity(unittest.TestCase):
             self.assertIn(need, run)
         self.assertNotIn("|| true", run)
 
+    LOCK_STEP = "رفع حدّ أقفال PostgreSQL (tmpfs — عبر قالب الإعداد)"
+
+    def test_lock_limit_is_raised_and_verified_before_the_schema_is_built(self):
+        # PG-PERF-LOCKS: أول `RefreshDatabase` يُسقط المخطط كله في عبارة واحدة (≈12.8 ألف قفل > 6400 افتراضياً)،
+        # فبدون هذه الخطوة تفشل الوظيفة متقطّعاً بـ«out of shared memory» قبل أي قياس.
+        names = [s.get("name") for s in self.perf_job["steps"]]
+        self.assertIn(self.LOCK_STEP, names)
+        self.assertLess(names.index(self.LOCK_STEP), names.index("تهيئة قاعدة بيانات القياس (pgsql)"),
+                        "إعادة التشغيل تمحو tmpfs: يجب أن تسبق بناء المخطط")
+        step = self.ps[self.LOCK_STEP]
+        self.assertNotIn("if", step)
+        self.assertNotIn("continue-on-error", step)
+        run = step["run"]
+        for need in ("set -euo pipefail", "postgresql.conf.sample", "docker restart", "init process complete",
+                     "SHOW max_locks_per_transaction", '[ "$LIMIT" = "1024" ]', "exit 1"):
+            self.assertIn(need, run)
+        self.assertNotIn("|| true", run)
+        # ALTER SYSTEM يُكتب في PGDATA على tmpfs فيُمحى عند إعادة التشغيل ويعود الحدّ إلى 64 بصمت.
+        self.assertNotIn("ALTER SYSTEM", run)
+
+    def test_lock_limit_matches_the_full_suite_job(self):
+        test_lock = next(s for s in self.test_job["steps"] if "max_locks_per_transaction = " in str(s.get("run", "")))
+        want = re.search(r"max_locks_per_transaction = (\d+)", test_lock["run"]).group(1)
+        got = re.search(r"max_locks_per_transaction = (\d+)", self.ps[self.LOCK_STEP]["run"]).group(1)
+        self.assertEqual(want, got, "حدّ الأقفال انحرف بين test وpg-perf")
+
     def test_p95_budget_and_workload_are_unchanged_by_the_storage_fix(self):
         php = (ROOT / "tests" / "Feature" / "CommerceOrderEventsPostgresTest.php").read_text(encoding="utf-8")
         self.assertIn("private const P95_BUDGET_MS = 50.0;", php)

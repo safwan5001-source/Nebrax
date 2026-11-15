@@ -51,6 +51,9 @@ export const nozzleSchema = z.object({
   fuel_product_id: text.min(1),
   nozzle_number: label,
   status: text,
+  /** TANKER-PR7: قيد عمليات الفوهة (`null` = كل العمليات) والمسموح فعلاً (`effective_operations`). غيابهما (خادم أقدم) = غير معروف، فلا تُخمَّن العمليات. */
+  allowed_operations: z.array(text).nullable().optional(),
+  effective_operations: z.array(text).optional(),
 });
 
 export const tankSchema = z.object({

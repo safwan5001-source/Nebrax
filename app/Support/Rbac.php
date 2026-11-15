@@ -154,6 +154,9 @@ class Rbac
             'fuel_stations.view', 'fuel_stations.manage',
             'fuel.shift.view', 'fuel.shift.open', 'fuel.shift.close', 'fuel.shift.approve',
             'fuel.shift.correct', 'fuel.shift.cash_count', 'fuel.shift.cash_variance_review',
+            // TANKER-PR3 (قرار المالك 8): مراجعة المشرف لفروق **العدادات** (عدّاد الفوهة ↔ المسجَّل) سلطة مستقلة عن مراجعة فروق النقد `cash_variance_review`.
+            // owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني). تُسجَّل الآن ولا يستعملها مسار بعد (التطبيق في PR-8).
+            'fuel.shift.meter_variance_review',
             'fuel.sale.view', 'fuel.sale.create', 'fuel.sale.finalize', 'fuel.sale.collect', 'fuel.sale.price.manage',
             // Cycle 6: سلطات العقد والائتمان والبطاقة مستقلة، ولا ترثها
             // أدوار المحطة من fuel_stations.manage.
@@ -212,6 +215,19 @@ class Rbac
             // owner/admin عبر `*`؛ لا تُضافان لـ`MATRIX` ولا لأي قالب موظف ولا تُمنحان لأي دور مخزَّن بهجرة (لا منح ضمني). المسارات خلف بوابة
             // نشر مغلقة (`fuel_stations.tanker_management_enabled`) فلا أثر قبل التفعيل.
             'fuel.tanker.view', 'fuel.tanker.manage',
+            // TANKER-PR4: سندات تعبئة الصهاريج — عرض وتسجيل وإلغاء منفصلة. **تشغيلي فقط (لا مخزون ولا قيد)**. owner/admin عبر `*`؛ لا تُضاف لـ`MATRIX` ولا لأي قالب موظف
+            // (منحها لموظف المحطة يأتي مع واجهة التطبيق المكتملة) ولا تُمنح لأي دور مخزَّن بهجرة. المسارات خلف بوابة نشر منفصلة مغلقة (`tanker_fills_enabled`).
+            'fuel.tanker.fill.view', 'fuel.tanker.fill.record', 'fuel.tanker.fill.void',
+            // TANKER-PR5: مرفقات سندات التعبئة — إضافة وإزالة/استبدال منفصلتان (العرض والتنزيل بـ`fuel.tanker.fill.view`). دليل فقط، لا أثر مخزني أو محاسبي.
+            // owner/admin عبر `*`؛ لا `MATRIX` ولا قالب موظف ولا دور مخزَّن؛ جلسة PIN لا تصل المسارات (تكامل موظف المحطة = PR-7).
+            'fuel.tanker.fill.attachment.add', 'fuel.tanker.fill.attachment.remove',
+            // TANKER-PR6A: مراجعة جاهزية الدمج المخزني للسندات المعلّقة (قراءة فقط — لا ترحيل ولا خصم ولا قيد في هذه الشريحة). owner/admin عبر `*`؛ لا `MATRIX` ولا قالب
+            // موظف ولا دور مخزَّن؛ جلسة PIN لا تصل المسار. صلاحية تعديل سياسات المراجعة الحساسة هي `fuel.governance.manage` القائمة (لا صلاحية موازية).
+            'fuel.tanker.fill.inventory.view',
+            // TANKER-PR6B-1: صلاحيات الدمج المخزني **المحجوزة** — ترحيل السند (`post`)، عكسه (`reverse`)، وترحيل سند تاريخي منفرداً (`post_historical`، D-6B-7). **لا مسار يستعملها بعد** (الكاتب = PR-6B-3/4
+            // خلف بوابة `FUEL_TANKER_INVENTORY_POSTING_ENABLED` المغلقة)؛ تُسجَّل الآن كي لا تُمنح بالخطأ ولتثبَّت بالاختبار. owner/admin عبر `*` فقط؛ لا `MATRIX` ولا قالب موظف محطة ولا دور مخزَّن بهجرة
+            // ولا جلسة PIN (القائمة البيضاء لا تحوي مساراً لها). الإعدادات الحساسة تبقى بـ`fuel.governance.manage` القائمة.
+            'fuel.tanker.fill.inventory.post', 'fuel.tanker.fill.inventory.reverse', 'fuel.tanker.fill.inventory.post_historical',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
             // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات

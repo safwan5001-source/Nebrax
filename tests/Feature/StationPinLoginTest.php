@@ -376,6 +376,7 @@ class StationPinLoginTest extends TestCase
             'POST shifts/{id}/meter-readings',
             'POST shifts/{id}/staff',
             'POST shifts/{id}/tank-readings',
+            'POST tanker-fills', // TANKER-PR7: تسجيل تعبئة صهريج وحده (لا void ولا ترحيل ولا عكس ولا مرفقات)
         ], $reachable);
         foreach (['PUT staff/{id}', 'POST staff/{id}/pin', 'DELETE staff/{id}/pin', 'POST stations', 'PUT stations/{id}', 'DELETE stations/{id}', 'PUT stations/{id}/settings',
             'POST pumps', 'POST nozzles', 'POST tanks', 'POST products', 'POST prices', 'POST sales', 'POST shifts/{id}/corrections'] as $mustBeDenied) {

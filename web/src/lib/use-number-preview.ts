@@ -22,6 +22,7 @@ export type NumberingKey =
   | 'fuel_shift'
   | 'fuel_sale'
   | 'fuel_opening_balance'
+  | 'fuel_tanker_fill'
   | 'fuel_maintenance_work_order'
   | 'fuel_safety_inspection'
   | 'corporate_fuel_contract'

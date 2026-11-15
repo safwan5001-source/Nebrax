@@ -104,6 +104,13 @@ use App\Http\Controllers\Api\FuelStaffController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelTankerController;
+use App\Http\Controllers\Api\FuelTankerFillAttachmentController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryPostingController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryReversalController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryWorkspaceController;
+use App\Http\Controllers\Api\FuelTankerFillReportController;
+use App\Http\Controllers\Api\FuelTankerFillInventoryReviewController;
+use App\Http\Controllers\Api\FuelTankerFillController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelShiftCollectionController;
 use App\Http\Controllers\Api\FuelShiftSettlementPreviewController;
@@ -223,6 +230,8 @@ use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAuditController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
+use App\Http\Middleware\EnsureFuelTankerFillsEnabled;
+use App\Http\Middleware\EnsureFuelTankerInventoryPostingEnabled;
 use App\Http\Middleware\EnsureFuelTankerManagementEnabled;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
@@ -1753,6 +1762,36 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('fuel-stations/tankers', [FuelTankerController::class, 'storeTanker'])->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/tankers/{id}', [FuelTankerController::class, 'showTanker'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.view'), $commercialApp('fuel_stations.core')]);
         Route::put('fuel-stations/tankers/{id}', [FuelTankerController::class, 'updateTanker'])->whereUuid('id')->middleware([$tankerGate, $perm('fuel.tanker.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR4 — سندات تعبئة الصهاريج (تشغيلي فقط: لا خصم مخزون ولا قيد ولا فاتورة ولا تحصيل). بوابة نشر منفصلة مغلقة افتراضياً
+        // (`fuel_stations.tanker_fills_enabled`) فوق بوابة PR-1؛ لا مسار منها يصل جلسة PIN (خارج `StationSessionBoundary` = فشل مغلق).
+        $tankerFillGate = EnsureFuelTankerFillsEnabled::class;
+        Route::get('fuel-stations/tanker-fills', [FuelTankerFillController::class, 'index'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills', [FuelTankerFillController::class, 'store'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.record'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR6A: مراجعة جاهزية الدمج المخزني للسندات المعلّقة — قراءة فقط (لا ترحيل). قبل `{id}` كي لا يُحسب «inventory-review» معرّفاً.
+        Route::get('fuel-stations/tanker-fills/inventory-review', [FuelTankerFillInventoryReviewController::class, 'index'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/tanker-fills/inventory-review/reconciliation', [FuelTankerFillInventoryReviewController::class, 'reconciliation'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/tanker-fills/inventory-settings', [FuelTankerFillInventoryReviewController::class, 'settings'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/tanker-fills/{id}', [FuelTankerFillController::class, 'show'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/void', [FuelTankerFillController::class, 'void'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.void'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR5: مرفقات سندات التعبئة (دليل فقط). العرض والتنزيل `fuel.tanker.fill.view`؛ الرفع `…attachment.add`؛ الإزالة والاستبدال `…attachment.remove`. خلف البوابتين نفسيهما؛ جلسة PIN لا تصل (PR-7).
+        // TANKER-PR6B-3 — الترحيل المخزني والمحاسبي لسند تعبئة (سند واحد بطلب صريح، معاملة واحدة). **ثلاث بوابات**: PR-1 وPR-4 و`fuel_stations.tanker_inventory_posting_enabled` (مغلقة افتراضياً) ⇒ 404 موحَّد.
+        // لا مسار منها يصل جلسة PIN (خارج `StationSessionBoundary` = فشل مغلق). العكس المالي = PR-6B-4 (لا مسار له هنا).
+        $tankerPostingGate = EnsureFuelTankerInventoryPostingEnabled::class;
+        Route::get('fuel-stations/tanker-fills/{id}/inventory-posting/preview', [FuelTankerFillInventoryPostingController::class, 'preview'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/inventory-posting', [FuelTankerFillInventoryPostingController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.post'), $commercialApp('fuel_stations.core', 'write')]);
+        // TANKER-PR6B-5 — مساحة عمل الدمج المخزني (قراءة فقط): القائمة بالتبويبات وتفاصيل سند؛ البوابات الثلاث نفسها ولا مسار يصل جلسة PIN. المسار الثابت قبل `{id}`.
+        Route::get('fuel-stations/tanker-fills/inventory-workspace', [FuelTankerFillInventoryWorkspaceController::class, 'index'])->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/tanker-fills/{id}/inventory', [FuelTankerFillInventoryWorkspaceController::class, 'show'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        // TANKER-PR6B-6 — تقارير الرقابة والمطابقة المحاسبية لسندات التعبئة (قراءة فقط): fills · inventory-reconciliation · clearing-account · accounting-control. البوابات الثلاث نفسها ولا مسار يصل جلسة PIN.
+        Route::get('fuel-stations/tanker-fill-reports/{key}', [FuelTankerFillReportController::class, 'show'])->where('key', '[a-z-]+')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        // TANKER-PR6B-4 — عكس ترحيل السند بالتكلفة التاريخية (سند واحد بسبب إلزامي) ومعاينة أثره؛ البوابات الثلاث نفسها، ولا مسار يصل جلسة PIN.
+        Route::get('fuel-stations/tanker-fills/{id}/inventory-reversal/preview', [FuelTankerFillInventoryReversalController::class, 'preview'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/inventory-reversal', [FuelTankerFillInventoryReversalController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $tankerPostingGate, $perm('fuel.tanker.fill.inventory.reverse'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'index'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/attachments', [FuelTankerFillAttachmentController::class, 'store'])->whereUuid('id')->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.add'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/download', [FuelTankerFillAttachmentController::class, 'download'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}/replace', [FuelTankerFillAttachmentController::class, 'replace'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.remove'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/tanker-fills/{id}/attachments/{attachmentId}', [FuelTankerFillAttachmentController::class, 'destroy'])->whereUuid(['id', 'attachmentId'])->middleware([$tankerGate, $tankerFillGate, $perm('fuel.tanker.fill.attachment.remove'), $commercialApp('fuel_stations.core', 'write')]);
 
         Route::get('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'vehicles'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'storeVehicle'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);

@@ -117,6 +117,9 @@ class FuelStationMasterDataRequest extends FormRequest
             'controller_key' => ['sometimes', 'nullable', 'string', 'max:128'],
             'meter_opening_milliliters' => ['sometimes', 'integer', 'min:0'],
             'status' => ['sometimes', Rule::in(FuelNozzle::STATUSES)],
+            // TANKER-PR3: `null` = كل العمليات؛ الدلالة (غير فارغة، مجموعة كاملة ⇒ null) والتضييق المحكوم في الخدمة.
+            'allowed_operations' => ['sometimes', 'nullable', 'array'],
+            'allowed_operations.*' => ['string', Rule::in(FuelNozzle::OPERATIONS)],
         ];
     }
 }

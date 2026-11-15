@@ -54,3 +54,61 @@ describe('Fuel Workspace navigation presentation', () => {
     expect(routes(['*'])).toContain('/fuel-stations/prices');
   });
 });
+
+describe('TANKER-PR2 deployment-gated navigation', () => {
+  const tankerRoutes = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+
+  it('hides tanker owners until the server confirms the deployment gate is open (fail closed)', () => {
+    expect(tankerRoutes(['*'])).not.toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['*'])).not.toContain('/fuel-stations/tanker-settings');
+    expect(tankerRoutes(['*'], ['some_other_gate'])).not.toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['*'], ['tanker_management'])).toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['*'], ['tanker_management'])).toContain('/fuel-stations/tanker-settings');
+  });
+
+  it('needs the exact view permission even when the gate is open; the legacy station keys are not enough', () => {
+    expect(tankerRoutes(['fuel.tanker.view'], ['tanker_management'])).toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['fuel_stations.view', 'fuel_stations.manage'], ['tanker_management'])).not.toContain('/fuel-stations/tanker-owners');
+    expect(tankerRoutes(['fuel_stations.view', 'fuel_stations.manage'], ['tanker_management'])).not.toContain('/fuel-stations/tanker-settings');
+  });
+
+  it('leaves every existing route untouched (gate-less items ignore the gate set)', () => {
+    const before = visibleFuelWorkspaceGroups(['*'], new Set()).flatMap((g) => g.items.map((i) => i.href)).filter((h) => h !== '/fuel-stations/tanker-owners' && h !== '/fuel-stations/tanker-settings');
+    expect(before).toContain('/fuel-stations/shifts');
+    expect(before).toContain('/fuel-stations/corporate-contracts');
+  });
+});
+
+describe('TANKER-PR6B-5 inventory workspace navigation', () => {
+  const routesWith = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+
+  it('stays hidden until the server confirms the workspace gate (its own probe, not the owners gate)', () => {
+    expect(routesWith(['*'])).not.toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['*'], ['tanker_management'])).not.toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['*'], ['tanker_fills_workspace'])).toContain('/fuel-stations/tanker-fills');
+  });
+
+  it('needs the exact inventory view permission; the owners or legacy station keys are not enough', () => {
+    expect(routesWith(['fuel.tanker.fill.inventory.view'], ['tanker_fills_workspace'])).toContain('/fuel-stations/tanker-fills');
+    expect(routesWith(['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'], ['tanker_fills_workspace', 'tanker_management'])).not.toContain('/fuel-stations/tanker-fills');
+  });
+});
+
+describe('TANKER-PR6B-6 reports navigation', () => {
+  const routesWith = (permissions: string[], open: string[] = []) =>
+    visibleFuelWorkspaceGroups(permissions, new Set(), new Set(open)).flatMap((group) => group.items.map((item) => item.href));
+  const REPORTS = '/fuel-stations/tanker-fill-reports';
+
+  it('stays hidden until the server confirms the same three-gate probe as the fills workspace', () => {
+    expect(routesWith(['*'])).not.toContain(REPORTS);
+    expect(routesWith(['*'], ['tanker_management'])).not.toContain(REPORTS);
+    expect(routesWith(['*'], ['tanker_fills_workspace'])).toContain(REPORTS);
+  });
+
+  it('needs the exact inventory view permission (the owners or legacy station keys are not enough)', () => {
+    expect(routesWith(['fuel.tanker.fill.inventory.view'], ['tanker_fills_workspace'])).toContain(REPORTS);
+    expect(routesWith(['fuel.tanker.view', 'fuel_stations.view', 'fuel_stations.manage'], ['tanker_fills_workspace', 'tanker_management'])).not.toContain(REPORTS);
+  });
+});

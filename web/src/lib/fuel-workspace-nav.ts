@@ -3,6 +3,11 @@ export type FuelWorkspaceNavItem = {
   labelKey: string;
   permissions: string[];
   appKey?: string;
+  /**
+   * بوابة نشر على مستوى الخادم (علم بيئة) لا تعلنها قدرة التطبيقات: لا يُظهر العنصر إلا بعد أن يؤكد الخادم فتحها (`openGates`).
+   * مغلقة أو لم تُفحص بعد ⇒ مخفي (فشل مغلق، لا رابط يقود لصفحة «غير متاحة» لكل مالك). عرض فقط؛ الخادم يفرضها على كل طلب.
+   */
+  gate?: string;
 };
 
 export type FuelWorkspaceNavGroup = {
@@ -36,6 +41,16 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
     items: [
       { href: '/fuel-stations/corporate-contracts', labelKey: 'corporateContracts', permissions: ['fuel.contract.view'] },
       { href: '/fuel-stations/avi-rfid', labelKey: 'aviRfid', permissions: ['fuel.avi.view'], appKey: 'fuel_stations.avi' },
+      // TANKER-PR2: إدارة أصحاب الصهاريج — بوابة نشر مغلقة افتراضياً (`FUEL_TANKER_MANAGEMENT_ENABLED`).
+      { href: '/fuel-stations/tanker-owners', labelKey: 'tankerOwners', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
+      // TANKER-PR3: إعدادات تعبئة الصهاريج (سياسات + عمليات الفوهات) — البوابة نفسها.
+      { href: '/fuel-stations/tanker-settings', labelKey: 'tankerSettings', permissions: ['fuel.tanker.view'], gate: 'tanker_management' },
+      // TANKER-PR6A: مراجعة جاهزية الدمج المخزني للسندات المعلّقة (عرض فقط، لا ترحيل) — البوابة نفسها، وصلاحية مراجعة مستقلة.
+      { href: '/fuel-stations/tanker-inventory-review', labelKey: 'tankerInventoryReview', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_management' },
+      // TANKER-PR6B-5: سندات التعبئة — الدمج المخزني (ترحيل/عكس بمعاينة وتأكيد). تُخفى حتى يؤكد الخادم فتح بوابات الميزة الثلاث (مسبار قراءة خفيف في `FuelWorkspaceNav`).
+      { href: '/fuel-stations/tanker-fills', labelKey: 'tankerFills', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_fills_workspace' },
+      // TANKER-PR6B-6: تقارير الرقابة والمطابقة المحاسبية (قراءة فقط) — البوابات الثلاث نفسها فتظهر مع المسبار نفسه؛ الخادم هو السلطة في كل تقرير.
+      { href: '/fuel-stations/tanker-fill-reports', labelKey: 'tankerFillReports', permissions: ['fuel.tanker.fill.inventory.view'], gate: 'tanker_fills_workspace' },
     ],
   },
   {
@@ -62,13 +77,13 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
   },
 ];
 
-export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>): FuelWorkspaceNavGroup[] {
+export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>, openGates: ReadonlySet<string> = new Set()): FuelWorkspaceNavGroup[] {
   const canAccess = (required: string[]) => permissions.includes('*') || required.every((permission) => permissions.includes(permission));
 
   return FUEL_WORKSPACE_NAV_GROUPS
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canAccess(item.permissions) && (!item.appKey || !hiddenAppKeys.has(item.appKey))),
+      items: group.items.filter((item) => canAccess(item.permissions) && (!item.appKey || !hiddenAppKeys.has(item.appKey)) && (!item.gate || openGates.has(item.gate))),
     }))
     .filter((group) => group.items.length > 0);
 }

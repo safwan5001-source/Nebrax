@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\FuelStationAuditEventResource;
 use App\Models\FuelStationAuditEvent;
+use App\Models\FuelOpeningBalance;
 use App\Models\FuelTanker;
+use App\Models\FuelTankerFill;
 use App\Models\FuelTankerOwner;
 use App\Models\FuelTankerOwnerCompanyLink;
+use App\Services\FuelOpeningBalanceService;
 use App\Support\Rbac;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,11 +30,29 @@ class FuelStationAuditController extends ApiController
      */
     private const TANKER_SUBJECTS = [FuelTankerOwner::class, FuelTanker::class, FuelTankerOwnerCompanyLink::class];
 
+    /**
+     * قائمة سماح (لا قائمة منع) لأحداث `FuelTankerFill` التي يراها حامل `fuel.tanker.fill.view` وحده: حدثا السند الأساسيان. **كل ما عداها** — أحداث المرفقات
+     * (`attachment_added|replaced|removed` وما قد يُضاف مستقبلاً) وأي نوع حدث جديد غير مصنَّف — يتطلب صلاحية السجل التاريخي `fuel.tanker.fill.attachment.remove`:
+     * لقطاتها تحمل اسم الملف الأصلي وبصمته وتبقى بعد إزالة المرفق أو استبداله، بينما لا تعرض واجهة المرفقات العادية هذا التاريخ إلا بتلك الصلاحية.
+     * إضافة نوع حدث جديد إلى هذه القائمة قرارٌ صريح بأن لقطته لا تكشف شيئاً يتجاوز عرض السند.
+     *
+     * @var list<string>
+     */
+    private const FILL_VIEW_ACTIONS = ['tanker_fill.recorded', 'tanker_fill.voided'];
+
+    /**
+     * TANKER-PR6B-3: حدث ترحيل السند مخزنياً (`tanker_fill.inventory_posted`) لقطته بلا أي مبلغ (حالة السند فقط)؛ يراه حامل `fuel.tanker.fill.inventory.view` مع `fuel.tanker.fill.view`
+     * دون صلاحية السجل التاريخي للمرفقات. نوع حدث مستقبلي آخر يبقى مخفياً حتى يُضاف عمداً.
+     *
+     * @var list<string>
+     */
+    private const FILL_INVENTORY_ACTIONS = ['tanker_fill.inventory_posted', 'tanker_fill.inventory_reversed'];
+
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
             'fuel_station_id' => ['nullable', 'uuid'],
-            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink'],
+            'subject_type' => ['nullable', 'string', 'in:FuelStation,FuelProduct,FuelTank,FuelPump,FuelNozzle,FuelStationDevice,FuelDelivery,FuelTankReading,FuelTankReadingRequest,FuelTankerOwner,FuelTanker,FuelTankerOwnerCompanyLink,FuelTankerFill,FuelOpeningBalance'],
             'subject_id' => ['nullable', 'uuid'],
             'actor_id' => ['nullable', 'uuid'],
             'action' => ['nullable', 'string', 'max:80'],
@@ -43,6 +64,8 @@ class FuelStationAuditController extends ApiController
         $query = FuelStationAuditEvent::query()->with('actor:id,name')->orderByDesc('occurred_at')->orderByDesc('id');
         $this->restrictEventsToUserScope($query, $request);
         $this->restrictTankerSubjects($query, $request);
+        $this->restrictTankerFillSubjects($query, $request);
+        $this->restrictOpeningBalanceSubjects($query);
         if (! empty($filters['fuel_station_id'])) {
             $query->where('fuel_station_id', $filters['fuel_station_id']);
         }
@@ -74,6 +97,43 @@ class FuelStationAuditController extends ApiController
             && $user !== null && Rbac::allows((string) $user->role, 'fuel.tanker.manage');
         if (! $allowed) {
             $query->whereNotIn('subject_type', self::TANKER_SUBJECTS);
+        }
+    }
+
+    /**
+     * TANKER-SEC-1: أحداث سندات التعبئة ومرفقاتها (موضوعها `FuelTankerFill`). لقطاتها تحوي الكمية والسند الورقي والملاحظات وبيانات المرفقات، ومحكومة
+     * في مساراتها ببوابتَي PR-1 وPR-4 معاً وبصلاحية `fuel.tanker.fill.view` — فلا يكفي لقراءتها `fuel_stations.manage` المطلوب لهذا المسار.
+     * البوابتان مغلقتان ⇒ لا يراها أحد (بمن فيهم المالك) حتى ما كُتب قبل الإغلاق. غير حدثَي السند الأساسيين (`recorded|voided`) — أي كل أحداث
+     * المرفقات الحالية والمستقبلية — يتطلب أيضاً `fuel.tanker.fill.attachment.remove` كما تتطلبه قراءة السجل التاريخي للمرفقات (قائمة سماح: `FILL_VIEW_ACTIONS`). السجل الأصلي لا يُمسّ؛ التصفية على القراءة فقط. نطاق المحطة/الفرع يطبّقه `restrictEventsToUserScope`.
+     */
+    private function restrictTankerFillSubjects(Builder $query, Request $request): void
+    {
+        $user = $request->user();
+        $role = (string) $user?->role;
+        $canView = (bool) config('fuel_stations.tanker_management_enabled', false)
+            && (bool) config('fuel_stations.tanker_fills_enabled', false)
+            && $user !== null && Rbac::allows($role, 'fuel.tanker.fill.view');
+        if (! $canView) {
+            $query->where('subject_type', '!=', FuelTankerFill::class);
+
+            return;
+        }
+        if (! Rbac::allows($role, 'fuel.tanker.fill.attachment.remove')) {
+            $visible = Rbac::allows($role, 'fuel.tanker.fill.inventory.view') ? array_merge(self::FILL_VIEW_ACTIONS, self::FILL_INVENTORY_ACTIONS) : self::FILL_VIEW_ACTIONS;
+            $query->where(fn (Builder $q) => $q->where('subject_type', '!=', FuelTankerFill::class)->orWhereIn('action', $visible));
+        }
+    }
+
+    /**
+     * FUEL-OPEN-AUDIT-SEC (#2114): بوابة الرصيد الافتتاحي تحكم قراءة أحداثه
+     * كما تحكم مسارات مستنداته. لا نُغيّر أو نمسح السجل الأصلي.
+     * حجب التكلفة داخل before/after يتم في FuelStationAuditEventResource
+     * باستخدام سلطة التكلفة نفسها التي تحكم FuelOpeningBalanceResource.
+     */
+    private function restrictOpeningBalanceSubjects(Builder $query): void
+    {
+        if (! FuelOpeningBalanceService::enabled()) {
+            $query->where('subject_type', '!=', FuelOpeningBalance::class);
         }
     }
 
