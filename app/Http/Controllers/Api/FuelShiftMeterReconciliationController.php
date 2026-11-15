@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 
 /**
  * مطابقة قراءات الفوهات عند إغلاق الوردية ومراجعة فروقها (TANKER-PR8) — **تشغيلية بحتة (لا قيد ولا مخزون ولا فاتورة ولا تحصيل)**.
- * مغلقة خلف `fuel_stations.shift_meter_reconciliation_enabled` ⇒ 404. نطاق المحطة (فرع + مخزن) على الخادم قبل أي قراءة أو كتابة، 404 موحَّد.
+ * **الإتاحة (TANKER-PR8-S):** تُتاح المسارات لوردية لها لقطات مجمَّدة (قراءة ومراجعة) **حتى بعد تعطيل الإعداد أو إغلاق بوابة النشر** — مسار إكمال المراجعة؛ ولوردية بلا لقطات
+ * فقط إن كانت المطابقة فعّالة الآن (بوابة النشر **و**الإعداد). غير ذلك ⇒ 404. نطاق المحطة (فرع + مخزن) على الخادم قبل أي قراءة أو كتابة، 404 موحَّد.
  * القراءة `fuel.shift.view`، المراجعة `fuel.shift.meter_variance_review` (مستقلة عن `cash_variance_review`).
  */
 class FuelShiftMeterReconciliationController extends ApiController
@@ -21,16 +22,16 @@ class FuelShiftMeterReconciliationController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
-        abort_unless(FuelShiftMeterReconciliationService::enabled(), 404);
         $shift = $this->visibleShift($id, $request);
+        abort_unless($this->service->accessibleFor($shift), 404);
 
         return response()->json(['data' => $this->service->view($shift, $request->user())]);
     }
 
     public function review(ReviewFuelShiftMeterVarianceRequest $request, string $id): JsonResponse
     {
-        abort_unless(FuelShiftMeterReconciliationService::enabled(), 404);
         $shift = $this->visibleShift($id, $request);
+        abort_unless($this->service->accessibleFor($shift), 404);
         $data = $request->validated();
         $this->domain(fn () => $this->service->review($shift, $data['nozzle_id'], $data['classification'], $data['note'] ?? null, $request->user()));
 

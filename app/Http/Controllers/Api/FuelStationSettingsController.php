@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\UpdateFuelStationSettingsRequest;
 use App\Http\Requests\UpdateFuelTenantSettingsRequest;
 use App\Models\FuelStation;
+use App\Services\FuelShiftMeterReconciliationService;
 use App\Services\FuelStationSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
@@ -13,11 +14,11 @@ class FuelStationSettingsController extends ApiController
 {
     use AuthorizesFuelStationScope;
 
-    public function __construct(private FuelStationSettingsService $settings) {}
+    public function __construct(private FuelStationSettingsService $settings, private FuelShiftMeterReconciliationService $meterReconciliation) {}
 
     public function showTenant(): JsonResponse
     {
-        return response()->json(['data' => $this->settings->forTenant()]);
+        return response()->json(['data' => $this->settings->forTenant(), 'meta' => ['meter_reconciliation' => ['deployment_open' => FuelShiftMeterReconciliationService::enabled()]]]);
     }
 
     public function updateTenant(UpdateFuelTenantSettingsRequest $request): JsonResponse
@@ -29,7 +30,7 @@ class FuelStationSettingsController extends ApiController
             $data['reason'] ?? null,
         ));
 
-        return response()->json(['data' => $settings]);
+        return response()->json(['data' => $settings, 'meta' => ['meter_reconciliation' => ['deployment_open' => FuelShiftMeterReconciliationService::enabled()]]]);
     }
 
     public function showStation(UpdateFuelStationSettingsRequest $request, string $id): JsonResponse
@@ -38,7 +39,7 @@ class FuelStationSettingsController extends ApiController
         // FUEL-B3: نطاق الفرع/المخزن/المحطة المسنَدة على قراءة إعدادات المحطة (404 موحّد) — كانت بلا فحص نطاق مستخدم.
         $this->accessibleStation($station->id);
 
-        return response()->json(['data' => $this->settings->forStation($station), 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station)]]);
+        return response()->json(['data' => $this->settings->forStation($station), 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station), 'meter_reconciliation' => $this->meterReconciliation->policyFor($station)]]);
     }
 
     public function updateStation(UpdateFuelStationSettingsRequest $request, string $id): JsonResponse
@@ -53,6 +54,6 @@ class FuelStationSettingsController extends ApiController
             $data['reason'] ?? null,
         ));
 
-        return response()->json(['data' => $settings, 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station)]]);
+        return response()->json(['data' => $settings, 'meta' => ['overrides' => $this->settings->stationOverrideKeys($station), 'meter_reconciliation' => $this->meterReconciliation->policyFor($station)]]);
     }
 }

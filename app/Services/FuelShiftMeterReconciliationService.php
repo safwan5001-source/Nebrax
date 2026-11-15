@@ -21,10 +21,15 @@ use RuntimeException;
  *
  * تعبئة الصهريج **ليست بيعاً نقدياً ولا شبكة**: لا تُنشأ لها فاتورة أو تحصيل، وتُفصل لتراتها في عمود مستقل (انظر `PR8_ANALYSIS_AND_PLAN.md`).
  *
- * خلف بوابة `fuel_stations.shift_meter_reconciliation_enabled` (مغلقة افتراضياً): مغلقةً ⇒ لا لقطة ولا شرط اعتماد ولا مسار.
+ * **فصل بين «إنشاء لقطات جديدة» و«حماية الاعتماد» (TANKER-PR8-S):**
+ *  - إنشاء لقطات جديدة عند الإغلاق = بوابة النشر `fuel_stations.shift_meter_reconciliation_enabled` (مغلقة افتراضياً) **و**إعداد المؤسسة/المحطة `shift_meter_reconciliation_enabled`
+ *    (حوكمة، الافتراضي `false`). أيٌّ منهما مغلق ⇒ لا لقطة جديدة ولا متطلب للوردية الجديدة (السلوك السابق حرفياً).
+ *  - حماية الاعتماد والمراجعة لورديات **لها لقطات مجمَّدة** مستقلة تماماً عن البوابة والإعداد: المتطلب (`review_requirement`) مثبَّت على اللقطة وقت الإغلاق، فلا يُسقطه تعطيل الإعداد
+ *    ولا إغلاق البوابة ولا تغيير سياسة لاحق؛ والمشرف يُكمل المراجعة بصلاحيته وبنطاق محطته حتى بعد التعطيل. عطلٌ يمنع المراجعة ⇒ يبقى الاعتماد محجوباً (لا مسار تجاوز عام).
+ *  - ورديات أُغلقت بلا لقطات (قبل PR-8، أو والمطابقة غير فعّالة) لا متطلب عليها بأثر رجعي ولا تُحجب.
  *  - `freezeAtClose` داخل معاملة الإغلاق (تحت قفل الوردية `FOR UPDATE`: مجموعة سندات التعبئة ثابتة لأن تسجيلها وإلغاءها يأخذان قفل الوردية `FOR SHARE` ويتطلبان وردية مفتوحة).
  *  - `review` تصنيف وصفي من قائمة ثابتة، قرار واحد ثابت لكل لقطة (`fuel.shift.meter_variance_review`)، تحت قفل الوردية.
- *  - `assertApprovable` شرط الاعتماد: كل فرق (خارج التفاوت) أو مطابقة لم تكتمل تحتاج مراجعة مسجَّلة.
+ *  - `assertApprovable` شرط الاعتماد (تحت قفل الوردية، بلا شرط على البوابة أو الإعداد): كل لقطة مجمَّدة ذات متطلب فرقُها (خارج التفاوت) أو مطابقتها لم تكتمل تحتاج مراجعة مسجَّلة.
  */
 class FuelShiftMeterReconciliationService
 {
@@ -35,9 +40,58 @@ class FuelShiftMeterReconciliationService
         private FuelStationSettingsService $settings,
     ) {}
 
+    public const REQUIREMENT = FuelShiftNozzleReconciliation::REQUIREMENT_REQUIRED_BEFORE_APPROVAL;
+
+    /** بوابة النشر (env): تحكم إنشاء لقطات جديدة وفتح المطابقة الحيّة. **ليست** شرطاً لحماية اعتماد ورديات لها لقطات. */
     public static function enabled(): bool
     {
         return (bool) config('fuel_stations.shift_meter_reconciliation_enabled', false);
+    }
+
+    /** إعداد المؤسسة/المحطة الفعّال `shift_meter_reconciliation_enabled` (محطة ← مؤسسة ← افتراضي `false`) — اشتراك اختياري. */
+    public function settingEnabled(FuelStation $station): bool
+    {
+        return $this->settings->get($station, 'shift_meter_reconciliation_enabled') === true;
+    }
+
+    /** هل تُنشأ لقطات جديدة عند إغلاق ورديات هذه المحطة؟ بوابة النشر **و**الإعداد معاً. */
+    public function activeFor(FuelStation $station): bool
+    {
+        return self::enabled() && $this->settingEnabled($station);
+    }
+
+    /** هل للوردية لقطات مجمَّدة؟ (تحدد إتاحة القراءة والمراجعة والحماية بمعزل عن البوابة والإعداد.) */
+    public function hasSnapshots(FuelShift $shift): bool
+    {
+        return FuelShiftNozzleReconciliation::where('fuel_shift_id', $shift->id)->exists();
+    }
+
+    /**
+     * هل تُتاح مسارات المطابقة لهذه الوردية؟ لقطات موجودة (قراءة ومراجعة، حتى بعد تعطيل الإعداد أو إغلاق البوابة) **أو** مطابقة فعّالة الآن (العرض الحيّ).
+     * غير ذلك ⇒ 404 كما كان عند غلق البوابة.
+     */
+    public function accessibleFor(FuelShift $shift): bool
+    {
+        if ($this->hasSnapshots($shift)) {
+            return true;
+        }
+
+        return $this->activeFor(FuelStation::findOrFail($shift->fuel_station_id));
+    }
+
+    /**
+     * الحالة الفعلية للمحطة للعرض في الإعدادات (لا تُسرّب شيئاً غير مفتاحين منطقيين ومصدر القيمة).
+     *
+     * @return array{deployment_open: bool, setting_enabled: bool, active: bool, source: string}
+     */
+    public function policyFor(FuelStation $station): array
+    {
+        $setting = $this->settingEnabled($station);
+
+        return [
+            'deployment_open' => self::enabled(), 'setting_enabled' => $setting, 'active' => self::enabled() && $setting,
+            'source' => in_array('shift_meter_reconciliation_enabled', $this->settings->stationOverrideKeys($station), true) ? 'station' : 'organization',
+        ];
     }
 
     /**
@@ -49,6 +103,9 @@ class FuelShiftMeterReconciliationService
             return;
         }
         $station = FuelStation::findOrFail($shift->fuel_station_id);
+        if (! $this->settingEnabled($station)) {
+            return;   // المطابقة غير مفعّلة لهذه المحطة/المؤسسة: لا لقطة جديدة ولا متطلب (ورديات أُغلقت بلا لقطات لا تُلزَم بأثر رجعي).
+        }
         $tolerance = (int) $this->settings->get($station, 'shift_meter_tolerance_milliliters');
         $existing = FuelShiftNozzleReconciliation::where('fuel_shift_id', $shift->id)->pluck('fuel_nozzle_id')->all();
 
@@ -62,6 +119,7 @@ class FuelShiftMeterReconciliationService
             (new FuelShiftNozzleReconciliation)->forceFill($row + [
                 'id' => (string) Str::uuid(), 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id,
                 'fuel_station_id' => $station->id, 'fuel_shift_id' => $shift->id, 'frozen_at' => $now,
+                'review_requirement' => self::REQUIREMENT,
             ])->save();
             $created++;
         }
@@ -69,7 +127,7 @@ class FuelShiftMeterReconciliationService
             FuelShiftEvent::create([
                 'branch_id' => $shift->branch_id, 'fuel_shift_id' => $shift->id, 'type' => FuelShiftEvent::TYPE_METER_RECONCILIATION_FROZEN,
                 'payload' => [
-                    'nozzles' => $created,
+                    'nozzles' => $created, 'review_requirement' => self::REQUIREMENT, 'setting_source' => $this->policyFor($station)['source'],
                     'variance_nozzles' => count(array_filter($computed, fn (array $r) => in_array($r['status'], [FuelShiftNozzleReconciliation::STATUS_VARIANCE, FuelShiftNozzleReconciliation::STATUS_INCOMPLETE], true))),
                 ],
                 'actor_id' => $actor->id, 'occurred_at' => $now,
@@ -109,7 +167,8 @@ class FuelShiftMeterReconciliationService
         })->sortBy([['nozzle_number', 'asc'], ['nozzle_id', 'asc']])->values();
 
         $needs = $presented->filter(fn (array $r) => $r['requires_review'] && $r['review'] === null && ! $isLive);
-        $canReview = $viewer->hasPermission('fuel.shift.meter_variance_review') && $shift->isClosed();
+        // المراجعة متاحة للمشرف على لقطات مجمَّدة لوردية مغلقة بصلاحيته ونطاق محطته، **بمعزل عن الإعداد الحالي والبوابة** (مسار إكمال المراجعة بعد التعطيل).
+        $canReview = $viewer->hasPermission('fuel.shift.meter_variance_review') && $shift->isClosed() && ! $isLive;
 
         return [
             'shift_id' => $shift->id,
@@ -129,6 +188,7 @@ class FuelShiftMeterReconciliationService
                 'review_complete' => ! $isLive && $needs->isEmpty(),
             ],
             'tolerance_milliliters' => $tolerance,
+            'policy' => $this->policyFor($station) + ['review_requirement' => $isLive ? null : (($frozen->first()?->review_requirement) ?? self::REQUIREMENT), 'approval_blocked' => ! $isLive && $needs->isNotEmpty()],
             'can_review' => $canReview,
             'review_classifications' => [
                 'surplus' => FuelShiftMeterVarianceReview::FOR_SURPLUS,
@@ -209,15 +269,15 @@ class FuelShiftMeterReconciliationService
     }
 
     /**
-     * شرط الاعتماد (والبوابة مفتوحة فقط): كل فرق خارج التفاوت أو مطابقة لم تكتمل تحتاج مراجعة مسجَّلة. وردية بلا لقطة (أُغلقت قبل فتح البوابة) لا تُحجب.
+     * شرط الاعتماد: كل لقطة مجمَّدة ذات متطلب مراجعة (فرق خارج التفاوت أو مطابقة لم تكتمل) تحتاج مراجعة مسجَّلة. وردية بلا لقطات (أُغلقت قبل PR-8 أو والمطابقة غير فعّالة) لا تُحجب.
+     * يُستدعى تحت قفل الوردية `FOR UPDATE` من `FuelShiftService::approve`.
      */
     public function assertApprovable(FuelShift $shift): void
     {
-        if (! self::enabled()) {
-            return;
-        }
+        // لا شرط على البوابة ولا على الإعداد: المتطلب مثبَّت على اللقطة. ورديات بلا لقطات لا تُحجب (لا أثر رجعي). أي عطل في القراءة يرمي فيبقى الاعتماد محجوباً (فشل مغلق).
         $pending = FuelShiftNozzleReconciliation::where('fuel_shift_id', $shift->id)
             ->whereIn('status', [FuelShiftNozzleReconciliation::STATUS_VARIANCE, FuelShiftNozzleReconciliation::STATUS_INCOMPLETE])
+            ->where(fn ($query) => $query->whereNull('review_requirement')->orWhere('review_requirement', self::REQUIREMENT))
             ->whereNotIn('id', FuelShiftMeterVarianceReview::query()->select('fuel_shift_nozzle_reconciliation_id'))
             ->exists();
         if ($pending) {

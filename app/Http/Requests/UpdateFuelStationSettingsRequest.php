@@ -31,6 +31,7 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'fuel_distinct_approver_required' => ['sometimes', 'nullable', 'boolean'],
             'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'nullable', 'boolean'],
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'nullable', 'boolean'],
+            'shift_meter_reconciliation_enabled' => ['sometimes', 'nullable', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'tank_reading_backdating_policy' => ['sometimes', 'nullable', 'in:deny,supervisor_approval,authorized_user'],
             'tank_reading_backdating_max_hours' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:720'],

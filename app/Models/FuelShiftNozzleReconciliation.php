@@ -21,6 +21,9 @@ class FuelShiftNozzleReconciliation extends BaseModel
     public const STATUS_INCOMPLETE = 'incomplete';
     public const STATUSES = [self::STATUS_BALANCED, self::STATUS_WITHIN_TOLERANCE, self::STATUS_VARIANCE, self::STATUS_INCOMPLETE];
 
+    /** TANKER-PR8-S: متطلب المراجعة المثبَّت على اللقطة وقت الإغلاق (القيمة الوحيدة الآن). NULL = مطلوب (فشل مغلق للقطات السابقة للعمود). */
+    public const REQUIREMENT_REQUIRED_BEFORE_APPROVAL = 'required_before_approval';
+
     public const INCOMPLETE_MISSING_READING = 'missing_reading';
     public const INCOMPLETE_CLOSING_BELOW_OPENING = 'closing_below_opening';
 
@@ -39,6 +42,13 @@ class FuelShiftNozzleReconciliation extends BaseModel
     public function requiresReview(): bool
     {
         return in_array($this->status, [self::STATUS_VARIANCE, self::STATUS_INCOMPLETE], true);
+    }
+
+    /** هل تحجب هذه اللقطة اعتماد الوردية حتى تُراجَع؟ فرق/مطابقة غير مكتملة **و**متطلب مثبَّت (أو NULL ⇒ مطلوب). */
+    public function requiresReviewBeforeApproval(): bool
+    {
+        return $this->requiresReview()
+            && ($this->review_requirement === null || $this->review_requirement === self::REQUIREMENT_REQUIRED_BEFORE_APPROVAL);
     }
 
     public function nozzle(): BelongsTo { return $this->belongsTo(FuelNozzle::class, 'fuel_nozzle_id'); }
