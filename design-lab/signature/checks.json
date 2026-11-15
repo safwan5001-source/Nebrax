@@ -1,0 +1,3209 @@
+{
+ "generated": "2026-11-14T09:33:01.454Z",
+ "matrix": [
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 320,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 390,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 430,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 683,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 768,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 834,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1366,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 1920,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "ar",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "dark",
+   "lang": "en",
+   "w": 2560,
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "nasaq",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "dashboard",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "sales",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "purchase",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "inventory",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  },
+  {
+   "identity": "liwan",
+   "route": "shift",
+   "mode": "light",
+   "lang": "ar",
+   "w": 1366,
+   "density": "compact",
+   "ok": true
+  }
+ ],
+ "interactions": [
+  {
+   "name": "Same markup, different identity: every proof screen renders identical DOM in Nasaq and Liwan",
+   "ok": true
+  },
+  {
+   "name": "Contract: Nasaq and Liwan are accepted in light and dark; v3, brass, fayrouz stay accepted; invalid stays rejected",
+   "ok": true
+  },
+  {
+   "name": "D1: amounts use physical right alignment with tabular figures in V3 (no A/B switch)",
+   "ok": true
+  },
+  {
+   "name": "Navigation model per window class holds in both identities (bottom bar · rail · sidebar)",
+   "ok": true
+  },
+  {
+   "name": "Dashboard: quick action opens a sales invoice; attention action opens the shift; cash chart has a data-table alternative",
+   "ok": true
+  },
+  {
+   "name": "Long invoice (80 lines): count, sticky header inside its own scroller, find filters without losing data",
+   "ok": true
+  },
+  {
+   "name": "Errors keep the typed data: line-numbered summary, \"with errors\" filter, link focuses the field inside the scroller",
+   "ok": true
+  },
+  {
+   "name": "A correction link to a line hidden by \"find in lines\" clears the find and focuses the field",
+   "ok": true
+  },
+  {
+   "name": "Recovery keeps the last saved draft: discard after reload returns to the save, not to a blank invoice",
+   "ok": true
+  },
+  {
+   "name": "Keyboard actions update recovery: Ctrl+S survives a reload with no \"unsaved\" notice; Alt+N line survives a reload",
+   "ok": true
+  },
+  {
+   "name": "Enter in a filtered invoice skips hidden rows; Enter on the last visible row adds a visible, focused line",
+   "ok": true
+  },
+  {
+   "name": "\"With errors\" filter keeps the row being corrected visible until the field is left",
+   "ok": true
+  },
+  {
+   "name": "\"Add line\" and Alt+N under find / error filter add a visible, focused line (no hidden lines)",
+   "ok": true
+  },
+  {
+   "name": "Navigation icons: every item has its own approved icon, drawn (no missing symbol), identical in sidebar, mobile sheet and tablet group sheet",
+   "ok": true
+  },
+  {
+   "name": "Navigation icons: an item without an icon, or with an unknown one, keeps its group icon (EXT.nav compatibility)",
+   "ok": true
+  },
+  {
+   "name": "Mobile menu sheet: 44px rows, current item revealed below the sticky header, every item reachable, bottom bar unchanged",
+   "ok": true
+  },
+  {
+   "name": "One icon family: rail groups, create sheet and dashboard quick actions draw the approved Lucide shapes, the same as the menu for the same meaning",
+   "ok": true
+  },
+  {
+   "name": "Sidebar keeps its scroll position across re-renders, and a route change brings the current item into view",
+   "ok": true
+  },
+  {
+   "name": "Mobile menu: quick access one tap away (≥ 44px, current marked, labelled «وصول سريع»), full group order below unchanged",
+   "ok": true
+  },
+  {
+   "name": "Phone density: invoice line cards in three columns, inventory and invoice cards in paired rows, amounts never clipped or wrapped",
+   "ok": true
+  },
+  {
+   "name": "An active line search keeps its field when deletions bring the invoice to ten lines or fewer",
+   "ok": true
+  },
+  {
+   "name": "\"#app\" from the compare view shows the app, not a blank page",
+   "ok": true
+  },
+  {
+   "name": "Phone KPI labels: short (one line at 390, never cut below), no abbreviated tax term, «payable» in the note, full labels for screen readers; desktop unchanged",
+   "ok": true
+  },
+  {
+   "name": "Tablet rail: every group name is readable in full (wraps, never cut)",
+   "ok": true
+  },
+  {
+   "name": "Phone «needs attention»: an item without an amount keeps its action beside the text; targets ≥ 44px; nothing overflows",
+   "ok": true
+  },
+  {
+   "name": "Long invoice keeps its line-scroll position when a line is deleted",
+   "ok": true
+  },
+  {
+   "name": "Draft vs post is explicit: lifecycle captions, draft note, Save draft keeps the document editable",
+   "ok": true
+  },
+  {
+   "name": "Unsaved changes survive a reload: local recovery notice restores the typed values; discard returns to the last save",
+   "ok": true
+  },
+  {
+   "name": "Explorer compare view loads both identities side by side for the same screen and state",
+   "ok": true
+  },
+  {
+   "name": "Mobile ergonomics: at 390px every action in the main area is ≥ 44px tall in both identities",
+   "ok": true
+  },
+  {
+   "name": "Reduced motion: no transitions on controls in either identity",
+   "ok": true
+  }
+ ],
+ "summary": {
+  "interactions": {
+   "tests": 31,
+   "failed": 0
+  },
+  "matrix": {
+   "configs": 370,
+   "failed": 0
+  }
+ },
+ "contract": {
+  "nasaq": {
+   "accepted": true,
+   "allowedChanged": 59,
+   "lockedChanged": [],
+   "checks": 21,
+   "failing": {
+    "light": [],
+    "dark": []
+   },
+   "min": {
+    "light": "1.16",
+    "dark": "1.11"
+   }
+  },
+  "liwan": {
+   "accepted": true,
+   "allowedChanged": 55,
+   "lockedChanged": [],
+   "checks": 21,
+   "failing": {
+    "light": [],
+    "dark": []
+   },
+   "min": {
+    "light": "1.16",
+    "dark": "1.11"
+   }
+  },
+  "base": {
+   "accepted": true,
+   "allowedChanged": 0,
+   "lockedChanged": [],
+   "checks": 21,
+   "failing": {
+    "light": [],
+    "dark": []
+   },
+   "min": {
+    "light": "1.13",
+    "dark": "1.11"
+   }
+  },
+  "brass": {
+   "accepted": true,
+   "allowedChanged": 33,
+   "lockedChanged": [],
+   "checks": 21,
+   "failing": {
+    "light": [],
+    "dark": []
+   },
+   "min": {
+    "light": "1.13",
+    "dark": "1.11"
+   }
+  },
+  "fayrouz": {
+   "accepted": true,
+   "allowedChanged": 35,
+   "lockedChanged": [],
+   "checks": 21,
+   "failing": {
+    "light": [],
+    "dark": []
+   },
+   "min": {
+    "light": "1.16",
+    "dark": "1.11"
+   }
+  },
+  "invalid": {
+   "accepted": false,
+   "allowedChanged": 6,
+   "lockedChanged": [
+    "--awj-status-negative-fg"
+   ],
+   "checks": 21,
+   "failing": {
+    "light": [
+     "action-fg / action 2",
+     "action (link) / paper 2",
+     "focus-ring / paper 1.23",
+     "topbar-focus / topbar-bg 1.23",
+     "hero-cta-fg / hero-cta-bg 2"
+    ],
+    "dark": [
+     "action-fg / action 2",
+     "negative / paper 3.21",
+     "hero-cta-fg / hero-cta-bg 2"
+    ]
+   },
+   "min": {
+    "light": "0.41",
+    "dark": "0.44"
+   }
+  }
+ }
+}
