@@ -314,9 +314,11 @@ class FuelShiftSettlementPostingService
         DB::table('fuel_shift_settlements')->insert([
             'id' => $id, 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id, 'fuel_station_id' => $station->id, 'fuel_shift_id' => $shift->id,
             'status' => $this->headerStatus($lines, ($evaluation['finance']['allocation']['rows'] ?? []) !== []), 'sales_basis' => 'per_invoice', 'preview_hash' => $evaluation['hash'], 'tax_mode' => $evaluation['tax_mode'],
-            'policy_snapshot' => json_encode(['mode' => FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE, 'granularity' => 'per_nozzle', 'engine' => 'p1-3b-2b'], JSON_UNESCAPED_UNICODE),
+            // `tanker_exclusion`: التسوية استبعدت لترات سندات تعبئة الصهاريج من البقية (PR-8) — شرط ترحيل تلك السندات بلا خصم مزدوج.
+            'policy_snapshot' => json_encode(['mode' => FuelShiftSettlementReadiness::MODE_POST_ON_CLOSE, 'granularity' => 'per_nozzle', 'engine' => 'p1-3b-2b', 'tanker_exclusion' => true], JSON_UNESCAPED_UNICODE),
             'metered_milliliters' => (int) array_sum(array_column($lines, 'metered_milliliters')),
             'erp_milliliters' => (int) array_sum(array_column($lines, 'erp_milliliters')),
+            'tanker_milliliters' => (int) array_sum(array_column($lines, 'tanker_milliliters')),
             'residual_milliliters' => (int) array_sum(array_column($lines, 'residual_milliliters')),
             'settled_invoice_total_minor' => (int) array_sum(array_map(fn ($l) => $l['state'] === 'posted' ? (int) $l['expected_gross_minor'] : 0, $lines)),
             'pending_value_minor' => (int) array_sum(array_map(fn ($l) => (int) ($l['pending_value_minor'] ?? 0), $lines)),
@@ -339,7 +341,7 @@ class FuelShiftSettlementPostingService
             DB::table('fuel_shift_settlement_lines')->insert([
                 'id' => $id, 'tenant_id' => $shift->tenant_id, 'branch_id' => $shift->branch_id, 'fuel_shift_settlement_id' => $settlementId,
                 'fuel_nozzle_id' => $line['nozzle_id'], 'fuel_product_id' => $line['fuel_product_id'], 'warehouse_id' => $station->warehouse_id,
-                'metered_milliliters' => (int) $line['metered_milliliters'], 'erp_milliliters' => (int) $line['erp_milliliters'], 'residual_milliliters' => (int) $line['residual_milliliters'],
+                'metered_milliliters' => (int) $line['metered_milliliters'], 'erp_milliliters' => (int) $line['erp_milliliters'], 'tanker_milliliters' => (int) ($line['tanker_milliliters'] ?? 0), 'residual_milliliters' => (int) $line['residual_milliliters'],
                 'price_per_liter_minor' => $line['price_per_liter_minor'], 'tax_mode' => $evaluation['tax_mode'], 'expected_gross_minor' => $line['expected_gross_minor'],
                 'state' => $line['state'], 'withheld_reason' => $line['withheld_reason'], 'pending_value_minor' => $line['pending_value_minor'],
                 'created_at' => now(), 'updated_at' => now(),

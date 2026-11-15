@@ -73,7 +73,7 @@ final class StationSessionBoundary
      */
     private const WRITE_RULES = [
         ['POST', '#^api/fuel-stations/shifts/open$#'],
-        ['POST', '#^api/fuel-stations/shifts/\{[a-zA-Z]+\}/(staff|meter-readings|tank-readings|cash-movements|close|collection|collection/review|cash-variance/review|approve)$#'],
+        ['POST', '#^api/fuel-stations/shifts/\{[a-zA-Z]+\}/(staff|meter-readings|tank-readings|cash-movements|close|collection|collection/review|cash-variance/review|meter-reconciliation/review|approve)$#'],
         ['POST', '#^api/fuel-stations/readings$#'],
         ['POST', '#^api/fuel-stations/reading-requests/\{[a-zA-Z]+\}/(approve|reject)$#'],
         ['POST', '#^api/fuel-stations/deliveries$#'],

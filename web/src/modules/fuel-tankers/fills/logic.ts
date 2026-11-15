@@ -298,7 +298,7 @@ export function readWriteSuccess(payload: unknown): { fillId: string; inventoryS
 /** موانع الجاهزية والترحيل والعكس المعروفة؛ غير المعروف يُعرض برمزه الخام (لا يُخفى ولا يُخمَّن). */
 export const KNOWN_BLOCKERS = [
   'station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing',
-  'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict',
+  'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'settlement_covers_fill',
   'clearing_account_missing', 'clearing_account_invalid', 'inventory_account_invalid', 'quantity_exceeds_stock_limit', 'insufficient_stock',
   'quantity_not_positive', 'cost_state_missing', 'exceeds_cost_pool', 'not_posted', 'already_reversed', 'original_entry_invalid',
   'downstream_invoiced', 'downstream_settled', 'downstream_supply',

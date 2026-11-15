@@ -68,6 +68,9 @@ class FuelShiftSettlementEvaluator
             ->where('source', 'station')->get()->groupBy('fuel_nozzle_id')
             ->map(fn ($group) => (int) $group->sum('quantity_milliliters'));
 
+        // TANKER-PR8: تعبئات الصهاريج المسجَّلة تُخصم بترحيل سندها (لا بيع ولا فاتورة) فتُستبعد من البقية. مجموعتها ثابتة عند الإغلاق (التسجيل والإلغاء يتطلبان وردية مفتوحة).
+        $tankerByNozzle = app(FuelShiftNozzleLiters::class)->tankerByNozzle($shift);
+
         $products = collect($sales['products'])->keyBy('fuel_product_id');
         $fuelProducts = FuelProduct::query()->whereIn('id', $products->keys()->all())->get()->keyBy('id');
         $taxMode = $sales['tax_mode'];
@@ -76,9 +79,10 @@ class FuelShiftSettlementEvaluator
         foreach ($sales['nozzles'] as $nozzle) {
             $metered = $nozzle['milliliters'];
             $erp = (int) ($erpByNozzle[$nozzle['nozzle_id']] ?? 0);
+            $tanker = (int) ($tankerByNozzle[$nozzle['nozzle_id']] ?? 0);
             $line = [
                 'nozzle_id' => $nozzle['nozzle_id'], 'nozzle_number' => $nozzle['nozzle_number'], 'fuel_product_id' => $nozzle['fuel_product_id'],
-                'metered_milliliters' => $metered, 'erp_milliliters' => $erp, 'residual_milliliters' => null,
+                'metered_milliliters' => $metered, 'erp_milliliters' => $erp, 'tanker_milliliters' => $tanker, 'residual_milliliters' => null,
                 'price_per_liter_minor' => null, 'expected_gross_minor' => null, 'state' => 'unavailable',
                 'withheld_reason' => null, 'pending_value_minor' => null,
             ];
@@ -86,7 +90,7 @@ class FuelShiftSettlementEvaluator
                 $lines[] = $line;
                 continue;
             }
-            $residual = $metered - $erp;
+            $residual = $metered - $erp - $tanker;
             $line['residual_milliliters'] = $residual;
             if ($residual < 0) {
                 $blockers[] = 'FUEL_SETTLEMENT_ERP_EXCEEDS_METER';

@@ -413,9 +413,11 @@ class FuelInventoryLedgerReconciliationTest extends TestCase
         $this->assertNull($result['value']);
         $this->assertSame('hidden_no_cost_permission', $result['value_scope']);
         $json = (string) json_encode($result);
-        foreach ([(string) self::TOTAL_VALUE, (string) self::VALUE_91, '777', 'cost_pool_value_minor', 'state_vs_movements_value_minor', 'ledger_share_minor'] as $needle) {
+        foreach ([(string) self::TOTAL_VALUE, (string) self::VALUE_91, 'cost_pool_value_minor', 'state_vs_movements_value_minor', 'ledger_share_minor'] as $needle) {
             $this->assertStringNotContainsString($needle, $json, $needle);
         }
+        // 777 قيمة الانحراف المزروعة: يُبحث عنها كرقم قائم بذاته لا كسلسلة فرعية — معرّفات UUID العشوائية في الحمولة قد تحوي «777» بالمصادفة (فشل متقطّع كان يظهر في CI).
+        $this->assertDoesNotMatchRegularExpression('/(?<![0-9a-f\-])777(?![0-9a-f\-])/i', $json, '777');
         // الكمية تبقى (الأداة مفيدة لمن لا يرى التكلفة).
         $this->assertSame(3, $result['quantity']['summary']['pools']);
     }

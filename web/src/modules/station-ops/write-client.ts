@@ -2,6 +2,7 @@ import { api, ApiError } from '@/lib/api';
 import { isDemo } from '@/lib/demo';
 import { isValidShiftId } from './read-client';
 import { collectionResponse, type CollectionBody, type CollectionView } from './collection';
+import { meterReconciliationResponse, type MeterReconciliation, type MeterReviewBody } from './meter-reconciliation';
 import { shiftDetailResponse, type ShiftDetail } from './schemas';
 
 /**
@@ -16,7 +17,7 @@ import { shiftDetailResponse, type ShiftDetail } from './schemas';
  * - لا إعادة محاولة تلقائية أبداً.
  */
 
-export type WriteAction = 'open' | 'assign_staff' | 'meter_reading' | 'tank_reading' | 'cash_movement' | 'close' | 'collection' | 'approve' | 'review_cash_variance' | 'review_collection';
+export type WriteAction = 'open' | 'assign_staff' | 'meter_reading' | 'tank_reading' | 'cash_movement' | 'close' | 'collection' | 'approve' | 'review_cash_variance' | 'review_collection' | 'review_meter_variance';
 
 export type WriteRequest =
   | { action: 'open'; body: { fuel_station_id: string; idempotency_key: string; opening_float_minor?: number } }
@@ -34,7 +35,9 @@ type ReviewCollectionRequest = { action: 'review_collection'; shiftId: string; b
 
 /** إقرار تحصيل الوردية: نتيجته من نوع مختلف (`CollectionWriteResult`) فله دالة مستقلة `opsWriteCollection`. */
 type CollectionRequest = { action: 'collection'; shiftId: string; body: CollectionBody };
-type AnyRequest = WriteRequest | CollectionRequest | ReviewCollectionRequest;
+/** تصنيف فرق عدّاد فوهة (TANKER-PR8، `fuel.shift.meter_variance_review`): وصفي بلا أثر مالي/مخزني؛ ردّه عرض المطابقة فله دالة مستقلة `opsWriteReviewMeterVariance`. */
+type ReviewMeterVarianceRequest = { action: 'review_meter_variance'; shiftId: string; body: MeterReviewBody };
+type AnyRequest = WriteRequest | CollectionRequest | ReviewCollectionRequest | ReviewMeterVarianceRequest;
 
 export type RejectionCode =
   // رسائل الخادم المعروفة (تصنيف بالنص — الخادم يعيد 422 + رسالة عربية حرة)
@@ -46,6 +49,7 @@ export type RejectionCode =
   // شرط الإغلاق (Q1/Q3) عند رفض `close`
   | 'collection_required' | 'collection_incomplete' | 'collection_no_methods' | 'collection_reason_required'
   // اعتماد المشرف ومراجعة الفروق
+  | 'meter_variance_review_required' | 'meter_variance_already_reviewed' | 'meter_variance_not_required' | 'meter_variance_classification' | 'meter_variance_note_required'
   | 'approve_needs_closed' | 'approve_needs_other_supervisor' | 'collection_review_required' | 'cash_variance_review_required' | 'review_already_done' | 'review_not_needed' | 'review_needs_closed'
   // حالات HTTP
   | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'validation' | 'demo';
@@ -56,6 +60,12 @@ const KNOWN_MESSAGES: ReadonlyArray<[RegExp, RejectionCode]> = [
   [/FUEL_COLLECTION_INVALID/, 'collection_invalid'],
   [/FUEL_COLLECTION_REVIEW_REQUIRED/, 'collection_review_required'],
   [/FUEL_CASH_VARIANCE_REVIEW_REQUIRED/, 'cash_variance_review_required'],
+  [/FUEL_METER_VARIANCE_REVIEW_REQUIRED/, 'meter_variance_review_required'],
+  [/METER_VARIANCE_ALREADY_REVIEWED/, 'meter_variance_already_reviewed'],
+  [/METER_VARIANCE_NOT_REQUIRED/, 'meter_variance_not_required'],
+  [/METER_VARIANCE_SHIFT_NOT_CLOSED/, 'review_needs_closed'],
+  [/METER_VARIANCE_(CLASSIFICATION_MISMATCH|CLASSIFICATION_INVALID)/, 'meter_variance_classification'],
+  [/METER_VARIANCE_NOTE_REQUIRED/, 'meter_variance_note_required'],
   [/لا تعتمد إلا وردية مغلقة/, 'approve_needs_closed'],
   [/مشرف مختلف عن فاتح الشفت/, 'approve_needs_other_supervisor'],
   [/(تمت مراجعة فرق النقد|روجع فرق التحصيل).*بالفعل/, 'review_already_done'],
@@ -125,6 +135,7 @@ function buildPath(request: AnyRequest): string {
     case 'approve': return `${base}/approve`;
     case 'review_cash_variance': return `${base}/cash-variance/review`;
     case 'review_collection': return `${base}/collection/review`;
+    case 'review_meter_variance': return `${base}/meter-reconciliation/review`;
   }
 }
 
@@ -196,4 +207,14 @@ export async function opsWriteReviewCollection(shiftId: string, note: string, op
   if (!('raw' in sent)) return sent;
   const parsed = collectionResponse.safeParse(sent.raw);
   return parsed.success ? { kind: 'ok', view: parsed.data.data, replayed: false, unchanged: false } : { kind: 'unverified' };
+}
+
+/** نتيجة تصنيف فرق عدّاد: النجاح يُعلَن فقط إن أعاد الخادم عرض المطابقة (`data.nozzles`)؛ لا إعادة إرسال تلقائية. */
+export type MeterReviewWriteResult = NonOk | { kind: 'ok'; view: MeterReconciliation };
+
+export async function opsWriteReviewMeterVariance(shiftId: string, body: MeterReviewBody, options: { branchId?: string | null; timeoutMs?: number } = {}): Promise<MeterReviewWriteResult> {
+  const sent = await send({ action: 'review_meter_variance', shiftId, body }, options);
+  if (!('raw' in sent)) return sent;
+  const parsed = meterReconciliationResponse.safeParse(sent.raw);
+  return parsed.success ? { kind: 'ok', view: parsed.data.data } : { kind: 'unverified' };
 }

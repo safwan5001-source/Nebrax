@@ -393,6 +393,8 @@ class FuelShiftService
                 'official_cash_basis' => $basis,
                 'expectation_complete' => $live['complete'],
             ]);
+            // TANKER-PR8: لقطة مطابقة الفوهات (قراءات العدّاد ↔ مبيعات مباشرة + سندات تعبئة صهاريج). البوابة مغلقة (الافتراضي) ⇒ لا شيء. تشغيلية بحتة بلا أي أثر مالي/مخزني.
+            app(FuelShiftMeterReconciliationService::class)->freezeAtClose($shift, $actor);
             // إقرار تحصيل الوردية (إن وُجد): يُجمَّد مع لقطة الدرج داخل معاملة الإغلاق نفسها ولو أُغلقت بوابته بعد الحفظ. الحل الكسول عبر app() يكسر الدورة مع خدمة الإقرار.
             app(FuelShiftCollectionService::class)->freezeAtClose($shift, $countedCashMinor, $live, $actor, $closingNote);
             if ($variance !== 0) {
@@ -426,6 +428,8 @@ class FuelShiftService
             }
             // Q3: فرق مطابقة التحصيل غير الصفري يحتاج مراجعة مشرف مسجَّلة قبل الاعتماد (والبوابة مفتوحة فقط).
             app(FuelShiftCollectionService::class)->assertApprovable($shift);
+            // TANKER-PR8: كل فرق عدّاد خارج التفاوت يحتاج تصنيفاً ومراجعة مشرف مسجَّلة (والبوابة مفتوحة فقط).
+            app(FuelShiftMeterReconciliationService::class)->assertApprovable($shift);
 
             $shift->update([
                 'status' => FuelShift::STATUS_APPROVED,

@@ -7,7 +7,8 @@ import { resolveStationPrices, type PriceResult } from './prices';
 import { previousClosingMap } from './entry';
 import { STRICT_POLICY, toShiftPolicy, type ShiftPolicy } from './policy';
 import { collectionResponse, type CollectionView } from './collection';
-import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftCollectionPath, shiftDetailPath, shiftSettlementPreviewPath, stationSettingsPath } from './read-client';
+import { StationOpsError, isAbort, isValidShiftId, opsGet, shiftCollectionPath, shiftDetailPath, shiftMeterReconciliationPath, shiftSettlementPreviewPath, stationSettingsPath } from './read-client';
+import { meterReconciliationResponse, type MeterReconciliation } from './meter-reconciliation';
 import { settlementPreviewResponse, type SettlementPreview } from './settlement-preview';
 import {
   fuelProductsResponse,
@@ -399,5 +400,35 @@ export function useSettlementPreview(station: Station | null, shiftId: string): 
   const retained = key !== null && last.current?.key === key ? last.current.data : null;
 
   const idle: QueryState<SettlementPreview> = useMemo(() => ({ status: 'error', error: new StationOpsError('forbidden', 403) }), []);
+  return { allowed, state: key === null ? idle : query.state, retained, reload: query.reload };
+}
+
+
+export interface MeterReconciliationResult {
+  /** `false` = لا صلاحية عرض الورديات (لا طلب أُرسل). */
+  allowed: boolean;
+  state: QueryState<MeterReconciliation>;
+  retained: MeterReconciliation | null;
+  reload: () => void;
+}
+
+/**
+ * مطابقة قراءات الفوهات (TANKER-PR8، قراءة فقط): لقطة مجمَّدة للوردية المغلقة، وحساب حيّ للمفتوحة. البوابة مغلقة ⇒ 404 ⇒ `not_found` ⇒ القسم لا يُعرض
+ * (الشاشة كما كانت حرفياً). لا تحديث تلقائي: يُحدَّث بطلب المستخدم أو بعد تسجيل مراجعة، وتبقى آخر نتيجة ناجحة معروضة أثناء إعادة الجلب.
+ */
+export function useMeterReconciliation(station: Station | null, shiftId: string): MeterReconciliationResult {
+  const { scopeKey, can } = useStationOps();
+  const allowed = can('fuel.shift.view');
+  const stationId = station?.id ?? null;
+  const valid = isValidShiftId(shiftId);
+  const key = allowed && stationId && valid ? `${scopeKey}|${stationId}|shift|${shiftId}|meter-reconciliation` : null;
+
+  const query = useScopedQuery<MeterReconciliation>(key, async (signal) => (await opsGet(shiftMeterReconciliationPath(shiftId), meterReconciliationResponse, { signal, branchId: station?.branch_id })).data);
+
+  const last = useRef<{ key: string; data: MeterReconciliation } | null>(null);
+  if (key !== null && query.state.status === 'success') last.current = { key, data: query.state.data };
+  const retained = key !== null && last.current?.key === key ? last.current.data : null;
+
+  const idle: QueryState<MeterReconciliation> = useMemo(() => ({ status: 'error', error: new StationOpsError('forbidden', 403) }), []);
   return { allowed, state: key === null ? idle : query.state, retained, reload: query.reload };
 }

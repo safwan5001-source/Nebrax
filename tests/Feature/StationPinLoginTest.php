@@ -374,6 +374,7 @@ class StationPinLoginTest extends TestCase
             'POST shifts/{id}/collection',
             'POST shifts/{id}/collection/review',
             'POST shifts/{id}/meter-readings',
+            'POST shifts/{id}/meter-reconciliation/review', // TANKER-PR8: تصنيف فرق عدّاد (وصفي بلا أثر مالي) لمن يملك fuel.shift.meter_variance_review وحده
             'POST shifts/{id}/staff',
             'POST shifts/{id}/tank-readings',
             'POST tanker-fills', // TANKER-PR7: تسجيل تعبئة صهريج وحده (لا void ولا ترحيل ولا عكس ولا مرفقات)

@@ -48,7 +48,7 @@ function usedKeys(): Set<string> {
   }
   const inventoryGroups: Record<string, string[]> = {
     readiness: ['ready', 'needs_review', 'blocked'],
-    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'clearing_account_missing', 'clearing_account_invalid', 'unknown'],
+    blocker: ['station_not_active', 'station_warehouse_required', 'warehouse_unavailable', 'warehouse_branch_mismatch', 'fuel_product_unavailable', 'stock_record_missing', 'cost_baseline_required', 'cost_history_open', 'cost_pool_quantity_mismatch', 'insufficient_balance', 'period_locked', 'settlement_mode_conflict', 'settlement_covers_fill', 'clearing_account_missing', 'clearing_account_invalid', 'unknown'],
     reason: ['capacity_overrun', 'insufficient_balance', 'overdue', 'unknown'],
     summary: ['total', 'ready', 'needs_review', 'blocked', 'overdue'],
     // PR-6B-0: لوحة مطابقة الأستاذ (مفاتيح ديناميكية بحسب رموز الخادم).
@@ -67,7 +67,7 @@ function usedKeys(): Set<string> {
     for (const m of readFileSync(join(inventorySettingsDir, file), 'utf8').matchAll(/\bt\(\s*(['`])([A-Za-z0-9_.${}]+)\1/g)) keys.add(`inventorySettings.${m[2]}`);
   }
   const inventorySettingsGroups: Record<string, string[]> = {
-    blocker: ['clearing_account_missing', 'clearing_account_invalid', 'settlement_mode_conflict', 'unknown'],
+    blocker: ['clearing_account_missing', 'clearing_account_invalid', 'settlement_mode_conflict', 'settlement_covers_fill', 'unknown'],
     notice: ['posting_start_not_set', 'posting_gate_closed', 'unknown'],
     reason: ['not_found', 'group', 'inactive', 'not_asset', 'inventory_account', 'cash_or_bank', 'tax_account', 'reserved_role', 'other'],
     'cost.option': ['clearing_until_invoice'],

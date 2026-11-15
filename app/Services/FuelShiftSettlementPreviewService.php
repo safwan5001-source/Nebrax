@@ -78,6 +78,8 @@ class FuelShiftSettlementPreviewService
         $finalizedSales = FuelSale::query()->where('fuel_shift_id', $shift->id)->where('status', FuelSale::STATUS_FINALIZED)
             ->orderBy('finalized_at')->orderBy('id')->get();
         $erpByNozzle = $finalizedSales->groupBy('fuel_nozzle_id')->map(fn ($group) => (int) $group->sum('quantity_milliliters'));
+        // TANKER-PR8: لترات سندات تعبئة الصهاريج تُخصم بترحيل سندها وحده (ليست بيعاً) فلا تدخل بقية التسوية.
+        $tankerByNozzle = app(FuelShiftNozzleLiters::class)->tankerByNozzle($shift);
         $products = collect($sales['products'])->keyBy('fuel_product_id');
         $fuelProducts = FuelProduct::query()->whereIn('id', $products->keys()->all())->get()->keyBy('id');
         $warehouse = Warehouse::query()->find($station->warehouse_id);
@@ -92,9 +94,10 @@ class FuelShiftSettlementPreviewService
         foreach ($sales['nozzles'] as $nozzle) {
             $metered = $nozzle['milliliters'];
             $erp = (int) ($erpByNozzle[$nozzle['nozzle_id']] ?? 0);
+            $tanker = (int) ($tankerByNozzle[$nozzle['nozzle_id']] ?? 0);
             $line = [
                 'nozzle_id' => $nozzle['nozzle_id'], 'nozzle_number' => $nozzle['nozzle_number'], 'fuel_product_id' => $nozzle['fuel_product_id'],
-                'metered_milliliters' => $metered, 'erp_milliliters' => $erp, 'residual_milliliters' => null,
+                'metered_milliliters' => $metered, 'erp_milliliters' => $erp, 'tanker_milliliters' => $tanker, 'residual_milliliters' => null,
                 'price_per_liter_minor' => null, 'expected_gross_minor' => null, 'state' => 'unavailable', 'withheld_reason' => null,
                 'cost_minor' => null, 'cost_blocked' => null,
             ];
@@ -102,7 +105,7 @@ class FuelShiftSettlementPreviewService
                 $lines[] = $line;
                 continue;
             }
-            $residual = $metered - $erp;
+            $residual = $metered - $erp - $tanker;
             if ($residual < 0) {
                 $blockers[] = 'FUEL_SETTLEMENT_ERP_EXCEEDS_METER';
                 $line['residual_milliliters'] = $residual;
@@ -570,7 +573,7 @@ class FuelShiftSettlementPreviewService
             return $base;
         }
         $base += [
-            'erp_milliliters' => $line['erp_milliliters'], 'residual_milliliters' => $line['residual_milliliters'],
+            'erp_milliliters' => $line['erp_milliliters'], 'tanker_milliliters' => $line['tanker_milliliters'] ?? 0, 'residual_milliliters' => $line['residual_milliliters'],
             'price_per_liter_minor' => $line['price_per_liter_minor'], 'expected_gross_minor' => $line['expected_gross_minor'],
             'state' => $line['state'], 'withheld_reason' => $line['withheld_reason'],
         ];

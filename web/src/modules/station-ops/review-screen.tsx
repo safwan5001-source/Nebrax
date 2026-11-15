@@ -11,6 +11,7 @@ import { useStationOps } from './context';
 import { useShiftCollection, useShiftDetail, useStationPolicy } from './data';
 import { formatInZone } from './format';
 import { PageMasthead, ScreenBody } from './masthead';
+import { MeterReconciliationSection } from './meter-reconciliation-section';
 import { OPS_BASE } from './nav';
 import type { ShiftDetail, Station } from './schemas';
 import { StationGate } from './station-gate';
@@ -196,6 +197,8 @@ function Content({ station, shiftId }: { station: Station; shiftId: string }) {
           </div>
         </div>
       </SectionCard>
+
+      <MeterReconciliationSection station={station} shiftId={shiftId} />
 
       <Explainer />
 

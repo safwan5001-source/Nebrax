@@ -17,7 +17,7 @@ class FuelShiftSettlement extends BaseModel
 
     protected $casts = [
         'policy_snapshot' => 'array',
-        'metered_milliliters' => 'integer', 'erp_milliliters' => 'integer', 'residual_milliliters' => 'integer',
+        'metered_milliliters' => 'integer', 'erp_milliliters' => 'integer', 'tanker_milliliters' => 'integer', 'residual_milliliters' => 'integer',
         'settled_invoice_total_minor' => 'integer', 'pending_value_minor' => 'integer', 'reference_total_minor' => 'integer',
         'settled_at' => 'datetime',
     ];

@@ -9917,7 +9917,8 @@
       "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse stock",
       "insufficient_balance": "Warehouse balance does not cover this fill and the earlier ones",
       "period_locked": "The accounting period is locked",
-      "settlement_mode_conflict": "Station settles on shift close (double deduction)",
+      "settlement_mode_conflict": "Station settles on shift close — reversal is held for an owner decision",
+      "settlement_covers_fill": "A shift settlement that ran before this change already counted these liters as sales",
       "clearing_account_missing": "Clearing account is not set",
       "clearing_account_invalid": "Clearing account is no longer valid",
       "inventory_account_invalid": "Fuel inventory account is not valid for posting",
@@ -10710,7 +10711,8 @@
         "cost_pool_quantity_mismatch": "Cost pool quantity does not match the warehouse balance",
         "insufficient_balance": "Insufficient balance",
         "period_locked": "The accounting period or fiscal year of the fill date is locked",
-        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting with it would deduct stock twice",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): reversing is held until the owner decides how to treat liters already settled",
+        "settlement_covers_fill": "A shift settlement that ran before this change already counted these liters as sales — posting would deduct them twice",
         "clearing_account_missing": "The clearing account is not assigned yet (a prerequisite for future posting)",
         "clearing_account_invalid": "The assigned clearing account is no longer valid (inactive/group/now an inventory, cash, tax or other-role account)",
         "unknown": "Unknown blocker"
@@ -10845,7 +10847,8 @@
       "blocker": {
         "clearing_account_missing": "The clearing account is not assigned yet — required for future posting",
         "clearing_account_invalid": "The assigned clearing account is no longer valid — choose another account",
-        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): posting alongside it would deduct the quantity twice",
+        "settlement_mode_conflict": "The station uses meter-based shift settlement (post_on_close): reversing is held until the owner decides how to treat liters already settled",
+        "settlement_covers_fill": "A shift settlement that ran before this change already counted these liters as sales — posting would deduct them twice",
         "unknown": "Unknown blocker"
       },
       "notice": {
@@ -16935,6 +16938,65 @@
       "complete": "This shift is complete",
       "soon": "This step will arrive inside the app soon"
     },
+    "meterRecon": {
+      "title": "Meter reconciliation",
+      "note": "Operational only: it changes no stock and no amounts. A tanker fill is not a sale — it is never counted as cash or card.",
+      "refresh": "Refresh",
+      "unavailable": "The reconciliation could not be loaded right now.",
+      "liveHint": "Live figures. They are frozen when the shift is closed.",
+      "frozenHint": "Frozen at close.",
+      "allMatched": "All nozzles match.",
+      "pendingReview": "Differences awaiting supervisor review: {count}",
+      "liveDifferences": "Differences found on {count} nozzle(s). They will need a supervisor review after the shift is closed.",
+      "reviewDone": "All differences have been reviewed.",
+      "reviewedOnly": "Differences were reviewed. Nothing else is needed.",
+      "nozzle": "Nozzle {number}",
+      "field": {
+        "meter": "Meter reading",
+        "direct": "Direct sales",
+        "tanker": "Tanker fills",
+        "tankerCount": "{count} voucher(s)",
+        "unexplained": "Unexplained",
+        "draft": "Unfinished sales (not counted)",
+        "tolerance": "Tolerance"
+      },
+      "status": {
+        "balanced": "Matched",
+        "within_tolerance": "Within tolerance",
+        "variance": "Needs review",
+        "incomplete": "Incomplete"
+      },
+      "incomplete": {
+        "missing_reading": "A meter reading is missing",
+        "closing_below_opening": "The closing reading is lower than the opening reading"
+      },
+      "direction": {
+        "surplus": "Liters dispensed with no record",
+        "over": "Recorded liters exceed the meter"
+      },
+      "review": {
+        "title": "Supervisor review",
+        "classification": "Classification",
+        "choose": "Choose a classification",
+        "note": "Note",
+        "noteRequired": "A note is required for “Other”.",
+        "submit": "Confirm classification",
+        "sending": "Saving…",
+        "reviewedAs": "Classified as",
+        "descriptive": "The classification is a record only: it changes no stock and no amounts.",
+        "noPermission": "A supervisor with permission to review meter differences must classify this."
+      },
+      "class": {
+        "unrecorded_direct_sale": "A sale that was not recorded",
+        "unrecorded_tanker_fill": "A tanker fill that was not recorded",
+        "over_recorded_entry": "A record was entered twice or too large",
+        "reading_error": "Meter reading error",
+        "calibration_test": "Calibration or test",
+        "internal_use": "Internal use",
+        "loss_or_leak": "Loss or leak",
+        "other": "Other"
+      }
+    },
     "settlement": {
       "title": "Settlement preview",
       "previewOnly": "Preview only: nothing is recorded — no sale, payment or stock movement — and it may change before you close.",
@@ -17216,6 +17278,11 @@
         "approve_needs_closed": "Only a closed shift can be approved. Refresh to see its state.",
         "approve_needs_other_supervisor": "Station policy requires a supervisor other than the one who opened the shift to approve it.",
         "collection_review_required": "A collection reconciliation difference needs a recorded supervisor review before approval.",
+        "meter_variance_review_required": "A meter difference needs a classification and a recorded supervisor review before approval.",
+        "meter_variance_already_reviewed": "This difference was already classified. Refresh the page.",
+        "meter_variance_not_required": "This nozzle matches or is within tolerance and needs no review.",
+        "meter_variance_classification": "This classification does not fit the type of difference. Choose another one.",
+        "meter_variance_note_required": "A note is required for “Other”.",
         "cash_variance_review_required": "A drawer cash difference needs a recorded supervisor review before approval.",
         "review_already_done": "This difference was already reviewed. Refresh the page.",
         "review_not_needed": "This shift has no difference that needs review.",

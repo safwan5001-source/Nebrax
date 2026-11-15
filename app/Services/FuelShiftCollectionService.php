@@ -58,7 +58,7 @@ class FuelShiftCollectionService
         $frozen = $declaration?->status === FuelShiftCollectionDeclaration::STATUS_FROZEN;
         $sales = $frozen
             ? $this->frozenSales($declaration)
-            : $this->sales->compute($shift, $shift->closed_at ?? now());
+            : $this->sales->compute($shift, $shift->closed_at ?? now(), excludeTankerFills: true);
 
         $difference = null;
         if ($declaration !== null) {
@@ -170,7 +170,7 @@ class FuelShiftCollectionService
             $total = array_sum(array_column($stored, 'amount_minor'));
             $cash = array_sum(array_column(array_filter($stored, fn ($l) => $l['settlement_type'] === 'cash'), 'amount_minor'));
             $now = now();
-            $sales = $this->sales->compute($shift, $now);
+            $sales = $this->sales->compute($shift, $now, excludeTankerFills: true);
             $difference = $sales['complete'] ? $total - (int) $sales['amount_minor'] : null;
 
             $state = [
@@ -229,7 +229,7 @@ class FuelShiftCollectionService
         $station = FuelStation::findOrFail($shift->fuel_station_id);
         $declaration = FuelShiftCollectionDeclaration::where('fuel_shift_id', $shift->id)->first();
         $viewsSales = $actor->hasPermission('fuel.sale.view');
-        $readiness = $this->closeReadiness($station, $declaration, $viewsSales, $viewsSales && $declaration !== null ? $this->sales->compute($shift, now()) : null);
+        $readiness = $this->closeReadiness($station, $declaration, $viewsSales, $viewsSales && $declaration !== null ? $this->sales->compute($shift, now(), excludeTankerFills: true) : null);
 
         if (in_array('no_methods', $readiness['blockers'], true)) {
             throw new RuntimeException('FUEL_COLLECTION_NO_METHODS: لا توجد طرق دفع مفعّلة لهذه المحطة، فلا يمكن حفظ توزيع التحصيل المطلوب قبل التسليم. اطلب من المسؤول تفعيل طريقة دفع للمحطة.');
@@ -373,7 +373,7 @@ class FuelShiftCollectionService
         }
 
         $now = now();
-        $sales = $this->sales->compute($shift, $now);
+        $sales = $this->sales->compute($shift, $now, excludeTankerFills: true);
         $difference = $sales['complete'] ? $declaration->collected_total_minor - (int) $sales['amount_minor'] : null;
         // P1-2: إقرار نقد أقل من إيصالات النقد المسجَّلة (تصريح متناقض مع دليل رسمي) يستوجب مراجعة مشرف قبل الاعتماد حتى لو طابق مجموع
         // الإقرار مبيعات العدادات (تعويضٌ بشبكة مضخَّمة) وطابق الدرج الإقرار؛ وإلا لما أفاد إعلان الثغرة وحده شيئاً.
