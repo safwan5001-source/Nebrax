@@ -7,7 +7,7 @@ const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: /pay-h8-02-payments-screens\.spec\.ts/,   // مصفوفة PAY-H8-02 لها إعدادها ومنفذها (playwright.pay-qa.config.ts)
+  testIgnore: /(pay-h8-02-payments-screens|tanker-fill-mobile)\.spec\.ts/,   // مصفوفة PAY-H8-02 (playwright.pay-qa.config.ts) ومواصفة جوال تعبئة الصهاريج (playwright.tanker-fill.config.ts) لكلٍّ إعداده ومنفذه وأجهزته
   timeout: 30_000,
   fullyParallel: false,
   workers: 1,
