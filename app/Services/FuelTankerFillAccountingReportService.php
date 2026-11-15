@@ -214,7 +214,10 @@ class FuelTankerFillAccountingReportService
                 : 'تقرير الحساب الوسيط ماليٌّ ويتطلب صلاحيتَي عرض التكلفة والحسابات.', 403, ['reason' => $balanceScope['reason']]);
         }
         $tenantId = (string) $this->tenant->id();
-        $to = $period['to'] ?? now()->toDateString();
+        // نهاية الفترة الافتراضية = «اليوم» بتوقيت المحطات المعنية لا بتوقيت الخادم (UTC): قيود الترحيل تُؤرَّخ بتاريخ المحطة
+        // (`FuelStationSettingsService::businessDate`)، فمن 21:00 إلى 24:00 UTC تسبق الرياض يوماً وكانت قيود «اليوم» تقع بعد نهاية الفترة.
+        // الفترة الصريحة من المستخدم تُستعمل كما هي بلا أي تحويل.
+        $to = $period['to'] ?? $this->defaultPeriodEnd($visibleBranchIds);
         $from = $period['from'] ?? \Carbon\CarbonImmutable::parse($to)->startOfMonth()->toDateString();
 
         // الحسابات الوسيطة المعنية: المعيَّن حالياً + كل حساب مدين في قيود ترحيل السندات تاريخياً.
@@ -549,6 +552,26 @@ class FuelTankerFillAccountingReportService
         }
 
         return ['stations' => $stations, 'products' => $products];
+    }
+
+    /**
+     * أحدث تاريخ تقويمي «اليوم» عبر محطات النطاق المرئي، كلٌّ بمنطقتها التشغيلية (محطة ← مستأجر ← منطقة المملكة المعتمدة عند قيمة غير صالحة).
+     * التقرير على مستوى حساب الأستاذ لا محطة واحدة، وقيود المحطات تُؤرَّخ بتواريخها المحلية؛ فالأحدث بينها هو الحدّ الذي لا يستثني قيداً مُرحَّلاً اليوم.
+     * محطات الفروع المرئية فقط (`null` = كل المؤسسة)؛ لا محطات ⇒ منطقة المملكة المعتمدة كما في بقية خدمات الوقود.
+     *
+     * @param  list<string>|null  $visibleBranchIds
+     */
+    private function defaultPeriodEnd(?array $visibleBranchIds): string
+    {
+        $stations = FuelStation::query()
+            ->when($visibleBranchIds !== null, fn ($q) => $visibleBranchIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('branch_id', $visibleBranchIds))
+            ->get();
+        $now = now();
+        if ($stations->isEmpty()) {
+            return $now->setTimezone(FuelStationSettingsService::FALLBACK_TIMEZONE)->toDateString();
+        }
+
+        return $stations->map(fn (FuelStation $station) => $this->settings->businessDate($station, $now))->max();
     }
 
     /**

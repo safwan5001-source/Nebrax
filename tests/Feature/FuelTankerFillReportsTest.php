@@ -8,8 +8,10 @@ use App\Models\FuelTankerFill;
 use App\Models\FuelTankerOwner;
 use App\Models\User;
 use App\Services\Accounting\LedgerService;
+use App\Services\FuelStationSettingsService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -27,10 +29,29 @@ class FuelTankerFillReportsTest extends TestCase
     private const BASE = '/api/fuel-stations/tanker-fill-reports/';
     private const VIEW = ['fuel_stations.view', 'fuel.tanker.fill.view', 'fuel.tanker.fill.inventory.view'];
 
+    /**
+     * لحظة ثابتة داخل النافذة الحرجة: 22:30 UTC = 01:30 اليوم التالي بتوقيت الرياض. الاختبارات لا تعتمد على ساعة التشغيل، وتقع قيودها
+     * في تاريخ المحطة (11 مارس) لا تاريخ UTC (10 مارس) فتُمارَس الحالة التي كانت تفشل بين 21:00 و24:00 UTC.
+     */
+    private const FROZEN_UTC = '2026-03-10 22:30:00';
+
     protected function setUp(): void
     {
         parent::setUp();
+        Carbon::setTestNow(Carbon::parse(self::FROZEN_UTC, 'UTC'));
         $this->bootPostingWorld();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    /** «اليوم» بتوقيت المحطة (مصدر تاريخ القيود) — لا `now()->toDateString()` الذي يتبع UTC. */
+    private function stationToday(int $addDays = 0): string
+    {
+        return \Carbon\CarbonImmutable::parse(app(FuelStationSettingsService::class)->businessDate($this->w['station']))->addDays($addDays)->toDateString();
     }
 
     private function report(string $key, array $query = [], ?string $token = null): \Illuminate\Testing\TestResponse
@@ -149,7 +170,7 @@ class FuelTankerFillReportsTest extends TestCase
         app(LedgerService::class)->post([
             ['account_id' => $this->clearing->id, 'debit' => 777, 'branch_id' => $this->w['station']->branch_id],
             ['account_id' => $inventory->id, 'credit' => 777, 'branch_id' => $this->w['station']->branch_id],
-        ], ['entry_date' => now()->toDateString(), 'description' => 'قيد شاذ', 'source_type' => FuelTankerFill::class, 'source_id' => $f['pending']->id]);
+        ], ['entry_date' => $this->stationToday(), 'description' => 'قيد شاذ', 'source_type' => FuelTankerFill::class, 'source_id' => $f['pending']->id]);
         $row = $this->rowOf($control()['rows'], $f['pending']);
         $this->assertContains('entry_without_posting', $this->codes($row));
         $this->assertSame('mismatch', $row['result']);
@@ -178,7 +199,7 @@ class FuelTankerFillReportsTest extends TestCase
         $this->assertContains('reversal_incomplete', $this->codes($this->rowOf($control()['rows'], $f['reversed'])));
         $original = DB::table('fuel_inventory_cost_movements')->where('id', DB::table('fuel_tanker_fill_inventory_postings')->where('fuel_tanker_fill_id', $f['reversed']->id)->value('cost_movement_id'))->value('journal_entry_id');
         $dupId = (string) \Illuminate\Support\Str::uuid();
-        DB::table('journal_entries')->insert(['id' => $dupId, 'tenant_id' => $this->w['tenant_id'], 'number' => 'JE-DUP-1', 'entry_date' => now()->toDateString(), 'description' => 'عكس مكرر', 'status' => 'posted', 'reversal_of' => $original, 'source_type' => FuelTankerFill::class, 'source_id' => $f['reversed']->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('journal_entries')->insert(['id' => $dupId, 'tenant_id' => $this->w['tenant_id'], 'number' => 'JE-DUP-1', 'entry_date' => $this->stationToday(), 'description' => 'عكس مكرر', 'status' => 'posted', 'reversal_of' => $original, 'source_type' => FuelTankerFill::class, 'source_id' => $f['reversed']->id, 'created_at' => now(), 'updated_at' => now()]);
         $this->assertContains('reversal_duplicate', $this->codes($this->rowOf($control()['rows'], $f['reversed'])));
 
         $summary = $control()['summary'];
@@ -211,7 +232,7 @@ class FuelTankerFillReportsTest extends TestCase
     public function the_clearing_account_report_shows_balances_supported_by_postings_and_other_entries(): void
     {
         $f = $this->seedFills();
-        $today = now()->toDateString();
+        $today = $this->stationToday();
         $data = $this->report('clearing-account', ['from' => $today, 'to' => $today])->assertOk()->json('data');
         $account = $data['accounts'][0];
         $this->assertSame('1145', $account['account']['code']);
@@ -243,7 +264,7 @@ class FuelTankerFillReportsTest extends TestCase
         $this->assertSame('قيد يدوي على الوسيط', $account['other_entries'][0]['description']);
 
         // الافتتاحي لفترة لاحقة = ختامي ما قبلها.
-        $tomorrow = now()->addDay()->toDateString();
+        $tomorrow = $this->stationToday(1);
         $next = $this->report('clearing-account', ['from' => $tomorrow, 'to' => $tomorrow])->json('data.accounts.0');
         $this->assertSame(659_000, $next['opening_balance_minor']);
         $this->assertSame(0, $next['period_debits_minor']);
@@ -338,7 +359,7 @@ class FuelTankerFillReportsTest extends TestCase
     public function a_station_restricted_user_with_cost_and_accounts_permissions_never_sees_ledger_balances_or_other_stations_data(): void
     {
         $f = $this->seedFills();
-        $today = now()->toDateString();
+        $today = $this->stationToday();
         // قيد يدوي على الحساب الوسيط بفرع المحطة نفسه (يمثّل نشاط محطة أخرى في الفرع: سطر القيد يحمل الفرع لا المحطة).
         app(TenantContext::class)->set($this->w['tenant_id']);
         $counter = Account::create(['code' => '9997', 'name' => 'مقابل اختباري', 'type' => 'liability', 'normal_balance' => 'credit', 'is_group' => false, 'is_active' => true]);
