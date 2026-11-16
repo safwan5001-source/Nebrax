@@ -1,0 +1,23 @@
+import React from 'react';
+
+/**
+ * Saudi Riyal sign (U+20C1). IBM Plex has no glyph for it, so the product relies on a
+ * system fallback; the film renders the outline directly (from the OFL-licensed
+ * saudi-riyal-font, see public/fonts/OFL-saudi-riyal.txt) so it can never tofu.
+ */
+export const Riyal: React.FC<{ size?: number | string; color?: string; style?: React.CSSProperties }> = ({
+  size = '0.78em',
+  color = 'currentColor',
+  style,
+}) => (
+  <svg
+    viewBox="40 0 1150 1270"
+    style={{ width: size, height: size, display: 'inline-block', flexShrink: 0, verticalAlign: '-0.06em', ...style }}
+    aria-hidden
+  >
+    <path
+      fill={color}
+      d="M750,1119 C730,1163,716,1211,711,1262 C711,1262,1136,1172,1136,1172 C1156,1127,1169,1079,1174,1028 C1174,1028,750,1119,750,1119Z M1136,901 C1156,857,1169,809,1174,758 C1174,758,843,828,843,828 C843,828,843,693,843,693 C843,693,1136,631,1136,631 C1156,587,1169,538,1174,488 C1174,488,843,558,843,558 C843,558,843,72,843,72 C793,100,748,138,711,183 C711,183,711,586,711,586 C711,586,579,614,579,614 C579,614,579,6,579,6 C528,34,483,72,447,117 C447,117,447,642,447,642 C447,642,151,705,151,705 C131,750,117,798,112,849 C112,849,447,777,447,777 C447,777,447,948,447,948 C447,948,88,1024,88,1024 C68,1068,55,1117,50,1167 C50,1167,425,1088,425,1088 C456,1081,482,1063,499,1038 C499,1038,568,936,568,936 C575,926,579,913,579,899 C579,899,579,749,579,749 C579,749,711,721,711,721 C711,721,711,992,711,992 C711,992,1136,901,1136,901Z"
+    />
+  </svg>
+);
