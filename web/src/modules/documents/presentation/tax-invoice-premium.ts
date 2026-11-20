@@ -60,15 +60,16 @@ export function premiumPalette(theme: DocumentTheme): PremiumPalette {
     accent,
     soft: theme.id === 'green' ? '#e8efec' : brandSoft,
     line: mixHex(deep, '#ffffff', 0.82),
-    muted: mixHex(deep, '#ffffff', 0.38),
+    // نص ثانوي بتباين ≥ 4.5:1 على الأبيض لكل الثيمات (يحرسه اختبار) — التسميات الصغيرة يجب أن تُقرأ مطبوعةً.
+    muted: mixHex(deep, '#ffffff', 0.22),
   };
 }
 
 export const PREMIUM = {
-  logoMaxPx: 56,
-  qrSizePx: 96,
+  logoMaxPx: 48,
+  qrSizePx: 100,
   /** صفوف جدول البنود الدنيا — صفوف فارغة مرقّمة تكمل النموذج المطبوع كما في المرجع البصري. */
-  minTableRows: 10,
+  minTableRows: 7,
 } as const;
 
 export type PremiumLabelPair = { ar: string; en: string };

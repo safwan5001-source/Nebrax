@@ -214,4 +214,26 @@ describe('buildInvoiceDocumentModel', () => {
       expect(Object.keys(line).filter((key) => ['unit', 'taxRate', 'lineDiscount', 'netAmount'].includes(key))).toEqual([]);
     });
   });
+  describe('logo source (real company logo, never a default image)', () => {
+    const build = (over: { logoUrl?: string | null; companyLogo?: string | null }) => buildInvoiceDocumentModel({
+      invoice: { number: 'INV-1', invoice_date: '2026-11-20', payment_type: 'cash', subtotal: '100.00', tax_amount: '15.00', total: '115.00', lines: [] },
+      company: { name: 'منشأة', logo: over.companyLogo ?? null },
+      customer: null, qr: null, logoUrl: over.logoUrl,
+    });
+
+    it('uses the company logo from the organisation profile', () => {
+      expect(build({ companyLogo: 'data:image/png;base64,COMPANY' }).seller.logoUrl).toBe('data:image/png;base64,COMPANY');
+    });
+
+    it('lets a design-settings logo win over the company logo', () => {
+      expect(build({ logoUrl: 'data:image/png;base64,DESIGN', companyLogo: 'data:image/png;base64,COMPANY' }).seller.logoUrl).toBe('data:image/png;base64,DESIGN');
+    });
+
+    it('has no logo (and no stamp/signature) when none is configured — nothing is invented', () => {
+      const model = build({});
+      expect(model.seller.logoUrl).toBeNull();
+      expect(model.stampUrl).toBeNull();
+      expect(model.signatureUrl).toBeNull();
+    });
+  });
 });

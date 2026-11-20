@@ -73,20 +73,29 @@ const usePremiumDir = () => useContext(PremiumDirContext);
 const single = (pair: PremiumLabelPair, mode: Mode) => (mode === 'en' ? pair.en : pair.ar);
 
 /**
+ * سلّم الخطوط (الأدنى 9px — يحرسه اختبار): عنوان البطاقة 13 ← قيمة 11.5 ← تسمية 10 (والإنجليزية 9 تحتها).
  * تسمية ثنائية متراصة: العربية فوق والإنجليزية أصغر تحتها، وكلاهما يحاذي بداية الحاوية.
  * لا `dir` على السطرين عمداً: الإنجليزية تتبع اتجاه الصفحة فتحاذي النهاية نفسها كالمرجع (عكس `ModernBilingualLabel`).
  */
-function Bi({ pair, mode, className, enClassName }: { pair: PremiumLabelPair; mode: Mode; className?: string; enClassName?: string }) {
+function Bi({ pair, mode, className, enClassName, inline }: { pair: PremiumLabelPair; mode: Mode; className?: string; enClassName?: string; inline?: boolean }) {
   const ar = pair.ar.trim();
   const en = pair.en.trim();
   if (mode === 'ar' || (mode === 'bilingual' && !en)) return <span className={className}>{ar}</span>;
   if (mode === 'en' || !ar) return <span className={className}>{en}</span>;
   if (ar === en) return <span className={className}>{ar}</span>;
+  // قيمة قصيرة (نقدي/آجل): سطر واحد «آجل · Credit» بدل كومة من سطرين تضخّم البطاقة.
+  if (inline) {
+    return (
+      <span className={className} data-premium-bilingual>
+        {ar}<span style={{ color: 'var(--pv-muted)' }}> · </span><span dir="ltr" className={cn('text-[0.8em] font-medium', enClassName)} style={{ color: 'var(--pv-muted)' }}>{en}</span>
+      </span>
+    );
+  }
   // السطر الإنجليزي `dir=ltr` كي تبقى علامات الترقيم (VAT No.) في موضعها داخل صفحة RTL؛ المحاذاة للبداية من الحاوية.
   return (
-    <span className={cn('inline-flex flex-col items-start leading-tight', className)} data-premium-bilingual>
+    <span className={cn('inline-flex flex-col items-start leading-snug', className)} data-premium-bilingual>
       <span>{ar}</span>
-      <span dir="ltr" className={cn('text-[0.8em] font-normal opacity-85', enClassName)}>{en}</span>
+      <span dir="ltr" className={cn('text-[0.9em] font-normal', enClassName)}>{en}</span>
     </span>
   );
 }
@@ -124,13 +133,13 @@ function PremiumHeader({ model, showLogo, mode, locale }: { model: DocumentModel
 
   return (
     <header data-premium-header data-premium-mode={mode}>
-      <div className={cn('flex items-center justify-between gap-6 px-8 pb-3 pt-4 text-white', blockTextClassName(properties))} style={{ background: 'var(--pv-deep)' }}>
+      <div className={cn('flex items-center justify-between gap-6 px-8 pb-3 pt-3.5 text-white', blockTextClassName(properties))} style={{ background: 'var(--pv-deep)' }}>
         <div className="min-w-0">
-          <h1 className={cn('font-extrabold leading-tight', mode === 'en' ? 'text-[20px]' : 'text-[22px]')}>
+          <h1 className={cn('font-extrabold leading-tight', mode === 'en' ? 'text-[22px]' : 'text-[24px]')}>
             {mode === 'en' ? title.en : title.ar}
           </h1>
           {bilingual ? (
-            <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--pv-accent)' }} dir="ltr">{title.en}</div>
+            <div className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--pv-accent)' }} dir="ltr">{title.en}</div>
           ) : null}
           {isNoticeStatus(model.status) ? (
             <div className="mt-2 inline-block rounded-md border border-white/60 px-2 py-0.5 text-[10px] font-bold" data-premium-notice>
@@ -139,9 +148,9 @@ function PremiumHeader({ model, showLogo, mode, locale }: { model: DocumentModel
           ) : null}
         </div>
         {logo ? (
-          <div className="shrink-0 rounded-xl bg-white p-2" data-premium-logo>
+          <div className="shrink-0 rounded-lg bg-white px-2.5 py-1.5" data-premium-logo>
             {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-            <img src={logo} alt={seller.name} className="w-auto max-w-[170px] object-contain" style={{ height: `${logoHeight}px` }} />
+            <img src={logo} alt={seller.name} className="w-auto max-w-[150px] object-contain" style={{ height: `${logoHeight}px` }} />
           </div>
         ) : (
           <div className="max-w-[45%] shrink-0 break-words text-end text-[18px] font-extrabold leading-snug" data-premium-seller-name>
@@ -160,11 +169,11 @@ function MetaTiles({ model, mode }: { model: DocumentModel; mode: Mode }) {
     <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }} data-premium-meta>
       {tiles.map((tile) => (
         <div key={tile.key} className="min-w-0 rounded-xl px-3 py-1" style={{ background: 'var(--pv-soft)' }} data-premium-meta-tile={tile.key}>
-          <div className="text-[9.5px] font-bold" style={{ color: 'var(--pv-muted)' }}>
+          <div className="text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}>
             <Bi pair={label(tile.key === 'invoice_no' ? 'invoice_no' : tile.key === 'issue_date' ? 'issue_date' : tile.key === 'due_date' ? 'due_date' : 'payment')} mode={mode} />
           </div>
-          <div className="mt-0.5 break-words text-[12px] font-extrabold leading-tight text-black">
-            {tile.valueLabel ? <Bi pair={label(tile.valueLabel)} mode={mode} /> : ltrValue(tile.value)}
+          <div className="mt-0.5 break-words text-[13px] font-extrabold leading-snug text-black">
+            {tile.valueLabel ? <Bi pair={label(tile.valueLabel)} mode={mode} inline /> : ltrValue(tile.value)}
           </div>
         </div>
       ))}
@@ -180,11 +189,11 @@ interface PartyRow {
 function PartyCard({ title, rows, mode, kind }: { title: PremiumLabelPair; rows: PartyRow[]; mode: Mode; kind: 'seller' | 'buyer' }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--pv-line)' }} data-premium-party={kind}>
-      <div className="flex items-center justify-between gap-3 px-4 py-1 text-white" style={{ background: 'var(--pv-deep)' }}>
+      <div className="flex items-center justify-between gap-3 px-4 py-1.5 leading-[1.7] text-white" style={{ background: 'var(--pv-deep)' }}>
         {mode === 'bilingual' ? (
           <>
             <span className="text-[13px] font-extrabold">{title.ar}</span>
-            <span className="text-[9.5px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--pv-accent)' }} dir="ltr">{title.en}</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--pv-accent)' }} dir="ltr">{title.en}</span>
           </>
         ) : (
           <span className={cn('text-[13px] font-extrabold', mode === 'en' && 'uppercase tracking-wide')}>{mode === 'en' ? title.en : title.ar}</span>
@@ -193,10 +202,10 @@ function PartyCard({ title, rows, mode, kind }: { title: PremiumLabelPair; rows:
       <div>
         {rows.map((row, index) => (
           <div key={row.key} className={cn('flex items-start gap-3 px-4 py-1', index > 0 && 'border-t')} style={{ borderColor: 'var(--pv-line)' }} data-premium-party-row={row.key}>
-            <div className="w-[6rem] shrink-0 text-[9px] font-semibold leading-tight" style={{ color: 'var(--pv-muted)' }}>
+            <div className="w-[6.4rem] shrink-0 text-[10px] font-semibold leading-snug" style={{ color: 'var(--pv-muted)' }}>
               <Bi pair={label(row.key)} mode={mode} />
             </div>
-            <div className="min-w-0 flex-1 break-words text-[10.5px] font-bold leading-snug text-black">{row.value}</div>
+            <div className="min-w-0 flex-1 break-words text-[11.5px] font-bold leading-snug text-black">{row.value}</div>
           </div>
         ))}
       </div>
@@ -225,9 +234,9 @@ function PartiesSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   };
 
   return (
-    <section className="mt-3 px-8" data-premium-parties>
+    <section className="mt-2.5 px-8" data-premium-parties>
       <MetaTiles model={model} mode={mode} />
-      <div className="mt-3 grid grid-cols-2 gap-4">
+      <div className="mt-2.5 grid grid-cols-2 gap-4">
         <PartyCard kind="seller" title={label('seller')} rows={rows(seller, 'trade_name')} mode={mode} />
         <PartyCard kind="buyer" title={label('buyer')} rows={rows(buyer, 'customer_name')} mode={mode} />
       </div>
@@ -249,10 +258,11 @@ function defaultAlignment(id: PremiumColumn['id']): DocBlockAlignment {
   return id === 'product' || id === 'description' ? 'start' : 'center';
 }
 
-const HEAD_CELL = 'px-1.5 py-1 font-extrabold leading-tight whitespace-normal break-words';
-const BODY_CELL = 'px-1.5 py-0.5 leading-snug align-middle';
+const HEAD_CELL = 'px-1.5 py-1 font-extrabold leading-snug whitespace-normal break-words';
+// حشو علوي أقل من السفلي بـ4px: مصدّر PDF (html2canvas) ينزل نص الخلية قليلاً فيلامس آخر صف الحد السفلي؛ هذا التعويض يوسّطه هناك دون تغيير ارتفاع الصف.
+const BODY_CELL = 'px-1.5 pb-[7px] pt-[3px] leading-snug align-middle';
 /** الأحجام المضغوطة الافتراضية؛ الحجم المحفوظ للكتلة (`font_size`) يغلبها كاملةً كما في `blockTextClassName`. */
-const COMPACT_ITEMS = { head: 'text-[9.5px]', body: 'text-[10.5px]', name: 'text-[11.5px]', secondary: 'text-[9px]', code: 'text-[10px]' } as const;
+const COMPACT_ITEMS = { head: 'text-[10px]', body: 'text-[11px]', name: 'text-[11.5px]', secondary: 'text-[9.5px]', code: 'text-[10px]' } as const;
 const SAVED_ITEMS_SIZE = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' } as const;
 
 function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
@@ -269,6 +279,21 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const dash = (minor: number | null | undefined) => (minor === null || minor === undefined || minor === 0 ? '–' : formatModernAmount(minor, model.currency));
   const fillers = Math.max(0, PREMIUM.minTableRows - model.lines.length);
   const lineBorder = 'var(--pv-line)';
+
+  // الأعمدة المالية تُحاذى على الفاصلة العشرية: كل رقم يملأ عرضاً أدنى = أطول نص في عموده، فتصطف الخانات
+  // رغم تمركز العمود (الصيغة نفسها `formatModernAmount`؛ لا حساب ولا تقريب جديد).
+  const MONEY: Partial<Record<PremiumColumn['id'], (line: DocumentModel['lines'][number]) => string>> = {
+    unit_price: (l) => money(l.unitPrice),
+    price_before_tax: (l) => money(l.priceBeforeTax),
+    line_discount: (l) => dash(l.lineDiscount),
+    line_net: (l) => money(l.netAmount),
+    tax: (l) => money(l.tax),
+    total: (l) => money(l.total),
+  };
+  const moneyWidthCh = (id: PremiumColumn['id']): number => Math.max(0, ...model.lines.map((l) => MONEY[id]?.(l).length ?? 0));
+  const moneyCell = (id: PremiumColumn['id'], line: DocumentModel['lines'][number], className?: string) => (
+    <span dir="ltr" className={cn('inline-block text-end font-sans tabular-nums', className)} style={{ minWidth: `${moneyWidthCh(id)}ch` }}>{MONEY[id]?.(line)}</span>
+  );
 
   const cell = (id: PremiumColumn['id'], line: DocumentModel['lines'][number], index: number): ReactNode => {
     switch (id) {
@@ -288,20 +313,20 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
       case 'barcode': return <span className={cn('font-sans tabular-nums', size.code)}>{line.barcode || '—'}</span>;
       case 'unit': return <span className="break-words">{line.unit?.trim() || '—'}</span>;
       case 'quantity': return <span className="font-sans tabular-nums font-semibold">{line.quantity}</span>;
-      case 'unit_price': return <span className="font-sans tabular-nums">{money(line.unitPrice)}</span>;
-      case 'price_before_tax': return <span className="font-sans tabular-nums">{money(line.priceBeforeTax)}</span>;
-      case 'line_discount': return <span className="font-sans tabular-nums">{dash(line.lineDiscount)}</span>;
-      case 'line_net': return <span className="font-sans tabular-nums">{money(line.netAmount)}</span>;
+      case 'unit_price': return moneyCell(id, line);
+      case 'price_before_tax': return moneyCell(id, line);
+      case 'line_discount': return moneyCell(id, line);
+      case 'line_net': return moneyCell(id, line);
       case 'tax_rate': return <span className="font-sans tabular-nums">{line.taxRate === null || line.taxRate === undefined ? '—' : `${line.taxRate}%`}</span>;
-      case 'tax': return <span className="font-sans tabular-nums">{money(line.tax)}</span>;
-      case 'total': return <span className="font-sans tabular-nums font-extrabold">{money(line.total)}</span>;
+      case 'tax': return moneyCell(id, line);
+      case 'total': return moneyCell(id, line, 'font-extrabold');
     }
   };
 
   const cellStyle = (index: number): CSSProperties | undefined => (index > 0 ? { borderInlineStart: `1px solid ${lineBorder}` } : undefined);
 
   return (
-    <section className="mt-3 px-8" data-premium-items>
+    <section className="mt-2.5 px-8" data-premium-items>
       <div className={cn('overflow-hidden rounded-xl border', blockTextClassName(properties))} style={{ borderColor: 'var(--pv-line)' }}>
         <table className="w-full table-fixed border-collapse">
           <thead>
@@ -328,7 +353,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
               </tr>
             ))}
             {Array.from({ length: fillers }, (_, i) => (
-              <tr key={`filler-${i}`} className="break-inside-avoid" style={{ borderTop: `1px solid ${lineBorder}`, height: '1.5rem' }} data-premium-row="filler" aria-hidden>
+              <tr key={`filler-${i}`} className="break-inside-avoid" style={{ borderTop: `1px solid ${lineBorder}`, height: '1.75rem' }} data-premium-row="filler" aria-hidden>
                 {columns.map((column, index) => (
                   <td key={`${column.id}-${index}`} className={cn(BODY_CELL, size.body, 'text-center')} style={cellStyle(index)}>
                     {column.id === 'number' ? <span className="font-sans tabular-nums" style={{ color: 'var(--pv-muted)' }}>{model.lines.length + i + 1}</span> : null}
@@ -359,14 +384,14 @@ function TotalsBox({ model, mode }: { model: DocumentModel; mode: Mode }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--pv-line)' }} data-premium-totals>
       {rows.map((row, index) => (
-        <div key={row.key} className={cn('flex items-center justify-between gap-3 px-3 py-1 text-[11px]', index > 0 && 'border-t')} style={{ borderColor: 'var(--pv-line)' }} data-premium-total-row={row.key}>
-          <span className="min-w-0 text-[10.5px] font-bold leading-tight text-black"><Bi pair={labelFor(row.key)} mode={mode} enClassName="font-medium" /></span>
-          <Money minor={row.amount} currency={currency} mode={mode} className="shrink-0 font-bold text-black" />
+        <div key={row.key} className={cn('flex items-center justify-between gap-3 px-3.5 py-1', index > 0 && 'border-t')} style={{ borderColor: 'var(--pv-line)' }} data-premium-total-row={row.key}>
+          <span className="min-w-0 text-[11px] font-bold leading-tight text-black"><Bi pair={labelFor(row.key)} mode={mode} enClassName="font-medium" /></span>
+          <Money minor={row.amount} currency={currency} mode={mode} className="shrink-0 text-[12px] font-bold text-black" />
         </div>
       ))}
-      <div className="flex items-center justify-between gap-3 px-3 py-2 text-white" style={{ background: 'var(--pv-deep)' }} data-premium-grand-total>
-        <span className="min-w-0 text-[11.5px] font-extrabold leading-tight"><Bi pair={MODERN_TOTAL_LABELS.grand_total} mode={mode} enClassName="font-medium" /></span>
-        <Money minor={totals.total} currency={currency} mode={mode} className="shrink-0 text-[16px] font-extrabold" />
+      <div className="flex items-center justify-between gap-3 px-3.5 py-1.5 text-white" style={{ background: 'var(--pv-deep)' }} data-premium-grand-total>
+        <span className="min-w-0 text-[12px] font-extrabold leading-snug"><Bi pair={MODERN_TOTAL_LABELS.grand_total} mode={mode} enClassName="font-medium" /></span>
+        <Money minor={totals.total} currency={currency} mode={mode} className="shrink-0 text-[18px] font-extrabold" />
       </div>
     </div>
   );
@@ -380,7 +405,7 @@ function QrBox({ model, mode }: { model: DocumentModel; mode: Mode }) {
       <div className="rounded-md bg-white p-1">
         <QRCodeSVG value={qr} size={PREMIUM.qrSizePx} level="M" />
       </div>
-      <div className="text-center text-[9px] leading-tight" style={{ color: 'var(--pv-muted)' }}>
+      <div className="text-center text-[9.5px] leading-snug" style={{ color: 'var(--pv-muted)' }}>
         {model.qr?.note ?? <Bi pair={label('qr_caption')} mode={mode} className="items-center" />}
       </div>
     </div>
@@ -390,7 +415,7 @@ function QrBox({ model, mode }: { model: DocumentModel; mode: Mode }) {
 function InfoCard({ title, mode, children, kind }: { title: PremiumLabelPair; mode: Mode; children: ReactNode; kind: string }) {
   return (
     <div className="min-w-0 rounded-xl border px-3.5 py-2.5" style={{ borderColor: 'var(--pv-line)' }} data-premium-card={kind}>
-      <div className="mb-1.5 text-[10px] font-bold" style={{ color: 'var(--pv-muted)' }}><Bi pair={title} mode={mode} /></div>
+      <div className="mb-1.5 text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}><Bi pair={title} mode={mode} /></div>
       {children}
     </div>
   );
@@ -403,7 +428,7 @@ function NotesCard({ model, mode, showNotes, showTerms }: { model: DocumentModel
   const notes = showNotes ? model.notes?.trim() : '';
   const terms = showTerms ? (termsProps.static_content ?? model.terms)?.trim() : '';
   if (!notes && !terms) return null;
-  const body = 'whitespace-pre-line break-words text-[11px] leading-relaxed text-black';
+  const body = 'whitespace-pre-line break-words text-[11.5px] leading-relaxed text-black';
   return (
     <InfoCard title={label('notes_terms')} mode={mode} kind="notes">
       {notes ? <p dir="auto" className={blockTextClassName(notesProps, body)}>{notes}</p> : null}
@@ -418,7 +443,7 @@ function BankCard({ model, mode }: { model: DocumentModel; mode: Mode }) {
   if (!content) return null;
   return (
     <InfoCard title={label('bank_details')} mode={mode} kind="bank">
-      <p dir="auto" className={blockTextClassName(properties, 'whitespace-pre-line break-words text-[11px] leading-relaxed text-black')}>{content}</p>
+      <p dir="auto" className={blockTextClassName(properties, 'whitespace-pre-line break-words text-[11.5px] leading-relaxed text-black')}>{content}</p>
     </InfoCard>
   );
 }
@@ -435,7 +460,7 @@ function SummarySection({ model, mode, showQr, composed }: { model: DocumentMode
   );
   // DOM: QR ثم الملاحظات ثم الإجماليات — في RTL يقع الـQR عند الحافة اليمنى كالمرجع، وفي LTR يُعكس تلقائياً.
   return (
-    <section className="mt-3 grid items-start gap-3 px-8 break-inside-avoid" style={{ gridTemplateColumns: `${qr ? '8.4rem ' : ''}minmax(0, 1fr) 17.5rem` }} data-premium-summary>
+    <section className="mt-2.5 grid items-start gap-3 px-8 break-inside-avoid" style={{ gridTemplateColumns: `${qr ? '8.4rem ' : ''}minmax(0, 1fr) 18rem` }} data-premium-summary>
       {qr}
       <div className="flex min-w-0 flex-col gap-3">{middle}</div>
       <TotalsBox model={model} mode={mode} />
@@ -443,9 +468,16 @@ function SummarySection({ model, mode, showQr, composed }: { model: DocumentMode
   );
 }
 
-function CardsRow({ model, mode, keys }: { model: DocumentModel; mode: Mode; keys: ReadonlySet<DocSectionKey> }) {
+/** نص الملاحظات والشروط أطول من هذا (محارف) ⇒ يُفصل عن صف الإجماليات ويصير قابلاً للانقسام عبر الصفحات. */
+const LONG_NOTES_CHARS = 420;
+
+function notesLength(model: DocumentModel, keys: ReadonlySet<DocSectionKey>): number {
+  return (keys.has('notes') ? model.notes?.trim().length ?? 0 : 0) + (keys.has('terms') ? model.terms?.trim().length ?? 0 : 0);
+}
+
+function CardsRow({ model, mode, keys, long = false }: { model: DocumentModel; mode: Mode; keys: ReadonlySet<DocSectionKey>; long?: boolean }) {
   return (
-    <section className="mt-3 grid grid-cols-2 items-start gap-3 px-8 break-inside-avoid" data-premium-cards>
+    <section className={cn('mt-2.5 grid items-start gap-3 px-8', long ? 'grid-cols-1' : 'break-inside-avoid grid-cols-2')} data-premium-cards={long ? 'long' : ''}>
       <NotesCard model={model} mode={mode} showNotes={keys.has('notes')} showTerms={keys.has('terms')} />
       {keys.has('bank') ? <BankCard model={model} mode={mode} /> : null}
     </section>
@@ -456,35 +488,45 @@ function AmountWords({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const dir = usePremiumDir();
   const total = model.totals.total;
   return (
-    <section className="mt-3 px-8 break-inside-avoid" data-premium-words>
-      <div className="rounded-xl border px-4 py-2" style={{ borderColor: 'var(--pv-line)' }}>
-        <div className="mb-1 text-[10px] font-bold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('amount_words')} mode={mode} /></div>
-        {mode !== 'en' ? <div className="break-words text-[12.5px] font-bold leading-relaxed text-black">{amountToWords(total, model.currency, 'ar')}</div> : null}
-        {mode !== 'ar' ? <div className="break-words text-[10.5px] leading-snug text-black" dir="ltr" style={{ textAlign: dir === 'rtl' ? 'right' : 'left' }}>{amountToWords(total, model.currency, 'en')}</div> : null}
+    <section className="mt-2.5 px-8 break-inside-avoid" data-premium-words>
+      <div className="rounded-xl border px-4 py-1.5" style={{ borderColor: 'var(--pv-line)' }}>
+        <div className="mb-0.5 text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('amount_words')} mode={mode} /></div>
+        {mode !== 'en' ? <div className="break-words text-[13px] font-bold leading-relaxed text-black" data-premium-words-ar>{amountToWords(total, model.currency, 'ar')}</div> : null}
+        {/* الترجمة الإنجليزية سطر ثانوي أصغر درجة ومفصول بمسافة: لا تزاحم الجملة العربية ولا تتجاوز عرض البطاقة. */}
+        {mode !== 'ar' ? (
+          <div
+            className={cn('break-words text-[10.5px] leading-relaxed', mode === 'bilingual' ? 'mt-1' : 'text-[13px] font-bold text-black')}
+            style={{ textAlign: dir === 'rtl' ? 'right' : 'left', ...(mode === 'bilingual' ? { color: 'var(--pv-muted)' } : {}) }}
+            dir="ltr"
+            data-premium-words-en
+          >
+            {amountToWords(total, model.currency, 'en')}
+          </div>
+        ) : null}
       </div>
     </section>
   );
 }
 
 /** حجم الصورة الافتراضي (بلا `image_size` محفوظ) مضغوط كي تبقى عينة المرجع في صفحة A4 واحدة؛ الحجم المحفوظ يغلب بصنوف الكتل المشتركة. */
-const COMPACT_SIGNATURE = 'max-h-[11mm] w-auto max-w-full object-contain';
-const COMPACT_STAMP = 'max-h-[13mm] w-auto max-w-full object-contain';
+const COMPACT_SIGNATURE = 'max-h-[10mm] w-auto max-w-full object-contain';
+const COMPACT_STAMP = 'max-h-[12mm] w-auto max-w-full object-contain';
 
 function SignatureRow({ model, mode, showSignature, showStamp }: { model: DocumentModel; mode: Mode; showSignature: boolean; showStamp: boolean }) {
   const signatureProps = useDocBlockProperties('signature');
   const stampProps = useDocBlockProperties('stamp');
-  const box = 'relative flex min-h-[17mm] flex-col justify-between rounded-xl border-2 border-dashed px-4 py-2';
+  const box = 'relative flex min-h-[20mm] flex-col justify-between rounded-xl border-2 border-dashed px-4 py-2';
   const sign = showSignature ? model.signatureUrl : null;
   const stamp = showStamp ? model.stampUrl : null;
   return (
-    <section className="mt-3 grid grid-cols-2 gap-4 px-8 break-inside-avoid" data-premium-signatures>
+    <section className="mt-2.5 grid grid-cols-2 gap-4 px-8 break-inside-avoid" data-premium-signatures>
       {showSignature ? (
         <div className={box} style={{ borderColor: 'var(--pv-line)' }} data-premium-sign-box="receiver">
-          <div className="text-[10px] font-bold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('received_by')} mode={mode} /></div>
+          <div className="text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('received_by')} mode={mode} /></div>
         </div>
       ) : null}
       <div className={box} style={{ borderColor: 'var(--pv-line)' }} data-premium-sign-box="seller">
-        <div className="text-[10px] font-bold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('seller_signature')} mode={mode} /></div>
+        <div className="text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('seller_signature')} mode={mode} /></div>
         {sign || stamp ? (
           <div className="mt-1 flex items-end gap-4">
             {sign ? (
@@ -523,9 +565,9 @@ function PremiumFooter({ model, mode, locale }: { model: DocumentModel; mode: Mo
   const phones = join(seller.phone, seller.mobile);
 
   return (
-    <footer className="mt-auto pt-5" data-premium-footer>
-      {custom ? <div className={blockTextClassName(properties, 'px-8 pb-2 text-center text-[9.5px] leading-relaxed')} style={{ color: 'var(--pv-muted)' }}>{custom}</div> : null}
-      <div className="mx-8 mb-4 flex items-center justify-between gap-4 border-t pt-2.5 text-[9.5px]" style={{ borderColor: 'var(--pv-line)', color: 'var(--pv-muted)' }}>
+    <footer className="mt-auto pt-2" data-premium-footer>
+      {custom ? <div className={blockTextClassName(properties, 'px-8 pb-2 text-center text-[10px] leading-relaxed')} style={{ color: 'var(--pv-muted)' }}>{custom}</div> : null}
+      <div className="mx-8 mb-3 flex items-center justify-between gap-4 border-t pt-3 text-[10px]" style={{ borderColor: 'var(--pv-line)', color: 'var(--pv-muted)' }}>
         <span className="min-w-0 break-words font-bold text-black">{[seller.name?.trim(), title].filter(Boolean).join(' · ')}</span>
         {ids.length > 0 ? <span className="min-w-0 text-center">{ids.join('  ·  ')}</span> : null}
         {phones.length > 0 ? <span className="font-sans tabular-nums shrink-0 font-bold text-black" dir="ltr">{phones.join('  ·  ')}</span> : null}
@@ -575,7 +617,19 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
       case 'barcode': return <div className="mt-3 flex justify-center px-8"><DocBarcode value={model.meta.number} /></div>;
       case 'parties': return <PartiesSection model={model} mode={mode} />;
       case 'items': return <ItemsSection model={model} mode={mode} />;
-      case 'summary': return <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={new Set(cardKeys)} />;
+      case 'summary': {
+        const keys = new Set<DocSectionKey>(cardKeys);
+        // ملاحظات/شروط طويلة: الإجماليات والـQR صف مضغوط، وبطاقاتها قسم مستقل قابل للانقسام (بدل دفع الصف كله لصفحة جديدة).
+        if (notesLength(model, keys) > LONG_NOTES_CHARS) {
+          return (
+            <>
+              <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={new Set<DocSectionKey>(keys.has('bank') ? ['bank'] : [])} />
+              <CardsRow model={model} mode={mode} keys={new Set<DocSectionKey>(cardKeys.filter((k) => k !== 'bank'))} long />
+            </>
+          );
+        }
+        return <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={keys} />;
+      }
       case 'amountWords': return <AmountWords model={model} mode={mode} />;
       case 'notes':
       case 'terms':

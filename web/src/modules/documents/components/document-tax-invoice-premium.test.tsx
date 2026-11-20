@@ -250,8 +250,8 @@ describe('tax-invoice-premium-v1 PDF export boundaries and image properties', ()
     cleanup();
     const plain = renderPremium(sample(), FULL);
     // بلا حجم محفوظ: الحجم المضغوط الافتراضي (يبقي العينة في صفحة واحدة).
-    expect(plain.container.querySelector('img[alt="stamp"]')!.className).toContain('max-h-[13mm]');
-    expect(plain.container.querySelector('img[alt="signature"]')!.className).toContain('max-h-[11mm]');
+    expect(plain.container.querySelector('img[alt="stamp"]')!.className).toContain('max-h-[12mm]');
+    expect(plain.container.querySelector('img[alt="signature"]')!.className).toContain('max-h-[10mm]');
   });
 });
 
@@ -301,8 +301,105 @@ describe('tax-invoice-premium-v1 saved items font size', () => {
   it('keeps the compact sizes when no size is saved', () => {
     const { container } = renderPremium(sample(), withSize());
     const root = container.querySelector('[data-premium-items]')!;
-    expect(root.querySelector('thead th')!.className).toContain('text-[9.5px]');
-    expect(root.querySelector('tbody tr td')!.className).toContain('text-[10.5px]');
+    expect(root.querySelector('thead th')!.className).toContain('text-[10px]');
+    expect(root.querySelector('tbody tr td')!.className).toContain('text-[11px]');
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.1 visual refinement', () => {
+  it('aligns money columns on the decimal point: every cell of a column shares one LTR end-aligned min width', () => {
+    const { container } = renderPremium(sample());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    const cols = rows[0].children.length;
+    let checked = 0;
+    for (let c = 0; c < cols; c += 1) {
+      const spans = rows.map((r) => r.children[c].querySelector<HTMLElement>('span[dir="ltr"].inline-block')).filter((x): x is HTMLElement => !!x);
+      if (spans.length === 0) continue;
+      checked += 1;
+      expect(new Set(spans.map((x) => x.style.minWidth)).size).toBe(1);
+      expect(spans[0].className).toContain('text-end');
+    }
+    expect(checked).toBe(5); // سعر الوحدة، الخصم، الخاضع، مبلغ الضريبة، الإجمالي
+  });
+
+  it('keeps every financial column of the reference sample (ten columns, no data hidden)', () => {
+    const { container } = renderPremium(sample());
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+  });
+
+  it('shows the payment value on one line with a neutral separator (no flipped slash)', () => {
+    const { container } = renderPremium(sample());
+    const value = container.querySelector('[data-premium-meta-tile="payment"]')!.textContent!;
+    expect(value).toContain('آجل');
+    expect(value).toContain('Credit');
+    expect(value).not.toContain('/');
+  });
+
+  it('amount in words: Arabic primary + a separate smaller English line in bilingual, one language otherwise', () => {
+    const bi = renderPremium(sample('rtl')).container;
+    expect(bi.querySelector('[data-premium-words-ar]')!.textContent).toContain('فقط لا غير');
+    expect(bi.querySelector('[data-premium-words-en]')!.className).toContain('mt-1');
+    expect(bi.querySelector('[data-premium-words-en]')!.className).toContain('break-words');
+    cleanup();
+    locale.current = 'en';
+    const en = renderPremium(sample('ltr')).container;
+    expect(en.querySelector('[data-premium-words-ar]')).toBeNull();
+    expect(en.querySelector('[data-premium-words-en]')!.textContent).toMatch(/one thousand/i);
+  });
+
+  it('long notes/terms are split out of the totals row so the totals+QR stay compact and the cards can break across pages', () => {
+    const long = 'ملاحظة طويلة جداً '.repeat(60);
+    const { container } = renderPremium({ ...sample(), notes: long, terms: long }, FULL);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeNull();
+    const cards = container.querySelector('[data-premium-cards="long"]')!;
+    expect(cards.querySelector('[data-premium-card="notes"]')).toBeTruthy();
+    expect(cards.className).not.toContain('break-inside-avoid');
+    expect(container.querySelector('[data-premium-summary]')!.className).toContain('break-inside-avoid');
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="bank"]')).toBeTruthy();
+    expect(container.querySelector('[data-premium-totals]')).toBeTruthy();
+  });
+
+  it('keeps the original inline composition for ordinary notes', () => {
+    const { container } = renderPremium(sample(), FULL);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
+    expect(container.querySelector('[data-premium-cards]')).toBeNull();
+  });
+
+  it('long Arabic/English names wrap instead of clipping or overflowing (break-words on names and party values)', () => {
+    const longName = 'مؤسسة الخليج الإقليمية للتوريدات الصناعية واللوجستية للمشروعات المتقدمة والخدمات التجارية المتكاملة'.repeat(2);
+    const token = 'SuperLongEnglishProductNameWithoutAnySpacesAtAll'.repeat(3);
+    const base = sample();
+    const model = { ...base, seller: { ...base.seller, name: longName }, buyer: { ...base.buyer, name: token }, lines: [{ ...base.lines[0], productName: token, description: longName }] };
+    const { container } = renderPremium(model);
+    for (const el of container.querySelectorAll('[data-premium-party-row="trade_name"] > div:last-child, [data-premium-party-row="customer_name"] > div:last-child, [data-premium-row="line"] td:nth-child(2) span')) {
+      expect(el.className, el.textContent?.slice(0, 20)).toContain('break-words');
+    }
+    expect(container.textContent).toContain(token);
+    expect(container.textContent).toContain(longName.slice(0, 30));
+  });
+
+  it('never ships demo assets: with no logo/stamp/signature in the model there are no images and no QA fixture text', () => {
+    const { container } = renderPremium({ ...sample(), seller: { ...sample().seller, logoUrl: null }, stampUrl: null, signatureUrl: null });
+    expect(container.querySelectorAll('img')).toHaveLength(0);
+    expect(container.querySelector('[data-premium-seller-name]')!.textContent).toBe(sample().seller.name);
+    expect(container.textContent).not.toContain('Nebrax QA');
+    const source = readFileSync(resolve(__dirname, '../templates/tax-invoice-premium.tsx'), 'utf8');
+    expect(source).not.toMatch(/data:image|Nebrax QA|logoUrl\s*=\s*['"`]/);
+  });
+
+  it('renders the real company logo from the model when present (chip keeps transparent and dark logos legible)', () => {
+    const real = 'data:image/png;base64,REAL';
+    const { container } = renderPremium({ ...sample(), seller: { ...sample().seller, logoUrl: real } });
+    const img = container.querySelector<HTMLImageElement>('[data-premium-logo] img')!;
+    expect(img.getAttribute('src')).toBe(real);
+    expect(container.querySelector('[data-premium-logo]')!.className).toContain('bg-white');
+  });
+
+  it('type scale: no text below 9px anywhere in the template source', () => {
+    const source = readFileSync(resolve(__dirname, '../templates/tax-invoice-premium.tsx'), 'utf8');
+    const sizes = [...source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThan(10);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(9);
   });
 });
 

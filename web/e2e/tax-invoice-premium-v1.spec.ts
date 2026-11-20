@@ -32,7 +32,22 @@ async function geometry(page: Page) {
         if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) overlaps += 1;
       }
     }
-    return { wMm: mm(rr.width), hMm: mm(rr.height), outside, overlaps, composition: root.getAttribute('data-doc-composition'), dir: root.getAttribute('dir') };
+    // نصّ مقصوص: خلية/قيمة طرف يفيض محتواها أفقياً عن صندوقها (overflow مخفي في الحاوية المستديرة يقصّه صامتاً).
+    const clipped = [...root.querySelectorAll<HTMLElement>('th, td, [data-premium-party-row] > div, [data-premium-totals] span')].filter((e) => e.scrollWidth > e.clientWidth + 1).length;
+    // كلمة تمتد على أكثر من سطر داخل الجداول = كُسرت وسط الكلمة (الأسماء الطويلة تلتف عند الفواصل).
+    let splitWords = 0;
+    for (const cell of root.querySelectorAll('th, td')) {
+      const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+        for (const match of (node.textContent ?? '').matchAll(/\S{2,}/g)) {
+          const range = document.createRange();
+          range.setStart(node, match.index ?? 0);
+          range.setEnd(node, (match.index ?? 0) + match[0].length);
+          if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) splitWords += 1;
+        }
+      }
+    }
+    return { wMm: mm(rr.width), hMm: mm(rr.height), outside, overlaps, clipped, splitWords, composition: root.getAttribute('data-doc-composition'), dir: root.getAttribute('dir') };
   });
 }
 
@@ -51,6 +66,7 @@ for (const direction of ['rtl', 'ltr'] as const) {
       expect(g.wMm).toBeCloseTo(210, 0);
       expect(g.outside).toBe(0);
       expect(g.overlaps).toBe(0);
+      expect(g.clipped).toBe(0);
     });
 
     test('A4 with zero margins: the reference sample fits exactly one A4 page (preview + exported PDF)', async ({ page }) => {
@@ -58,9 +74,22 @@ for (const direction of ['rtl', 'ltr'] as const) {
       const g = await geometry(page);
       expect(g.hMm).toBeLessThanOrEqual(297.5);
       expect(g.outside).toBe(0);
+      expect(g.clipped).toBe(0);
+      expect(g.splitWords).toBe(0);
       const pdf = await exportPdf(page);
       expect(pdf.pageCount).toBe(1);
       expect(pdf.mediaBoxes[0].widthPt).toBeCloseTo(595.28, 0);
+    });
+
+    test('long Arabic/English names and long notes: wrap without clipping, overlap or broken words', async ({ page }) => {
+      await open(page, 'long_content', direction, '&paper=a4&orientation=portrait&margins=0');
+      const g = await geometry(page);
+      expect(g.outside).toBe(0);
+      expect(g.overlaps).toBe(0);
+      expect(g.clipped).toBe(0);
+      expect(g.splitWords).toBe(0);
+      const pdf = await exportPdf(page);
+      expect(pdf.pageCount).toBeGreaterThanOrEqual(2);
     });
 
     test('a 40-line invoice flows onto several pages without clipping', async ({ page }) => {
@@ -69,6 +98,7 @@ for (const direction of ['rtl', 'ltr'] as const) {
       expect(g.hMm).toBeGreaterThan(297.5);
       expect(g.outside).toBe(0);
       expect(g.overlaps).toBe(0);
+      expect(g.clipped).toBe(0);
       const pdf = await exportPdf(page);
       expect(pdf.pageCount).toBeGreaterThanOrEqual(2);
     });
