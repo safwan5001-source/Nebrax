@@ -14,7 +14,7 @@ import { normalizeOutputProfile, type OutputProfile } from '@/modules/print-temp
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import type { DocumentTypeId } from '@/modules/documents/types';
 
-const SCENARIOS = ['single', 'three', 'five', 'twenty', 'multipage', 'long_content'] as const satisfies readonly DocumentQaScenario[];
+const SCENARIOS = ['single', 'three', 'five', 'twenty', 'multipage', 'long_content', 'reference_sample'] as const satisfies readonly DocumentQaScenario[];
 const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
   { id: 'tax-invoice-classic', labelKey: 'classic' },
@@ -31,6 +31,8 @@ const TEMPLATES = [
   { id: 'purchase-order-formal', labelKey: 'purchase_order_formal' },
   // AWJ-DOC-V2-PR5: السند المدمج (قبض/صرف) يُفحص بمقاسات A5/A6 بالمسارات نفسها.
   { id: 'voucher-compact', labelKey: 'voucher_compact' },
+  // AWJ-DOC-TAX-PREMIUM-V1: الفاتورة الضريبية الفاخرة؛ عينة `reference_sample` تقابل المرجع البصري.
+  { id: 'tax-invoice-premium-v1', labelKey: 'premium_v1' },
   // AWJ-DOC-V2-PR2: الإيصال الحراري يُفحص بالمسارات نفسها (معاينة/طباعة/PDF) بمقاسه الحقيقي.
   { id: 'tax-invoice-thermal58', labelKey: 'thermal58' },
   { id: 'tax-invoice-thermal80', labelKey: 'thermal80' },
@@ -107,11 +109,12 @@ export default function DocumentQaPage() {
     () => makeDocumentQaModel({ documentType, scenario, direction, showQr, showAssets }),
     [direction, documentType, scenario, showAssets, showQr],
   );
-  const layout = useMemo(() => getDefaultDocumentLayout(documentType).map((item) => ({
+  // القالب الفاخر بتخطيطه الافتراضي الكامل (الذي يعرض المرجع)؛ بقية القوالب بالتخطيط الافتراضي للنوع.
+  const layout = useMemo(() => (templateId === 'tax-invoice-premium-v1' ? null : getDefaultDocumentLayout(documentType).map((item) => ({
     ...item,
     visible: (item.visible && (showAssets || !['bank', 'stamp', 'signature'].includes(item.key)))
       || (item.key === 'barcode' && (templateId === 'tax-invoice-retail' || templateId === 'tax-invoice-retail-v2')),
-  })), [documentType, showAssets, templateId]);
+  }))), [documentType, showAssets, templateId]);
 
   const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction' | 'paper' | 'orientation', value: string) => {
     const next = new URLSearchParams({
@@ -226,7 +229,7 @@ export default function DocumentQaPage() {
             <DocumentView
               model={model}
               templateId={templateId}
-              themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              themeId={templateId === 'tax-invoice-premium-v1' ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"
@@ -238,7 +241,7 @@ export default function DocumentQaPage() {
             <DocumentView
               model={model}
               templateId={templateId}
-              themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              themeId={templateId === 'tax-invoice-premium-v1' ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"

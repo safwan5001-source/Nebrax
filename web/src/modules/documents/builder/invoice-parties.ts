@@ -50,6 +50,15 @@ export interface InvoiceParties {
 
 const SUPPORTED_VERSION = 1;
 
+/** عنوان المشتري من أجزاء اللقطة كما خُزِّنت (بلا اختلاق)؛ الغائب كله `null`. */
+function joinBuyerAddress(address: InvoicePartiesBuyer['address'] | null | undefined): string | null {
+  if (!address) return null;
+  const parts = [address.building_no, address.street, address.district, address.city, address.postal_code]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join('، ') : null;
+}
+
 /** لقطة سليمة يعرف هذا الكود تفسيرها (v1 ببنية كاملة)؛ وغير ذلك يُعامَل كأن لا لقطة. */
 export function isUsableParties(parties: InvoiceParties | null | undefined): parties is InvoiceParties {
   return (
@@ -103,6 +112,9 @@ export function resolveInvoiceParties(input: {
       name: buyer.name ?? '—',
       vat_number: buyer.vat_number,
       city: buyer.address?.city ?? null,
+      // مفتاحان إضافيان بشرط وجود قيمتهما: شكل `customer` لمن لا يحملهما يبقى كما كان.
+      ...(buyer.cr_number?.trim() ? { cr_number: buyer.cr_number.trim() } : {}),
+      ...(joinBuyerAddress(buyer.address) ? { address: joinBuyerAddress(buyer.address) } : {}),
     },
   };
 }

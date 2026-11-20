@@ -28,6 +28,8 @@ const DECLARED: Record<string, { extra: string[]; minContentWidthMm: number }> =
   'tax-invoice-retail-v2': { extra: ['a4_landscape', 'a5_landscape'], minContentWidthMm: 182 },
   'quotation-proposal': { extra: ['a5_landscape'], minContentWidthMm: 182 },
   'purchase-order-formal': { extra: ['a5_landscape'], minContentWidthMm: 182 },
+  // AWJ-DOC-TAX-PREMIUM-V1: A4/Letter/Legal عمودياً فقط (لا ورق إضافي معلن)؛ أقل عرض محتوى 182مم.
+  'tax-invoice-premium-v1': { extra: [], minContentWidthMm: 182 },
   // AWJ-DOC-V2-PR5: السند المدمج — قيس في e2e/voucher-compact-pr5-harness.spec.ts (A6 عمودي وLetter/Legal غير معلنة).
   'voucher-compact': { extra: ['a4_landscape', 'a5_landscape', 'a5', 'a6_landscape'], minContentWidthMm: 128 },
 };

@@ -16,6 +16,10 @@ export interface SourceInvoiceLine {
   quantity: number;
   unit_price: string;
   unit_price_before_tax?: string | null;
+  /** تفاصيل إضافية يعيدها `InvoiceLineResource`؛ اختيارية للمستدعين القدامى (POS، معاينات). */
+  unit_name?: string | null;
+  line_subtotal?: string | null;
+  line_discount?: string | null;
   tax_rate: number;
   line_tax: string;
   line_total: string;
@@ -69,6 +73,9 @@ export interface SourceCustomer {
   name: string;
   vat_number?: string | null;
   city?: string | null;
+  /** إضافية: تأتي من لقطة المشتري لفاتورة مرحَّلة؛ لا تقرؤها قوالب الفاتورة التاريخية. */
+  cr_number?: string | null;
+  address?: string | null;
 }
 
 /**
@@ -99,6 +106,37 @@ function optionalSourceMinor(value?: string | null): number | undefined {
   const n = riyalToMinor(value);
   if (!Number.isFinite(n) || n === 0) return undefined;
   return n;
+}
+
+/** مبلغ مخزَّن اختياري بالهللات؛ الغائب أو غير الرقمي `null` (لا يُفترض صفراً). */
+function storedMinor(value?: string | null): number | null {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const n = riyalToMinor(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * تفاصيل سطر الفاتورة لقالب التفاصيل (الوحدة · الخصم · الخاضع · النسبة). تُضاف فقط حين يعلن المصدر `line_subtotal`
+ * (أي عقد `InvoiceLineResource` الكامل)، فيبقى سطر المستدعي القديم كما كان حرفياً.
+ *
+ * الخاضع = line_subtotal − line_discount **كما خُزِّنا** (يخزنهما `InvoiceService` صافيين للأسعار الشاملة)، ولا يُعتمد
+ * إلا إن تطابق بالهللة مع (الإجمالي − الضريبة)؛ وإلا يُترك الخصم والخاضع `null` فيعرضهما القالب «—» بدل أن يختلق رقماً.
+ * لا يُملأ `discount` الموجود (يفعّل ملاحظة الخصم في الجدول المشترك فيغيّر مخرجات القوالب المنشورة).
+ */
+function invoiceLineDetail(l: SourceInvoiceLine): Partial<DocumentModel['lines'][number]> {
+  if (l.line_subtotal === undefined || l.line_subtotal === null) return {};
+  const subtotal = storedMinor(l.line_subtotal);
+  const discount = storedMinor(l.line_discount) ?? 0;
+  const tax = riyalToMinor(l.line_tax);
+  const total = riyalToMinor(l.line_total);
+  const reconciled = subtotal !== null && subtotal - discount === total - tax;
+  const rate = l.tax_rate === null || l.tax_rate === undefined ? null : Number(l.tax_rate);
+  return {
+    unit: l.unit_name?.trim() || null,
+    taxRate: rate !== null && Number.isFinite(rate) ? rate : null,
+    lineDiscount: reconciled ? discount : null,
+    netAmount: reconciled ? subtotal - discount : null,
+  };
 }
 
 /**
@@ -171,6 +209,9 @@ export function buildInvoiceDocumentModel(input: {
       name: customer?.name ?? '—',
       vatNumber: customer?.vat_number ?? null,
       city: customer?.city ?? null,
+      // مفاتيح إضافية بشرط وجودها فقط، فلا يتغيّر شكل النموذج لمصدر لا يحملها.
+      ...(customer?.cr_number?.trim() ? { crNumber: customer.cr_number.trim() } : {}),
+      ...(customer?.address?.trim() ? { address: customer.address.trim() } : {}),
     },
     meta: {
       number: invoice.number,
@@ -191,6 +232,7 @@ export function buildInvoiceDocumentModel(input: {
         : riyalToMinor(l.unit_price_before_tax),
       tax: riyalToMinor(l.line_tax),
       total: riyalToMinor(l.line_total),
+      ...invoiceLineDetail(l),
     })),
     totals: {
       subtotal: riyalToMinor(invoice.subtotal),

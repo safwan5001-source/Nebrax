@@ -26,7 +26,8 @@ describe('resolveInvoiceParties (REM-14c)', () => {
       name: 'شركة الأفق', vat_number: '300000000000003', cr_number: '1010101010', city: 'الرياض', postal_code: '12643',
       building_no: '8228', phone: '0112345678', street: 'شارع الملك فهد',
     });
-    expect(r.customer).toEqual({ name: 'شركة الأمل', vat_number: '300111222333003', city: 'الدمام' });
+    // العنوان من أجزاء اللقطة بلا اختلاق؛ السجل التجاري الفارغ (null) لا يظهر مفتاحاً.
+    expect(r.customer).toEqual({ name: 'شركة الأمل', vat_number: '300111222333003', city: 'الدمام', address: '1234، شارع القدس، الفيحاء، الدمام، 31411' });
   });
 
   it('keeps only the non-legal branding fields (logo, currency) from the live company profile', () => {
@@ -64,7 +65,7 @@ describe('resolveInvoiceParties (REM-14c)', () => {
     };
     const r = resolveInvoiceParties({ status: 'posted', parties: sparse, company: null, customer: null });
     expect(r.company).toMatchObject({ name: '—', vat_number: null, cr_number: null, street: null, city: null, logo: null, currency: null });
-    expect(r.customer).toEqual({ name: '—', vat_number: null, city: null });
+    expect(r.customer).toEqual({ name: '—', vat_number: null, city: null, address: '1234، شارع القدس، الفيحاء، 31411' });
   });
 });
 
@@ -81,7 +82,7 @@ describe('buildInvoiceDocumentModel with a party snapshot', () => {
     expect(model.seller.crNumber).toBe('1010101010');
     expect(model.seller.address).toContain('شارع الملك فهد');
     expect(model.seller.address).toContain('12643');
-    expect(model.buyer).toEqual({ name: 'شركة الأمل', vatNumber: '300111222333003', city: 'الدمام' });
+    expect(model.buyer).toEqual({ name: 'شركة الأمل', vatNumber: '300111222333003', city: 'الدمام', address: '1234، شارع القدس، الفيحاء، الدمام، 31411' });
     expect(model.seller.logoUrl).toBe('data:image/png;base64,LIVE');
   });
 

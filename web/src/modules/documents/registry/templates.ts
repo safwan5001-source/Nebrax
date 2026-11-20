@@ -12,6 +12,7 @@ import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { QuotationProposal } from '../templates/quotation-proposal';
 import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
 import { VoucherCompact } from '../templates/voucher-compact';
+import { TaxInvoicePremium } from '../templates/tax-invoice-premium';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -98,6 +99,18 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     defaultTheme: 'blue',
     supportedPaper: ['a4', 'letter', 'a4_landscape', 'a5_landscape'],
     minContentWidthMm: 182,
+  },
+  // الفاتورة الضريبية الفاخرة A4 (AWJ-DOC-TAX-PREMIUM-V1): هوية مستقلة بترويسة كاملة العرض وبطاقات مستديرة.
+  // الورق المعلن A4/Letter/Legal عمودياً فقط؛ أقل عرض محتوى 182مم (هامش `@page` العام 14مم على A4)، فلا يُعلَن ما لم يُثبَت
+  // تخطيطه (الجدول بعشرة أعمدة مالية). أنواعه: الفاتورة الضريبية والمبسطة.
+  'tax-invoice-premium-v1': {
+    id: 'tax-invoice-premium-v1',
+    nameKey: 'premium_v1',
+    component: TaxInvoicePremium,
+    defaultTheme: 'green',
+    supportedPaper: ['a4', 'letter', 'legal'],
+    minContentWidthMm: 182,
+    documentTypes: ['tax_invoice', 'simplified_tax_invoice'],
   },
   'tax-invoice-thermal58': {
     id: 'tax-invoice-thermal58',

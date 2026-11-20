@@ -229,3 +229,21 @@ export const VOUCHER_COMPACT_STYLE: TemplateStyle = {
 export function isVoucherCompact(style: Pick<TemplateStyle, 'composition'>): boolean {
   return style.composition === 'voucher_compact';
 }
+
+/**
+ * Tax Invoice Premium V1 — فاتورة ضريبية A4 بترويسة هوية كاملة العرض وبطاقات مستديرة (AWJ-DOC-TAX-PREMIUM-V1).
+ * مربوط بـ`tax-invoice-premium-v1` فقط. الحشو صفر: الترويسة تمتد لحافة الورقة وكل قسم يحمل هامشه الأفقي.
+ */
+export const TAX_INVOICE_PREMIUM_STYLE: TemplateStyle = {
+  composition: 'tax_invoice_premium',
+  pagePadding: 'p-0',
+  cardRadius: 'rounded-xl',
+  sectionGap: 'mt-3',
+  tableHead: 'brand',
+  tableDensity: 'comfortable',
+  brandBar: false,
+};
+
+export function isTaxInvoicePremium(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'tax_invoice_premium';
+}

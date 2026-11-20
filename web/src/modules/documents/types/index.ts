@@ -88,6 +88,14 @@ export interface DocumentLine {
   taxRate?: number | null;
   /** سعر الوحدة المعروض مقرَّب: الكمية × السعر ≠ مبلغ السطر المخزَّن بالهللة. */
   unitPriceRounded?: boolean;
+  /** اسم وحدة البيع كما خُزِّن على سطر الفاتورة؛ يقرؤه قالب التفاصيل `tax-invoice-premium-v1` وحده. */
+  unit?: string | null;
+  /**
+   * خصم السطر المخزَّن كما هو (دون حصة خصم الرأس). حقل منفصل عن `discount` عمداً: `discount` يفعّل
+   * ملاحظة الخصم في الجدول المشترك، فتعبئته للفواتير كانت ستغيّر مخرجات القوالب المنشورة.
+   * لا يقرؤه إلا قالب التفاصيل؛ `null`/غياب = غير معروف ولا يُفترض صفراً.
+   */
+  lineDiscount?: number | null;
   tax: number;       // minor units
   total: number;     // minor units (شامل الضريبة للسطر)
 }
@@ -244,7 +252,7 @@ export interface TemplateConfig {
  * الهوية التركيبية للقالب. هذه قيمة عرضية محلية فقط؛ لا تحفظ داخل تعريف الكتلة
  * ولا تعيد تفسير المراجعات المثبتة أو نموذج المستند.
  */
-export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2' | 'quotation_proposal' | 'purchase_order_formal' | 'voucher_compact';
+export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2' | 'quotation_proposal' | 'purchase_order_formal' | 'voucher_compact' | 'tax_invoice_premium';
 
 export interface TemplateStyle {
   /** الهوية التركيبية للقالب ضمن الأقسام المشتركة. */

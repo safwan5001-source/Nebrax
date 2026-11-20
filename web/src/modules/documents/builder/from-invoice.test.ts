@@ -179,4 +179,39 @@ describe('buildInvoiceDocumentModel', () => {
     expect(model.totals.shipping).toBeUndefined();
     expect(model.totals.adjustment).toBeUndefined();
   });
+  describe('line detail for the premium tax-invoice template', () => {
+    const build = (line: Record<string, unknown>) => buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-1', invoice_date: '2026-11-20', payment_type: 'cash', subtotal: '1000.00', tax_amount: '150.00', total: '1150.00',
+        lines: [{ id: 'l1', description: 'صنف', quantity: 10, unit_price: '100.00', tax_rate: 15, line_tax: '150.00', line_total: '1150.00', ...line }],
+      },
+      company: null, customer: null, qr: null,
+    }).lines[0];
+
+    it('adds unit, rate, stored discount and taxable amount when the stored line values reconcile', () => {
+      const line = build({ unit_name: 'كرتون', line_subtotal: '1000.00', line_discount: '0.00' });
+      expect(line).toMatchObject({ unit: 'كرتون', taxRate: 15, lineDiscount: 0, netAmount: 100000 });
+    });
+
+    it('takes the stored discount as-is and derives taxable = subtotal − discount only when it matches total − tax', () => {
+      const line = build({ line_subtotal: '1100.00', line_discount: '100.00' });
+      expect(line).toMatchObject({ lineDiscount: 10000, netAmount: 100000 });
+    });
+
+    it('leaves discount and taxable unknown (null, never zero/invented) when the stored values do not reconcile', () => {
+      const line = build({ line_subtotal: '1000.00', line_discount: '50.00' });
+      expect(line.lineDiscount).toBeNull();
+      expect(line.netAmount).toBeNull();
+      expect(line.taxRate).toBe(15);
+    });
+
+    it('never fills the shared `discount` field (it would add the discount note to published templates)', () => {
+      expect(build({ line_subtotal: '1100.00', line_discount: '100.00' }).discount).toBeUndefined();
+    });
+
+    it('keeps a legacy payload (no line_subtotal) byte-for-byte unchanged — no detail keys at all', () => {
+      const line = build({});
+      expect(Object.keys(line).filter((key) => ['unit', 'taxRate', 'lineDiscount', 'netAmount'].includes(key))).toEqual([]);
+    });
+  });
 });
