@@ -255,6 +255,37 @@ describe('tax-invoice-premium-v1 PDF export boundaries and image properties', ()
   });
 });
 
+describe('tax-invoice-premium-v1 saved alignment', () => {
+  it('stamp and signature are aligned independently, each from its own saved alignment', () => {
+    const layout = FULL.map((i) => (i.key === 'stamp' ? { ...i, properties: { alignment: 'start' as const } } : i.key === 'signature' ? { ...i, properties: { alignment: 'end' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelector('[data-premium-stamp-cell]')!.className).toContain('justify-start');
+    expect(container.querySelector('[data-premium-signature-cell]')!.className).toContain('justify-end');
+  });
+
+  it('a stamp alone (signature block hidden) still follows its own alignment', () => {
+    const layout = FULL.map((i) => (i.key === 'signature' ? { ...i, visible: false } : i.key === 'stamp' ? { ...i, properties: { alignment: 'center' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelector('[data-premium-signature-cell]')).toBeNull();
+    expect(container.querySelector('[data-premium-stamp-cell]')!.className).toContain('justify-center');
+  });
+
+  it('item cells follow column alignment, then the saved items-block alignment, then the default', () => {
+    const layout = FULL.map((i) => (i.key === 'items' ? { ...i, properties: { alignment: 'end' as const, columns: [{ id: 'number' as const }, { id: 'product' as const, alignment: 'center' as const }, { id: 'quantity' as const }, { id: 'total' as const }] } } : i));
+    const { container } = renderPremium(sample(), layout);
+    const heads = [...container.querySelectorAll('thead th')];
+    expect(heads[0].className).toContain('text-end'); // يرث محاذاة الكتلة (لا الافتراضي start)
+    expect(heads[1].className).toContain('text-center'); // محاذاة العمود تغلب
+    expect(heads[2].className).toContain('text-end');
+    const firstRow = [...container.querySelector('[data-premium-row="line"]')!.children];
+    expect(firstRow[0].className).toContain('text-end');
+    expect(firstRow[1].className).toContain('text-center');
+    cleanup();
+    const plain = renderPremium(sample(), FULL);
+    expect([...plain.container.querySelectorAll('thead th')][1].className).toContain('text-start'); // الافتراضي كما كان
+  });
+});
+
 describe('tax-invoice-premium-v1 multi-page', () => {
   it('40 lines render without filler and keep the summary/signature blocks unsplittable', () => {
     const model = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });

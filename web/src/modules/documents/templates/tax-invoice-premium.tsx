@@ -256,6 +256,8 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const properties = useDocBlockProperties('items');
   const columns = resolveColumns(model, properties.columns);
   const widths = premiumColumnWidths(columns);
+  // كما `DocItemsTable`: محاذاة العمود ثم محاذاة كتلة البنود المحفوظة ثم الافتراضي.
+  const alignOf = (column: { id: PremiumColumn['id']; alignment?: DocBlockAlignment }): DocBlockAlignment => column.alignment ?? properties.alignment ?? defaultAlignment(column.id);
   const money = (minor: number | null | undefined) => (minor === null || minor === undefined ? '—' : formatModernAmount(minor, model.currency));
   const dash = (minor: number | null | undefined) => (minor === null || minor === undefined || minor === 0 ? '–' : formatModernAmount(minor, model.currency));
   const fillers = Math.max(0, PREMIUM.minTableRows - model.lines.length);
@@ -300,7 +302,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
               {columns.map((column, index) => (
                 <th
                   key={`${column.id}-${index}`}
-                  className={cn(HEAD_CELL, textAlign[column.alignment ?? defaultAlignment(column.id)])}
+                  className={cn(HEAD_CELL, textAlign[alignOf(column)])}
                   style={{ width: `${widths[index]}%`, ...(index > 0 ? { borderInlineStart: '1px solid rgba(255,255,255,0.18)' } : {}) }}
                 >
                   <Bi pair={column.label ?? PREMIUM_COLUMN_LABELS[column.id]} mode={mode} enClassName="font-medium" />
@@ -312,7 +314,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
             {model.lines.map((line, rowIndex) => (
               <tr key={line.id} className="break-inside-avoid" style={{ borderTop: `1px solid ${lineBorder}` }} data-premium-row="line">
                 {columns.map((column, index) => (
-                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, textAlign[column.alignment ?? defaultAlignment(column.id)])} style={cellStyle(index)}>
+                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, textAlign[alignOf(column)])} style={cellStyle(index)}>
                     {cell(column.id, line, rowIndex)}
                   </td>
                 ))}
@@ -477,14 +479,18 @@ function SignatureRow({ model, mode, showSignature, showStamp }: { model: Docume
       <div className={box} style={{ borderColor: 'var(--pv-line)' }} data-premium-sign-box="seller">
         <div className="text-[10px] font-bold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('seller_signature')} mode={mode} /></div>
         {sign || stamp ? (
-          <div className={cn('mt-1 flex items-end gap-4', blockJustifyClassName(signatureProps))}>
+          <div className="mt-1 flex items-end gap-4">
             {sign ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data URL
-              <img src={sign} alt="signature" className={cn(signatureProps.image_size ? getDocumentImagePreviewClass('signature', signatureProps.image_size) : COMPACT_SIGNATURE, getDocumentImagePreviewOpacityClass('signature', signatureProps.image_opacity))} />
+              <div className={cn('flex min-w-0 flex-1', blockJustifyClassName(signatureProps))} data-premium-signature-cell>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+                <img src={sign} alt="signature" className={cn(signatureProps.image_size ? getDocumentImagePreviewClass('signature', signatureProps.image_size) : COMPACT_SIGNATURE, getDocumentImagePreviewOpacityClass('signature', signatureProps.image_opacity))} />
+              </div>
             ) : null}
             {stamp ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data URL
-              <img src={stamp} alt="stamp" className={cn(stampProps.image_size ? getDocumentImagePreviewClass('stamp', stampProps.image_size) : COMPACT_STAMP, getDocumentImagePreviewOpacityClass('stamp', stampProps.image_opacity))} />
+              <div className={cn('flex min-w-0 flex-1', blockJustifyClassName(stampProps))} data-premium-stamp-cell>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+                <img src={stamp} alt="stamp" className={cn(stampProps.image_size ? getDocumentImagePreviewClass('stamp', stampProps.image_size) : COMPACT_STAMP, getDocumentImagePreviewOpacityClass('stamp', stampProps.image_opacity))} />
+              </div>
             ) : null}
           </div>
         ) : null}
