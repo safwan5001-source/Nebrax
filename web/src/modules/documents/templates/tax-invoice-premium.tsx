@@ -280,8 +280,9 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const fillers = Math.max(0, PREMIUM.minTableRows - model.lines.length);
   const lineBorder = 'var(--pv-line)';
 
-  // الأعمدة المالية تُحاذى على الفاصلة العشرية: كل رقم يملأ عرضاً أدنى = أطول نص في عموده، فتصطف الخانات
+  // الأعمدة المالية تُحاذى على الفاصلة العشرية: كل رقم يملأ عرضاً أدنى = أطول نصّ في عموده (`ch`)، فتصطف الخانات
   // رغم تمركز العمود (الصيغة نفسها `formatModernAmount`؛ لا حساب ولا تقريب جديد).
+  // تُحسب النصوص والعرض **مرة واحدة** لكل عمود مالي ظاهر (O(أسطر × أعمدة)) — لا إعادة مسح لكل خلية.
   const MONEY: Partial<Record<PremiumColumn['id'], (line: DocumentModel['lines'][number]) => string>> = {
     unit_price: (l) => money(l.unitPrice),
     price_before_tax: (l) => money(l.priceBeforeTax),
@@ -290,10 +291,19 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
     tax: (l) => money(l.tax),
     total: (l) => money(l.total),
   };
-  const moneyWidthCh = (id: PremiumColumn['id']): number => Math.max(0, ...model.lines.map((l) => MONEY[id]?.(l).length ?? 0));
-  const moneyCell = (id: PremiumColumn['id'], line: DocumentModel['lines'][number], className?: string) => (
-    <span dir="ltr" className={cn('inline-block text-end font-sans tabular-nums', className)} style={{ minWidth: `${moneyWidthCh(id)}ch` }}>{MONEY[id]?.(line)}</span>
-  );
+  const moneyColumns = new Map<PremiumColumn['id'], { texts: string[]; widthCh: number }>();
+  for (const column of columns) {
+    const text = MONEY[column.id];
+    if (!text || moneyColumns.has(column.id)) continue;
+    const texts = model.lines.map(text);
+    moneyColumns.set(column.id, { texts, widthCh: texts.reduce((max, t) => Math.max(max, t.length), 0) });
+  }
+  const moneyCell = (id: PremiumColumn['id'], rowIndex: number, className?: string) => {
+    const col = moneyColumns.get(id);
+    return (
+      <span dir="ltr" className={cn('inline-block text-end font-sans tabular-nums', className)} style={{ minWidth: `${col?.widthCh ?? 0}ch` }}>{col?.texts[rowIndex]}</span>
+    );
+  };
 
   const cell = (id: PremiumColumn['id'], line: DocumentModel['lines'][number], index: number): ReactNode => {
     switch (id) {
@@ -313,13 +323,13 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
       case 'barcode': return <span className={cn('font-sans tabular-nums', size.code)}>{line.barcode || '—'}</span>;
       case 'unit': return <span className="break-words">{line.unit?.trim() || '—'}</span>;
       case 'quantity': return <span className="font-sans tabular-nums font-semibold">{line.quantity}</span>;
-      case 'unit_price': return moneyCell(id, line);
-      case 'price_before_tax': return moneyCell(id, line);
-      case 'line_discount': return moneyCell(id, line);
-      case 'line_net': return moneyCell(id, line);
+      case 'unit_price': return moneyCell(id, index);
+      case 'price_before_tax': return moneyCell(id, index);
+      case 'line_discount': return moneyCell(id, index);
+      case 'line_net': return moneyCell(id, index);
       case 'tax_rate': return <span className="font-sans tabular-nums">{line.taxRate === null || line.taxRate === undefined ? '—' : `${line.taxRate}%`}</span>;
-      case 'tax': return moneyCell(id, line);
-      case 'total': return moneyCell(id, line, 'font-extrabold');
+      case 'tax': return moneyCell(id, index);
+      case 'total': return moneyCell(id, index, 'font-extrabold');
     }
   };
 

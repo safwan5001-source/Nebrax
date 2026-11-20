@@ -403,6 +403,29 @@ describe('tax-invoice-premium-v1 V1.1 visual refinement', () => {
   });
 });
 
+describe('tax-invoice-premium-v1 render cost', () => {
+  it('formats each money cell once: formatter constructions grow linearly with lines, not quadratically', () => {
+    const base = sample();
+    const lines = Array.from({ length: 200 }, (_, i) => ({ ...base.lines[i % base.lines.length], id: `perf-${i}` }));
+    const spy = vi.spyOn(Intl, 'NumberFormat');
+    try {
+      renderPremium({ ...base, lines });
+      // ≈ 200 أسطر × 5 أعمدة مالية + الإجماليات؛ الإعادة لكل خلية كانت 6 × 200² ≈ 240,000.
+      expect(spy.mock.calls.length).toBeLessThan(2500);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('still aligns decimals after the one-pass width computation (same min width for all rows of a column)', () => {
+    const { container } = renderPremium(sample());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    const total = rows.map((r) => r.lastElementChild!.querySelector<HTMLElement>('span[dir="ltr"]')!.style.minWidth);
+    expect(new Set(total).size).toBe(1);
+    expect(total[0]).toBe('6ch');
+  });
+});
+
 describe('tax-invoice-premium-v1 multi-page', () => {
   it('40 lines render without filler and keep the summary/signature blocks unsplittable', () => {
     const model = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });
