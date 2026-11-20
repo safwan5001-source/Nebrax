@@ -40,6 +40,7 @@ import {
   type PremiumLabelPair,
 } from '../presentation/tax-invoice-premium';
 import { amountToWords } from '../utils/amount-words';
+import { getDocumentImagePreviewClass, getDocumentImagePreviewOpacityClass } from '../utils/block-image-size';
 import { resolveDirection } from '../utils/direction';
 import { TAX_INVOICE_PREMIUM_STYLE } from './template-styles';
 
@@ -122,7 +123,7 @@ function PremiumHeader({ model, showLogo, mode, locale }: { model: DocumentModel
   const bilingual = mode === 'bilingual';
 
   return (
-    <header data-premium-header>
+    <header data-premium-header data-premium-mode={mode}>
       <div className={cn('flex items-center justify-between gap-6 px-8 pb-3 pt-4 text-white', blockTextClassName(properties))} style={{ background: 'var(--pv-deep)' }}>
         <div className="min-w-0">
           <h1 className={cn('font-extrabold leading-tight', mode === 'en' ? 'text-[20px]' : 'text-[22px]')}>
@@ -456,6 +457,10 @@ function AmountWords({ model, mode }: { model: DocumentModel; mode: Mode }) {
   );
 }
 
+/** حجم الصورة الافتراضي (بلا `image_size` محفوظ) مضغوط كي تبقى عينة المرجع في صفحة A4 واحدة؛ الحجم المحفوظ يغلب بصنوف الكتل المشتركة. */
+const COMPACT_SIGNATURE = 'max-h-[11mm] w-auto max-w-full object-contain';
+const COMPACT_STAMP = 'max-h-[13mm] w-auto max-w-full object-contain';
+
 function SignatureRow({ model, mode, showSignature, showStamp }: { model: DocumentModel; mode: Mode; showSignature: boolean; showStamp: boolean }) {
   const signatureProps = useDocBlockProperties('signature');
   const stampProps = useDocBlockProperties('stamp');
@@ -475,11 +480,11 @@ function SignatureRow({ model, mode, showSignature, showStamp }: { model: Docume
           <div className={cn('mt-1 flex items-end gap-4', blockJustifyClassName(signatureProps))}>
             {sign ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL
-              <img src={sign} alt="signature" className="max-h-[11mm] w-auto object-contain" />
+              <img src={sign} alt="signature" className={cn(signatureProps.image_size ? getDocumentImagePreviewClass('signature', signatureProps.image_size) : COMPACT_SIGNATURE, getDocumentImagePreviewOpacityClass('signature', signatureProps.image_opacity))} />
             ) : null}
             {stamp ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL
-              <img src={stamp} alt="stamp" className={cn('max-h-[13mm] w-auto object-contain', stampProps.image_opacity === 'faint' && 'opacity-40', stampProps.image_opacity === 'soft' && 'opacity-70')} />
+              <img src={stamp} alt="stamp" className={cn(stampProps.image_size ? getDocumentImagePreviewClass('stamp', stampProps.image_size) : COMPACT_STAMP, getDocumentImagePreviewOpacityClass('stamp', stampProps.image_opacity))} />
             ) : null}
           </div>
         ) : null}
@@ -586,10 +591,10 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
         directionSample={model.seller.name || model.buyer.name}
         style={TAX_INVOICE_PREMIUM_STYLE}
         rootId={rootId}
+        rootStyle={vars}
       >
-        <div className="flex min-h-0 flex-1 flex-col" style={vars} data-tax-invoice-premium data-premium-mode={mode}>
-          {items.map((item) => (item.visible ? <Fragment key={item.key}>{render(item.key)}</Fragment> : null))}
-        </div>
+        {/* الأقسام أبناء مباشرون للجذر: مصدّر PDF يقصّ الصفحات عند حدود `children` فلا يشطر الإجماليات أو الـQR أو التوقيع. */}
+        {items.map((item) => (item.visible ? <Fragment key={item.key}>{render(item.key)}</Fragment> : null))}
       </DocLayout>
     </DocBlockPropertiesProvider>
     </PremiumDirContext.Provider>

@@ -65,7 +65,7 @@ describe('tax-invoice-premium-v1 registration', () => {
 describe('tax-invoice-premium-v1 rendering', () => {
   it('renders the reference structure with real model data', () => {
     const { container } = renderPremium(sample());
-    const root = container.querySelector('[data-tax-invoice-premium]')!;
+    const root = container.querySelector('[data-doc-composition="tax_invoice_premium"]')!;
     expect(container.querySelector('[data-doc-composition="tax_invoice_premium"]')).toBeTruthy();
     expect(root.querySelector('[data-premium-header] h1')?.textContent).toBe('فاتورة ضريبية');
     expect(root.querySelector('[data-premium-header]')?.textContent).toContain('Tax Invoice');
@@ -153,7 +153,7 @@ describe('tax-invoice-premium-v1 direction and language', () => {
   it('LTR English document renders English-only labels and an English amount in words', () => {
     locale.current = 'en';
     const { container } = renderPremium(sample('ltr'));
-    expect(container.querySelector('[data-premium-mode]')?.getAttribute('data-premium-mode')).toBe('en');
+    expect(container.querySelector('[data-premium-header]')?.getAttribute('data-premium-mode')).toBe('en');
     expect(container.querySelector('[data-doc-paper]')?.getAttribute('dir')).toBe('ltr');
     expect(container.querySelector('[data-premium-header] h1')?.textContent).toBe('Tax Invoice');
     expect(container.querySelector('[data-premium-bilingual]')).toBeNull();
@@ -177,7 +177,7 @@ describe('tax-invoice-premium-v1 studio integration (layout & block properties)'
       { key: 'footer', visible: false },
     ];
     const { container } = renderPremium(sample(), layout);
-    const order = [...container.querySelectorAll('[data-tax-invoice-premium] > [data-premium-header], [data-tax-invoice-premium] > section, [data-tax-invoice-premium] > footer')].map((n) => n.tagName === 'HEADER' ? 'header' : n.tagName === 'FOOTER' ? 'footer' : n.getAttribute('data-premium-items') !== null ? 'items' : 'parties');
+    const order = [...container.querySelectorAll('[data-doc-composition="tax_invoice_premium"] > header, [data-doc-composition="tax_invoice_premium"] > section, [data-doc-composition="tax_invoice_premium"] > footer')].map((n) => n.tagName === 'HEADER' ? 'header' : n.tagName === 'FOOTER' ? 'footer' : n.getAttribute('data-premium-items') !== null ? 'items' : 'parties');
     expect(order).toEqual(['header', 'items', 'parties']);
     expect(container.querySelector('[data-premium-summary]')).toBeNull();
   });
@@ -224,10 +224,34 @@ describe('tax-invoice-premium-v1 studio integration (layout & block properties)'
 
   it('follows the chosen theme: green = deep green identity, blue = derived deep blue', () => {
     const green = renderPremium(sample());
-    expect(green.container.querySelector<HTMLElement>('[data-tax-invoice-premium]')!.style.getPropertyValue('--pv-deep')).toBe('#0b3d2e');
+    expect(green.container.querySelector<HTMLElement>('[data-doc-composition="tax_invoice_premium"]')!.style.getPropertyValue('--pv-deep')).toBe('#0b3d2e');
     cleanup();
     const blue = render(<TaxInvoicePremium model={sample()} theme={getTheme('blue')} formatMoney={formatMoney} />);
-    expect(blue.container.querySelector<HTMLElement>('[data-tax-invoice-premium]')!.style.getPropertyValue('--pv-deep')).not.toBe('#0b3d2e');
+    expect(blue.container.querySelector<HTMLElement>('[data-doc-composition="tax_invoice_premium"]')!.style.getPropertyValue('--pv-deep')).not.toBe('#0b3d2e');
+  });
+});
+
+describe('tax-invoice-premium-v1 PDF export boundaries and image properties', () => {
+  it('every section is a direct child of the capture root so the PDF exporter can break between them', () => {
+    const { container } = renderPremium(sample(), FULL);
+    const root = container.querySelector('[data-doc-composition="tax_invoice_premium"]')!;
+    const direct = [...root.children].map((c) => c.getAttribute('data-premium-header') !== null ? 'header' : c.getAttribute('data-premium-parties') !== null ? 'parties' : c.getAttribute('data-premium-items') !== null ? 'items' : c.getAttribute('data-premium-summary') !== null ? 'summary' : c.getAttribute('data-premium-words') !== null ? 'words' : c.getAttribute('data-premium-signatures') !== null ? 'signatures' : c.getAttribute('data-premium-footer') !== null ? 'footer' : 'other');
+    expect(direct).toEqual(['header', 'parties', 'items', 'summary', 'words', 'signatures', 'footer']);
+  });
+
+  it('honours the saved image size and opacity for stamp and signature (same classes as DocStamp/DocSignature)', () => {
+    const layout = FULL.map((i) => (i.key === 'stamp' ? { ...i, properties: { image_size: 'lg' as const, image_opacity: 'faint' as const } } : i.key === 'signature' ? { ...i, properties: { image_size: 'sm' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    const stamp = container.querySelector('img[alt="stamp"]')!;
+    const sign = container.querySelector('img[alt="signature"]')!;
+    expect(stamp.className).toContain('h-32');
+    expect(stamp.className).toContain('opacity-50');
+    expect(sign.className).toContain('h-10');
+    cleanup();
+    const plain = renderPremium(sample(), FULL);
+    // بلا حجم محفوظ: الحجم المضغوط الافتراضي (يبقي العينة في صفحة واحدة).
+    expect(plain.container.querySelector('img[alt="stamp"]')!.className).toContain('max-h-[13mm]');
+    expect(plain.container.querySelector('img[alt="signature"]')!.className).toContain('max-h-[11mm]');
   });
 });
 

@@ -19,6 +19,7 @@ export function DocLayout({
   directionSample,
   style = CLASSIC_STYLE,
   rootId = 'print-root',
+  rootStyle,
   children,
 }: {
   theme: DocumentTheme;
@@ -26,6 +27,8 @@ export function DocLayout({
   directionSample?: string | null;
   style?: TemplateStyle;
   rootId?: string | null;
+  /** متغيّرات/أنماط إضافية على الجذر نفسه (للقوالب التي تحتاج أقسامها أبناءً مباشرين للجذر كي يراها مصدّر PDF). */
+  rootStyle?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   const dir = resolveDirection(direction, directionSample);
@@ -40,11 +43,12 @@ export function DocLayout({
         style={frame
           ? {
               ...themeCssVars(theme),
+              ...rootStyle,
               width: `${frame.contentWidthMm}mm`,
               maxWidth: `${frame.contentWidthMm}mm`,
               minHeight: `${frame.contentMinHeightMm}mm`,
             }
-          : themeCssVars(theme)}
+          : { ...themeCssVars(theme), ...rootStyle }}
         data-doc-composition={style.composition}
         data-doc-paper
         data-doc-narrow={isNarrowDocPageFrame(frame) ? '' : undefined}
