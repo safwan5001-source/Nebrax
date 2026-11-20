@@ -481,8 +481,10 @@ function SummarySection({ model, mode, showQr, composed }: { model: DocumentMode
 /** نص الملاحظات والشروط أطول من هذا (محارف) ⇒ يُفصل عن صف الإجماليات ويصير قابلاً للانقسام عبر الصفحات. */
 const LONG_NOTES_CHARS = 420;
 
-function notesLength(model: DocumentModel, keys: ReadonlySet<DocSectionKey>): number {
-  return (keys.has('notes') ? model.notes?.trim().length ?? 0 : 0) + (keys.has('terms') ? model.terms?.trim().length ?? 0 : 0);
+/** يقيس النص الفعلي الذي ستعرضه `NotesCard`: الشروط = المحتوى الثابت المحفوظ في الاستوديو إن وُجد وإلا `model.terms`. */
+function notesLength(model: DocumentModel, keys: ReadonlySet<DocSectionKey>, termsStatic?: string): number {
+  const terms = (termsStatic ?? model.terms)?.trim().length ?? 0;
+  return (keys.has('notes') ? model.notes?.trim().length ?? 0 : 0) + (keys.has('terms') ? terms : 0);
 }
 
 function CardsRow({ model, mode, keys, long = false }: { model: DocumentModel; mode: Mode; keys: ReadonlySet<DocSectionKey>; long?: boolean }) {
@@ -630,7 +632,7 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
       case 'summary': {
         const keys = new Set<DocSectionKey>(cardKeys);
         // ملاحظات/شروط طويلة: الإجماليات والـQR صف مضغوط، وبطاقاتها قسم مستقل قابل للانقسام (بدل دفع الصف كله لصفحة جديدة).
-        if (notesLength(model, keys) > LONG_NOTES_CHARS) {
+        if (notesLength(model, keys, blockProperties.terms?.static_content) > LONG_NOTES_CHARS) {
           return (
             <>
               <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={new Set<DocSectionKey>(keys.has('bank') ? ['bank'] : [])} />

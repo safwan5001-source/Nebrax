@@ -359,6 +359,22 @@ describe('tax-invoice-premium-v1 V1.1 visual refinement', () => {
     expect(container.querySelector('[data-premium-totals]')).toBeTruthy();
   });
 
+  it('measures the effective terms (saved static content) when choosing the layout, not only model.terms', () => {
+    const longStatic = 'شروط ثابتة طويلة من الاستوديو '.repeat(70);
+    const layout = FULL.map((i) => (i.key === 'terms' ? { ...i, properties: { static_content: longStatic } } : i));
+    const { container } = renderPremium({ ...sample(), terms: 'قصير', notes: null }, layout);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeNull();
+    const cards = container.querySelector('[data-premium-cards="long"]')!;
+    expect(cards.textContent).toContain('شروط ثابتة طويلة');
+    expect(cards.className).not.toContain('break-inside-avoid');
+    cleanup();
+    // العكس: محتوى ثابت قصير يغلب model.terms الطويل ⇒ يبقى التركيب المضغوط داخل صف الإجماليات.
+    const shortStatic = FULL.map((i) => (i.key === 'terms' ? { ...i, properties: { static_content: 'قصير' } } : i));
+    const compact = renderPremium({ ...sample(), terms: 'ط'.repeat(900), notes: null }, shortStatic);
+    expect(compact.container.querySelector('[data-premium-cards]')).toBeNull();
+    expect(compact.container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
+  });
+
   it('keeps the original inline composition for ordinary notes', () => {
     const { container } = renderPremium(sample(), FULL);
     expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
