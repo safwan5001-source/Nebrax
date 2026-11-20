@@ -249,14 +249,21 @@ function defaultAlignment(id: PremiumColumn['id']): DocBlockAlignment {
   return id === 'product' || id === 'description' ? 'start' : 'center';
 }
 
-const HEAD_CELL = 'px-1.5 py-1 text-[9.5px] font-extrabold leading-tight whitespace-normal break-words';
-const BODY_CELL = 'px-1.5 py-0.5 text-[10.5px] leading-snug align-middle';
+const HEAD_CELL = 'px-1.5 py-1 font-extrabold leading-tight whitespace-normal break-words';
+const BODY_CELL = 'px-1.5 py-0.5 leading-snug align-middle';
+/** الأحجام المضغوطة الافتراضية؛ الحجم المحفوظ للكتلة (`font_size`) يغلبها كاملةً كما في `blockTextClassName`. */
+const COMPACT_ITEMS = { head: 'text-[9.5px]', body: 'text-[10.5px]', name: 'text-[11.5px]', secondary: 'text-[9px]', code: 'text-[10px]' } as const;
+const SAVED_ITEMS_SIZE = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' } as const;
 
 function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const properties = useDocBlockProperties('items');
   const columns = resolveColumns(model, properties.columns);
   const widths = premiumColumnWidths(columns);
   // كما `DocItemsTable`: محاذاة العمود ثم محاذاة كتلة البنود المحفوظة ثم الافتراضي.
+  const saved = properties.font_size ? SAVED_ITEMS_SIZE[properties.font_size] : null;
+  const size = saved
+    ? { head: saved, body: saved, name: saved, secondary: 'text-[0.8em]', code: saved }
+    : COMPACT_ITEMS;
   const alignOf = (column: { id: PremiumColumn['id']; alignment?: DocBlockAlignment }): DocBlockAlignment => column.alignment ?? properties.alignment ?? defaultAlignment(column.id);
   const money = (minor: number | null | undefined) => (minor === null || minor === undefined ? '—' : formatModernAmount(minor, model.currency));
   const dash = (minor: number | null | undefined) => (minor === null || minor === undefined || minor === 0 ? '–' : formatModernAmount(minor, model.currency));
@@ -271,14 +278,14 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
         const secondary = line.description?.trim() && line.description.trim() !== name ? line.description.trim() : null;
         return (
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-            <span dir="auto" className="break-words text-[11.5px] font-bold text-black">{name}</span>
-            {secondary ? <span dir="auto" className="break-words text-[9px] font-normal" style={{ color: 'var(--pv-muted)' }}>{secondary}</span> : null}
+            <span dir="auto" className={cn('break-words font-bold text-black', size.name)}>{name}</span>
+            {secondary ? <span dir="auto" className={cn('break-words font-normal', size.secondary)} style={{ color: 'var(--pv-muted)' }}>{secondary}</span> : null}
           </div>
         );
       }
       case 'description': return <span className="break-words">{line.description || '—'}</span>;
-      case 'product_code': return <span className="font-sans tabular-nums break-words text-[10px]">{line.productCode || '—'}</span>;
-      case 'barcode': return <span className="font-sans tabular-nums text-[10px]">{line.barcode || '—'}</span>;
+      case 'product_code': return <span className={cn('break-words font-sans tabular-nums', size.code)}>{line.productCode || '—'}</span>;
+      case 'barcode': return <span className={cn('font-sans tabular-nums', size.code)}>{line.barcode || '—'}</span>;
       case 'unit': return <span className="break-words">{line.unit?.trim() || '—'}</span>;
       case 'quantity': return <span className="font-sans tabular-nums font-semibold">{line.quantity}</span>;
       case 'unit_price': return <span className="font-sans tabular-nums">{money(line.unitPrice)}</span>;
@@ -302,7 +309,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
               {columns.map((column, index) => (
                 <th
                   key={`${column.id}-${index}`}
-                  className={cn(HEAD_CELL, textAlign[alignOf(column)])}
+                  className={cn(HEAD_CELL, size.head, textAlign[alignOf(column)])}
                   style={{ width: `${widths[index]}%`, ...(index > 0 ? { borderInlineStart: '1px solid rgba(255,255,255,0.18)' } : {}) }}
                 >
                   <Bi pair={column.label ?? PREMIUM_COLUMN_LABELS[column.id]} mode={mode} enClassName="font-medium" />
@@ -314,7 +321,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
             {model.lines.map((line, rowIndex) => (
               <tr key={line.id} className="break-inside-avoid" style={{ borderTop: `1px solid ${lineBorder}` }} data-premium-row="line">
                 {columns.map((column, index) => (
-                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, textAlign[alignOf(column)])} style={cellStyle(index)}>
+                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, size.body, textAlign[alignOf(column)])} style={cellStyle(index)}>
                     {cell(column.id, line, rowIndex)}
                   </td>
                 ))}
@@ -323,7 +330,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
             {Array.from({ length: fillers }, (_, i) => (
               <tr key={`filler-${i}`} className="break-inside-avoid" style={{ borderTop: `1px solid ${lineBorder}`, height: '1.5rem' }} data-premium-row="filler" aria-hidden>
                 {columns.map((column, index) => (
-                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, 'text-center')} style={cellStyle(index)}>
+                  <td key={`${column.id}-${index}`} className={cn(BODY_CELL, size.body, 'text-center')} style={cellStyle(index)}>
                     {column.id === 'number' ? <span className="font-sans tabular-nums" style={{ color: 'var(--pv-muted)' }}>{model.lines.length + i + 1}</span> : null}
                   </td>
                 ))}

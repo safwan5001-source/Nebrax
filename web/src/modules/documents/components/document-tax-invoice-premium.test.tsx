@@ -286,6 +286,26 @@ describe('tax-invoice-premium-v1 saved alignment', () => {
   });
 });
 
+describe('tax-invoice-premium-v1 saved items font size', () => {
+  const withSize = (font_size?: 'sm' | 'md' | 'lg') => FULL.map((i) => (i.key === 'items' && font_size ? { ...i, properties: { font_size } } : i));
+
+  it('applies the saved size to header cells, body cells and product/code content, replacing the fixed sizes', () => {
+    const { container } = renderPremium(sample(), withSize('lg'));
+    const root = container.querySelector('[data-premium-items]')!;
+    expect(root.querySelector('thead th')!.className).toContain('text-base');
+    expect(root.querySelector('tbody tr td')!.className).toContain('text-base');
+    expect(root.innerHTML).not.toMatch(/text-\[(?:9\.5|10\.5|11\.5|9|10)px\]/);
+    expect(root.querySelector('tbody td span[dir="auto"]')!.className).toContain('text-base');
+  });
+
+  it('keeps the compact sizes when no size is saved', () => {
+    const { container } = renderPremium(sample(), withSize());
+    const root = container.querySelector('[data-premium-items]')!;
+    expect(root.querySelector('thead th')!.className).toContain('text-[9.5px]');
+    expect(root.querySelector('tbody tr td')!.className).toContain('text-[10.5px]');
+  });
+});
+
 describe('tax-invoice-premium-v1 multi-page', () => {
   it('40 lines render without filler and keep the summary/signature blocks unsplittable', () => {
     const model = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });
