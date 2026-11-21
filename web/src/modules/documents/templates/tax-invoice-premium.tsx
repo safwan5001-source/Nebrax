@@ -30,8 +30,10 @@ import {
   PREMIUM,
   PREMIUM_COLUMN_LABELS,
   PREMIUM_LABELS,
+  PREMIUM_STUDIO_DEFAULT_COLUMNS,
   premiumColumnWidths,
-  premiumDefaultColumns,
+  premiumResolveColumns,
+  premiumSkuLine,
   premiumMetaTiles,
   premiumPalette,
   premiumTotalsRows,
@@ -62,6 +64,16 @@ const PREMIUM_DEFAULT_LAYOUT: readonly DocSectionLayoutItem[] = [
   { key: 'stamp', visible: true },
   { key: 'footer', visible: true },
 ];
+
+/**
+ * التخطيط الذي يحفظه الاستوديو حين يُفعَّل «رمز المنتج» على القالب الفاخر: تخطيطه الافتراضي مع أعمدة القالب الافتراضية + `product_code`
+ * (يُرسم الرمز تحت اسم الصنف لا عموداً مستقلاً). للتحقق البصري/الاختبار؛ لا يُستعمل في مسار الإنتاج.
+ */
+export function premiumLayoutWithSku(): DocSectionLayoutItem[] {
+  return PREMIUM_DEFAULT_LAYOUT.map((item) => (item.key === 'items'
+    ? { ...item, properties: { columns: [...PREMIUM_STUDIO_DEFAULT_COLUMNS, 'product_code' as const].map((id) => ({ id })) } }
+    : { ...item }));
+}
 
 type Mode = DocumentLabelMode;
 
@@ -170,7 +182,7 @@ function MetaTiles({ model, mode }: { model: DocumentModel; mode: Mode }) {
       {tiles.map((tile) => (
         <div key={tile.key} className="min-w-0 rounded-xl px-3 py-1" style={{ background: 'var(--pv-soft)' }} data-premium-meta-tile={tile.key}>
           <div className="text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}>
-            <Bi pair={label(tile.key === 'invoice_no' ? 'invoice_no' : tile.key === 'issue_date' ? 'issue_date' : tile.key === 'due_date' ? 'due_date' : 'payment')} mode={mode} />
+            <Bi pair={label(tile.key)} mode={mode} />
           </div>
           <div className="mt-0.5 break-words text-[13px] font-extrabold leading-snug text-black">
             {tile.valueLabel ? <Bi pair={label(tile.valueLabel)} mode={mode} inline /> : ltrValue(tile.value)}
@@ -244,18 +256,20 @@ function PartiesSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   );
 }
 
-/** عمود مصرَّح به: أعمدة المحرر المحفوظة تُحوَّل كما هي (التسمية المخصصة تغلب)، وإلا الافتراضي من البيانات المتاحة. */
-function resolveColumns(model: DocumentModel, saved: readonly DocItemsColumn[] | undefined): (PremiumColumn & { alignment?: DocBlockAlignment })[] {
-  if (!saved) return premiumDefaultColumns(model.lines);
-  return saved.map((column) => ({
-    id: column.id,
-    alignment: column.alignment,
-    label: column.label?.trim() ? { ar: column.label.trim(), en: column.label.trim() } : undefined,
-  }));
-}
-
 function defaultAlignment(id: PremiumColumn['id']): DocBlockAlignment {
   return id === 'product' || id === 'description' ? 'start' : 'center';
+}
+
+/** رمز المنتج تحت الاسم: سطر مستقل صغير؛ لا يظهر إن لم يتوفر الرمز أو كان مكرراً في الاسم/الوصف. */
+function SkuLine({ line, className }: { line: DocumentModel['lines'][number]; className?: string }) {
+  const code = premiumSkuLine(line);
+  if (!code) return null;
+  return (
+    <div className={cn('mt-0.5 flex items-baseline gap-1.5 text-[9.5px] leading-snug', className)} style={{ color: 'var(--pv-muted)' }} data-premium-sku>
+      <span className="font-semibold" dir="ltr">SKU</span>
+      <span dir="ltr" className="min-w-0 break-all font-sans tabular-nums">{code}</span>
+    </div>
+  );
 }
 
 const HEAD_CELL = 'px-1.5 py-1 font-extrabold leading-snug whitespace-normal break-words';
@@ -267,8 +281,9 @@ const SAVED_ITEMS_SIZE = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' } as co
 
 function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const properties = useDocBlockProperties('items');
-  const columns = resolveColumns(model, properties.columns);
+  const { columns, skuInName } = premiumResolveColumns(model.lines, properties.columns);
   const widths = premiumColumnWidths(columns);
+  const hasProductColumn = columns.some((column) => column.id === 'product');
   // كما `DocItemsTable`: محاذاة العمود ثم محاذاة كتلة البنود المحفوظة ثم الافتراضي.
   const saved = properties.font_size ? SAVED_ITEMS_SIZE[properties.font_size] : null;
   const size = saved
@@ -312,13 +327,21 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
         const name = line.productName?.trim() || line.description?.trim() || '—';
         const secondary = line.description?.trim() && line.description.trim() !== name ? line.description.trim() : null;
         return (
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-            <span dir="auto" className={cn('break-words font-bold text-black', size.name)}>{name}</span>
-            {secondary ? <span dir="auto" className={cn('break-words font-normal', size.secondary)} style={{ color: 'var(--pv-muted)' }}>{secondary}</span> : null}
-          </div>
+          <>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+              <span dir="auto" className={cn('break-words font-bold text-black', size.name)}>{name}</span>
+              {secondary ? <span dir="auto" className={cn('break-words font-normal', size.secondary)} style={{ color: 'var(--pv-muted)' }}>{secondary}</span> : null}
+            </div>
+            {skuInName && hasProductColumn ? <SkuLine line={line} /> : null}
+          </>
         );
       }
-      case 'description': return <span className="break-words">{line.description || '—'}</span>;
+      case 'description': return (
+        <>
+          <span className="break-words">{line.description || '—'}</span>
+          {skuInName && !hasProductColumn ? <SkuLine line={line} /> : null}
+        </>
+      );
       case 'product_code': return <span className={cn('break-words font-sans tabular-nums', size.code)}>{line.productCode || '—'}</span>;
       case 'barcode': return <span className={cn('font-sans tabular-nums', size.code)}>{line.barcode || '—'}</span>;
       case 'unit': return <span className="break-words">{line.unit?.trim() || '—'}</span>;
@@ -344,6 +367,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
               {columns.map((column, index) => (
                 <th
                   key={`${column.id}-${index}`}
+                  data-premium-col={column.id}
                   className={cn(HEAD_CELL, size.head, textAlign[alignOf(column)])}
                   style={{ width: `${widths[index]}%`, ...(index > 0 ? { borderInlineStart: '1px solid rgba(255,255,255,0.18)' } : {}) }}
                 >

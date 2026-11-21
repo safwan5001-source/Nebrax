@@ -13,6 +13,7 @@ import { QuotationProposal } from '../templates/quotation-proposal';
 import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
 import { VoucherCompact } from '../templates/voucher-compact';
 import { TaxInvoicePremium } from '../templates/tax-invoice-premium';
+import { PREMIUM_STUDIO_DEFAULT_COLUMNS } from '../presentation/tax-invoice-premium';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -111,6 +112,8 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     supportedPaper: ['a4', 'letter', 'legal'],
     minContentWidthMm: 182,
     documentTypes: ['tax_invoice', 'simplified_tax_invoice'],
+    // الاستوديو يعرض أعمدة هذا القالب (رمز المنتج غير مفعّل) لا القائمة العامة؛ تفعيله يُظهر الرمز تحت اسم الصنف.
+    defaultItemColumns: PREMIUM_STUDIO_DEFAULT_COLUMNS,
   },
   'tax-invoice-thermal58': {
     id: 'tax-invoice-thermal58',

@@ -78,7 +78,8 @@ export const PREMIUM_LABELS = {
   invoice_no: { ar: 'رقم الفاتورة', en: 'Invoice No.' },
   issue_date: { ar: 'تاريخ الإصدار', en: 'Issue date' },
   due_date: { ar: 'تاريخ الاستحقاق', en: 'Due date' },
-  payment: { ar: 'طريقة الدفع', en: 'Payment' },
+  // نقدي/آجل = شروط السداد لا وسيلة الدفع؛ وسيلة الدفع الفعلية غير موجودة في `DocumentModel` فلا تُعرض.
+  payment_terms: { ar: 'شروط السداد', en: 'Payment terms' },
   cash: { ar: 'نقدي', en: 'Cash' },
   credit: { ar: 'آجل', en: 'Credit' },
   seller: { ar: 'البائع', en: 'SELLER' },
@@ -91,7 +92,7 @@ export const PREMIUM_LABELS = {
   phone: { ar: 'الهاتف', en: 'Phone' },
   vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' },
   taxable_total: { ar: 'الإجمالي الخاضع للضريبة', en: 'Total taxable amount' },
-  notes_terms: { ar: 'ملاحظات وشروط الدفع', en: 'Notes & payment terms' },
+  notes_terms: { ar: 'ملاحظات وشروط', en: 'Notes & terms' },
   bank_details: { ar: 'بيانات التحويل البنكي', en: 'Bank details' },
   qr_caption: { ar: 'رمز الاستجابة السريعة', en: 'QR code' },
   amount_words: { ar: 'المبلغ كتابةً', en: 'Amount in words' },
@@ -206,13 +207,18 @@ export function premiumTotalsRows(model: DocumentModel): PremiumTotalsRow[] {
 }
 
 export interface PremiumMetaTile {
-  key: 'invoice_no' | 'issue_date' | 'due_date' | 'payment';
+  key: 'invoice_no' | 'issue_date' | 'due_date' | 'payment_terms';
   /** القيمة المعروضة؛ طريقة الدفع تحمل مفتاح التسمية لتُترجم بوضع المستند. */
   value: string;
   valueLabel?: PremiumLabelKey;
 }
 
-/** بطاقات الميتا: لا بطاقة بلا قيمة في المصدر (تاريخ التوريد غير موجود في `DocumentMeta` فلا يُختلق). */
+/**
+ * بطاقات الميتا — كل بطاقة تحمل المعنى الحقيقي لحقلها، ولا بطاقة بلا قيمة موثوقة:
+ *  • تاريخ الإصدار = `meta.date` (تاريخ الفاتورة)، وتاريخ الاستحقاق = `meta.dueDate` — **ليس** تاريخ التوريد.
+ *  • تاريخ التوريد غير موجود في `DocumentModel` ولا في عقد الفاتورة (الموجود تاريخ مذكرة التسليم فقط، وهو غيره)، فلا يُعرض ولا يُختلق.
+ *  • نقدي/آجل = شروط السداد (`meta.paymentType`) لا وسيلة الدفع؛ وسيلة الدفع لا مصدر لها فلا تُعرض.
+ */
 export function premiumMetaTiles(model: DocumentModel): PremiumMetaTile[] {
   const { meta } = model;
   const tiles: PremiumMetaTile[] = [
@@ -220,7 +226,99 @@ export function premiumMetaTiles(model: DocumentModel): PremiumMetaTile[] {
     { key: 'issue_date', value: meta.date },
   ];
   if (meta.dueDate?.trim()) tiles.push({ key: 'due_date', value: meta.dueDate.trim() });
-  if (meta.paymentType === 'cash') tiles.push({ key: 'payment', value: '', valueLabel: 'cash' });
-  else if (meta.paymentType === 'credit') tiles.push({ key: 'payment', value: '', valueLabel: 'credit' });
+  if (meta.paymentType === 'cash') tiles.push({ key: 'payment_terms', value: '', valueLabel: 'cash' });
+  else if (meta.paymentType === 'credit') tiles.push({ key: 'payment_terms', value: '', valueLabel: 'credit' });
   return tiles;
+}
+
+
+/**
+ * أعمدة الاستوديو الافتراضية لهذا القالب (معرّفات المحرك فقط): ما يستطيع عقد الأعمدة القائم تمثيله من الأعمدة العشرة.
+ * الوحدة والخصم والخاضع ونسبة الضريبة أعمدة يملكها القالب (يشتقها من بيانات السطر) ولا يعرفها عقد المحرر؛ تبقى ظاهرة دائماً.
+ * `product_code` غير مفعّل هنا عمداً: رمز المنتج خيار يُفعَّل من الاستوديو ولا يظهر افتراضياً.
+ */
+export const PREMIUM_STUDIO_DEFAULT_COLUMNS = ['number', 'product', 'description', 'quantity', 'price_before_tax', 'tax', 'total'] as const satisfies readonly DocItemsColumnId[];
+
+export interface PremiumSavedColumn {
+  id: DocItemsColumnId;
+  label?: string;
+  alignment?: 'start' | 'center' | 'end';
+}
+
+export interface ResolvedPremiumColumns {
+  columns: (PremiumColumn & { alignment?: 'start' | 'center' | 'end' })[];
+  /** رمز المنتج يُعرض تحت اسم الصنف (لا عموداً مستقلاً). */
+  skuInName: boolean;
+}
+
+const PRICE_IDS: readonly PremiumColumnId[] = ['price_before_tax', 'unit_price'];
+
+/**
+ * يحسم أعمدة الجدول:
+ *  • بلا أعمدة محفوظة: الأعمدة العشرة المشتقة من البيانات، ورمز المنتج مخفي (المظهر الافتراضي).
+ *  • بأعمدة محفوظة من الاستوديو: ترتيبها وتسمياتها ومحاذاتها كما حُفظت، **مع إبقاء الأعمدة الأربعة التي يملكها القالب**
+ *    (الوحدة، الخصم، الخاضع، نسبة الضريبة) متى وُجدت بياناتها — فلا يُسقطها حفظ قائمة المحرر (لا يعرفها عقد الأعمدة).
+ *  • `description` المحفوظ مع `product` يُطوى في خانة الصنف (سطر ثانوي)، لأن العقد يُلزم بالوصف.
+ *  • `product_code` المحفوظ = «أظهر رمز المنتج تحت الاسم»: لا يصير عموداً. إن لم يوجد عمود اسم/وصف يحمله يبقى عموداً مستقلاً
+ *    بدل أن يضيع.
+ */
+export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: readonly PremiumSavedColumn[] | null): ResolvedPremiumColumns {
+  if (!saved) return { columns: premiumDefaultColumns(lines), skuInName: false };
+
+  const savedIds = new Set(saved.map((column) => column.id));
+  // عقد الاستوديو يُلزم عمود «الوصف» دائماً (`description` + `total` إلزاميان)، وخانة الصنف في هذا القالب تحمل الوصف أصلاً كسطر ثانوي؛
+  // فحين يوجد `product` يُطوى `description` فيه بدل عمود مكرر (لا يضيع الوصف ولا تتضاعف الأعمدة).
+  const foldDescription = savedIds.has('product') && savedIds.has('description');
+  const base: (PremiumColumn & { alignment?: 'start' | 'center' | 'end' })[] = saved
+    .filter((column) => !(foldDescription && column.id === 'description'))
+    .map((column) => ({
+      id: column.id,
+      alignment: column.alignment,
+      label: column.label?.trim() ? { ar: column.label.trim(), en: column.label.trim() } : undefined,
+    }));
+  const hasId = (id: PremiumColumnId) => base.some((column) => column.id === id);
+  const host = hasId('product') || hasId('description');
+  const skuRequested = hasId('product_code');
+  const skuInName = skuRequested && host;
+  const columns = skuInName ? base.filter((column) => column.id !== 'product_code') : base;
+
+  const has = (predicate: (line: DocumentLine) => boolean) => lines.some(predicate);
+  const insertAt = (column: PremiumColumn, index: number) => { columns.splice(Math.max(0, Math.min(index, columns.length)), 0, column); };
+  const indexOf = (id: PremiumColumnId) => columns.findIndex((column) => column.id === id);
+  const afterNameIndex = () => {
+    const last = Math.max(indexOf('product'), indexOf('description'), indexOf('barcode'), indexOf('number'));
+    return last + 1;
+  };
+
+  // الوحدة قبل الكمية (وإلا بعد الاسم).
+  if (!hasId('unit') && has((line) => !!line.unit?.trim())) insertAt({ id: 'unit' }, indexOf('quantity') >= 0 ? indexOf('quantity') : afterNameIndex());
+  // الخصم والخاضع والنسبة بعد عمود السعر (وإلا قبل الضريبة/الإجمالي).
+  const detail: PremiumColumn[] = [];
+  if (!hasId('line_discount') && has((line) => known(line.lineDiscount))) detail.push({ id: 'line_discount' });
+  if (!hasId('line_net') && has((line) => known(line.netAmount))) detail.push({ id: 'line_net' });
+  if (!hasId('tax_rate') && has((line) => known(line.taxRate))) detail.push({ id: 'tax_rate' });
+  if (detail.length > 0) {
+    const priceIdx = Math.max(...PRICE_IDS.map((id) => indexOf(id)));
+    const anchor = priceIdx >= 0 ? priceIdx + 1 : (indexOf('tax') >= 0 ? indexOf('tax') : (indexOf('total') >= 0 ? indexOf('total') : columns.length));
+    detail.forEach((column, i) => insertAt(column, anchor + i));
+  }
+  return { columns, skuInName };
+}
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * سطر رمز المنتج تحت الاسم: الرمز المخزَّن في السطر (`productCode`) فقط، مقصوصاً.
+ * يُحجب (`null`) إن كان فارغاً، أو مطابقاً للاسم، أو مذكوراً أصلاً في اسم الصنف/وصفه كرمز مستقل
+ * (مطابقة بحدود الأحرف والأرقام وبلا حساسية لحالة الأحرف: «POT-004» داخل «Potato POT-004» مكرر، و«1» داخل «10 كجم» ليس كذلك).
+ */
+export function premiumSkuLine(line: Pick<DocumentLine, 'productCode' | 'productName' | 'description'>): string | null {
+  const code = line.productCode?.trim();
+  if (!code) return null;
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(code)}($|[^\\p{L}\\p{N}])`, 'iu');
+  for (const text of [line.productName, line.description]) {
+    const value = text?.trim();
+    if (value && (value.toLowerCase() === code.toLowerCase() || pattern.test(value))) return null;
+  }
+  return code;
 }

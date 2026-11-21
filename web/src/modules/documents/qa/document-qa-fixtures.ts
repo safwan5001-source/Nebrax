@@ -72,6 +72,9 @@ function lineAt(index: number, direction: DocumentQaOptions['direction'], verbos
  * بنود عينة الفاتورة الفاخرة. الأرقام مخزَّنة كما يخزنها المحرك (هللات): السعر قبل الضريبة × الكمية − الخصم = الخاضع،
  * والضريبة 15% منه. تُستعمل لمقارنة المخرج بالمرجع البصري؛ ليست بيانات مستأجر.
  */
+// رموز المنتج في عيّنة المرجع تغطي الحالات: عادي، مفقود (الليمون)، طويل جداً (الخس)، ومكرر داخل الوصف (البطاطس).
+const REFERENCE_SAMPLE_CODES: readonly (string | null)[] = ['TOM-001', 'CUC-002', 'ONI-003', 'POT-004', null, 'LET-WHITE-ICEBERG-12-CTN-SA-2026-LONG-CODE-0005', 'BAN-007'];
+
 const REFERENCE_SAMPLE_ITEMS = [
   { ar: 'طماطم (6 كجم)', en: 'Tomato', unit: ['كرتون', 'Carton'], qty: 10, price: 2400, discount: 0 },
   { ar: 'خيار (5 كجم)', en: 'Cucumber', unit: ['كرتون', 'Carton'], qty: 8, price: 1850, discount: 0 },
@@ -91,7 +94,8 @@ function makeReferenceSampleModel(options: DocumentQaOptions): DocumentModel {
     return {
       id: `ref-line-${index + 1}`,
       productName: english ? item.en : item.ar,
-      description: english ? item.ar : item.en,
+      description: index === 3 ? `${english ? item.ar : item.en} ${REFERENCE_SAMPLE_CODES[index]}` : english ? item.ar : item.en,
+      productCode: REFERENCE_SAMPLE_CODES[index],
       quantity: item.qty,
       unit: english ? item.unit[1] : item.unit[0],
       unitPrice: item.price,

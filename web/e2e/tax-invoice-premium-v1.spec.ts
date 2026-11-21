@@ -81,6 +81,30 @@ for (const direction of ['rtl', 'ltr'] as const) {
       expect(pdf.mediaBoxes[0].widthPt).toBeCloseTo(595.28, 0);
     });
 
+    test('V1.2 product code (sku=on): sits under the name inside the same cell, no clipping/overlap/broken words, PDF exports', async ({ page }) => {
+      await open(page, 'reference_sample', direction, '&paper=a4&orientation=portrait&margins=0&sku=on');
+      const g = await geometry(page);
+      expect(g.outside).toBe(0);
+      expect(g.overlaps).toBe(0);
+      expect(g.clipped).toBe(0);
+      // الكلمة المكسورة المسموحة الوحيدة: الرمز الطويل جداً (`break-all` عمداً)؛ بقية النصوص لا تنكسر.
+      expect(g.splitWords).toBeLessThanOrEqual(1);
+      const placement = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#qa-print-root [data-premium-row="line"]')];
+        const skus = rows.map((row) => row.querySelector('[data-premium-sku]')).filter(Boolean) as HTMLElement[];
+        const under = skus.every((sku) => {
+          const name = sku.closest('td')!.querySelector('span[dir="auto"]')!.getBoundingClientRect();
+          const box = sku.getBoundingClientRect();
+          const cell = sku.closest('td')!.getBoundingClientRect();
+          return box.top >= name.bottom - 1 && box.left >= cell.left - 1 && box.right <= cell.right + 1;
+        });
+        return { count: skus.length, under, headers: document.querySelectorAll('#qa-print-root thead th').length };
+      });
+      expect(placement).toEqual({ count: 5, under: true, headers: 10 });
+      const pdf = await exportPdf(page);
+      expect(pdf.pageCount).toBeGreaterThanOrEqual(1);
+    });
+
     test('long Arabic/English names and long notes: wrap without clipping, overlap or broken words', async ({ page }) => {
       await open(page, 'long_content', direction, '&paper=a4&orientation=portrait&margins=0');
       const g = await geometry(page);

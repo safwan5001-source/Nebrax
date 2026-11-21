@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { premiumLayoutWithSku } from '@/modules/documents/templates/tax-invoice-premium';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { downloadPdf } from '@/lib/pdf';
 import { printDocument } from '@/modules/documents/services/export';
@@ -110,11 +111,13 @@ export default function DocumentQaPage() {
     [direction, documentType, scenario, showAssets, showQr],
   );
   // القالب الفاخر بتخطيطه الافتراضي الكامل (الذي يعرض المرجع)؛ بقية القوالب بالتخطيط الافتراضي للنوع.
-  const layout = useMemo(() => (templateId === 'tax-invoice-premium-v1' ? null : getDefaultDocumentLayout(documentType).map((item) => ({
+  // `sku=on` (للقالب الفاخر فقط): يحاكي ما يحفظه الاستوديو عند تفعيل «رمز المنتج» — أعمدة القالب الافتراضية + product_code.
+  const skuOn = searchParams.get('sku') === 'on';
+  const layout = useMemo(() => (templateId === 'tax-invoice-premium-v1' ? (skuOn ? premiumLayoutWithSku() : null) : getDefaultDocumentLayout(documentType).map((item) => ({
     ...item,
     visible: (item.visible && (showAssets || !['bank', 'stamp', 'signature'].includes(item.key)))
       || (item.key === 'barcode' && (templateId === 'tax-invoice-retail' || templateId === 'tax-invoice-retail-v2')),
-  }))), [documentType, showAssets, templateId]);
+  }))), [documentType, showAssets, skuOn, templateId]);
 
   const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction' | 'paper' | 'orientation', value: string) => {
     const next = new URLSearchParams({
@@ -126,7 +129,7 @@ export default function DocumentQaPage() {
       logo: showLogo ? 'on' : 'off',
       assets: showAssets ? 'on' : 'off',
     });
-    for (const extra of ['paper', 'orientation', 'margins', 'custom_w', 'custom_h']) {
+    for (const extra of ['paper', 'orientation', 'margins', 'custom_w', 'custom_h', 'sku']) {
       const current = searchParams.get(extra);
       if (current) next.set(extra, current);
     }

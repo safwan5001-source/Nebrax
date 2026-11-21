@@ -9,7 +9,10 @@ import {
   premiumDefaultColumns,
   premiumMetaTiles,
   premiumPalette,
+  premiumResolveColumns,
+  premiumSkuLine,
   premiumTotalsRows,
+  PREMIUM_STUDIO_DEFAULT_COLUMNS,
 } from './tax-invoice-premium';
 
 const reference = (): DocumentModel => makeDocumentQaModel({ scenario: 'reference_sample', direction: 'rtl', showQr: true, showAssets: true });
@@ -102,8 +105,100 @@ describe('premium totals rows (no independent recompute)', () => {
 describe('premium meta tiles', () => {
   it('lists number, issue date, due date and payment; omits what the source lacks (supply date is not invented)', () => {
     const model = reference();
-    expect(premiumMetaTiles(model).map((t) => t.key)).toEqual(['invoice_no', 'issue_date', 'due_date', 'payment']);
+    expect(premiumMetaTiles(model).map((t) => t.key)).toEqual(['invoice_no', 'issue_date', 'due_date', 'payment_terms']);
     const lean = { ...model, meta: { number: 'A', date: '2026-01-01', dueDate: null, paymentType: null } };
     expect(premiumMetaTiles(lean).map((t) => t.key)).toEqual(['invoice_no', 'issue_date']);
+  });
+});
+
+describe('premiumSkuLine (product code under the name)', () => {
+  const sku = (over: Partial<DocumentLine>) => premiumSkuLine({ productName: 'طماطم', description: 'خضار', productCode: 'TOM-001', ...over });
+
+  it('returns the trimmed stored code', () => {
+    expect(sku({ productCode: '  TOM-001 ' })).toBe('TOM-001');
+  });
+
+  it('is hidden when the code is missing, empty or whitespace (no empty line)', () => {
+    expect(sku({ productCode: null })).toBeNull();
+    expect(sku({ productCode: undefined })).toBeNull();
+    expect(sku({ productCode: '' })).toBeNull();
+    expect(sku({ productCode: '   ' })).toBeNull();
+  });
+
+  it('keeps a very long code (wrapping is the renderer\'s job)', () => {
+    const long = 'LET-WHITE-ICEBERG-12-CTN-SA-2026-LONG-CODE-0005';
+    expect(sku({ productCode: long })).toBe(long);
+  });
+
+  it('is hidden when the code already appears in the name or description (case-insensitive, token-bounded)', () => {
+    expect(sku({ description: 'Potato POT-004', productCode: 'POT-004' })).toBeNull();
+    expect(sku({ productName: 'بطاطس POT-004 (10 كجم)', productCode: 'POT-004' })).toBeNull();
+    expect(sku({ description: 'potato pot-004', productCode: 'POT-004' })).toBeNull();
+    expect(sku({ productName: 'TOM-001', productCode: 'TOM-001' })).toBeNull();
+  });
+
+  it('does not treat a code embedded inside another token as a duplicate', () => {
+    expect(sku({ productName: 'ليمون 10 كجم', description: '', productCode: '1' })).toBe('1');
+    expect(sku({ description: 'XPOT-0045', productCode: 'POT-004' })).toBe('POT-004');
+  });
+});
+
+describe('premiumResolveColumns (studio-saved columns vs the template-owned ones)', () => {
+  const lines = reference().lines;
+  const ids = (saved?: Parameters<typeof premiumResolveColumns>[1]) => premiumResolveColumns(lines, saved).columns.map((c) => c.id);
+
+  it('keeps the ten data-derived columns and no SKU when nothing is saved (default look unchanged)', () => {
+    const resolved = premiumResolveColumns(lines, null);
+    expect(resolved.skuInName).toBe(false);
+    expect(resolved.columns.map((c) => c.id)).toEqual(premiumDefaultColumns(lines).map((c) => c.id));
+    expect(resolved.columns).toHaveLength(10);
+  });
+
+  it('the studio default for this template has the SKU off and yields the same ten columns', () => {
+    expect(PREMIUM_STUDIO_DEFAULT_COLUMNS).not.toContain('product_code');
+    const resolved = premiumResolveColumns(lines, PREMIUM_STUDIO_DEFAULT_COLUMNS.map((id) => ({ id })));
+    expect(resolved.skuInName).toBe(false);
+    expect(resolved.columns.map((c) => c.id)).toEqual(premiumDefaultColumns(lines).map((c) => c.id));
+  });
+
+  it('product_code folds into the name cell without adding a column (still ten columns)', () => {
+    const resolved = premiumResolveColumns(lines, [...PREMIUM_STUDIO_DEFAULT_COLUMNS, 'product_code'].map((id) => ({ id })));
+    expect(resolved.skuInName).toBe(true);
+    expect(resolved.columns).toHaveLength(10);
+    expect(resolved.columns.some((c) => c.id === 'product_code')).toBe(false);
+  });
+
+  it('keeps saved order, labels and alignment, and re-inserts the template-owned detail columns', () => {
+    const resolved = premiumResolveColumns(lines, [{ id: 'number' }, { id: 'product' }, { id: 'quantity', label: 'العدد', alignment: 'center' }, { id: 'total' }]);
+    const got = resolved.columns.map((c) => c.id);
+    expect(got.indexOf('number')).toBeLessThan(got.indexOf('product'));
+    expect(got).toEqual(expect.arrayContaining(['unit', 'line_discount', 'line_net', 'tax_rate']));
+    expect(got.indexOf('unit')).toBeLessThan(got.indexOf('quantity'));
+    const qty = resolved.columns.find((c) => c.id === 'quantity')!;
+    expect(qty.alignment).toBe('center');
+    expect(qty.label).toEqual({ ar: 'العدد', en: 'العدد' });
+  });
+
+  it('folds the contract-required description column into the name cell when a product column exists (no duplicate column)', () => {
+    const got = ids([{ id: 'number' }, { id: 'product' }, { id: 'description' }, { id: 'quantity' }, { id: 'total' }]);
+    expect(got).not.toContain('description');
+    expect(got).toContain('product');
+    // وبلا عمود صنف يبقى الوصف عموداً ويحمل الرمز.
+    const only = premiumResolveColumns(lines, [{ id: 'number' }, { id: 'description' }, { id: 'product_code' }, { id: 'total' }]);
+    expect(only.columns.map((c) => c.id)).toContain('description');
+    expect(only.skuInName).toBe(true);
+  });
+
+  it('never drops a requested SKU: without a name/description column it stays a standalone column', () => {
+    const resolved = premiumResolveColumns(lines, [{ id: 'number' }, { id: 'product_code' }, { id: 'total' }]);
+    expect(resolved.skuInName).toBe(false);
+    expect(resolved.columns.some((c) => c.id === 'product_code')).toBe(true);
+  });
+
+  it('hides unit/discount/net/VAT% columns when no line carries that data', () => {
+    const bare = [line({ unit: undefined, lineDiscount: undefined, netAmount: undefined, taxRate: undefined })];
+    const got = premiumResolveColumns(bare, [{ id: 'description' }, { id: 'total' }]).columns.map((c) => c.id);
+    expect(got).toEqual(['description', 'total']);
+    expect(ids()).toHaveLength(10);
   });
 });

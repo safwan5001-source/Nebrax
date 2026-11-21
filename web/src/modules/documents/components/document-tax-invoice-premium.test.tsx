@@ -9,6 +9,7 @@ import { makeDocumentQaModel } from '../qa/document-qa-fixtures';
 import { getTheme } from '../themes';
 import { formatModernAmount } from '../presentation/visual-v2';
 import { PREMIUM } from '../presentation/tax-invoice-premium';
+import { premiumLayoutWithSku } from '../templates/tax-invoice-premium';
 import type { DocSectionLayoutItem, DocumentModel } from '../types';
 
 const locale = { current: 'ar' };
@@ -69,7 +70,7 @@ describe('tax-invoice-premium-v1 rendering', () => {
     expect(container.querySelector('[data-doc-composition="tax_invoice_premium"]')).toBeTruthy();
     expect(root.querySelector('[data-premium-header] h1')?.textContent).toBe('فاتورة ضريبية');
     expect(root.querySelector('[data-premium-header]')?.textContent).toContain('Tax Invoice');
-    expect([...root.querySelectorAll('[data-premium-meta-tile]')].map((n) => n.getAttribute('data-premium-meta-tile'))).toEqual(['invoice_no', 'issue_date', 'due_date', 'payment']);
+    expect([...root.querySelectorAll('[data-premium-meta-tile]')].map((n) => n.getAttribute('data-premium-meta-tile'))).toEqual(['invoice_no', 'issue_date', 'due_date', 'payment_terms']);
     expect(root.querySelector('[data-premium-party="seller"]')?.textContent).toContain('313037133700003');
     expect(root.querySelector('[data-premium-party="buyer"]')?.textContent).toContain('مطعم الذوق الأصيل');
     expect(root.querySelector('[data-premium-qr] svg')).toBeTruthy();
@@ -209,8 +210,10 @@ describe('tax-invoice-premium-v1 studio integration (layout & block properties)'
     });
     const { container } = renderPremium(sample(), layout);
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent);
-    expect(heads).toHaveLength(4);
-    expect(heads[2]).toBe('العدد');
+    // الأعمدة المحفوظة تحتفظ بترتيبها وتسميتها، والأعمدة التي يملكها القالب (الوحدة والخصم والصافي ونسبة الضريبة) تُدرج من بيانات السطر.
+    expect(heads.some((h) => h === 'العدد')).toBe(true);
+    const saved = ['number', 'product', 'quantity', 'total'].map((id) => container.querySelector(`thead th[data-premium-col="${id}"]`));
+    expect(saved.every(Boolean)).toBe(true);
     expect(container.querySelector('[data-premium-footer]')?.textContent).toContain('شكراً لتعاملكم');
   });
 
@@ -329,7 +332,7 @@ describe('tax-invoice-premium-v1 V1.1 visual refinement', () => {
 
   it('shows the payment value on one line with a neutral separator (no flipped slash)', () => {
     const { container } = renderPremium(sample());
-    const value = container.querySelector('[data-premium-meta-tile="payment"]')!.textContent!;
+    const value = container.querySelector('[data-premium-meta-tile="payment_terms"]')!.textContent!;
     expect(value).toContain('آجل');
     expect(value).toContain('Credit');
     expect(value).not.toContain('/');
@@ -451,5 +454,106 @@ describe('tax-invoice-premium-v1 multi-page', () => {
     for (const selector of ['[data-premium-summary]', '[data-premium-signatures]', '[data-premium-row="line"]']) {
       expect(container.querySelector(selector)?.className, selector).toContain('break-inside-avoid');
     }
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.2 product code (SKU) under the name', () => {
+  const skus = (root: ParentNode) => [...root.querySelectorAll('[data-premium-row="line"] [data-premium-sku]')].map((n) => n.textContent ?? '');
+
+  it('is hidden by default (no saved columns): look and column count unchanged', () => {
+    const { container } = renderPremium(sample());
+    expect(container.querySelectorAll('[data-premium-sku]')).toHaveLength(0);
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+    expect(container.textContent).not.toContain('TOM-001');
+  });
+
+  it('is hidden when the studio columns do not include product_code', () => {
+    const layout = premiumLayoutWithSku().map((i) => (i.key === 'items' ? { ...i, properties: { columns: i.properties!.columns!.filter((c) => c.id !== 'product_code') } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelectorAll('[data-premium-sku]')).toHaveLength(0);
+  });
+
+  it('shows the code under the product name inside the same cell, without adding a column', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+    expect(container.querySelector('thead th[data-premium-col="product_code"]')).toBeNull();
+    const first = container.querySelector('[data-premium-row="line"]')!;
+    const sku = first.querySelector('[data-premium-sku]')!;
+    expect(sku.textContent).toContain('TOM-001');
+    expect(sku.closest('td')).toBe(first.querySelector('td:nth-child(2)'));
+    // أسفل الاسم لا بجانبه: عنصر كتلة بعد صف الاسم.
+    const cell = sku.closest('td')!;
+    expect(cell.querySelector('[data-premium-sku]')!.previousElementSibling?.textContent).toContain('طماطم');
+  });
+
+  it('renders no empty line for a line without a code, and none for a code duplicated in the description', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    expect(rows).toHaveLength(7);
+    expect(rows[4]!.querySelector('[data-premium-sku]')).toBeNull(); // ليمون بلا رمز
+    expect(rows[3]!.querySelector('[data-premium-sku]')).toBeNull(); // بطاطس: POT-004 مذكور في الوصف
+    expect(skus(container)).toHaveLength(5);
+  });
+
+  it('a very long code wraps inside the cell instead of overflowing', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    const long = [...container.querySelectorAll('[data-premium-sku]')].find((n) => n.textContent!.includes('LET-WHITE-ICEBERG'))!;
+    expect(long.innerHTML).toContain('break-all');
+  });
+
+  it('works for the simplified tax invoice and in LTR/English', () => {
+    const simplified = { ...sample(), type: 'simplified_tax_invoice' as const };
+    expect(skus(renderPremium(simplified, premiumLayoutWithSku()).container).length).toBe(5);
+    cleanup();
+    locale.current = 'en';
+    const ltr = renderPremium(sample('ltr'), premiumLayoutWithSku()).container;
+    expect(skus(ltr).length).toBe(5);
+    expect(ltr.querySelector('[data-premium-sku]')!.textContent).toContain('SKU');
+  });
+
+  it('never touches the financial values: every non-name cell and the totals are identical with the SKU on or off', () => {
+    const cells = (root: ParentNode) => [...root.querySelectorAll('[data-premium-row="line"]')].map((row) => [...row.querySelectorAll('td')].filter((_, i) => i !== 1).map((td) => td.textContent));
+    const off = renderPremium(sample()).container;
+    const offCells = cells(off);
+    const offSummary = off.querySelector('[data-premium-summary]')!.textContent;
+    cleanup();
+    const on = renderPremium(sample(), premiumLayoutWithSku()).container;
+    expect(cells(on)).toEqual(offCells);
+    expect(on.querySelector('[data-premium-summary]')!.textContent).toBe(offSummary);
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.2 date and payment labels match the data', () => {
+  it('labels: issue date, due date (not supply date), payment terms (not payment method)', () => {
+    const { container } = renderPremium(sample());
+    const tiles = Object.fromEntries([...container.querySelectorAll('[data-premium-meta-tile]')].map((n) => [n.getAttribute('data-premium-meta-tile'), n.textContent ?? '']));
+    expect(tiles.issue_date).toContain('تاريخ الإصدار');
+    expect(tiles.due_date).toContain('تاريخ الاستحقاق');
+    expect(tiles.payment_terms).toContain('شروط السداد');
+    const text = container.querySelector('[data-premium-meta]')?.textContent ?? container.textContent!;
+    expect(text).not.toContain('تاريخ التوريد');
+    expect(text).not.toContain('طريقة الدفع');
+    expect(text).not.toContain('Supply date');
+    expect(text).not.toContain('Payment method');
+  });
+
+  it('English labels', () => {
+    locale.current = 'en';
+    const { container } = renderPremium(sample('ltr'));
+    const t = (key: string) => container.querySelector(`[data-premium-meta-tile="${key}"]`)!.textContent!;
+    expect(t('issue_date')).toContain('Issue date');
+    expect(t('due_date')).toContain('Due date');
+    expect(t('payment_terms')).toContain('Payment terms');
+  });
+
+  it('shows the due date value from dueDate and the terms value from paymentType, never inventing one when absent', () => {
+    const lean = { ...sample(), meta: { number: 'A', date: '2026-11-20', dueDate: null, paymentType: null } };
+    const { container } = renderPremium(lean);
+    expect(container.querySelector('[data-premium-meta-tile="due_date"]')).toBeNull();
+    expect(container.querySelector('[data-premium-meta-tile="payment_terms"]')).toBeNull();
+    expect(container.querySelector('[data-premium-meta-tile="issue_date"]')).toBeTruthy();
+    cleanup();
+    const cash = renderPremium({ ...sample(), meta: { ...sample().meta, paymentType: 'cash', dueDate: null } }).container;
+    expect(cash.querySelector('[data-premium-meta-tile="payment_terms"]')!.textContent).toContain('نقدي');
   });
 });
