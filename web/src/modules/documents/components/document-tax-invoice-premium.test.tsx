@@ -1,0 +1,559 @@
+// @vitest-environment jsdom
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { TaxInvoicePremium } from '../templates/tax-invoice-premium';
+import { getTemplate, listTemplatesForDocumentType, TEMPLATES } from '../registry/templates';
+import { makeDocumentQaModel } from '../qa/document-qa-fixtures';
+import { getTheme } from '../themes';
+import { formatModernAmount } from '../presentation/visual-v2';
+import { PREMIUM } from '../presentation/tax-invoice-premium';
+import { premiumLayoutWithSku } from '../templates/tax-invoice-premium';
+import type { DocSectionLayoutItem, DocumentModel } from '../types';
+
+const locale = { current: 'ar' };
+
+vi.mock('next-intl', () => ({
+  useLocale: () => locale.current,
+  useTranslations: (namespace: string) => (key: string) => {
+    if (namespace === 'documentTypes') return locale.current === 'ar' ? 'فاتورة ضريبية' : 'Tax Invoice';
+    if (namespace === 'documentTypesAlt') return locale.current === 'ar' ? 'Tax Invoice' : 'فاتورة ضريبية';
+    return key;
+  },
+}));
+
+const theme = getTheme('green');
+const formatMoney = (minor: number) => String(minor);
+const sample = (direction: 'rtl' | 'ltr' = 'rtl'): DocumentModel => makeDocumentQaModel({ scenario: 'reference_sample', direction, showQr: true, showAssets: true });
+
+function renderPremium(model: DocumentModel, layout?: DocSectionLayoutItem[] | null, sections?: Parameters<typeof TaxInvoicePremium>[0]['sections']) {
+  return render(<TaxInvoicePremium model={model} theme={theme} formatMoney={formatMoney} layout={layout} sections={sections} rootId="qa-print-root" />);
+}
+
+const FULL: DocSectionLayoutItem[] = ['header', 'parties', 'items', 'summary', 'amountWords', 'notes', 'terms', 'bank', 'signature', 'stamp', 'footer']
+  .map((key) => ({ key: key as DocSectionLayoutItem['key'], visible: true }));
+
+afterEach(() => { cleanup(); locale.current = 'ar'; });
+
+describe('tax-invoice-premium-v1 registration', () => {
+  it('is a distinct template identity that leaves every published template untouched', () => {
+    const descriptor = getTemplate('tax-invoice-premium-v1');
+    expect(descriptor.id).toBe('tax-invoice-premium-v1');
+    expect(descriptor.component).toBe(TaxInvoicePremium);
+    expect(descriptor.documentTypes).toEqual(['tax_invoice', 'simplified_tax_invoice']);
+    expect(descriptor.supportedPaper).toEqual(['a4', 'letter', 'legal']);
+    const others = Object.values(TEMPLATES).filter((t) => t.id !== 'tax-invoice-premium-v1');
+    expect(others.every((t) => t.component !== TaxInvoicePremium)).toBe(true);
+    expect(getTemplate(undefined).id).toBe('tax-invoice-classic');
+  });
+
+  it('is offered for tax invoices only', () => {
+    expect(listTemplatesForDocumentType('tax_invoice').map((t) => t.id)).toContain('tax-invoice-premium-v1');
+    expect(listTemplatesForDocumentType('quotation').map((t) => t.id)).not.toContain('tax-invoice-premium-v1');
+    expect(listTemplatesForDocumentType('receipt_voucher').map((t) => t.id)).not.toContain('tax-invoice-premium-v1');
+  });
+
+  it('is presentation-only: no network, tenant or accounting imports (isolation by construction)', () => {
+    const dir = resolve(__dirname, '..');
+    for (const file of ['templates/tax-invoice-premium.tsx', 'presentation/tax-invoice-premium.ts']) {
+      const source = readFileSync(resolve(dir, file), 'utf8');
+      expect(source, file).not.toMatch(/from '@\/lib\/api'|fetch\(|tenant|LedgerService|zatca/i);
+    }
+  });
+});
+
+describe('tax-invoice-premium-v1 rendering', () => {
+  it('renders the reference structure with real model data', () => {
+    const { container } = renderPremium(sample());
+    const root = container.querySelector('[data-doc-composition="tax_invoice_premium"]')!;
+    expect(container.querySelector('[data-doc-composition="tax_invoice_premium"]')).toBeTruthy();
+    expect(root.querySelector('[data-premium-header] h1')?.textContent).toBe('فاتورة ضريبية');
+    expect(root.querySelector('[data-premium-header]')?.textContent).toContain('Tax Invoice');
+    expect([...root.querySelectorAll('[data-premium-meta-tile]')].map((n) => n.getAttribute('data-premium-meta-tile'))).toEqual(['invoice_no', 'issue_date', 'due_date', 'payment_terms']);
+    expect(root.querySelector('[data-premium-party="seller"]')?.textContent).toContain('313037133700003');
+    expect(root.querySelector('[data-premium-party="buyer"]')?.textContent).toContain('مطعم الذوق الأصيل');
+    expect(root.querySelector('[data-premium-qr] svg')).toBeTruthy();
+    expect(root.querySelector('[data-premium-words]')?.textContent).toContain('فقط لا غير');
+    expect(root.querySelector('[data-premium-footer]')?.textContent).toContain('0557996876');
+  });
+
+  it('prints the stored totals verbatim — the grand total is the model total, never recomputed', () => {
+    const model = sample();
+    const { container } = renderPremium(model);
+    const grand = container.querySelector('[data-premium-grand-total]')!.textContent!;
+    expect(grand).toContain(formatModernAmount(model.totals.total, 'SAR'));
+    // إجمالي معدَّل في المصدر يظهر كما هو حتى لو لم يطابق الحساب (لا إصلاح صامت).
+    const tampered = { ...model, totals: { ...model.totals, total: model.totals.total + 777 } };
+    cleanup();
+    const second = renderPremium(tampered);
+    expect(second.container.querySelector('[data-premium-grand-total]')!.textContent).toContain(formatModernAmount(tampered.totals.total, 'SAR'));
+    // وبما أنه لا يطابق: لا صف «خاضع» مشتق.
+    expect(second.container.querySelector('[data-premium-total-row="taxable"]')).toBeNull();
+  });
+
+  it('prints line values from the model: taxable, VAT amount, total per row', () => {
+    const model = sample();
+    const { container } = renderPremium(model);
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    expect(rows).toHaveLength(model.lines.length);
+    model.lines.forEach((l, i) => {
+      const text = rows[i].textContent!;
+      expect(text).toContain(formatModernAmount(l.total, 'SAR'));
+      expect(text).toContain(formatModernAmount(l.tax, 'SAR'));
+      expect(text).toContain(formatModernAmount(l.netAmount!, 'SAR'));
+    });
+  });
+
+  it('pads the table with numbered empty rows up to the minimum, and none beyond it', () => {
+    const { container } = renderPremium(sample());
+    expect(container.querySelectorAll('[data-premium-row="filler"]')).toHaveLength(PREMIUM.minTableRows - 7);
+    cleanup();
+    const many = { ...sample(), lines: Array.from({ length: 14 }, (_, i) => ({ ...sample().lines[0], id: `m${i}` })) };
+    const big = renderPremium(many);
+    expect(big.container.querySelectorAll('[data-premium-row="filler"]')).toHaveLength(0);
+    expect(big.container.querySelectorAll('[data-premium-row="line"]')).toHaveLength(14);
+  });
+
+  it('empty states: no QR, notes, bank, assets → those cards and images are absent, nothing crashes', () => {
+    const model: DocumentModel = { ...sample(), qr: null, notes: null, terms: null, bank: null, stampUrl: null, signatureUrl: null, footerText: null, lines: [] };
+    const { container } = renderPremium(model);
+    expect(container.querySelector('[data-premium-qr]')).toBeNull();
+    expect(container.querySelector('[data-premium-card]')).toBeNull();
+    expect(container.querySelectorAll('[data-premium-sign-box] img')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-premium-row="filler"]')).toHaveLength(PREMIUM.minTableRows);
+    expect(container.textContent).not.toMatch(/NaN|undefined|null/);
+  });
+
+  it('legacy payload without line detail falls back to the engine columns (no empty unit/discount columns)', () => {
+    const model = sample();
+    const legacy = { ...model, lines: model.lines.map(({ unit: _u, lineDiscount: _d, netAmount: _n, taxRate: _r, ...rest }) => rest) };
+    const { container } = renderPremium(legacy);
+    const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(heads).toHaveLength(6);
+    expect(heads.join('|')).not.toMatch(/(^|\|)الوحدة|الخصم|الخاضع|نسبة الضريبة/);
+  });
+
+  it('shows the draft notice only for notice statuses', () => {
+    expect(renderPremium({ ...sample(), status: 'draft' }).container.querySelector('[data-premium-notice]')).toBeTruthy();
+    cleanup();
+    expect(renderPremium({ ...sample(), status: 'posted' }).container.querySelector('[data-premium-notice]')).toBeNull();
+  });
+});
+
+describe('tax-invoice-premium-v1 direction and language', () => {
+  it('RTL Arabic+English keeps the English line isolated LTR so punctuation (VAT No.) stays put', () => {
+    const { container } = renderPremium(sample('rtl'));
+    expect(container.querySelector('[data-doc-paper]')?.getAttribute('dir')).toBe('rtl');
+    const bilingual = container.querySelector('[data-premium-party-row="vat_no"] [data-premium-bilingual]')!;
+    expect(bilingual.children[0].textContent).toBe('الرقم الضريبي');
+    expect(bilingual.children[1].getAttribute('dir')).toBe('ltr');
+    expect(bilingual.children[1].textContent).toBe('VAT No.');
+  });
+
+  it('LTR English document renders English-only labels and an English amount in words', () => {
+    locale.current = 'en';
+    const { container } = renderPremium(sample('ltr'));
+    expect(container.querySelector('[data-premium-header]')?.getAttribute('data-premium-mode')).toBe('en');
+    expect(container.querySelector('[data-doc-paper]')?.getAttribute('dir')).toBe('ltr');
+    expect(container.querySelector('[data-premium-header] h1')?.textContent).toBe('Tax Invoice');
+    expect(container.querySelector('[data-premium-bilingual]')).toBeNull();
+    expect(container.querySelector('[data-premium-words]')?.textContent).toMatch(/one thousand/i);
+    expect(container.querySelector('[data-premium-words]')?.textContent).not.toMatch(/[؀-ۿ]{4}.*فقط/);
+  });
+
+  it('uses logical alignment only — no physical left/right utilities in the template source', () => {
+    const source = readFileSync(resolve(__dirname, '../templates/tax-invoice-premium.tsx'), 'utf8');
+    expect(source).not.toMatch(/\b(?:ml|mr|pl|pr|left|right|text-left|text-right)-/);
+  });
+});
+
+describe('tax-invoice-premium-v1 studio integration (layout & block properties)', () => {
+  it('honours section visibility and order from a saved layout', () => {
+    const layout: DocSectionLayoutItem[] = [
+      { key: 'header', visible: true },
+      { key: 'items', visible: true },
+      { key: 'parties', visible: true },
+      { key: 'summary', visible: false },
+      { key: 'footer', visible: false },
+    ];
+    const { container } = renderPremium(sample(), layout);
+    const order = [...container.querySelectorAll('[data-doc-composition="tax_invoice_premium"] > header, [data-doc-composition="tax_invoice_premium"] > section, [data-doc-composition="tax_invoice_premium"] > footer')].map((n) => n.tagName === 'HEADER' ? 'header' : n.tagName === 'FOOTER' ? 'footer' : n.getAttribute('data-premium-items') !== null ? 'items' : 'parties');
+    expect(order).toEqual(['header', 'items', 'parties']);
+    expect(container.querySelector('[data-premium-summary]')).toBeNull();
+  });
+
+  it('composes notes/bank inside the summary row, and stands them alone when the summary is hidden', () => {
+    const inline = renderPremium(sample(), FULL);
+    expect(inline.container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
+    expect(inline.container.querySelector('[data-premium-summary] [data-premium-card="bank"]')).toBeTruthy();
+    expect(inline.container.querySelector('[data-premium-cards]')).toBeNull();
+    cleanup();
+    const alone = renderPremium(sample(), FULL.map((i) => (i.key === 'summary' ? { ...i, visible: false } : i)));
+    expect(alone.container.querySelector('[data-premium-summary]')).toBeNull();
+    expect(alone.container.querySelector('[data-premium-cards] [data-premium-card="bank"]')).toBeTruthy();
+  });
+
+  it('hides blocks the editor turned off (bank, signature+stamp, amount in words)', () => {
+    const layout = FULL.map((i) => (['bank', 'signature', 'stamp', 'amountWords'].includes(i.key) ? { ...i, visible: false } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelector('[data-premium-card="bank"]')).toBeNull();
+    expect(container.querySelector('[data-premium-signatures]')).toBeNull();
+    expect(container.querySelector('[data-premium-words]')).toBeNull();
+  });
+
+  it('applies saved item columns (order, custom label) and footer static content', () => {
+    const layout: DocSectionLayoutItem[] = FULL.map((i) => {
+      if (i.key === 'items') return { ...i, properties: { columns: [{ id: 'number' }, { id: 'product' }, { id: 'quantity', label: 'العدد' }, { id: 'total' }] } };
+      if (i.key === 'footer') return { ...i, properties: { static_content: 'شكراً لتعاملكم' } };
+      return i;
+    });
+    const { container } = renderPremium(sample(), layout);
+    const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent);
+    // الأعمدة المحفوظة تحتفظ بترتيبها وتسميتها، والأعمدة التي يملكها القالب (الوحدة والخصم والصافي ونسبة الضريبة) تُدرج من بيانات السطر.
+    expect(heads.some((h) => h === 'العدد')).toBe(true);
+    const saved = ['number', 'product', 'quantity', 'total'].map((id) => container.querySelector(`thead th[data-premium-col="${id}"]`));
+    expect(saved.every(Boolean)).toBe(true);
+    expect(container.querySelector('[data-premium-footer]')?.textContent).toContain('شكراً لتعاملكم');
+  });
+
+  it('respects explicit section flags when no layout is saved (logo/qr off)', () => {
+    const { container } = renderPremium(sample(), null, { logo: false, qr: false, amountWords: false });
+    expect(container.querySelector('[data-premium-logo]')).toBeNull();
+    expect(container.querySelector('[data-premium-seller-name]')).toBeTruthy();
+    expect(container.querySelector('[data-premium-qr]')).toBeNull();
+    expect(container.querySelector('[data-premium-words]')).toBeNull();
+  });
+
+  it('follows the chosen theme: green = deep green identity, blue = derived deep blue', () => {
+    const green = renderPremium(sample());
+    expect(green.container.querySelector<HTMLElement>('[data-doc-composition="tax_invoice_premium"]')!.style.getPropertyValue('--pv-deep')).toBe('#0b3d2e');
+    cleanup();
+    const blue = render(<TaxInvoicePremium model={sample()} theme={getTheme('blue')} formatMoney={formatMoney} />);
+    expect(blue.container.querySelector<HTMLElement>('[data-doc-composition="tax_invoice_premium"]')!.style.getPropertyValue('--pv-deep')).not.toBe('#0b3d2e');
+  });
+});
+
+describe('tax-invoice-premium-v1 PDF export boundaries and image properties', () => {
+  it('every section is a direct child of the capture root so the PDF exporter can break between them', () => {
+    const { container } = renderPremium(sample(), FULL);
+    const root = container.querySelector('[data-doc-composition="tax_invoice_premium"]')!;
+    const direct = [...root.children].map((c) => c.getAttribute('data-premium-header') !== null ? 'header' : c.getAttribute('data-premium-parties') !== null ? 'parties' : c.getAttribute('data-premium-items') !== null ? 'items' : c.getAttribute('data-premium-summary') !== null ? 'summary' : c.getAttribute('data-premium-words') !== null ? 'words' : c.getAttribute('data-premium-signatures') !== null ? 'signatures' : c.getAttribute('data-premium-footer') !== null ? 'footer' : 'other');
+    expect(direct).toEqual(['header', 'parties', 'items', 'summary', 'words', 'signatures', 'footer']);
+  });
+
+  it('honours the saved image size and opacity for stamp and signature (same classes as DocStamp/DocSignature)', () => {
+    const layout = FULL.map((i) => (i.key === 'stamp' ? { ...i, properties: { image_size: 'lg' as const, image_opacity: 'faint' as const } } : i.key === 'signature' ? { ...i, properties: { image_size: 'sm' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    const stamp = container.querySelector('img[alt="stamp"]')!;
+    const sign = container.querySelector('img[alt="signature"]')!;
+    expect(stamp.className).toContain('h-32');
+    expect(stamp.className).toContain('opacity-50');
+    expect(sign.className).toContain('h-10');
+    cleanup();
+    const plain = renderPremium(sample(), FULL);
+    // بلا حجم محفوظ: الحجم المضغوط الافتراضي (يبقي العينة في صفحة واحدة).
+    expect(plain.container.querySelector('img[alt="stamp"]')!.className).toContain('max-h-[12mm]');
+    expect(plain.container.querySelector('img[alt="signature"]')!.className).toContain('max-h-[10mm]');
+  });
+});
+
+describe('tax-invoice-premium-v1 saved alignment', () => {
+  it('stamp and signature are aligned independently, each from its own saved alignment', () => {
+    const layout = FULL.map((i) => (i.key === 'stamp' ? { ...i, properties: { alignment: 'start' as const } } : i.key === 'signature' ? { ...i, properties: { alignment: 'end' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelector('[data-premium-stamp-cell]')!.className).toContain('justify-start');
+    expect(container.querySelector('[data-premium-signature-cell]')!.className).toContain('justify-end');
+  });
+
+  it('a stamp alone (signature block hidden) still follows its own alignment', () => {
+    const layout = FULL.map((i) => (i.key === 'signature' ? { ...i, visible: false } : i.key === 'stamp' ? { ...i, properties: { alignment: 'center' as const } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelector('[data-premium-signature-cell]')).toBeNull();
+    expect(container.querySelector('[data-premium-stamp-cell]')!.className).toContain('justify-center');
+  });
+
+  it('item cells follow column alignment, then the saved items-block alignment, then the default', () => {
+    const layout = FULL.map((i) => (i.key === 'items' ? { ...i, properties: { alignment: 'end' as const, columns: [{ id: 'number' as const }, { id: 'product' as const, alignment: 'center' as const }, { id: 'quantity' as const }, { id: 'total' as const }] } } : i));
+    const { container } = renderPremium(sample(), layout);
+    const heads = [...container.querySelectorAll('thead th')];
+    expect(heads[0].className).toContain('text-end'); // يرث محاذاة الكتلة (لا الافتراضي start)
+    expect(heads[1].className).toContain('text-center'); // محاذاة العمود تغلب
+    expect(heads[2].className).toContain('text-end');
+    const firstRow = [...container.querySelector('[data-premium-row="line"]')!.children];
+    expect(firstRow[0].className).toContain('text-end');
+    expect(firstRow[1].className).toContain('text-center');
+    cleanup();
+    const plain = renderPremium(sample(), FULL);
+    expect([...plain.container.querySelectorAll('thead th')][1].className).toContain('text-start'); // الافتراضي كما كان
+  });
+});
+
+describe('tax-invoice-premium-v1 saved items font size', () => {
+  const withSize = (font_size?: 'sm' | 'md' | 'lg') => FULL.map((i) => (i.key === 'items' && font_size ? { ...i, properties: { font_size } } : i));
+
+  it('applies the saved size to header cells, body cells and product/code content, replacing the fixed sizes', () => {
+    const { container } = renderPremium(sample(), withSize('lg'));
+    const root = container.querySelector('[data-premium-items]')!;
+    expect(root.querySelector('thead th')!.className).toContain('text-base');
+    expect(root.querySelector('tbody tr td')!.className).toContain('text-base');
+    expect(root.innerHTML).not.toMatch(/text-\[(?:9\.5|10\.5|11\.5|9|10)px\]/);
+    expect(root.querySelector('tbody td span[dir="auto"]')!.className).toContain('text-base');
+  });
+
+  it('keeps the compact sizes when no size is saved', () => {
+    const { container } = renderPremium(sample(), withSize());
+    const root = container.querySelector('[data-premium-items]')!;
+    expect(root.querySelector('thead th')!.className).toContain('text-[10px]');
+    expect(root.querySelector('tbody tr td')!.className).toContain('text-[11px]');
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.1 visual refinement', () => {
+  it('aligns money columns on the decimal point: every cell of a column shares one LTR end-aligned min width', () => {
+    const { container } = renderPremium(sample());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    const cols = rows[0].children.length;
+    let checked = 0;
+    for (let c = 0; c < cols; c += 1) {
+      const spans = rows.map((r) => r.children[c].querySelector<HTMLElement>('span[dir="ltr"].inline-block')).filter((x): x is HTMLElement => !!x);
+      if (spans.length === 0) continue;
+      checked += 1;
+      expect(new Set(spans.map((x) => x.style.minWidth)).size).toBe(1);
+      expect(spans[0].className).toContain('text-end');
+    }
+    expect(checked).toBe(5); // سعر الوحدة، الخصم، الخاضع، مبلغ الضريبة، الإجمالي
+  });
+
+  it('keeps every financial column of the reference sample (ten columns, no data hidden)', () => {
+    const { container } = renderPremium(sample());
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+  });
+
+  it('shows the payment value on one line with a neutral separator (no flipped slash)', () => {
+    const { container } = renderPremium(sample());
+    const value = container.querySelector('[data-premium-meta-tile="payment_terms"]')!.textContent!;
+    expect(value).toContain('آجل');
+    expect(value).toContain('Credit');
+    expect(value).not.toContain('/');
+  });
+
+  it('amount in words: Arabic primary + a separate smaller English line in bilingual, one language otherwise', () => {
+    const bi = renderPremium(sample('rtl')).container;
+    expect(bi.querySelector('[data-premium-words-ar]')!.textContent).toContain('فقط لا غير');
+    expect(bi.querySelector('[data-premium-words-en]')!.className).toContain('mt-1');
+    expect(bi.querySelector('[data-premium-words-en]')!.className).toContain('break-words');
+    cleanup();
+    locale.current = 'en';
+    const en = renderPremium(sample('ltr')).container;
+    expect(en.querySelector('[data-premium-words-ar]')).toBeNull();
+    expect(en.querySelector('[data-premium-words-en]')!.textContent).toMatch(/one thousand/i);
+  });
+
+  it('long notes/terms are split out of the totals row so the totals+QR stay compact and the cards can break across pages', () => {
+    const long = 'ملاحظة طويلة جداً '.repeat(60);
+    const { container } = renderPremium({ ...sample(), notes: long, terms: long }, FULL);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeNull();
+    const cards = container.querySelector('[data-premium-cards="long"]')!;
+    expect(cards.querySelector('[data-premium-card="notes"]')).toBeTruthy();
+    expect(cards.className).not.toContain('break-inside-avoid');
+    expect(container.querySelector('[data-premium-summary]')!.className).toContain('break-inside-avoid');
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="bank"]')).toBeTruthy();
+    expect(container.querySelector('[data-premium-totals]')).toBeTruthy();
+  });
+
+  it('measures the effective terms (saved static content) when choosing the layout, not only model.terms', () => {
+    const longStatic = 'شروط ثابتة طويلة من الاستوديو '.repeat(70);
+    const layout = FULL.map((i) => (i.key === 'terms' ? { ...i, properties: { static_content: longStatic } } : i));
+    const { container } = renderPremium({ ...sample(), terms: 'قصير', notes: null }, layout);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeNull();
+    const cards = container.querySelector('[data-premium-cards="long"]')!;
+    expect(cards.textContent).toContain('شروط ثابتة طويلة');
+    expect(cards.className).not.toContain('break-inside-avoid');
+    cleanup();
+    // العكس: محتوى ثابت قصير يغلب model.terms الطويل ⇒ يبقى التركيب المضغوط داخل صف الإجماليات.
+    const shortStatic = FULL.map((i) => (i.key === 'terms' ? { ...i, properties: { static_content: 'قصير' } } : i));
+    const compact = renderPremium({ ...sample(), terms: 'ط'.repeat(900), notes: null }, shortStatic);
+    expect(compact.container.querySelector('[data-premium-cards]')).toBeNull();
+    expect(compact.container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
+  });
+
+  it('keeps the original inline composition for ordinary notes', () => {
+    const { container } = renderPremium(sample(), FULL);
+    expect(container.querySelector('[data-premium-summary] [data-premium-card="notes"]')).toBeTruthy();
+    expect(container.querySelector('[data-premium-cards]')).toBeNull();
+  });
+
+  it('long Arabic/English names wrap instead of clipping or overflowing (break-words on names and party values)', () => {
+    const longName = 'مؤسسة الخليج الإقليمية للتوريدات الصناعية واللوجستية للمشروعات المتقدمة والخدمات التجارية المتكاملة'.repeat(2);
+    const token = 'SuperLongEnglishProductNameWithoutAnySpacesAtAll'.repeat(3);
+    const base = sample();
+    const model = { ...base, seller: { ...base.seller, name: longName }, buyer: { ...base.buyer, name: token }, lines: [{ ...base.lines[0], productName: token, description: longName }] };
+    const { container } = renderPremium(model);
+    for (const el of container.querySelectorAll('[data-premium-party-row="trade_name"] > div:last-child, [data-premium-party-row="customer_name"] > div:last-child, [data-premium-row="line"] td:nth-child(2) span')) {
+      expect(el.className, el.textContent?.slice(0, 20)).toContain('break-words');
+    }
+    expect(container.textContent).toContain(token);
+    expect(container.textContent).toContain(longName.slice(0, 30));
+  });
+
+  it('never ships demo assets: with no logo/stamp/signature in the model there are no images and no QA fixture text', () => {
+    const { container } = renderPremium({ ...sample(), seller: { ...sample().seller, logoUrl: null }, stampUrl: null, signatureUrl: null });
+    expect(container.querySelectorAll('img')).toHaveLength(0);
+    expect(container.querySelector('[data-premium-seller-name]')!.textContent).toBe(sample().seller.name);
+    expect(container.textContent).not.toContain('Nebrax QA');
+    const source = readFileSync(resolve(__dirname, '../templates/tax-invoice-premium.tsx'), 'utf8');
+    expect(source).not.toMatch(/data:image|Nebrax QA|logoUrl\s*=\s*['"`]/);
+  });
+
+  it('renders the real company logo from the model when present (chip keeps transparent and dark logos legible)', () => {
+    const real = 'data:image/png;base64,REAL';
+    const { container } = renderPremium({ ...sample(), seller: { ...sample().seller, logoUrl: real } });
+    const img = container.querySelector<HTMLImageElement>('[data-premium-logo] img')!;
+    expect(img.getAttribute('src')).toBe(real);
+    expect(container.querySelector('[data-premium-logo]')!.className).toContain('bg-white');
+  });
+
+  it('type scale: no text below 9px anywhere in the template source', () => {
+    const source = readFileSync(resolve(__dirname, '../templates/tax-invoice-premium.tsx'), 'utf8');
+    const sizes = [...source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThan(10);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(9);
+  });
+});
+
+describe('tax-invoice-premium-v1 render cost', () => {
+  it('formats each money cell once: formatter constructions grow linearly with lines, not quadratically', () => {
+    const base = sample();
+    const lines = Array.from({ length: 200 }, (_, i) => ({ ...base.lines[i % base.lines.length], id: `perf-${i}` }));
+    const spy = vi.spyOn(Intl, 'NumberFormat');
+    try {
+      renderPremium({ ...base, lines });
+      // ≈ 200 أسطر × 5 أعمدة مالية + الإجماليات؛ الإعادة لكل خلية كانت 6 × 200² ≈ 240,000.
+      expect(spy.mock.calls.length).toBeLessThan(2500);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('still aligns decimals after the one-pass width computation (same min width for all rows of a column)', () => {
+    const { container } = renderPremium(sample());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    const total = rows.map((r) => r.lastElementChild!.querySelector<HTMLElement>('span[dir="ltr"]')!.style.minWidth);
+    expect(new Set(total).size).toBe(1);
+    expect(total[0]).toBe('6ch');
+  });
+});
+
+describe('tax-invoice-premium-v1 multi-page', () => {
+  it('40 lines render without filler and keep the summary/signature blocks unsplittable', () => {
+    const model = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });
+    const { container } = renderPremium(model);
+    expect(container.querySelectorAll('[data-premium-row="line"]')).toHaveLength(40);
+    expect(container.querySelectorAll('[data-premium-row="filler"]')).toHaveLength(0);
+    for (const selector of ['[data-premium-summary]', '[data-premium-signatures]', '[data-premium-row="line"]']) {
+      expect(container.querySelector(selector)?.className, selector).toContain('break-inside-avoid');
+    }
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.2 product code (SKU) under the name', () => {
+  const skus = (root: ParentNode) => [...root.querySelectorAll('[data-premium-row="line"] [data-premium-sku]')].map((n) => n.textContent ?? '');
+
+  it('is hidden by default (no saved columns): look and column count unchanged', () => {
+    const { container } = renderPremium(sample());
+    expect(container.querySelectorAll('[data-premium-sku]')).toHaveLength(0);
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+    expect(container.textContent).not.toContain('TOM-001');
+  });
+
+  it('is hidden when the studio columns do not include product_code', () => {
+    const layout = premiumLayoutWithSku().map((i) => (i.key === 'items' ? { ...i, properties: { columns: i.properties!.columns!.filter((c) => c.id !== 'product_code') } } : i));
+    const { container } = renderPremium(sample(), layout);
+    expect(container.querySelectorAll('[data-premium-sku]')).toHaveLength(0);
+  });
+
+  it('shows the code under the product name inside the same cell, without adding a column', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    expect([...container.querySelectorAll('thead th')]).toHaveLength(10);
+    expect(container.querySelector('thead th[data-premium-col="product_code"]')).toBeNull();
+    const first = container.querySelector('[data-premium-row="line"]')!;
+    const sku = first.querySelector('[data-premium-sku]')!;
+    expect(sku.textContent).toContain('TOM-001');
+    expect(sku.closest('td')).toBe(first.querySelector('td:nth-child(2)'));
+    // أسفل الاسم لا بجانبه: عنصر كتلة بعد صف الاسم.
+    const cell = sku.closest('td')!;
+    expect(cell.querySelector('[data-premium-sku]')!.previousElementSibling?.textContent).toContain('طماطم');
+  });
+
+  it('renders no empty line for a line without a code, and none for a code duplicated in the description', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    const rows = [...container.querySelectorAll('[data-premium-row="line"]')];
+    expect(rows).toHaveLength(7);
+    expect(rows[4]!.querySelector('[data-premium-sku]')).toBeNull(); // ليمون بلا رمز
+    expect(rows[3]!.querySelector('[data-premium-sku]')).toBeNull(); // بطاطس: POT-004 مذكور في الوصف
+    expect(skus(container)).toHaveLength(5);
+  });
+
+  it('a very long code wraps inside the cell instead of overflowing', () => {
+    const { container } = renderPremium(sample(), premiumLayoutWithSku());
+    const long = [...container.querySelectorAll('[data-premium-sku]')].find((n) => n.textContent!.includes('LET-WHITE-ICEBERG'))!;
+    expect(long.innerHTML).toContain('break-all');
+  });
+
+  it('works for the simplified tax invoice and in LTR/English', () => {
+    const simplified = { ...sample(), type: 'simplified_tax_invoice' as const };
+    expect(skus(renderPremium(simplified, premiumLayoutWithSku()).container).length).toBe(5);
+    cleanup();
+    locale.current = 'en';
+    const ltr = renderPremium(sample('ltr'), premiumLayoutWithSku()).container;
+    expect(skus(ltr).length).toBe(5);
+    expect(ltr.querySelector('[data-premium-sku]')!.textContent).toContain('SKU');
+  });
+
+  it('never touches the financial values: every non-name cell and the totals are identical with the SKU on or off', () => {
+    const cells = (root: ParentNode) => [...root.querySelectorAll('[data-premium-row="line"]')].map((row) => [...row.querySelectorAll('td')].filter((_, i) => i !== 1).map((td) => td.textContent));
+    const off = renderPremium(sample()).container;
+    const offCells = cells(off);
+    const offSummary = off.querySelector('[data-premium-summary]')!.textContent;
+    cleanup();
+    const on = renderPremium(sample(), premiumLayoutWithSku()).container;
+    expect(cells(on)).toEqual(offCells);
+    expect(on.querySelector('[data-premium-summary]')!.textContent).toBe(offSummary);
+  });
+});
+
+describe('tax-invoice-premium-v1 V1.2 date and payment labels match the data', () => {
+  it('labels: issue date, due date (not supply date), payment terms (not payment method)', () => {
+    const { container } = renderPremium(sample());
+    const tiles = Object.fromEntries([...container.querySelectorAll('[data-premium-meta-tile]')].map((n) => [n.getAttribute('data-premium-meta-tile'), n.textContent ?? '']));
+    expect(tiles.issue_date).toContain('تاريخ الإصدار');
+    expect(tiles.due_date).toContain('تاريخ الاستحقاق');
+    expect(tiles.payment_terms).toContain('شروط السداد');
+    const text = container.querySelector('[data-premium-meta]')?.textContent ?? container.textContent!;
+    expect(text).not.toContain('تاريخ التوريد');
+    expect(text).not.toContain('طريقة الدفع');
+    expect(text).not.toContain('Supply date');
+    expect(text).not.toContain('Payment method');
+  });
+
+  it('English labels', () => {
+    locale.current = 'en';
+    const { container } = renderPremium(sample('ltr'));
+    const t = (key: string) => container.querySelector(`[data-premium-meta-tile="${key}"]`)!.textContent!;
+    expect(t('issue_date')).toContain('Issue date');
+    expect(t('due_date')).toContain('Due date');
+    expect(t('payment_terms')).toContain('Payment terms');
+  });
+
+  it('shows the due date value from dueDate and the terms value from paymentType, never inventing one when absent', () => {
+    const lean = { ...sample(), meta: { number: 'A', date: '2026-11-20', dueDate: null, paymentType: null } };
+    const { container } = renderPremium(lean);
+    expect(container.querySelector('[data-premium-meta-tile="due_date"]')).toBeNull();
+    expect(container.querySelector('[data-premium-meta-tile="payment_terms"]')).toBeNull();
+    expect(container.querySelector('[data-premium-meta-tile="issue_date"]')).toBeTruthy();
+    cleanup();
+    const cash = renderPremium({ ...sample(), meta: { ...sample().meta, paymentType: 'cash', dueDate: null } }).container;
+    expect(cash.querySelector('[data-premium-meta-tile="payment_terms"]')!.textContent).toContain('نقدي');
+  });
+});

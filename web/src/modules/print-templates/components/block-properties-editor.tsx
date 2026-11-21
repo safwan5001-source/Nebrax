@@ -153,11 +153,14 @@ export function BlockPropertiesEditor({
   onChange,
   documentType,
   disabled,
+  defaultColumns,
 }: {
   value: DocSectionLayoutItem[];
   onChange: (layout: DocSectionLayoutItem[]) => void;
   documentType: DocumentTypeId;
   disabled?: boolean;
+  /** أعمدة القالب المختار حين لا توجد أعمدة محفوظة؛ غيابه = قائمة المحرك العامة (سلوك القوالب القائمة). */
+  defaultColumns?: readonly DocItemsColumnId[];
 }) {
   const t = useTranslations('printTemplateStudio');
   const tSections = useTranslations('documentSections');
@@ -205,7 +208,7 @@ export function BlockPropertiesEditor({
     tax: tInvoice('tax'),
     total: tInvoice('total'),
   };
-  const columns: readonly DocItemsColumn[] = properties.columns ?? DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
+  const columns: readonly DocItemsColumn[] = properties.columns ?? (defaultColumns ?? DEFAULT_DOCUMENT_ITEMS_COLUMNS).map((id) => ({ id }));
   const columnFor = (id: DocItemsColumnId) => columns.find((column) => column.id === id);
   const toggleColumn = (id: DocItemsColumnId) => {
     const current = columnFor(id);

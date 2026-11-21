@@ -1,6 +1,7 @@
 import type { Direction, DocumentLine, DocumentModel, DocumentTypeId } from '../types';
 
-export type DocumentQaScenario = 'single' | 'three' | 'five' | 'twenty' | 'multipage' | 'long_content';
+/** `reference_sample`: عينة الفاتورة الضريبية الفاخرة (7 بنود، خصم على بند، تفاصيل السطر كاملة) لمقارنتها بالمرجع البصري. */
+export type DocumentQaScenario = 'single' | 'three' | 'five' | 'twenty' | 'multipage' | 'long_content' | 'reference_sample';
 
 export type DocumentQaOptions = {
   /** اختياري للتوافق مع فحوصات المرحلة الأولى؛ الافتراضي فاتورة ضريبية. */
@@ -67,8 +68,86 @@ function lineAt(index: number, direction: DocumentQaOptions['direction'], verbos
   };
 }
 
+/**
+ * بنود عينة الفاتورة الفاخرة. الأرقام مخزَّنة كما يخزنها المحرك (هللات): السعر قبل الضريبة × الكمية − الخصم = الخاضع،
+ * والضريبة 15% منه. تُستعمل لمقارنة المخرج بالمرجع البصري؛ ليست بيانات مستأجر.
+ */
+// رموز المنتج في عيّنة المرجع تغطي الحالات: عادي، مفقود (الليمون)، طويل جداً (الخس)، ومكرر داخل الوصف (البطاطس).
+const REFERENCE_SAMPLE_CODES: readonly (string | null)[] = ['TOM-001', 'CUC-002', 'ONI-003', 'POT-004', null, 'LET-WHITE-ICEBERG-12-CTN-SA-2026-LONG-CODE-0005', 'BAN-007'];
+
+const REFERENCE_SAMPLE_ITEMS = [
+  { ar: 'طماطم (6 كجم)', en: 'Tomato', unit: ['كرتون', 'Carton'], qty: 10, price: 2400, discount: 0 },
+  { ar: 'خيار (5 كجم)', en: 'Cucumber', unit: ['كرتون', 'Carton'], qty: 8, price: 1850, discount: 0 },
+  { ar: 'بصل أحمر (10 كجم)', en: 'Red onion', unit: ['كيس', 'Bag'], qty: 6, price: 2100, discount: 0 },
+  { ar: 'بطاطس (10 كجم)', en: 'Potato', unit: ['كيس', 'Bag'], qty: 8, price: 1950, discount: 0 },
+  { ar: 'ليمون (4 كجم)', en: 'Lemon', unit: ['كرتون', 'Carton'], qty: 5, price: 2800, discount: 0 },
+  { ar: 'خس (12 حبة)', en: 'Lettuce', unit: ['كرتون', 'Carton'], qty: 4, price: 3000, discount: 0 },
+  { ar: 'موز (13 كجم)', en: 'Banana', unit: ['كرتون', 'Carton'], qty: 3, price: 6500, discount: 1500 },
+] as const;
+
+function makeReferenceSampleModel(options: DocumentQaOptions): DocumentModel {
+  const english = options.direction === 'ltr';
+  const lines: DocumentLine[] = REFERENCE_SAMPLE_ITEMS.map((item, index) => {
+    const gross = item.price * item.qty;
+    const net = gross - item.discount;
+    const tax = Math.round(net * 0.15);
+    return {
+      id: `ref-line-${index + 1}`,
+      productName: english ? item.en : item.ar,
+      description: index === 3 ? `${english ? item.ar : item.en} ${REFERENCE_SAMPLE_CODES[index]}` : english ? item.ar : item.en,
+      productCode: REFERENCE_SAMPLE_CODES[index],
+      quantity: item.qty,
+      unit: english ? item.unit[1] : item.unit[0],
+      unitPrice: item.price,
+      priceBeforeTax: item.price,
+      lineDiscount: item.discount,
+      netAmount: net,
+      taxRate: 15,
+      tax,
+      total: net + tax,
+    };
+  });
+  const subtotal = REFERENCE_SAMPLE_ITEMS.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discount = REFERENCE_SAMPLE_ITEMS.reduce((sum, item) => sum + item.discount, 0);
+  const tax = lines.reduce((sum, line) => sum + line.tax, 0);
+  const assets = options.showAssets;
+
+  return {
+    type: options.documentType === 'simplified_tax_invoice' ? 'simplified_tax_invoice' : 'tax_invoice',
+    currency: 'SAR',
+    direction: options.direction,
+    language: english ? 'en' : 'bilingual',
+    seller: {
+      name: english ? 'Nebras Cart — Nebras Al-Tumooh Company' : 'عربة نبراس - شركة نبراس الطموح',
+      vatNumber: '313037133700003',
+      crNumber: '7050247977',
+      address: english ? 'Dammam, Al Faisaliyah, Imam Mohammed bin Saud St.' : 'الدمام، حي الفيصلية، شارع الإمام محمد بن سعود',
+      phone: '0557996876',
+      logoUrl: assets ? LOGO_DATA_URL : null,
+      logoHeight: 52,
+    },
+    buyer: {
+      name: english ? 'Original Taste Restaurant' : 'مطعم الذوق الأصيل',
+      vatNumber: '300000000000003',
+      crNumber: '2050000000',
+      address: english ? 'Dammam, Al Shati, Prince Mohammed bin Fahd St.' : 'الدمام، حي الشاطئ، شارع الأمير محمد بن فهد',
+      phone: '0500000000',
+    },
+    meta: { number: 'DEMO-0001', date: '2026-11-20', dueDate: '2026-11-27', paymentType: 'credit' },
+    lines,
+    totals: { subtotal, discount, taxRate: 15, tax, total: subtotal - discount + tax },
+    qr: options.showQr ? { value: `AWJ premium sample ${subtotal - discount + tax}`, note: english ? 'Demo QR · not valid' : 'رمز تجريبي · غير صالح' } : null,
+    notes: english ? 'Pay within 7 days of the invoice date. Delivery the next morning.' : 'السداد خلال 7 أيام من تاريخ الفاتورة. التوريد صباح اليوم التالي.',
+    terms: null,
+    bank: assets ? 'SA00 0000 0000 0000 0000 0000 (IBAN)' : null,
+    stampUrl: assets ? STAMP_DATA_URL : null,
+    signatureUrl: assets ? SIGNATURE_DATA_URL : null,
+    footerText: null,
+  };
+}
+
 function countForScenario(scenario: DocumentQaScenario): number {
-  return { single: 1, three: 3, five: 5, twenty: 20, multipage: 40, long_content: 5 }[scenario];
+  return { single: 1, three: 3, five: 5, twenty: 20, multipage: 40, long_content: 5, reference_sample: REFERENCE_SAMPLE_ITEMS.length }[scenario];
 }
 
 function longArabicText(label: string): string {
@@ -85,6 +164,7 @@ function longEnglishText(label: string): string {
  */
 export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
   const type = options.documentType ?? 'tax_invoice';
+  if (options.scenario === 'reference_sample') return makeReferenceSampleModel(options);
   if (type === 'receipt_voucher' || type === 'payment_voucher') return makeVoucherQaModel(options, type);
   const english = options.direction === 'ltr';
   const verbose = options.scenario === 'multipage' || options.scenario === 'long_content' || options.scenario === 'twenty';
