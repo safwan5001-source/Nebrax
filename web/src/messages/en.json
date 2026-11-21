@@ -2541,6 +2541,7 @@
     "scenario_multipage": "Multi-page",
     "scenario_long_content": "Long content",
     "scenario_reference_sample": "Premium reference sample",
+    "scenario_simplified_sample": "Premium simplified sample",
     "direction_rtl": "Arabic RTL",
     "direction_ltr": "English LTR"
   },
@@ -3522,6 +3523,7 @@
     "purchase_order_formal": "Formal Purchase Order",
     "voucher_compact": "Compact Voucher",
     "premium_v1": "Premium Invoice V1",
+    "simplified_premium_v1": "Premium Simplified Invoice V1",
     "thermal58": "Thermal 58mm",
     "thermal80": "Thermal 80mm"
   },

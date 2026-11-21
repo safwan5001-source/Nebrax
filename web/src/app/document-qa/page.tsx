@@ -15,7 +15,7 @@ import { normalizeOutputProfile, type OutputProfile } from '@/modules/print-temp
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import type { DocumentTypeId } from '@/modules/documents/types';
 
-const SCENARIOS = ['single', 'three', 'five', 'twenty', 'multipage', 'long_content', 'reference_sample'] as const satisfies readonly DocumentQaScenario[];
+const SCENARIOS = ['single', 'three', 'five', 'twenty', 'multipage', 'long_content', 'reference_sample', 'simplified_sample'] as const satisfies readonly DocumentQaScenario[];
 const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
   { id: 'tax-invoice-classic', labelKey: 'classic' },
@@ -34,6 +34,8 @@ const TEMPLATES = [
   { id: 'voucher-compact', labelKey: 'voucher_compact' },
   // AWJ-DOC-TAX-PREMIUM-V1: الفاتورة الضريبية الفاخرة؛ عينة `reference_sample` تقابل المرجع البصري.
   { id: 'tax-invoice-premium-v1', labelKey: 'premium_v1' },
+  // AWJ-DOC-SIMPLIFIED-PREMIUM-V1: الفاتورة الضريبية المبسطة الفاخرة؛ عينة `simplified_sample`.
+  { id: 'tax-invoice-simplified-premium-v1', labelKey: 'simplified_premium_v1' },
   // AWJ-DOC-V2-PR2: الإيصال الحراري يُفحص بالمسارات نفسها (معاينة/طباعة/PDF) بمقاسه الحقيقي.
   { id: 'tax-invoice-thermal58', labelKey: 'thermal58' },
   { id: 'tax-invoice-thermal80', labelKey: 'thermal80' },
@@ -113,11 +115,12 @@ export default function DocumentQaPage() {
   // القالب الفاخر بتخطيطه الافتراضي الكامل (الذي يعرض المرجع)؛ بقية القوالب بالتخطيط الافتراضي للنوع.
   // `sku=on` (للقالب الفاخر فقط): يحاكي ما يحفظه الاستوديو عند تفعيل «رمز المنتج» — أعمدة القالب الافتراضية + product_code.
   const skuOn = searchParams.get('sku') === 'on';
-  const layout = useMemo(() => (templateId === 'tax-invoice-premium-v1' ? (skuOn ? premiumLayoutWithSku() : null) : getDefaultDocumentLayout(documentType).map((item) => ({
+  const isPremium = templateId === 'tax-invoice-premium-v1' || templateId === 'tax-invoice-simplified-premium-v1';
+  const layout = useMemo(() => (isPremium ? (skuOn ? premiumLayoutWithSku(templateId === 'tax-invoice-simplified-premium-v1' ? 'simplified' : 'full') : null) : getDefaultDocumentLayout(documentType).map((item) => ({
     ...item,
     visible: (item.visible && (showAssets || !['bank', 'stamp', 'signature'].includes(item.key)))
       || (item.key === 'barcode' && (templateId === 'tax-invoice-retail' || templateId === 'tax-invoice-retail-v2')),
-  }))), [documentType, showAssets, skuOn, templateId]);
+  }))), [documentType, isPremium, showAssets, skuOn, templateId]);
 
   const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction' | 'paper' | 'orientation', value: string) => {
     const next = new URLSearchParams({
@@ -232,7 +235,7 @@ export default function DocumentQaPage() {
             <DocumentView
               model={model}
               templateId={templateId}
-              themeId={templateId === 'tax-invoice-premium-v1' ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              themeId={isPremium ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"
@@ -244,7 +247,7 @@ export default function DocumentQaPage() {
             <DocumentView
               model={model}
               templateId={templateId}
-              themeId={templateId === 'tax-invoice-premium-v1' ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+              themeId={isPremium ? 'green' : templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
               showLogo={showLogo}
               layout={layout}
               rootId="qa-print-root"

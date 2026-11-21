@@ -12,7 +12,7 @@ import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { QuotationProposal } from '../templates/quotation-proposal';
 import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
 import { VoucherCompact } from '../templates/voucher-compact';
-import { TaxInvoicePremium } from '../templates/tax-invoice-premium';
+import { TaxInvoicePremium, TaxInvoiceSimplifiedPremium } from '../templates/tax-invoice-premium';
 import { PREMIUM_STUDIO_DEFAULT_COLUMNS } from '../presentation/tax-invoice-premium';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
@@ -113,6 +113,18 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     minContentWidthMm: 182,
     documentTypes: ['tax_invoice', 'simplified_tax_invoice'],
     // الاستوديو يعرض أعمدة هذا القالب (رمز المنتج غير مفعّل) لا القائمة العامة؛ تفعيله يُظهر الرمز تحت اسم الصنف.
+    defaultItemColumns: PREMIUM_STUDIO_DEFAULT_COLUMNS,
+  },
+  // الفاتورة الضريبية المبسطة الفاخرة A4 (AWJ-DOC-SIMPLIFIED-PREMIUM-V1): المحرك والهوية نفسهما للفاخرة بمتغيّر `simplified`
+  // (لا نسخة مكونات). نوعها المبسطة وحده؛ `tax-invoice-premium-v1` يبقى بنوعيه ومخرجه كما هو. A4/Letter/Legal عمودياً فقط كالأصل.
+  'tax-invoice-simplified-premium-v1': {
+    id: 'tax-invoice-simplified-premium-v1',
+    nameKey: 'simplified_premium_v1',
+    component: TaxInvoiceSimplifiedPremium,
+    defaultTheme: 'green',
+    supportedPaper: ['a4', 'letter', 'legal'],
+    minContentWidthMm: 182,
+    documentTypes: ['simplified_tax_invoice'],
     defaultItemColumns: PREMIUM_STUDIO_DEFAULT_COLUMNS,
   },
   'tax-invoice-thermal58': {

@@ -122,6 +122,8 @@ export interface DocumentMeta {
   date: string;
   dueDate?: string | null;
   paymentType?: 'cash' | 'credit' | null;
+  /** وقت الإصدار `HH:mm` بتوقيت السعودية من لحظة الإصدار المخزَّنة؛ اختياري ولا يقرؤه إلا قالب المبسطة الفاخر (`tax-invoice-simplified-premium-v1`). */
+  time?: string | null;
 }
 
 /** رمز ZATCA (أو أي هيئة لاحقاً) — قيمة QR جاهزة. */
