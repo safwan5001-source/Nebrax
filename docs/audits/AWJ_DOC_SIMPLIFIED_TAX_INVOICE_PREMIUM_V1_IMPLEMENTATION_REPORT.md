@@ -43,23 +43,23 @@
 
 **معدّلة (كلها إضافية/عرضية):** `templates/tax-invoice-premium.tsx` · `presentation/tax-invoice-premium.ts` · `registry/templates.ts` · `builder/from-invoice.ts` · `types/index.ts` (`meta.time`) · `qa/document-qa-fixtures.ts` · `app/document-qa/page.tsx` · `messages/{ar,en}.json` (اسم القالب + سيناريو QA) · حارسا جدول الدعم `documents/services/output-spec.test.ts` و`print-templates/services/output-profile.test.ts` (إدخال القالب الجديد).
 **جديدة:** `components/document-tax-invoice-simplified-premium.test.tsx` (33 اختباراً) · `e2e/tax-invoice-simplified-premium-v1.spec.ts` (17) · هذا التقرير و`docs/audits/assets/tax-invoice-simplified-premium-v1/*`.
-**لم تُلمس:** كل PHP، `DocumentModel`/`DocumentView`، الاستوديو، `design-system/governance/baseline.json`.
+**أيضاً:** `design-system/governance/baseline.json` (مدخل القالب 17→20). **لم تُلمس:** كل PHP، `DocumentModel`/`DocumentView`، الاستوديو.
 
 ## 5) الاختبارات والنتائج
 
 | المجموعة | النتيجة |
 |---|---|
 | Vitest الوحدات (documents + print-templates) | **70 ملفاً / 815 اختباراً أخضر** (33 جديداً). |
-| Vitest الكامل | انظر §6. |
+| Vitest الكامل (`npx vitest run`) | **1019 ملفاً / 13,700 اختبار**: التشغيل الأول فشل اختبار واحد فقط — حارس انحراف الألوان `drift-ratchet` (3 فئات `text-black` جديدة في ملف القالب؛ مستند طباعة، استثناء موثَّق). عُدِّل مدخل الملف في `baseline.json` (17→20 والمجموع 395→398) دون غيره، فنجح الحارس (6 ملفات / 191 اختباراً). |
 | Playwright الجديدة (Chromium، `--project=desktop`) | **17/17**: RTL وLTR؛ A4 بهامش 0 = **صفحة واحدة** (معاينة + PDF)؛ هوامش 14مم الافتراضية = صفحة واحدة؛ فاتورة قصيرة (سطر واحد + ملاحظات/بنك/خصم/شحن) بلا فيضان؛ `sku=on` (6 رموز تحت الاسم داخل الخلية، 7 أعمدة) ومخفي؛ محتوى طويل بلا قصّ ولا كلمات مكسورة؛ 40 سطراً متعدد الصفحات؛ A5 غير المعلن يبقى على الإطار القديم. |
 | Playwright الفاخرة الكاملة (`tax-invoice-premium-v1.spec.ts`) | **11/11** على الشجرة المعدّلة — لا انحدار. |
 | تغطية الحالات المطلوبة | RTL/LTR ✔ · PDF A4 فعلي ✔ · الإجماليات والضرائب (تطابق السطور بالمجموع، إجمالي معدَّل يُطبع كما هو، لا إعادة حساب) ✔ · SKU مفعّل/مخفي/مفقود/مكرر ✔ · قصيرة/طويلة/فارغة ✔ · بائع ناقص (اسم فقط، بلا هاتف/عنوان/سجل، بلا شعار) ✔ · مشتري ناقص (لا اسم، «—»، مسافات، بلا ضريبي) ✔ · الفاتورة الكاملة Premium V1.2 سليمة ✔ (بنيتها، 10 أعمدة، توقيعات، قسم المبلغ كتابةً المنفرد، عدم قراءة `meta.time`). |
 | `tsc --noEmit` | لا أخطاء في أي ملف عدّلته (أخطاء ملفات اختبار قديمة قائمة قبل التغيير). |
-| `next build` / CI | انظر §6 ووصف الـPR. |
+| `next build` (محلي) | **ناجح**. نتيجة CI على الرأس النهائي في وصف الـPR. |
 
 ## 6) Build وCI
 
-يُدرج في وصف الـPR بعد تشغيل CI على الرأس النهائي. محلياً: انظر نتيجة Vitest الكامل و`next build` في ردّ التسليم.
+`next build` المحلي ناجح؛ نتيجة CI على الرأس النهائي في وصف الـPR. **`baseline.json`** (حارس انحراف الألوان) عُدِّل لهذا الملف وحده؛ لم أشغّل `--write` لأنه يعدّل مدخلات ملفات أخرى غير مرتبطة.
 خطأ `INVALID_KEY: Namespace keys can not contain "."` في سجل خادم التطوير أثناء مواصفات Playwright **موجود على main أيضاً** (تحققت بـ`git stash`) ولا يرتبط بالتغيير.
 
 ## 7) مواد المقارنة (`docs/audits/assets/tax-invoice-simplified-premium-v1/`)
