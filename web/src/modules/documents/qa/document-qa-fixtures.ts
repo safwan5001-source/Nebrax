@@ -1,7 +1,7 @@
 import type { Direction, DocumentLine, DocumentModel, DocumentTypeId } from '../types';
 
 /** `reference_sample`: عينة الفاتورة الضريبية الفاخرة (7 بنود، خصم على بند، تفاصيل السطر كاملة) لمقارنتها بالمرجع البصري. */
-export type DocumentQaScenario = 'single' | 'three' | 'five' | 'twenty' | 'multipage' | 'long_content' | 'reference_sample';
+export type DocumentQaScenario = 'single' | 'three' | 'five' | 'twenty' | 'multipage' | 'long_content' | 'reference_sample' | 'simplified_sample';
 
 export type DocumentQaOptions = {
   /** اختياري للتوافق مع فحوصات المرحلة الأولى؛ الافتراضي فاتورة ضريبية. */
@@ -146,8 +146,77 @@ function makeReferenceSampleModel(options: DocumentQaOptions): DocumentModel {
   };
 }
 
+/**
+ * عينة الفاتورة الضريبية المبسطة الفاخرة: بيع تجزئة نقدي بثمانية أصناف (وحدة، كمية، سعر قبل الضريبة، ضريبة 15%) وبلا خصم،
+ * تغطي حالات رمز المنتج: عادي، مفقود، مكرر في الاسم. بيانات اختبار محايدة (لا نسخ لبيانات المرجع التجريبي ولا علامته).
+ * المبالغ مخزَّنة كما يخزنها المحرك: الضريبة = 15% من (السعر × الكمية)، والإجمالي = الخاضع + الضريبة.
+ */
+const SIMPLIFIED_SAMPLE_ITEMS = [
+  { ar: 'قهوة عربية 250 جم', en: 'Arabic coffee 250 g', code: 'COF-250', unit: ['عبوة', 'Pack'], qty: 3, price: 4500 },
+  { ar: 'تمر سكري 1 كجم', en: 'Sukkari dates 1 kg', code: 'DAT-001', unit: ['كجم', 'Kg'], qty: 2, price: 3800 },
+  { ar: 'ماء معدني 330 مل', en: 'Mineral water 330 ml', code: null, unit: ['علبة', 'Box'], qty: 4, price: 1000 },
+  { ar: 'عسل سدر 500 جم', en: 'Sidr honey 500 g', code: 'HON-500', unit: ['برطمان', 'Jar'], qty: 1, price: 12000 },
+  { ar: 'شاي أخضر', en: 'Green tea', code: 'TEA-GRN', unit: ['علبة', 'Box'], qty: 2, price: 2600 },
+  { ar: 'لوز محمص 250 جم', en: 'Roasted almonds 250 g', code: 'ALM-250', unit: ['عبوة', 'Pack'], qty: 2, price: 5500 },
+  { ar: 'حليب طازج لتر', en: 'Fresh milk 1 L', code: 'MLK-001', unit: ['لتر', 'Litre'], qty: 6, price: 600 },
+  { ar: 'خبز عربي', en: 'Arabic bread', code: 'BRD-001', unit: ['حزمة', 'Bundle'], qty: 5, price: 250 },
+] as const;
+
+function makeSimplifiedSampleModel(options: DocumentQaOptions): DocumentModel {
+  const english = options.direction === 'ltr';
+  const lines: DocumentLine[] = SIMPLIFIED_SAMPLE_ITEMS.map((item, index) => {
+    const net = item.price * item.qty;
+    const tax = Math.round(net * 0.15);
+    return {
+      id: `simp-line-${index + 1}`,
+      productName: english ? item.en : item.ar,
+      // الصنف الأخير: الرمز مذكور في الوصف أصلاً فيُحجب سطر الرمز (لا تكرار).
+      description: index === 7 ? `${english ? item.en : item.ar} ${item.code}` : english ? item.en : item.ar,
+      productCode: item.code,
+      quantity: item.qty,
+      unit: english ? item.unit[1] : item.unit[0],
+      unitPrice: item.price,
+      priceBeforeTax: item.price,
+      lineDiscount: 0,
+      netAmount: net,
+      taxRate: 15,
+      tax,
+      total: net + tax,
+    };
+  });
+  const subtotal = lines.reduce((sum, line) => sum + (line.netAmount ?? 0), 0);
+  const tax = lines.reduce((sum, line) => sum + line.tax, 0);
+  const assets = options.showAssets;
+  return {
+    type: 'simplified_tax_invoice',
+    currency: 'SAR',
+    direction: options.direction,
+    language: english ? 'en' : 'bilingual',
+    seller: {
+      name: english ? 'Nebrax QA Trading Company' : 'شركة نبراكس التجريبية للتجارة',
+      vatNumber: '310122393500003',
+      crNumber: '2050123456',
+      address: english ? 'King Fahd Road, Al Faisaliyah, Dammam' : 'طريق الملك فهد، حي الفيصلية، الدمام',
+      phone: '0500000000',
+      logoUrl: assets ? LOGO_DATA_URL : null,
+      logoHeight: 52,
+    },
+    buyer: { name: english ? 'Walk-in customer' : 'عميل نقدي' },
+    meta: { number: 'SIMP-QA-0001', date: '2026-11-20', time: '14:35', paymentType: 'cash' },
+    lines,
+    totals: { subtotal, taxRate: 15, tax, total: subtotal + tax },
+    qr: options.showQr ? { value: `AWJ simplified sample ${subtotal + tax}`, note: english ? 'Demo QR · not valid' : 'رمز تجريبي · غير صالح' } : null,
+    notes: english ? 'Thank you for shopping with us. Prices include 15% VAT.' : 'شكراً لتسوقكم معنا. الأسعار شاملة ضريبة القيمة المضافة 15%.',
+    terms: null,
+    bank: null,
+    stampUrl: null,
+    signatureUrl: null,
+    footerText: null,
+  };
+}
+
 function countForScenario(scenario: DocumentQaScenario): number {
-  return { single: 1, three: 3, five: 5, twenty: 20, multipage: 40, long_content: 5, reference_sample: REFERENCE_SAMPLE_ITEMS.length }[scenario];
+  return { single: 1, three: 3, five: 5, twenty: 20, multipage: 40, long_content: 5, reference_sample: REFERENCE_SAMPLE_ITEMS.length, simplified_sample: SIMPLIFIED_SAMPLE_ITEMS.length }[scenario];
 }
 
 function longArabicText(label: string): string {
@@ -165,6 +234,7 @@ function longEnglishText(label: string): string {
 export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
   const type = options.documentType ?? 'tax_invoice';
   if (options.scenario === 'reference_sample') return makeReferenceSampleModel(options);
+  if (options.scenario === 'simplified_sample') return makeSimplifiedSampleModel(options);
   if (type === 'receipt_voucher' || type === 'payment_voucher') return makeVoucherQaModel(options, type);
   const english = options.direction === 'ltr';
   const verbose = options.scenario === 'multipage' || options.scenario === 'long_content' || options.scenario === 'twenty';

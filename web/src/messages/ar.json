@@ -2541,6 +2541,7 @@
     "scenario_multipage": "متعدد الصفحات",
     "scenario_long_content": "محتوى طويل",
     "scenario_reference_sample": "عينة الفاتورة الفاخرة (المرجع)",
+    "scenario_simplified_sample": "عينة الفاتورة المبسطة الفاخرة",
     "direction_rtl": "العربية RTL",
     "direction_ltr": "الإنجليزية LTR"
   },
@@ -3522,6 +3523,7 @@
     "purchase_order_formal": "أمر شراء رسمي",
     "voucher_compact": "سند مدمج",
     "premium_v1": "فاتورة فاخرة V1",
+    "simplified_premium_v1": "فاتورة مبسطة فاخرة V1",
     "thermal58": "حراري 58مم",
     "thermal80": "حراري 80مم"
   },

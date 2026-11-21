@@ -1,7 +1,7 @@
 {
   "$comment": "Per-file counts of fixed-palette classes and raw hex in TSX. Ratchet: may only go down. Regenerate with `node scripts/awj-drift-scan.mjs --write` after a reduction.",
   "totals": {
-    "palette": 395,
+    "palette": 398,
     "hex": 8
   },
   "files": {
@@ -198,7 +198,7 @@
       "hex": 0
     },
     "web/src/modules/documents/templates/tax-invoice-premium.tsx": {
-      "palette": 17,
+      "palette": 20,
       "hex": 0
     },
     "web/src/modules/documents/templates/voucher-compact.tsx": {

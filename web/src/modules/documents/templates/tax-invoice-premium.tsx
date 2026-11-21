@@ -32,6 +32,7 @@ import {
   PREMIUM_LABELS,
   PREMIUM_STUDIO_DEFAULT_COLUMNS,
   premiumColumnWidths,
+  premiumMinRows,
   premiumResolveColumns,
   premiumSkuLine,
   premiumMetaTiles,
@@ -40,6 +41,7 @@ import {
   type PremiumColumn,
   type PremiumLabelKey,
   type PremiumLabelPair,
+  type PremiumVariant,
 } from '../presentation/tax-invoice-premium';
 import { amountToWords } from '../utils/amount-words';
 import { getDocumentImagePreviewClass, getDocumentImagePreviewOpacityClass } from '../utils/block-image-size';
@@ -66,11 +68,19 @@ const PREMIUM_DEFAULT_LAYOUT: readonly DocSectionLayoutItem[] = [
 ];
 
 /**
+ * ترتيب أقسام المبسطة عند غياب تخطيط محفوظ: كالكاملة عدا التوقيع والختم (المرجع المبسط بلا مربعات توقيع). المبلغ كتابةً يُركَّب داخل
+ * صف الإجماليات (كالمرجع) لا قسماً مستقلاً. تخطيط محفوظ من الاستوديو يغلب هذا دائماً ويستطيع إظهارهما.
+ */
+const SIMPLIFIED_DEFAULT_LAYOUT: readonly DocSectionLayoutItem[] = PREMIUM_DEFAULT_LAYOUT.map((item) => (
+  item.key === 'signature' || item.key === 'stamp' ? { ...item, visible: false } : item
+));
+
+/**
  * التخطيط الذي يحفظه الاستوديو حين يُفعَّل «رمز المنتج» على القالب الفاخر: تخطيطه الافتراضي مع أعمدة القالب الافتراضية + `product_code`
  * (يُرسم الرمز تحت اسم الصنف لا عموداً مستقلاً). للتحقق البصري/الاختبار؛ لا يُستعمل في مسار الإنتاج.
  */
-export function premiumLayoutWithSku(): DocSectionLayoutItem[] {
-  return PREMIUM_DEFAULT_LAYOUT.map((item) => (item.key === 'items'
+export function premiumLayoutWithSku(variant: PremiumVariant = 'full'): DocSectionLayoutItem[] {
+  return (variant === 'simplified' ? SIMPLIFIED_DEFAULT_LAYOUT : PREMIUM_DEFAULT_LAYOUT).map((item) => (item.key === 'items'
     ? { ...item, properties: { columns: [...PREMIUM_STUDIO_DEFAULT_COLUMNS, 'product_code' as const].map((id) => ({ id })) } }
     : { ...item }));
 }
@@ -80,6 +90,9 @@ type Mode = DocumentLabelMode;
 /** اتجاه المستند الفعلي — تحتاجه محاذاة النص الإنجليزي المعزول (`dir=ltr`) داخل صفحة RTL. */
 const PremiumDirContext = createContext<'rtl' | 'ltr'>('rtl');
 const usePremiumDir = () => useContext(PremiumDirContext);
+/** متغيّر التركيب (`full` افتراضي = الفاتورة الضريبية الكاملة بلا أي تغيير؛ `simplified` = المبسطة). */
+const PremiumVariantContext = createContext<PremiumVariant>('full');
+const useVariant = () => useContext(PremiumVariantContext);
 
 /** تسمية بلغة واحدة: الإنجليزية للوضع `en`، وإلا العربية (للتذييلات المضغوطة). */
 const single = (pair: PremiumLabelPair, mode: Mode) => (mode === 'en' ? pair.en : pair.ar);
@@ -142,9 +155,10 @@ function PremiumHeader({ model, showLogo, mode, locale }: { model: DocumentModel
   const logo = showLogo && seller.logoUrl ? seller.logoUrl : null;
   const logoHeight = Math.min(seller.logoHeight && seller.logoHeight > 0 ? seller.logoHeight : PREMIUM.logoMaxPx, PREMIUM.logoMaxPx);
   const bilingual = mode === 'bilingual';
+  const variant = useVariant();
 
   return (
-    <header data-premium-header data-premium-mode={mode}>
+    <header data-premium-header data-premium-mode={mode} data-premium-variant={variant}>
       <div className={cn('flex items-center justify-between gap-6 px-8 pb-3 pt-3.5 text-white', blockTextClassName(properties))} style={{ background: 'var(--pv-deep)' }}>
         <div className="min-w-0">
           <h1 className={cn('font-extrabold leading-tight', mode === 'en' ? 'text-[22px]' : 'text-[24px]')}>
@@ -176,7 +190,7 @@ function PremiumHeader({ model, showLogo, mode, locale }: { model: DocumentModel
 }
 
 function MetaTiles({ model, mode }: { model: DocumentModel; mode: Mode }) {
-  const tiles = premiumMetaTiles(model);
+  const tiles = premiumMetaTiles(model, useVariant());
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }} data-premium-meta>
       {tiles.map((tile) => (
@@ -196,9 +210,46 @@ function MetaTiles({ model, mode }: { model: DocumentModel; mode: Mode }) {
 interface PartyRow {
   key: PremiumLabelKey;
   value: ReactNode;
+  /** صف بعرض البطاقة كلها (الاسم، العنوان) في الشبكة المدمجة. */
+  wide?: boolean;
 }
 
-function PartyCard({ title, rows, mode, kind }: { title: PremiumLabelPair; rows: PartyRow[]; mode: Mode; kind: 'seller' | 'buyer' }) {
+/**
+ * الشبكة المدمجة لبطاقة بائع المبسطة: عمودان، والصفوف العريضة (الاسم/العنوان) بعرض البطاقة. يُحشى فراغ خلية حين يقع صف عريض
+ * بعد خلية مفردة فلا يلتف الترتيب. تُرسم الحدود الفاصلة بين الصفوف والأعمدة كخلايا الجدول.
+ */
+function CompactPartyRows({ rows, mode }: { rows: PartyRow[]; mode: Mode }) {
+  type Cell = { key: string; row: PartyRow | null; wide: boolean; column: number };
+  const cells: Cell[] = [];
+  let column = 0;
+  rows.forEach((row) => {
+    if (row.wide && column === 1) { cells.push({ key: `pad-${row.key}`, row: null, wide: false, column: 1 }); column = 0; }
+    cells.push({ key: row.key, row, wide: !!row.wide, column: row.wide ? 0 : column });
+    column = row.wide ? 0 : (column + 1) % 2;
+  });
+  if (column === 1) cells.push({ key: 'pad-end', row: null, wide: false, column: 1 });
+  return (
+    <div className="grid grid-cols-2" data-premium-party-grid>
+      {cells.map((cell, index) => (
+        <div
+          key={cell.key}
+          className={cn('flex min-w-0 items-start gap-3 px-4 py-1', cell.wide && 'col-span-2', index > 0 && 'border-t')}
+          style={{ borderColor: 'var(--pv-line)', ...(cell.column === 1 ? { borderInlineStart: '1px solid var(--pv-line)' } : {}) }}
+          data-premium-party-row={cell.row?.key}
+        >
+          {cell.row ? (
+            <>
+              <div className="w-[5.6rem] shrink-0 text-[10px] font-semibold leading-snug" style={{ color: 'var(--pv-muted)' }}><Bi pair={label(cell.row.key)} mode={mode} /></div>
+              <div className="min-w-0 flex-1 break-words text-[11.5px] font-bold leading-snug text-black">{cell.row.value}</div>
+            </>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PartyCard({ title, rows, mode, kind, compact = false }: { title: PremiumLabelPair; rows: PartyRow[]; mode: Mode; kind: 'seller' | 'buyer'; compact?: boolean }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--pv-line)' }} data-premium-party={kind}>
       <div className="flex items-center justify-between gap-3 px-4 py-1.5 leading-[1.7] text-white" style={{ background: 'var(--pv-deep)' }}>
@@ -211,16 +262,18 @@ function PartyCard({ title, rows, mode, kind }: { title: PremiumLabelPair; rows:
           <span className={cn('text-[13px] font-extrabold', mode === 'en' && 'uppercase tracking-wide')}>{mode === 'en' ? title.en : title.ar}</span>
         )}
       </div>
-      <div>
-        {rows.map((row, index) => (
-          <div key={row.key} className={cn('flex items-start gap-3 px-4 py-1', index > 0 && 'border-t')} style={{ borderColor: 'var(--pv-line)' }} data-premium-party-row={row.key}>
-            <div className="w-[6.4rem] shrink-0 text-[10px] font-semibold leading-snug" style={{ color: 'var(--pv-muted)' }}>
-              <Bi pair={label(row.key)} mode={mode} />
+      {compact ? <CompactPartyRows rows={rows} mode={mode} /> : (
+        <div>
+          {rows.map((row, index) => (
+            <div key={row.key} className={cn('flex items-start gap-3 px-4 py-1', index > 0 && 'border-t')} style={{ borderColor: 'var(--pv-line)' }} data-premium-party-row={row.key}>
+              <div className="w-[6.4rem] shrink-0 text-[10px] font-semibold leading-snug" style={{ color: 'var(--pv-muted)' }}>
+                <Bi pair={label(row.key)} mode={mode} />
+              </div>
+              <div className="min-w-0 flex-1 break-words text-[11.5px] font-bold leading-snug text-black">{row.value}</div>
             </div>
-            <div className="min-w-0 flex-1 break-words text-[11.5px] font-bold leading-snug text-black">{row.value}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -236,14 +289,49 @@ function PartiesSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
     const city = party.city?.trim() ?? '';
     return full && city && !full.includes(city) ? `${full}، ${city}` : full || city;
   };
+  const variant = useVariant();
+  const simplified = variant === 'simplified';
   const rows = (party: typeof seller, nameKey: PremiumLabelKey): PartyRow[] => {
-    const list: PartyRow[] = [{ key: nameKey, value: party.name || '—' }];
+    const list: PartyRow[] = [{ key: nameKey, value: party.name || '—', wide: simplified }];
     if (party.vatNumber?.trim()) list.push({ key: 'vat_no', value: ltrValue(party.vatNumber.trim()) });
     if (party.crNumber?.trim()) list.push({ key: 'cr_no', value: ltrValue(party.crNumber.trim()) });
+    // المبسطة: الهاتف والعنوان في صف واحد (نصف عرض لكلٍّ) بعد الرقم الضريبي والسجل؛ العنوان الطويل يلتف داخل خليته.
+    if (simplified) {
+      if (phones(party).length > 0) list.push({ key: 'phone', value: ltrValue(phones(party).join('  ·  ')) });
+      if (address(party)) list.push({ key: 'address', value: address(party) });
+      return list;
+    }
     if (address(party)) list.push({ key: 'address', value: address(party) });
     if (phones(party).length > 0) list.push({ key: 'phone', value: ltrValue(phones(party).join('  ·  ')) });
     return list;
   };
+
+  if (simplified) {
+    // العميل اختياري: يُعرض اسمه إن وُجد في شريط واحد (ورقمه الضريبي إن كان لديه)، ولا تُفرض بقية بيانات المشتري ولا يُختلق عميل.
+    const customer = (buyer.name ?? '').trim();
+    const customerVat = buyer.vatNumber?.trim();
+    const named = customer !== '' && customer !== '—';
+    return (
+      <section className="mt-2.5 px-8" data-premium-parties>
+        <MetaTiles model={model} mode={mode} />
+        <div className="mt-2.5">
+          <PartyCard kind="seller" title={label('seller')} rows={rows(seller, 'trade_name')} mode={mode} compact />
+        </div>
+        {named ? (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-xl border px-4 py-1.5" style={{ borderColor: 'var(--pv-line)' }} data-premium-customer>
+            <span className="shrink-0 text-[10px] font-semibold leading-snug" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('customer_optional')} mode={mode} /></span>
+            <span dir="auto" className="min-w-0 break-words text-[12px] font-extrabold leading-snug text-black" data-premium-customer-name>{customer}</span>
+            {customerVat ? (
+              <span className="ms-auto flex shrink-0 items-baseline gap-1.5 text-[10px]" style={{ color: 'var(--pv-muted)' }} data-premium-customer-vat>
+                <Bi pair={label('vat_no')} mode={mode} />
+                <span className="font-sans text-[11px] font-bold tabular-nums text-black" dir="ltr">{customerVat}</span>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section className="mt-2.5 px-8" data-premium-parties>
@@ -281,7 +369,8 @@ const SAVED_ITEMS_SIZE = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' } as co
 
 function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const properties = useDocBlockProperties('items');
-  const { columns, skuInName } = premiumResolveColumns(model.lines, properties.columns);
+  const variant = useVariant();
+  const { columns, skuInName } = premiumResolveColumns(model.lines, properties.columns, variant);
   const widths = premiumColumnWidths(columns);
   const hasProductColumn = columns.some((column) => column.id === 'product');
   // كما `DocItemsTable`: محاذاة العمود ثم محاذاة كتلة البنود المحفوظة ثم الافتراضي.
@@ -292,7 +381,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
   const alignOf = (column: { id: PremiumColumn['id']; alignment?: DocBlockAlignment }): DocBlockAlignment => column.alignment ?? properties.alignment ?? defaultAlignment(column.id);
   const money = (minor: number | null | undefined) => (minor === null || minor === undefined ? '—' : formatModernAmount(minor, model.currency));
   const dash = (minor: number | null | undefined) => (minor === null || minor === undefined || minor === 0 ? '–' : formatModernAmount(minor, model.currency));
-  const fillers = Math.max(0, PREMIUM.minTableRows - model.lines.length);
+  const fillers = Math.max(0, premiumMinRows(variant) - model.lines.length);
   const lineBorder = 'var(--pv-line)';
 
   // الأعمدة المالية تُحاذى على الفاصلة العشرية: كل رقم يملأ عرضاً أدنى = أطول نصّ في عموده (`ch`)، فتصطف الخانات
@@ -403,6 +492,7 @@ function ItemsSection({ model, mode }: { model: DocumentModel; mode: Mode }) {
 }
 
 function TotalsBox({ model, mode }: { model: DocumentModel; mode: Mode }) {
+  const variant = useVariant();
   const rows = premiumTotalsRows(model);
   const { currency, totals } = model;
   const labelFor = (key: (typeof rows)[number]['key']): PremiumLabelPair => {
@@ -412,6 +502,8 @@ function TotalsBox({ model, mode }: { model: DocumentModel; mode: Mode }) {
       const rate = typeof totals.taxRate === 'number' ? ` ${totals.taxRate}%` : '';
       return { ar: `${PREMIUM_LABELS.vat.ar}${rate}`, en: `${PREMIUM_LABELS.vat.en}${rate}` };
     }
+    // المبسطة بلا خصم/شحن/تسوية: المجموع هو «الإجمالي قبل الضريبة» كالمرجع؛ وإلا يبقى «المجموع» كي لا يُسمّى إجمالياً ما سبق خصماً أو رسماً.
+    if (key === 'subtotal' && variant === 'simplified' && rows.every((r) => r.key === 'subtotal' || r.key === 'vat')) return PREMIUM_LABELS.total_excl_vat;
     return MODERN_TOTAL_LABELS[key];
   };
 
@@ -490,6 +582,8 @@ function SummarySection({ model, mode, showQr, composed }: { model: DocumentMode
     <>
       <NotesCard model={model} mode={mode} showNotes={showNotes} showTerms={showTerms} />
       {composed.has('bank') ? <BankCard model={model} mode={mode} /> : null}
+      {/* المبسطة: المبلغ كتابةً بطاقة في العمود الأوسط تحت الملاحظات (كالمرجع) بدل قسم بعرض الصفحة. */}
+      {composed.has('amountWords') ? <AmountWordsCard model={model} mode={mode} marker /> : null}
     </>
   );
   // DOM: QR ثم الملاحظات ثم الإجماليات — في RTL يقع الـQR عند الحافة اليمنى كالمرجع، وفي LTR يُعكس تلقائياً.
@@ -521,11 +615,19 @@ function CardsRow({ model, mode, keys, long = false }: { model: DocumentModel; m
 }
 
 function AmountWords({ model, mode }: { model: DocumentModel; mode: Mode }) {
+  return (
+    <section className="mt-2.5 px-8 break-inside-avoid" data-premium-words>
+      <AmountWordsCard model={model} mode={mode} />
+    </section>
+  );
+}
+
+function AmountWordsCard({ model, mode, marker = false }: { model: DocumentModel; mode: Mode; marker?: boolean }) {
   const dir = usePremiumDir();
   const total = model.totals.total;
   return (
-    <section className="mt-2.5 px-8 break-inside-avoid" data-premium-words>
-      <div className="rounded-xl border px-4 py-1.5" style={{ borderColor: 'var(--pv-line)' }}>
+    <div className="min-w-0 break-inside-avoid">
+      <div className="rounded-xl border px-4 py-1.5" style={{ borderColor: 'var(--pv-line)' }} data-premium-words={marker ? '' : undefined}>
         <div className="mb-0.5 text-[10px] font-semibold" style={{ color: 'var(--pv-muted)' }}><Bi pair={label('amount_words')} mode={mode} /></div>
         {mode !== 'en' ? <div className="break-words text-[13px] font-bold leading-relaxed text-black" data-premium-words-ar>{amountToWords(total, model.currency, 'ar')}</div> : null}
         {/* الترجمة الإنجليزية سطر ثانوي أصغر درجة ومفصول بمسافة: لا تزاحم الجملة العربية ولا تتجاوز عرض البطاقة. */}
@@ -540,7 +642,7 @@ function AmountWords({ model, mode }: { model: DocumentModel; mode: Mode }) {
           </div>
         ) : null}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -619,8 +721,23 @@ function PremiumFooter({ model, mode, locale }: { model: DocumentModel; mode: Mo
  * الملاحظات والشروط والبنك تُركَّب داخل صف الإجماليات كما في المرجع، وتنفرد في صف خاص إن أُخفي الملخّص.
  * لا يحسب مبلغاً: كل رقم من النموذج كما هو، والاشتقاق الوحيد المسموح (الإجمالي الخاضع) يُحجب ما لم يطابق المخزَّن.
  */
-export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: DocumentTemplateProps) {
+export function TaxInvoicePremium(props: DocumentTemplateProps) {
+  return <PremiumDocument {...props} variant="full" />;
+}
+
+/**
+ * قالب الفاتورة الضريبية المبسطة الفاخرة (`tax-invoice-simplified-premium-v1`): **المحرك والهوية نفسهما** لـ`tax-invoice-premium-v1`
+ * بمتغيّر تركيب `simplified` لا نسخة منه — بطاقة بائع مدمجة، عميل اختياري في شريط، وقت الإصدار، جدول بلا أعمدة خصم/خاضع افتراضياً،
+ * المبلغ كتابةً داخل صف الإجماليات، وبلا مربعات توقيع افتراضياً. يبقى `TaxInvoicePremium` بمخرجه حرفياً.
+ */
+export function TaxInvoiceSimplifiedPremium(props: DocumentTemplateProps) {
+  return <PremiumDocument {...props} variant="simplified" />;
+}
+
+function PremiumDocument({ model, theme, sections, layout, rootId, variant }: DocumentTemplateProps & { variant: PremiumVariant }) {
   const { locale, mode } = useDocumentLabelMode(model);
+  const simplified = variant === 'simplified';
+  const defaultLayout = simplified ? SIMPLIFIED_DEFAULT_LAYOUT : PREMIUM_DEFAULT_LAYOUT;
   const palette = premiumPalette(theme);
   const vars = {
     '--pv-deep': palette.deep,
@@ -634,7 +751,7 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
   const flags = sections ?? {};
   const items: readonly DocSectionLayoutItem[] = layout && layout.length > 0
     ? layout
-    : PREMIUM_DEFAULT_LAYOUT.map((item) => ({ ...item, visible: item.visible && isExplicitSectionVisible(item.key, flags) }));
+    : defaultLayout.map((item) => ({ ...item, visible: item.visible && isExplicitSectionVisible(item.key, flags) }));
   const visible = new Set<DocSectionKey>(items.filter((item) => item.visible).map((item) => item.key));
   const blockProperties = items.reduce<DocBlockPropertiesMap>((acc, item) => {
     if (item.properties) acc[item.key] = item.properties;
@@ -655,18 +772,21 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
       case 'items': return <ItemsSection model={model} mode={mode} />;
       case 'summary': {
         const keys = new Set<DocSectionKey>(cardKeys);
+        // المبسطة: المبلغ كتابةً يُركَّب في الملخّص (كالمرجع) ما دام قسمه ظاهراً.
+        const words = simplified && visible.has('amountWords');
         // ملاحظات/شروط طويلة: الإجماليات والـQR صف مضغوط، وبطاقاتها قسم مستقل قابل للانقسام (بدل دفع الصف كله لصفحة جديدة).
         if (notesLength(model, keys, blockProperties.terms?.static_content) > LONG_NOTES_CHARS) {
           return (
             <>
-              <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={new Set<DocSectionKey>(keys.has('bank') ? ['bank'] : [])} />
+              <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={new Set<DocSectionKey>([...(keys.has('bank') ? ['bank' as const] : []), ...(words ? ['amountWords' as const] : [])])} />
               <CardsRow model={model} mode={mode} keys={new Set<DocSectionKey>(cardKeys.filter((k) => k !== 'bank'))} long />
             </>
           );
         }
+        if (words) keys.add('amountWords');
         return <SummarySection model={model} mode={mode} showQr={flags.qr !== false} composed={keys} />;
       }
-      case 'amountWords': return <AmountWords model={model} mode={mode} />;
+      case 'amountWords': return simplified && showSummary ? null : <AmountWords model={model} mode={mode} />;
       case 'notes':
       case 'terms':
       case 'bank': {
@@ -686,6 +806,7 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
   };
 
   return (
+    <PremiumVariantContext.Provider value={variant}>
     <PremiumDirContext.Provider value={direction}>
     <DocBlockPropertiesProvider value={blockProperties}>
       <DocLayout
@@ -701,5 +822,6 @@ export function TaxInvoicePremium({ model, theme, sections, layout, rootId }: Do
       </DocLayout>
     </DocBlockPropertiesProvider>
     </PremiumDirContext.Provider>
+    </PremiumVariantContext.Provider>
   );
 }

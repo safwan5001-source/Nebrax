@@ -34,6 +34,8 @@ export interface SourceInvoice {
   notes?: string | null;
   /** حقول قائمة على عقد الفاتورة؛ اختيارية حتى لا ينكسر مستدعو POS والمعاينة. */
   due_date?: string | null;
+  /** لحظة الإصدار المخزَّنة (UTC، ISO-8601) من `InvoiceResource`؛ فاتورة مرحَّلة فقط. المصدر الوحيد لوقت الإصدار المعروض. */
+  issued_at?: string | null;
   status?: string | null;
   /** REM-14c: لقطة الطرفين لحظة الإصدار (فاتورة مرحَّلة فقط)؛ تغلب البيانات الحية عند وجودها. */
   parties?: InvoiceParties | null;
@@ -51,6 +53,19 @@ export interface SourceInvoice {
   language_frozen?: 'ar' | 'en' | 'bilingual' | null;
   language_effective?: 'ar' | 'en' | 'bilingual';
 }
+/**
+ * وقت الإصدار `HH:mm` بتوقيت السعودية (UTC+3، بلا توقيت صيفي) من لحظة الإصدار المخزَّنة. صيغة غير صالحة أو غياب = `null` (لا وقت مختلَق).
+ * يعتمد التحويل الثابت +3 ساعات لا `Intl` بمنطقة زمنية، فيطابق `ZatcaIssueTimestamp` على كل بيئة تشغيل.
+ */
+export function issueTimeAst(issuedAt: string | null | undefined): string | null {
+  const value = issuedAt?.trim();
+  if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  const ast = new Date(ms + 3 * 60 * 60 * 1000);
+  return `${String(ast.getUTCHours()).padStart(2, '0')}:${String(ast.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 export interface SourceCompany {
   name: string;
   vat_number?: string | null;
@@ -218,6 +233,8 @@ export function buildInvoiceDocumentModel(input: {
       date: invoice.invoice_date,
       dueDate: invoice.due_date?.trim() || null,
       paymentType: invoice.payment_type === 'cash' ? 'cash' : 'credit',
+      // مفتاح إضافي بشرط وجوده فقط: شكل `meta` لا يتغيّر لمصدر لا يحمل لحظة الإصدار (مسودة، POS، معاينة).
+      ...(issueTimeAst(invoice.issued_at) ? { time: issueTimeAst(invoice.issued_at) } : {}),
     },
     lines: invoice.lines.map((l) => ({
       id: l.id,

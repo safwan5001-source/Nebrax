@@ -9,6 +9,13 @@
 
 import type { DocItemsColumnId, DocumentLine, DocumentModel, DocumentTheme, ThemeId } from '../types';
 
+/**
+ * متغيّر التركيب: `full` الفاتورة الضريبية الكاملة (الافتراضي، لا يتغيّر مخرجه)، و`simplified` الفاتورة الضريبية المبسطة
+ * (`tax-invoice-simplified-premium-v1`): بطاقة بائع مدمجة، عميل اختياري في شريط واحد، جدول بلا أعمدة خصم/خاضع افتراضياً، وبلا توقيعات.
+ * فرق عرضي بحت: المبالغ والاشتقاقات الوحيدة المسموحة هي نفسها.
+ */
+export type PremiumVariant = 'full' | 'simplified';
+
 export interface PremiumPalette {
   /** خلفية الترويسة ورؤوس الجداول ومربع الإجمالي. */
   deep: string;
@@ -72,11 +79,19 @@ export const PREMIUM = {
   minTableRows: 7,
 } as const;
 
+/** صفوف جدول المبسطة الدنيا: أقصر من الكاملة بلا توقيعات وبطاقة مشتري فتتسع صفحة A4 لصفوف مرقّمة أكثر كالمرجع. */
+export const PREMIUM_SIMPLIFIED = { minTableRows: 8 } as const;
+
+export const premiumMinRows = (variant: PremiumVariant) => (variant === 'simplified' ? PREMIUM_SIMPLIFIED.minTableRows : PREMIUM.minTableRows);
+
 export type PremiumLabelPair = { ar: string; en: string };
 
 export const PREMIUM_LABELS = {
   invoice_no: { ar: 'رقم الفاتورة', en: 'Invoice No.' },
   issue_date: { ar: 'تاريخ الإصدار', en: 'Issue date' },
+  issue_time: { ar: 'الوقت', en: 'Time' },
+  customer_optional: { ar: 'اسم العميل (اختياري)', en: 'Customer name (optional)' },
+  total_excl_vat: { ar: 'الإجمالي قبل الضريبة', en: 'Total (excl. VAT)' },
   due_date: { ar: 'تاريخ الاستحقاق', en: 'Due date' },
   // نقدي/آجل = شروط السداد لا وسيلة الدفع؛ وسيلة الدفع الفعلية غير موجودة في `DocumentModel` فلا تُعرض.
   payment_terms: { ar: 'شروط السداد', en: 'Payment terms' },
@@ -158,8 +173,9 @@ const known = (value: number | null | undefined): value is number => value !== n
  * (م · الصنف · الوحدة · الكمية · السعر · الخصم · الخاضع · النسبة · الضريبة · الإجمالي)
  * مع إسقاط ما لا يملك المصدر قيمته لأي سطر — لا عمود فارغ بالكامل ولا قيمة مختلَقة.
  */
-export function premiumDefaultColumns(lines: readonly DocumentLine[]): PremiumColumn[] {
+export function premiumDefaultColumns(lines: readonly DocumentLine[], variant: PremiumVariant = 'full'): PremiumColumn[] {
   const has = (predicate: (line: DocumentLine) => boolean) => lines.some(predicate);
+  if (variant === 'simplified') return simplifiedColumns(lines);
   const columns: PremiumColumn[] = [
     { id: 'number' },
     { id: 'product' },
@@ -176,6 +192,45 @@ export function premiumDefaultColumns(lines: readonly DocumentLine[]): PremiumCo
   if (has((line) => known(line.taxRate))) columns.push({ id: 'tax_rate' });
   columns.push({ id: 'tax' }, { id: 'total' });
   return columns;
+}
+
+/** نسبة الضريبة الموحَّدة المعلنة في كل الأسطر (`15`) أو `null` إن تعددت أو غابت لأي سطر — لا تُفترض. */
+export function premiumUniformTaxRate(lines: readonly DocumentLine[]): number | null {
+  if (lines.length === 0) return null;
+  const first = lines[0].taxRate;
+  if (!known(first)) return null;
+  return lines.every((line) => line.taxRate === first) ? first : null;
+}
+
+/**
+ * أعمدة المبسطة الافتراضية: م · الصنف · الوحدة · الكمية · السعر · (الخصم إن وُجد خصم موجب فتتطابق الأرقام) · الضريبة · الإجمالي شامل.
+ * نسبة الضريبة تُكتب في عنوان عمود الضريبة حين تتوحد («ضريبة 15%»)، فإن تعددت المعلنة صار لها عمود، وغير المعلنة لا عمود لها.
+ */
+function simplifiedColumns(lines: readonly DocumentLine[]): PremiumColumn[] {
+  const has = (predicate: (line: DocumentLine) => boolean) => lines.some(predicate);
+  const columns: PremiumColumn[] = [{ id: 'number' }, { id: 'product' }];
+  if (has((line) => !!line.unit?.trim())) columns.push({ id: 'unit' });
+  columns.push({ id: 'quantity' });
+  columns.push(has((line) => known(line.priceBeforeTax))
+    ? { id: 'price_before_tax', label: PREMIUM_COLUMN_LABELS.unit_price }
+    : { id: 'unit_price' });
+  if (has((line) => (line.lineDiscount ?? 0) > 0)) columns.push({ id: 'line_discount' });
+  if (new Set(lines.map((line) => line.taxRate).filter(known)).size > 1) columns.push({ id: 'tax_rate' });
+  columns.push({ id: 'tax' }, { id: 'total' });
+  return columns;
+}
+
+/**
+ * تسميات أعمدة المبسطة حين لا تسمية محفوظة: «ضريبة 15%» لعمود الضريبة (نسبة موحَّدة معلنة) و«الإجمالي شامل / Total incl. VAT».
+ * تغلبها دائماً التسمية التي حفظها صاحب القالب.
+ */
+export function premiumSimplifiedLabel(id: PremiumColumnId, lines: readonly DocumentLine[]): PremiumLabelPair | undefined {
+  if (id === 'total') return { ar: 'الإجمالي شامل', en: 'Total incl. VAT' };
+  if (id === 'tax') {
+    const rate = premiumUniformTaxRate(lines);
+    return rate === null ? undefined : { ar: `ضريبة ${rate}%`, en: `VAT ${rate}%` };
+  }
+  return undefined;
 }
 
 export type PremiumTotalsRow =
@@ -207,7 +262,7 @@ export function premiumTotalsRows(model: DocumentModel): PremiumTotalsRow[] {
 }
 
 export interface PremiumMetaTile {
-  key: 'invoice_no' | 'issue_date' | 'due_date' | 'payment_terms';
+  key: 'invoice_no' | 'issue_date' | 'issue_time' | 'due_date' | 'payment_terms';
   /** القيمة المعروضة؛ طريقة الدفع تحمل مفتاح التسمية لتُترجم بوضع المستند. */
   value: string;
   valueLabel?: PremiumLabelKey;
@@ -219,12 +274,14 @@ export interface PremiumMetaTile {
  *  • تاريخ التوريد غير موجود في `DocumentModel` ولا في عقد الفاتورة (الموجود تاريخ مذكرة التسليم فقط، وهو غيره)، فلا يُعرض ولا يُختلق.
  *  • نقدي/آجل = شروط السداد (`meta.paymentType`) لا وسيلة الدفع؛ وسيلة الدفع لا مصدر لها فلا تُعرض.
  */
-export function premiumMetaTiles(model: DocumentModel): PremiumMetaTile[] {
+export function premiumMetaTiles(model: DocumentModel, variant: PremiumVariant = 'full'): PremiumMetaTile[] {
   const { meta } = model;
   const tiles: PremiumMetaTile[] = [
     { key: 'invoice_no', value: meta.number },
     { key: 'issue_date', value: meta.date },
   ];
+  // الوقت للمبسطة فقط وحين يوفّره المصدر (لحظة الإصدار المخزَّنة)؛ لا يُشتق ولا يُفترض.
+  if (variant === 'simplified' && meta.time?.trim()) tiles.push({ key: 'issue_time', value: meta.time.trim() });
   if (meta.dueDate?.trim()) tiles.push({ key: 'due_date', value: meta.dueDate.trim() });
   if (meta.paymentType === 'cash') tiles.push({ key: 'payment_terms', value: '', valueLabel: 'cash' });
   else if (meta.paymentType === 'credit') tiles.push({ key: 'payment_terms', value: '', valueLabel: 'credit' });
@@ -262,8 +319,8 @@ const PRICE_IDS: readonly PremiumColumnId[] = ['price_before_tax', 'unit_price']
  *  • `product_code` المحفوظ = «أظهر رمز المنتج تحت الاسم»: لا يصير عموداً. إن لم يوجد عمود اسم/وصف يحمله يبقى عموداً مستقلاً
  *    بدل أن يضيع.
  */
-export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: readonly PremiumSavedColumn[] | null): ResolvedPremiumColumns {
-  if (!saved) return { columns: premiumDefaultColumns(lines), skuInName: false };
+export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: readonly PremiumSavedColumn[] | null, variant: PremiumVariant = 'full'): ResolvedPremiumColumns {
+  if (!saved) return { columns: withSimplifiedLabels(premiumDefaultColumns(lines, variant), lines, variant), skuInName: false };
 
   const savedIds = new Set(saved.map((column) => column.id));
   // عقد الاستوديو يُلزم عمود «الوصف» دائماً (`description` + `total` إلزاميان)، وخانة الصنف في هذا القالب تحمل الوصف أصلاً كسطر ثانوي؛
@@ -281,6 +338,24 @@ export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: re
   const skuRequested = hasId('product_code');
   const skuInName = skuRequested && host;
   const columns = skuInName ? base.filter((column) => column.id !== 'product_code') : base;
+
+  if (variant === 'simplified') {
+    // المبسطة: لا يُحقن «الخاضع/النسبة» تلقائياً؛ الوحدة قبل الكمية، والخصم فقط إن وُجد خصم موجب (لتتطابق الأرقام).
+    const unitAt = columns.findIndex((column) => column.id === 'quantity');
+    const withUnit = !hasId('unit') && lines.some((line) => !!line.unit?.trim());
+    if (withUnit) columns.splice(unitAt >= 0 ? unitAt : columns.length, 0, { id: 'unit' });
+    if (!hasId('line_discount') && lines.some((line) => (line.lineDiscount ?? 0) > 0)) {
+      const price = Math.max(...PRICE_IDS.map((id) => columns.findIndex((column) => column.id === id)));
+      columns.splice(price >= 0 ? price + 1 : columns.length, 0, { id: 'line_discount' });
+    }
+    // نسب ضريبة متعددة: عنوان الضريبة لا يحمل نسبة، فيبقى عمود النسبة (كمسار غير المحفوظ) كي لا يُسقطها تعديل استوديو لا علاقة له (مثل تفعيل رمز المنتج).
+    if (!hasId('tax_rate') && new Set(lines.map((line) => line.taxRate).filter(known)).size > 1) {
+      const tax = columns.findIndex((column) => column.id === 'tax');
+      const total = columns.findIndex((column) => column.id === 'total');
+      columns.splice(tax >= 0 ? tax : total >= 0 ? total : columns.length, 0, { id: 'tax_rate' });
+    }
+    return { columns: withSimplifiedLabels(columns, lines, variant), skuInName };
+  }
 
   const has = (predicate: (line: DocumentLine) => boolean) => lines.some(predicate);
   const insertAt = (column: PremiumColumn, index: number) => { columns.splice(Math.max(0, Math.min(index, columns.length)), 0, column); };
@@ -303,6 +378,11 @@ export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: re
     detail.forEach((column, i) => insertAt(column, anchor + i));
   }
   return { columns, skuInName };
+}
+
+function withSimplifiedLabels<T extends PremiumColumn>(columns: T[], lines: readonly DocumentLine[], variant: PremiumVariant): T[] {
+  if (variant !== 'simplified') return columns;
+  return columns.map((column) => (column.label ? column : { ...column, label: premiumSimplifiedLabel(column.id, lines) }));
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
