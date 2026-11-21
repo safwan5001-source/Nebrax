@@ -348,6 +348,12 @@ export function premiumResolveColumns(lines: readonly DocumentLine[], saved?: re
       const price = Math.max(...PRICE_IDS.map((id) => columns.findIndex((column) => column.id === id)));
       columns.splice(price >= 0 ? price + 1 : columns.length, 0, { id: 'line_discount' });
     }
+    // نسب ضريبة متعددة: عنوان الضريبة لا يحمل نسبة، فيبقى عمود النسبة (كمسار غير المحفوظ) كي لا يُسقطها تعديل استوديو لا علاقة له (مثل تفعيل رمز المنتج).
+    if (!hasId('tax_rate') && new Set(lines.map((line) => line.taxRate).filter(known)).size > 1) {
+      const tax = columns.findIndex((column) => column.id === 'tax');
+      const total = columns.findIndex((column) => column.id === 'total');
+      columns.splice(tax >= 0 ? tax : total >= 0 ? total : columns.length, 0, { id: 'tax_rate' });
+    }
     return { columns: withSimplifiedLabels(columns, lines, variant), skuInName };
   }
 

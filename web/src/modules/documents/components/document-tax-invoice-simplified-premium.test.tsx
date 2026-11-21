@@ -275,6 +275,18 @@ describe('simplified column resolution', () => {
     expect(cols.find((c) => c.id === 'tax')!.label).toEqual({ ar: 'VAT', en: 'VAT' });
   });
 
+  it('saved studio columns keep the rate column for mixed tax rates (an unrelated studio edit never drops it)', () => {
+    const mixed = lines.map((l, i) => (i === 0 ? { ...l, taxRate: 0 } : l));
+    const saved = [{ id: 'number' as const }, { id: 'product' as const }, { id: 'quantity' as const }, { id: 'price_before_tax' as const }, { id: 'tax' as const }, { id: 'total' as const }, { id: 'product_code' as const }];
+    const cols = premiumResolveColumns(mixed, saved, 'simplified').columns.map((c) => c.id);
+    expect(cols).toEqual(['number', 'product', 'unit', 'quantity', 'price_before_tax', 'tax_rate', 'tax', 'total']);
+    // نسبة موحَّدة: لا عمود نسبة (تظهر في عنوان الضريبة).
+    expect(premiumResolveColumns(lines, saved, 'simplified').columns.map((c) => c.id)).not.toContain('tax_rate');
+    // عمود نسبة محفوظ صراحةً لا يتكرر.
+    const withRate = [...saved.slice(0, 4), { id: 'tax_rate' as const }, ...saved.slice(4)];
+    expect(premiumResolveColumns(mixed, withRate, 'simplified').columns.filter((c) => c.id === 'tax_rate')).toHaveLength(1);
+  });
+
   it('the full variant is untouched by the new parameter (defaults identical)', () => {
     expect(premiumDefaultColumns(lines).map((c) => c.id)).toEqual(premiumDefaultColumns(lines, 'full').map((c) => c.id));
     expect(premiumMetaTiles({ ...sample(), type: 'tax_invoice' }).map((t) => t.key)).not.toContain('issue_time');
